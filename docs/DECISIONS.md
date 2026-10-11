@@ -243,7 +243,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   * When a minimum version reaches its vendor's end of security support, the minimum version is raised.
   * The software uses semantic versioning. Raising the minimum major version of Python, Django or MySQL can lead to a new major version of the software.
 * Verified facts: Django 4.2 no longer receives security updates since 7 April 2026; Django 5.2 LTS receives them until April 2028 (checked on 2026-10-09). `django-axes` 8.3.1 still declares Django 4.2, so package declarations alone do not determine the minimum version.
-* Not yet verified: support periods of MySQL and Python; to be checked against the vendors' official pages in the next step.
+* Support periods of MySQL and Python: checked on 2026-10-11 against the vendors' official pages; results and proposed minimum versions in D-026.
 * Open: how the minimum versions are proven by tests (e.g. a test matrix in continuous integration over the declared minimum and current versions); decided together with the minimum versions.
 * Rationale: "as old as possible" alone would allow versions without security updates; declaring them as supported contradicts security by default.
 * Sources: https://semver.org/, https://www.djangoproject.com/download/
@@ -460,6 +460,38 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 * Alternatives: application under a path of the website (rejected for the reasons above); public home page in the application (rejected by the project owner: one public website per LEG); a mandatory separate registrable domain (not made mandatory: the operator chooses, and the residual risk of a subdomain is documented).
 * Sources: statements of the project owner (2026-10-11); https://www.rfc-editor.org/rfc/rfc6454.html, section 3.2; https://www.rfc-editor.org/rfc/rfc6265.html, sections 8.5 and 8.6 (checked on 2026-10-11); https://docs.djangoproject.com/en/5.2/ref/csrf/, "Limitations"; draft-ietf-httpbis-rfc6265bis (https://datatracker.ietf.org/doc/draft-ietf-httpbis-rfc6265bis/), cookie name prefixes (both as cited in the security review of 2026-10-11, not yet re-checked in this document update; re-checked against the installed Django version and the current draft revision at implementation)
 * Consequences: `docs/PROJECT.md`, `docs/ACCEPTANCE.md` and `README.md` replace the public home page with the login page as entry point. The privacy notice is linked on all pages accessible without login (D-022).
+
+## D-026: Minimum Versions and Package Selection
+
+* Date: 2026-10-11
+* Status: Proposed (awaiting confirmation by the project owner; nothing has been installed)
+* Context: README "Current Status", next step 2: determine the minimum versions of Python, Django, MySQL and the intended packages from official sources (D-015) before the Django project skeleton is created.
+* Proposal:
+
+  | Component | Proposed minimum | Basis |
+  | --------- | ---------------- | ----- |
+  | Python | 3.11 | 3.10 reached end of life on 2026-10-01; 3.11 receives security fixes until 2027-10 (scheduled). Django 6.x requires Python ≥ 3.12, so the minimum combination is Python 3.11 with Django 5.2. |
+  | Django | 5.2 LTS, at least the latest patch 5.2.18 | Extended support ("Security fixes and data loss bugs") until April 2028. Django 5.2 supports Python 3.10 to 3.14 (3.14 added in 5.2.8). Django's download page: the answer to whether to upgrade to the latest patch release "will always be 'yes.'" |
+  | MySQL | 8.4 LTS | "As of April 2026, with version 8.0.46, MySQL 8.0 reaches End of Life (EoL)." An LTS series "follows the Oracle Lifetime Support Policy, which includes 5 years of premier support and 3 years of extended support"; 8.4.0 was released on 2024-04-30 (end dates derived from this, not stated as dates by Oracle). Latest patch: 8.4.12 (2026-08-18). Django 5.2 supports MySQL 8.0.11 and higher. |
+  | `mysqlclient` | 2.3.0 | Django: "the recommended choice"; Django requires ≥ 1.4.3. Release 2026-09-14, Python ≥ 3.10, Windows wheels for CPython 3.10 to 3.15. |
+  | `django-axes` | 8.3.1 | Login abuse protection (D-017). Release 2026-02-11, Python ≥ 3.10, declares Django 4.2, 5.2, 6.0 and Python 3.10 to 3.14. |
+  | `django-otp` | 1.7.4 | TOTP and static recovery tokens (D-004). Release 2026-10-08, Python ≥ 3.8; built-in exponential throttling of failed verifications (`OTP_TOTP_THROTTLE_FACTOR`, `OTP_STATIC_THROTTLE_FACTOR`, default 1). Offers the extras `qrcode` and `segno`. |
+  | `cryptography` | 50.0.2 | HKDF and Fernet for the Microsoft Graph client secret (D-006) and keyed hashes (D-023). Python ≥ 3.9 (except 3.9.0, 3.9.1). |
+  | `segno` (new) | 1.6.6 | QR code for TOTP enrolment in the application views; pure Python, BSD licence, no dependencies on Python ≥ 3.10; one of the two extras offered by `django-otp`. |
+  | `msal` (new) | 1.39.0 | Token acquisition for Microsoft Graph with the client credentials flow; Microsoft's own library, MIT licence, Python ≥ 3.9. Depends on `requests`, `PyJWT[crypto]` and `cryptography<51`. |
+  | Tabler | 1.6.1 | Latest release (28 September); served by the instance itself (D-024). |
+
+  * Minimum patch levels are the current releases at the time of the decision, because older patch releases of these components may contain fixed vulnerabilities; whether an older patch release would be free of known vulnerabilities was not checked for each package.
+* Not recommended: `django-ratelimit` for the per-IP and per-address limits of registration, password reset and email change (D-017). Its latest release 4.1.0 dates from 2023-07-24 and declares Python only up to 3.11. Alternative: a small, tested component on Django's cache framework (`django.core.cache`) with the keyed hash from D-023. This is a custom development for a security function and therefore requires the project owner's decision.
+* Open, requires the project owner:
+  * confirmation of the minimum versions and of the new packages `segno` and `msal`;
+  * the approach for the per-IP and per-address rate limits (see above);
+  * a local MySQL 8.4 server for development and tests (none is installed on the development machine; Docker is not installed); tests depend on MySQL behaviour (unique index with several `NULL` values, D-016) and cannot be replaced by SQLite;
+  * how the minimum versions are proven by tests (D-015): only Python 3.13 (and the end-of-life 3.8) is installed locally; a test matrix with Python 3.11 needs a further local Python installation or continuous integration, and continuous integration on an external service publishes project content and requires consent;
+  * `msal` caps `cryptography` below 51; a future security release of `cryptography` 51 could only be installed once `msal` allows it. Alternative: request the token with `requests` directly against the documented Microsoft identity platform endpoint (custom code, not recommended).
+* Security implications: all proposed versions receive security updates from their vendors as of 2026-10-11. Python 3.11 reaches end of life in October 2027 and Django 5.2 in April 2028; the minimum versions are raised then (D-015). `msal` adds `requests` and `PyJWT` as transitive dependencies.
+* Sources (all checked on 2026-10-11): https://devguide.python.org/versions/, https://www.djangoproject.com/download/, https://docs.djangoproject.com/en/5.2/faq/install/, https://docs.djangoproject.com/en/5.2/ref/databases/, https://dev.mysql.com/doc/relnotes/mysql/8.0/en/, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/, https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/news-8-4-0.html ("Changes in MySQL 8.4.0 (2024-04-30)"), https://pypi.org/project/mysqlclient/, https://pypi.org/pypi/django-axes/json, https://pypi.org/project/django-otp/, https://django-otp-official.readthedocs.io/en/stable/overview.html, https://pypi.org/pypi/cryptography/json, https://pypi.org/pypi/segno/json, https://pypi.org/pypi/msal/json, https://pypi.org/pypi/django-ratelimit/json, https://github.com/tabler/tabler/releases
+* Consequences: after confirmation, the versions are recorded as decided, the dependency file is created, and the Django project skeleton (README, next step 3) is set up.
 
 ## Template for New Decisions
 

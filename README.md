@@ -81,8 +81,9 @@ No assumptions are made. Decisions are based on verified facts from official sou
 
 The project foundation and security requirements are defined. They were revised on 2026-10-09 after a consistency check and a security review, and revised again on the same day after a second consistency check (login with email address only, customer number assigned at verification, AGOV preparation, rules of conduct for agents); open points are listed in `docs/ARCHITECTURE.md` ("Deliberately Open") and in the decisions. No application code exists yet. Git 2.55.0 is installed on the development machine. On 2026-10-11 the design language was defined (`docs/DESIGN.md`, D-024), and the public home page was replaced by the login page as entry point on its own host name (D-025).
 
+On 2026-10-11 the Git repository was initialised (branch `main`, local only) and the ignore rules for secret files were verified with `git check-ignore`. The minimum versions and packages were determined from official sources and proposed in D-026; nothing has been installed yet.
+
 Next steps:
 
-1. Initialise the Git repository and verify that secrets are excluded (`.gitignore`), without installing dependencies.
-2. Determine the minimum versions of Python, Django, MySQL and the intended packages from official sources (D-015), without installing them.
-3. Create the Django project skeleton.
+1. Confirmation of D-026 by the project owner: minimum versions, new packages, approach for rate limits, local MySQL 8.4 server, proof of the minimum versions by tests.
+2. Create the Django project skeleton.
