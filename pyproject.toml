@@ -1,0 +1,29 @@
+# Dependency declaration of LEG-Platform (docs/DECISIONS.md, D-015 and D-026).
+# Only minimum versions are declared. They are proven by the "minimum" job in
+# .github/workflows/ci.yml, which installs exactly the versions pinned in
+# requirements/minimum-constraints.txt. Installations use the newest compatible releases.
+
+[build-system]
+requires = ["setuptools>=84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leg-platform"
+version = "0.1.0"
+description = "Web application for local electricity communities (LEG) in Switzerland."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # 5.2 LTS is the minimum (D-026). The upper bound is the newest release line that is
+    # tested in continuous integration; it is raised after the next release line passed the tests.
+    "Django>=5.2.18,<6.2",
+    "mysqlclient>=2.3.0",
+    "django-axes>=8.3.1",
+    "django-otp>=1.7.4",
+    "cryptography>=50.0.2",
+    "segno>=1.6.6",
+    "msal>=1.39.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["leg_platform*"]

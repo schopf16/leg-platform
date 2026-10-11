@@ -1,0 +1,11 @@
+# Exact minimum versions declared in pyproject.toml (docs/DECISIONS.md, D-026).
+# Used only by the "minimum" job in .github/workflows/ci.yml:
+#   pip install -c requirements/minimum-constraints.txt -e .
+# Keep this file in sync with the lower bounds in pyproject.toml.
+Django==5.2.18
+mysqlclient==2.3.0
+django-axes==8.3.1
+django-otp==1.7.4
+cryptography==50.0.2
+segno==1.6.6
+msal==1.39.0
