@@ -6,20 +6,30 @@
 .DESCRIPTION
     For local development only. Never use this script for stage or production.
 
-    1. Installs MySQL Community Server (default version: 9.7.2, latest LTS series) and
-       Python (default version: 3.14.8) with Chocolatey.
-    2. Binds the server to 127.0.0.1, because the Chocolatey package sets no bind address.
-    3. Sets a password for 'root'@'localhost', because the package initialises the data
-       directory with --initialize-insecure (root without a password).
-    4. Creates the database 'leg_platform' and the account 'leg_platform'@'127.0.0.1' with
-       privileges only on 'leg_platform' and on Django's test database 'test_leg_platform'.
-    5. Stores the local configuration as user environment variables (DB_NAME, DB_USER,
+    1. Asks for the new password of the local MySQL 'root' account and validates it before
+       anything is installed.
+    2. Installs Python (default version: 3.14.8) and then MySQL Community Server (default
+       version: 9.7.2, latest LTS series) with Chocolatey.
+    3. Binds the server to 127.0.0.1 (the Chocolatey package sets no bind address) and
+       disables X Plugin (mysqlx=OFF; Django does not use the X Protocol, and X Plugin listens
+       on all interfaces on port 33060 by default). After the restart, the script verifies
+       that the server listens only on 127.0.0.1 and not on port 33060.
+    4. Sets the password of 'root'@'localhost', because the package initialises the data
+       directory with --initialize-insecure (root without a password), and verifies a login
+       with the new password.
+    5. Creates the database 'leg_platform' and the account 'leg_platform'@'127.0.0.1' with
+       only the privileges Django needs, on 'leg_platform' and on Django's test database
+       'test_leg_platform'.
+    6. Stores the local configuration as user environment variables (DB_NAME, DB_USER,
        DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY, APP_ENV=local). Generated values are
        never printed.
 
+    If a step after the MySQL installation fails, the script stops the MySQL service, sets its
+    start type to Disabled and prints recovery instructions (docs/INSTALLATION.md).
+
     The root password is entered interactively and is not stored by this script; keep it in
-    your password manager. Passwords are passed to the mysql client via standard input, never
-    on the command line.
+    your password manager. Passwords are passed to the mysql client via standard input or a
+    temporary option file readable only by the current user, never on the command line.
 
 .PARAMETER MySqlVersion
     Chocolatey package version of MySQL to install.
@@ -40,6 +50,18 @@ $ServiceName = 'MySQL'
 $DatabaseName = 'leg_platform'
 $TestDatabaseName = 'test_leg_platform'
 $AppUser = 'leg_platform'
+$MySqlPort = 3306
+$XPluginPort = 33060
+$MinimumRootPasswordLength = 15
+
+# Privileges Django needs on MySQL: data access, and schema changes by migrations (CREATE,
+# DROP, ALTER, INDEX; REFERENCES for foreign key constraints). On the test database, CREATE
+# and DROP also allow the test runner to create and remove the database itself.
+$AppPrivileges = 'SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES'
+
+# Options this script manages in my.ini; existing lines for them are replaced. Dashes and
+# underscores are interchangeable in option names, and "loose-" is an optional prefix.
+$ManagedOptionPattern = '^\s*(loose[-_])?(bind[-_]address|mysqlx[-_]bind[-_]address|skip[-_]mysqlx|mysqlx)\s*(=.*)?$'
 
 function New-RandomSecret {
     param([int]$Bytes = 32)
@@ -55,6 +77,46 @@ function ConvertFrom-SecureStringToPlain {
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+}
+
+function Get-RootPasswordProblem {
+    # Returns a description of the problem, or $null if the password is acceptable.
+    # The password is written into an SQL string literal and into a MySQL option file. Only
+    # printable ASCII is accepted, without characters that have a meaning there: quotes and
+    # backslashes (SQL literal, option file quoting and escape sequences), '#' and ';'
+    # (option file comments). Leading and trailing spaces would be removed from option file
+    # values (MySQL Reference Manual, "Using Option Files").
+    param([string]$Password)
+    if ($Password.Length -lt $MinimumRootPasswordLength) {
+        return "Use at least $MinimumRootPasswordLength characters."
+    }
+    if ($Password -cnotmatch '^[\x20-\x7E]+$') {
+        return 'Use only printable ASCII characters (no umlauts or other non-ASCII characters).'
+    }
+    if ($Password -match '[#"''\\;]') {
+        return 'The password must not contain # " '' \ or ;.'
+    }
+    if ($Password -ne $Password.Trim()) {
+        return 'The password must not start or end with a space.'
+    }
+    return $null
+}
+
+function Read-RootPassword {
+    while ($true) {
+        $first = ConvertFrom-SecureStringToPlain (Read-Host -AsSecureString 'New password for the local MySQL root account')
+        $second = ConvertFrom-SecureStringToPlain (Read-Host -AsSecureString 'Repeat the password')
+        if ($first -cne $second) {
+            Write-Warning 'The passwords do not match. Please try again.'
+            continue
+        }
+        $problem = Get-RootPasswordProblem -Password $first
+        if ($problem) {
+            Write-Warning "$problem Please try again."
+            continue
+        }
+        return $first
+    }
 }
 
 function Invoke-MySql {
@@ -74,6 +136,7 @@ function Invoke-MySql {
             $rule = New-Object Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'Allow')
             $acl.AddAccessRule($rule)
             Set-Acl -Path $optionFile -AclObject $acl
+            # The password contains only printable ASCII (Get-RootPasswordProblem).
             Set-Content -Path $optionFile -Encoding ascii -Value "[client]`npassword=$RootPassword"
             $Sql | & $Client "--defaults-extra-file=$optionFile" --user=root --batch
         } finally {
@@ -85,92 +148,238 @@ function Invoke-MySql {
     if ($LASTEXITCODE -ne 0) { throw "mysql client exited with code $LASTEXITCODE" }
 }
 
-# 1. Install MySQL
+function Get-ServerPaths {
+    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
+    if (-not $service) { throw "Service '$ServiceName' was not created by the installation." }
+    $pathName = $service.PathName
+    $mysqld = ([regex]::Match($pathName, '^\s*"([^"]+)"|^\s*(\S+)')).Groups |
+        Select-Object -Skip 1 | Where-Object { $_.Success } | Select-Object -First 1 -ExpandProperty Value
+    if (-not $mysqld -or -not (Test-Path -LiteralPath $mysqld)) { throw "mysqld not found in the service command line." }
+    $binDir = Split-Path -Parent $mysqld
+    $client = Join-Path $binDir 'mysql.exe'
+    if (-not (Test-Path -LiteralPath $client)) { throw "mysql client not found at $client" }
+    # --defaults-file="C:\path with spaces\my.ini" or --defaults-file=C:\path\my.ini
+    $match = [regex]::Match($pathName, '--defaults-file=(?:"([^"]+)"|(\S+))')
+    if ($match.Success) {
+        $myIni = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+    } else {
+        $myIni = Join-Path (Split-Path -Parent $binDir) 'my.ini'
+    }
+    if (-not (Test-Path -LiteralPath $myIni)) { throw "Option file not found at $myIni." }
+    return [pscustomobject]@{ Client = $client; MyIni = $myIni }
+}
+
+function Read-TextFile {
+    # Reads a text file and returns its text together with the encoding and line break, so
+    # that it can be written back unchanged apart from the edited lines. A file without a byte
+    # order mark must be valid UTF-8 (ASCII is a subset); otherwise the script stops instead of
+    # guessing a code page and damaging the file.
+    param([string]$Path)
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $strictUtf8 = New-Object Text.UTF8Encoding($false, $true)
+    $encoding = $null
+    $offset = 0
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $encoding = New-Object Text.UTF8Encoding($true, $true)
+        $offset = 3
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        $encoding = New-Object Text.UnicodeEncoding($false, $true, $true)
+        $offset = 2
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        $encoding = New-Object Text.UnicodeEncoding($true, $true, $true)
+        $offset = 2
+    } else {
+        $encoding = $strictUtf8
+    }
+    try {
+        $text = $encoding.GetString($bytes, $offset, $bytes.Length - $offset)
+    } catch {
+        # Strict decoders throw on invalid byte sequences.
+        throw "$Path is not valid UTF-8 or UTF-16; edit it manually (see docs/INSTALLATION.md)."
+    }
+    $lineBreak = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    return [pscustomobject]@{ Text = $text; Encoding = $encoding; LineBreak = $lineBreak }
+}
+
+function Set-ServerNetworkOptions {
+    # Removes existing lines for the managed options from all groups and appends a [mysqld]
+    # group at the end of the file. "If multiple instances of a given option are found, the
+    # last instance takes precedence" (MySQL Reference Manual, "Using Option Files"). Options
+    # from files included with !include or !includedir are not edited; the listening sockets
+    # are therefore verified after the restart (Assert-LoopbackOnly).
+    param([string]$Path)
+    $file = Read-TextFile -Path $Path
+    $lines = $file.Text -split "\r?\n"
+    $kept = @($lines | Where-Object { $_ -notmatch $ManagedOptionPattern })
+    while ($kept.Count -gt 0 -and $kept[-1] -eq '') { $kept = @($kept | Select-Object -SkipLast 1) }
+    $kept += @(
+        '',
+        '[mysqld]',
+        '# Managed by scripts/local/setup-dev-windows.ps1 (D-027): loopback only, X Plugin off.',
+        'bind-address=127.0.0.1',
+        'mysqlx=OFF',
+        ''
+    )
+    # Keep a backup next to the original; it contains no secrets.
+    Copy-Item -LiteralPath $Path -Destination "$Path.before-leg-setup" -Force
+    [IO.File]::WriteAllText($Path, ($kept -join $file.LineBreak), $file.Encoding)
+}
+
+function Get-ServiceProcessId {
+    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
+    if (-not $service -or $service.ProcessId -eq 0) { throw "Service '$ServiceName' is not running." }
+    return [int]$service.ProcessId
+}
+
+function Assert-LoopbackOnly {
+    # Waits until the server accepts connections on 127.0.0.1:$MySqlPort and verifies that it
+    # listens on no other address and that nothing listens on the X Plugin port.
+    $deadline = (Get-Date).AddSeconds(60)
+    $listeners = @()
+    while ((Get-Date) -lt $deadline) {
+        $processId = Get-ServiceProcessId
+        $listeners = @(Get-NetTCPConnection -State Listen -OwningProcess $processId -ErrorAction SilentlyContinue)
+        if (@($listeners | Where-Object { $_.LocalPort -eq $MySqlPort }).Count -gt 0) { break }
+        Start-Sleep -Seconds 2
+    }
+    if (@($listeners | Where-Object { $_.LocalAddress -eq '127.0.0.1' -and $_.LocalPort -eq $MySqlPort }).Count -eq 0) {
+        throw "MySQL does not listen on 127.0.0.1:$MySqlPort."
+    }
+    $exposed = @($listeners | Where-Object { $_.LocalAddress -ne '127.0.0.1' })
+    if ($exposed.Count -gt 0) {
+        $addresses = ($exposed | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort)" }) -join ', '
+        throw "MySQL listens on addresses other than 127.0.0.1: $addresses."
+    }
+    $xPlugin = @(Get-NetTCPConnection -State Listen -LocalPort $XPluginPort -ErrorAction SilentlyContinue)
+    if ($xPlugin.Count -gt 0) {
+        throw "A process listens on the X Plugin port $XPluginPort; X Plugin is not disabled."
+    }
+}
+
+function Get-DataDirectory {
+    param([string]$MyIni)
+    if (-not $MyIni -or -not (Test-Path -LiteralPath $MyIni)) { return $null }
+    try {
+        $text = (Read-TextFile -Path $MyIni).Text
+    } catch {
+        return $null
+    }
+    $match = [regex]::Match($text, '(?m)^\s*datadir\s*=\s*"?([^"\r\n]+?)"?\s*$')
+    if ($match.Success) { return $match.Groups[1].Value }
+    return $null
+}
+
+function Disable-MySqlService {
+    if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+        Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
+        Write-Warning "The service '$ServiceName' was stopped and its start type set to Disabled."
+    }
+}
+
+function Write-RecoveryInstructions {
+    param([string]$MyIni)
+    $dataDir = Get-DataDirectory -MyIni $MyIni
+    if (-not $dataDir) { $dataDir = '<the datadir in my.ini>' }
+    Write-Host ''
+    Write-Host 'Recovery (docs/INSTALLATION.md, "Recovery after a failed setup"):'
+    Write-Host '  1. Uninstall MySQL:            choco uninstall mysql -y'
+    Write-Host "  2. If the service still exists: sc.exe delete $ServiceName"
+    Write-Host "  3. Delete the data directory:   $dataDir"
+    Write-Host '     (it contains only the new, empty local server; root may already have the new password)'
+    if ($MyIni) {
+        Write-Host "  4. Delete the option file if it remains: $MyIni (and $MyIni.before-leg-setup)"
+    }
+    Write-Host '  5. Remove user environment variables set by this script, if any:'
+    Write-Host '     APP_ENV, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY'
+    Write-Host '  6. Fix the cause shown above and run this script again.'
+}
+
+# 0. Preconditions
 
 if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-    throw "A Windows service named '$ServiceName' already exists. This script only sets up a new installation."
+    throw "A Windows service named '$ServiceName' already exists. This script only sets up a new installation; see docs/INSTALLATION.md for recovery."
 }
-choco install mysql --version $MySqlVersion -y --no-progress
-if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE" }
+if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+    throw 'Chocolatey (choco) was not found.'
+}
 
+# 1. Ask for the root password before anything is installed
+
+$rootPassword = Read-RootPassword
+
+# 2. Install Python
 # Newest Python version supported by the newest Django release (D-015: the newest possible
 # version is used for development; the minimum versions are only declared and tested in CI).
+
 choco install python314 --version $PythonVersion -y --no-progress
-if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE" }
+if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing Python." }
 
-# 2. Locate the server and its option file
+# 3. Install and configure MySQL; on any failure, leave the server stopped and disabled
 
-$service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
-if (-not $service) { throw "Service '$ServiceName' was not created by the installation." }
-$pathName = $service.PathName
-$mysqld = ([regex]::Match($pathName, '^"?([^"]+mysqld\.exe)"?')).Groups[1].Value
-$optionFileMatch = [regex]::Match($pathName, '--defaults-file="?([^"\s]+)"?')
-$binDir = Split-Path -Parent $mysqld
-$client = Join-Path $binDir 'mysql.exe'
-if (-not (Test-Path $client)) { throw "mysql client not found at $client" }
+$paths = $null
+try {
+    choco install mysql --version $MySqlVersion -y --no-progress
+    if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MySQL." }
 
-if ($optionFileMatch.Success) {
-    $myIni = $optionFileMatch.Groups[1].Value
-} else {
-    $myIni = Join-Path (Split-Path -Parent $binDir) 'my.ini'
-}
-if (-not (Test-Path $myIni)) { throw "Option file not found at $myIni; bind address not set." }
-Write-Host "Server option file: $myIni"
+    $paths = Get-ServerPaths
+    Write-Host "Server option file: $($paths.MyIni)"
 
-# 3. Bind the server to the loopback interface
+    # 3a. Loopback only, X Plugin off; verify the listening sockets
 
-$ini = Get-Content -LiteralPath $myIni
-if ($ini -match '^\s*bind-address\s*=') {
-    $ini = $ini -replace '^\s*bind-address\s*=.*$', 'bind-address=127.0.0.1'
-} elseif ($ini -match '^\s*\[mysqld\]\s*$') {
-    $ini = $ini -replace '^\s*\[mysqld\]\s*$', "[mysqld]`r`nbind-address=127.0.0.1"
-} else {
-    $ini += @('', '[mysqld]', 'bind-address=127.0.0.1')
-}
-Set-Content -LiteralPath $myIni -Value $ini -Encoding ascii
-Restart-Service -Name $ServiceName
+    Set-ServerNetworkOptions -Path $paths.MyIni
+    Restart-Service -Name $ServiceName
+    Assert-LoopbackOnly
+    Write-Host "MySQL listens only on 127.0.0.1:$MySqlPort; X Plugin is disabled."
 
-# 4. Set the root password
+    # 3b. Set the root password and verify a login with it
 
-$rootSecure = Read-Host -AsSecureString 'New password for the local MySQL root account'
-$rootConfirm = Read-Host -AsSecureString 'Repeat the password'
-$rootPassword = ConvertFrom-SecureStringToPlain $rootSecure
-if ($rootPassword -ne (ConvertFrom-SecureStringToPlain $rootConfirm)) { throw 'The passwords do not match.' }
-if ($rootPassword.Length -lt 15) { throw 'Use at least 15 characters.' }
-if ($rootPassword -match "['\\]") { throw 'The password must not contain single quotes or backslashes.' }
+    Invoke-MySql -Client $paths.Client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
+    Invoke-MySql -Client $paths.Client -Sql 'SELECT 1;' -RootPassword $rootPassword | Out-Null
 
-Invoke-MySql -Client $client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
+    # 3c. Create the database and the application account
+    # In database-level GRANT statements, '_' is a wildcard and is escaped as '\_' so that
+    # the grant covers exactly these databases (MySQL Reference Manual, "GRANT Statement").
 
-# 5. Create the databases and the application account
-
-$appPassword = New-RandomSecret
-$sql = @"
+    $appPassword = New-RandomSecret
+    $grantDatabase = $DatabaseName.Replace('_', '\_')
+    $grantTestDatabase = $TestDatabaseName.Replace('_', '\_')
+    $sql = @"
 CREATE DATABASE IF NOT EXISTS ``$DatabaseName`` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE USER '$AppUser'@'127.0.0.1' IDENTIFIED BY '$appPassword';
-GRANT ALL PRIVILEGES ON ``$DatabaseName``.* TO '$AppUser'@'127.0.0.1';
-GRANT ALL PRIVILEGES ON ``$TestDatabaseName``.* TO '$AppUser'@'127.0.0.1';
+GRANT $AppPrivileges ON ``$grantDatabase``.* TO '$AppUser'@'127.0.0.1';
+GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
 "@
-Invoke-MySql -Client $client -Sql $sql -RootPassword $rootPassword
-$rootPassword = $null
+    Invoke-MySql -Client $paths.Client -Sql $sql -RootPassword $rootPassword
 
-# 6. Store the local configuration as user environment variables
+    # 4. Store the local configuration as user environment variables
 
-$settings = [ordered]@{
-    APP_ENV           = 'local'
-    DB_NAME           = $DatabaseName
-    DB_USER           = $AppUser
-    DB_PASSWORD       = $appPassword
-    DB_HOST           = '127.0.0.1'
-    DB_PORT           = '3306'
-    DJANGO_SECRET_KEY = (New-RandomSecret -Bytes 50)
+    $settings = [ordered]@{
+        APP_ENV           = 'local'
+        DB_NAME           = $DatabaseName
+        DB_USER           = $AppUser
+        DB_PASSWORD       = $appPassword
+        DB_HOST           = '127.0.0.1'
+        DB_PORT           = "$MySqlPort"
+        DJANGO_SECRET_KEY = (New-RandomSecret -Bytes 50)
+    }
+    foreach ($name in $settings.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $settings[$name], 'User')
+    }
+    $appPassword = $null
+} catch {
+    Write-Warning "Setup failed: $($_.Exception.Message)"
+    Disable-MySqlService
+    $myIni = if ($paths) { $paths.MyIni } else { $null }
+    Write-RecoveryInstructions -MyIni $myIni
+    throw
+} finally {
+    $rootPassword = $null
 }
-foreach ($name in $settings.Keys) {
-    [Environment]::SetEnvironmentVariable($name, $settings[$name], 'User')
-}
-$appPassword = $null
 
 Write-Host ''
-Write-Host "MySQL $MySqlVersion is installed, bound to 127.0.0.1 and the root password is set."
+Write-Host "MySQL $MySqlVersion is installed, listens only on 127.0.0.1, X Plugin is disabled and the root password is set."
 Write-Host "Database '$DatabaseName' and account '$AppUser'@'127.0.0.1' were created."
 Write-Host "User environment variables set: $($settings.Keys -join ', ')"
 Write-Host 'Restart VS Code so that new terminals and Claude Code receive the variables.'
+Write-Host 'Never print the environment (e.g. Get-ChildItem env:); it contains DB_PASSWORD and DJANGO_SECRET_KEY.'
