@@ -77,6 +77,32 @@ $PythonPackage = 'python314'
 $PackageDataDirectory = 'C:\ProgramData\MySQL\data'
 $RetryCommand = '.\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation'
 
+# Well-known SIDs (Microsoft Learn, "Security identifiers"); names are localised, SIDs are not.
+$SidAdministrators = 'S-1-5-32-544'
+$SidSystem = 'S-1-5-18'
+$SidUsers = 'S-1-5-32-545'
+$SidAuthenticatedUsers = 'S-1-5-11'
+$SidEveryone = 'S-1-1-0'
+$SidInteractive = 'S-1-5-4'
+$SidCreatorOwner = 'S-1-3-0'
+# Groups that contain ordinary users. They must never be able to change the server program or
+# the data directory: the service runs as LocalSystem ("The default user for running the
+# MySQL service is LocalSystem", MySQL Reference Manual, "Starting MySQL as a Windows
+# Service"), so a replaced mysqld.exe would run with full system rights.
+$UnprivilegedSids = @($SidUsers, $SidAuthenticatedUsers, $SidEveryone, $SidInteractive, $SidCreatorOwner)
+
+# Rights that allow changing a file or directory, its attributes, permissions or owner.
+$WriteRights = [Security.AccessControl.FileSystemRights](
+    [int][Security.AccessControl.FileSystemRights]::WriteData -bor
+    [int][Security.AccessControl.FileSystemRights]::AppendData -bor
+    [int][Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+    [int][Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+    [int][Security.AccessControl.FileSystemRights]::Delete -bor
+    [int][Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+    [int][Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+    [int][Security.AccessControl.FileSystemRights]::TakeOwnership
+)
+
 # Privileges Django needs on MySQL: data access, and schema changes by migrations (CREATE,
 # DROP, ALTER, INDEX; REFERENCES for foreign key constraints). On the test database, CREATE
 # and DROP also allow the test runner to create and remove the database itself.
@@ -448,6 +474,72 @@ function Disable-MySqlService {
     }
 }
 
+function Test-RightsAllowWrite {
+    # Takes the raw value: generic rights are not defined in the FileSystemRights enumeration.
+    param([long]$Rights)
+    # Generic rights (e.g. GENERIC_WRITE 0x40000000, GENERIC_ALL 0x10000000) can appear in
+    # inherit-only ACEs; they are treated as write access.
+    $generic = 0x10000000 -bor 0x40000000
+    return (($Rights -band [long]$WriteRights) -ne 0) -or (($Rights -band $generic) -ne 0)
+}
+
+function Get-AclProblems {
+    # Returns descriptions of allow entries that give unprivileged groups write access to the
+    # path or anything below it; with -NoAccess, any access of these groups is a problem.
+    param([string]$Path, [switch]$NoAccess)
+    $problems = @()
+    $items = @(Get-Item -LiteralPath $Path -Force) + @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction Stop)
+    foreach ($item in $items) {
+        $acl = Get-Acl -LiteralPath $item.FullName
+        foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+            if ($rule.AccessControlType -ne 'Allow') { continue }
+            if ($rule.IdentityReference.Value -notin $UnprivilegedSids) { continue }
+            if ($NoAccess -or (Test-RightsAllowWrite -Rights ([long]$rule.FileSystemRights))) {
+                $problems += "$($item.FullName): $($rule.IdentityReference.Value) $($rule.FileSystemRights)"
+            }
+        }
+    }
+    return $problems
+}
+
+function Set-RestrictedAcl {
+    # Replaces the permissions of a directory tree: no inheritance from the parent, full
+    # control for Administrators and SYSTEM, optionally read and execute for Users (the client
+    # programs in bin), nothing for anyone else. All files and directories below it get the
+    # inherited permissions only (icacls /reset /t). Owner: Administrators.
+    # Microsoft Learn, "icacls": /grant:r "Permissions replace previously granted explicit
+    # permissions"; /reset "Replaces ACLs with default inherited ACLs for all matching files";
+    # numerical SIDs are prefixed with "*". The option /inheritance:r ("removes all inherited
+    # ACEs") is named as shown by "icacls /?" on Windows 11.
+    param([string]$Path, [switch]$UsersReadExecute)
+    $grants = @("*$($SidAdministrators):(OI)(CI)F", "*$($SidSystem):(OI)(CI)F")
+    if ($UsersReadExecute) { $grants += "*$($SidUsers):(OI)(CI)RX" }
+    & icacls.exe $Path /inheritance:r /grant:r @grants /q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE on $Path." }
+    if (@(Get-ChildItem -LiteralPath $Path -Force).Count -gt 0) {
+        & icacls.exe (Join-Path $Path '*') /reset /t /q | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "icacls /reset failed with exit code $LASTEXITCODE below $Path." }
+    }
+    & icacls.exe $Path /setowner "*$SidAdministrators" /t /q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "icacls /setowner failed with exit code $LASTEXITCODE on $Path." }
+}
+
+function Protect-MySqlFiles {
+    # Restricts the program directory and the data directory, and verifies the result. Throws
+    # (into the failure path of the setup) if unprivileged groups keep write access.
+    param([string]$ProgramRoot, [string]$DataRoot)
+    foreach ($path in @($ProgramRoot, $DataRoot)) {
+        if (Test-IsReparsePoint -Path $path) { throw "$path is a symbolic link, junction or mount point." }
+    }
+    Set-RestrictedAcl -Path $ProgramRoot -UsersReadExecute
+    Set-RestrictedAcl -Path $DataRoot
+    $problems = @(Get-AclProblems -Path $ProgramRoot) + @(Get-AclProblems -Path $DataRoot -NoAccess)
+    if ($problems.Count -gt 0) {
+        throw "Unprivileged groups still have access: $($problems -join '; ')"
+    }
+    Write-Host "Permissions restricted: $ProgramRoot (Users: read and execute), $DataRoot (Administrators and SYSTEM only)."
+}
+
 function Write-RecoveryInstructions {
     param([string]$MyIni)
     $dataDir = Get-DataDirectory -MyIni $MyIni
@@ -639,6 +731,17 @@ function Remove-FailedInstallation {
     # Removes the installation after Confirm-FailedInstallationRemoval. Every step checks the
     # current state, so that the removal can be repeated after an interruption.
     param($Installation)
+    # Re-check the ownership right before changing anything: the service may have been
+    # replaced since the confirmation.
+    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
+    if ($service) {
+        $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
+        $problem = Get-ServiceOwnershipProblem -PathName $service.PathName -Executable $executable -ToolsRoot (Get-ChocolateyToolsRoot)
+        if ($problem) {
+            Write-ManualRemovalInstructions
+            throw "The service '$ServiceName' does not look like the local installation of the Chocolatey package '$MySqlPackage': $problem."
+        }
+    }
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         # First stop the service and set it to Disabled, so that it cannot start again while
         # the installation is removed.
@@ -661,6 +764,14 @@ function Remove-FailedInstallation {
     if ($Installation.DataDirectoryExists -and (Test-Path -LiteralPath $PackageDataDirectory)) {
         # Confirmed by the user in Confirm-FailedInstallationRemoval.
         Remove-PackageDataDirectory
+    }
+    # Re-check right before deleting the option files: none of the paths may have become a
+    # symbolic link, junction or mount point in the meantime.
+    $packageRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
+    $reparsePoints = @(@($packageRoot, (Join-Path $packageRoot 'current')) + @(Get-PackageOptionFiles) |
+        Where-Object { Test-IsReparsePoint -Path $_ })
+    if ($reparsePoints.Count -gt 0) {
+        throw "These paths became symbolic links, junctions or mount points; the option files were not deleted: $($reparsePoints -join ', ')."
     }
     foreach ($file in Get-PackageOptionFiles) {
         if (Test-IsFile -Path $file) {
@@ -738,20 +849,35 @@ try {
     $paths = Get-ServerPaths
     Write-Host "Server option file: $($paths.MyIni)"
 
-    # 4a. Loopback only, X Plugin off; verify the listening sockets
+    # 4a. Restrict the permissions of the program and data directories before the server is
+    # restarted: the package installs below Chocolatey's tools directory and
+    # C:\ProgramData\MySQL, which inherit write access for ordinary users from C:\ and
+    # C:\ProgramData, while the service runs as LocalSystem.
+
+    $programRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
+    if (-not (Test-IsPathUnder -Path $paths.Client -Root $programRoot)) {
+        throw "The MySQL programs are not below $programRoot."
+    }
+    $dataDirectory = Get-DataDirectory -MyIni $paths.MyIni
+    if (-not (Test-IsSamePath -First $dataDirectory -Second $PackageDataDirectory)) {
+        throw "Unexpected data directory '$dataDirectory'; expected $PackageDataDirectory."
+    }
+    Protect-MySqlFiles -ProgramRoot $programRoot -DataRoot (Split-Path -Parent $PackageDataDirectory)
+
+    # 4b. Loopback only, X Plugin off; verify the listening sockets
 
     Set-ServerNetworkOptions -Path $paths.MyIni
     Restart-Service -Name $ServiceName
     Assert-LoopbackOnly
     Write-Host "MySQL listens only on 127.0.0.1:$MySqlPort; X Plugin is disabled."
 
-    # 4b. Set the root password and verify a login with it
+    # 4c. Set the root password and verify a login with it
 
     Invoke-MySql -Client $paths.Client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
     Invoke-MySql -Client $paths.Client -Sql 'SELECT 1;' -RootPassword $rootPassword | Out-Null
     Assert-ServerConfiguration -Client $paths.Client -RootPassword $rootPassword
 
-    # 4c. Create the database and the application account
+    # 4d. Create the database and the application account
     # In database-level GRANT statements, '_' is a wildcard and is escaped as '\_' so that
     # the grant covers exactly these databases (MySQL Reference Manual, "GRANT Statement").
 
@@ -766,7 +892,7 @@ GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
 "@
     Invoke-MySql -Client $paths.Client -Sql $sql -RootPassword $rootPassword
 
-    # 4d. Store the local configuration as user environment variables
+    # 4e. Store the local configuration as user environment variables
 
     $settings = [ordered]@{
         APP_ENV           = 'local'

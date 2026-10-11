@@ -136,6 +136,43 @@ try {
     # Remove the junction itself before the temporary directory is deleted.
     [IO.Directory]::Delete($junction, $false)
 
+    # Test-RightsAllowWrite
+    $rights = [Security.AccessControl.FileSystemRights]
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::ReadAndExecute)) $false 'Rights: read and execute'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::Read)) $false 'Rights: read'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::Modify)) $true 'Rights: modify'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::FullControl)) $true 'Rights: full control'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::AppendData)) $true 'Rights: append data (add subdirectory)'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::ChangePermissions)) $true 'Rights: change permissions'
+    Assert-Equal (Test-RightsAllowWrite -Rights ([long]0x40000000)) $true 'Rights: generic write'
+
+    # Get-AclProblems (only grants on the temporary directory, no administrator rights needed)
+    $aclRoot = Join-Path $root 'acl'
+    New-Item -ItemType Directory -Path (Join-Path $aclRoot 'bin') | Out-Null
+    Set-Content -LiteralPath (Join-Path $aclRoot 'bin\mysqld.exe') -Value ''
+    $before = @(Get-AclProblems -Path $aclRoot -NoAccess)
+    Assert-Equal $before.Count 0 'Get-AclProblems: temporary directory has no unprivileged access'
+    & icacls.exe $aclRoot /grant "*$($SidUsers):(OI)(CI)RX" /q | Out-Null
+    Assert-Equal @(Get-AclProblems -Path $aclRoot).Count 0 'Get-AclProblems: Users read and execute is no write access'
+    Assert-Equal ([bool]@(Get-AclProblems -Path $aclRoot -NoAccess).Count) $true 'Get-AclProblems: Users read is reported with -NoAccess'
+    & icacls.exe (Join-Path $aclRoot 'bin\mysqld.exe') /grant "*$($SidAuthenticatedUsers):M" /q | Out-Null
+    $found = @(Get-AclProblems -Path $aclRoot)
+    Assert-Equal $found.Count 1 'Get-AclProblems: Authenticated Users modify on a file below is reported'
+    Assert-Equal ([bool]($found[0] -like '*mysqld.exe: S-1-5-11*')) $true 'Get-AclProblems: names file and SID'
+    & icacls.exe $aclRoot /grant "*$($SidEveryone):(OI)(CI)(AD)" /q | Out-Null
+    Assert-Equal ([bool](@(Get-AclProblems -Path $aclRoot) | Where-Object { $_ -like '*S-1-1-0*' })) $true 'Get-AclProblems: Everyone add subdirectory is reported'
+
+    # Set-RestrictedAcl needs administrator rights (owner change); tested only when elevated.
+    $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if ($elevated) {
+        Set-RestrictedAcl -Path $aclRoot -UsersReadExecute
+        Assert-Equal @(Get-AclProblems -Path $aclRoot).Count 0 'Set-RestrictedAcl: no write access for unprivileged groups'
+        Set-RestrictedAcl -Path $aclRoot
+        Assert-Equal @(Get-AclProblems -Path $aclRoot -NoAccess).Count 0 'Set-RestrictedAcl: no access for unprivileged groups'
+    } else {
+        Write-Host 'SKIPPED: Set-RestrictedAcl (needs an elevated PowerShell).'
+    }
+
     # Test-IsMySqlDataDirectory
     $dataDir = Join-Path $root 'data'
     New-Item -ItemType Directory -Path $dataDir | Out-Null
