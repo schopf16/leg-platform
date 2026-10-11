@@ -198,6 +198,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 EMAIL_MODE = ENVIRONMENT.email_mode
 EMAIL_ALLOWED_RECIPIENTS = list(ENVIRONMENT.email_allowed_recipients)
+# Masks EMAIL_ALLOWED_RECIPIENTS (personal addresses on development machines) on debug pages
+# and in error reports, in addition to Django's default sensitive names (D-028).
+DEFAULT_EXCEPTION_REPORTER_FILTER = "leg_platform.debug.ExceptionReporterFilter"
 
 if django.VERSION >= (6, 1):
     MAILERS = {"default": {"BACKEND": email_backend(ENVIRONMENT)}}

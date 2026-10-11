@@ -251,10 +251,37 @@ def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, .
         raise ImproperlyConfigured(
             f"APP_ENV={app_env} allows only EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
         )
-    recipients = tuple(
-        address.lower() for address in _split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS"))
-    )
+    recipients = parse_email_allowed_recipients(env)
+    if mode == EMAIL_MODE_ALLOWLIST and not recipients:
+        # An allowlist without entries would deliver to nobody without notice; refuse the
+        # start instead (D-028, re-review of 2026-10-11, N-5).
+        raise ImproperlyConfigured("EMAIL_MODE=allowlist requires EMAIL_ALLOWED_RECIPIENTS.")
     return mode, recipients
+
+
+# One complete address: exactly one "@", a non-empty local part and a domain with at least two
+# labels; no white space, wildcards or list separators. Deliberately simple: the list contains
+# only addresses the operator or developer chose, and it only restricts delivery.
+_ALLOWED_RECIPIENT = re.compile(
+    r"[^@\s,*]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+"
+)
+
+
+def parse_email_allowed_recipients(env: Mapping[str, str]) -> tuple[str, ...]:
+    """Return the normalised (lower-case) allowed recipients; refuse invalid entries.
+
+    Error messages name only the position of an invalid entry, never the addresses, which
+    are personal data.
+    """
+    recipients = []
+    for position, entry in enumerate(_split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS")), 1):
+        if not _ALLOWED_RECIPIENT.fullmatch(entry):
+            raise ImproperlyConfigured(
+                f"Entry {position} of EMAIL_ALLOWED_RECIPIENTS is not a single complete email "
+                f"address (exactly one '@', no wildcards, no domain-only entries)."
+            )
+        recipients.append(entry.lower())
+    return tuple(recipients)
 
 
 def parse_database(env: Mapping[str, str]) -> dict[str, str]:

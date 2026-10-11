@@ -10,7 +10,9 @@ from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.views.debug import get_default_exception_reporter_filter
 
+from leg_platform.debug import ExceptionReporterFilter
 from leg_platform.mail import GraphNotImplementedEmailBackend
 from leg_platform.tests.test_responses import EXPECTED_CSP
 
@@ -115,7 +117,26 @@ class ContentSecurityPolicyTests(SimpleTestCase):
     """
 
     def test_middleware_and_policy(self):
-        self.assertIn("django.middleware.csp.ContentSecurityPolicyMiddleware", settings.MIDDLEWARE)
+        middleware = list(settings.MIDDLEWARE)
+        security = middleware.index("django.middleware.security.SecurityMiddleware")
+        self.assertEqual(
+            middleware[security + 1], "django.middleware.csp.ContentSecurityPolicyMiddleware"
+        )
+        self.assertEqual(middleware.count("django.middleware.csp.ContentSecurityPolicyMiddleware"), 1)
+        self.assertEqual(
+            {directive: [str(value) for value in values] for directive, values in settings.SECURE_CSP.items()},
+            {
+                "default-src": ["'self'"],
+                "script-src": ["'self'"],
+                "style-src": ["'self'"],
+                "img-src": ["'self'"],
+                "font-src": ["'self'"],
+                "object-src": ["'none'"],
+                "base-uri": ["'none'"],
+                "form-action": ["'self'"],
+                "frame-ancestors": ["'none'"],
+            },
+        )
         self.assertEqual(settings.SECURE_CSP_REPORT_ONLY, {})
         values = [value for values in settings.SECURE_CSP.values() for value in values]
         for forbidden in ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "*", "data:"):
@@ -177,6 +198,41 @@ class TestRunnerEmailTests(SimpleTestCase):
         self.assertEqual(sent, 1)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["to@example.org"])
+
+
+class ExceptionReporterFilterTests(SimpleTestCase):
+    """Debug pages and error reports mask the allowed recipients (D-028)."""
+
+    def test_filter_is_configured(self):
+        self.assertEqual(
+            settings.DEFAULT_EXCEPTION_REPORTER_FILTER,
+            "leg_platform.debug.ExceptionReporterFilter",
+        )
+        self.assertIsInstance(get_default_exception_reporter_filter(), ExceptionReporterFilter)
+
+    def test_allowed_recipients_are_masked(self):
+        reporter_filter = ExceptionReporterFilter()
+        substitute = reporter_filter.cleansed_substitute
+        self.assertEqual(
+            reporter_filter.cleanse_setting("EMAIL_ALLOWED_RECIPIENTS", ["tester@example.org"]),
+            substitute,
+        )
+        with override_settings(EMAIL_ALLOWED_RECIPIENTS=["tester@example.org"]):
+            safe = reporter_filter.get_safe_settings()
+        self.assertEqual(safe["EMAIL_ALLOWED_RECIPIENTS"], substitute)
+        request = RequestFactory().get("/", EMAIL_ALLOWED_RECIPIENTS="tester@example.org")
+        meta = reporter_filter.get_safe_request_meta(request)
+        self.assertEqual(meta["EMAIL_ALLOWED_RECIPIENTS"], substitute)
+
+    def test_django_defaults_are_kept(self):
+        reporter_filter = ExceptionReporterFilter()
+        for name in ("SECRET_KEY", "DB_PASSWORD", "API_TOKEN", "HTTP_COOKIE", "AUTH_HEADER"):
+            with self.subTest(name=name):
+                self.assertEqual(
+                    reporter_filter.cleanse_setting(name, "value"),
+                    reporter_filter.cleansed_substitute,
+                )
+        self.assertEqual(reporter_filter.cleanse_setting("EMAIL_MODE", "console"), "console")
 
 
 class PlaceholderEmailBackendTests(SimpleTestCase):
