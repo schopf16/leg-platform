@@ -178,7 +178,8 @@ $OtherConnectionsSql = "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHER
 # line per problem. Expected state from the bootstrap SQL of the MariaDB sources (branch 12.3:
 # scripts/mariadb_system_tables.sql, mariadb_system_tables_data.sql, mariadb_test_db.sql,
 # sys_schema) after the hardening: system schemas only; no routines, events, triggers or views
-# outside sys and mysql; mysql.db, columns_priv, procs_priv and roles_mapping empty; tables_priv
+# outside sys and mysql; mysql.db, columns_priv, procs_priv, roles_mapping, plugin, func and
+# servers empty (the Windows bootstrap installs no plugin: auth_root_socket is not set); tables_priv
 # only mariadb.sys@localhost with Select,Delete on mysql.global_priv; proxies_priv only the
 # root accounts kept; mariadb.sys locked; PUBLIC without global privileges; no account without
 # a password; no other client connection; general log and shared memory off. MariaDB stores
@@ -195,6 +196,9 @@ SELECT CONCAT('column grant: ', User, '@', Host) FROM mysql.columns_priv;
 SELECT CONCAT('routine grant: ', User, '@', Host) FROM mysql.procs_priv;
 SELECT CONCAT('role mapping: ', User, '@', Host, ' ', Role) FROM mysql.roles_mapping;
 SELECT CONCAT('proxy grant: ', User, '@', Host, ' for ', Proxied_user, '@', Proxied_host) FROM mysql.proxies_priv WHERE NOT (User = 'root' AND Host IN ('localhost', '127.0.0.1', '::1') AND Proxied_user = '' AND Proxied_host = '');
+SELECT CONCAT('installed plugin: ', name) FROM mysql.plugin;
+SELECT CONCAT('user-defined function: ', name) FROM mysql.func;
+SELECT CONCAT('federated server: ', Server_name) FROM mysql.servers;
 SELECT CONCAT('schema: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys');
 SELECT CONCAT('routine: ', ROUTINE_SCHEMA, '.', ROUTINE_NAME) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql');
 SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS WHERE EVENT_SCHEMA NOT IN ('sys', 'mysql');

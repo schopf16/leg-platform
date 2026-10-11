@@ -288,7 +288,7 @@ try {
     Assert-Equal ([regex]::Matches($hardening, "IDENTIFIED BY 'correct horse battery staple'").Count) 3 'Hardening SQL: password for the three root accounts'
     $hardeningLines = @($hardening -split "`r?`n" | Where-Object { $_ })
     Assert-Equal ([bool]($hardeningLines[1] -clike "IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000'*END IF //")) $true 'Hardening SQL: aborts first if another client is connected'
-    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'information_schema.ROUTINES', 'information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.VIEWS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")) {
+    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.ROUTINES', 'information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.VIEWS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")) {
         Assert-Equal $HardeningProblemSql.Contains($check) $true "Hardening check SQL: $check"
     }
     $appSql = Get-AppAccountSql -Password 'generated-secret'
