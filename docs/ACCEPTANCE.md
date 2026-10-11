@@ -6,7 +6,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 
 * [ ] The source code is managed in a Git repository.
 * [ ] The application can be set up locally using the documentation.
-* [ ] Minimum versions of Python, Django, MySQL and all packages are documented with their sources, still receive security updates from their vendor and are proven by tests (D-015).
+* [ ] Minimum versions of Python, Django, MariaDB and all packages are documented with their sources, still receive security updates from their vendor and are proven by tests (D-015).
 * [ ] Database migrations run reproducibly.
 * [ ] Tests can be run locally.
 

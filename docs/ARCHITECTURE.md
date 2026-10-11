@@ -8,7 +8,7 @@ A simple, secure and maintainable architecture with the lowest possible operatin
 
 * Python
 * Django
-* MySQL
+* MariaDB (through Django's MySQL backend, D-002, D-030)
 * Tabler for the user interface
 * Django admin for system administration
 * Microsoft Graph for outgoing email
@@ -102,9 +102,9 @@ The project uses a custom user model from the first migration (D-021). Django's 
 * **Customer number:** six digits, generated with a cryptographically secure random generator (Python `secrets`) exactly once, when the registration is completed (password form submitted successfully via the verification link; the link is consumed only then), stored as text so that leading zeros are possible, unique and never reused. Unverified accounts have no customer number (the field is nullable), so that registrations that are never verified do not use up numbers. Numbers of deleted accounts are kept in a list of retired numbers without any personal reference. On a collision with an existing or retired number, a new number is drawn. Confirming an email address change and reactivation never change the number; the initial system administrator receives a number from the setup command. Because two tables cannot share one unique index, "never reused" is preferably enforced in the database with a single table of all issued numbers with a unique key (decided at implementation). Displayed as two blocks of three digits. The customer number is not a login identifier.
 * **Login:** an authentication backend accepts the email address together with the password. Email addresses are looked up only through the normalised unique column. The abuse protection counts failed attempts per normalised email address and treats nonexistent addresses the same way as existing ones. The backend is based on Django's `ModelBackend` or reproduces its protection against timing differences for nonexistent users. How `django-axes` can be given the normalised address is verified in its documentation before implementation.
 * **Normalisation of email addresses:** defined in one place (at least removal of surrounding whitespace and conversion to lower case) and used for storage and for all lookups and per-address counters (login, registration, password reset, email change, counting of failed attempts and rate limits).
-* **Email uniqueness among accounts that are not deactivated:** a conditional unique constraint is not possible, because Django ignores the condition on MySQL ("The `condition` argument is ignored with MySQL and MariaDB as neither supports conditional indexes."). Instead, an additional nullable column contains the normalised (lower-case) email address while the account is not deactivated and `NULL` when it is deactivated. A normal unique index on this column enforces uniqueness in the database, because "A `UNIQUE` index permits multiple `NULL` values for columns that can contain `NULL`" (MySQL 8.4 Reference Manual). The column is maintained in one central place of the model logic and covered by tests, including concurrent requests.
+* **Email uniqueness among accounts that are not deactivated:** a conditional unique constraint is not possible, because Django does not support conditions on MariaDB ("The `condition` argument is ignored with MySQL and MariaDB as neither supports conditional indexes.", Django's model index reference; system check `models.W036`: "<database> does not support unique constraints with conditions"). Instead, an additional nullable column contains the normalised (lower-case) email address while the account is not deactivated and `NULL` when it is deactivated. A normal unique index on this column enforces uniqueness in the database, because "A `UNIQUE` constraint allows multiple `NULL` values because in SQL, `NULL` is never equal to another `NULL`" (MariaDB documentation, "MariaDB Indexes Guide"). The column is maintained in one central place of the model logic and covered by tests, including concurrent requests.
 
-Sources: https://docs.djangoproject.com/en/stable/topics/auth/customizing/, https://docs.djangoproject.com/en/stable/ref/models/indexes/, https://docs.djangoproject.com/en/stable/ref/models/constraints/, https://dev.mysql.com/doc/refman/8.4/en/create-index.html (checked on 2026-10-09)
+Sources: https://docs.djangoproject.com/en/stable/topics/auth/customizing/, https://docs.djangoproject.com/en/stable/ref/models/indexes/, https://docs.djangoproject.com/en/stable/ref/models/constraints/ (checked on 2026-10-09), https://docs.djangoproject.com/en/6.0/ref/checks/, https://mariadb.com/docs/server/mariadb-quickstart-guides/mariadb-indexes-guide (checked on 2026-10-11 after the switch from MySQL to MariaDB, D-030)
 
 ## Account Lifecycle
 
@@ -177,7 +177,7 @@ Sources: https://github.com/tabler/tabler, https://getbootstrap.com/docs/5.3/get
 
 ## Data Storage
 
-MySQL is the intended database. Django migrations are the traceable source for schema changes.
+MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.
 
 Later documents and receipts must not be stored exclusively in an ephemeral container file system. The concrete storage solution will be decided once corresponding functions are planned.
 
@@ -202,7 +202,7 @@ Each environment uses separate credentials and configurations. Production data i
 
 Not yet decided:
 
-* final hosting provider and hosting plan
+* hosting details beyond provider and plan of the Ittigen instance (Infomaniak "VPS Lite 1", D-008), and the hosting of other instances
 * container-based or direct server deployment
 * final document storage
 * whether AGOV may be used as the second factor (request by the project owner pending), AGOV integration details, and whether password login can later be disabled for system administrators

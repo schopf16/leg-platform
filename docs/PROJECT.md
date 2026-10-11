@@ -31,7 +31,7 @@ Server and hosting operations (operating system, database server, deployment) ta
 
 * Python
 * Django
-* MySQL
+* MariaDB
 * Tabler for the user interface
 * Django admin for system administration
 * Microsoft Graph for outgoing email

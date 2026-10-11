@@ -11,14 +11,14 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 ## Technology Direction
 
 * Backend: Python and Django
-* Database: MySQL
+* Database: MariaDB (minimum 10.11, used 12.3 LTS; MySQL is not supported, D-002, D-030)
 * User interface: Tabler, responsive for desktop computers, tablets and mobile phones; design language in `docs/DESIGN.md`
 * System administration: Django admin
 * Outgoing email: Microsoft Graph, configured in the Django admin
 * Login: email address with password
 * Two-factor authentication: authenticator app (TOTP), mandatory for staff users and system administrators; a later switch to AGOV as the second factor is prepared (approval requested, answer pending)
 * Development: local, then stage, later production
-* Hosting preference for the Ittigen instance: Infomaniak; the final choice is open
+* Hosting of the Ittigen instance: Infomaniak "VPS Lite 1" (decided by the project owner on 2026-10-11, D-008); the remaining hosting details are open
 * Deployment model: one independent instance per municipality
 * Supported versions: minimum versions only, as old as technically possible while still receiving vendor security updates (D-015)
 * Language of software and documentation: English (code, database, comments, commits, documents, etc.)
@@ -87,11 +87,13 @@ The project foundation and security requirements are defined. They were revised 
 
 On 2026-10-11 the Git repository was initialised (branch `main`) and the ignore rules for secret files were verified with `git check-ignore`. The minimum versions and packages were determined from official sources and proposed in D-026.
 
-On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (at the time Python 3.11, Django 5.2, MySQL 8.4; since 2026-10-11 Python 3.12, Django 6.0, MySQL 8.4) and the newest versions (Python 3.14, Django 6.1, MySQL 9.7). Local development is described in `docs/INSTALLATION.md`. The repository is public on GitHub (D-027); secret scanning with push protection, Dependabot alerts and private vulnerability reporting are enabled, and the default workflow token is read-only. The first run of continuous integration on GitHub passed both jobs. No application functions exist yet: the code consists of the settings, their validation, a placeholder email backend and tests.
+On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (at the time Python 3.11, Django 5.2, MySQL 8.4; since 2026-10-11 Python 3.12, Django 6.0, MariaDB 10.11) and the newest versions (Python 3.14, Django 6.1, at the time MySQL 9.7, now MariaDB 12.3). Local development is described in `docs/INSTALLATION.md`. The repository is public on GitHub (D-027); secret scanning with push protection, Dependabot alerts and private vulnerability reporting are enabled, and the default workflow token is read-only. The first run of continuous integration on GitHub passed both jobs. No application functions exist yet: the code consists of the settings, their validation, a placeholder email backend and tests.
 
 On 2026-10-11 a security review of the skeleton was carried out. Its findings were corrected: email delivery modes per environment, HSTS `includeSubDomains` configurable by the operator (D-028), stricter validation of numeric values, `HttpOnly` CSRF cookie, response-level tests with production settings, a hardened local setup script (D-027, `docs/INSTALLATION.md`), service images pinned by digest and Dependabot for actions and Python packages. Three re-review rounds on the same day confirmed the corrections and the follow-up fixes; no review findings are open. Continuous integration passed both jobs after each round. The setup script has not yet been run against a real server.
 
 On 2026-10-11 the project owner decided: the setup script failed on the first run right after the MySQL installation; the path resolution was fixed and a switch `-RemoveFailedInstallation` was added for a retry (D-027). The minimum versions were raised to Django 6.0 and Python 3.12 to use Django's built-in Content Security Policy, which is now set (D-026, D-028). Local email delivery may use `allowlist` with a dedicated development app registration besides `console` (D-028). The project is licensed under the BSD 3-Clause License (D-029).
+
+On 2026-10-11 the project owner decided to use MariaDB instead of MySQL and to run production of the Ittigen instance on an Infomaniak "VPS Lite 1" (D-002, D-008, D-030). The minimum version is MariaDB 10.11, the newest long-term support release 12.3 is used; MySQL is no longer supported. Settings, database tests, continuous integration and the local setup script were changed accordingly; the setup script has not yet been run on the development machine.
 
 Deployment gates: no stage or production instance is deployed before
 
@@ -104,5 +106,5 @@ Deployment gates: no stage or production instance is deployed before
 Next steps:
 
 1. Confirmation of D-028 by the project owner. Decided on 2026-10-11: Content Security Policy with Django's built-in support (D-026, D-028), local email delivery with `console` or `allowlist` (`docs/SECURITY.md`, sections 8 and 11; D-028), licence BSD-3-Clause (D-029).
-2. Retry of the setup script on the development machine with `-RemoveFailedInstallation` (`docs/INSTALLATION.md`) and a local test run against MySQL with the restricted application account.
+2. On the development machine: manual removal of the earlier, failed MySQL installation, first run of the MariaDB setup script (`docs/INSTALLATION.md`) and a local test run against MariaDB with the restricted application account.
 3. Custom user model (D-021), before any persistent database is migrated.
