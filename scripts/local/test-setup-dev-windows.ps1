@@ -254,6 +254,7 @@ try {
         $values = @{
             OwnershipProblem = $null; ServiceIsLegacy = $false; OldPackageRootExists = $false
             OldDataDirectoryExists = $false; NewRootExists = $true; NewRootViolations = @()
+            ServiceExists = $false; PackageVersion = $null
         }
         foreach ($key in $Changes.Keys) { $values[$key] = $Changes[$key] }
         return [pscustomobject]$values
@@ -262,7 +263,7 @@ try {
     Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OwnershipProblem = 'foreign service' })) -like '*foreign service*')) $true 'Removal: foreign service is refused'
     Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ ServiceIsLegacy = $true })) -like '*earlier layout*')) $true 'Removal: service of the earlier layout is refused'
     Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OldPackageRootExists = $true })) -like '*earlier layout*')) $true 'Removal: <tools>\mysql is refused'
-    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OldDataDirectoryExists = $true })) -like '*earlier layout*')) $true 'Removal: C:\ProgramData\MySQL is refused'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OldDataDirectoryExists = $true })) -like '*earlier layout*')) $true 'Removal: C:\ProgramData\MySQL\data is refused'
     Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ NewRootViolations = @('x has the owner S-1-5-21-1-2-3-1001') })) -like '*was not created by this script*')) $true 'Removal: C:\LEG-MySQL that fails the allowlist is refused'
     Assert-Equal (Test-HasLegacyLayout -Installation (New-MockInstallation)) $false 'Legacy layout: not detected for the new layout'
 
@@ -277,12 +278,45 @@ try {
     Assert-Equal ([bool]($rootViolations | Where-Object { $_ -like '*unexpected entries*other*' })) $true 'Install root: unexpected entry is a violation'
 
     # Manual removal commands of the earlier layout
-    $commands = @(Get-LegacyRemovalCommands)
-    Assert-Equal ([bool]($commands -ccontains "choco uninstall mysql -y")) $true 'Manual removal: choco uninstall'
-    Assert-Equal ([bool]($commands -ccontains "sc.exe delete MySQL")) $true 'Manual removal: service deletion'
-    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('$(Get-OldPackageRoot)', `$true)")) $true 'Manual removal: program folder without following reparse points'
-    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('C:\ProgramData\MySQL', `$true)")) $true 'Manual removal: data folder without following reparse points'
+    $legacy = New-MockInstallation @{ ServiceExists = $true; ServiceIsLegacy = $true; PackageVersion = '9.7.2'; OldPackageRootExists = $true; OldDataDirectoryExists = $true; NewRootExists = $false }
+    $commands = @(Get-LegacyRemovalCommands -Installation $legacy -ReparsePaths @())
+    Assert-Equal ([bool]($commands[1] -like "Get-Item -LiteralPath *'C:\ProgramData\MySQL\data'*ReparsePoint*")) $true 'Manual removal: first command checks for reparse points'
+    foreach ($expected in @('Stop-Service -Name MySQL -Force', 'sc.exe config MySQL start= disabled', 'choco uninstall mysql -y', 'sc.exe delete MySQL', "[IO.Directory]::Delete('$(Get-OldPackageRoot)', `$true)", "[IO.Directory]::Delete('C:\ProgramData\MySQL\data', `$true)", "[IO.Directory]::Delete('C:\ProgramData\MySQL')")) {
+        Assert-Equal ([bool]($commands -ccontains $expected)) $true "Manual removal: $expected"
+    }
+    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('C:\ProgramData\MySQL', `$true)")) $false 'Manual removal: C:\ProgramData\MySQL is never deleted recursively'
     Assert-Equal ([bool]($commands | Where-Object { $_ -like '*Remove-Item*' })) $false 'Manual removal: no Remove-Item'
+    $foreign = New-MockInstallation @{ ServiceExists = $true; ServiceIsLegacy = $false; OwnershipProblem = 'other installation'; PackageVersion = '9.7.2'; OldDataDirectoryExists = $true; NewRootExists = $false }
+    $commands = @(Get-LegacyRemovalCommands -Installation $foreign -ReparsePaths @())
+    Assert-Equal ([bool]($commands | Where-Object { $_ -like '*Stop-Service*' -or $_ -like 'sc.exe*' -or $_ -like 'choco*' })) $false 'Manual removal: no service or package commands for a foreign service'
+    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('C:\ProgramData\MySQL\data', `$true)")) $true 'Manual removal: data folder of the earlier layout with a foreign service'
+    Assert-Equal @(Get-LegacyRemovalCommands -Installation $legacy -ReparsePaths @('C:\tools')).Count 0 'Manual removal: no commands if a folder is a reparse point'
+
+    # Get-ReparsePaths
+    $reparseTarget = Join-Path $root 'reparse-target'
+    $reparseLink = Join-Path $root 'reparse-link'
+    New-Item -ItemType Directory -Path $reparseTarget | Out-Null
+    New-Item -ItemType Junction -Path $reparseLink -Target $reparseTarget | Out-Null
+    Assert-Equal ((Get-ReparsePaths -Paths @($reparseTarget, $reparseLink, (Join-Path $root 'missing'))) -join ',') $reparseLink 'Reparse paths: only the junction is reported'
+    [IO.Directory]::Delete($reparseLink, $false)
+
+    # The printed data commands keep other MySQL installations below C:\ProgramData\MySQL
+    $mockProgramData = Join-Path $root 'ProgramData\MySQL'
+    New-Item -ItemType Directory -Path (Join-Path $mockProgramData 'data\mysql'), (Join-Path $mockProgramData 'MySQL Server 9.7\Data') | Out-Null
+    $savedParent = $OldDataParent
+    $savedData = $OldDataDirectory
+    $OldDataParent = $mockProgramData
+    $OldDataDirectory = Join-Path $mockProgramData 'data'
+    $dataCommands = @(Get-LegacyRemovalCommands -Installation (New-MockInstallation @{ OldDataDirectoryExists = $true; NewRootExists = $false }) -ReparsePaths @() | Where-Object { $_ -like '`[IO.Directory`]::Delete*' })
+    Assert-Equal $dataCommands.Count 2 'Data commands: data folder and optional parent'
+    Invoke-Expression $dataCommands[0]
+    $parentFailed = $false
+    try { Invoke-Expression $dataCommands[1] } catch { $parentFailed = $true }
+    Assert-Equal (Test-Path -LiteralPath $OldDataDirectory) $false 'Data commands: data folder deleted'
+    Assert-Equal $parentFailed $true 'Data commands: non-empty parent is not deleted'
+    Assert-Equal (Test-Path -LiteralPath (Join-Path $mockProgramData 'MySQL Server 9.7\Data')) $true 'Data commands: other installation kept'
+    $OldDataParent = $savedParent
+    $OldDataDirectory = $savedData
     Assert-Equal (Get-ChocolateyToolsRoot) $(if ([Environment]::GetEnvironmentVariable('ChocolateyToolsLocation', 'Machine')) { [Environment]::GetEnvironmentVariable('ChocolateyToolsLocation', 'Machine') } else { 'C:\tools' }) 'Tools root: machine value or C:\tools'
 
     # mysql client arguments and environment (L-1)

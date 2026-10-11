@@ -90,6 +90,7 @@ $DataDirectory = 'C:\LEG-MySQL\data\mysql\data'
 # Layout of the earlier version of this script (package defaults), which is only removed:
 # <tools>\mysql (Chocolatey's tools directory) and C:\ProgramData\MySQL\data.
 $OldDataParent = 'C:\ProgramData\MySQL'
+$OldDataDirectory = 'C:\ProgramData\MySQL\data'
 
 # Global option files that mysqld reads before BASEDIR\my.ini (MySQL Reference Manual, "Using
 # Option Files"); none may exist, so that only the option file of this script applies.
@@ -927,7 +928,7 @@ function Get-FailedInstallation {
         NewRootExists          = $newRootExists
         NewRootViolations      = @(if ($newRootExists) { Get-InstallRootViolations })
         OldPackageRootExists   = Test-Path -LiteralPath (Get-OldPackageRoot)
-        OldDataDirectoryExists = Test-Path -LiteralPath $OldDataParent
+        OldDataDirectoryExists = Test-Path -LiteralPath $OldDataDirectory
     }
 }
 
@@ -952,7 +953,7 @@ function Get-RemovalProblems {
         $problems += "the service '$ServiceName' does not belong to a local installation of the Chocolatey package '$MySqlPackage': $($Installation.OwnershipProblem)"
     }
     if (Test-HasLegacyLayout -Installation $Installation) {
-        $problems += "an installation of the earlier layout ($(Get-OldPackageRoot), $OldDataParent) exists; it is removed manually"
+        $problems += "an installation of the earlier layout ($(Get-OldPackageRoot), $OldDataDirectory) exists; it is removed manually"
     }
     if ($Installation.NewRootExists -and @($Installation.NewRootViolations).Count -gt 0) {
         $problems += "$InstallRoot was not created by this script or was changed: $(@($Installation.NewRootViolations) -join '; ')"
@@ -960,30 +961,79 @@ function Get-RemovalProblems {
     return $problems
 }
 
+function Get-LegacyCheckPaths {
+    # Folders whose type is checked before deletion commands are printed.
+    param($Installation)
+    $paths = @((Get-ChocolateyToolsRoot), (Get-OldPackageRoot), $OldDataParent, $OldDataDirectory)
+    if ($Installation -and $Installation.NewRootExists) { $paths += $InstallRoot }
+    return $paths
+}
+
+function Get-ReparsePaths {
+    # Returns the existing paths among $Paths that are reparse points (symbolic links,
+    # junctions, mount points).
+    param([string[]]$Paths)
+    return @($Paths | Where-Object { $_ -and (Test-IsReparsePoint -Path $_) })
+}
+
 function Get-LegacyRemovalCommands {
-    # Manual removal of the earlier layout, for an elevated PowerShell. [IO.Directory]::Delete
-    # with recursive=true "does not recurse through the reparse point" (Microsoft Learn,
-    # "Directory.Delete Method").
-    $oldPackageRoot = Get-OldPackageRoot
-    return @(
-        "Stop-Service -Name $ServiceName -Force",
-        "sc.exe config $ServiceName start= disabled",
-        "choco uninstall $MySqlPackage -y",
-        "sc.exe delete $ServiceName",
-        "[IO.Directory]::Delete('$oldPackageRoot', `$true)",
-        "[IO.Directory]::Delete('$OldDataParent', `$true)"
+    # Commands for the manual removal of the earlier layout, for an elevated PowerShell.
+    # Only C:\ProgramData\MySQL\data is deleted recursively (Oracle's installer uses other
+    # folders below C:\ProgramData\MySQL); the parent only if it is then empty (non-recursive
+    # Directory.Delete fails otherwise). [IO.Directory]::Delete with recursive=true "does not
+    # recurse through the reparse point" (Microsoft Learn, "Directory.Delete Method"). The
+    # service commands are included only for the service of the earlier layout. Returns no
+    # deletion commands if one of the folders is a reparse point.
+    param($Installation, [string[]]$ReparsePaths)
+    if (@($ReparsePaths).Count -gt 0) { return @() }
+    $checkPaths = (@(Get-LegacyCheckPaths -Installation $Installation) | ForEach-Object { "'$_'" }) -join ', '
+    $commands = @(
+        "# 1. Must print nothing; otherwise stop and ask for help:",
+        "Get-Item -LiteralPath $checkPaths -Force -ErrorAction SilentlyContinue | Where-Object { `$_.Attributes -band [IO.FileAttributes]::ReparsePoint }"
     )
+    $serviceIsOurs = $Installation.ServiceIsLegacy -and -not $Installation.OwnershipProblem
+    if ($serviceIsOurs) {
+        $commands += @(
+            "Stop-Service -Name $ServiceName -Force",
+            "sc.exe config $ServiceName start= disabled"
+        )
+    }
+    if ($Installation.PackageVersion -and ($serviceIsOurs -or -not $Installation.ServiceExists)) {
+        $commands += "choco uninstall $MySqlPackage -y"
+    }
+    if ($serviceIsOurs) { $commands += "sc.exe delete $ServiceName" }
+    if ($Installation.OldPackageRootExists) { $commands += "[IO.Directory]::Delete('$(Get-OldPackageRoot)', `$true)" }
+    if ($Installation.OldDataDirectoryExists) {
+        $commands += @(
+            "[IO.Directory]::Delete('$OldDataDirectory', `$true)",
+            "# Optional; fails if the folder is not empty (other MySQL installations):",
+            "[IO.Directory]::Delete('$OldDataParent')"
+        )
+    }
+    return $commands
 }
 
 function Write-ManualRemovalInstructions {
     param($Installation)
     Write-Host ''
     Write-Host 'Nothing was changed. This installation is not removed automatically (docs/INSTALLATION.md, "Recovery after a failed setup").' -ForegroundColor Red
+    if ($Installation -and $Installation.ServiceExists -and -not ($Installation.ServiceIsLegacy -and -not $Installation.OwnershipProblem)) {
+        Write-Warning "The service '$ServiceName' belongs to another MySQL installation. Do not stop or delete it for this project; resolve the name conflict manually."
+    }
     if ($Installation -and (Test-HasLegacyLayout -Installation $Installation)) {
+        $reparsePaths = @(Get-ReparsePaths -Paths (Get-LegacyCheckPaths -Installation $Installation))
+        if ($reparsePaths.Count -gt 0) {
+            Write-Warning "These folders are symbolic links, junctions or mount points: $($reparsePaths -join ', '). Do not delete anything; check the folders first."
+            return
+        }
         Write-Host 'Remove it in a PowerShell window opened as administrator, while no other user is signed in to this computer:' -ForegroundColor Red
-        foreach ($command in Get-LegacyRemovalCommands) { Write-Host "  $command" }
+        foreach ($command in Get-LegacyRemovalCommands -Installation $Installation -ReparsePaths $reparsePaths) { Write-Host "  $command" }
         Write-Host 'Commands for parts that do not exist report an error; that is expected. Then run this script again.' -ForegroundColor Red
     } else {
+        $reparsePaths = @(Get-ReparsePaths -Paths (Get-LegacyCheckPaths -Installation $Installation))
+        if ($reparsePaths.Count -gt 0) {
+            Write-Warning "These folders are symbolic links, junctions or mount points: $($reparsePaths -join ', '). Do not delete anything; check the folders first."
+        }
         Write-Host 'Check the installation and remove it manually if it is no longer needed.' -ForegroundColor Red
     }
 }

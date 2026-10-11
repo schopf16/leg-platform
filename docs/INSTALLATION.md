@@ -96,18 +96,24 @@ If the script reports that the service still exists after `sc.exe delete`, close
 
 #### Installation made by the earlier version of the script, or anything else
 
-The earlier version installed the programs in Chocolatey's tools folder (`C:\tools\mysql`; the machine-wide variable `ChocolateyToolsLocation` if it is set, otherwise `C:\tools`) and the databases in `C:\ProgramData\MySQL`. Ordinary users could change both folders, so the script does not delete them itself; it also refuses a `C:\LEG-MySQL` that fails the check above. In these cases it changes nothing and prints the commands for the manual removal. For the earlier layout they are:
+The earlier version installed the programs in Chocolatey's tools folder (`C:\tools\mysql`; the machine-wide variable `ChocolateyToolsLocation` if it is set, otherwise `C:\tools`) and the databases in `C:\ProgramData\MySQL\data`. Ordinary users could change both folders, so the script does not delete them itself; it also refuses a `C:\LEG-MySQL` that fails the check above. In these cases it changes nothing and prints the commands for the manual removal, adapted to what it found. On the current development machine they are:
 
 ```powershell
+# 1. Must print nothing; otherwise stop and ask for help:
+Get-Item -LiteralPath 'C:\tools', 'C:\tools\mysql', 'C:\ProgramData\MySQL', 'C:\ProgramData\MySQL\data' -Force -ErrorAction SilentlyContinue | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }
 Stop-Service -Name MySQL -Force
 sc.exe config MySQL start= disabled
 choco uninstall mysql -y
 sc.exe delete MySQL
 [IO.Directory]::Delete('C:\tools\mysql', $true)
-[IO.Directory]::Delete('C:\ProgramData\MySQL', $true)
+[IO.Directory]::Delete('C:\ProgramData\MySQL\data', $true)
+# Optional; fails if the folder is not empty (other MySQL installations):
+[IO.Directory]::Delete('C:\ProgramData\MySQL')
 ```
 
-Run them in a PowerShell window opened as administrator, while no other user is signed in to the computer. Commands for parts that no longer exist report an error; that is expected. `[IO.Directory]::Delete` with `$true` deletes the folder with its content and does not follow symbolic links or junctions inside it ("This method does not recurse through the reparse point", Microsoft Learn, "Directory.Delete Method"). All local MySQL databases are lost. Then run the setup script again (first command above, without `-RemoveFailedInstallation`); it removes the old entry `C:\tools\mysql\current\bin` from your user `PATH` automatically. The folder `C:\tools` itself may remain; it is no longer used by this project.
+The first command must print nothing; if it lists a folder, one of the folders is a symbolic link, junction or mount point, and you must not run the other commands. The script itself also checks these folders and prints no delete commands if one of them is such a link. Only `C:\ProgramData\MySQL\data` is deleted with its content; `C:\ProgramData\MySQL` is deleted only if it is then empty, because MySQL's own installer keeps its data in other folders there (`MySQL Server <version>`). The service commands are printed only if the `MySQL` service belongs to the earlier installation of this project; if it belongs to another MySQL installation, the script warns and you must not stop or delete it.
+
+Run the commands in a PowerShell window opened as administrator, while no other user is signed in to the computer and no scheduled tasks or services of other users are running. Commands for parts that no longer exist report an error; that is expected. `[IO.Directory]::Delete` with `$true` deletes the folder with its content and does not follow symbolic links or junctions inside it ("This method does not recurse through the reparse point", Microsoft Learn, "Directory.Delete Method"). All local MySQL databases are lost. Then run the setup script again (first command above, without `-RemoveFailedInstallation`); it removes the old entry `C:\tools\mysql\current\bin` from your user `PATH` automatically. The folder `C:\tools` itself may remain; it is no longer used by this project.
 
 For a `C:\LEG-MySQL` that the script refuses, check its content and owner first (`Get-Acl C:\LEG-MySQL | Format-List`), then remove it the same way (`[IO.Directory]::Delete('C:\LEG-MySQL', $true)`), together with the service and package as above.
 
