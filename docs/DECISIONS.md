@@ -521,6 +521,30 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 * Open: licence of the public repository (without a licence, the default copyright applies and nobody may reuse the code).
 * Sources: https://community.chocolatey.org/packages/mysql, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/, https://dev.mysql.com/doc/relnotes/mysql/9.7/en/, https://dev.mysql.com/doc/relnotes/mysql/9.7/en/news-9-7-0.html, https://dev.mysql.com/doc/refman/9.7/en/mysql-releases.html, https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions (checked on 2026-10-11)
 
+## D-028: Baseline Settings of the Django Project Skeleton
+
+* Date: 2026-10-11
+* Status: Proposed (implemented in the project skeleton; confirmation by the project owner pending)
+* Context: README "Current Status", next step: create the Django project skeleton. `docs/SECURITY.md` (sections 3 and 6) requires secure defaults, but leaves several details of the settings open.
+* Decision:
+  * The environment variables are validated in one place (`leg_platform/environment.py`); invalid or unsafe values prevent the start. Beyond `APP_ENV`, `DJANGO_DEBUG` and `EMAIL_MODE`: outside `APP_ENV=local`, `DJANGO_SECRET_KEY` and every fallback key must meet the criteria of Django's deployment check `security.W009` (at least 50 characters, at least 5 unique characters, no `django-insecure-` prefix), `DJANGO_ALLOWED_HOSTS` must be set, and `DJANGO_CSRF_TRUSTED_ORIGINS` accepts only `https://` origins. Wildcards (`*`, leading `.`) are rejected in `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` in all environments.
+  * HSTS in stage and production with a default of one year (`DJANGO_SECURE_HSTS_SECONDS`, can be lowered for testing but not disabled). `SECURE_HSTS_INCLUDE_SUBDOMAINS` and `SECURE_HSTS_PRELOAD` stay `False`: the policy would also apply to every host below the application's host name, and preloading is hard to revoke; both are decisions of the operator for its domain. The deployment warnings `security.W005` and `security.W021` are silenced for this reason, so that `check --deploy --fail-level WARNING` reports every other warning.
+  * `SECURE_PROXY_SSL_HEADER` is set only through `DJANGO_SECURE_PROXY_SSL_HEADER`, never by default.
+  * Email delivery via Microsoft Graph is not implemented yet. In the modes `allowlist` and `graph`, a placeholder backend (`leg_platform.mail.GraphNotImplementedEmailBackend`) raises an error on every send attempt, so that email is never dropped silently and never sent through Django's default SMTP backend or to the console. Django 6.1 deprecates `EMAIL_BACKEND` in favour of `MAILERS`, which Django 5.2 does not know; the settings set `MAILERS` on Django 6.1 and later and `EMAIL_BACKEND` otherwise.
+  * MySQL connection: `isolation_level` "read committed" (Django's default, set explicitly), `charset` utf8mb4, test database with utf8mb4 and `utf8mb4_0900_ai_ci`. `sql_mode` is not overridden; MySQL's default contains `STRICT_TRANS_TABLES`, and Django's check `mysql.W002` (run in CI with `--database default`) and a test verify strict mode.
+  * Logging: warnings and errors to standard error; no email to `ADMINS`.
+* Verified facts:
+  * Django's MySQL notes: "Django works best with and defaults to read committed rather than MySQL's default, repeatable read. Data loss is possible with repeatable read."; "The default value of the `sql_mode` option contains `STRICT_TRANS_TABLES`." Django connects with `charset` utf8mb4 by default (source `django/db/backends/mysql/base.py`, 5.2.18 and 6.1.2).
+  * Django's SecurityMiddleware documentation: "it's a good idea to first use a small value for testing, for example, `SECURE_HSTS_SECONDS = 3600` [...] (31536000 seconds, i.e. 1 year, is common)"; "The HSTS policy applies to your entire domain".
+  * Django 6.1 release notes: `EMAIL_BACKEND` and related settings "are deprecated. Replace them with a `MAILERS` configuration"; new deployment check `mail.E001` against development-only backends in `MAILERS`; "The check management command now supplies all databases if not specified."
+  * Django 6.0 and later provide `django.middleware.csp` and `SECURE_CSP` (present in 6.1.2); Django 5.2.18 has no built-in Content Security Policy support (no `django/middleware/csp.py`).
+  * None of Django's password validators sets a maximum length (source `django/contrib/auth/password_validation.py`, 6.1.2).
+* Rationale: fail early and closed on configuration errors; operators without in-depth IT knowledge get secure defaults (`docs/SECURITY.md`, section 1).
+* Security implications: a Content Security Policy is not set yet, because the minimum version Django 5.2 has no built-in support and no package was agreed (open). Encrypted transport to the database in stage and production (`docs/SECURITY.md`, section 9) is not configured yet and depends on the hosting (open).
+* Alternatives: `SECURE_HSTS_INCLUDE_SUBDOMAINS = True` (left to the operator); silencing `mail.E001` instead of a placeholder backend (rejected: it would hide that production cannot send email); Django's dummy backend (rejected: drops email silently).
+* Sources (checked on 2026-10-11): https://docs.djangoproject.com/en/5.2/ref/databases/, https://docs.djangoproject.com/en/5.2/ref/middleware/, https://docs.djangoproject.com/en/6.1/releases/6.1/, https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/, installed source of Django 6.1.2 and 5.2.18
+* Consequences: a Content Security Policy must be decided before the first application view with templates; the placeholder email backend is replaced by the Microsoft Graph backend (D-006).
+
 ## Template for New Decisions
 
 ### D-XXX: Title

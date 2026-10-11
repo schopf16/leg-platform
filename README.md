@@ -83,7 +83,9 @@ The project foundation and security requirements are defined. They were revised 
 
 On 2026-10-11 the Git repository was initialised (branch `main`, local only) and the ignore rules for secret files were verified with `git check-ignore`. The minimum versions and packages were determined from official sources and proposed in D-026; nothing has been installed yet.
 
+On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (Python 3.11, Django 5.2, MySQL 8.4) and the newest versions (Python 3.14, Django 6.1, MySQL 9.7). Local development is described in `docs/INSTALLATION.md`. No application functions exist yet.
+
 Next steps:
 
-1. Confirmation of D-026 by the project owner: minimum versions, new packages, approach for rate limits, local MySQL 8.4 server, proof of the minimum versions by tests.
-2. Create the Django project skeleton.
+1. Confirmation of D-028 by the project owner and a first run of continuous integration on GitHub.
+2. Custom user model (D-021), before any persistent database is migrated.
