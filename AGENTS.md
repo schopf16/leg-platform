@@ -191,6 +191,8 @@ Use locally ignored configuration files, and protected environment variables or 
 
 Do not read `.env` or other secret files directly; `.env.example` documents the variables. Do not keep production or stage secrets on development machines (`docs/DECISIONS.md`, D-020).
 
+* Never print the process environment (e.g. `env`, `set`, `Get-ChildItem env:`); local configuration and secrets are kept in environment variables (D-027).
+
 Never publish project content (e.g. as a shared page or to an external service) without the project owner's consent.
 
 ## 9. Database and Migrations
