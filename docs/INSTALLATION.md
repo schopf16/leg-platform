@@ -6,16 +6,27 @@ This guide grows with the project. Installation of stage and production instance
 
 For Windows development machines (D-027). Never use these steps or their credentials for stage or production.
 
-1. Run the setup script once in PowerShell **as administrator**:
+1. Open PowerShell **as administrator** in the project directory and run the setup script.
+
+   First setup:
 
    ```powershell
    .\scripts\local\setup-dev-windows.ps1
    ```
 
+   Retry after a failed setup (removes the local MySQL installation of the failed run first, then sets everything up again):
+
+   ```powershell
+   .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
+   ```
+
+   If a local MySQL installation already exists, the first command stops without changing anything and shows the second command. Before the second command deletes the MySQL data directory, it asks you to type `DELETE`; all local MySQL databases are then lost. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
+
    The script:
 
    * first asks for the new password of the local MySQL `root` account, before anything is installed. The password needs at least 15 characters, only printable ASCII characters, none of `#`, `"`, `'`, `\` and `;`, and no leading or trailing space, because it is written into an SQL string and into a MySQL option file, where these characters have a special meaning (MySQL Reference Manual, "Using Option Files"). Keep it in your password manager; the script does not store it;
-   * installs Python 3.14 and then MySQL 9.7 LTS with Chocolatey;
+   * installs Python 3.14 with Chocolatey, unless the package `python314` is already installed, and then MySQL 9.7 LTS;
+   * finds the MySQL server program from the Windows service, also when the service command line has no `.exe` extension and no quotes, as the Chocolatey package registers it (`C:\tools\mysql\current\bin\mysqld MySQL`), and reads the option file `my.ini` in the MySQL base directory;
    * binds MySQL to `127.0.0.1` and disables X Plugin (`mysqlx=OFF`) in `my.ini`, restarts the service and verifies with `Get-NetTCPConnection` that the server listens only on `127.0.0.1:3306` and that nothing listens on the X Plugin port 33060. X Plugin is enabled by default and listens on all interfaces (`mysqlx_bind_address` default `*`); Django does not use the X Protocol. A copy of the original option file is kept as `my.ini.before-leg-setup`;
    * sets the `root` password, verifies a login with it, and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`), because X Plugin may open its port only after the socket check;
    * keeps the service start type `Manual` until the setup has succeeded and sets it to `Automatic` at the end;
@@ -48,16 +59,38 @@ For Windows development machines (D-027). Never use these steps or their credent
 
 ### Recovery after a failed setup
 
-If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled`, checks the result and prints the paths it found. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`. To start over:
+If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled`, checks the result and prints the paths it found. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`.
+
+To start over, fix the cause shown by the script and run as administrator:
+
+```powershell
+.\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
+```
+
+Before it changes anything, the script lists what it will remove and asks for the new `root` password. It then:
+
+* stops the `MySQL` service, uninstalls the Chocolatey package `mysql` and deletes the service if it still exists (`sc.exe delete MySQL`);
+* deletes the data directory `C:\ProgramData\MySQL\data` only after you have typed `DELETE`, and only if it looks like a MySQL data directory (it contains `mysql.ibd` and the folder `mysql`) or is empty. It never deletes another directory: if `my.ini` names a different `datadir`, the script reports it and leaves it in place;
+* deletes the leftover `my.ini` and `my.ini.before-leg-setup`, checks that nothing of the old installation remains, and continues with the normal setup.
+
+If the script reports that the service still exists after `sc.exe delete`, close the Services console and Task Manager or restart Windows, and run the command again; every step checks the current state and can be repeated. User environment variables of an earlier run are overwritten by a successful run.
+
+Manual steps, if you prefer them or the script cannot complete them:
 
 1. Uninstall MySQL: `choco uninstall mysql -y`.
 2. If the Windows service still exists (`Get-Service MySQL`), remove it: `sc.exe delete MySQL`.
 3. Delete the data directory (`datadir` in `my.ini`; the Chocolatey package uses `C:\ProgramData\MySQL\data` unless `/dataLocation` was given). This is required: the package initialises a new data directory only if none exists, and an old one may already contain the new `root` password or the application account.
 4. Delete `my.ini` and `my.ini.before-leg-setup` in the MySQL installation directory if they remain; the package creates `my.ini` only if it does not exist.
 5. Remove user environment variables the script may have set (`APP_ENV`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY`), e.g. with `[Environment]::SetEnvironmentVariable('DB_PASSWORD', $null, 'User')`.
-6. Fix the cause shown by the script and run it again. The script refuses to run while a service named `MySQL` exists.
+6. Fix the cause shown by the script and run it again. Without `-RemoveFailedInstallation`, the script refuses to run while the `MySQL` service, the Chocolatey package `mysql`, the data directory `C:\ProgramData\MySQL\data` or a leftover `my.ini` exists.
 
-The Chocolatey package's own uninstall script was not reviewed; check after step 1 whether the service and the files still exist. Source: https://community.chocolatey.org/packages/mysql (install script, checked on 2026-10-11).
+The Chocolatey package `mysql` 9.7.2 has no uninstall script (its `tools` folder contains only `chocolateyInstall.ps1`; checked on the development machine on 2026-10-11), so `choco uninstall` does not remove the service; the program files under `C:\tools\mysql` may also remain and are overwritten by the next installation. Source: https://community.chocolatey.org/packages/mysql (install script, checked on 2026-10-11).
+
+The helper functions of the setup script are tested without changing the system (no administrator rights needed):
+
+```powershell
+powershell -NoProfile -File scripts\local\test-setup-dev-windows.ps1
+```
 
 ### Database privileges
 

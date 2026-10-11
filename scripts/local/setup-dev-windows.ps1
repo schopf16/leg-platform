@@ -34,16 +34,29 @@
     your password manager. Passwords are passed to the mysql client via standard input or a
     temporary option file readable only by the current user, never on the command line.
 
+    If the python314 Chocolatey package is already installed, the Python step is skipped.
+
+    If a service named 'MySQL' already exists (e.g. from a failed run), the script stops
+    without changing anything, unless -RemoveFailedInstallation is given.
+
 .PARAMETER MySqlVersion
     Chocolatey package version of MySQL to install.
 
 .PARAMETER PythonVersion
     Chocolatey package version of the python314 package to install.
+
+.PARAMETER RemoveFailedInstallation
+    Removes the local MySQL installation left behind by a failed run before the normal setup
+    starts: stops the service, uninstalls the Chocolatey package 'mysql', deletes the service,
+    deletes the data directory (only the package's default data directory, and only after
+    you confirm by typing DELETE) and removes the leftover option file. All local MySQL
+    databases are lost. For local development machines only.
 #>
 [CmdletBinding()]
 param(
     [string]$MySqlVersion = '9.7.2',
-    [string]$PythonVersion = '3.14.8'
+    [string]$PythonVersion = '3.14.8',
+    [switch]$RemoveFailedInstallation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,6 +69,13 @@ $AppUser = 'leg_platform'
 $MySqlPort = 3306
 $XPluginPort = 33060
 $MinimumRootPasswordLength = 15
+$MySqlPackage = 'mysql'
+$PythonPackage = 'python314'
+# Data directory the Chocolatey package 'mysql' uses without the package parameter
+# /dataLocation: "C:\ProgramData\MySQL" plus "\data" (its tools\chocolateyInstall.ps1, 9.7.2).
+# Only this directory is ever deleted by -RemoveFailedInstallation.
+$PackageDataDirectory = 'C:\ProgramData\MySQL\data'
+$RetryCommand = '.\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation'
 
 # Privileges Django needs on MySQL: data access, and schema changes by migrations (CREATE,
 # DROP, ALTER, INDEX; REFERENCES for foreign key constraints). On the test database, CREATE
@@ -151,24 +171,75 @@ function Invoke-MySql {
     if ($LASTEXITCODE -ne 0) { throw "mysql client exited with code $LASTEXITCODE" }
 }
 
+function Test-IsFile {
+    param([string]$Path)
+    try { return [bool](Test-Path -LiteralPath $Path -PathType Leaf) } catch { return $false }
+}
+
+function Resolve-ServiceExecutablePath {
+    # Returns the existing executable that a service command line (Win32_Service.PathName)
+    # starts, or $null. The Chocolatey package 'mysql' registers the service with
+    # "mysqld --install MySQL", which results in an unquoted path without extension, e.g.
+    # C:\tools\mysql\current\bin\mysqld MySQL (observed on 2026-10-11).
+    # A quoted path is taken as it is. For an unquoted path, the white-space separated
+    # prefixes are tried from the shortest to the longest, the order Microsoft documents for
+    # CreateProcess (Microsoft Learn, "CreateProcessW function": "c:\program.exe", then
+    # "c:\program files\sub.exe", ...). For a candidate without an extension, the path itself
+    # and then the path with ".exe" appended are tried. Only existing files are returned.
+    param([string]$PathName)
+    if (-not $PathName) { return $null }
+    $trimmed = $PathName.Trim()
+    $candidates = @()
+    if ($trimmed.StartsWith('"')) {
+        $end = $trimmed.IndexOf('"', 1)
+        if ($end -lt 2) { return $null }
+        $candidates += $trimmed.Substring(1, $end - 1)
+    } else {
+        $tokens = @($trimmed -split '\s+')
+        for ($count = 1; $count -le $tokens.Count; $count++) {
+            $candidates += ($tokens[0..($count - 1)] -join ' ')
+        }
+    }
+    foreach ($candidate in $candidates) {
+        $paths = @($candidate)
+        try {
+            $extension = [IO.Path]::GetExtension($candidate)
+        } catch {
+            # Characters that are invalid in paths: not an executable path.
+            continue
+        }
+        if (-not $extension) { $paths += "$candidate.exe" }
+        foreach ($path in $paths) {
+            if (Test-IsFile -Path $path) { return $path }
+        }
+    }
+    return $null
+}
+
+function Get-OptionFilePath {
+    # Returns the option file of the server: the value of --defaults-file in the service
+    # command line, or otherwise my.ini in the base directory (the parent of bin), which
+    # mysqld reads on Windows (MySQL Reference Manual, "Using Option Files": BASEDIR\my.ini).
+    param([string]$PathName, [string]$Executable)
+    # --defaults-file="C:\path with spaces\my.ini" or --defaults-file=C:\path\my.ini
+    $match = [regex]::Match("$PathName", '--defaults-file=(?:"([^"]+)"|(\S+))')
+    if ($match.Success) {
+        if ($match.Groups[1].Success) { return $match.Groups[1].Value }
+        return $match.Groups[2].Value
+    }
+    if (-not $Executable) { return $null }
+    return Join-Path (Split-Path -Parent (Split-Path -Parent $Executable)) 'my.ini'
+}
+
 function Get-ServerPaths {
     $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
     if (-not $service) { throw "Service '$ServiceName' was not created by the installation." }
-    $pathName = $service.PathName
-    $mysqld = ([regex]::Match($pathName, '^\s*"([^"]+)"|^\s*(\S+)')).Groups |
-        Select-Object -Skip 1 | Where-Object { $_.Success } | Select-Object -First 1 -ExpandProperty Value
-    if (-not $mysqld -or -not (Test-Path -LiteralPath $mysqld)) { throw "mysqld not found in the service command line." }
-    $binDir = Split-Path -Parent $mysqld
-    $client = Join-Path $binDir 'mysql.exe'
-    if (-not (Test-Path -LiteralPath $client)) { throw "mysql client not found at $client" }
-    # --defaults-file="C:\path with spaces\my.ini" or --defaults-file=C:\path\my.ini
-    $match = [regex]::Match($pathName, '--defaults-file=(?:"([^"]+)"|(\S+))')
-    if ($match.Success) {
-        $myIni = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
-    } else {
-        $myIni = Join-Path (Split-Path -Parent $binDir) 'my.ini'
-    }
-    if (-not (Test-Path -LiteralPath $myIni)) { throw "Option file not found at $myIni." }
+    $mysqld = Resolve-ServiceExecutablePath -PathName $service.PathName
+    if (-not $mysqld) { throw "mysqld not found in the service command line '$($service.PathName)'." }
+    $client = Join-Path (Split-Path -Parent $mysqld) 'mysql.exe'
+    if (-not (Test-IsFile -Path $client)) { throw "mysql client not found at $client" }
+    $myIni = Get-OptionFilePath -PathName $service.PathName -Executable $mysqld
+    if (-not (Test-IsFile -Path $myIni)) { throw "Option file not found at $myIni." }
     return [pscustomobject]@{ Client = $client; MyIni = $myIni }
 }
 
@@ -288,9 +359,68 @@ function Get-DataDirectory {
     } catch {
         return $null
     }
-    $match = [regex]::Match($text, '(?m)^\s*datadir\s*=\s*"?([^"\r\n]+?)"?\s*$')
-    if ($match.Success) { return $match.Groups[1].Value }
+    # "If multiple instances of a given option are found, the last instance takes precedence"
+    # (MySQL Reference Manual, "Using Option Files").
+    $found = [regex]::Matches($text, '(?m)^\s*datadir\s*=\s*"?([^"\r\n]+?)"?\s*$')
+    if ($found.Count -eq 0) { return $null }
+    # In option files, "\\" stands for a single backslash (MySQL Reference Manual, "Using
+    # Option Files"); the Chocolatey package writes datadir=C:\\ProgramData\\MySQL\\data.
+    return $found[$found.Count - 1].Groups[1].Value.Replace('\\', '\')
+}
+
+function Test-IsSamePath {
+    # Compares two absolute Windows paths case-insensitively, ignoring trailing separators
+    # and "/" versus "\". Relative paths are never considered equal.
+    param([string]$First, [string]$Second)
+    if (-not $First -or -not $Second) { return $false }
+    try {
+        if (-not [IO.Path]::IsPathRooted($First) -or -not [IO.Path]::IsPathRooted($Second)) { return $false }
+        $a = [IO.Path]::GetFullPath($First.Replace('/', '\')).TrimEnd('\')
+        $b = [IO.Path]::GetFullPath($Second.Replace('/', '\')).TrimEnd('\')
+    } catch {
+        return $false
+    }
+    return [string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-IsMySqlDataDirectory {
+    # A MySQL 8.0 or later data directory contains the data dictionary tablespace mysql.ibd
+    # and the system schema directory mysql (MySQL Reference Manual, "The MySQL Data
+    # Directory"). An empty directory is also accepted.
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    if (@(Get-ChildItem -LiteralPath $Path -Force).Count -eq 0) { return $true }
+    return (Test-IsFile -Path (Join-Path $Path 'mysql.ibd')) -and
+        (Test-Path -LiteralPath (Join-Path $Path 'mysql') -PathType Container)
+}
+
+function ConvertFrom-ChocolateyListOutput {
+    # Returns the installed version of a package from "choco list <name> --exact
+    # --limit-output" (lines of the form name|version), or $null.
+    param([string[]]$Lines, [string]$Name)
+    foreach ($line in @($Lines)) {
+        $parts = "$line".Trim().Split('|')
+        if ($parts.Count -eq 2 -and $parts[0] -ieq $Name -and $parts[1]) { return $parts[1] }
+    }
     return $null
+}
+
+function Get-InstalledChocolateyPackageVersion {
+    # Chocolatey 2 lists only locally installed packages with "choco list".
+    param([string]$Name)
+    $output = @(choco list $Name --exact --limit-output)
+    if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while listing packages." }
+    return ConvertFrom-ChocolateyListOutput -Lines $output -Name $Name
+}
+
+function Get-ChocolateyToolsRoot {
+    # Installation root of the package 'mysql' without /installLocation: Chocolatey's
+    # Get-ToolsLocation (helpers\functions\Get-ToolsLocation.ps1), i.e. the variable
+    # ChocolateyToolsLocation or "<system drive>\tools". The older ChocolateyBinRoot is not
+    # considered; the service command line is used whenever the service exists.
+    $value = [Environment]::GetEnvironmentVariable('ChocolateyToolsLocation')
+    if ($value) { return $value }
+    return Join-Path $env:SystemDrive 'tools'
 }
 
 function Disable-MySqlService {
@@ -334,34 +464,173 @@ function Write-RecoveryInstructions {
     Write-Host '  5. Remove user environment variables set by this script, if any:'
     Write-Host '     APP_ENV, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY'
     Write-Host '  6. Fix the cause shown above and run this script again.'
+    Write-Host ''
+    Write-Host 'Steps 1 to 4 are done automatically, after a confirmation, by running as administrator:'
+    Write-Host "  $RetryCommand"
+}
+
+function Get-FailedInstallation {
+    # Collects what an earlier run left behind, without changing anything.
+    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
+    $myIni = $null
+    if ($service) {
+        $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
+        $myIni = Get-OptionFilePath -PathName $service.PathName -Executable $executable
+    }
+    if (-not $myIni) {
+        $myIni = Join-Path (Get-ChocolateyToolsRoot) "$MySqlPackage\current\my.ini"
+    }
+    $optionFiles = @($myIni, "$myIni.before-leg-setup") | Where-Object { Test-IsFile -Path $_ }
+    $configuredDataDirectory = Get-DataDirectory -MyIni $myIni
+    $dataDirectoryExists = Test-Path -LiteralPath $PackageDataDirectory -PathType Container
+    return [pscustomobject]@{
+        ServiceExists           = [bool]$service
+        PackageVersion          = Get-InstalledChocolateyPackageVersion -Name $MySqlPackage
+        OptionFiles             = @($optionFiles)
+        ConfiguredDataDirectory = $configuredDataDirectory
+        DataDirectoryExists     = $dataDirectoryExists
+    }
+}
+
+function Test-HasLeftovers {
+    param($Installation)
+    return $Installation.ServiceExists -or $Installation.PackageVersion -or
+        $Installation.OptionFiles.Count -gt 0 -or $Installation.DataDirectoryExists
+}
+
+function Confirm-FailedInstallationRemoval {
+    # Shows what will be removed and asks for the confirmation before anything is changed.
+    # Returns only if the removal may proceed; throws otherwise.
+    param($Installation)
+    if ($Installation.ConfiguredDataDirectory -and
+        -not (Test-IsSamePath -First $Installation.ConfiguredDataDirectory -Second $PackageDataDirectory)) {
+        # Never delete a directory other than the package default: a my.ini changed by hand
+        # could point anywhere. The package creates a new my.ini with its default datadir.
+        Write-Warning "my.ini names the data directory '$($Installation.ConfiguredDataDirectory)'. It is not the package default and is NOT deleted; delete it yourself if it is no longer needed."
+    }
+    if ($Installation.DataDirectoryExists -and -not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
+        throw "'$PackageDataDirectory' does not look like a MySQL data directory (no mysql.ibd and mysql folder). Nothing was changed; check and remove it manually (docs/INSTALLATION.md)."
+    }
+    Write-Host ''
+    Write-Host 'The following local MySQL installation will be removed:' -ForegroundColor Yellow
+    if ($Installation.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped first, then deleted)" }
+    if ($Installation.PackageVersion) { Write-Host "  - Chocolatey package '$MySqlPackage' $($Installation.PackageVersion) (choco uninstall)" }
+    foreach ($file in $Installation.OptionFiles) { Write-Host "  - Option file $file" }
+    if ($Installation.DataDirectoryExists) {
+        Write-Host "  - Data directory $PackageDataDirectory with ALL local MySQL databases (cannot be undone)" -ForegroundColor Yellow
+        $answer = Read-Host "Type DELETE to permanently delete '$PackageDataDirectory'"
+        if ($answer -cne 'DELETE') {
+            throw 'Not confirmed. Nothing was changed.'
+        }
+    }
+}
+
+function Wait-ServiceRemoved {
+    # "sc.exe delete" only marks a service for deletion; it disappears once no handle is open.
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { return }
+        Start-Sleep -Seconds 2
+    }
+    throw "The service '$ServiceName' still exists. Close the Services console and Task Manager, or restart Windows, then run: $RetryCommand"
+}
+
+function Remove-FailedInstallation {
+    # Removes the installation after Confirm-FailedInstallationRemoval. Every step checks the
+    # current state, so that the removal can be repeated after an interruption.
+    param($Installation)
+    if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+        $deadline = (Get-Date).AddSeconds(30)
+        while ((Get-Date) -lt $deadline -and "$((Get-Service -Name $ServiceName).Status)" -ne 'Stopped') {
+            Start-Sleep -Seconds 2
+        }
+        if ("$((Get-Service -Name $ServiceName).Status)" -ne 'Stopped') {
+            throw "The service '$ServiceName' could not be stopped. Nothing else was changed."
+        }
+        Write-Host "Service '$ServiceName' is stopped."
+    }
+    if (Get-InstalledChocolateyPackageVersion -Name $MySqlPackage) {
+        choco uninstall $MySqlPackage -y --no-progress
+        if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while uninstalling MySQL." }
+    }
+    # The package has no uninstall script, so the service usually remains.
+    if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+        sc.exe delete $ServiceName | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe delete $ServiceName failed with exit code $LASTEXITCODE." }
+        Wait-ServiceRemoved
+        Write-Host "Service '$ServiceName' was deleted."
+    }
+    if ($Installation.DataDirectoryExists -and (Test-Path -LiteralPath $PackageDataDirectory)) {
+        # Confirmed by the user in Confirm-FailedInstallationRemoval.
+        Remove-Item -LiteralPath $PackageDataDirectory -Recurse -Force
+        if (Test-Path -LiteralPath $PackageDataDirectory) { throw "The data directory $PackageDataDirectory could not be deleted." }
+        Write-Host "Data directory $PackageDataDirectory was deleted."
+    }
+    foreach ($file in $Installation.OptionFiles) {
+        if (Test-IsFile -Path $file) {
+            Remove-Item -LiteralPath $file -Force
+            Write-Host "Option file $file was deleted."
+        }
+    }
 }
 
 # 0. Preconditions
 
-if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-    throw "A Windows service named '$ServiceName' already exists. This script only sets up a new installation; see docs/INSTALLATION.md for recovery."
-}
 if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
     throw 'Chocolatey (choco) was not found.'
+}
+$chocoVersion = "$(choco --version)".Trim()
+if ($chocoVersion -notmatch '^(\d+)\.' -or [int]$Matches[1] -lt 2) {
+    # "choco list" lists only local packages from Chocolatey 2 on.
+    throw "Chocolatey 2 or later is required (found '$chocoVersion'). Run: choco upgrade chocolatey -y"
+}
+
+$failedInstallation = Get-FailedInstallation
+if (Test-HasLeftovers -Installation $failedInstallation) {
+    if (-not $RemoveFailedInstallation) {
+        throw "A local MySQL installation already exists (e.g. from a failed run). To remove it and start over, run as administrator: $RetryCommand"
+    }
+    Confirm-FailedInstallationRemoval -Installation $failedInstallation
+} elseif ($RemoveFailedInstallation) {
+    Write-Host 'No local MySQL installation found; nothing to remove.'
 }
 
 # 1. Ask for the root password before anything is installed
 
 $rootPassword = Read-RootPassword
 
-# 2. Install Python
+# 2. Remove the failed installation (only with -RemoveFailedInstallation, confirmed above)
+
+if ($RemoveFailedInstallation -and (Test-HasLeftovers -Installation $failedInstallation)) {
+    Remove-FailedInstallation -Installation $failedInstallation
+    if (Test-HasLeftovers -Installation (Get-FailedInstallation)) {
+        throw "Parts of the old installation remain. Check docs/INSTALLATION.md, then run: $RetryCommand"
+    }
+    Write-Host 'The old local MySQL installation was removed.'
+}
+
+# 3. Install Python unless the package is already installed
 # Newest Python version supported by the newest Django release (D-015: the newest possible
 # version is used for development; the minimum versions are only declared and tested in CI).
 
-choco install python314 --version $PythonVersion -y --no-progress
-if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing Python." }
+$installedPython = Get-InstalledChocolateyPackageVersion -Name $PythonPackage
+if ($installedPython) {
+    Write-Host "$PythonPackage $installedPython is already installed; skipping the installation."
+    if ($installedPython -ne $PythonVersion) {
+        Write-Warning "Expected $PythonPackage $PythonVersion. Update it with: choco upgrade $PythonPackage -y"
+    }
+} else {
+    choco install $PythonPackage --version $PythonVersion -y --no-progress
+    if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing Python." }
+}
 
-# 3. Install and configure MySQL; on any failure, leave the server stopped and disabled
+# 4. Install and configure MySQL; on any failure, leave the server stopped and disabled
 
 $paths = $null
 $completed = $false
 try {
-    choco install mysql --version $MySqlVersion -y --no-progress
+    choco install $MySqlPackage --version $MySqlVersion -y --no-progress
     if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MySQL." }
     # The server must not start automatically before it is hardened.
     Set-Service -Name $ServiceName -StartupType Manual
@@ -369,20 +638,20 @@ try {
     $paths = Get-ServerPaths
     Write-Host "Server option file: $($paths.MyIni)"
 
-    # 3a. Loopback only, X Plugin off; verify the listening sockets
+    # 4a. Loopback only, X Plugin off; verify the listening sockets
 
     Set-ServerNetworkOptions -Path $paths.MyIni
     Restart-Service -Name $ServiceName
     Assert-LoopbackOnly
     Write-Host "MySQL listens only on 127.0.0.1:$MySqlPort; X Plugin is disabled."
 
-    # 3b. Set the root password and verify a login with it
+    # 4b. Set the root password and verify a login with it
 
     Invoke-MySql -Client $paths.Client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
     Invoke-MySql -Client $paths.Client -Sql 'SELECT 1;' -RootPassword $rootPassword | Out-Null
     Assert-ServerConfiguration -Client $paths.Client -RootPassword $rootPassword
 
-    # 3c. Create the database and the application account
+    # 4c. Create the database and the application account
     # In database-level GRANT statements, '_' is a wildcard and is escaped as '\_' so that
     # the grant covers exactly these databases (MySQL Reference Manual, "GRANT Statement").
 
@@ -397,7 +666,7 @@ GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
 "@
     Invoke-MySql -Client $paths.Client -Sql $sql -RootPassword $rootPassword
 
-    # 4. Store the local configuration as user environment variables
+    # 4d. Store the local configuration as user environment variables
 
     $settings = [ordered]@{
         APP_ENV           = 'local'
