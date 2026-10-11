@@ -15,7 +15,12 @@ from pathlib import Path
 import django
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.environment import email_backend, load_environment, security_settings
+from leg_platform.environment import (
+    email_backend,
+    load_environment,
+    security_settings,
+    silenced_system_checks,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -119,6 +124,11 @@ AUTH_PASSWORD_VALIDATORS = [
 # None), so that the cookies are host-only. SameSite stays at Django's default "Lax".
 
 SESSION_COOKIE_HTTPONLY = True
+# No JavaScript reads the CSRF cookie. Django's documentation states that HttpOnly offers
+# little practical protection for this cookie; it is set because docs/SECURITY.md (section 3)
+# requires HttpOnly where possible. Scripts that need the token must read it from the form
+# field rendered by {% csrf_token %}, not from the cookie.
+CSRF_COOKIE_HTTPONLY = True
 
 _security = security_settings(ENVIRONMENT)
 SESSION_COOKIE_NAME = _security["SESSION_COOKIE_NAME"]
@@ -135,10 +145,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# HSTS includeSubDomains and preload are left to the operator (D-028); the corresponding
-# deployment warnings are silenced so that "check --deploy --fail-level WARNING" reports
-# every other warning.
-SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W021"]
+# HSTS preload is never set and includeSubDomains is left to the operator (D-028); the
+# corresponding deployment warnings are silenced (security.W005 only while includeSubDomains
+# is off), so that "check --deploy --fail-level WARNING" reports every other warning.
+SILENCED_SYSTEM_CHECKS = silenced_system_checks(ENVIRONMENT)
 
 # Internationalization (D-010)
 

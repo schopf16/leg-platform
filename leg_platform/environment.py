@@ -14,6 +14,7 @@ Error messages never contain the values of secret variables.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -39,8 +40,22 @@ SECRET_KEY_MIN_LENGTH = 50
 SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
 
+PORT_MIN = 1
+PORT_MAX = 65535
+
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
+
+# The delivery mode each APP_ENV requires (docs/SECURITY.md, sections 8 and 11;
+# docs/ARCHITECTURE.md, "Email"): local delivery is controlled (console by default, or the
+# allowlist), stage delivery is restricted to allowed recipients, and production allows only
+# unrestricted Microsoft Graph delivery, so that security links never end up in console or
+# server logs.
+ALLOWED_EMAIL_MODES = {
+    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
+    APP_ENV_STAGE: (EMAIL_MODE_ALLOWLIST,),
+    APP_ENV_PRODUCTION: (EMAIL_MODE_GRAPH,),
+}
 
 
 @dataclass(frozen=True)
@@ -55,6 +70,7 @@ class EnvironmentConfig:
     csrf_trusted_origins: tuple[str, ...]
     secure_proxy_ssl_header: tuple[str, str] | None
     hsts_seconds: int
+    hsts_include_subdomains: bool
     email_mode: str
     email_allowed_recipients: tuple[str, ...]
     db_name: str
@@ -78,6 +94,22 @@ def _get(env: Mapping[str, str], name: str) -> str:
 
 def _split_list(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def _is_ascii_number(value: str) -> bool:
+    # str.isdigit() also accepts characters such as "²" that int() rejects.
+    return re.fullmatch(r"[0-9]+", value) is not None
+
+
+def _parse_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    value = _get(env, name).lower()
+    if not value:
+        return default
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    raise ImproperlyConfigured(f"{name} must be 'True' or 'False'.")
 
 
 def parse_app_env(env: Mapping[str, str]) -> str:
@@ -151,9 +183,15 @@ def parse_csrf_trusted_origins(env: Mapping[str, str], app_env: str) -> tuple[st
                 f"DJANGO_CSRF_TRUSTED_ORIGINS must not contain wildcards (got {origin!r})."
             )
         parts = urlsplit(origin)
+        try:
+            # Accessing port raises ValueError for a non-numeric or out-of-range port.
+            port = parts.port
+        except ValueError:
+            port = -1
         if (
             parts.scheme not in allowed_schemes
             or not parts.hostname
+            or (port is not None and not PORT_MIN <= port <= PORT_MAX)
             or parts.path
             or parts.query
             or parts.fragment
@@ -185,24 +223,33 @@ def parse_hsts_seconds(env: Mapping[str, str]) -> int:
     value = _get(env, "DJANGO_SECURE_HSTS_SECONDS")
     if not value:
         return DEFAULT_HSTS_SECONDS
-    if not value.isdigit() or int(value) < 1:
+    if not _is_ascii_number(value) or int(value) < 1:
         raise ImproperlyConfigured("DJANGO_SECURE_HSTS_SECONDS must be a positive integer.")
     return int(value)
 
 
+def parse_hsts_include_subdomains(env: Mapping[str, str]) -> bool:
+    # Off by default: the policy would also apply to every host below the application's host
+    # name; enabling it is a decision of the operator for its domain (D-028).
+    return _parse_bool(env, "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+
+
 def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, ...]]:
-    mode = _get(env, "EMAIL_MODE") or EMAIL_MODE_CONSOLE
+    mode = _get(env, "EMAIL_MODE")
+    if not mode:
+        # Only local development has a default; elsewhere the mode must be chosen explicitly.
+        if app_env != APP_ENV_LOCAL:
+            raise ImproperlyConfigured("EMAIL_MODE must be set outside APP_ENV=local.")
+        mode = EMAIL_MODE_CONSOLE
     if mode not in EMAIL_MODES:
         raise ImproperlyConfigured(
             f"EMAIL_MODE must be one of {', '.join(EMAIL_MODES)}; got {mode!r}."
         )
-    # docs/ARCHITECTURE.md, "Email": production allows only unrestricted Microsoft Graph
-    # delivery, so that security links never end up in console or server logs; unrestricted
-    # delivery is not allowed outside production.
-    if app_env == APP_ENV_PRODUCTION and mode != EMAIL_MODE_GRAPH:
-        raise ImproperlyConfigured("APP_ENV=production requires EMAIL_MODE=graph.")
-    if app_env != APP_ENV_PRODUCTION and mode == EMAIL_MODE_GRAPH:
-        raise ImproperlyConfigured("EMAIL_MODE=graph is only allowed with APP_ENV=production.")
+    allowed = ALLOWED_EMAIL_MODES[app_env]
+    if mode not in allowed:
+        raise ImproperlyConfigured(
+            f"APP_ENV={app_env} requires EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
+        )
     recipients = tuple(
         address.lower() for address in _split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS"))
     )
@@ -215,8 +262,8 @@ def parse_database(env: Mapping[str, str]) -> dict[str, str]:
     if missing:
         raise ImproperlyConfigured(f"Missing database settings: {', '.join(missing)}.")
     port = _get(env, "DB_PORT") or "3306"
-    if not port.isdigit():
-        raise ImproperlyConfigured("DB_PORT must be a number.")
+    if not _is_ascii_number(port) or not PORT_MIN <= int(port) <= PORT_MAX:
+        raise ImproperlyConfigured(f"DB_PORT must be a number from {PORT_MIN} to {PORT_MAX}.")
     values["DB_HOST"] = _get(env, "DB_HOST") or "127.0.0.1"
     values["DB_PORT"] = port
     return values
@@ -238,6 +285,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         csrf_trusted_origins=parse_csrf_trusted_origins(env, app_env),
         secure_proxy_ssl_header=parse_secure_proxy_ssl_header(env),
         hsts_seconds=parse_hsts_seconds(env),
+        hsts_include_subdomains=parse_hsts_include_subdomains(env),
         email_mode=email_mode,
         email_allowed_recipients=email_allowed_recipients,
         db_name=database["DB_NAME"],
@@ -260,10 +308,11 @@ def security_settings(config: EnvironmentConfig) -> dict[str, object]:
         "CSRF_COOKIE_SECURE": secure,
         "SECURE_SSL_REDIRECT": secure,
         "SECURE_HSTS_SECONDS": config.hsts_seconds if secure else 0,
-        # The policy would also cover every host below the application's host name and,
-        # with preload, would be hard to revoke; both are decisions of the operator
-        # (docs/DECISIONS.md, D-028).
-        "SECURE_HSTS_INCLUDE_SUBDOMAINS": False,
+        # includeSubDomains would also cover every host below the application's host name; it
+        # is a decision of the operator (DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS). Preload is
+        # never set: removal from browsers' preload lists is slow and not under the operator's
+        # control (docs/DECISIONS.md, D-028).
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS": secure and config.hsts_include_subdomains,
         "SECURE_HSTS_PRELOAD": False,
         "SECURE_PROXY_SSL_HEADER": config.secure_proxy_ssl_header,
     }
@@ -288,3 +337,17 @@ def email_backend(config: EnvironmentConfig) -> str:
     if config.email_mode == EMAIL_MODE_CONSOLE:
         return "django.core.mail.backends.console.EmailBackend"
     return "leg_platform.mail.GraphNotImplementedEmailBackend"
+
+
+def silenced_system_checks(config: EnvironmentConfig) -> list[str]:
+    """Return the deployment checks that are silenced deliberately (D-028).
+
+    security.W021 (no HSTS preload) is always silenced, because preload is never set.
+    security.W005 (no includeSubDomains) is silenced only while the operator has not enabled
+    includeSubDomains, so that "check --deploy --fail-level WARNING" reports every other
+    warning.
+    """
+    checks = ["security.W021"]
+    if not config.hsts_include_subdomains:
+        checks.insert(0, "security.W005")
+    return checks

@@ -8,6 +8,7 @@ from leg_platform.environment import (
     email_backend,
     load_environment,
     security_settings,
+    silenced_system_checks,
 )
 
 # Test values only; not secrets of any environment.
@@ -106,6 +107,47 @@ class SecretKeyTests(SimpleTestCase):
         with self.assertRaises(ImproperlyConfigured):
             load_environment(make_env(DJANGO_SECRET_KEY_FALLBACKS="short"))
 
+    def test_error_message_does_not_contain_fallback_keys(self):
+        weak_fallback = "weak-fallback-value"
+        with self.assertRaises(ImproperlyConfigured) as context:
+            load_environment(
+                make_env(DJANGO_SECRET_KEY_FALLBACKS=f"{OTHER_STRONG_KEY},{weak_fallback}")
+            )
+        message = str(context.exception)
+        self.assertNotIn(weak_fallback, message)
+        self.assertNotIn(OTHER_STRONG_KEY, message)
+        self.assertNotIn(STRONG_KEY, message)
+
+    def test_repr_does_not_contain_fallback_keys(self):
+        config = load_environment(make_env(DJANGO_SECRET_KEY_FALLBACKS=OTHER_STRONG_KEY))
+        self.assertNotIn(OTHER_STRONG_KEY, repr(config))
+        self.assertNotIn(OTHER_STRONG_KEY, str(config))
+
+    def test_database_errors_do_not_contain_the_password(self):
+        invalid = ({"DB_NAME": None}, {"DB_USER": None}, {"DB_PORT": "abc"})
+        for overrides in invalid:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(ImproperlyConfigured) as context:
+                    load_environment(make_env(**overrides))
+                self.assertNotIn(TEST_DB_PASSWORD, str(context.exception))
+
+    def test_other_errors_do_not_contain_secrets(self):
+        invalid = (
+            {"APP_ENV": "unknown"},
+            {"DJANGO_DEBUG": "True"},
+            {"EMAIL_MODE": "console"},
+            {"DJANGO_ALLOWED_HOSTS": "*"},
+        )
+        for overrides in invalid:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(ImproperlyConfigured) as context:
+                    load_environment(
+                        make_env(DJANGO_SECRET_KEY_FALLBACKS=OTHER_STRONG_KEY, **overrides)
+                    )
+                message = str(context.exception)
+                for secret in (STRONG_KEY, OTHER_STRONG_KEY, TEST_DB_PASSWORD):
+                    self.assertNotIn(secret, message)
+
 
 class AllowedHostsTests(SimpleTestCase):
     def test_wildcards_are_rejected(self):
@@ -141,6 +183,10 @@ class CsrfTrustedOriginsTests(SimpleTestCase):
             "https://portal.example.org/path",
             "https://user@portal.example.org",
             "ftp://portal.example.org",
+            "https://portal.example.org:abc",
+            "https://portal.example.org:0",
+            "https://portal.example.org:65536",
+            "https://portal.example.org:99999",
         )
         for value in invalid:
             with self.subTest(value=value):
@@ -162,16 +208,29 @@ class CsrfTrustedOriginsTests(SimpleTestCase):
 
 
 class EmailModeTests(SimpleTestCase):
-    def test_console_is_the_default(self):
+    def test_console_is_the_default_locally(self):
         config = load_environment(make_env("local", EMAIL_MODE=None))
         self.assertEqual(config.email_mode, "console")
+
+    def test_missing_mode_refuses_start_outside_local(self):
+        for app_env in ("stage", "production"):
+            for value in (None, ""):
+                with self.subTest(app_env=app_env, value=value):
+                    with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
+                        load_environment(make_env(app_env, EMAIL_MODE=value))
+
+    def test_stage_requires_allowlist(self):
+        for mode in ("console", "graph"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=allowlist"):
+                    load_environment(make_env("stage", EMAIL_MODE=mode))
 
     def test_unknown_mode_refuses_start(self):
         with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
             load_environment(make_env("local", EMAIL_MODE="smtp"))
 
     def test_console_and_allowlist_refused_in_production(self):
-        for mode in ("console", "allowlist", None):
+        for mode in ("console", "allowlist"):
             with self.subTest(mode=mode):
                 with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
                     load_environment(make_env("production", EMAIL_MODE=mode))
@@ -179,13 +238,13 @@ class EmailModeTests(SimpleTestCase):
     def test_graph_refused_outside_production(self):
         for app_env in ("local", "stage"):
             with self.subTest(app_env=app_env):
-                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
+                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
                     load_environment(make_env(app_env, EMAIL_MODE="graph"))
 
     def test_allowed_combinations(self):
         allowed = {
             "local": ("console", "allowlist"),
-            "stage": ("console", "allowlist"),
+            "stage": ("allowlist",),
             "production": ("graph",),
         }
         for app_env, modes in allowed.items():
@@ -223,8 +282,13 @@ class DatabaseSettingsTests(SimpleTestCase):
     def test_defaults_and_port_validation(self):
         config = load_environment(make_env())
         self.assertEqual((config.db_host, config.db_port), ("127.0.0.1", "3306"))
-        with self.assertRaisesMessage(ImproperlyConfigured, "DB_PORT"):
-            load_environment(make_env(DB_PORT="abc"))
+        self.assertEqual(load_environment(make_env(DB_PORT="65535")).db_port, "65535")
+        # "\u00b2" (superscript two) and "\u0663" (Arabic-Indic digit three) pass
+        # str.isdigit() but are not ASCII digits.
+        for value in ("abc", "0", "65536", "-1", "\u00b2", "\u0663306", "33 06"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DB_PORT"):
+                    load_environment(make_env(DB_PORT=value))
 
 
 class SecuritySettingsTests(SimpleTestCase):
@@ -254,10 +318,32 @@ class SecuritySettingsTests(SimpleTestCase):
     def test_hsts_seconds_can_be_configured_but_not_disabled(self):
         config = load_environment(make_env(DJANGO_SECURE_HSTS_SECONDS="3600"))
         self.assertEqual(security_settings(config)["SECURE_HSTS_SECONDS"], 3600)
-        for value in ("0", "-1", "abc"):
+        for value in ("0", "-1", "abc", "\u00b2", "\u0663600", "1.5"):
             with self.subTest(value=value):
                 with self.assertRaisesMessage(ImproperlyConfigured, "HSTS"):
                     load_environment(make_env(DJANGO_SECURE_HSTS_SECONDS=value))
+
+    def test_hsts_include_subdomains_is_off_by_default(self):
+        config = load_environment(make_env())
+        self.assertIs(config.hsts_include_subdomains, False)
+        self.assertIs(security_settings(config)["SECURE_HSTS_INCLUDE_SUBDOMAINS"], False)
+        self.assertEqual(silenced_system_checks(config), ["security.W005", "security.W021"])
+
+    def test_hsts_include_subdomains_can_be_enabled(self):
+        config = load_environment(make_env(DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS="True"))
+        settings = security_settings(config)
+        self.assertIs(settings["SECURE_HSTS_INCLUDE_SUBDOMAINS"], True)
+        self.assertIs(settings["SECURE_HSTS_PRELOAD"], False)
+        # security.W005 is no longer silenced; W021 (preload) stays silenced.
+        self.assertEqual(silenced_system_checks(config), ["security.W021"])
+
+    def test_hsts_include_subdomains_rejects_invalid_values(self):
+        for value in ("1", "yes", "on"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(
+                    ImproperlyConfigured, "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS"
+                ):
+                    load_environment(make_env(DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=value))
 
     def test_proxy_ssl_header_only_when_configured(self):
         config = load_environment(

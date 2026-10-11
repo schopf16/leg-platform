@@ -68,6 +68,7 @@ class CookieTests(SimpleTestCase):
         cookie = self._csrf_cookie()
         self._assert_host_prefix_requirements(cookie)
         self.assertEqual(cookie["samesite"], "Lax")
+        self.assertTrue(cookie["httponly"])
 
     @override_settings(
         SESSION_COOKIE_NAME="__Host-sessionid",
@@ -85,6 +86,7 @@ class CookieTests(SimpleTestCase):
         self.assertIsNone(settings.SESSION_COOKIE_DOMAIN)
         self.assertIsNone(settings.CSRF_COOKIE_DOMAIN)
         self.assertIs(settings.SESSION_COOKIE_HTTPONLY, True)
+        self.assertIs(settings.CSRF_COOKIE_HTTPONLY, True)
 
 
 class HeaderTests(SimpleTestCase):

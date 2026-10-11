@@ -144,15 +144,15 @@ The Microsoft Graph configuration is kept in the database and maintained in a de
 
 The exact `cryptography` API is verified against the documentation of the installed version before implementation.
 
-Local development, stage and production have separate settings and credentials. So do different instances. The environment variable `EMAIL_MODE` controls delivery:
+Local development, stage and production have separate settings and credentials. So do different instances. The environment variable `EMAIL_MODE` controls delivery; which values are allowed depends on `APP_ENV`:
 
-| Value | Behaviour |
-| ----- | --------- |
-| `console` (default) | Emails are only written to the console or test output. Not allowed if `APP_ENV=production`, because security links would end up in server logs; the application refuses to start. |
-| `allowlist` | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. |
-| `graph` | Emails are sent via Microsoft Graph without restriction. Only allowed if `APP_ENV=production`; otherwise the application refuses to start. |
+| Value | `local` | `stage` | `production` | Behaviour |
+| ----- | ------- | ------- | ------------ | --------- |
+| `console` | allowed (default) | refused | refused | Emails are only written to the console or test output. Outside local development, security links would end up in server logs. |
+| `allowlist` | allowed | required | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. |
+| `graph` | refused | refused | required | Emails are sent via Microsoft Graph without restriction. |
 
-`allowlist` is likewise not allowed in production. A missing or unknown `APP_ENV` prevents the application from starting; security settings are secure by default and are only relaxed explicitly for `APP_ENV=local`.
+"Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`. Until the Microsoft Graph backend exists (D-006), `allowlist` and `graph` use a placeholder backend that refuses to send (D-028).
 
 Links in emails (verification, password reset, email change) are built from the canonical base URL in the instance configuration, not from the request. This also works for emails that are not triggered by a request (e.g. management commands). `ALLOWED_HOSTS` still lists only the host names of the application (not the instance's website; D-025).
 
