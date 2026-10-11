@@ -22,7 +22,9 @@ For Windows development machines (D-027). Never use these steps or their credent
 
    If a local MySQL installation already exists, the first command stops without changing anything and shows the second command. Before the second command removes anything, it lists everything it will remove and asks you to type `DELETE`; all local MySQL databases are then lost. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
 
-   Short unprotected phase: the Chocolatey package initialises MySQL with a `root` account without password and starts the service right away (`NET START`), listening on all network interfaces (port 3306, and port 33060 for X Plugin). The script hardens and restarts the server immediately afterwards, but during these seconds, and again on every retry, the server is reachable from the network unless the Windows Firewall blocks it. Before running the script, check as administrator that the firewall is on and blocks inbound connections for all profiles, and that no rule allows inbound connections to MySQL:
+   Short phase without a root password: the Chocolatey package initialises MySQL with a `root` account without password and starts the service right away. The script writes the server settings beforehand, so the server listens only on `127.0.0.1` from its first start and X Plugin is off; the script sets the password a few seconds later. During these seconds, any program on the same computer could log in as `root`. Run the script only when no untrusted user or program is active on the computer.
+
+   As an additional safeguard, check as administrator that the Windows Firewall is on and blocks inbound connections for all profiles, and that no rule allows inbound connections to MySQL:
 
    ```powershell
    Get-NetFirewallProfile -PolicyStore ActiveStore | Select-Object Name, Enabled, DefaultInboundAction
@@ -31,21 +33,23 @@ For Windows development machines (D-027). Never use these steps or their credent
    Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Action Allow -Enabled True | Where-Object { $port = $_ | Get-NetFirewallPortFilter; $app = $_ | Get-NetFirewallApplicationFilter; $svc = $_ | Get-NetFirewallServiceFilter; -not $_.Owner -and -not $app.Package -and $app.Program -eq 'Any' -and $svc.Service -eq 'Any' -and $port.Protocol -in 'Any', 'TCP' -and $port.LocalPort -eq 'Any' } | Select-Object DisplayName, Profile
    ```
 
-   The first command must show `Enabled True` and `DefaultInboundAction Block` for every profile; the other three must show nothing. The fourth lists enabled inbound allow rules that are not restricted to a port, a program, a service or a Windows Store app; such a rule would also allow connections to MySQL. Rules with an owner or a package are network isolation rules of Windows Store apps and match only traffic of that app (Microsoft Learn, "New-NetFirewallRule", parameters `-Owner` and `-Package`), so they are not listed. Limit: the commands do not evaluate remote address restrictions, rules for other protocols or the order of block and allow rules; if in doubt, run the script only on a trusted network. If Windows asks whether `mysqld` may communicate on networks, deny it. Run the script only on a trusted network. Sources: Microsoft Learn, "Get-NetFirewallProfile" (`-PolicyStore ActiveStore` "retrieves the active profile conditions"), "Get-NetFirewallPortFilter", "Get-NetFirewallApplicationFilter", "Get-NetFirewallServiceFilter", "Get-NetFirewallRule" and "New-NetFirewallRule" (NetSecurity module).
+   The first command must show `Enabled True` and `DefaultInboundAction Block` for every profile; the other three must show nothing. The fourth lists enabled inbound allow rules that are not restricted to a port, a program, a service or a Windows Store app; such a rule would also allow connections to MySQL. Rules with an owner or a package are network isolation rules of Windows Store apps and match only traffic of that app (Microsoft Learn, "New-NetFirewallRule", parameters `-Owner` and `-Package`), so they are not listed. Limit: the second command finds only rules whose local port is exactly 3306 or 33060, not port ranges or lists that contain them; the commands do not evaluate remote address restrictions, rules for other protocols or the order of block and allow rules. If in doubt, run the script only on a trusted network. If Windows asks whether `mysqld` may communicate on networks, deny it. Sources: Microsoft Learn, "Get-NetFirewallProfile" (`-PolicyStore ActiveStore` "retrieves the active profile conditions"), "Get-NetFirewallPortFilter", "Get-NetFirewallApplicationFilter", "Get-NetFirewallServiceFilter", "Get-NetFirewallRule" and "New-NetFirewallRule" (NetSecurity module).
 
    The script:
 
    * first asks for the new password of the local MySQL `root` account, before anything is installed. The password needs at least 15 characters, only printable ASCII characters, none of `#`, `"`, `'`, `\` and `;`, and no leading or trailing space, because it is written into an SQL string and into a MySQL option file, where these characters have a special meaning (MySQL Reference Manual, "Using Option Files"). Keep it in your password manager; the script does not store it;
-   * installs Python 3.14 with Chocolatey, unless the package `python314` is already installed, and then MySQL 9.7 LTS;
-   * finds the MySQL server program from the Windows service, also when the service command line has no `.exe` extension and no quotes, as the Chocolatey package registers it (`C:\tools\mysql\current\bin\mysqld MySQL`), and reads the option file `my.ini` in the MySQL base directory;
-   * restricts the permissions of the MySQL program directory `C:\tools\mysql` and of `C:\ProgramData\MySQL` (with the data directory), before the server is restarted: both inherit write access for ordinary users from `C:\` and `C:\ProgramData` (on the development machine, "Authenticated Users" could modify `mysqld.exe`), while the MySQL service runs as `LocalSystem`, so a replaced `mysqld.exe` would run with full system rights. The script removes the inherited permissions, gives Administrators and SYSTEM full control, Users only read and execute on the program directory and no access to the data directory, makes Administrators the owner, and verifies that no unprivileged group (Users, Authenticated Users, Everyone, Interactive, Creator Owner) keeps write access (or, for the data directory, any access); otherwise the setup fails. Tool: `icacls` (Microsoft Learn, "icacls");
-   * binds MySQL to `127.0.0.1` and disables X Plugin (`mysqlx=OFF`) in `my.ini`, restarts the service and verifies with `Get-NetTCPConnection` that the server listens only on `127.0.0.1:3306` and that nothing listens on the X Plugin port 33060. X Plugin is enabled by default and listens on all interfaces (`mysqlx_bind_address` default `*`); Django does not use the X Protocol. A copy of the original option file is kept as `my.ini.before-leg-setup`;
-   * sets the `root` password, verifies a login with it, and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`), because X Plugin may open its port only after the socket check;
+   * installs Python 3.14 with Chocolatey, unless the package `python314` is already installed;
+   * creates the folder `C:\LEG-MySQL` with the subfolders `server` (MySQL programs) and `data` (databases). The script stops if `C:\LEG-MySQL` already exists. Each folder is created with its permissions already set: nothing is inherited from `C:\`, only Administrators and SYSTEM have full control, ordinary users may only read and run the programs in `server` and have no access to `data`, and the owner is Administrators. This matters because the MySQL service runs with full system rights (`LocalSystem`): anybody who could change its files could take over the computer. Folders such as `C:\tools` or `C:\ProgramData`, where the package installs by default, let ordinary users create or change files;
+   * writes the MySQL settings file `C:\LEG-MySQL\server\mysql\current\my.ini` before the installation: MySQL listens only on `127.0.0.1` (`bind-address`), X Plugin is off (`mysqlx=OFF`; it would listen on all interfaces on port 33060, and Django does not use it), and the program and data folders are below `C:\LEG-MySQL`. The package keeps an existing `my.ini`, so MySQL uses these settings from its very first start. The script stops if one of the global settings files `C:\my.ini`, `C:\my.cnf`, `%WINDIR%\my.ini` or `%WINDIR%\my.cnf` exists, because MySQL would read them as well;
+   * installs MySQL 9.7 LTS with Chocolatey into these folders (package parameters `/installLocation` and `/dataLocation`);
+   * checks after the installation that `my.ini` is unchanged, that the data folder was initialised, and that every file and folder below `C:\LEG-MySQL` has only the permissions and owners listed above; any other entry, owner or symbolic link makes the setup fail;
+   * verifies with `Get-NetTCPConnection` that the server listens only on `127.0.0.1:3306` and that nothing listens on port 33060;
+   * sets the `root` password, verifies a login with it, and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`);
    * keeps the service start type `Manual` until the setup has succeeded and sets it to `Automatic` at the end;
    * creates the database `leg_platform` and the account `leg_platform`@`127.0.0.1` with the privileges described in "Database privileges" below, on `leg_platform` and `test_leg_platform` only;
    * stores the local configuration (`APP_ENV=local`, `DB_*`, `DJANGO_SECRET_KEY`) as user environment variables without printing generated values.
 
-   Restart VS Code and the terminal afterwards so that they receive the variables. All variables are described in `.env.example`.
+   The package adds `C:\LEG-MySQL\server\mysql\current\bin` to your user `PATH`, so that the MySQL command line tools can be used. Restart VS Code and the terminal afterwards so that they receive the variables. All variables are described in `.env.example`.
 
    User environment variables are inherited by every process of the Windows user, including AI tools and their subprocesses. Never print the environment (e.g. `Get-ChildItem env:`, `set`, `env`); it contains `DB_PASSWORD` and `DJANGO_SECRET_KEY` (D-027).
 
@@ -73,7 +77,7 @@ Email: locally, emails are written to the console by default (`EMAIL_MODE=consol
 
 ### Recovery after a failed setup
 
-If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled`, checks the result and prints the paths it found. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`.
+If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled` and checks the result. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`.
 
 To start over, fix the cause shown by the script and run as administrator:
 
@@ -81,11 +85,19 @@ To start over, fix the cause shown by the script and run as administrator:
 .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
 ```
 
-Before it changes anything, the script checks that the installation is the one the Chocolatey package `mysql` created: the service must run a program below `C:\tools\mysql` (Chocolatey's tools directory) and must not use an option file other than `C:\tools\mysql\current\my.ini`, and none of the affected folders may be a symbolic link, junction or mount point. Otherwise it stops without changing anything, and the installation has to be removed manually. It then lists everything it will remove, asks you to type `DELETE`, and asks for the new `root` password. It then:
+This works for an installation made by this script (in `C:\LEG-MySQL`) and for one made by its earlier version (programs in `C:\tools\mysql`, databases in `C:\ProgramData\MySQL\data`). Before it changes anything, the script checks that everything it would remove was created by the Chocolatey package `mysql` or by this script:
+
+* the `MySQL` service must run a program below `C:\LEG-MySQL\server\mysql` or `C:\tools\mysql` and must not use another settings file;
+* `C:\LEG-MySQL` may contain only `server` and `data`; `C:\tools\mysql` may contain only `current` and `mysql-<version>-winx64`; other content of `C:\tools` is never touched;
+* `C:\ProgramData\MySQL\data` must look like a MySQL data folder (it contains `mysql.ibd` and the folder `mysql`); if the old `my.ini` names a different data folder, that folder is reported and left in place;
+* none of these folders may be a symbolic link, junction or mount point.
+
+Otherwise it stops without changing anything, and the installation has to be removed manually. It then lists everything it will remove, asks you to type `DELETE`, and asks for the new `root` password. It checks everything again and then:
 
 * stops the `MySQL` service and sets its start type to `Disabled`, uninstalls the Chocolatey package `mysql` and deletes the service if it still exists (`sc.exe delete MySQL`);
-* deletes the data directory `C:\ProgramData\MySQL\data` only if it looks like a MySQL data directory (it contains `mysql.ibd` and the folder `mysql`) or is empty; both checks are repeated immediately before deleting. It never deletes another directory: if `my.ini` names a different `datadir`, the script reports it and leaves it in place;
-* deletes only `C:\tools\mysql\current\my.ini` and `my.ini.before-leg-setup`, checks that nothing of the old installation remains, and continues with the normal setup.
+* removes the MySQL folders from your user `PATH`;
+* deletes `C:\LEG-MySQL`, `C:\ProgramData\MySQL\data` (and `C:\ProgramData\MySQL` if it is then empty) and `C:\tools\mysql`, each after checking it again; symbolic links and junctions inside are removed without following them;
+* checks that nothing of the old installation remains and continues with the normal setup.
 
 If the script reports that the service still exists after `sc.exe delete`, close the Services console and Task Manager or restart Windows, and run the command again; every step checks the current state and can be repeated. User environment variables of an earlier run are overwritten by a successful run.
 
@@ -93,14 +105,14 @@ Manual steps, if you prefer them or the script cannot complete them:
 
 1. Uninstall MySQL: `choco uninstall mysql -y`.
 2. If the Windows service still exists (`Get-Service MySQL`), remove it: `sc.exe delete MySQL`.
-3. Delete the data directory (`datadir` in `my.ini`; the Chocolatey package uses `C:\ProgramData\MySQL\data` unless `/dataLocation` was given). This is required: the package initialises a new data directory only if none exists, and an old one may already contain the new `root` password or the application account.
-4. Delete `my.ini` and `my.ini.before-leg-setup` in the MySQL installation directory if they remain; the package creates `my.ini` only if it does not exist.
+3. Delete the MySQL folders: `C:\LEG-MySQL`, or for the earlier layout `C:\tools\mysql` and the data folder (`datadir` in `C:\tools\mysql\current\my.ini`, by default `C:\ProgramData\MySQL\data`). This is required: the package initialises a new data folder only if none exists, and an old one may already contain the new `root` password or the application account.
+4. Remove the MySQL `bin` folder from your user `PATH`.
 5. Remove user environment variables the script may have set (`APP_ENV`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY`), e.g. with `[Environment]::SetEnvironmentVariable('DB_PASSWORD', $null, 'User')`.
-6. Fix the cause shown by the script and run it again. Without `-RemoveFailedInstallation`, the script refuses to run while the `MySQL` service, the Chocolatey package `mysql`, the data directory `C:\ProgramData\MySQL\data` or a leftover `my.ini` exists.
+6. Fix the cause shown by the script and run it again. Without `-RemoveFailedInstallation`, the script refuses to run while the `MySQL` service, the Chocolatey package `mysql`, `C:\LEG-MySQL`, `C:\tools\mysql` or `C:\ProgramData\MySQL\data` exists.
 
-The Chocolatey package `mysql` 9.7.2 has no uninstall script (its `tools` folder contains only `chocolateyInstall.ps1`; checked on the development machine on 2026-10-11), so `choco uninstall` does not remove the service; the program files under `C:\tools\mysql` may also remain and are overwritten by the next installation. Source: https://community.chocolatey.org/packages/mysql (install script, checked on 2026-10-11).
+The Chocolatey package `mysql` 9.7.2 has no uninstall script (its `tools` folder contains only `chocolateyInstall.ps1`; checked on the development machine on 2026-10-11), so `choco uninstall` removes neither the service nor the program files. It installs to `<installLocation>\mysql\current`, writes `my.ini` there only if none exists, initialises `<dataLocation>\mysql\data` with `--initialize-insecure` using that `my.ini`, registers the service with `mysqld --install MySQL` (an unquoted path; therefore the folder names contain no spaces) and starts it. Source: https://community.chocolatey.org/packages/mysql and its `tools\chocolateyInstall.ps1` (checked on 2026-10-11).
 
-The helper functions of the setup script are tested without changing the system (no administrator rights needed):
+The helper functions of the setup script are tested without changing the system (no administrator rights needed; the creation of folders with the owner Administrators is tested only in an elevated PowerShell):
 
 ```powershell
 powershell -NoProfile -File scripts\local\test-setup-dev-windows.ps1

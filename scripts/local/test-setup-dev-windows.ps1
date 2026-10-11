@@ -104,7 +104,15 @@ try {
     Assert-Equal (Test-IsSamePath -First 'C:\ProgramData\MySQL\data\..' -Second 'C:\ProgramData\MySQL\data') $false 'Test-IsSamePath: parent via ..'
     Assert-Equal (Test-IsSamePath -First 'data' -Second 'data') $false 'Test-IsSamePath: relative paths'
     Assert-Equal (Test-IsSamePath -First '' -Second 'C:\') $false 'Test-IsSamePath: empty'
-    Assert-Equal $PackageDataDirectory 'C:\ProgramData\MySQL\data' 'PackageDataDirectory is the package default'
+    Assert-Equal $OldDataDirectory 'C:\ProgramData\MySQL\data' 'OldDataDirectory is the package default of the earlier layout'
+    [IO.File]::WriteAllText($myIni, (Get-ServerOptionFileContent), (New-Object Text.ASCIIEncoding))
+    Assert-Equal (Get-DataDirectory -MyIni $myIni) 'C:/LEG-MySQL/data/mysql/data' 'Get-DataDirectory: forward slashes'
+    Assert-Equal (Test-IsSamePath -First (Get-DataDirectory -MyIni $myIni) -Second $DataDirectory) $true 'Option file: datadir is the data directory'
+    $content = Get-ServerOptionFileContent
+    foreach ($line in @('[mysqld]', 'bind-address=127.0.0.1', 'mysqlx=OFF', 'port=3306', 'basedir=C:/LEG-MySQL/server/mysql/current', 'datadir=C:/LEG-MySQL/data/mysql/data')) {
+        Assert-Equal ([bool](($content -split "`r`n") -ccontains $line)) $true "Option file contains '$line'"
+    }
+    Assert-Equal $InstallRoot.Contains(' ') $false 'Install root has no spaces (unquoted service path)'
 
     # Test-IsPathUnder
     Assert-Equal (Test-IsPathUnder -Path 'C:\tools\mysql\current\bin\mysqld.exe' -Root 'C:\tools\mysql') $true 'Test-IsPathUnder: below'
@@ -113,15 +121,22 @@ try {
     Assert-Equal (Test-IsPathUnder -Path 'C:\tools\mysql\..\evil\mysqld.exe' -Root 'C:\tools\mysql') $false 'Test-IsPathUnder: escape via ..'
     Assert-Equal (Test-IsPathUnder -Path 'tools\mysql\bin' -Root 'C:\tools\mysql') $false 'Test-IsPathUnder: relative path'
 
-    # Get-ServiceOwnershipProblem
+    # Get-ServiceOwnershipProblem (earlier layout below <tools>\mysql and new layout)
     $toolsRoot = Join-Path $root 'tools'
     $ownIni = Join-Path $toolsRoot 'mysql\current\my.ini'
-    Assert-Equal (Get-ServiceOwnershipProblem -PathName "$plainBase MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: Chocolatey service without --defaults-file'
-    Assert-Equal (Get-ServiceOwnershipProblem -PathName "`"$plainExe`" --defaults-file=`"$ownIni`" MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: --defaults-file of the package'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName "$plainBase MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: earlier layout without --defaults-file'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName "`"$plainExe`" --defaults-file=`"$ownIni`" MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: earlier layout, its own --defaults-file'
     $problem = Get-ServiceOwnershipProblem -PathName "`"$plainExe`" --defaults-file=C:\other\my.ini MySQL" -Executable $plainExe -ToolsRoot $toolsRoot
     Assert-Equal ([bool]$problem) $true 'Ownership: other --defaults-file is refused'
+    $newExe = 'C:\LEG-MySQL\server\mysql\current\bin\mysqld.exe'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName 'C:\LEG-MySQL\server\mysql\current\bin\mysqld MySQL' -Executable $newExe -ToolsRoot $toolsRoot) $null 'Ownership: new layout'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName "$newExe --defaults-file=C:\LEG-MySQL\server\mysql\current\my.ini MySQL" -Executable $newExe -ToolsRoot $toolsRoot) $null 'Ownership: new layout, its own --defaults-file'
+    $problem = Get-ServiceOwnershipProblem -PathName "$newExe --defaults-file=`"$ownIni`" MySQL" -Executable $newExe -ToolsRoot $toolsRoot
+    Assert-Equal ([bool]$problem) $true 'Ownership: new layout with the option file of the earlier layout is refused'
+    $problem = Get-ServiceOwnershipProblem -PathName 'C:\LEG-MySQL\other\mysqld.exe MySQL' -Executable 'C:\LEG-MySQL\other\mysqld.exe' -ToolsRoot $toolsRoot
+    Assert-Equal ([bool]$problem) $true 'Ownership: other program below C:\LEG-MySQL is refused'
     $problem = Get-ServiceOwnershipProblem -PathName "`"$spaceExe`" MySQL" -Executable $spaceExe -ToolsRoot $toolsRoot
-    Assert-Equal ([bool]$problem) $true 'Ownership: executable outside <tools>\mysql is refused'
+    Assert-Equal ([bool]$problem) $true 'Ownership: executable outside both layouts is refused'
     $problem = Get-ServiceOwnershipProblem -PathName 'C:\missing\mysqld MySQL' -Executable $null -ToolsRoot $toolsRoot
     Assert-Equal ([bool]$problem) $true 'Ownership: unresolved executable is refused'
 
@@ -146,31 +161,67 @@ try {
     Assert-Equal (Test-RightsAllowWrite -Rights ([long]$rights::ChangePermissions)) $true 'Rights: change permissions'
     Assert-Equal (Test-RightsAllowWrite -Rights ([long]0x40000000)) $true 'Rights: generic write'
 
-    # Get-AclProblems (only grants on the temporary directory, no administrator rights needed)
-    $aclRoot = Join-Path $root 'acl'
-    New-Item -ItemType Directory -Path (Join-Path $aclRoot 'bin') | Out-Null
-    Set-Content -LiteralPath (Join-Path $aclRoot 'bin\mysqld.exe') -Value ''
-    $before = @(Get-AclProblems -Path $aclRoot -NoAccess)
-    Assert-Equal $before.Count 0 'Get-AclProblems: temporary directory has no unprivileged access'
-    & icacls.exe $aclRoot /grant "*$($SidUsers):(OI)(CI)RX" /q | Out-Null
-    Assert-Equal @(Get-AclProblems -Path $aclRoot).Count 0 'Get-AclProblems: Users read and execute is no write access'
-    Assert-Equal ([bool]@(Get-AclProblems -Path $aclRoot -NoAccess).Count) $true 'Get-AclProblems: Users read is reported with -NoAccess'
-    & icacls.exe (Join-Path $aclRoot 'bin\mysqld.exe') /grant "*$($SidAuthenticatedUsers):M" /q | Out-Null
-    $found = @(Get-AclProblems -Path $aclRoot)
-    Assert-Equal $found.Count 1 'Get-AclProblems: Authenticated Users modify on a file below is reported'
-    Assert-Equal ([bool]($found[0] -like '*mysqld.exe: S-1-5-11*')) $true 'Get-AclProblems: names file and SID'
-    & icacls.exe $aclRoot /grant "*$($SidEveryone):(OI)(CI)(AD)" /q | Out-Null
-    Assert-Equal ([bool](@(Get-AclProblems -Path $aclRoot) | Where-Object { $_ -like '*S-1-1-0*' })) $true 'Get-AclProblems: Everyone add subdirectory is reported'
+    # Get-AceViolation and Test-IsAllowedOwner (allowlist)
+    $full = [long][Security.AccessControl.FileSystemRights]::FullControl
+    $readExecute = [long][Security.AccessControl.FileSystemRights]::ReadAndExecute
+    $modify = [long][Security.AccessControl.FileSystemRights]::Modify
+    $userSid = 'S-1-5-21-1000000000-2000000000-3000000000-1001'
+    Assert-Equal (Get-AceViolation -Sid $SidAdministrators -Rights $full -Type 'Allow') $null 'ACE: Administrators full control'
+    Assert-Equal (Get-AceViolation -Sid $SidSystem -Rights $full -Type 'Allow') $null 'ACE: SYSTEM full control'
+    Assert-Equal (Get-AceViolation -Sid $SidUsers -Rights $readExecute -Type 'Allow' -AllowUsersReadExecute) $null 'ACE: Users read and execute on server'
+    Assert-Equal ([bool](Get-AceViolation -Sid $SidUsers -Rights $readExecute -Type 'Allow')) $true 'ACE: Users read and execute on data is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid $SidUsers -Rights $modify -Type 'Allow' -AllowUsersReadExecute)) $true 'ACE: Users modify is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid $SidUsers -Rights 0x10000000 -Type 'Allow' -AllowUsersReadExecute)) $true 'ACE: Users GENERIC_ALL is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid $SidUsers -Rights 0x40000000 -Type 'Allow' -AllowUsersReadExecute)) $true 'ACE: Users GENERIC_WRITE is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid 'S-1-5-11' -Rights $readExecute -Type 'Allow' -AllowUsersReadExecute)) $true 'ACE: Authenticated Users is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid $userSid -Rights $readExecute -Type 'Allow' -AllowUsersReadExecute)) $true 'ACE: unlisted user SID is refused'
+    Assert-Equal ([bool](Get-AceViolation -Sid 'S-1-3-0' -Rights $full -Type 'Allow')) $true 'ACE: Creator Owner is refused'
+    Assert-Equal (Get-AceViolation -Sid 'S-1-1-0' -Rights $full -Type 'Deny') $null 'ACE: deny entries are allowed'
+    Assert-Equal (Test-IsAllowedOwner -Sid $SidAdministrators) $true 'Owner: Administrators'
+    Assert-Equal (Test-IsAllowedOwner -Sid $SidSystem) $true 'Owner: SYSTEM'
+    Assert-Equal (Test-IsAllowedOwner -Sid $userSid) $false 'Owner: non-admin user is refused'
+    Assert-Equal (Test-IsAllowedOwner -Sid $SidUsers) $false 'Owner: Users is refused'
 
-    # Set-RestrictedAcl needs administrator rights (owner change); tested only when elevated.
+    # New-RestrictedDirectorySecurity
+    $security = New-RestrictedDirectorySecurity -UsersReadExecute
+    $rules = @($security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+    Assert-Equal $security.AreAccessRulesProtected $true 'Directory security: inheritance from the parent is blocked'
+    Assert-Equal (($rules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidUsers, $SidSystem, $SidAdministrators) | Sort-Object) -join ',') 'Directory security: only Administrators, SYSTEM and Users'
+    $violations = @($rules | ForEach-Object { Get-AceViolation -Sid $_.IdentityReference.Value -Rights ([long]$_.FileSystemRights) -Type "$($_.AccessControlType)" -AllowUsersReadExecute } | Where-Object { $_ })
+    Assert-Equal $violations.Count 0 'Directory security: passes the allowlist for server'
+    $dataRules = @((New-RestrictedDirectorySecurity).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+    Assert-Equal (@($dataRules | Where-Object { $_.IdentityReference.Value -eq $SidUsers }).Count) 0 'Directory security: no Users entry for data'
+
+    # Get-SecurityViolations on a temporary tree (owned by the current user, so it must fail)
+    $treeRoot = Join-Path $root 'tree'
+    New-Item -ItemType Directory -Path (Join-Path $treeRoot 'bin') | Out-Null
+    $treeViolations = @(Get-SecurityViolations -Path $treeRoot -Recurse)
+    Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*has the owner*' })) $true 'Security: owner that is not Administrators or SYSTEM is reported'
+    Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*bin*' })) $true 'Security: items below are checked'
+    $treeTarget = Join-Path $root 'tree-target'
+    New-Item -ItemType Directory -Path $treeTarget | Out-Null
+    New-Item -ItemType Junction -Path (Join-Path $treeRoot 'link') -Target $treeTarget | Out-Null
+    $treeViolations = @(Get-SecurityViolations -Path $treeRoot -Recurse)
+    Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*link is a reparse point*' })) $true 'Security: reparse point is reported and not followed'
+    Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*tree-target*' })) $false 'Security: junction target is not checked'
+
+    # Test-ContainsOnly
+    $packageDir = Join-Path $root 'package'
+    New-Item -ItemType Directory -Path (Join-Path $packageDir 'current'), (Join-Path $packageDir 'mysql-9.7.2-winx64') | Out-Null
+    Assert-Equal (Test-ContainsOnly -Path $packageDir -Patterns @('current', 'mysql-*-winx64')) $true 'ContainsOnly: package content'
+    New-Item -ItemType Directory -Path (Join-Path $packageDir 'other') | Out-Null
+    Assert-Equal (Test-ContainsOnly -Path $packageDir -Patterns @('current', 'mysql-*-winx64')) $false 'ContainsOnly: other content'
+    Assert-Equal (Test-ContainsOnly -Path $treeRoot -Patterns @('bin', 'link')) $false 'ContainsOnly: reparse point'
+    [IO.Directory]::Delete((Join-Path $treeRoot 'link'), $false)
+
+    # New-RestrictedDirectory sets the owner Administrators; only possible when elevated.
     $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if ($elevated) {
-        Set-RestrictedAcl -Path $aclRoot -UsersReadExecute
-        Assert-Equal @(Get-AclProblems -Path $aclRoot).Count 0 'Set-RestrictedAcl: no write access for unprivileged groups'
-        Set-RestrictedAcl -Path $aclRoot
-        Assert-Equal @(Get-AclProblems -Path $aclRoot -NoAccess).Count 0 'Set-RestrictedAcl: no access for unprivileged groups'
+        $restricted = Join-Path $root 'restricted'
+        New-RestrictedDirectory -Path $restricted -UsersReadExecute
+        Assert-Equal @(Get-SecurityViolations -Path $restricted -AllowUsersReadExecute -Recurse).Count 0 'New-RestrictedDirectory: passes the allowlist'
     } else {
-        Write-Host 'SKIPPED: Set-RestrictedAcl (needs an elevated PowerShell).'
+        Write-Host 'SKIPPED: New-RestrictedDirectory (needs an elevated PowerShell).'
     }
 
     # Test-IsMySqlDataDirectory

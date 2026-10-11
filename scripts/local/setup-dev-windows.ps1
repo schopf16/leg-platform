@@ -8,19 +8,25 @@
 
     1. Asks for the new password of the local MySQL 'root' account and validates it before
        anything is installed.
-    2. Installs Python (default version: 3.14.8) and then MySQL Community Server (default
-       version: 9.7.2, latest LTS series) with Chocolatey.
-    3. Binds the server to 127.0.0.1 (the Chocolatey package sets no bind address) and
-       disables X Plugin (mysqlx=OFF; Django does not use the X Protocol, and X Plugin listens
-       on all interfaces on port 33060 by default). After the restart, the script verifies
-       that the server listens only on 127.0.0.1 and not on port 33060.
-    4. Sets the password of 'root'@'localhost', because the package initialises the data
-       directory with --initialize-insecure (root without a password), and verifies a login
-       with the new password.
-    5. Creates the database 'leg_platform' and the account 'leg_platform'@'127.0.0.1' with
+    2. Installs Python (default version: 3.14.8) with Chocolatey, unless it is installed.
+    3. Creates C:\LEG-MySQL with the subfolders server and data, each created with restricted
+       permissions from the start (no inherited permissions; Administrators and SYSTEM full
+       control; Users only read and execute, and only on server). The MySQL service runs as
+       LocalSystem, so ordinary users must never be able to change its files.
+    4. Writes the server option file my.ini before the installation: loopback only
+       (bind-address=127.0.0.1), X Plugin off (mysqlx=OFF), base and data directory below
+       C:\LEG-MySQL. The Chocolatey package keeps an existing my.ini, so the server is
+       initialised and first started with these settings.
+    5. Installs MySQL Community Server (default version: 9.7.2, latest LTS series) with the
+       package parameters /installLocation and /dataLocation, verifies that my.ini is unchanged,
+       that every file and folder below C:\LEG-MySQL has only the allowed permissions and
+       owners, and that the server listens only on 127.0.0.1 and not on the X Plugin port.
+    6. Sets the password of 'root'@'localhost' (the package initialises the data directory
+       with --initialize-insecure, i.e. root without a password) and verifies a login with it.
+    7. Creates the database 'leg_platform' and the account 'leg_platform'@'127.0.0.1' with
        only the privileges Django needs, on 'leg_platform' and on Django's test database
        'test_leg_platform'.
-    6. Stores the local configuration as user environment variables (DB_NAME, DB_USER,
+    8. Stores the local configuration as user environment variables (DB_NAME, DB_USER,
        DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY, APP_ENV=local). Generated values are
        never printed.
 
@@ -34,10 +40,9 @@
     your password manager. Passwords are passed to the mysql client via standard input or a
     temporary option file readable only by the current user, never on the command line.
 
-    If the python314 Chocolatey package is already installed, the Python step is skipped.
-
-    If a service named 'MySQL' already exists (e.g. from a failed run), the script stops
-    without changing anything, unless -RemoveFailedInstallation is given.
+    If a MySQL installation already exists (from this script or from an earlier version that
+    installed below C:\tools and C:\ProgramData\MySQL), the script stops without changing
+    anything, unless -RemoveFailedInstallation is given.
 
 .PARAMETER MySqlVersion
     Chocolatey package version of MySQL to install.
@@ -47,10 +52,8 @@
 
 .PARAMETER RemoveFailedInstallation
     Removes the local MySQL installation left behind by a failed run before the normal setup
-    starts: stops the service, uninstalls the Chocolatey package 'mysql', deletes the service,
-    deletes the data directory (only the package's default data directory, and only after
-    you confirm by typing DELETE) and removes the leftover option file. All local MySQL
-    databases are lost. For local development machines only.
+    starts, after a list of everything that will be removed and a typed confirmation (DELETE).
+    All local MySQL databases are lost. For local development machines only.
 #>
 [CmdletBinding()]
 param(
@@ -71,25 +74,34 @@ $XPluginPort = 33060
 $MinimumRootPasswordLength = 15
 $MySqlPackage = 'mysql'
 $PythonPackage = 'python314'
-# Data directory the Chocolatey package 'mysql' uses without the package parameter
-# /dataLocation: "C:\ProgramData\MySQL" plus "\data" (its tools\chocolateyInstall.ps1, 9.7.2).
-# Only this directory is ever deleted by -RemoveFailedInstallation.
-$PackageDataDirectory = 'C:\ProgramData\MySQL\data'
 $RetryCommand = '.\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation'
+
+# Layout (D-027). A dedicated root without spaces: the package registers the service with an
+# unquoted path. The package installs to <installLocation>\mysql\current and initialises the
+# data directory <dataLocation>\mysql\data (tools\chocolateyInstall.ps1 of mysql 9.7.2).
+$InstallRoot = 'C:\LEG-MySQL'
+$ServerRoot = 'C:\LEG-MySQL\server'
+$DataRoot = 'C:\LEG-MySQL\data'
+$ServerPackageRoot = 'C:\LEG-MySQL\server\mysql'
+$ServerCurrent = 'C:\LEG-MySQL\server\mysql\current'
+$ServerOptionFile = 'C:\LEG-MySQL\server\mysql\current\my.ini'
+$DataDirectory = 'C:\LEG-MySQL\data\mysql\data'
+
+# Layout of the earlier version of this script (package defaults), which is only removed:
+# <tools>\mysql (Chocolatey's tools directory) and C:\ProgramData\MySQL\data.
+$OldDataParent = 'C:\ProgramData\MySQL'
+$OldDataDirectory = 'C:\ProgramData\MySQL\data'
+
+# Global option files that mysqld reads before BASEDIR\my.ini (MySQL Reference Manual, "Using
+# Option Files"); none may exist, so that only the option file of this script applies.
+$GlobalOptionFiles = @(
+    (Join-Path $env:WINDIR 'my.ini'), (Join-Path $env:WINDIR 'my.cnf'), 'C:\my.ini', 'C:\my.cnf'
+)
 
 # Well-known SIDs (Microsoft Learn, "Security identifiers"); names are localised, SIDs are not.
 $SidAdministrators = 'S-1-5-32-544'
 $SidSystem = 'S-1-5-18'
 $SidUsers = 'S-1-5-32-545'
-$SidAuthenticatedUsers = 'S-1-5-11'
-$SidEveryone = 'S-1-1-0'
-$SidInteractive = 'S-1-5-4'
-$SidCreatorOwner = 'S-1-3-0'
-# Groups that contain ordinary users. They must never be able to change the server program or
-# the data directory: the service runs as LocalSystem ("The default user for running the
-# MySQL service is LocalSystem", MySQL Reference Manual, "Starting MySQL as a Windows
-# Service"), so a replaced mysqld.exe would run with full system rights.
-$UnprivilegedSids = @($SidUsers, $SidAuthenticatedUsers, $SidEveryone, $SidInteractive, $SidCreatorOwner)
 
 # Rights that allow changing a file or directory, its attributes, permissions or owner.
 $WriteRights = [Security.AccessControl.FileSystemRights](
@@ -107,10 +119,6 @@ $WriteRights = [Security.AccessControl.FileSystemRights](
 # DROP, ALTER, INDEX; REFERENCES for foreign key constraints). On the test database, CREATE
 # and DROP also allow the test runner to create and remove the database itself.
 $AppPrivileges = 'SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES'
-
-# Options this script manages in my.ini; existing lines for them are replaced. Dashes and
-# underscores are interchangeable in option names, and "loose-" is an optional prefix.
-$ManagedOptionPattern = '^\s*(loose[-_])?(bind[-_]address|mysqlx[-_]bind[-_]address|skip[-_]mysqlx|mysqlx)\s*(=.*)?$'
 
 function New-RandomSecret {
     param([int]$Bytes = 32)
@@ -301,30 +309,6 @@ function Read-TextFile {
     return [pscustomobject]@{ Text = $text; Encoding = $encoding; LineBreak = $lineBreak }
 }
 
-function Set-ServerNetworkOptions {
-    # Removes existing lines for the managed options from all groups and appends a [mysqld]
-    # group at the end of the file. "If multiple instances of a given option are found, the
-    # last instance takes precedence" (MySQL Reference Manual, "Using Option Files"). Options
-    # from files included with !include or !includedir are not edited; the listening sockets
-    # are therefore verified after the restart (Assert-LoopbackOnly).
-    param([string]$Path)
-    $file = Read-TextFile -Path $Path
-    $lines = $file.Text -split "\r?\n"
-    $kept = @($lines | Where-Object { $_ -notmatch $ManagedOptionPattern })
-    while ($kept.Count -gt 0 -and $kept[-1] -eq '') { $kept = @($kept | Select-Object -SkipLast 1) }
-    $kept += @(
-        '',
-        '[mysqld]',
-        '# Managed by scripts/local/setup-dev-windows.ps1 (D-027): loopback only, X Plugin off.',
-        'bind-address=127.0.0.1',
-        'mysqlx=OFF',
-        ''
-    )
-    # Keep a backup next to the original; it contains no secrets.
-    Copy-Item -LiteralPath $Path -Destination "$Path.before-leg-setup" -Force
-    [IO.File]::WriteAllText($Path, ($kept -join $file.LineBreak), $file.Encoding)
-}
-
 function Get-ServiceProcessId {
     $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
     if (-not $service -or $service.ProcessId -eq 0) { throw "Service '$ServiceName' is not running." }
@@ -409,6 +393,22 @@ function Test-IsSamePath {
     return [string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-IsPathUnder {
+    # True if $Path is $Root or lies below it. Both are normalised to full paths and compared
+    # case-insensitively; relative paths are never accepted.
+    param([string]$Path, [string]$Root)
+    if (-not $Path -or -not $Root) { return $false }
+    try {
+        if (-not [IO.Path]::IsPathRooted($Path) -or -not [IO.Path]::IsPathRooted($Root)) { return $false }
+        $fullPath = [IO.Path]::GetFullPath($Path.Replace('/', '\')).TrimEnd('\')
+        $fullRoot = [IO.Path]::GetFullPath($Root.Replace('/', '\')).TrimEnd('\')
+    } catch {
+        return $false
+    }
+    return [string]::Equals($fullPath, $fullRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($fullRoot + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Test-IsMySqlDataDirectory {
     # A MySQL 8.0 or later data directory contains the data dictionary tablespace mysql.ibd
     # and the system schema directory mysql (MySQL Reference Manual, "The MySQL Data
@@ -474,132 +474,6 @@ function Disable-MySqlService {
     }
 }
 
-function Test-RightsAllowWrite {
-    # Takes the raw value: generic rights are not defined in the FileSystemRights enumeration.
-    param([long]$Rights)
-    # Generic rights (e.g. GENERIC_WRITE 0x40000000, GENERIC_ALL 0x10000000) can appear in
-    # inherit-only ACEs; they are treated as write access.
-    $generic = 0x10000000 -bor 0x40000000
-    return (($Rights -band [long]$WriteRights) -ne 0) -or (($Rights -band $generic) -ne 0)
-}
-
-function Get-AclProblems {
-    # Returns descriptions of allow entries that give unprivileged groups write access to the
-    # path or anything below it; with -NoAccess, any access of these groups is a problem.
-    param([string]$Path, [switch]$NoAccess)
-    $problems = @()
-    $items = @(Get-Item -LiteralPath $Path -Force) + @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction Stop)
-    foreach ($item in $items) {
-        $acl = Get-Acl -LiteralPath $item.FullName
-        foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
-            if ($rule.AccessControlType -ne 'Allow') { continue }
-            if ($rule.IdentityReference.Value -notin $UnprivilegedSids) { continue }
-            if ($NoAccess -or (Test-RightsAllowWrite -Rights ([long]$rule.FileSystemRights))) {
-                $problems += "$($item.FullName): $($rule.IdentityReference.Value) $($rule.FileSystemRights)"
-            }
-        }
-    }
-    return $problems
-}
-
-function Set-RestrictedAcl {
-    # Replaces the permissions of a directory tree: no inheritance from the parent, full
-    # control for Administrators and SYSTEM, optionally read and execute for Users (the client
-    # programs in bin), nothing for anyone else. All files and directories below it get the
-    # inherited permissions only (icacls /reset /t). Owner: Administrators.
-    # Microsoft Learn, "icacls": /grant:r "Permissions replace previously granted explicit
-    # permissions"; /reset "Replaces ACLs with default inherited ACLs for all matching files";
-    # numerical SIDs are prefixed with "*". The option /inheritance:r ("removes all inherited
-    # ACEs") is named as shown by "icacls /?" on Windows 11.
-    param([string]$Path, [switch]$UsersReadExecute)
-    $grants = @("*$($SidAdministrators):(OI)(CI)F", "*$($SidSystem):(OI)(CI)F")
-    if ($UsersReadExecute) { $grants += "*$($SidUsers):(OI)(CI)RX" }
-    & icacls.exe $Path /inheritance:r /grant:r @grants /q | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "icacls failed with exit code $LASTEXITCODE on $Path." }
-    if (@(Get-ChildItem -LiteralPath $Path -Force).Count -gt 0) {
-        & icacls.exe (Join-Path $Path '*') /reset /t /q | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "icacls /reset failed with exit code $LASTEXITCODE below $Path." }
-    }
-    & icacls.exe $Path /setowner "*$SidAdministrators" /t /q | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "icacls /setowner failed with exit code $LASTEXITCODE on $Path." }
-}
-
-function Protect-MySqlFiles {
-    # Restricts the program directory and the data directory, and verifies the result. Throws
-    # (into the failure path of the setup) if unprivileged groups keep write access.
-    param([string]$ProgramRoot, [string]$DataRoot)
-    foreach ($path in @($ProgramRoot, $DataRoot)) {
-        if (Test-IsReparsePoint -Path $path) { throw "$path is a symbolic link, junction or mount point." }
-    }
-    Set-RestrictedAcl -Path $ProgramRoot -UsersReadExecute
-    Set-RestrictedAcl -Path $DataRoot
-    $problems = @(Get-AclProblems -Path $ProgramRoot) + @(Get-AclProblems -Path $DataRoot -NoAccess)
-    if ($problems.Count -gt 0) {
-        throw "Unprivileged groups still have access: $($problems -join '; ')"
-    }
-    Write-Host "Permissions restricted: $ProgramRoot (Users: read and execute), $DataRoot (Administrators and SYSTEM only)."
-}
-
-function Write-RecoveryInstructions {
-    param([string]$MyIni)
-    $dataDir = Get-DataDirectory -MyIni $MyIni
-    if (-not $dataDir) { $dataDir = '<the datadir in my.ini>' }
-    Write-Host ''
-    Write-Host 'Recovery (docs/INSTALLATION.md, "Recovery after a failed setup"):'
-    Write-Host '  1. Uninstall MySQL:            choco uninstall mysql -y'
-    Write-Host "  2. If the service still exists: sc.exe delete $ServiceName"
-    Write-Host "  3. Delete the data directory:   $dataDir"
-    Write-Host '     (it contains only the new, empty local server; root may already have the new password)'
-    if ($MyIni) {
-        Write-Host "  4. Delete the option file if it remains: $MyIni (and $MyIni.before-leg-setup)"
-    }
-    Write-Host '  5. Remove user environment variables set by this script, if any:'
-    Write-Host '     APP_ENV, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY'
-    Write-Host '  6. Fix the cause shown above and run this script again.'
-    Write-Host ''
-    Write-Host 'Steps 1 to 4 are done automatically, after a confirmation, by running as administrator:'
-    Write-Host "  $RetryCommand"
-}
-
-function Test-IsPathUnder {
-    # True if $Path is $Root or lies below it. Both are normalised to full paths and compared
-    # case-insensitively; relative paths are never accepted.
-    param([string]$Path, [string]$Root)
-    if (-not $Path -or -not $Root) { return $false }
-    try {
-        if (-not [IO.Path]::IsPathRooted($Path) -or -not [IO.Path]::IsPathRooted($Root)) { return $false }
-        $fullPath = [IO.Path]::GetFullPath($Path.Replace('/', '\')).TrimEnd('\')
-        $fullRoot = [IO.Path]::GetFullPath($Root.Replace('/', '\')).TrimEnd('\')
-    } catch {
-        return $false
-    }
-    return [string]::Equals($fullPath, $fullRoot, [StringComparison]::OrdinalIgnoreCase) -or
-        $fullPath.StartsWith($fullRoot + '\', [StringComparison]::OrdinalIgnoreCase)
-}
-
-function Get-ServiceOwnershipProblem {
-    # Returns $null if the service command line belongs to an installation of the Chocolatey
-    # package 'mysql' that this script may remove, or a description of the problem otherwise:
-    # the executable must lie under <tools>\mysql, and --defaults-file must be absent or point
-    # to <tools>\mysql\current\my.ini.
-    param([string]$PathName, [string]$Executable, [string]$ToolsRoot)
-    $packageRoot = Join-Path $ToolsRoot $MySqlPackage
-    if (-not $Executable) {
-        return "the program of the service could not be found in its command line '$PathName'"
-    }
-    if (-not (Test-IsPathUnder -Path $Executable -Root $packageRoot)) {
-        return "the service runs '$Executable', which is not under $packageRoot"
-    }
-    $match = [regex]::Match("$PathName", '--defaults-file=(?:"([^"]+)"|(\S+))')
-    if ($match.Success) {
-        $defaultsFile = Get-OptionFilePath -PathName $PathName -Executable $Executable
-        if (-not (Test-IsSamePath -First $defaultsFile -Second (Join-Path $packageRoot 'current\my.ini'))) {
-            return "the service uses the option file '$defaultsFile', not $(Join-Path $packageRoot 'current\my.ini')"
-        }
-    }
-    return $null
-}
-
 function Test-IsReparsePoint {
     # True if the file or directory exists and is a reparse point (e.g. a symbolic link, a
     # junction or a mount point).
@@ -607,98 +481,6 @@ function Test-IsReparsePoint {
     if (-not (Test-Path -LiteralPath $Path)) { return $false }
     $item = Get-Item -LiteralPath $Path -Force
     return [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
-}
-
-function Get-ReparsePointPaths {
-    # Returns the paths among those this script would delete or delete from that are reparse
-    # points. The removal refuses to work through them.
-    $packageRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
-    $paths = @(
-        (Split-Path -Parent $PackageDataDirectory),
-        $PackageDataDirectory,
-        $packageRoot,
-        (Join-Path $packageRoot 'current')
-    ) + @(Get-PackageOptionFiles)
-    return @($paths | Where-Object { Test-IsReparsePoint -Path $_ })
-}
-
-function Get-PackageOptionFiles {
-    # The only option files the removal deletes: my.ini of the package and the backup this
-    # script writes next to it.
-    $myIni = Join-Path (Get-ChocolateyToolsRoot) "$MySqlPackage\current\my.ini"
-    return @($myIni, "$myIni.before-leg-setup")
-}
-
-function Get-FailedInstallation {
-    # Collects what an earlier run left behind, without changing anything.
-    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
-    $ownershipProblem = $null
-    $serviceRunning = $false
-    if ($service) {
-        $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
-        $ownershipProblem = Get-ServiceOwnershipProblem -PathName $service.PathName -Executable $executable -ToolsRoot (Get-ChocolateyToolsRoot)
-        $serviceRunning = "$($service.State)" -ne 'Stopped'
-    }
-    $myIni = (Get-PackageOptionFiles)[0]
-    return [pscustomobject]@{
-        ServiceExists           = [bool]$service
-        ServiceRunning          = $serviceRunning
-        OwnershipProblem        = $ownershipProblem
-        PackageVersion          = Get-InstalledChocolateyPackageVersion -Name $MySqlPackage
-        OptionFiles             = @(Get-PackageOptionFiles | Where-Object { Test-IsFile -Path $_ })
-        ConfiguredDataDirectory = Get-DataDirectory -MyIni $myIni
-        DataDirectoryExists     = Test-Path -LiteralPath $PackageDataDirectory -PathType Container
-        ReparsePoints           = @(Get-ReparsePointPaths)
-    }
-}
-
-function Test-HasLeftovers {
-    param($Installation)
-    return $Installation.ServiceExists -or $Installation.PackageVersion -or
-        $Installation.OptionFiles.Count -gt 0 -or $Installation.DataDirectoryExists
-}
-
-function Write-ManualRemovalInstructions {
-    Write-Host ''
-    Write-Host 'Nothing was changed. Check the installation and remove it manually if it is no longer needed' -ForegroundColor Red
-    Write-Host '(docs/INSTALLATION.md, "Recovery after a failed setup", manual steps).' -ForegroundColor Red
-}
-
-function Confirm-FailedInstallationRemoval {
-    # Checks that the installation is one this script may remove, lists everything that will be
-    # removed and asks for the typed confirmation before anything is changed. Returns only if
-    # the removal may proceed; throws otherwise.
-    param($Installation)
-    if ($Installation.OwnershipProblem) {
-        Write-ManualRemovalInstructions
-        throw "The service '$ServiceName' does not look like the local installation of the Chocolatey package '$MySqlPackage': $($Installation.OwnershipProblem)."
-    }
-    if ($Installation.ReparsePoints.Count -gt 0) {
-        Write-ManualRemovalInstructions
-        throw "These paths are symbolic links, junctions or mount points: $($Installation.ReparsePoints -join ', ')."
-    }
-    if ($Installation.DataDirectoryExists -and -not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
-        Write-ManualRemovalInstructions
-        throw "'$PackageDataDirectory' does not look like a MySQL data directory (no mysql.ibd and mysql folder)."
-    }
-    if ($Installation.ConfiguredDataDirectory -and
-        -not (Test-IsSamePath -First $Installation.ConfiguredDataDirectory -Second $PackageDataDirectory)) {
-        # Never delete a directory other than the package default: a my.ini changed by hand
-        # could point anywhere. The package creates a new my.ini with its default datadir.
-        Write-Warning "my.ini names the data directory '$($Installation.ConfiguredDataDirectory)'. It is not the package default and is NOT deleted; delete it yourself if it is no longer needed."
-    }
-    Write-Host ''
-    Write-Host 'The following local MySQL installation will be removed:' -ForegroundColor Yellow
-    if ($Installation.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped and disabled first, then deleted)" }
-    if ($Installation.PackageVersion) { Write-Host "  - Chocolatey package '$MySqlPackage' $($Installation.PackageVersion) (choco uninstall)" }
-    foreach ($file in $Installation.OptionFiles) { Write-Host "  - Option file $file" }
-    if ($Installation.DataDirectoryExists) {
-        Write-Host "  - Data directory $PackageDataDirectory with ALL local MySQL databases (cannot be undone)" -ForegroundColor Yellow
-    }
-    $answer = Read-Host 'Type DELETE to remove all items listed above'
-    if ($answer -cne 'DELETE') {
-        throw 'Not confirmed. Nothing was changed.'
-    }
 }
 
 function Wait-ServiceRemoved {
@@ -711,36 +493,309 @@ function Wait-ServiceRemoved {
     throw "The service '$ServiceName' still exists. Close the Services console and Task Manager, or restart Windows, then run: $RetryCommand"
 }
 
-function Remove-PackageDataDirectory {
-    # Re-checks the data directory immediately before deleting it. [IO.Directory]::Delete with
-    # recursive=true "does not recurse through the reparse point" (Microsoft Learn,
-    # "Directory.Delete Method").
-    $parent = Split-Path -Parent $PackageDataDirectory
-    if ((Test-IsReparsePoint -Path $parent) -or (Test-IsReparsePoint -Path $PackageDataDirectory)) {
-        throw "$PackageDataDirectory or its parent became a symbolic link, junction or mount point; it was not deleted."
+function Test-RightsAllowWrite {
+    # Takes the raw value: generic rights are not defined in the FileSystemRights enumeration.
+    param([long]$Rights)
+    # Generic rights (e.g. GENERIC_WRITE 0x40000000, GENERIC_ALL 0x10000000) can appear in
+    # inherit-only ACEs; they are treated as write access.
+    $generic = 0x10000000 -bor 0x40000000
+    return (($Rights -band [long]$WriteRights) -ne 0) -or (($Rights -band $generic) -ne 0)
+}
+
+function Get-ServerOptionFileContent {
+    # The option file written before the installation. "/" may be used in Windows path names
+    # in option files and is treated as "\" (MySQL Reference Manual, "Using Option Files").
+    return @(
+        '[mysqld]',
+        '# Written by scripts/local/setup-dev-windows.ps1 before the installation (D-027).',
+        "basedir=$($ServerCurrent.Replace('\', '/'))",
+        "datadir=$($DataDirectory.Replace('\', '/'))",
+        "port=$MySqlPort",
+        'bind-address=127.0.0.1',
+        'mysqlx=OFF',
+        ''
+    ) -join "`r`n"
+}
+
+function New-RestrictedDirectorySecurity {
+    # Permissions of the folders below C:\LEG-MySQL: no inheritance from the parent, full
+    # control for Administrators and SYSTEM, optionally read and execute for Users; inherited
+    # by all files and folders created below. With -SetOwner, the owner is Administrators.
+    param([switch]$UsersReadExecute, [switch]$SetOwner)
+    $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    $propagation = [Security.AccessControl.PropagationFlags]::None
+    $security = New-Object Security.AccessControl.DirectorySecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $grants = @(
+        @($SidAdministrators, [Security.AccessControl.FileSystemRights]::FullControl),
+        @($SidSystem, [Security.AccessControl.FileSystemRights]::FullControl)
+    )
+    if ($UsersReadExecute) { $grants += , @($SidUsers, [Security.AccessControl.FileSystemRights]::ReadAndExecute) }
+    foreach ($grant in $grants) {
+        $sid = New-Object Security.Principal.SecurityIdentifier($grant[0])
+        $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, $grant[1], $inherit, $propagation, 'Allow')
+        $security.AddAccessRule($rule)
     }
-    if (-not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
-        throw "$PackageDataDirectory no longer looks like a MySQL data directory; it was not deleted."
+    if ($SetOwner) { $security.SetOwner((New-Object Security.Principal.SecurityIdentifier($SidAdministrators))) }
+    return $security
+}
+
+function New-RestrictedDirectory {
+    # Creates a directory that does not exist yet, with its permissions set at creation
+    # (DirectoryInfo.Create(DirectorySecurity) in .NET Framework, FileSystemAclExtensions.Create
+    # in .NET; Microsoft Learn). Both do nothing if the directory exists, so its absence is
+    # checked before and the result is verified by Assert-InstallationSecurity.
+    param([string]$Path, [switch]$UsersReadExecute)
+    if (Test-Path -LiteralPath $Path) { throw "$Path already exists." }
+    $parent = Split-Path -Parent $Path
+    if (Test-IsReparsePoint -Path $parent) { throw "$parent is a symbolic link, junction or mount point." }
+    $security = New-RestrictedDirectorySecurity -UsersReadExecute:$UsersReadExecute -SetOwner
+    $info = New-Object IO.DirectoryInfo($Path)
+    $extensions = 'System.IO.FileSystemAclExtensions' -as [type]
+    if ($extensions) {
+        $extensions::Create($info, $security)
+    } else {
+        $info.Create($security)
     }
-    [IO.Directory]::Delete($PackageDataDirectory, $true)
-    if (Test-Path -LiteralPath $PackageDataDirectory) { throw "The data directory $PackageDataDirectory could not be deleted." }
-    Write-Host "Data directory $PackageDataDirectory was deleted."
+}
+
+function Test-IsAllowedOwner {
+    param([string]$Sid)
+    return $Sid -in @($SidAdministrators, $SidSystem)
+}
+
+function Get-AceViolation {
+    # Allowlist for one access control entry: deny entries are always allowed; allow entries
+    # only for Administrators and SYSTEM, and, with -AllowUsersReadExecute, for Users without
+    # any write right (generic rights count as write rights). Returns $null or a description.
+    param([string]$Sid, [long]$Rights, [string]$Type, [switch]$AllowUsersReadExecute)
+    if ($Type -eq 'Deny') { return $null }
+    if ($Sid -in @($SidAdministrators, $SidSystem)) { return $null }
+    if ($AllowUsersReadExecute -and $Sid -eq $SidUsers -and -not (Test-RightsAllowWrite -Rights $Rights)) {
+        return $null
+    }
+    return "$Type $Sid $Rights"
+}
+
+function Get-SecurityViolations {
+    # Checks the owner and every access control entry of $Path and, with -Recurse, of every
+    # file and folder below it. Reparse points are never followed; each one is a violation.
+    param([string]$Path, [switch]$AllowUsersReadExecute, [switch]$Recurse)
+    $violations = @()
+    $pending = New-Object System.Collections.Generic.Queue[string]
+    $pending.Enqueue($Path)
+    while ($pending.Count -gt 0) {
+        $current = $pending.Dequeue()
+        $item = Get-Item -LiteralPath $current -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            $violations += "$current is a reparse point"
+            continue
+        }
+        $acl = Get-Acl -LiteralPath $current
+        $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+        if (-not (Test-IsAllowedOwner -Sid $owner)) { $violations += "$current has the owner $owner" }
+        foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+            $violation = Get-AceViolation -Sid $rule.IdentityReference.Value -Rights ([long]$rule.FileSystemRights) -Type "$($rule.AccessControlType)" -AllowUsersReadExecute:$AllowUsersReadExecute
+            if ($violation) { $violations += "${current}: $violation" }
+        }
+        if ($Recurse -and $item.PSIsContainer) {
+            foreach ($child in @(Get-ChildItem -LiteralPath $current -Force)) { $pending.Enqueue($child.FullName) }
+        }
+    }
+    return $violations
+}
+
+function Assert-InstallationSecurity {
+    # Every file and folder below C:\LEG-MySQL: owner Administrators or SYSTEM; access only
+    # for Administrators and SYSTEM, and read and execute for Users below server.
+    $violations = @(Get-SecurityViolations -Path $InstallRoot) +
+        @(Get-SecurityViolations -Path $ServerRoot -AllowUsersReadExecute -Recurse) +
+        @(Get-SecurityViolations -Path $DataRoot -Recurse)
+    $unexpected = @(Get-ChildItem -LiteralPath $InstallRoot -Force | Where-Object { $_.Name -notin @('server', 'data') })
+    if ($unexpected.Count -gt 0) { $violations += "unexpected entries in ${InstallRoot}: $($unexpected.Name -join ', ')" }
+    if ($violations.Count -gt 0) {
+        throw "Unexpected permissions below ${InstallRoot}: $($violations -join '; ')"
+    }
+}
+
+function Get-ServiceOwnershipProblem {
+    # Returns $null if the service command line belongs to an installation this script may
+    # remove: the program lies under the package directory of the new layout
+    # (C:\LEG-MySQL\server\mysql) or of the earlier layout (<tools>\mysql), and --defaults-file
+    # is absent or points to that layout's current\my.ini. Otherwise returns the problem.
+    param([string]$PathName, [string]$Executable, [string]$ToolsRoot)
+    if (-not $Executable) {
+        return "the program of the service could not be found in its command line '$PathName'"
+    }
+    $oldPackageRoot = Join-Path $ToolsRoot $MySqlPackage
+    $packageRoot = $null
+    foreach ($candidate in @($ServerPackageRoot, $oldPackageRoot)) {
+        if (Test-IsPathUnder -Path $Executable -Root $candidate) { $packageRoot = $candidate }
+    }
+    if (-not $packageRoot) {
+        return "the service runs '$Executable', which is neither under $ServerPackageRoot nor under $oldPackageRoot"
+    }
+    $expected = Join-Path $packageRoot 'current\my.ini'
+    if ([regex]::IsMatch("$PathName", '--defaults-file=')) {
+        $defaultsFile = Get-OptionFilePath -PathName $PathName -Executable $Executable
+        if (-not (Test-IsSamePath -First $defaultsFile -Second $expected)) {
+            return "the service uses the option file '$defaultsFile', not $expected"
+        }
+    }
+    return $null
+}
+
+function Test-ContainsOnly {
+    # True if every entry directly below $Path matches one of the patterns (case-insensitive,
+    # -like) and none is a reparse point.
+    param([string]$Path, [string[]]$Patterns)
+    foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force)) {
+        if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $false }
+        if (-not ($Patterns | Where-Object { $entry.Name -like $_ })) { return $false }
+    }
+    return $true
+}
+
+function Remove-UserPathEntry {
+    # Removes the given directories from the PATH of the current user. The package adds its
+    # bin directory there (Install-ChocolateyPath, default PathType User). A stale entry would
+    # let anyone who can recreate the folder place programs that are found through PATH.
+    param([string[]]$Directories)
+    $value = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if (-not $value) { return }
+    $entries = @($value.Split(';') | Where-Object { $_ -ne '' })
+    $kept = @($entries | Where-Object {
+        $entry = $_
+        -not ($Directories | Where-Object { Test-IsSamePath -First $entry -Second $_ })
+    })
+    if ($kept.Count -ne $entries.Count) {
+        [Environment]::SetEnvironmentVariable('Path', ($kept -join ';'), 'User')
+        Write-Host "Removed $($entries.Count - $kept.Count) MySQL entry or entries from the user PATH."
+    }
+}
+
+function Get-OldPackageRoot {
+    return Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
+}
+
+function Get-FailedInstallation {
+    # Collects what an earlier run left behind, without changing anything.
+    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
+    $ownershipProblem = $null
+    $serviceRunning = $false
+    if ($service) {
+        $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
+        $ownershipProblem = Get-ServiceOwnershipProblem -PathName $service.PathName -Executable $executable -ToolsRoot (Get-ChocolateyToolsRoot)
+        $serviceRunning = "$($service.State)" -ne 'Stopped'
+    }
+    $oldPackageRoot = Get-OldPackageRoot
+    $oldOptionFile = Join-Path $oldPackageRoot 'current\my.ini'
+    return [pscustomobject]@{
+        ServiceExists              = [bool]$service
+        ServiceRunning             = $serviceRunning
+        OwnershipProblem           = $ownershipProblem
+        PackageVersion             = Get-InstalledChocolateyPackageVersion -Name $MySqlPackage
+        NewRootExists              = Test-Path -LiteralPath $InstallRoot
+        OldPackageRootExists       = Test-Path -LiteralPath $oldPackageRoot
+        OldConfiguredDataDirectory = Get-DataDirectory -MyIni $oldOptionFile
+        OldDataDirectoryExists     = Test-Path -LiteralPath $OldDataDirectory
+    }
+}
+
+function Test-HasLeftovers {
+    param($Installation)
+    return $Installation.ServiceExists -or $Installation.PackageVersion -or $Installation.NewRootExists -or
+        $Installation.OldPackageRootExists -or $Installation.OldDataDirectoryExists
+}
+
+function Get-RemovalProblems {
+    # Checks everything that would be deleted; returns descriptions of problems. Called before
+    # the confirmation and again immediately before each deletion.
+    param($Installation)
+    $problems = @()
+    if ($Installation.OwnershipProblem) {
+        $problems += "the service '$ServiceName' does not look like a local installation of the Chocolatey package '$MySqlPackage': $($Installation.OwnershipProblem)"
+    }
+    if (Test-Path -LiteralPath $InstallRoot) {
+        if (Test-IsReparsePoint -Path $InstallRoot) { $problems += "$InstallRoot is a reparse point" }
+        elseif (-not (Test-ContainsOnly -Path $InstallRoot -Patterns @('server', 'data'))) {
+            $problems += "$InstallRoot contains entries other than server and data, or reparse points"
+        }
+    }
+    $oldPackageRoot = Get-OldPackageRoot
+    if (Test-Path -LiteralPath $oldPackageRoot) {
+        if (Test-IsReparsePoint -Path $oldPackageRoot) { $problems += "$oldPackageRoot is a reparse point" }
+        elseif (-not (Test-ContainsOnly -Path $oldPackageRoot -Patterns @('current', 'mysql-*-winx64'))) {
+            $problems += "$oldPackageRoot contains entries the package did not create (only 'current' and 'mysql-<version>-winx64' are removed automatically)"
+        }
+    }
+    foreach ($path in @($OldDataParent, $OldDataDirectory)) {
+        if (Test-IsReparsePoint -Path $path) { $problems += "$path is a reparse point" }
+    }
+    if ((Test-Path -LiteralPath $OldDataDirectory) -and -not (Test-IsMySqlDataDirectory -Path $OldDataDirectory)) {
+        $problems += "$OldDataDirectory does not look like a MySQL data directory (no mysql.ibd and mysql folder)"
+    }
+    return $problems
+}
+
+function Write-ManualRemovalInstructions {
+    Write-Host ''
+    Write-Host 'Nothing was changed. Check the installation and remove it manually if it is no longer needed' -ForegroundColor Red
+    Write-Host '(docs/INSTALLATION.md, "Recovery after a failed setup", manual steps).' -ForegroundColor Red
+}
+
+function Confirm-FailedInstallationRemoval {
+    # Checks that everything to be removed belongs to a package installation, lists it and
+    # asks for the typed confirmation before anything is changed. Throws otherwise.
+    param($Installation)
+    $problems = @(Get-RemovalProblems -Installation $Installation)
+    if ($problems.Count -gt 0) {
+        Write-ManualRemovalInstructions
+        throw "The installation cannot be removed automatically: $($problems -join '; ')."
+    }
+    if ($Installation.OldConfiguredDataDirectory -and
+        -not (Test-IsSamePath -First $Installation.OldConfiguredDataDirectory -Second $OldDataDirectory)) {
+        Write-Warning "The old my.ini names the data directory '$($Installation.OldConfiguredDataDirectory)'. It is not the package default and is NOT deleted; delete it yourself if it is no longer needed."
+    }
+    Write-Host ''
+    Write-Host 'The following local MySQL installation will be removed:' -ForegroundColor Yellow
+    if ($Installation.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped and disabled first, then deleted)" }
+    if ($Installation.PackageVersion) { Write-Host "  - Chocolatey package '$MySqlPackage' $($Installation.PackageVersion) (choco uninstall)" }
+    if ($Installation.NewRootExists) { Write-Host "  - $InstallRoot with programs, option file and ALL local MySQL databases" -ForegroundColor Yellow }
+    if ($Installation.OldPackageRootExists) { Write-Host "  - $(Get-OldPackageRoot) (programs and option file of the earlier layout)" }
+    if ($Installation.OldDataDirectoryExists) { Write-Host "  - $OldDataDirectory with ALL local MySQL databases of the earlier layout" -ForegroundColor Yellow }
+    Write-Host '  - MySQL entries in the PATH of the current user'
+    Write-Host 'This cannot be undone.' -ForegroundColor Yellow
+    $answer = Read-Host 'Type DELETE to remove all items listed above'
+    if ($answer -cne 'DELETE') {
+        throw 'Not confirmed. Nothing was changed.'
+    }
+}
+
+function Remove-DirectoryTree {
+    # Deletes a directory tree after re-checking it. [IO.Directory]::Delete with recursive=true
+    # "does not recurse through the reparse point" (Microsoft Learn, "Directory.Delete Method").
+    param([string]$Path, [string[]]$Patterns)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    if (Test-IsReparsePoint -Path $Path) { throw "$Path became a reparse point; it was not deleted." }
+    if ($Patterns -and -not (Test-ContainsOnly -Path $Path -Patterns $Patterns)) {
+        throw "$Path contains unexpected entries; it was not deleted."
+    }
+    [IO.Directory]::Delete($Path, $true)
+    if (Test-Path -LiteralPath $Path) { throw "$Path could not be deleted." }
+    Write-Host "$Path was deleted."
 }
 
 function Remove-FailedInstallation {
     # Removes the installation after Confirm-FailedInstallationRemoval. Every step checks the
     # current state, so that the removal can be repeated after an interruption.
     param($Installation)
-    # Re-check the ownership right before changing anything: the service may have been
-    # replaced since the confirmation.
-    $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
-    if ($service) {
-        $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
-        $problem = Get-ServiceOwnershipProblem -PathName $service.PathName -Executable $executable -ToolsRoot (Get-ChocolateyToolsRoot)
-        if ($problem) {
-            Write-ManualRemovalInstructions
-            throw "The service '$ServiceName' does not look like the local installation of the Chocolatey package '$MySqlPackage': $problem."
-        }
+    # Re-check immediately before changing anything.
+    $current = Get-FailedInstallation
+    $problems = @(Get-RemovalProblems -Installation $current)
+    if ($problems.Count -gt 0) {
+        Write-ManualRemovalInstructions
+        throw "The installation changed since the confirmation: $($problems -join '; ')."
     }
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         # First stop the service and set it to Disabled, so that it cannot start again while
@@ -761,25 +816,28 @@ function Remove-FailedInstallation {
         Wait-ServiceRemoved
         Write-Host "Service '$ServiceName' was deleted."
     }
-    if ($Installation.DataDirectoryExists -and (Test-Path -LiteralPath $PackageDataDirectory)) {
-        # Confirmed by the user in Confirm-FailedInstallationRemoval.
-        Remove-PackageDataDirectory
-    }
-    # Re-check right before deleting the option files: none of the paths may have become a
-    # symbolic link, junction or mount point in the meantime.
-    $packageRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
-    $reparsePoints = @(@($packageRoot, (Join-Path $packageRoot 'current')) + @(Get-PackageOptionFiles) |
-        Where-Object { Test-IsReparsePoint -Path $_ })
-    if ($reparsePoints.Count -gt 0) {
-        throw "These paths became symbolic links, junctions or mount points; the option files were not deleted: $($reparsePoints -join ', ')."
-    }
-    foreach ($file in Get-PackageOptionFiles) {
-        if (Test-IsFile -Path $file) {
-            Remove-Item -LiteralPath $file -Force
-            Write-Host "Option file $file was deleted."
+    $oldPackageRoot = Get-OldPackageRoot
+    Remove-UserPathEntry -Directories @((Join-Path $ServerCurrent 'bin'), (Join-Path $oldPackageRoot 'current\bin'))
+    Remove-DirectoryTree -Path $InstallRoot -Patterns @('server', 'data')
+    if ((Test-Path -LiteralPath $OldDataDirectory)) {
+        if ((Test-IsReparsePoint -Path $OldDataParent) -or -not (Test-IsMySqlDataDirectory -Path $OldDataDirectory)) {
+            throw "$OldDataDirectory changed since the confirmation; it was not deleted."
         }
+        Remove-DirectoryTree -Path $OldDataDirectory
     }
+    if ((Test-Path -LiteralPath $OldDataParent) -and @(Get-ChildItem -LiteralPath $OldDataParent -Force).Count -eq 0) {
+        [IO.Directory]::Delete($OldDataParent, $false)
+    }
+    Remove-DirectoryTree -Path $oldPackageRoot -Patterns @('current', 'mysql-*-winx64')
 }
+
+function Write-RecoveryInstructions {
+    Write-Host ''
+    Write-Host 'Recovery (docs/INSTALLATION.md, "Recovery after a failed setup"): fix the cause shown above and run as administrator:'
+    Write-Host "  $RetryCommand"
+    Write-Host 'It lists what it removes and asks for a typed confirmation before it deletes anything.'
+}
+
 
 # 0. Preconditions
 
@@ -791,13 +849,15 @@ if ($chocoVersion -notmatch '^(\d+)\.' -or [int]$Matches[1] -lt 2) {
     # "choco list" lists only local packages from Chocolatey 2 on.
     throw "Chocolatey 2 or later is required (found '$chocoVersion'). Run: choco upgrade chocolatey -y"
 }
+$globalOptionFiles = @($GlobalOptionFiles | Where-Object { Test-Path -LiteralPath $_ })
+if ($globalOptionFiles.Count -gt 0) {
+    throw "MySQL would also read these option files: $($globalOptionFiles -join ', '). Remove or rename them first."
+}
 
 $failedInstallation = Get-FailedInstallation
 if (Test-HasLeftovers -Installation $failedInstallation) {
     if (-not $RemoveFailedInstallation) {
         if ($failedInstallation.ServiceRunning) {
-            # A server of a failed run may still run with a root account without password and
-            # listen on all interfaces (docs/INSTALLATION.md, "Recovery after a failed setup").
             Write-Warning "The service '$ServiceName' is running. Stop and disable it as administrator: sc.exe stop $ServiceName; sc.exe config $ServiceName start= disabled"
         }
         throw "A local MySQL installation already exists (e.g. from a failed run). To remove it and start over, run as administrator: $RetryCommand"
@@ -841,43 +901,53 @@ if ($installedPython) {
 $paths = $null
 $completed = $false
 try {
-    choco install $MySqlPackage --version $MySqlVersion -y --no-progress
+    # 4a. Create C:\LEG-MySQL with restricted permissions and write my.ini before the
+    # installation, so that the server is initialised and first started with it.
+
+    New-RestrictedDirectory -Path $InstallRoot
+    New-RestrictedDirectory -Path $ServerRoot -UsersReadExecute
+    New-RestrictedDirectory -Path $DataRoot
+    Assert-InstallationSecurity
+    # Created below server, inheriting its permissions; the package keeps an existing my.ini.
+    New-Item -ItemType Directory -Path $ServerCurrent | Out-Null
+    $optionFileContent = Get-ServerOptionFileContent
+    [IO.File]::WriteAllText($ServerOptionFile, $optionFileContent, (New-Object Text.ASCIIEncoding))
+    Assert-InstallationSecurity
+
+    # 4b. Install MySQL below C:\LEG-MySQL (package parameters /installLocation and
+    # /dataLocation, https://community.chocolatey.org/packages/mysql).
+
+    $packageParameters = "/installLocation:$ServerRoot /dataLocation:$DataRoot"
+    choco install $MySqlPackage --version $MySqlVersion -y --no-progress --params $packageParameters
     if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MySQL." }
-    # The server must not start automatically before it is hardened.
+    # The server must not start automatically before the setup has succeeded.
     Set-Service -Name $ServiceName -StartupType Manual
 
     $paths = Get-ServerPaths
-    Write-Host "Server option file: $($paths.MyIni)"
-
-    # 4a. Restrict the permissions of the program and data directories before the server is
-    # restarted: the package installs below Chocolatey's tools directory and
-    # C:\ProgramData\MySQL, which inherit write access for ordinary users from C:\ and
-    # C:\ProgramData, while the service runs as LocalSystem.
-
-    $programRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
-    if (-not (Test-IsPathUnder -Path $paths.Client -Root $programRoot)) {
-        throw "The MySQL programs are not below $programRoot."
+    if (-not (Test-IsSamePath -First $paths.MyIni -Second $ServerOptionFile)) {
+        throw "The service uses the option file $($paths.MyIni), not $ServerOptionFile."
     }
-    $dataDirectory = Get-DataDirectory -MyIni $paths.MyIni
-    if (-not (Test-IsSamePath -First $dataDirectory -Second $PackageDataDirectory)) {
-        throw "Unexpected data directory '$dataDirectory'; expected $PackageDataDirectory."
+    if ([IO.File]::ReadAllText($ServerOptionFile) -cne $optionFileContent) {
+        throw "$ServerOptionFile was changed by the installation."
     }
-    Protect-MySqlFiles -ProgramRoot $programRoot -DataRoot (Split-Path -Parent $PackageDataDirectory)
+    if (-not (Test-IsFile -Path (Join-Path $DataDirectory 'mysql.ibd'))) {
+        throw "The data directory $DataDirectory was not initialised."
+    }
+    Assert-InstallationSecurity
+    Write-Host "Permissions below $InstallRoot verified (Administrators and SYSTEM; Users read and execute on server only)."
 
-    # 4b. Loopback only, X Plugin off; verify the listening sockets
+    # 4c. Verify the listening sockets: loopback only, X Plugin off.
 
-    Set-ServerNetworkOptions -Path $paths.MyIni
-    Restart-Service -Name $ServiceName
     Assert-LoopbackOnly
     Write-Host "MySQL listens only on 127.0.0.1:$MySqlPort; X Plugin is disabled."
 
-    # 4c. Set the root password and verify a login with it
+    # 4d. Set the root password and verify a login with it
 
     Invoke-MySql -Client $paths.Client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
     Invoke-MySql -Client $paths.Client -Sql 'SELECT 1;' -RootPassword $rootPassword | Out-Null
     Assert-ServerConfiguration -Client $paths.Client -RootPassword $rootPassword
 
-    # 4d. Create the database and the application account
+    # 4e. Create the database and the application account
     # In database-level GRANT statements, '_' is a wildcard and is escaped as '\_' so that
     # the grant covers exactly these databases (MySQL Reference Manual, "GRANT Statement").
 
@@ -892,7 +962,7 @@ GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
 "@
     Invoke-MySql -Client $paths.Client -Sql $sql -RootPassword $rootPassword
 
-    # 4e. Store the local configuration as user environment variables
+    # 4f. Store the local configuration as user environment variables
 
     $settings = [ordered]@{
         APP_ENV           = 'local'
@@ -919,13 +989,12 @@ GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
     $appPassword = $null
     if (-not $completed) {
         Disable-MySqlService
-        $myIni = if ($paths) { $paths.MyIni } else { $null }
-        Write-RecoveryInstructions -MyIni $myIni
+        Write-RecoveryInstructions
     }
 }
 
 Write-Host ''
-Write-Host "MySQL $MySqlVersion is installed, listens only on 127.0.0.1, X Plugin is disabled, the root password is set and the service starts automatically."
+Write-Host "MySQL $MySqlVersion is installed in $InstallRoot, listens only on 127.0.0.1, X Plugin is disabled, the root password is set and the service starts automatically."
 Write-Host "Database '$DatabaseName' and account '$AppUser'@'127.0.0.1' were created."
 Write-Host "User environment variables set: $($settings.Keys -join ', ')"
 Write-Host 'Restart VS Code so that new terminals and Claude Code receive the variables.'
