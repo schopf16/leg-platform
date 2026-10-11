@@ -17,7 +17,8 @@ For Windows development machines (D-027). Never use these steps or their credent
    * first asks for the new password of the local MySQL `root` account, before anything is installed. The password needs at least 15 characters, only printable ASCII characters, none of `#`, `"`, `'`, `\` and `;`, and no leading or trailing space, because it is written into an SQL string and into a MySQL option file, where these characters have a special meaning (MySQL Reference Manual, "Using Option Files"). Keep it in your password manager; the script does not store it;
    * installs Python 3.14 and then MySQL 9.7 LTS with Chocolatey;
    * binds MySQL to `127.0.0.1` and disables X Plugin (`mysqlx=OFF`) in `my.ini`, restarts the service and verifies with `Get-NetTCPConnection` that the server listens only on `127.0.0.1:3306` and that nothing listens on the X Plugin port 33060. X Plugin is enabled by default and listens on all interfaces (`mysqlx_bind_address` default `*`); Django does not use the X Protocol. A copy of the original option file is kept as `my.ini.before-leg-setup`;
-   * sets the `root` password and verifies a login with it;
+   * sets the `root` password, verifies a login with it, and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`), because X Plugin may open its port only after the socket check;
+   * keeps the service start type `Manual` until the setup has succeeded and sets it to `Automatic` at the end;
    * creates the database `leg_platform` and the account `leg_platform`@`127.0.0.1` with the privileges described in "Database privileges" below, on `leg_platform` and `test_leg_platform` only;
    * stores the local configuration (`APP_ENV=local`, `DB_*`, `DJANGO_SECRET_KEY`) as user environment variables without printing generated values.
 
@@ -47,7 +48,7 @@ For Windows development machines (D-027). Never use these steps or their credent
 
 ### Recovery after a failed setup
 
-If a step after the MySQL installation fails, the script stops the `MySQL` service, sets its start type to `Disabled` and prints the paths it found. The server is then not running and cannot be reached. To start over:
+If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled`, checks the result and prints the paths it found. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`. To start over:
 
 1. Uninstall MySQL: `choco uninstall mysql -y`.
 2. If the Windows service still exists (`Get-Service MySQL`), remove it: `sc.exe delete MySQL`.

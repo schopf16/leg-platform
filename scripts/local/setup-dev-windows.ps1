@@ -24,8 +24,11 @@
        DB_PASSWORD, DB_HOST, DB_PORT, DJANGO_SECRET_KEY, APP_ENV=local). Generated values are
        never printed.
 
-    If a step after the MySQL installation fails, the script stops the MySQL service, sets its
-    start type to Disabled and prints recovery instructions (docs/INSTALLATION.md).
+    Until the setup has succeeded, the MySQL service has the start type Manual. If a step after
+    the MySQL installation fails or the script is interrupted (e.g. with Ctrl+C), the script
+    stops the MySQL service, sets its start type to Disabled, verifies both and prints recovery
+    instructions (docs/INSTALLATION.md). Closing the console window may end the script without
+    this cleanup; check the service afterwards in that case.
 
     The root password is entered interactively and is not stored by this script; keep it in
     your password manager. Passwords are passed to the mysql client via standard input or a
@@ -256,6 +259,25 @@ function Assert-LoopbackOnly {
     }
 }
 
+function Assert-ServerConfiguration {
+    # Positive check inside the server, independent of the timing of the listening sockets:
+    # bind_address must be 127.0.0.1 and X Plugin ('mysqlx') must not be ACTIVE (MySQL
+    # Reference Manual, "The INFORMATION_SCHEMA PLUGINS Table": PLUGIN_STATUS is one of ACTIVE,
+    # INACTIVE, DISABLED, DELETING, DELETED).
+    param([string]$Client, [string]$RootPassword)
+    $sql = "SELECT CONCAT(@@GLOBAL.bind_address, '|', COALESCE((SELECT PLUGIN_STATUS FROM information_schema.PLUGINS WHERE PLUGIN_NAME = 'mysqlx'), 'NONE')) AS result;"
+    $output = @(Invoke-MySql -Client $Client -Sql $sql -RootPassword $RootPassword)
+    $result = @($output | Where-Object { "$_".Trim() -ne '' } | Select-Object -Last 1)
+    if ($result.Count -eq 0) { throw 'The server configuration could not be read.' }
+    $bindAddress, $xPluginStatus = "$($result[0])".Trim().Split('|')
+    if ($bindAddress -ne '127.0.0.1') {
+        throw "bind_address is '$bindAddress', not 127.0.0.1."
+    }
+    if ($xPluginStatus -eq 'ACTIVE') {
+        throw 'X Plugin (mysqlx) is ACTIVE; mysqlx=OFF did not take effect.'
+    }
+}
+
 function Get-DataDirectory {
     param([string]$MyIni)
     if (-not $MyIni -or -not (Test-Path -LiteralPath $MyIni)) { return $null }
@@ -270,10 +292,18 @@ function Get-DataDirectory {
 }
 
 function Disable-MySqlService {
-    if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-        Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
+    if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { return }
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
+    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($service -and $service.Status -eq 'Stopped' -and "$($service.StartType)" -eq 'Disabled') {
         Write-Warning "The service '$ServiceName' was stopped and its start type set to Disabled."
+    } else {
+        Write-Host ''
+        Write-Host "ERROR: The service '$ServiceName' could not be stopped and disabled. Run as administrator:" -ForegroundColor Red
+        Write-Host "  sc.exe stop $ServiceName" -ForegroundColor Red
+        Write-Host "  sc.exe config $ServiceName start= disabled" -ForegroundColor Red
+        Write-Host "Then check with: Get-Service $ServiceName | Select-Object Status, StartType" -ForegroundColor Red
     }
 }
 
@@ -318,9 +348,12 @@ if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE whil
 # 3. Install and configure MySQL; on any failure, leave the server stopped and disabled
 
 $paths = $null
+$completed = $false
 try {
     choco install mysql --version $MySqlVersion -y --no-progress
     if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MySQL." }
+    # The server must not start automatically before it is hardened.
+    Set-Service -Name $ServiceName -StartupType Manual
 
     $paths = Get-ServerPaths
     Write-Host "Server option file: $($paths.MyIni)"
@@ -336,6 +369,7 @@ try {
 
     Invoke-MySql -Client $paths.Client -Sql "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootPassword';"
     Invoke-MySql -Client $paths.Client -Sql 'SELECT 1;' -RootPassword $rootPassword | Out-Null
+    Assert-ServerConfiguration -Client $paths.Client -RootPassword $rootPassword
 
     # 3c. Create the database and the application account
     # In database-level GRANT statements, '_' is a wildcard and is escaped as '\_' so that
@@ -367,18 +401,25 @@ GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
         [Environment]::SetEnvironmentVariable($name, $settings[$name], 'User')
     }
     $appPassword = $null
+
+    Set-Service -Name $ServiceName -StartupType Automatic
+    $completed = $true
 } catch {
     Write-Warning "Setup failed: $($_.Exception.Message)"
-    Disable-MySqlService
-    $myIni = if ($paths) { $paths.MyIni } else { $null }
-    Write-RecoveryInstructions -MyIni $myIni
     throw
 } finally {
+    # Also runs when the script is interrupted with Ctrl+C, which skips the catch block.
     $rootPassword = $null
+    $appPassword = $null
+    if (-not $completed) {
+        Disable-MySqlService
+        $myIni = if ($paths) { $paths.MyIni } else { $null }
+        Write-RecoveryInstructions -MyIni $myIni
+    }
 }
 
 Write-Host ''
-Write-Host "MySQL $MySqlVersion is installed, listens only on 127.0.0.1, X Plugin is disabled and the root password is set."
+Write-Host "MySQL $MySqlVersion is installed, listens only on 127.0.0.1, X Plugin is disabled, the root password is set and the service starts automatically."
 Write-Host "Database '$DatabaseName' and account '$AppUser'@'127.0.0.1' were created."
 Write-Host "User environment variables set: $($settings.Keys -join ', ')"
 Write-Host 'Restart VS Code so that new terminals and Claude Code receive the variables.'
