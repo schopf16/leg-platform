@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.test import RequestFactory, SimpleTestCase, override_settings
-from django.views.debug import get_default_exception_reporter_filter
+from django.views.debug import SafeExceptionReporterFilter, get_default_exception_reporter_filter
 
 from leg_platform.debug import ExceptionReporterFilter
 from leg_platform.mail import GraphNotImplementedEmailBackend
@@ -223,6 +223,13 @@ class ExceptionReporterFilterTests(SimpleTestCase):
         request = RequestFactory().get("/", EMAIL_ALLOWED_RECIPIENTS="tester@example.org")
         meta = reporter_filter.get_safe_request_meta(request)
         self.assertEqual(meta["EMAIL_ALLOWED_RECIPIENTS"], substitute)
+
+    def test_pattern_extends_djangos_pattern(self):
+        default = SafeExceptionReporterFilter.hidden_settings
+        self.assertEqual(
+            ExceptionReporterFilter.hidden_settings.pattern, default.pattern + "|RECIPIENTS"
+        )
+        self.assertTrue(ExceptionReporterFilter.hidden_settings.flags & re.IGNORECASE)
 
     def test_django_defaults_are_kept(self):
         reporter_filter = ExceptionReporterFilter()

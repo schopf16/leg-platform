@@ -9,6 +9,7 @@ Only files tracked by Git are read (``git ls-files``), never untracked or ignore
 as ``.env`` (AGENTS.md, section 8). Findings name only the file and line, not the address.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -87,8 +88,12 @@ class ReservedEmailDomainTests(SimpleTestCase):
         files = tracked_files(root)
         if files is None:
             # Without Git, tracked and ignored files cannot be told apart; ignored files (e.g.
-            # .env) must not be read, so the check is skipped. Continuous integration has Git.
-            self.skipTest("Git is not available; the repository scan needs 'git ls-files'.")
+            # .env) must not be read. In continuous integration the check must run, so it
+            # fails there; elsewhere it is skipped.
+            message = "Git is not available; the repository scan needs 'git ls-files'."
+            if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+                self.fail(message)
+            self.skipTest(message)
         findings = []
         scanned = 0
         for path in files:

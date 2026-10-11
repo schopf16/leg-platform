@@ -3,7 +3,8 @@
 Django's ``SafeExceptionReporterFilter`` masks settings and ``request.META`` values whose names
 match ``hidden_settings`` on debug pages and in error reports. Its default pattern does not
 cover ``EMAIL_ALLOWED_RECIPIENTS``, which holds personal email addresses on development
-machines (docs/DECISIONS.md, D-028). This filter adds ``RECIPIENTS`` to the pattern.
+machines (docs/DECISIONS.md, D-028). This filter extends Django's own pattern with
+``RECIPIENTS``, so that terms Django adds in later versions are kept.
 
 https://docs.djangoproject.com/en/6.0/howto/error-reporting/
 """
@@ -12,8 +13,7 @@ import re
 
 from django.views.debug import SafeExceptionReporterFilter
 
-# Django's default pattern (django/views/debug.py, 6.0.9 and 6.1.2) plus RECIPIENTS.
-HIDDEN_SETTINGS_PATTERN = r"API|AUTH|TOKEN|KEY|SECRET|PASS|SIGNATURE|HTTP_COOKIE|RECIPIENTS"
+HIDDEN_SETTINGS_PATTERN = SafeExceptionReporterFilter.hidden_settings.pattern + "|RECIPIENTS"
 
 
 class ExceptionReporterFilter(SafeExceptionReporterFilter):
