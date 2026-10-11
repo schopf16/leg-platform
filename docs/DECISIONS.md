@@ -241,6 +241,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   * The minimum versions result from the functions used and from the requirements of the packages used (e.g. `django-axes` requires Python ≥ 3.10). They are determined from official sources and proven by automated tests, not estimated.
   * No package with known security vulnerabilities is used in order to support old versions.
   * When a minimum version reaches its vendor's end of security support, the minimum version is raised.
+  * Declared versus used versions (project owner, 2026-10-11, applies to the whole development): the minimum versions are declared and tested, but whenever a version is chosen for use (development environment, dependency installation, continuous integration "latest" jobs, recommendations for operators), the newest possible version is used: the newest release that is compatible with the other components and, for components with long-term support tracks (e.g. MySQL), the newest release of the long-term support track, so that instances can stay on a stable version for as long as possible.
   * The software uses semantic versioning. Raising the minimum major version of Python, Django or MySQL can lead to a new major version of the software.
 * Verified facts: Django 4.2 no longer receives security updates since 7 April 2026; Django 5.2 LTS receives them until April 2028 (checked on 2026-10-09). `django-axes` 8.3.1 still declares Django 4.2, so package declarations alone do not determine the minimum version.
 * Support periods of MySQL and Python: checked on 2026-10-11 against the vendors' official pages; results and proposed minimum versions in D-026.
@@ -464,7 +465,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 ## D-026: Minimum Versions and Package Selection
 
 * Date: 2026-10-11
-* Status: Proposed (awaiting confirmation by the project owner; nothing has been installed)
+* Status: Decided (project owner, 2026-10-11: minimum versions, `segno` and `msal`, and the custom rate-limit component confirmed; see "Decisions of the project owner" below)
 * Context: README "Current Status", next step 2: determine the minimum versions of Python, Django, MySQL and the intended packages from official sources (D-015) before the Django project skeleton is created.
 * Proposal:
 
@@ -481,6 +482,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   | `msal` (new) | 1.39.0 | Token acquisition for Microsoft Graph with the client credentials flow; Microsoft's own library, MIT licence, Python ≥ 3.9. Depends on `requests`, `PyJWT[crypto]` and `cryptography<51`. |
   | Tabler | 1.6.1 | Latest release (28 September); served by the instance itself (D-024). |
 
+  * Versions used (D-015, newest possible version): development uses Django 6.1 (latest 6.1.2; supports Python 3.12 to 3.14) with Python 3.14 (latest 3.14.8, 2026-09-30; Python 3.15.0 was released on 2026-10-09 but is not yet supported by any Django release) and MySQL 9.7 LTS (D-027), and the newest releases of all packages. The code must also run with the minimum versions; continuous integration tests both ends. `django-axes` 8.3.1 declares Django only up to 6.0; its compatibility with Django 6.1 is proven by the tests, otherwise development falls back to Django 6.0.
   * Minimum patch levels are the current releases at the time of the decision, because older patch releases of these components may contain fixed vulnerabilities; whether an older patch release would be free of known vulnerabilities was not checked for each package.
 * Not recommended: `django-ratelimit` for the per-IP and per-address limits of registration, password reset and email change (D-017). Its latest release 4.1.0 dates from 2023-07-24 and declares Python only up to 3.11. Alternative: a small, tested component on Django's cache framework (`django.core.cache`) with the keyed hash from D-023. This is a custom development for a security function and therefore requires the project owner's decision.
 * Open, requires the project owner:
@@ -491,7 +493,33 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   * `msal` caps `cryptography` below 51; a future security release of `cryptography` 51 could only be installed once `msal` allows it. Alternative: request the token with `requests` directly against the documented Microsoft identity platform endpoint (custom code, not recommended).
 * Security implications: all proposed versions receive security updates from their vendors as of 2026-10-11. Python 3.11 reaches end of life in October 2027 and Django 5.2 in April 2028; the minimum versions are raised then (D-015). `msal` adds `requests` and `PyJWT` as transitive dependencies.
 * Sources (all checked on 2026-10-11): https://devguide.python.org/versions/, https://www.djangoproject.com/download/, https://docs.djangoproject.com/en/5.2/faq/install/, https://docs.djangoproject.com/en/5.2/ref/databases/, https://dev.mysql.com/doc/relnotes/mysql/8.0/en/, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/, https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/news-8-4-0.html ("Changes in MySQL 8.4.0 (2024-04-30)"), https://pypi.org/project/mysqlclient/, https://pypi.org/pypi/django-axes/json, https://pypi.org/project/django-otp/, https://django-otp-official.readthedocs.io/en/stable/overview.html, https://pypi.org/pypi/cryptography/json, https://pypi.org/pypi/segno/json, https://pypi.org/pypi/msal/json, https://pypi.org/pypi/django-ratelimit/json, https://github.com/tabler/tabler/releases
-* Consequences: after confirmation, the versions are recorded as decided, the dependency file is created, and the Django project skeleton (README, next step 3) is set up.
+* Decisions of the project owner (2026-10-11):
+  * The minimum versions and the packages `segno` and `msal` are confirmed.
+  * The per-IP and per-address limits of registration, password reset and email change are implemented as a small, tested component on Django's cache framework instead of `django-ratelimit`. Because the counters must be shared between all worker processes, a shared cache backend is required (Django's local-memory cache is per process); the backend is chosen at implementation and recorded.
+  * The local MySQL server is installed with Chocolatey (D-027).
+  * The minimum versions are proven by continuous integration; the project is made public for this purpose (D-027).
+* Consequences: the dependency file is created and the Django project skeleton is set up.
+
+## D-027: Local Database, Public Repository and Continuous Integration
+
+* Date: 2026-10-11
+* Status: Decided
+* Context: Tests depend on MySQL behaviour (D-016), and the minimum versions must be proven by tests (D-015, D-026). The development machine had neither MySQL nor Docker, and only Python 3.13.
+* Decision:
+  * Local development and tests use MySQL installed with Chocolatey (project owner, 2026-10-11). The local server runs MySQL 9.7 LTS, not the minimum version 8.4: the minimum version (D-026) states what the software must support, not what an instance runs. 9.7 is supported longer, and the Chocolatey package is closer to Oracle's latest patch for 9.7 (9.7.2 vs. 9.7.3) than for 8.4 (8.4.6 vs. 8.4.12). The project owner asked on 2026-10-11 why 9.7 LTS was not used.
+  * The local setup is done by `scripts/local/setup-dev-windows.ps1`, which the developer runs once as administrator (installation of a Windows service requires elevation). The settings read their configuration from environment variables, the method shown in Django's deployment checklist (`SECRET_KEY = os.environ["SECRET_KEY"]`). Locally, the script stores the configuration as user environment variables without printing generated values; how `.env` is loaded into the environment on servers is decided with the hosting (D-008). AI tools therefore never need to read a secret file.
+  * Continuous integration tests both the minimum version (MySQL 8.4) and the latest LTS (MySQL 9.7). Whether Django 5.2 works correctly with MySQL 9.7 is not stated by Django ("Django supports MySQL 8.0.11 and higher") and is proven by these tests.
+  * The repository is published on GitHub and continuous integration runs there with GitHub Actions; the project owner consented to making the project public (2026-10-11).
+* Verified facts:
+  * The Chocolatey package `mysql` (community package, not maintained by Oracle) offers 8.4.6 as its latest 8.4 version (Oracle: 8.4.12, 2026-08-18) and 9.7.2 as its latest 9.7 version (Oracle: 9.7.3, 2026-08-18).
+  * MySQL 9.7 is an LTS series: Oracle's reference manual names the repository `mysql-9.7-lts-community` for 9.7.x releases, and the 9.7.0 release notes (2026-04-21) refer to "consecutive LTS versions higher than 9.7.0". An LTS series receives "5 years of premier support and 3 years of extended support"; no end date is stated for 9.7. 9.7 is the last release line before calendar versioning (YY.M). It downloads the official zip archive from `cdn.mysql.com`, checks a SHA-256 checksum, installs a Windows service and initialises the data directory with `--initialize-insecure`, i.e. the `root` account has no password. The package sets no bind address.
+  * Commits use the GitHub no-reply address as author email; no private email address is published with the history.
+* Security implications:
+  * Local MySQL: without hardening, `root` has no password and the server may listen on all interfaces. The setup script therefore binds the server to `127.0.0.1`, sets a `root` password and creates an application account limited to the project databases. 9.7.2 lacks the fixes of 9.7.3; it is used only for local development, bound to the loopback interface, and is upgraded once the Chocolatey package offers a newer patch.
+  * Public repository: all documents, including the security policy, become public. They contain no secrets (checked with a pattern search before publishing). Security through obscurity is not relied upon. GitHub's secret scanning with push protection and Dependabot alerts are enabled.
+  * Continuous integration: workflow permissions are read-only, no repository secrets are used, and third-party actions are pinned to full commit SHAs (GitHub documentation "Security hardening for GitHub Actions").
+* Open: licence of the public repository (without a licence, the default copyright applies and nobody may reuse the code).
+* Sources: https://community.chocolatey.org/packages/mysql, https://dev.mysql.com/doc/relnotes/mysql/8.4/en/, https://dev.mysql.com/doc/relnotes/mysql/9.7/en/, https://dev.mysql.com/doc/relnotes/mysql/9.7/en/news-9-7-0.html, https://dev.mysql.com/doc/refman/9.7/en/mysql-releases.html, https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions (checked on 2026-10-11)
 
 ## Template for New Decisions
 

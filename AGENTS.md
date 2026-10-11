@@ -172,6 +172,7 @@ The software is called LEG-Platform (initiated by the LEG Ittigen, developed neu
 
 * Prefer established, maintained packages over custom developments, especially for security functions. Do not reinvent the wheel.
 * Specify only minimum versions: as old as technically possible, but still receiving security updates from their vendor, proven by tests (`docs/DECISIONS.md`, D-015). Never use a package with known security vulnerabilities to support old versions.
+* Use the newest possible version: the minimum versions are only declared and tested. Whenever a version is chosen for use (development environment, installation, recommendations), the newest compatible release is used; for components with long-term support tracks, the newest release of that track (D-015).
 * Prefer Django's security features.
 * Write tests for new functionality and security-critical cases.
 * Run appropriate tests and available security checks.
