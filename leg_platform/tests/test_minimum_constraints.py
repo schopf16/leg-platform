@@ -16,14 +16,14 @@ _spec.loader.exec_module(check)
 PYPROJECT = """
 [project]
 dependencies = [
-    "Django>=5.2.18,<6.2",
+    "Django>=6.0.9,<6.2",
     "django_axes>=8.3.1",
     "segno[extra] >= 1.6.6",
 ]
 """
 CONSTRAINTS = """
 # comment
-Django==5.2.18
+Django==6.0.9
 django-axes==8.3.1
 segno==1.6.6  # trailing comment
 """
@@ -34,7 +34,7 @@ class MinimumConstraintsTests(SimpleTestCase):
         self.assertEqual(check.compare(PYPROJECT, CONSTRAINTS), [])
 
     def test_raised_pin_is_reported(self):
-        errors = check.compare(PYPROJECT, CONSTRAINTS.replace("Django==5.2.18", "Django==6.1.2"))
+        errors = check.compare(PYPROJECT, CONSTRAINTS.replace("Django==6.0.9", "Django==6.1.2"))
         self.assertEqual(len(errors), 1)
         self.assertIn("django", errors[0])
 

@@ -13,7 +13,7 @@ A simple, secure and maintainable architecture with the lowest possible operatin
 * Django admin for system administration
 * Microsoft Graph for outgoing email
 
-Only minimum versions are specified (D-015): the oldest versions that are technically possible and still receive security updates from their vendor. They are determined from official sources and proven by tests. Assumptions about versions or compatibility are not permitted. Example: Django 4.2 no longer receives security updates since 7 April 2026; Django 5.2 LTS receives them until April 2028 (https://www.djangoproject.com/download/, checked on 2026-10-09).
+Only minimum versions are specified (D-015): the oldest versions that are technically possible and still receive security updates from their vendor. They are determined from official sources and proven by tests. Assumptions about versions or compatibility are not permitted. Example: Django 4.2 no longer receives security updates since 7 April 2026; Django 5.2 LTS receives them until April 2028 (https://www.djangoproject.com/download/, checked on 2026-10-09). The minimum is Django 6.0, the oldest supported release line with built-in Content Security Policy support (`SECURE_CSP`); its security support ends in April 2027, when the minimum is raised (D-015, D-026, D-028).
 
 ### Candidate Packages for Security Functions
 
@@ -213,7 +213,6 @@ Not yet decided:
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025)
 * which instance-specific values are kept in environment variables and which in the database
 * scheduling of the automatic deletion of expired log entries and of unverified accounts whose verification link has expired
-* Content Security Policy: Django 5.2 has no built-in support, Django 6.0 and later provide `SECURE_CSP` (D-028); approach pending with the project owner; required before any deployment (README, "Deployment gates")
 * redaction of tokens in request logs: Django's request logging writes the path of every response with status 400 or higher; a logging filter that removes tokens from paths, with a test, is required when the first URL with a token is introduced (`docs/SECURITY.md`, sections 6 and 10)
 * an optional guard in the settings that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (security review of 2026-10-11, I-6; not implemented, the deployment gates in the README apply instead)
 * whether compiled translation files (`.mo`) are committed or compiled during deployment

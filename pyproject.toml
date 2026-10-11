@@ -15,11 +15,13 @@ readme = "README.md"
 # SPDX licence expression and licence files (PEP 639; setuptools >= 77.0.0). D-029.
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
-    # 5.2 LTS is the minimum (D-026). The upper bound is the newest release line that is
-    # tested in continuous integration; it is raised after the next release line passed the tests.
-    "Django>=5.2.18,<6.2",
+    # 6.0 is the minimum: the oldest supported release line with built-in Content Security
+    # Policy support (D-015, D-026). Its security support ends in April 2027; the minimum is
+    # raised then. The upper bound is the newest release line that is tested in continuous
+    # integration; it is raised after the next release line passed the tests.
+    "Django>=6.0.9,<6.2",
     "mysqlclient>=2.3.0",
     "django-axes>=8.3.1",
     "django-otp>=1.7.4",

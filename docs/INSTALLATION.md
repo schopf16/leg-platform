@@ -108,4 +108,4 @@ The privileges were taken from the sources above; whether Django's test suite an
 
 Do not run `manage.py migrate` against the local database yet: the custom user model (D-021) must exist before the first migration of a persistent database. The test runner creates and removes its own test database.
 
-Continuous integration (`.github/workflows/ci.yml`) runs the same checks and tests with the minimum versions (Python 3.11, Django 5.2, MySQL 8.4) and with the newest versions (Python 3.14, Django 6.1, MySQL 9.7).
+Continuous integration (`.github/workflows/ci.yml`) runs the same checks and tests with the minimum versions (Python 3.12, Django 6.0, MySQL 8.4) and with the newest versions (Python 3.14, Django 6.1, MySQL 9.7).

@@ -1,6 +1,6 @@
 """ASGI entry point of LEG-Platform.
 
-https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
+https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 """
 
 import os

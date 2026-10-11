@@ -45,8 +45,14 @@ names = (
     "SECURE_PROXY_SSL_HEADER",
     "SILENCED_SYSTEM_CHECKS",
     "ALLOWED_HOSTS",
+    "SECURE_CSP",
+    "SECURE_CSP_REPORT_ONLY",
 )
-print(json.dumps({name: getattr(settings, name) for name in names}))
+values = {name: getattr(settings, name) for name in names}
+values["CSP_MIDDLEWARE"] = (
+    "django.middleware.csp.ContentSecurityPolicyMiddleware" in settings.MIDDLEWARE
+)
+print(json.dumps(values))
 """
 
 # Technical variables the interpreter may need; none of them holds configuration or secrets.
@@ -101,6 +107,19 @@ class ProductionSettingsModuleTests(SimpleTestCase):
             "SECURE_PROXY_SSL_HEADER": None,
             "SILENCED_SYSTEM_CHECKS": ["security.W005", "security.W021"],
             "ALLOWED_HOSTS": ["portal.example.org"],
+            "SECURE_CSP": {
+                "default-src": ["'self'"],
+                "script-src": ["'self'"],
+                "style-src": ["'self'"],
+                "img-src": ["'self'"],
+                "font-src": ["'self'"],
+                "object-src": ["'none'"],
+                "base-uri": ["'none'"],
+                "form-action": ["'self'"],
+                "frame-ancestors": ["'none'"],
+            },
+            "SECURE_CSP_REPORT_ONLY": {},
+            "CSP_MIDDLEWARE": True,
         }
         self.assertEqual(values, expected)
 

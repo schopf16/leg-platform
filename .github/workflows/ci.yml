@@ -2,7 +2,7 @@
 #
 # Two jobs prove both ends of the supported range:
 # - minimum: the declared minimum versions (requirements/minimum-constraints.txt) with
-#   Python 3.11 and MySQL 8.4;
+#   Python 3.12 and MySQL 8.4;
 # - latest: the newest compatible releases with Python 3.14 and MySQL 9.7 LTS.
 #
 # Hardening (GitHub documentation "Security hardening for GitHub Actions"): read-only
@@ -36,12 +36,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: minimum (Python 3.11, Django 5.2, MySQL 8.4)
-            python-version: "3.11"
+          - name: minimum (Python 3.12, Django 6.0, MySQL 8.4)
+            python-version: "3.12"
             # mysql:8.4 (= 8.4.11)
             mysql-image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
             install-mode: minimum
-            django-series: "5.2"
+            django-series: "6.0"
           - name: latest (Python 3.14, Django 6.1, MySQL 9.7)
             python-version: "3.14"
             # mysql:9.7 (= 9.7.2)

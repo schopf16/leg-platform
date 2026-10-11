@@ -1,5 +1,7 @@
 """Tests of the loaded settings and of Django's behaviour with them (docs/SECURITY.md, 11)."""
 
+import re
+
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.middleware import SessionMiddleware
@@ -10,6 +12,7 @@ from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from leg_platform.mail import GraphNotImplementedEmailBackend
+from leg_platform.tests.test_responses import EXPECTED_CSP
 
 
 class PasswordValidationTests(SimpleTestCase):
@@ -102,6 +105,43 @@ class HeaderTests(SimpleTestCase):
                 "/admin/login/", headers={"host": "attacker.example"}
             )
         self.assertEqual(response.status_code, 400)
+
+
+class ContentSecurityPolicyTests(SimpleTestCase):
+    """The policy of docs/SECURITY.md, section 6, with the settings of the test run (D-028).
+
+    The test run uses the local settings; the production settings are covered by
+    test_responses and test_production_settings.
+    """
+
+    def test_middleware_and_policy(self):
+        self.assertIn("django.middleware.csp.ContentSecurityPolicyMiddleware", settings.MIDDLEWARE)
+        self.assertEqual(settings.SECURE_CSP_REPORT_ONLY, {})
+        values = [value for values in settings.SECURE_CSP.values() for value in values]
+        for forbidden in ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "*", "data:"):
+            self.assertNotIn(forbidden, values)
+        # No nonce: inline scripts and styles are not allowed at all.
+        self.assertNotIn("<CSP_NONCE_SENTINEL>", values)
+
+    @override_settings(ALLOWED_HOSTS=["testserver"])
+    def test_header_on_admin_login_page(self):
+        response = self.client.get("/admin/login/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Security-Policy"], EXPECTED_CSP)
+
+    @override_settings(ALLOWED_HOSTS=["testserver"])
+    def test_admin_login_page_needs_no_inline_code(self):
+        # The admin login page must work under the policy: no inline scripts, styles,
+        # style attributes or event handler attributes.
+        html = self.client.get("/admin/login/").content.decode()
+        scripts = re.findall(r"<script\b[^>]*>", html)
+        self.assertTrue(scripts)
+        for tag in scripts:
+            self.assertIn("src=", tag)
+        self.assertNotRegex(html, r"<style\b")
+        self.assertNotRegex(html, r"\sstyle\s*=")
+        self.assertNotRegex(html, r"\son[a-z]+\s*=")
+        self.assertNotIn("javascript:", html)
 
 
 class InternationalizationTests(SimpleTestCase):

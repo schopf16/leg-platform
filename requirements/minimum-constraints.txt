@@ -2,7 +2,7 @@
 # Used only by the "minimum" job in .github/workflows/ci.yml:
 #   pip install -c requirements/minimum-constraints.txt -e .
 # Keep this file in sync with the lower bounds in pyproject.toml.
-Django==5.2.18
+Django==6.0.9
 mysqlclient==2.3.0
 django-axes==8.3.1
 django-otp==1.7.4

@@ -1,6 +1,6 @@
 """WSGI entry point of LEG-Platform.
 
-https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
+https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
 """
 
 import os

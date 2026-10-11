@@ -5,14 +5,15 @@ validated in ``leg_platform.environment``; see ``.env.example`` for all variable
 instance-specific value is set in this file (D-013).
 
 References:
-https://docs.djangoproject.com/en/5.2/ref/settings/
-https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+https://docs.djangoproject.com/en/6.0/ref/settings/
+https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 """
 
 import os
 from pathlib import Path
 
 import django
+from django.utils.csp import CSP
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.environment import (
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -76,7 +78,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "leg_platform.wsgi.application"
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/databases/#mysql-notes
+# https://docs.djangoproject.com/en/6.0/ref/databases/#mysql-notes
 # Django connects with the character set utf8mb4 by default. "read committed" is Django's
 # default isolation level for MySQL ("Data loss is possible with repeatable read"); it is set
 # explicitly so that it is visible. Strict mode is MySQL's default sql_mode and is checked by
@@ -145,6 +147,29 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
+# Content Security Policy (docs/SECURITY.md, section 6; D-028)
+# Django's built-in ContentSecurityPolicyMiddleware (Django 6.0 and later) sends this policy
+# on every response in all environments. Scripts, styles, images and fonts are loaded only
+# from the application's own origin (static assets are self-hosted); no inline scripts or
+# styles, no 'unsafe-inline', no nonces. object-src, base-uri, form-action and
+# frame-ancestors are set explicitly, because base-uri, form-action and frame-ancestors do
+# not fall back to default-src (W3C Content Security Policy Level 3). frame-ancestors 'none'
+# complements X-Frame-Options DENY. Django's debug pages (DEBUG=True, local only) disable the
+# policy for themselves with csp_override({}).
+# https://docs.djangoproject.com/en/6.0/ref/csp/
+
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF],
+    "style-src": [CSP.SELF],
+    "img-src": [CSP.SELF],
+    "font-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.NONE],
+    "form-action": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+}
+
 # HSTS preload is never set and includeSubDomains is left to the operator (D-028); the
 # corresponding deployment warnings are silenced (security.W005 only while includeSubDomains
 # is off), so that "check --deploy --fail-level WARNING" reports every other warning.
@@ -165,9 +190,11 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Email (docs/ARCHITECTURE.md, "Email")
-# Django 6.1 replaces EMAIL_BACKEND with MAILERS and deprecates EMAIL_BACKEND; Django 5.2 only
-# knows EMAIL_BACKEND. The backend is always set explicitly, so that Django's default SMTP
-# backend is never used.
+# Django 6.1 replaces EMAIL_BACKEND with MAILERS and deprecates EMAIL_BACKEND; Django 6.0 only
+# knows EMAIL_BACKEND (no MAILERS in its global settings or test utilities). The backend is
+# always set explicitly, so that Django's default SMTP backend is never used. Django's test
+# runner replaces the backend with the locmem backend in both versions (EMAIL_BACKEND in 6.0,
+# every alias of MAILERS in 6.1; django/test/utils.py), so automated tests never send email.
 
 EMAIL_MODE = ENVIRONMENT.email_mode
 EMAIL_ALLOWED_RECIPIENTS = list(ENVIRONMENT.email_allowed_recipients)

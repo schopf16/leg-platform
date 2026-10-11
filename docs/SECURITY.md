@@ -122,7 +122,7 @@ Consider at least:
 * insecure direct object references
 * session and cookie security
 * secure HTTP headers: HSTS in stage and production, Content Security Policy, `X-Content-Type-Options`, `Referrer-Policy: same-origin` or stricter (Django's default `SECURE_REFERRER_POLICY` is `'same-origin'`), protection against framing
-* no inline scripts and no inline styles that would require `'unsafe-inline'` in the Content Security Policy
+* no inline scripts and no inline styles that would require `'unsafe-inline'` in the Content Security Policy; the policy is set with Django's built-in `ContentSecurityPolicyMiddleware` and `SECURE_CSP` (at least `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`) and is never relaxed globally (D-028)
 * pages whose URL contains a token (email verification, password reset and other links sent by email) remove the token from the URL before rendering, following the approach of Django's password reset view; the exact mechanism is verified against the installed Django version
 * static assets, including Tabler, fonts and icons, are served by the instance itself in fixed versions, not loaded from third-party CDNs
 * the application runs on its own host name, never under a path of another website, so that it does not share an origin with it (D-025); on a subdomain of the website's registrable domain it is still the same site, so the cookie rules in section 3 apply and the installation guide states the residual risk
@@ -136,7 +136,7 @@ Consider at least:
 
 Django's security features must be configured correctly and must not be disabled without a documented, reviewed justification.
 
-Sources: https://docs.djangoproject.com/en/5.2/ref/settings/ (`SECURE_REFERRER_POLICY`), https://docs.djangoproject.com/en/5.2/ref/csrf/ ("Limitations"), draft-ietf-httpbis-rfc6265bis (cookie name prefixes), https://www.w3.org/TR/svg-integration/ (as cited in the security review of 2026-10-11; re-checked against the installed versions at implementation)
+Sources: https://docs.djangoproject.com/en/6.0/ref/settings/ (`SECURE_REFERRER_POLICY`), https://docs.djangoproject.com/en/6.0/ref/csrf/ ("Limitations"), https://docs.djangoproject.com/en/6.0/ref/csp/ and https://docs.djangoproject.com/en/6.0/howto/csp/ (Content Security Policy), https://www.w3.org/TR/CSP3/ (directive names; Working Draft of 16 September 2026, checked on 2026-10-11), draft-ietf-httpbis-rfc6265bis (cookie name prefixes), https://www.w3.org/TR/svg-integration/ (as cited in the security review of 2026-10-11; re-checked against the installed versions at implementation)
 
 ## 7. Secrets
 

@@ -6,7 +6,7 @@ pyproject.toml (e.g. after an automated update of only one of the files), CI wou
 different version than the declared minimum. This script fails in that case.
 
 Usage: python scripts/check_minimum_constraints.py
-Exit code 0 if both files agree, 1 otherwise. Standard library only (Python >= 3.11).
+Exit code 0 if both files agree, 1 otherwise. Standard library only (Python >= 3.12, the declared minimum).
 """
 
 from __future__ import annotations

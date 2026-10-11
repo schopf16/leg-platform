@@ -18,6 +18,13 @@ WEBSITE_ORIGIN = "https://example.org"
 
 PRODUCTION_SECURITY = security_settings(load_environment(make_env("production")))
 
+# The policy required by docs/SECURITY.md, section 6, as Django renders it (D-028).
+EXPECTED_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+    "font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+
 
 @override_settings(
     ROOT_URLCONF="leg_platform.tests.urls",
@@ -46,6 +53,18 @@ class ProductionResponseTests(SimpleTestCase):
         self.assertEqual(
             response["Strict-Transport-Security"], f"max-age={DEFAULT_HSTS_SECONDS}"
         )
+
+    def test_content_security_policy(self):
+        response = self.client.get("/ok/", secure=True, headers={"host": APP_HOST})
+        self.assertEqual(response["Content-Security-Policy"], EXPECTED_CSP)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response)
+
+    def test_content_security_policy_on_error_responses(self):
+        client = Client(raise_request_exception=False)
+        with self.assertLogs("django.request", "ERROR"):
+            response = client.get("/error/", secure=True, headers={"host": APP_HOST})
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response["Content-Security-Policy"], EXPECTED_CSP)
 
     @override_settings(SECURE_HSTS_INCLUDE_SUBDOMAINS=True)
     def test_hsts_include_subdomains_when_enabled(self):
