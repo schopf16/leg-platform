@@ -164,7 +164,9 @@ Sources: https://docs.djangoproject.com/en/6.0/ref/settings/ (`SECURE_REFERRER_P
 * The configuration is accessible only to system administrators; every change is logged.
 * The test send never displays secrets.
 * Email logs must not contain tokens, passwords or complete security links.
-* Local and stage delivery must be controlled by default. Unrestricted delivery is only possible in production, and in production only unrestricted delivery via Microsoft Graph is allowed, so that security links never end up in console or server logs.
+* Local and stage delivery must be controlled by default. Locally, output to the console (the default) and delivery via Microsoft Graph restricted to allowed recipients are possible; stage allows only delivery restricted to allowed recipients. Unrestricted delivery is only possible in production, and in production only unrestricted delivery via Microsoft Graph is allowed, so that security links never end up in console or server logs (D-028).
+* Local delivery via Microsoft Graph uses a dedicated development app registration and sender mailbox whose credentials are separate from stage and production (section 7; D-020). The allowed local recipient addresses are kept only in the environment variable `EMAIL_ALLOWED_RECIPIENTS` on the developer machine, never in the repository.
+* Automated tests never send real email (Django's test runner replaces the email backend with its in-memory backend) and use only email addresses under domains reserved for testing and documentation (RFC 2606: `example.com`, `example.net`, `example.org`, `.test`, `.invalid`).
 * Replies to security notifications go to the sender mailbox; the operator must monitor it.
 
 Source: https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac
@@ -265,7 +267,8 @@ Email and Microsoft Graph:
 
 * The Microsoft Graph configuration is accessible only to system administrators; every change is logged; the client secret is never displayed after saving and is stored encrypted.
 * The client secret can still be decrypted with a key from `SECRET_KEY_FALLBACKS`; without a matching key, the admin clearly asks for the secret to be entered again.
-* Local delivery is restricted to test output; stage delivery is restricted to allowed recipients; unrestricted delivery is refused outside production; any mode other than unrestricted Microsoft Graph delivery is refused in production.
+* Local delivery is restricted to console output or to allowed recipients; stage delivery is restricted to allowed recipients; unrestricted delivery is refused outside production; any mode other than unrestricted Microsoft Graph delivery is refused in production.
+* Automated tests send no real email, and the repository contains email addresses only under reserved domains (RFC 2606).
 * A missing or unknown `APP_ENV` prevents the application from starting.
 * The test send never displays secrets.
 * Links in emails use the canonical base URL of the instance, not the `Host` header of the request.

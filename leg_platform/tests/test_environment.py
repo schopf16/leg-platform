@@ -219,11 +219,14 @@ class EmailModeTests(SimpleTestCase):
                     with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
                         load_environment(make_env(app_env, EMAIL_MODE=value))
 
-    def test_local_allows_only_console(self):
-        for mode in ("allowlist", "graph"):
+    def test_local_allows_console_and_allowlist_but_not_graph(self):
+        # Local Microsoft Graph tests use allowlist with a dedicated development app
+        # registration; unrestricted delivery stays production-only (D-028).
+        for mode in ("console", "allowlist"):
             with self.subTest(mode=mode):
-                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=console"):
-                    load_environment(make_env("local", EMAIL_MODE=mode))
+                self.assertEqual(load_environment(make_env("local", EMAIL_MODE=mode)).email_mode, mode)
+        with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=console or allowlist"):
+            load_environment(make_env("local", EMAIL_MODE="graph"))
 
     def test_stage_requires_allowlist(self):
         for mode in ("console", "graph"):
@@ -249,32 +252,42 @@ class EmailModeTests(SimpleTestCase):
 
     def test_allowed_combinations(self):
         allowed = {
-            "local": ("console",),
+            "local": ("console", "allowlist"),
             "stage": ("allowlist",),
             "production": ("graph",),
         }
         for app_env, modes in allowed.items():
-            for mode in modes:
+            for mode in ("console", "allowlist", "graph"):
                 with self.subTest(app_env=app_env, mode=mode):
-                    config = load_environment(make_env(app_env, EMAIL_MODE=mode))
-                    self.assertEqual(config.email_mode, mode)
+                    env = make_env(app_env, EMAIL_MODE=mode)
+                    if mode in modes:
+                        self.assertEqual(load_environment(env).email_mode, mode)
+                    else:
+                        with self.assertRaises(ImproperlyConfigured):
+                            load_environment(env)
 
     def test_allowed_recipients_are_normalised(self):
-        config = load_environment(
-            make_env("stage", EMAIL_ALLOWED_RECIPIENTS=" Tester@Example.org ,b@example.org")
-        )
-        self.assertEqual(
-            config.email_allowed_recipients, ("tester@example.org", "b@example.org")
-        )
+        for app_env in ("local", "stage"):
+            with self.subTest(app_env=app_env):
+                config = load_environment(
+                    make_env(
+                        app_env,
+                        EMAIL_MODE="allowlist",
+                        EMAIL_ALLOWED_RECIPIENTS=" Tester@Example.org ,b@mail.test",
+                    )
+                )
+                self.assertEqual(
+                    config.email_allowed_recipients, ("tester@example.org", "b@mail.test")
+                )
 
     def test_backend_is_never_smtp_and_console_only_in_console_mode(self):
         self.assertEqual(
             email_backend(load_environment(make_env("local"))),
             "django.core.mail.backends.console.EmailBackend",
         )
-        for app_env in ("stage", "production"):
-            with self.subTest(app_env=app_env):
-                backend = email_backend(load_environment(make_env(app_env)))
+        for app_env, mode in (("local", "allowlist"), ("stage", "allowlist"), ("production", "graph")):
+            with self.subTest(app_env=app_env, mode=mode):
+                backend = email_backend(load_environment(make_env(app_env, EMAIL_MODE=mode)))
                 self.assertEqual(backend, "leg_platform.mail.GraphNotImplementedEmailBackend")
 
 

@@ -154,6 +154,31 @@ class InternationalizationTests(SimpleTestCase):
         self.assertEqual(settings.LOCALE_PATHS, [settings.BASE_DIR / "locale"])
 
 
+class TestRunnerEmailTests(SimpleTestCase):
+    """Automated tests never send real email (D-028).
+
+    Django's test runner replaces the configured backend with the locmem backend:
+    EMAIL_BACKEND in Django 6.0, every alias of MAILERS in Django 6.1 (django/test/utils.py).
+    """
+
+    LOCMEM = "django.core.mail.backends.locmem.EmailBackend"
+
+    def test_backend_is_locmem_during_tests(self):
+        if hasattr(settings, "MAILERS"):
+            self.assertTrue(settings.MAILERS)
+            for alias, config in settings.MAILERS.items():
+                with self.subTest(alias=alias):
+                    self.assertEqual(config["BACKEND"], self.LOCMEM)
+        else:
+            self.assertEqual(settings.EMAIL_BACKEND, self.LOCMEM)
+
+    def test_sent_email_stays_in_the_outbox(self):
+        sent = mail.send_mail("Subject", "Body", "from@example.org", ["to@example.org"])
+        self.assertEqual(sent, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["to@example.org"])
+
+
 class PlaceholderEmailBackendTests(SimpleTestCase):
     def test_refuses_to_send(self):
         message = mail.EmailMessage("Subject", "Body", "from@example.org", ["to@example.org"])

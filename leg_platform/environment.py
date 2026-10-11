@@ -46,12 +46,14 @@ PORT_MAX = 65535
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
 
-# The delivery mode each APP_ENV requires (docs/SECURITY.md, section 11; docs/ARCHITECTURE.md,
-# "Email"): local delivery is restricted to test output, stage delivery is restricted to
-# allowed recipients, and production allows only unrestricted Microsoft Graph delivery, so
-# that security links never end up in console or server logs (D-028).
+# The delivery modes each APP_ENV allows (docs/SECURITY.md, sections 8 and 11;
+# docs/ARCHITECTURE.md, "Email"; D-028): local development allows console output (the default)
+# and delivery restricted to allowed recipients, so that Microsoft Graph delivery can be
+# tested locally with a dedicated development app registration; stage delivery is restricted
+# to allowed recipients; unrestricted delivery is allowed only in production, and production
+# allows nothing else, so that security links never end up in console or server logs.
 ALLOWED_EMAIL_MODES = {
-    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE,),
+    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
     APP_ENV_STAGE: (EMAIL_MODE_ALLOWLIST,),
     APP_ENV_PRODUCTION: (EMAIL_MODE_GRAPH,),
 }
@@ -247,7 +249,7 @@ def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, .
     allowed = ALLOWED_EMAIL_MODES[app_env]
     if mode not in allowed:
         raise ImproperlyConfigured(
-            f"APP_ENV={app_env} requires EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
+            f"APP_ENV={app_env} allows only EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
         )
     recipients = tuple(
         address.lower() for address in _split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS"))

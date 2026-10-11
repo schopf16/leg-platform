@@ -91,7 +91,7 @@ On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9
 
 On 2026-10-11 a security review of the skeleton was carried out. Its findings were corrected: email delivery modes per environment, HSTS `includeSubDomains` configurable by the operator (D-028), stricter validation of numeric values, `HttpOnly` CSRF cookie, response-level tests with production settings, a hardened local setup script (D-027, `docs/INSTALLATION.md`), service images pinned by digest and Dependabot for actions and Python packages. Three re-review rounds on the same day confirmed the corrections and the follow-up fixes; no review findings are open. Continuous integration passed both jobs after each round. The setup script has not yet been run against a real server.
 
-On 2026-10-11 the project owner decided: the setup script failed on the first run right after the MySQL installation; the path resolution was fixed and a switch `-RemoveFailedInstallation` was added for a retry (D-027). The minimum versions were raised to Django 6.0 and Python 3.12 to use Django's built-in Content Security Policy, which is now set (D-026, D-028). The project is licensed under the BSD 3-Clause License (D-029).
+On 2026-10-11 the project owner decided: the setup script failed on the first run right after the MySQL installation; the path resolution was fixed and a switch `-RemoveFailedInstallation` was added for a retry (D-027). The minimum versions were raised to Django 6.0 and Python 3.12 to use Django's built-in Content Security Policy, which is now set (D-026, D-028). Local email delivery may use `allowlist` with a dedicated development app registration besides `console` (D-028). The project is licensed under the BSD 3-Clause License (D-029).
 
 Deployment gates: no stage or production instance is deployed before
 
@@ -103,6 +103,6 @@ Deployment gates: no stage or production instance is deployed before
 
 Next steps:
 
-1. Decisions of the project owner: D-028, the Content Security Policy approach for Django 5.2, local email delivery (`docs/SECURITY.md`, sections 8 and 11) and the licence of the public repository (D-027).
-2. First run of the hardened setup script on the development machine and a local test run against MySQL with the restricted application account.
+1. Confirmation of D-028 by the project owner. Decided on 2026-10-11: Content Security Policy with Django's built-in support (D-026, D-028), local email delivery with `console` or `allowlist` (`docs/SECURITY.md`, sections 8 and 11; D-028), licence BSD-3-Clause (D-029).
+2. Retry of the setup script on the development machine with `-RemoveFailedInstallation` (`docs/INSTALLATION.md`) and a local test run against MySQL with the restricted application account.
 3. Custom user model (D-021), before any persistent database is migrated.
