@@ -1,0 +1,26 @@
+# Dependabot version updates (docs/DECISIONS.md, D-015, D-027).
+# Reference: https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+#
+# - github-actions: actions referenced with "uses" in .github/workflows/. Dependabot does not
+#   update Docker images of workflow services; those digests in ci.yml are updated manually.
+# - pip: pyproject.toml (PEP 621) and requirements/*.txt. "widen" only raises upper bounds
+#   where possible. Pull requests are proposals: minimum versions are raised only according
+#   to D-015 (end of vendor security support or a known vulnerability), not because a newer
+#   release exists; requirements/minimum-constraints.txt must keep matching the lower bounds
+#   in pyproject.toml.
+# - docker: not configured; the repository has no Dockerfile or other supported manifest.
+#
+# Security updates for vulnerable dependencies are enabled in the repository settings.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: widen

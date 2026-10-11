@@ -6,7 +6,15 @@
 # - latest: the newest compatible releases with Python 3.14 and MySQL 9.7 LTS.
 #
 # Hardening (GitHub documentation "Security hardening for GitHub Actions"): read-only
-# token, no repository secrets, third-party actions pinned to full commit SHAs.
+# token, no repository secrets, third-party actions pinned to full commit SHAs, service
+# images pinned by digest, matrix values passed to scripts through environment variables
+# instead of expressions inside "run".
+#
+# Service images: the digests are those of the multi-platform image index of the official
+# Docker image "mysql" for the tag named in the comment, read from
+# https://hub.docker.com/v2/repositories/library/mysql/tags/<tag> on 2026-10-11. Dependabot
+# does not update images in workflow files (only actions referenced with "uses"); update the
+# tag and digest manually when a new patch release is published.
 
 name: CI
 
@@ -30,13 +38,15 @@ jobs:
         include:
           - name: minimum (Python 3.11, Django 5.2, MySQL 8.4)
             python-version: "3.11"
-            mysql-image: mysql:8.4
-            install: pip install -c requirements/minimum-constraints.txt -e .
+            # mysql:8.4 (= 8.4.11)
+            mysql-image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+            install-mode: minimum
             django-series: "5.2"
           - name: latest (Python 3.14, Django 6.1, MySQL 9.7)
             python-version: "3.14"
-            mysql-image: mysql:9.7
-            install: pip install --upgrade -e .
+            # mysql:9.7 (= 9.7.2)
+            mysql-image: mysql:9.7.2@sha256:e2bde46db6563855d7177adb5f0b57b9dc663f5a20927a90f4259d3312068497
+            install-mode: latest
             django-series: "6.1"
 
     services:
@@ -90,13 +100,20 @@ jobs:
       - name: Install the project
         env:
           PYTHONWARNINGS: ""
+          INSTALL_MODE: ${{ matrix.install-mode }}
         run: |
           python -m pip install --upgrade pip
-          ${{ matrix.install }}
+          case "$INSTALL_MODE" in
+            minimum) python -m pip install -c requirements/minimum-constraints.txt -e . ;;
+            latest) python -m pip install --upgrade -e . ;;
+            *) echo "Unknown install mode: $INSTALL_MODE" >&2; exit 1 ;;
+          esac
           python -m pip freeze
 
       - name: Verify the Django release line
-        run: python -c "import django, sys; v = django.get_version(); print(v); sys.exit(0 if v.startswith('${{ matrix.django-series }}.') or v == '${{ matrix.django-series }}' else 1)"
+        env:
+          DJANGO_SERIES: ${{ matrix.django-series }}
+        run: python -c "import django, os, sys; s = os.environ['DJANGO_SERIES']; v = django.get_version(); print(v); sys.exit(0 if v == s or v.startswith(s + '.') else 1)"
 
       - name: Generate a throwaway secret key
         # Generated per job and masked; it protects nothing.
