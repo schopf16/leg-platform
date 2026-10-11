@@ -469,26 +469,94 @@ function Write-RecoveryInstructions {
     Write-Host "  $RetryCommand"
 }
 
+function Test-IsPathUnder {
+    # True if $Path is $Root or lies below it. Both are normalised to full paths and compared
+    # case-insensitively; relative paths are never accepted.
+    param([string]$Path, [string]$Root)
+    if (-not $Path -or -not $Root) { return $false }
+    try {
+        if (-not [IO.Path]::IsPathRooted($Path) -or -not [IO.Path]::IsPathRooted($Root)) { return $false }
+        $fullPath = [IO.Path]::GetFullPath($Path.Replace('/', '\')).TrimEnd('\')
+        $fullRoot = [IO.Path]::GetFullPath($Root.Replace('/', '\')).TrimEnd('\')
+    } catch {
+        return $false
+    }
+    return [string]::Equals($fullPath, $fullRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($fullRoot + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ServiceOwnershipProblem {
+    # Returns $null if the service command line belongs to an installation of the Chocolatey
+    # package 'mysql' that this script may remove, or a description of the problem otherwise:
+    # the executable must lie under <tools>\mysql, and --defaults-file must be absent or point
+    # to <tools>\mysql\current\my.ini.
+    param([string]$PathName, [string]$Executable, [string]$ToolsRoot)
+    $packageRoot = Join-Path $ToolsRoot $MySqlPackage
+    if (-not $Executable) {
+        return "the program of the service could not be found in its command line '$PathName'"
+    }
+    if (-not (Test-IsPathUnder -Path $Executable -Root $packageRoot)) {
+        return "the service runs '$Executable', which is not under $packageRoot"
+    }
+    $match = [regex]::Match("$PathName", '--defaults-file=(?:"([^"]+)"|(\S+))')
+    if ($match.Success) {
+        $defaultsFile = Get-OptionFilePath -PathName $PathName -Executable $Executable
+        if (-not (Test-IsSamePath -First $defaultsFile -Second (Join-Path $packageRoot 'current\my.ini'))) {
+            return "the service uses the option file '$defaultsFile', not $(Join-Path $packageRoot 'current\my.ini')"
+        }
+    }
+    return $null
+}
+
+function Test-IsReparsePoint {
+    # True if the file or directory exists and is a reparse point (e.g. a symbolic link, a
+    # junction or a mount point).
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    $item = Get-Item -LiteralPath $Path -Force
+    return [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
+}
+
+function Get-ReparsePointPaths {
+    # Returns the paths among those this script would delete or delete from that are reparse
+    # points. The removal refuses to work through them.
+    $packageRoot = Join-Path (Get-ChocolateyToolsRoot) $MySqlPackage
+    $paths = @(
+        (Split-Path -Parent $PackageDataDirectory),
+        $PackageDataDirectory,
+        $packageRoot,
+        (Join-Path $packageRoot 'current')
+    ) + @(Get-PackageOptionFiles)
+    return @($paths | Where-Object { Test-IsReparsePoint -Path $_ })
+}
+
+function Get-PackageOptionFiles {
+    # The only option files the removal deletes: my.ini of the package and the backup this
+    # script writes next to it.
+    $myIni = Join-Path (Get-ChocolateyToolsRoot) "$MySqlPackage\current\my.ini"
+    return @($myIni, "$myIni.before-leg-setup")
+}
+
 function Get-FailedInstallation {
     # Collects what an earlier run left behind, without changing anything.
     $service = Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
-    $myIni = $null
+    $ownershipProblem = $null
+    $serviceRunning = $false
     if ($service) {
         $executable = Resolve-ServiceExecutablePath -PathName $service.PathName
-        $myIni = Get-OptionFilePath -PathName $service.PathName -Executable $executable
+        $ownershipProblem = Get-ServiceOwnershipProblem -PathName $service.PathName -Executable $executable -ToolsRoot (Get-ChocolateyToolsRoot)
+        $serviceRunning = "$($service.State)" -ne 'Stopped'
     }
-    if (-not $myIni) {
-        $myIni = Join-Path (Get-ChocolateyToolsRoot) "$MySqlPackage\current\my.ini"
-    }
-    $optionFiles = @($myIni, "$myIni.before-leg-setup") | Where-Object { Test-IsFile -Path $_ }
-    $configuredDataDirectory = Get-DataDirectory -MyIni $myIni
-    $dataDirectoryExists = Test-Path -LiteralPath $PackageDataDirectory -PathType Container
+    $myIni = (Get-PackageOptionFiles)[0]
     return [pscustomobject]@{
         ServiceExists           = [bool]$service
+        ServiceRunning          = $serviceRunning
+        OwnershipProblem        = $ownershipProblem
         PackageVersion          = Get-InstalledChocolateyPackageVersion -Name $MySqlPackage
-        OptionFiles             = @($optionFiles)
-        ConfiguredDataDirectory = $configuredDataDirectory
-        DataDirectoryExists     = $dataDirectoryExists
+        OptionFiles             = @(Get-PackageOptionFiles | Where-Object { Test-IsFile -Path $_ })
+        ConfiguredDataDirectory = Get-DataDirectory -MyIni $myIni
+        DataDirectoryExists     = Test-Path -LiteralPath $PackageDataDirectory -PathType Container
+        ReparsePoints           = @(Get-ReparsePointPaths)
     }
 }
 
@@ -498,30 +566,46 @@ function Test-HasLeftovers {
         $Installation.OptionFiles.Count -gt 0 -or $Installation.DataDirectoryExists
 }
 
+function Write-ManualRemovalInstructions {
+    Write-Host ''
+    Write-Host 'Nothing was changed. Check the installation and remove it manually if it is no longer needed' -ForegroundColor Red
+    Write-Host '(docs/INSTALLATION.md, "Recovery after a failed setup", manual steps).' -ForegroundColor Red
+}
+
 function Confirm-FailedInstallationRemoval {
-    # Shows what will be removed and asks for the confirmation before anything is changed.
-    # Returns only if the removal may proceed; throws otherwise.
+    # Checks that the installation is one this script may remove, lists everything that will be
+    # removed and asks for the typed confirmation before anything is changed. Returns only if
+    # the removal may proceed; throws otherwise.
     param($Installation)
+    if ($Installation.OwnershipProblem) {
+        Write-ManualRemovalInstructions
+        throw "The service '$ServiceName' does not look like the local installation of the Chocolatey package '$MySqlPackage': $($Installation.OwnershipProblem)."
+    }
+    if ($Installation.ReparsePoints.Count -gt 0) {
+        Write-ManualRemovalInstructions
+        throw "These paths are symbolic links, junctions or mount points: $($Installation.ReparsePoints -join ', ')."
+    }
+    if ($Installation.DataDirectoryExists -and -not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
+        Write-ManualRemovalInstructions
+        throw "'$PackageDataDirectory' does not look like a MySQL data directory (no mysql.ibd and mysql folder)."
+    }
     if ($Installation.ConfiguredDataDirectory -and
         -not (Test-IsSamePath -First $Installation.ConfiguredDataDirectory -Second $PackageDataDirectory)) {
         # Never delete a directory other than the package default: a my.ini changed by hand
         # could point anywhere. The package creates a new my.ini with its default datadir.
         Write-Warning "my.ini names the data directory '$($Installation.ConfiguredDataDirectory)'. It is not the package default and is NOT deleted; delete it yourself if it is no longer needed."
     }
-    if ($Installation.DataDirectoryExists -and -not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
-        throw "'$PackageDataDirectory' does not look like a MySQL data directory (no mysql.ibd and mysql folder). Nothing was changed; check and remove it manually (docs/INSTALLATION.md)."
-    }
     Write-Host ''
     Write-Host 'The following local MySQL installation will be removed:' -ForegroundColor Yellow
-    if ($Installation.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped first, then deleted)" }
+    if ($Installation.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped and disabled first, then deleted)" }
     if ($Installation.PackageVersion) { Write-Host "  - Chocolatey package '$MySqlPackage' $($Installation.PackageVersion) (choco uninstall)" }
     foreach ($file in $Installation.OptionFiles) { Write-Host "  - Option file $file" }
     if ($Installation.DataDirectoryExists) {
         Write-Host "  - Data directory $PackageDataDirectory with ALL local MySQL databases (cannot be undone)" -ForegroundColor Yellow
-        $answer = Read-Host "Type DELETE to permanently delete '$PackageDataDirectory'"
-        if ($answer -cne 'DELETE') {
-            throw 'Not confirmed. Nothing was changed.'
-        }
+    }
+    $answer = Read-Host 'Type DELETE to remove all items listed above'
+    if ($answer -cne 'DELETE') {
+        throw 'Not confirmed. Nothing was changed.'
     }
 }
 
@@ -535,20 +619,33 @@ function Wait-ServiceRemoved {
     throw "The service '$ServiceName' still exists. Close the Services console and Task Manager, or restart Windows, then run: $RetryCommand"
 }
 
+function Remove-PackageDataDirectory {
+    # Re-checks the data directory immediately before deleting it. [IO.Directory]::Delete with
+    # recursive=true "does not recurse through the reparse point" (Microsoft Learn,
+    # "Directory.Delete Method").
+    $parent = Split-Path -Parent $PackageDataDirectory
+    if ((Test-IsReparsePoint -Path $parent) -or (Test-IsReparsePoint -Path $PackageDataDirectory)) {
+        throw "$PackageDataDirectory or its parent became a symbolic link, junction or mount point; it was not deleted."
+    }
+    if (-not (Test-IsMySqlDataDirectory -Path $PackageDataDirectory)) {
+        throw "$PackageDataDirectory no longer looks like a MySQL data directory; it was not deleted."
+    }
+    [IO.Directory]::Delete($PackageDataDirectory, $true)
+    if (Test-Path -LiteralPath $PackageDataDirectory) { throw "The data directory $PackageDataDirectory could not be deleted." }
+    Write-Host "Data directory $PackageDataDirectory was deleted."
+}
+
 function Remove-FailedInstallation {
     # Removes the installation after Confirm-FailedInstallationRemoval. Every step checks the
     # current state, so that the removal can be repeated after an interruption.
     param($Installation)
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-        $deadline = (Get-Date).AddSeconds(30)
-        while ((Get-Date) -lt $deadline -and "$((Get-Service -Name $ServiceName).Status)" -ne 'Stopped') {
-            Start-Sleep -Seconds 2
-        }
+        # First stop the service and set it to Disabled, so that it cannot start again while
+        # the installation is removed.
+        Disable-MySqlService
         if ("$((Get-Service -Name $ServiceName).Status)" -ne 'Stopped') {
             throw "The service '$ServiceName' could not be stopped. Nothing else was changed."
         }
-        Write-Host "Service '$ServiceName' is stopped."
     }
     if (Get-InstalledChocolateyPackageVersion -Name $MySqlPackage) {
         choco uninstall $MySqlPackage -y --no-progress
@@ -563,11 +660,9 @@ function Remove-FailedInstallation {
     }
     if ($Installation.DataDirectoryExists -and (Test-Path -LiteralPath $PackageDataDirectory)) {
         # Confirmed by the user in Confirm-FailedInstallationRemoval.
-        Remove-Item -LiteralPath $PackageDataDirectory -Recurse -Force
-        if (Test-Path -LiteralPath $PackageDataDirectory) { throw "The data directory $PackageDataDirectory could not be deleted." }
-        Write-Host "Data directory $PackageDataDirectory was deleted."
+        Remove-PackageDataDirectory
     }
-    foreach ($file in $Installation.OptionFiles) {
+    foreach ($file in Get-PackageOptionFiles) {
         if (Test-IsFile -Path $file) {
             Remove-Item -LiteralPath $file -Force
             Write-Host "Option file $file was deleted."
@@ -589,6 +684,11 @@ if ($chocoVersion -notmatch '^(\d+)\.' -or [int]$Matches[1] -lt 2) {
 $failedInstallation = Get-FailedInstallation
 if (Test-HasLeftovers -Installation $failedInstallation) {
     if (-not $RemoveFailedInstallation) {
+        if ($failedInstallation.ServiceRunning) {
+            # A server of a failed run may still run with a root account without password and
+            # listen on all interfaces (docs/INSTALLATION.md, "Recovery after a failed setup").
+            Write-Warning "The service '$ServiceName' is running. Stop and disable it as administrator: sc.exe stop $ServiceName; sc.exe config $ServiceName start= disabled"
+        }
         throw "A local MySQL installation already exists (e.g. from a failed run). To remove it and start over, run as administrator: $RetryCommand"
     }
     Confirm-FailedInstallationRemoval -Installation $failedInstallation

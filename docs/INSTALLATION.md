@@ -20,7 +20,17 @@ For Windows development machines (D-027). Never use these steps or their credent
    .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
    ```
 
-   If a local MySQL installation already exists, the first command stops without changing anything and shows the second command. Before the second command deletes the MySQL data directory, it asks you to type `DELETE`; all local MySQL databases are then lost. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
+   If a local MySQL installation already exists, the first command stops without changing anything and shows the second command. Before the second command removes anything, it lists everything it will remove and asks you to type `DELETE`; all local MySQL databases are then lost. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
+
+   Short unprotected phase: the Chocolatey package initialises MySQL with a `root` account without password and starts the service right away (`NET START`), listening on all network interfaces (port 3306, and port 33060 for X Plugin). The script hardens and restarts the server immediately afterwards, but during these seconds, and again on every retry, the server is reachable from the network unless the Windows Firewall blocks it. Before running the script, check as administrator that the firewall is on and blocks inbound connections for all profiles, and that no rule allows inbound connections to MySQL:
+
+   ```powershell
+   Get-NetFirewallProfile -PolicyStore ActiveStore | Select-Object Name, Enabled, DefaultInboundAction
+   Get-NetFirewallPortFilter -PolicyStore ActiveStore | Where-Object { $_.LocalPort -in '3306', '33060' } | Get-NetFirewallRule | Where-Object { $_.Direction -eq 'Inbound' -and $_.Action -eq 'Allow' -and $_.Enabled -eq 'True' }
+   Get-NetFirewallApplicationFilter -PolicyStore ActiveStore | Where-Object { $_.Program -like '*mysqld*' } | Get-NetFirewallRule | Where-Object { $_.Direction -eq 'Inbound' -and $_.Action -eq 'Allow' -and $_.Enabled -eq 'True' }
+   ```
+
+   The first command must show `Enabled True` and `DefaultInboundAction Block` for every profile; the other two must show nothing. If Windows asks whether `mysqld` may communicate on networks, deny it. Run the script only on a trusted network. Sources: Microsoft Learn, "Get-NetFirewallProfile" (`-PolicyStore ActiveStore` "retrieves the active profile conditions"), "Get-NetFirewallPortFilter", "Get-NetFirewallApplicationFilter" and "Get-NetFirewallRule" (NetSecurity module).
 
    The script:
 
@@ -69,11 +79,11 @@ To start over, fix the cause shown by the script and run as administrator:
 .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
 ```
 
-Before it changes anything, the script lists what it will remove and asks for the new `root` password. It then:
+Before it changes anything, the script checks that the installation is the one the Chocolatey package `mysql` created: the service must run a program below `C:\tools\mysql` (Chocolatey's tools directory) and must not use an option file other than `C:\tools\mysql\current\my.ini`, and none of the affected folders may be a symbolic link, junction or mount point. Otherwise it stops without changing anything, and the installation has to be removed manually. It then lists everything it will remove, asks you to type `DELETE`, and asks for the new `root` password. It then:
 
-* stops the `MySQL` service, uninstalls the Chocolatey package `mysql` and deletes the service if it still exists (`sc.exe delete MySQL`);
-* deletes the data directory `C:\ProgramData\MySQL\data` only after you have typed `DELETE`, and only if it looks like a MySQL data directory (it contains `mysql.ibd` and the folder `mysql`) or is empty. It never deletes another directory: if `my.ini` names a different `datadir`, the script reports it and leaves it in place;
-* deletes the leftover `my.ini` and `my.ini.before-leg-setup`, checks that nothing of the old installation remains, and continues with the normal setup.
+* stops the `MySQL` service and sets its start type to `Disabled`, uninstalls the Chocolatey package `mysql` and deletes the service if it still exists (`sc.exe delete MySQL`);
+* deletes the data directory `C:\ProgramData\MySQL\data` only if it looks like a MySQL data directory (it contains `mysql.ibd` and the folder `mysql`) or is empty; both checks are repeated immediately before deleting. It never deletes another directory: if `my.ini` names a different `datadir`, the script reports it and leaves it in place;
+* deletes only `C:\tools\mysql\current\my.ini` and `my.ini.before-leg-setup`, checks that nothing of the old installation remains, and continues with the normal setup.
 
 If the script reports that the service still exists after `sc.exe delete`, close the Services console and Task Manager or restart Windows, and run the command again; every step checks the current state and can be repeated. User environment variables of an earlier run are overwritten by a successful run.
 

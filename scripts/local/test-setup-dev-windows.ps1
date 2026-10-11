@@ -106,6 +106,36 @@ try {
     Assert-Equal (Test-IsSamePath -First '' -Second 'C:\') $false 'Test-IsSamePath: empty'
     Assert-Equal $PackageDataDirectory 'C:\ProgramData\MySQL\data' 'PackageDataDirectory is the package default'
 
+    # Test-IsPathUnder
+    Assert-Equal (Test-IsPathUnder -Path 'C:\tools\mysql\current\bin\mysqld.exe' -Root 'C:\tools\mysql') $true 'Test-IsPathUnder: below'
+    Assert-Equal (Test-IsPathUnder -Path 'c:\TOOLS\MySQL' -Root 'C:\tools\mysql\') $true 'Test-IsPathUnder: same, case and separator'
+    Assert-Equal (Test-IsPathUnder -Path 'C:\tools\mysql-other\bin\mysqld.exe' -Root 'C:\tools\mysql') $false 'Test-IsPathUnder: sibling with common prefix'
+    Assert-Equal (Test-IsPathUnder -Path 'C:\tools\mysql\..\evil\mysqld.exe' -Root 'C:\tools\mysql') $false 'Test-IsPathUnder: escape via ..'
+    Assert-Equal (Test-IsPathUnder -Path 'tools\mysql\bin' -Root 'C:\tools\mysql') $false 'Test-IsPathUnder: relative path'
+
+    # Get-ServiceOwnershipProblem
+    $toolsRoot = Join-Path $root 'tools'
+    $ownIni = Join-Path $toolsRoot 'mysql\current\my.ini'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName "$plainBase MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: Chocolatey service without --defaults-file'
+    Assert-Equal (Get-ServiceOwnershipProblem -PathName "`"$plainExe`" --defaults-file=`"$ownIni`" MySQL" -Executable $plainExe -ToolsRoot $toolsRoot) $null 'Ownership: --defaults-file of the package'
+    $problem = Get-ServiceOwnershipProblem -PathName "`"$plainExe`" --defaults-file=C:\other\my.ini MySQL" -Executable $plainExe -ToolsRoot $toolsRoot
+    Assert-Equal ([bool]$problem) $true 'Ownership: other --defaults-file is refused'
+    $problem = Get-ServiceOwnershipProblem -PathName "`"$spaceExe`" MySQL" -Executable $spaceExe -ToolsRoot $toolsRoot
+    Assert-Equal ([bool]$problem) $true 'Ownership: executable outside <tools>\mysql is refused'
+    $problem = Get-ServiceOwnershipProblem -PathName 'C:\missing\mysqld MySQL' -Executable $null -ToolsRoot $toolsRoot
+    Assert-Equal ([bool]$problem) $true 'Ownership: unresolved executable is refused'
+
+    # Test-IsReparsePoint (a junction needs no administrator rights)
+    $target = Join-Path $root 'junction-target'
+    $junction = Join-Path $root 'junction'
+    New-Item -ItemType Directory -Path $target | Out-Null
+    New-Item -ItemType Junction -Path $junction -Target $target | Out-Null
+    Assert-Equal (Test-IsReparsePoint -Path $junction) $true 'Test-IsReparsePoint: junction'
+    Assert-Equal (Test-IsReparsePoint -Path $target) $false 'Test-IsReparsePoint: normal directory'
+    Assert-Equal (Test-IsReparsePoint -Path (Join-Path $root 'missing')) $false 'Test-IsReparsePoint: missing'
+    # Remove the junction itself before the temporary directory is deleted.
+    [IO.Directory]::Delete($junction, $false)
+
     # Test-IsMySqlDataDirectory
     $dataDir = Join-Path $root 'data'
     New-Item -ItemType Directory -Path $dataDir | Out-Null
