@@ -560,6 +560,28 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 * Sources (checked on 2026-10-11): https://docs.djangoproject.com/en/5.2/ref/databases/, https://docs.djangoproject.com/en/5.2/ref/middleware/, https://docs.djangoproject.com/en/5.2/ref/settings/ (`SECURE_HSTS_INCLUDE_SUBDOMAINS`, `CSRF_COOKIE_HTTPONLY`, `CSRF_TRUSTED_ORIGINS`), https://docs.djangoproject.com/en/5.2/howto/csrf/, https://docs.djangoproject.com/en/6.1/releases/6.1/, https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/, installed source of Django 6.1.2 and 5.2.18
 * Consequences: a Content Security Policy must be decided before the first application view with templates; the placeholder email backend is replaced by the Microsoft Graph backend (D-006).
 
+## D-029: Licence
+
+* Date: 2026-10-11
+* Status: Decided (project owner, 2026-10-11)
+* Context: The repository is public (D-027). Without a licence, the default copyright applies and nobody may reuse the code. The project owner asked for a licence chosen according to the packages used.
+* Decision:
+  * LEG-Platform is licensed under the BSD 3-Clause License (SPDX identifier `BSD-3-Clause`), the licence of Django.
+  * Copyright line: "Copyright (c) 2026, the LEG-Platform contributors".
+  * `LICENSE` contains the licence text of the SPDX License List (https://spdx.org/licenses/BSD-3-Clause.json, field `licenseText`, copied verbatim except for the copyright line, which replaces the template line "Copyright (c) <year> <owner>.").
+  * `pyproject.toml` declares `license = "BSD-3-Clause"` and `license-files = ["LICENSE"]` (PEP 639).
+  * `docs/THIRD_PARTY_LICENSES.md` lists the licences of all dependencies. Bundled assets (Tabler, Tabler Icons, fonts; D-024) ship their licence texts when they are added.
+* Verified facts:
+  * Licences in the package metadata of the installed versions (Python 3.14.8, 2026-10-11): Django BSD-3-Clause; django-axes MIT; django-otp Unlicense; cryptography Apache-2.0 OR BSD-3-Clause; mysqlclient GPL-2.0-or-later; msal MIT; segno BSD (3-clause licence text); transitive: asgiref BSD-3-Clause, sqlparse BSD (3-clause licence text), requests Apache-2.0, PyJWT MIT, urllib3 MIT, charset-normalizer MIT, idna BSD-3-Clause, certifi MPL-2.0, cffi MIT-0, pycparser BSD-3-Clause, tzdata Apache-2.0. Tabler and Tabler Icons are MIT-licensed, the fonts SIL OFL 1.1 (D-024).
+  * Free Software Foundation, "Various Licenses and Comments about Them": Modified BSD license "compatible with the GNU GPL"; Expat "compatible with the GNU GPL"; Apache License 2.0 "compatible with version 3 of the GNU GPL" and "not compatible with GPL version 2"; MPL 2.0 "Section 3.3 provides indirect compatibility"; Unlicense "compatible with the GNU GPL".
+  * setuptools supports SPDX licence expressions in `project.license` and `project.license-files` from version 77.0.0; the project requires setuptools ≥ 84.0.0. A wheel built locally contains `Metadata-Version: 2.4`, `License-Expression: BSD-3-Clause` and `License-File: LICENSE`.
+* Rationale: BSD-3-Clause is the licence of the main framework, is permissive for municipalities that run or adapt their own instance (D-013), and is GPL-compatible, so that LEG-Platform can be combined with `mysqlclient` (GPL-2.0-or-later), which is then used under GPL-3.0-or-later terms together with the Apache-2.0 components.
+* Security implications: none.
+* Legal note: this decision is not legal advice and was not reviewed by a lawyer. The dependencies are installed separately and are not distributed with the source code; a distribution that bundles them (e.g. a container image) must comply with their licences, in particular the GPL of `mysqlclient`.
+* Alternatives: no licence (rejected: no reuse permitted); a copyleft licence such as GPL-3.0-or-later (not chosen: the project owner asked for a licence chosen according to the packages used; the main framework uses BSD-3-Clause); MIT (equally permissive; BSD-3-Clause chosen for consistency with Django).
+* Sources (checked on 2026-10-11): https://spdx.org/licenses/BSD-3-Clause.html, https://spdx.org/licenses/BSD-3-Clause.json, https://www.gnu.org/licenses/license-list.en.html, https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html, https://peps.python.org/pep-0639/, installed package metadata (`importlib.metadata`) and PyPI package pages
+* Consequences: new dependencies and bundled assets are added to `docs/THIRD_PARTY_LICENSES.md` with their licences.
+
 ## Template for New Decisions
 
 ### D-XXX: Title

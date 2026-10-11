@@ -77,6 +77,10 @@ The software is written in English without exception. Only the user interface is
 
 No assumptions are made. Decisions are based on verified facts from official sources. When in doubt, ask.
 
+## Licence
+
+LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same licence as Django (`docs/DECISIONS.md`, D-029). The dependencies are installed separately and keep their own licences; `mysqlclient` is licensed under GPL-2.0-or-later. The licences of all dependencies are listed in `docs/THIRD_PARTY_LICENSES.md`. This information is not legal advice.
+
 ## Current Status
 
 The project foundation and security requirements are defined. They were revised on 2026-10-09 after a consistency check and a security review, and revised again on the same day after a second consistency check (login with email address only, customer number assigned at verification, AGOV preparation, rules of conduct for agents); open points are listed in `docs/ARCHITECTURE.md` ("Deliberately Open") and in the decisions. Git 2.55.0 is installed on the development machine. On 2026-10-11 the design language was defined (`docs/DESIGN.md`, D-024), and the public home page was replaced by the login page as entry point on its own host name (D-025).

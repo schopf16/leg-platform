@@ -12,6 +12,9 @@ name = "leg-platform"
 version = "0.1.0"
 description = "Web application for local electricity communities (LEG) in Switzerland."
 readme = "README.md"
+# SPDX licence expression and licence files (PEP 639; setuptools >= 77.0.0). D-029.
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     # 5.2 LTS is the minimum (D-026). The upper bound is the newest release line that is
