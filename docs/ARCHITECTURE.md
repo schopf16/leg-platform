@@ -213,8 +213,9 @@ Not yet decided:
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025)
 * which instance-specific values are kept in environment variables and which in the database
 * scheduling of the automatic deletion of expired log entries and of unverified accounts whose verification link has expired
-* how the minimum versions are proven by tests (e.g. a test matrix in continuous integration over the declared minimum and current versions of Python, Django and MySQL; D-015)
-* tool for automatic secret scanning of commits (decided together with D-015)
+* Content Security Policy: Django 5.2 has no built-in support, Django 6.0 and later provide `SECURE_CSP` (D-028); approach pending with the project owner; required before any deployment (README, "Deployment gates")
+* redaction of tokens in request logs: Django's request logging writes the path of every response with status 400 or higher; a logging filter that removes tokens from paths, with a test, is required when the first URL with a token is introduced (`docs/SECURITY.md`, sections 6 and 10)
+* an optional guard in the settings that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (security review of 2026-10-11, I-6; not implemented, the deployment gates in the README apply instead)
 * whether compiled translation files (`.mo`) are committed or compiled during deployment
 * imprint (legal notice) and the content of the privacy notice (D-022)
 * which functions are restricted on mobile phones in later phases

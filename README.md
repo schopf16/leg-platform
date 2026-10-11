@@ -79,13 +79,24 @@ No assumptions are made. Decisions are based on verified facts from official sou
 
 ## Current Status
 
-The project foundation and security requirements are defined. They were revised on 2026-10-09 after a consistency check and a security review, and revised again on the same day after a second consistency check (login with email address only, customer number assigned at verification, AGOV preparation, rules of conduct for agents); open points are listed in `docs/ARCHITECTURE.md` ("Deliberately Open") and in the decisions. No application code exists yet. Git 2.55.0 is installed on the development machine. On 2026-10-11 the design language was defined (`docs/DESIGN.md`, D-024), and the public home page was replaced by the login page as entry point on its own host name (D-025).
+The project foundation and security requirements are defined. They were revised on 2026-10-09 after a consistency check and a security review, and revised again on the same day after a second consistency check (login with email address only, customer number assigned at verification, AGOV preparation, rules of conduct for agents); open points are listed in `docs/ARCHITECTURE.md` ("Deliberately Open") and in the decisions. Git 2.55.0 is installed on the development machine. On 2026-10-11 the design language was defined (`docs/DESIGN.md`, D-024), and the public home page was replaced by the login page as entry point on its own host name (D-025).
 
-On 2026-10-11 the Git repository was initialised (branch `main`, local only) and the ignore rules for secret files were verified with `git check-ignore`. The minimum versions and packages were determined from official sources and proposed in D-026; nothing has been installed yet.
+On 2026-10-11 the Git repository was initialised (branch `main`) and the ignore rules for secret files were verified with `git check-ignore`. The minimum versions and packages were determined from official sources and proposed in D-026.
 
-On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (Python 3.11, Django 5.2, MySQL 8.4) and the newest versions (Python 3.14, Django 6.1, MySQL 9.7). Local development is described in `docs/INSTALLATION.md`. No application functions exist yet.
+On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (Python 3.11, Django 5.2, MySQL 8.4) and the newest versions (Python 3.14, Django 6.1, MySQL 9.7). Local development is described in `docs/INSTALLATION.md`. The repository is public on GitHub (D-027); secret scanning with push protection, Dependabot alerts and private vulnerability reporting are enabled, and the default workflow token is read-only. The first run of continuous integration on GitHub passed both jobs. No application functions exist yet: the code consists of the settings, their validation, a placeholder email backend and tests.
+
+On 2026-10-11 a security review of the skeleton was carried out. Its findings were corrected: email delivery modes per environment, HSTS `includeSubDomains` configurable by the operator (D-028), stricter validation of numeric values, `HttpOnly` CSRF cookie, response-level tests with production settings, a hardened local setup script (D-027, `docs/INSTALLATION.md`), service images pinned by digest and Dependabot for actions and Python packages. The corrections are awaiting a new review.
+
+Deployment gates: no stage or production instance is deployed before
+
+1. a Content Security Policy is in place (decision pending with the project owner; D-028);
+2. the Microsoft Graph email backend is implemented (D-006); until then, the placeholder backend raises an error on every send, so that a function sending email would answer with an error page and could reveal whether an account exists;
+3. two-factor authentication and `django-axes` protect the admin and the login (D-004, D-017);
+4. the custom user model exists before any persistent database is migrated (D-021);
+5. tokens in URLs are redacted from request logs: Django's `django.request` and `django.security.csrf` loggers write the request path of every response with status 400 or higher (`log_response` in the installed Django source), so a token in a path would end up in the logs. A redaction filter and a test are required when the first URL with a token is introduced (`docs/SECURITY.md`, section 10).
 
 Next steps:
 
-1. Confirmation of D-028 by the project owner and a first run of continuous integration on GitHub.
-2. Custom user model (D-021), before any persistent database is migrated.
+1. Confirmation of D-028 by the project owner and a review of the corrections.
+2. First run of the hardened setup script on the development machine and a local test run against MySQL with the restricted application account.
+3. Custom user model (D-021), before any persistent database is migrated.
