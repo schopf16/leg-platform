@@ -48,6 +48,9 @@ def lower_bounds(pyproject_text: str) -> tuple[dict[str, str], list[str]]:
         if len(lower) != 1:
             errors.append(f"pyproject.toml: {requirement!r} needs exactly one '>=' lower bound")
             continue
+        if name in bounds:
+            errors.append(f"pyproject.toml: {name} is listed more than once")
+            continue
         bounds[name] = lower[0]
     return bounds, errors
 
@@ -64,7 +67,11 @@ def pins(constraints_text: str) -> tuple[dict[str, str], list[str]]:
         if not separator or not name.strip() or not version.strip():
             errors.append(f"minimum-constraints.txt: {line!r} is not of the form name==version")
             continue
-        result[normalize_name(name.strip())] = version.strip()
+        normalized = normalize_name(name.strip())
+        if normalized in result:
+            errors.append(f"minimum-constraints.txt: {normalized} is pinned more than once")
+            continue
+        result[normalized] = version.strip()
     return result, errors
 
 

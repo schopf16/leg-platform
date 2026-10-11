@@ -55,6 +55,18 @@ class MinimumConstraintsTests(SimpleTestCase):
         errors = check.compare(PYPROJECT, CONSTRAINTS.replace("segno==1.6.6", "segno>=1.6.6"))
         self.assertTrue(any("name==version" in error for error in errors))
 
+    def test_duplicate_dependency_is_reported(self):
+        # "Django_Axes" normalizes to the same name as "django_axes" (PEP 503).
+        pyproject = PYPROJECT.replace(
+            '"segno[extra] >= 1.6.6",', '"segno[extra] >= 1.6.6",\n    "Django_Axes>=8.4.0",'
+        )
+        errors = check.compare(pyproject, CONSTRAINTS)
+        self.assertTrue(any("django-axes is listed more than once" in e for e in errors))
+
+    def test_duplicate_pin_is_reported(self):
+        errors = check.compare(PYPROJECT, CONSTRAINTS + "Django.Axes==8.4.0\n")
+        self.assertTrue(any("django-axes is pinned more than once" in e for e in errors))
+
     def test_repository_files_agree(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
