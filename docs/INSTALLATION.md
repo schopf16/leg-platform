@@ -20,7 +20,7 @@ For Windows development machines (D-027). Never use these steps or their credent
    .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
    ```
 
-   If a local MySQL installation already exists, the first command stops without changing anything and shows the second command. Before the second command removes anything, it lists everything it will remove and asks you to type `DELETE`; all local MySQL databases are then lost. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
+   If a local MySQL installation already exists, the first command stops without changing anything. For an installation in `C:\LEG-MySQL` made by this script it shows the second command; before that command removes anything, it lists everything it will remove and asks you to type `DELETE`; all local MySQL databases are then lost. For an installation made by the earlier version of the script (in `C:\tools\mysql`, as on the current development machine), it prints a few commands to remove it by hand instead. Details in "Recovery after a failed setup" below. Chocolatey 2 or later is required.
 
    Short phase without a root password: the Chocolatey package initialises MySQL with a `root` account without password and starts the service right away. The script writes the server settings beforehand, so the server listens only on `127.0.0.1` from its first start and X Plugin is off; the script sets the password a few seconds later. During these seconds, any program on the same computer could log in as `root`. Run the script only when no untrusted user or program is active on the computer.
 
@@ -46,7 +46,8 @@ For Windows development machines (D-027). Never use these steps or their credent
    * installs MySQL 9.7 LTS with Chocolatey into these folders (package parameters `/installLocation` and `/dataLocation`);
    * checks after the installation that `my.ini` is unchanged and that the data folder was initialised, stops MySQL for the following checks, makes Administrators the owner of every file and folder below `C:\LEG-MySQL` (depending on a Windows policy, the files could otherwise belong to your own user account, and an owner can always change the permissions), and then checks that everything there has only the permissions and owners listed above; any other entry, owner or symbolic link, or an additional settings file `my.cnf` or `mysqld-auto.cnf`, makes the setup fail; MySQL is then started again;
    * verifies with `Get-NetTCPConnection` that the server listens only on `127.0.0.1:3306` and that nothing listens on port 33060;
-   * sets the `root` password, verifies a login with it, and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`);
+   * calls the MySQL client only with its own settings (`--defaults-file` or `--no-defaults`, TCP to `127.0.0.1` on port 3306 given on the command line) after removing MySQL client environment variables such as `MYSQL_HOST` or `MYSQL_PWD` from its own process;
+   * sets the `root` password, verifies a login with it, checks that only the accounts MySQL creates during the initialisation exist (`root`, `mysql.sys`, `mysql.session` and `mysql.infoschema`, all `@localhost`), and verifies inside the server that `@@GLOBAL.bind_address` is `127.0.0.1` and that the plugin `mysqlx` is not `ACTIVE` (`information_schema.PLUGINS`);
    * keeps the service start type `Manual` until the setup has succeeded and sets it to `Automatic` at the end;
    * creates the database `leg_platform` and the account `leg_platform`@`127.0.0.1` with the privileges described in "Database privileges" below, on `leg_platform` and `test_leg_platform` only;
    * stores the local configuration (`APP_ENV=local`, `DB_*`, `DJANGO_SECRET_KEY`) as user environment variables without printing generated values.
@@ -81,36 +82,36 @@ Email: locally, emails are written to the console by default (`EMAIL_MODE=consol
 
 If a step after the MySQL installation fails or the script is interrupted with Ctrl+C, the script tries to stop the `MySQL` service and set its start type to `Disabled` and checks the result. If it reports that this did not work, or if the console window was closed during the setup (the cleanup may then not run), stop and disable the service yourself as administrator (`sc.exe stop MySQL`, `sc.exe config MySQL start= disabled`) and check with `Get-Service MySQL | Select-Object Status, StartType`.
 
-To start over, fix the cause shown by the script and run as administrator:
+#### Installation made by this script (`C:\LEG-MySQL`)
+
+Fix the cause shown by the script and run as administrator:
 
 ```powershell
 .\scripts\local\setup-dev-windows.ps1 -RemoveFailedInstallation
 ```
 
-This works for an installation made by this script (in `C:\LEG-MySQL`) and for one made by its earlier version (programs in `C:\tools\mysql`, databases in `C:\ProgramData\MySQL\data`). Before it changes anything, the script checks that everything it would remove was created by the Chocolatey package `mysql` or by this script:
-
-* the `MySQL` service must run a program below `C:\LEG-MySQL\server\mysql` or `C:\tools\mysql` and must not use another settings file;
-* `C:\LEG-MySQL` may contain only `server` and `data`; `C:\tools\mysql` may contain only `current` and `mysql-<version>-winx64`; other content of `C:\tools` is never touched;
-* `C:\ProgramData\MySQL\data` must look like a MySQL data folder (it contains `mysql.ibd` and the folder `mysql`); if the old `my.ini` names a different data folder, that folder is reported and left in place;
-* none of these folders may be a symbolic link, junction or mount point.
-
-Otherwise it stops without changing anything, and the installation has to be removed manually. It then lists everything it will remove, asks you to type `DELETE`, and asks for the new `root` password. It checks everything again and then:
-
-* stops the `MySQL` service and sets its start type to `Disabled`, uninstalls the Chocolatey package `mysql` and deletes the service if it still exists (`sc.exe delete MySQL`);
-* removes the MySQL folders from your user `PATH`;
-* deletes `C:\LEG-MySQL`, `C:\ProgramData\MySQL\data` (and `C:\ProgramData\MySQL` if it is then empty) and `C:\tools\mysql`. Because ordinary users may have been able to change these folders, each one is first locked down from the top (owner Administrators, access for Administrators and SYSTEM only; a symbolic link, junction or mount point stops the removal), checked again and only then deleted. If `C:\LEG-MySQL` does not belong to Administrators or SYSTEM, the script warns that it was not created by the script before you confirm;
-* checks that nothing of the old installation remains and continues with the normal setup.
+The script removes the installation automatically only if `C:\LEG-MySQL` still has exactly the protection it was created with: owner Administrators or SYSTEM, access only for Administrators, SYSTEM and (read only, below `server`) Users, only the folders `server` and `data`, and no symbolic links or junctions; and only if the `MySQL` service runs the program in `C:\LEG-MySQL\server\mysql`. It lists what it will remove, asks you to type `DELETE` and asks for the new `root` password. It then checks everything again, stops the service and sets it to `Disabled`, uninstalls the Chocolatey package `mysql`, deletes the service (`sc.exe delete MySQL`), removes the MySQL folders from your user `PATH`, deletes `C:\LEG-MySQL` and continues with the normal setup.
 
 If the script reports that the service still exists after `sc.exe delete`, close the Services console and Task Manager or restart Windows, and run the command again; every step checks the current state and can be repeated. User environment variables of an earlier run are overwritten by a successful run.
 
-Manual steps, if you prefer them or the script cannot complete them:
+#### Installation made by the earlier version of the script, or anything else
 
-1. Uninstall MySQL: `choco uninstall mysql -y`.
-2. If the Windows service still exists (`Get-Service MySQL`), remove it: `sc.exe delete MySQL`.
-3. Delete the MySQL folders: `C:\LEG-MySQL`, or for the earlier layout `C:\tools\mysql` and the data folder (`datadir` in `C:\tools\mysql\current\my.ini`, by default `C:\ProgramData\MySQL\data`). This is required: the package initialises a new data folder only if none exists, and an old one may already contain the new `root` password or the application account.
-4. Remove the MySQL `bin` folder from your user `PATH`.
-5. Remove user environment variables the script may have set (`APP_ENV`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY`), e.g. with `[Environment]::SetEnvironmentVariable('DB_PASSWORD', $null, 'User')`.
-6. Fix the cause shown by the script and run it again. Without `-RemoveFailedInstallation`, the script refuses to run while the `MySQL` service, the Chocolatey package `mysql`, `C:\LEG-MySQL`, `C:\tools\mysql` or `C:\ProgramData\MySQL\data` exists.
+The earlier version installed the programs in Chocolatey's tools folder (`C:\tools\mysql`; the machine-wide variable `ChocolateyToolsLocation` if it is set, otherwise `C:\tools`) and the databases in `C:\ProgramData\MySQL`. Ordinary users could change both folders, so the script does not delete them itself; it also refuses a `C:\LEG-MySQL` that fails the check above. In these cases it changes nothing and prints the commands for the manual removal. For the earlier layout they are:
+
+```powershell
+Stop-Service -Name MySQL -Force
+sc.exe config MySQL start= disabled
+choco uninstall mysql -y
+sc.exe delete MySQL
+[IO.Directory]::Delete('C:\tools\mysql', $true)
+[IO.Directory]::Delete('C:\ProgramData\MySQL', $true)
+```
+
+Run them in a PowerShell window opened as administrator, while no other user is signed in to the computer. Commands for parts that no longer exist report an error; that is expected. `[IO.Directory]::Delete` with `$true` deletes the folder with its content and does not follow symbolic links or junctions inside it ("This method does not recurse through the reparse point", Microsoft Learn, "Directory.Delete Method"). All local MySQL databases are lost. Then run the setup script again (first command above, without `-RemoveFailedInstallation`); it removes the old entry `C:\tools\mysql\current\bin` from your user `PATH` automatically. The folder `C:\tools` itself may remain; it is no longer used by this project.
+
+For a `C:\LEG-MySQL` that the script refuses, check its content and owner first (`Get-Acl C:\LEG-MySQL | Format-List`), then remove it the same way (`[IO.Directory]::Delete('C:\LEG-MySQL', $true)`), together with the service and package as above.
+
+The `PATH` cleanup and the user environment variables apply to the Windows account that runs the script. Run it elevated with your own account ("Run as administrator"); the script warns if the account differs from the signed-in user.
 
 The Chocolatey package `mysql` 9.7.2 has no uninstall script (its `tools` folder contains only `chocolateyInstall.ps1`; checked on the development machine on 2026-10-11), so `choco uninstall` removes neither the service nor the program files. It installs to `<installLocation>\mysql\current`, writes `my.ini` there only if none exists, initialises `<dataLocation>\mysql\data` with `--initialize-insecure` using that `my.ini`, registers the service with `mysqld --install MySQL` (an unquoted path; therefore the folder names contain no spaces) and starts it. Source: https://community.chocolatey.org/packages/mysql and its `tools\chocolateyInstall.ps1` (checked on 2026-10-11).
 

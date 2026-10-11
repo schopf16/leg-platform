@@ -104,7 +104,7 @@ try {
     Assert-Equal (Test-IsSamePath -First 'C:\ProgramData\MySQL\data\..' -Second 'C:\ProgramData\MySQL\data') $false 'Test-IsSamePath: parent via ..'
     Assert-Equal (Test-IsSamePath -First 'data' -Second 'data') $false 'Test-IsSamePath: relative paths'
     Assert-Equal (Test-IsSamePath -First '' -Second 'C:\') $false 'Test-IsSamePath: empty'
-    Assert-Equal $OldDataDirectory 'C:\ProgramData\MySQL\data' 'OldDataDirectory is the package default of the earlier layout'
+    Assert-Equal $OldDataParent 'C:\ProgramData\MySQL' 'OldDataParent is the package default of the earlier layout'
     [IO.File]::WriteAllText($myIni, (Get-ServerOptionFileContent), (New-Object Text.ASCIIEncoding))
     Assert-Equal (Get-DataDirectory -MyIni $myIni) 'C:/LEG-MySQL/data/mysql/data' 'Get-DataDirectory: forward slashes'
     Assert-Equal (Test-IsSamePath -First (Get-DataDirectory -MyIni $myIni) -Second $DataDirectory) $true 'Option file: datadir is the data directory'
@@ -205,13 +205,6 @@ try {
     Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*link is a reparse point*' })) $true 'Security: reparse point is reported and not followed'
     Assert-Equal ([bool]($treeViolations | Where-Object { $_ -like '*tree-target*' })) $false 'Security: junction target is not checked'
 
-    # Test-ContainsOnly
-    $packageDir = Join-Path $root 'package'
-    New-Item -ItemType Directory -Path (Join-Path $packageDir 'current'), (Join-Path $packageDir 'mysql-9.7.2-winx64') | Out-Null
-    Assert-Equal (Test-ContainsOnly -Path $packageDir -Patterns @('current', 'mysql-*-winx64')) $true 'ContainsOnly: package content'
-    New-Item -ItemType Directory -Path (Join-Path $packageDir 'other') | Out-Null
-    Assert-Equal (Test-ContainsOnly -Path $packageDir -Patterns @('current', 'mysql-*-winx64')) $false 'ContainsOnly: other content'
-    Assert-Equal (Test-ContainsOnly -Path $treeRoot -Patterns @('bin', 'link')) $false 'ContainsOnly: reparse point'
     [IO.Directory]::Delete((Join-Path $treeRoot 'link'), $false)
 
     # Get-TreeItemsWithoutReparsePoints and Set-OwnerAdministrators
@@ -242,19 +235,6 @@ try {
     $fileRules = @((New-RestrictedFileSecurity -UsersReadExecute).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
     $fileViolations = @($fileRules | ForEach-Object { Get-AceViolation -Sid $_.IdentityReference.Value -Rights ([long]$_.FileSystemRights) -Type "$($_.AccessControlType)" -AllowUsersReadExecute } | Where-Object { $_ })
     Assert-Equal $fileViolations.Count 0 'File security: passes the allowlist for server'
-    $adminOnlyRules = @((New-AdminOnlyFileSecurity).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
-    Assert-Equal (($adminOnlyRules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidSystem, $SidAdministrators) | Sort-Object) -join ',') 'Lock-down file security: Administrators and SYSTEM only'
-
-    # Lock-DirectoryTree fails on a reparse point before changing anything
-    $lockTarget = Join-Path $root 'lock-target'
-    New-Item -ItemType Directory -Path $lockTarget | Out-Null
-    $lockLink = Join-Path $root 'lock-link'
-    New-Item -ItemType Junction -Path $lockLink -Target $lockTarget | Out-Null
-    $failed = $false
-    try { Lock-DirectoryTree -Path $lockLink } catch { $failed = $_.Exception.Message -like '*symbolic link, junction or mount point*' }
-    Assert-Equal $failed $true 'Lock-DirectoryTree: reparse point is refused'
-    [IO.Directory]::Delete($lockLink, $false)
-
     # PATH helpers on strings (the registry is not touched)
     $pathValue = 'C:\a;C:\tools\mysql\current\bin;%USERPROFILE%\bin;;C:\TOOLS\MySQL\current\bin\;C:\b'
     Assert-Equal (Remove-PathListEntry -Value $pathValue -Directories @($LegacyPathEntry)) 'C:\a;%USERPROFILE%\bin;;C:\b' 'PATH: legacy entry removed in all spellings, others kept'
@@ -268,29 +248,61 @@ try {
     Assert-Equal ((Get-PresentOptionFiles -Paths @($presentFile, (Join-Path $root 'missing.cnf'), '')) -join ',') $presentFile 'Option files: only existing files are reported'
     Assert-Equal ([bool]($LoginPathFile -like '*\MySQL\.mylogin.cnf')) $true 'Option files: login path file location'
 
-    # Get-RemovalProblems with mocked locations (no real installation is read)
+    # Get-RemovalProblems with mocked installation states (no real installation is read)
+    function New-MockInstallation {
+        param($Changes = @{})
+        $values = @{
+            OwnershipProblem = $null; ServiceIsLegacy = $false; OldPackageRootExists = $false
+            OldDataDirectoryExists = $false; NewRootExists = $true; NewRootViolations = @()
+        }
+        foreach ($key in $Changes.Keys) { $values[$key] = $Changes[$key] }
+        return [pscustomobject]$values
+    }
+    Assert-Equal @(Get-RemovalProblems -Installation (New-MockInstallation)).Count 0 'Removal: allowlist-clean C:\LEG-MySQL is removed automatically'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OwnershipProblem = 'foreign service' })) -like '*foreign service*')) $true 'Removal: foreign service is refused'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ ServiceIsLegacy = $true })) -like '*earlier layout*')) $true 'Removal: service of the earlier layout is refused'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OldPackageRootExists = $true })) -like '*earlier layout*')) $true 'Removal: <tools>\mysql is refused'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ OldDataDirectoryExists = $true })) -like '*earlier layout*')) $true 'Removal: C:\ProgramData\MySQL is refused'
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation (New-MockInstallation @{ NewRootViolations = @('x has the owner S-1-5-21-1-2-3-1001') })) -like '*was not created by this script*')) $true 'Removal: C:\LEG-MySQL that fails the allowlist is refused'
+    Assert-Equal (Test-HasLegacyLayout -Installation (New-MockInstallation)) $false 'Legacy layout: not detected for the new layout'
+
+    # Get-InstallRootViolations on a mocked root owned by the current user
     $mockRoot = Join-Path $root 'mock'
-    $script:mockOldPackageRoot = Join-Path $mockRoot 'tools\mysql'
-    New-Item -ItemType Directory -Path (Join-Path $mockRoot 'LEG-MySQL\server'), (Join-Path $mockRoot 'LEG-MySQL\data'), (Join-Path $script:mockOldPackageRoot 'current'), (Join-Path $mockRoot 'ProgramData\MySQL\data\mysql') | Out-Null
-    Set-Content -LiteralPath (Join-Path $mockRoot 'ProgramData\MySQL\data\mysql.ibd') -Value ''
     $InstallRoot = Join-Path $mockRoot 'LEG-MySQL'
-    $OldDataParent = Join-Path $mockRoot 'ProgramData\MySQL'
-    $OldDataDirectory = Join-Path $mockRoot 'ProgramData\MySQL\data'
-    function Get-OldPackageRoot { return $script:mockOldPackageRoot }
-    $mockInstallation = [pscustomobject]@{ OwnershipProblem = $null }
-    Assert-Equal @(Get-RemovalProblems -Installation $mockInstallation).Count 0 'Removal: package and script content only'
-    Assert-Equal (Test-IsAllowedOwner -Sid (Get-ItemOwnerSid -Path $InstallRoot)) $false 'Removal: folder owned by a user is reported as not created by the script'
-    $mockInstallation = [pscustomobject]@{ OwnershipProblem = 'foreign service' }
-    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*foreign service*')) $true 'Removal: foreign service is refused'
-    $mockInstallation = [pscustomobject]@{ OwnershipProblem = $null }
-    New-Item -ItemType Directory -Path (Join-Path $InstallRoot 'other') | Out-Null
-    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*other than server and data*')) $true 'Removal: unexpected content in the install root is refused'
-    [IO.Directory]::Delete((Join-Path $InstallRoot 'other'), $false)
-    New-Item -ItemType Directory -Path (Join-Path $script:mockOldPackageRoot 'other') | Out-Null
-    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*did not create*')) $true 'Removal: unexpected content in <tools>\mysql is refused'
-    [IO.Directory]::Delete((Join-Path $script:mockOldPackageRoot 'other'), $false)
-    Remove-Item -LiteralPath (Join-Path $OldDataDirectory 'mysql.ibd') -Force
-    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*does not look like a MySQL data directory*')) $true 'Removal: unknown data directory is refused'
+    $ServerRoot = Join-Path $InstallRoot 'server'
+    $DataRoot = Join-Path $InstallRoot 'data'
+    New-Item -ItemType Directory -Path $ServerRoot, $DataRoot, (Join-Path $InstallRoot 'other') | Out-Null
+    $rootViolations = @(Get-InstallRootViolations)
+    Assert-Equal ([bool]($rootViolations | Where-Object { $_ -like '*has the owner*' })) $true 'Install root: foreign owner is a violation'
+    Assert-Equal ([bool]($rootViolations | Where-Object { $_ -like '*unexpected entries*other*' })) $true 'Install root: unexpected entry is a violation'
+
+    # Manual removal commands of the earlier layout
+    $commands = @(Get-LegacyRemovalCommands)
+    Assert-Equal ([bool]($commands -ccontains "choco uninstall mysql -y")) $true 'Manual removal: choco uninstall'
+    Assert-Equal ([bool]($commands -ccontains "sc.exe delete MySQL")) $true 'Manual removal: service deletion'
+    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('$(Get-OldPackageRoot)', `$true)")) $true 'Manual removal: program folder without following reparse points'
+    Assert-Equal ([bool]($commands -ccontains "[IO.Directory]::Delete('C:\ProgramData\MySQL', `$true)")) $true 'Manual removal: data folder without following reparse points'
+    Assert-Equal ([bool]($commands | Where-Object { $_ -like '*Remove-Item*' })) $false 'Manual removal: no Remove-Item'
+    Assert-Equal (Get-ChocolateyToolsRoot) $(if ([Environment]::GetEnvironmentVariable('ChocolateyToolsLocation', 'Machine')) { [Environment]::GetEnvironmentVariable('ChocolateyToolsLocation', 'Machine') } else { 'C:\tools' }) 'Tools root: machine value or C:\tools'
+
+    # mysql client arguments and environment (L-1)
+    $withFile = @(Get-MySqlClientArguments -OptionFile 'C:\temp\x.cnf')
+    Assert-Equal $withFile[0] '--defaults-file=C:\temp\x.cnf' 'Client: --defaults-file comes first'
+    Assert-Equal (($withFile[1..3]) -join ' ') "--protocol=TCP --host=127.0.0.1 --port=$MySqlPort" 'Client: protocol, host and port on the command line'
+    Assert-Equal ([bool]($withFile -contains '--skip-password')) $false 'Client: no --skip-password with an option file'
+    $withoutFile = @(Get-MySqlClientArguments)
+    Assert-Equal $withoutFile[0] '--no-defaults' 'Client: --no-defaults comes first without an option file'
+    Assert-Equal ([bool]($withoutFile -contains '--skip-password')) $true 'Client: --skip-password without an option file'
+    [Environment]::SetEnvironmentVariable('MYSQL_HOST', 'test.invalid', 'Process')
+    [Environment]::SetEnvironmentVariable('MYSQL_TEST_LOGIN_FILE', 'C:\test.invalid', 'Process')
+    Clear-MySqlClientEnvironment
+    Assert-Equal (Test-Path -LiteralPath 'Env:MYSQL_HOST') $false 'Client environment: MYSQL_HOST removed'
+    Assert-Equal (Test-Path -LiteralPath 'Env:MYSQL_TEST_LOGIN_FILE') $false 'Client environment: MYSQL_TEST_LOGIN_FILE removed'
+
+    # Reserved accounts (L-2)
+    $reserved = @('account', 'mysql.infoschema@localhost', 'mysql.session@localhost', 'mysql.sys@localhost', 'root@localhost')
+    Assert-Equal @(Get-UnexpectedAccounts -Lines $reserved).Count 0 'Accounts: reserved accounts only'
+    Assert-Equal ((Get-UnexpectedAccounts -Lines ($reserved + @('root@%', 'evil@localhost', ''))) -join ',') 'root@%,evil@localhost' 'Accounts: other accounts are reported'
 
     # New-RestrictedDirectory and Set-OwnerAdministrators set the owner Administrators; only
     # possible when elevated.
