@@ -74,10 +74,8 @@ jobs:
       DJANGO_DEBUG: "False"
       EMAIL_MODE: console
       DB_NAME: leg_platform
-      # Root of the throwaway service container: Django's test runner must create the
-      # database test_leg_platform.
-      DB_USER: root
-      DB_PASSWORD: ci-only-throwaway-password
+      # DB_USER and DB_PASSWORD are set by the step "Create the application account": the
+      # checks and tests run with the narrow privileges of the application account.
       DB_HOST: 127.0.0.1
       DB_PORT: "3306"
       PYTHONWARNINGS: error::DeprecationWarning,error::PendingDeprecationWarning
@@ -126,6 +124,43 @@ jobs:
           key="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
           echo "::add-mask::$key"
           echo "DJANGO_SECRET_KEY=$key" >> "$GITHUB_ENV"
+
+      - name: Create the application account
+        # Same privileges as the local setup (docs/INSTALLATION.md, "Database privileges"), on
+        # leg_platform and Django's test database only, with "_" escaped. The host is '%'
+        # because the job reaches the service container through Docker's network. The
+        # generated password is masked and protects nothing beyond this job.
+        env:
+          ROOT_PASSWORD: ci-only-throwaway-password
+        run: |
+          python - <<'EOF'
+          import os
+          import secrets
+
+          import MySQLdb
+
+          password = secrets.token_urlsafe(32)
+          print(f"::add-mask::{password}")
+          privileges = "SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX"
+          databases = [r"leg\_platform", r"test\_leg\_platform"]
+          connection = MySQLdb.connect(
+              host=os.environ["DB_HOST"],
+              port=int(os.environ["DB_PORT"]),
+              user="root",
+              password=os.environ["ROOT_PASSWORD"],
+          )
+          cursor = connection.cursor()
+          cursor.execute(f"CREATE USER 'leg_platform'@'%' IDENTIFIED BY '{password}'")
+          for database in databases:
+              cursor.execute(f"GRANT {privileges} ON `{database}`.* TO 'leg_platform'@'%'")
+          cursor.execute("SELECT Db FROM mysql.db WHERE User = 'leg_platform' ORDER BY Db")
+          stored = [row[0].decode() if isinstance(row[0], bytes) else row[0] for row in cursor.fetchall()]
+          if stored != databases:
+              raise SystemExit(f"Unexpected grants: {stored}")
+          connection.close()
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as environment:
+              environment.write(f"DB_USER=leg_platform\nDB_PASSWORD={password}\n")
+          EOF
 
       - name: System checks
         run: python manage.py check --database default --fail-level WARNING

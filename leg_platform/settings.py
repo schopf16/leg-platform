@@ -82,12 +82,22 @@ WSGI_APPLICATION = "leg_platform.wsgi.application"
 # MySQL backend") and #mysql-notes.
 # Django connects with the character set utf8mb4 by default. "read committed" is Django's
 # default isolation level for this backend ("Data loss is possible with repeatable read";
-# REPEATABLE-READ is MariaDB's default); it is set explicitly so that it is visible. Strict mode is part of
-# MariaDB's default sql_mode and is checked by Django's system check mysql.W002 (run with
-# "check --database default" in CI).
+# REPEATABLE-READ is MariaDB's default); it is set explicitly so that it is visible. Strict mode
+# is part of MariaDB's default sql_mode; sql_mode is nevertheless set for every connection with
+# init_command (Django documentation, "Setting sql_mode"), so that a changed server default
+# cannot weaken it, to MariaDB's documented default (MariaDB documentation, "Server System
+# Variables"). Django's system check mysql.W002 (run with "check --database default" in CI) and
+# a test verify strict mode.
 # The test database is test_<DB_NAME> (Django's default TEST NAME). utf8mb4_uca1400_ai_ci exists
 # from MariaDB 10.10.1 on and is the default utf8mb4 collation from MariaDB 11.5 on; MySQL's
 # utf8mb4_0900_ai_ci exists in MariaDB only as an alias from 11.4.5 on (not in 10.11).
+
+DATABASE_SQL_MODE = (
+    "STRICT_TRANS_TABLES",
+    "ERROR_FOR_DIVISION_BY_ZERO",
+    "NO_AUTO_CREATE_USER",
+    "NO_ENGINE_SUBSTITUTION",
+)
 
 DATABASES = {
     "default": {
@@ -100,6 +110,7 @@ DATABASES = {
         "OPTIONS": {
             "charset": "utf8mb4",
             "isolation_level": "read committed",
+            "init_command": "SET sql_mode='" + ",".join(DATABASE_SQL_MODE) + "'",
         },
         "TEST": {
             "CHARSET": "utf8mb4",

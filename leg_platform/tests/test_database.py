@@ -1,10 +1,11 @@
-"""Tests of the MariaDB connection settings (D-002, D-028, D-030).
+"""Tests of the MariaDB connection settings (D-002, D-028, D-030, D-031).
 
 These tests need a MariaDB server and are tagged "mariadb". They run in continuous integration
 against MariaDB 10.11 and 12.3. Without a server, exclude them:
 ``manage.py test --exclude-tag mariadb``.
 """
 
+from django.conf import settings
 from django.db import connection
 from django.test import TestCase, tag
 
@@ -39,3 +40,29 @@ class MariaDbConnectionTests(TestCase):
     def test_strict_mode_is_active(self):
         modes = set(self._variable("sql_mode").split(","))
         self.assertTrue(modes & {"STRICT_TRANS_TABLES", "STRICT_ALL_TABLES"})
+
+    def test_sql_mode_is_set_by_the_settings(self):
+        modes = set(self._variable("SESSION.sql_mode").split(","))
+        self.assertEqual(modes, set(settings.DATABASE_SQL_MODE))
+
+    def test_database_default_character_set_and_collation(self):
+        # The database (here Django's test database) must be created with utf8mb4 and
+        # utf8mb4_uca1400_ai_ci; MariaDB 10.11 would otherwise default to latin1 (D-031).
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME "
+                "FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()"
+            )
+            self.assertEqual(cursor.fetchone(), ("utf8mb4", "utf8mb4_uca1400_ai_ci"))
+
+    def test_collations_of_the_project_exist(self):
+        # Default collation (utf8mb4_uca1400_ai_ci) and exact collation for identifier
+        # columns (utf8mb4_bin, D-031) in every supported version. COLLATE fails for an
+        # unknown collation; information_schema.COLLATIONS lists the UCA 14.0.0 collations
+        # without the character set prefix and is therefore not used.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COLLATION(CONVERT('a' USING utf8mb4) COLLATE utf8mb4_uca1400_ai_ci), "
+                "COLLATION(CONVERT('a' USING utf8mb4) COLLATE utf8mb4_bin)"
+            )
+            self.assertEqual(cursor.fetchone(), ("utf8mb4_uca1400_ai_ci", "utf8mb4_bin"))
