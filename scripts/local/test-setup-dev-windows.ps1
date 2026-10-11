@@ -230,6 +230,68 @@ try {
     Assert-Equal ((Get-Acl -LiteralPath $ownerRoot).GetOwner([Security.Principal.SecurityIdentifier]).Value) $ownerBefore 'Set-OwnerAdministrators: owner unchanged after the failure'
     [IO.Directory]::Delete((Join-Path $ownerRoot 'link'), $false)
 
+    # New-RestrictedDirectory and New-RestrictedFile refuse existing paths
+    $failed = $false
+    try { New-RestrictedDirectory -Path $ownerRoot } catch { $failed = $_.Exception.Message -like '*already exists*' }
+    Assert-Equal $failed $true 'New-RestrictedDirectory: existing path is refused'
+    $existingFile = Join-Path $ownerRoot 'bin\mysqld.exe'
+    $failed = $false
+    try { New-RestrictedFile -Path $existingFile -Content 'x' } catch { $failed = $_.Exception.Message -like '*already exists*' }
+    Assert-Equal $failed $true 'New-RestrictedFile: existing path is refused'
+    Assert-Equal ((Get-Content -LiteralPath $existingFile -Raw).Trim()) '' 'New-RestrictedFile: existing file unchanged'
+    $fileRules = @((New-RestrictedFileSecurity -UsersReadExecute).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+    $fileViolations = @($fileRules | ForEach-Object { Get-AceViolation -Sid $_.IdentityReference.Value -Rights ([long]$_.FileSystemRights) -Type "$($_.AccessControlType)" -AllowUsersReadExecute } | Where-Object { $_ })
+    Assert-Equal $fileViolations.Count 0 'File security: passes the allowlist for server'
+    $adminOnlyRules = @((New-AdminOnlyFileSecurity).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+    Assert-Equal (($adminOnlyRules | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidSystem, $SidAdministrators) | Sort-Object) -join ',') 'Lock-down file security: Administrators and SYSTEM only'
+
+    # Lock-DirectoryTree fails on a reparse point before changing anything
+    $lockTarget = Join-Path $root 'lock-target'
+    New-Item -ItemType Directory -Path $lockTarget | Out-Null
+    $lockLink = Join-Path $root 'lock-link'
+    New-Item -ItemType Junction -Path $lockLink -Target $lockTarget | Out-Null
+    $failed = $false
+    try { Lock-DirectoryTree -Path $lockLink } catch { $failed = $_.Exception.Message -like '*symbolic link, junction or mount point*' }
+    Assert-Equal $failed $true 'Lock-DirectoryTree: reparse point is refused'
+    [IO.Directory]::Delete($lockLink, $false)
+
+    # PATH helpers on strings (the registry is not touched)
+    $pathValue = 'C:\a;C:\tools\mysql\current\bin;%USERPROFILE%\bin;;C:\TOOLS\MySQL\current\bin\;C:\b'
+    Assert-Equal (Remove-PathListEntry -Value $pathValue -Directories @($LegacyPathEntry)) 'C:\a;%USERPROFILE%\bin;;C:\b' 'PATH: legacy entry removed in all spellings, others kept'
+    Assert-Equal (Remove-PathListEntry -Value 'C:\a;C:\b' -Directories @($LegacyPathEntry)) 'C:\a;C:\b' 'PATH: unchanged without the entry'
+    Assert-Equal ((Get-MySqlPathEntries -Value $pathValue) -join '|') 'C:\tools\mysql\current\bin|C:\TOOLS\MySQL\current\bin\' 'PATH: MySQL bin entries are found'
+    Assert-Equal $LegacyPathEntry 'C:\tools\mysql\current\bin' 'PATH: legacy entry'
+
+    # Get-PresentOptionFiles
+    $presentFile = Join-Path $root 'my.cnf'
+    Set-Content -LiteralPath $presentFile -Value ''
+    Assert-Equal ((Get-PresentOptionFiles -Paths @($presentFile, (Join-Path $root 'missing.cnf'), '')) -join ',') $presentFile 'Option files: only existing files are reported'
+    Assert-Equal ([bool]($LoginPathFile -like '*\MySQL\.mylogin.cnf')) $true 'Option files: login path file location'
+
+    # Get-RemovalProblems with mocked locations (no real installation is read)
+    $mockRoot = Join-Path $root 'mock'
+    $script:mockOldPackageRoot = Join-Path $mockRoot 'tools\mysql'
+    New-Item -ItemType Directory -Path (Join-Path $mockRoot 'LEG-MySQL\server'), (Join-Path $mockRoot 'LEG-MySQL\data'), (Join-Path $script:mockOldPackageRoot 'current'), (Join-Path $mockRoot 'ProgramData\MySQL\data\mysql') | Out-Null
+    Set-Content -LiteralPath (Join-Path $mockRoot 'ProgramData\MySQL\data\mysql.ibd') -Value ''
+    $InstallRoot = Join-Path $mockRoot 'LEG-MySQL'
+    $OldDataParent = Join-Path $mockRoot 'ProgramData\MySQL'
+    $OldDataDirectory = Join-Path $mockRoot 'ProgramData\MySQL\data'
+    function Get-OldPackageRoot { return $script:mockOldPackageRoot }
+    $mockInstallation = [pscustomobject]@{ OwnershipProblem = $null }
+    Assert-Equal @(Get-RemovalProblems -Installation $mockInstallation).Count 0 'Removal: package and script content only'
+    Assert-Equal (Test-IsAllowedOwner -Sid (Get-ItemOwnerSid -Path $InstallRoot)) $false 'Removal: folder owned by a user is reported as not created by the script'
+    $mockInstallation = [pscustomobject]@{ OwnershipProblem = 'foreign service' }
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*foreign service*')) $true 'Removal: foreign service is refused'
+    $mockInstallation = [pscustomobject]@{ OwnershipProblem = $null }
+    New-Item -ItemType Directory -Path (Join-Path $InstallRoot 'other') | Out-Null
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*other than server and data*')) $true 'Removal: unexpected content in the install root is refused'
+    [IO.Directory]::Delete((Join-Path $InstallRoot 'other'), $false)
+    New-Item -ItemType Directory -Path (Join-Path $script:mockOldPackageRoot 'other') | Out-Null
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*did not create*')) $true 'Removal: unexpected content in <tools>\mysql is refused'
+    [IO.Directory]::Delete((Join-Path $script:mockOldPackageRoot 'other'), $false)
+    Remove-Item -LiteralPath (Join-Path $OldDataDirectory 'mysql.ibd') -Force
+    Assert-Equal ([bool](@(Get-RemovalProblems -Installation $mockInstallation) -like '*does not look like a MySQL data directory*')) $true 'Removal: unknown data directory is refused'
+
     # New-RestrictedDirectory and Set-OwnerAdministrators set the owner Administrators; only
     # possible when elevated.
     $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)

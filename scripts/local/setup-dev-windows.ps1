@@ -98,6 +98,14 @@ $GlobalOptionFiles = @(
     (Join-Path $env:WINDIR 'my.ini'), (Join-Path $env:WINDIR 'my.cnf'), 'C:\my.ini', 'C:\my.cnf'
 )
 
+# Login path file that MySQL client programs read even with --defaults-file or --no-defaults
+# (MySQL Reference Manual, "Command-Line Options that Affect Option-File Handling"); it must
+# not exist, so that the client calls of this script use only their own option file.
+$LoginPathFile = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'MySQL\.mylogin.cnf'
+
+# PATH entry that the earlier layout added for the current user (Install-ChocolateyPath).
+$LegacyPathEntry = 'C:\tools\mysql\current\bin'
+
 # Well-known SIDs (Microsoft Learn, "Security identifiers"); names are localised, SIDs are not.
 $SidAdministrators = 'S-1-5-32-544'
 $SidSystem = 'S-1-5-18'
@@ -195,12 +203,15 @@ function Invoke-MySql {
             Set-Acl -Path $optionFile -AclObject $acl
             # The password contains only printable ASCII (Get-RootPasswordProblem).
             Set-Content -Path $optionFile -Encoding ascii -Value "[client]`npassword=$RootPassword"
-            $Sql | & $Client "--defaults-extra-file=$optionFile" --user=root --batch
+            # --defaults-file: "Read only the given option file" (MySQL Reference Manual,
+            # "Command-Line Options that Affect Option-File Handling"); clients still read
+            # .mylogin.cnf, whose absence is checked in the preconditions.
+            $Sql | & $Client "--defaults-file=$optionFile" --user=root --batch
         } finally {
             Remove-Item -LiteralPath $optionFile -Force -ErrorAction SilentlyContinue
         }
     } else {
-        $Sql | & $Client --user=root --skip-password --batch
+        $Sql | & $Client --no-defaults --user=root --skip-password --batch
     }
     if ($LASTEXITCODE -ne 0) { throw "mysql client exited with code $LASTEXITCODE" }
 }
@@ -440,13 +451,14 @@ function Get-InstalledChocolateyPackageVersion {
 }
 
 function Get-ChocolateyToolsRoot {
-    # Installation root of the package 'mysql' without /installLocation: Chocolatey's
-    # Get-ToolsLocation (helpers\functions\Get-ToolsLocation.ps1), i.e. the variable
-    # ChocolateyToolsLocation or "<system drive>\tools". The older ChocolateyBinRoot is not
-    # considered; the service command line is used whenever the service exists.
-    $value = [Environment]::GetEnvironmentVariable('ChocolateyToolsLocation')
+    # Installation root of the package 'mysql' in the earlier layout (without
+    # /installLocation): Chocolatey's Get-ToolsLocation uses the variable
+    # ChocolateyToolsLocation or "<system drive>\tools" (helpers\functions\Get-ToolsLocation.ps1).
+    # Only the machine-wide value or exactly C:\tools is used: process and user values can be
+    # set without administrator rights and must not decide which folders are deleted.
+    $value = [Environment]::GetEnvironmentVariable('ChocolateyToolsLocation', 'Machine')
     if ($value) { return $value }
-    return Join-Path $env:SystemDrive 'tools'
+    return 'C:\tools'
 }
 
 function Disable-MySqlService {
@@ -559,6 +571,53 @@ function New-RestrictedDirectory {
     }
 }
 
+function New-RestrictedFileSecurity {
+    # Permissions of a file written by this script: no inheritance, full control for
+    # Administrators and SYSTEM, optionally read and execute for Users, owner Administrators.
+    param([switch]$UsersReadExecute, [switch]$SetOwner)
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    $grants = @(
+        @($SidAdministrators, [Security.AccessControl.FileSystemRights]::FullControl),
+        @($SidSystem, [Security.AccessControl.FileSystemRights]::FullControl)
+    )
+    if ($UsersReadExecute) { $grants += , @($SidUsers, [Security.AccessControl.FileSystemRights]::ReadAndExecute) }
+    foreach ($grant in $grants) {
+        $sid = New-Object Security.Principal.SecurityIdentifier($grant[0])
+        $security.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid, $grant[1], 'Allow')))
+    }
+    if ($SetOwner) { $security.SetOwner((New-Object Security.Principal.SecurityIdentifier($SidAdministrators))) }
+    return $security
+}
+
+function New-RestrictedFile {
+    # Creates a new file (it must not exist) with its permissions set at creation and writes
+    # $Content as ASCII. .NET Framework: FileStream constructor with FileSecurity; .NET:
+    # FileSystemAclExtensions.Create(FileInfo, ..., FileSecurity) (Microsoft Learn).
+    param([string]$Path, [string]$Content, [switch]$UsersReadExecute)
+    if (Test-Path -LiteralPath $Path) { throw "$Path already exists." }
+    $security = New-RestrictedFileSecurity -UsersReadExecute:$UsersReadExecute -SetOwner
+    $rights = [Security.AccessControl.FileSystemRights]::FullControl
+    $extensions = 'System.IO.FileSystemAclExtensions' -as [type]
+    if ($extensions) {
+        $stream = $extensions::Create((New-Object IO.FileInfo($Path)), [IO.FileMode]::CreateNew, $rights, [IO.FileShare]::None, 4096, [IO.FileOptions]::None, $security)
+    } else {
+        $stream = New-Object IO.FileStream($Path, [IO.FileMode]::CreateNew, $rights, [IO.FileShare]::None, 4096, [IO.FileOptions]::None, $security)
+    }
+    try {
+        $bytes = [Text.Encoding]::ASCII.GetBytes($Content)
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally {
+        $stream.Dispose()
+    }
+}
+
+function Get-PresentOptionFiles {
+    # Returns the paths that exist (as file or folder) among $Paths.
+    param([string[]]$Paths)
+    return @($Paths | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
+}
+
 function Test-IsAllowedOwner {
     param([string]$Sid)
     return $Sid -in @($SidAdministrators, $SidSystem)
@@ -649,6 +708,52 @@ function Set-OwnerAdministrators {
     }
 }
 
+function Get-ItemOwnerSid {
+    param([string]$Path)
+    return (Get-Acl -LiteralPath $Path).GetOwner([Security.Principal.SecurityIdentifier]).Value
+}
+
+function New-AdminOnlyFileSecurity {
+    # Permissions of a single file during the lock-down before deletion: no inheritance, full
+    # control for Administrators and SYSTEM only, owner Administrators.
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    foreach ($sid in @($SidAdministrators, $SidSystem)) {
+        $identity = New-Object Security.Principal.SecurityIdentifier($sid)
+        $security.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($identity, [Security.AccessControl.FileSystemRights]::FullControl, 'Allow')))
+    }
+    $security.SetOwner((New-Object Security.Principal.SecurityIdentifier($SidAdministrators)))
+    return $security
+}
+
+function Lock-DirectoryTree {
+    # Before a tree that ordinary users may have been able to write is deleted, it is locked
+    # down from the top: for each folder, a reparse point fails, then owner Administrators and
+    # a protected DACL (Administrators and SYSTEM only) are set, and only then are its entries
+    # read and processed. Nothing below a locked folder can be added or replaced by ordinary
+    # users while the tree is processed. Afterwards, the whole tree is verified.
+    param([string]$Path)
+    $pending = New-Object System.Collections.Generic.Queue[string]
+    $pending.Enqueue($Path)
+    while ($pending.Count -gt 0) {
+        $current = $pending.Dequeue()
+        $item = Get-Item -LiteralPath $current -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "$current is a symbolic link, junction or mount point; nothing below it was deleted."
+        }
+        if ($item.PSIsContainer) {
+            Set-Acl -LiteralPath $current -AclObject (New-RestrictedDirectorySecurity -SetOwner)
+            foreach ($child in @(Get-ChildItem -LiteralPath $current -Force)) { $pending.Enqueue($child.FullName) }
+        } else {
+            Set-Acl -LiteralPath $current -AclObject (New-AdminOnlyFileSecurity)
+        }
+    }
+    $violations = @(Get-SecurityViolations -Path $Path -Recurse)
+    if ($violations.Count -gt 0) {
+        throw "$Path could not be locked down: $($violations -join '; ')"
+    }
+}
+
 function Assert-InstallationSecurity {
     # Every file and folder below C:\LEG-MySQL: owner Administrators or SYSTEM; access only
     # for Administrators and SYSTEM, and read and execute for Users below server.
@@ -700,21 +805,70 @@ function Test-ContainsOnly {
     return $true
 }
 
-function Remove-UserPathEntry {
-    # Removes the given directories from the PATH of the current user. The package adds its
-    # bin directory there (Install-ChocolateyPath, default PathType User). A stale entry would
-    # let anyone who can recreate the folder place programs that are found through PATH.
-    param([string[]]$Directories)
-    $value = [Environment]::GetEnvironmentVariable('Path', 'User')
-    if (-not $value) { return }
-    $entries = @($value.Split(';') | Where-Object { $_ -ne '' })
-    $kept = @($entries | Where-Object {
+function Remove-PathListEntry {
+    # Returns the PATH value without the entries that are the same path as one of
+    # $Directories; all other entries, including unexpanded ones such as %USERPROFILE%\bin,
+    # are kept unchanged and in order.
+    param([string]$Value, [string[]]$Directories)
+    if (-not $Value) { return $Value }
+    $kept = @($Value.Split(';') | Where-Object {
         $entry = $_
-        -not ($Directories | Where-Object { Test-IsSamePath -First $entry -Second $_ })
+        -not ($entry -and ($Directories | Where-Object { Test-IsSamePath -First $entry -Second $_ }))
     })
-    if ($kept.Count -ne $entries.Count) {
-        [Environment]::SetEnvironmentVariable('Path', ($kept -join ';'), 'User')
-        Write-Host "Removed $($entries.Count - $kept.Count) MySQL entry or entries from the user PATH."
+    return ($kept -join ';')
+}
+
+function Get-MySqlPathEntries {
+    # Returns the entries of a PATH value that point to a MySQL bin folder.
+    param([string]$Value)
+    if (-not $Value) { return @() }
+    return @($Value.Split(';') | Where-Object { $_ -match '(?i)mysql.*\\bin\\?$' })
+}
+
+function Read-PathValue {
+    # Reads a PATH value from the registry without expanding environment variables and
+    # returns it with its value kind, so that a REG_EXPAND_SZ value is written back as such
+    # (Microsoft Learn, "RegistryValueOptions": DoNotExpandEnvironmentNames; RegistryKey.GetValueKind).
+    param([Microsoft.Win32.RegistryKey]$Key)
+    if (-not $Key -or -not ($Key.GetValueNames() -contains 'Path')) { return $null }
+    return [pscustomobject]@{
+        Value = [string]$Key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        Kind  = $Key.GetValueKind('Path')
+    }
+}
+
+function Remove-UserPathEntry {
+    # Removes the given directories from the PATH of the current user (HKCU\Environment). The
+    # package adds its bin folder there (Install-ChocolateyPath, default PathType User). A
+    # stale entry would let anyone who can recreate the folder place programs that are found
+    # through PATH. New terminals see the change; running programs keep their old PATH.
+    param([string[]]$Directories)
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+    try {
+        $path = Read-PathValue -Key $key
+        if (-not $path) { return }
+        $newValue = Remove-PathListEntry -Value $path.Value -Directories $Directories
+        if ($newValue -cne $path.Value) {
+            $key.SetValue('Path', $newValue, $path.Kind)
+            Write-Host 'Removed MySQL entries from the user PATH; open a new terminal to use the new PATH.'
+        }
+    } finally {
+        if ($key) { $key.Dispose() }
+    }
+}
+
+function Write-MachinePathWarning {
+    # Machine-wide PATH entries are not changed by this script; MySQL entries there are
+    # reported.
+    $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SYSTEM\CurrentControlSet\Control\Session Manager\Environment', $false)
+    try {
+        $path = Read-PathValue -Key $key
+        $entries = @(if ($path) { Get-MySqlPathEntries -Value $path.Value })
+        if ($entries.Count -gt 0) {
+            Write-Warning "The machine PATH contains MySQL folders: $($entries -join ', '). Remove them if they are not used by another program (System Properties, Environment Variables)."
+        }
+    } finally {
+        if ($key) { $key.Dispose() }
     }
 }
 
@@ -797,6 +951,9 @@ function Confirm-FailedInstallationRemoval {
         Write-ManualRemovalInstructions
         throw "The installation cannot be removed automatically: $($problems -join '; ')."
     }
+    if ($Installation.NewRootExists -and -not (Test-IsAllowedOwner -Sid (Get-ItemOwnerSid -Path $InstallRoot))) {
+        Write-Warning "$InstallRoot is not owned by Administrators or SYSTEM, so it was not created by this script. Check its content before you confirm."
+    }
     if ($Installation.OldConfiguredDataDirectory -and
         -not (Test-IsSamePath -First $Installation.OldConfiguredDataDirectory -Second $OldDataDirectory)) {
         Write-Warning "The old my.ini names the data directory '$($Installation.OldConfiguredDataDirectory)'. It is not the package default and is NOT deleted; delete it yourself if it is no longer needed."
@@ -819,11 +976,20 @@ function Confirm-FailedInstallationRemoval {
 function Remove-DirectoryTree {
     # Deletes a directory tree after re-checking it. [IO.Directory]::Delete with recursive=true
     # "does not recurse through the reparse point" (Microsoft Learn, "Directory.Delete Method").
-    param([string]$Path, [string[]]$Patterns)
+    param([string]$Path, [string[]]$Patterns, [switch]$MySqlDataDirectory)
     if (-not (Test-Path -LiteralPath $Path)) { return }
     if (Test-IsReparsePoint -Path $Path) { throw "$Path became a reparse point; it was not deleted." }
     if ($Patterns -and -not (Test-ContainsOnly -Path $Path -Patterns $Patterns)) {
         throw "$Path contains unexpected entries; it was not deleted."
+    }
+    # Lock the tree down first, so that nobody else can change it until it is deleted, and
+    # check its content again afterwards.
+    Lock-DirectoryTree -Path $Path
+    if ($Patterns -and -not (Test-ContainsOnly -Path $Path -Patterns $Patterns)) {
+        throw "$Path contains unexpected entries; it was not deleted."
+    }
+    if ($MySqlDataDirectory -and -not (Test-IsMySqlDataDirectory -Path $Path)) {
+        throw "$Path does not look like a MySQL data directory; it was not deleted."
     }
     [IO.Directory]::Delete($Path, $true)
     if (Test-Path -LiteralPath $Path) { throw "$Path could not be deleted." }
@@ -861,13 +1027,16 @@ function Remove-FailedInstallation {
         Write-Host "Service '$ServiceName' was deleted."
     }
     $oldPackageRoot = Get-OldPackageRoot
-    Remove-UserPathEntry -Directories @((Join-Path $ServerCurrent 'bin'), (Join-Path $oldPackageRoot 'current\bin'))
+    Remove-UserPathEntry -Directories @((Join-Path $ServerCurrent 'bin'), (Join-Path $oldPackageRoot 'current\bin'), $LegacyPathEntry)
+    if ((Test-Path -LiteralPath $InstallRoot) -and -not (Test-IsAllowedOwner -Sid (Get-ItemOwnerSid -Path $InstallRoot))) {
+        Write-Warning "$InstallRoot is not owned by Administrators or SYSTEM, so it was not created by this script; it is locked down and deleted as confirmed."
+    }
     Remove-DirectoryTree -Path $InstallRoot -Patterns @('server', 'data')
     if ((Test-Path -LiteralPath $OldDataDirectory)) {
         if ((Test-IsReparsePoint -Path $OldDataParent) -or -not (Test-IsMySqlDataDirectory -Path $OldDataDirectory)) {
             throw "$OldDataDirectory changed since the confirmation; it was not deleted."
         }
-        Remove-DirectoryTree -Path $OldDataDirectory
+        Remove-DirectoryTree -Path $OldDataDirectory -MySqlDataDirectory
     }
     if ((Test-Path -LiteralPath $OldDataParent) -and @(Get-ChildItem -LiteralPath $OldDataParent -Force).Count -eq 0) {
         [IO.Directory]::Delete($OldDataParent, $false)
@@ -893,10 +1062,15 @@ if ($chocoVersion -notmatch '^(\d+)\.' -or [int]$Matches[1] -lt 2) {
     # "choco list" lists only local packages from Chocolatey 2 on.
     throw "Chocolatey 2 or later is required (found '$chocoVersion'). Run: choco upgrade chocolatey -y"
 }
-$globalOptionFiles = @($GlobalOptionFiles | Where-Object { Test-Path -LiteralPath $_ })
-if ($globalOptionFiles.Count -gt 0) {
-    throw "MySQL would also read these option files: $($globalOptionFiles -join ', '). Remove or rename them first."
+$presentOptionFiles = @(Get-PresentOptionFiles -Paths ($GlobalOptionFiles + @($LoginPathFile)))
+if ($presentOptionFiles.Count -gt 0) {
+    throw "MySQL would also read these option files: $($presentOptionFiles -join ', '). Remove or rename them first."
 }
+
+# Stale PATH entry of the earlier layout: removed from the user PATH; MySQL entries in the
+# machine PATH are only reported.
+Remove-UserPathEntry -Directories @($LegacyPathEntry, (Join-Path (Get-OldPackageRoot) 'current\bin'))
+Write-MachinePathWarning
 
 $failedInstallation = Get-FailedInstallation
 if (Test-HasLeftovers -Installation $failedInstallation) {
@@ -952,16 +1126,21 @@ try {
     New-RestrictedDirectory -Path $ServerRoot -UsersReadExecute
     New-RestrictedDirectory -Path $DataRoot
     Assert-InstallationSecurity
-    # Created below server, inheriting its permissions; the package keeps an existing my.ini.
-    New-Item -ItemType Directory -Path $ServerCurrent | Out-Null
+    # The package keeps an existing my.ini. The folders and the file are created with their
+    # permissions and owner set at creation.
+    New-RestrictedDirectory -Path $ServerPackageRoot -UsersReadExecute
+    New-RestrictedDirectory -Path $ServerCurrent -UsersReadExecute
     $optionFileContent = Get-ServerOptionFileContent
-    [IO.File]::WriteAllText($ServerOptionFile, $optionFileContent, (New-Object Text.ASCIIEncoding))
+    New-RestrictedFile -Path $ServerOptionFile -Content $optionFileContent -UsersReadExecute
     Set-OwnerAdministrators -Path $InstallRoot
     Assert-InstallationSecurity
 
     # 4b. Install MySQL below C:\LEG-MySQL (package parameters /installLocation and
     # /dataLocation, https://community.chocolatey.org/packages/mysql).
 
+    if ([IO.File]::ReadAllText($ServerOptionFile) -cne $optionFileContent) {
+        throw "$ServerOptionFile was changed before the installation."
+    }
     $packageParameters = "/installLocation:$ServerRoot /dataLocation:$DataRoot"
     choco install $MySqlPackage --version $MySqlVersion -y --no-progress --params $packageParameters
     if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MySQL." }
@@ -978,11 +1157,21 @@ try {
     if (-not (Test-IsFile -Path (Join-Path $DataDirectory 'mysql.ibd'))) {
         throw "The data directory $DataDirectory was not initialised."
     }
-    # Owner Administrators for everything the package and the initialisation created, then
-    # the allowlist check (owner, permission entries, no reparse points).
+    # Stop the server while the owners are set and the permissions are checked, so that it
+    # creates no files in the meantime; then the allowlist check (owner, permission entries,
+    # no reparse points).
+    Stop-Service -Name $ServiceName -Force
+    (Get-Service -Name $ServiceName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
     Set-OwnerAdministrators -Path $InstallRoot
     Assert-InstallationSecurity
+    # Option files mysqld would read in addition to my.ini: BASEDIR\my.cnf, and
+    # DATADIR\mysqld-auto.cnf, which mysqld reads even with --defaults-file (MySQL Reference
+    # Manual, "Using Option Files"); neither may exist after the installation.
+    foreach ($extra in @((Join-Path $ServerCurrent 'my.cnf'), (Join-Path $DataDirectory 'mysqld-auto.cnf'))) {
+        if (Test-Path -LiteralPath $extra) { throw "Unexpected option file $extra." }
+    }
     Write-Host "Permissions below $InstallRoot verified (Administrators and SYSTEM; Users read and execute on server only)."
+    Start-Service -Name $ServiceName
 
     # 4c. Verify the listening sockets: loopback only, X Plugin off.
 
