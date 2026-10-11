@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(!.env.example)",
+      "Read(.envrc)",
+      "Read(secrets/**)",
+      "Read(*.secret)",
+      "Read(*.pem)",
+      "Read(*.key)",
+      "Read(*.p12)",
+      "Read(*.pfx)",
+      "Read(.pypirc)",
+      "Edit(/CONDUCT.md)",
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/settings.local.json)"
+    ]
+  }
+}

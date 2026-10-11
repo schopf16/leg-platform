@@ -1,0 +1,126 @@
+# Based on the official GitHub template Python.gitignore
+# (https://github.com/github/gitignore/blob/main/Python.gitignore, checked on 2026-10-09),
+# reduced to entries relevant for this project and extended with project-specific entries.
+# Deviations from the template:
+# - "instance/" (Flask) is not ignored, because it could hide a Django app of that name.
+# - "*.mo" is not ignored yet; whether compiled translations are committed is open (docs/ARCHITECTURE.md).
+
+# Secrets and local environment
+
+.env
+.env.*
+!.env.example
+.envrc
+secrets/
+*.secret
+*.pem
+*.key
+*.p12
+*.pfx
+.pypirc
+
+# Claude Code local settings (personal, not shared)
+
+.claude/settings.local.json
+
+# Byte-compiled / optimized / DLL files
+
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+
+*.so
+*.pyd
+
+# Distribution / packaging
+
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Installer logs
+
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+*.lcov
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+
+*.pot
+
+# Django
+
+*.log
+logs/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+local.sqlite3
+staticfiles/
+media/
+
+# Environments
+
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# Type checkers and linters
+
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Editors and operating systems
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local backups and exports
+
+*.sql
+*.sql.gz
+*.dump
+*.bak
