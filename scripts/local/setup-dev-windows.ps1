@@ -273,8 +273,10 @@ function Assert-ServerConfiguration {
     if ($bindAddress -ne '127.0.0.1') {
         throw "bind_address is '$bindAddress', not 127.0.0.1."
     }
-    if ($xPluginStatus -eq 'ACTIVE') {
-        throw 'X Plugin (mysqlx) is ACTIVE; mysqlx=OFF did not take effect.'
+    # Allowlist: the plugin is either not loaded (no row) or DISABLED; any other status
+    # (ACTIVE, INACTIVE, DELETING, DELETED or unknown) fails.
+    if ($xPluginStatus -cnotin @('NONE', 'DISABLED')) {
+        throw "X Plugin (mysqlx) has status '$xPluginStatus'; expected no plugin or DISABLED."
     }
 }
 
@@ -293,6 +295,15 @@ function Get-DataDirectory {
 
 function Disable-MySqlService {
     if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { return }
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    # Stop-Service can fail while the service is still starting or stopping: wait up to 30
+    # seconds for a stable state and try again.
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Date) -lt $deadline) {
+        $status = "$((Get-Service -Name $ServiceName -ErrorAction SilentlyContinue).Status)"
+        if ($status -notin @('StartPending', 'StopPending', 'ContinuePending', 'PausePending')) { break }
+        Start-Sleep -Seconds 2
+    }
     Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
     Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
