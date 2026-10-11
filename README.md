@@ -85,7 +85,7 @@ On 2026-10-11 the Git repository was initialised (branch `main`) and the ignore 
 
 On 2026-10-11 the project owner confirmed D-026 and decided D-027 (local MySQL 9.7 LTS, public repository, continuous integration). The Django project skeleton was then created: dependency declaration (`pyproject.toml`, `requirements/minimum-constraints.txt`), the project package `leg_platform` with validated, secure-by-default settings read from environment variables (D-028), tests of the settings validation, and a GitHub Actions workflow that tests the minimum versions (Python 3.11, Django 5.2, MySQL 8.4) and the newest versions (Python 3.14, Django 6.1, MySQL 9.7). Local development is described in `docs/INSTALLATION.md`. The repository is public on GitHub (D-027); secret scanning with push protection, Dependabot alerts and private vulnerability reporting are enabled, and the default workflow token is read-only. The first run of continuous integration on GitHub passed both jobs. No application functions exist yet: the code consists of the settings, their validation, a placeholder email backend and tests.
 
-On 2026-10-11 a security review of the skeleton was carried out. Its findings were corrected: email delivery modes per environment, HSTS `includeSubDomains` configurable by the operator (D-028), stricter validation of numeric values, `HttpOnly` CSRF cookie, response-level tests with production settings, a hardened local setup script (D-027, `docs/INSTALLATION.md`), service images pinned by digest and Dependabot for actions and Python packages. The corrections are awaiting a new review.
+On 2026-10-11 a security review of the skeleton was carried out. Its findings were corrected: email delivery modes per environment, HSTS `includeSubDomains` configurable by the operator (D-028), stricter validation of numeric values, `HttpOnly` CSRF cookie, response-level tests with production settings, a hardened local setup script (D-027, `docs/INSTALLATION.md`), service images pinned by digest and Dependabot for actions and Python packages. Three re-review rounds on the same day confirmed the corrections and the follow-up fixes; no review findings are open. Continuous integration passed both jobs after each round. The setup script has not yet been run against a real server.
 
 Deployment gates: no stage or production instance is deployed before
 
@@ -97,6 +97,6 @@ Deployment gates: no stage or production instance is deployed before
 
 Next steps:
 
-1. Confirmation of D-028 by the project owner and a review of the corrections.
+1. Decisions of the project owner: D-028, the Content Security Policy approach for Django 5.2, local email delivery (`docs/SECURITY.md`, sections 8 and 11) and the licence of the public repository (D-027).
 2. First run of the hardened setup script on the development machine and a local test run against MySQL with the restricted application account.
 3. Custom user model (D-021), before any persistent database is migrated.
