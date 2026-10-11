@@ -91,6 +91,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Check that the minimum pins match the declared lower bounds
+        run: python scripts/check_minimum_constraints.py
+
       - name: Install build dependencies of mysqlclient
         # mysqlclient publishes no Linux wheels; packages as listed in its installation notes.
         run: |

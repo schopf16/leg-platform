@@ -3,11 +3,15 @@
 #
 # - github-actions: actions referenced with "uses" in .github/workflows/. Dependabot does not
 #   update Docker images of workflow services; those digests in ci.yml are updated manually.
-# - pip: pyproject.toml (PEP 621) and requirements/*.txt. "widen" only raises upper bounds
-#   where possible. Pull requests are proposals: minimum versions are raised only according
-#   to D-015 (end of vendor security support or a known vulnerability), not because a newer
-#   release exists; requirements/minimum-constraints.txt must keep matching the lower bounds
-#   in pyproject.toml.
+# - pip: pyproject.toml (PEP 621). "widen" only raises upper bounds where possible. Pull
+#   requests are proposals: minimum versions are raised only according to D-015 (end of
+#   vendor security support or a known vulnerability), not because a newer release exists.
+#   requirements/minimum-constraints.txt pins exactly the declared minimum versions and is
+#   excluded with "exclude-paths" ("paths of directories and files that Dependabot should
+#   ignore when scanning for manifests and dependencies"; the reference does not list the
+#   supported ecosystems, so whether pip honours it is not verified). CI additionally fails if
+#   the pins differ from the lower bounds in pyproject.toml
+#   (scripts/check_minimum_constraints.py).
 # - docker: not configured; the repository has no Dockerfile or other supported manifest.
 #
 # Security updates for vulnerable dependencies are enabled in the repository settings.
@@ -24,3 +28,5 @@ updates:
     schedule:
       interval: weekly
     versioning-strategy: widen
+    exclude-paths:
+      - "requirements/minimum-constraints.txt"
