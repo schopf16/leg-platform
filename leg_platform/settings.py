@@ -77,13 +77,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "leg_platform.wsgi.application"
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/databases/#mysql-notes
+# Database: MariaDB through Django's MySQL backend (docs/DECISIONS.md, D-002, D-030)
+# https://docs.djangoproject.com/en/6.0/ref/databases/#mariadb-notes ("To use MariaDB, use the
+# MySQL backend") and #mysql-notes.
 # Django connects with the character set utf8mb4 by default. "read committed" is Django's
-# default isolation level for MySQL ("Data loss is possible with repeatable read"); it is set
-# explicitly so that it is visible. Strict mode is MySQL's default sql_mode and is checked by
-# Django's system check mysql.W002 (run with "check --database default" in CI).
-# The test database is test_<DB_NAME> (Django's default TEST NAME).
+# default isolation level for this backend ("Data loss is possible with repeatable read";
+# REPEATABLE-READ is MariaDB's default); it is set explicitly so that it is visible. Strict mode is part of
+# MariaDB's default sql_mode and is checked by Django's system check mysql.W002 (run with
+# "check --database default" in CI).
+# The test database is test_<DB_NAME> (Django's default TEST NAME). utf8mb4_uca1400_ai_ci exists
+# from MariaDB 10.10.1 on and is the default utf8mb4 collation from MariaDB 11.5 on; MySQL's
+# utf8mb4_0900_ai_ci exists in MariaDB only as an alias from 11.4.5 on (not in 10.11).
 
 DATABASES = {
     "default": {
@@ -99,7 +103,7 @@ DATABASES = {
         },
         "TEST": {
             "CHARSET": "utf8mb4",
-            "COLLATION": "utf8mb4_0900_ai_ci",
+            "COLLATION": "utf8mb4_uca1400_ai_ci",
         },
     }
 }
