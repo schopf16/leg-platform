@@ -1,0 +1,273 @@
+"""Tests of the environment validation (docs/SECURITY.md, sections 3, 6 and 11)."""
+
+from django.core.exceptions import ImproperlyConfigured
+from django.test import SimpleTestCase
+
+from leg_platform.environment import (
+    DEFAULT_HSTS_SECONDS,
+    email_backend,
+    load_environment,
+    security_settings,
+)
+
+# Test values only; not secrets of any environment.
+STRONG_KEY = "test-key-" + "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ"
+OTHER_STRONG_KEY = "other-test-key-" + "ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210zyxw"
+TEST_DB_PASSWORD = "test-password"
+
+DEFAULT_EMAIL_MODE = {"local": "console", "stage": "allowlist", "production": "graph"}
+
+
+def make_env(app_env="production", **overrides):
+    """Return a valid environment for app_env; an override of None removes the variable."""
+    env = {
+        "APP_ENV": app_env,
+        "DJANGO_SECRET_KEY": STRONG_KEY,
+        "DJANGO_ALLOWED_HOSTS": "portal.example.org",
+        "EMAIL_MODE": DEFAULT_EMAIL_MODE.get(app_env, "console"),
+        "DB_NAME": "leg_platform",
+        "DB_USER": "leg_platform",
+        "DB_PASSWORD": TEST_DB_PASSWORD,
+    }
+    env.update(overrides)
+    return {name: value for name, value in env.items() if value is not None}
+
+
+class AppEnvTests(SimpleTestCase):
+    def test_missing_app_env_refuses_start(self):
+        with self.assertRaisesMessage(ImproperlyConfigured, "APP_ENV"):
+            load_environment(make_env(APP_ENV=None))
+
+    def test_empty_app_env_refuses_start(self):
+        with self.assertRaisesMessage(ImproperlyConfigured, "APP_ENV"):
+            load_environment(make_env(APP_ENV=""))
+
+    def test_unknown_app_env_refuses_start(self):
+        for value in ("development", "prod", "LOCAL", "test"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "APP_ENV"):
+                    load_environment(make_env(APP_ENV=value))
+
+    def test_known_app_envs_are_accepted(self):
+        for value in ("local", "stage", "production"):
+            with self.subTest(value=value):
+                self.assertEqual(load_environment(make_env(value)).app_env, value)
+
+
+class DebugTests(SimpleTestCase):
+    def test_debug_defaults_to_false(self):
+        self.assertFalse(load_environment(make_env("local")).debug)
+
+    def test_debug_allowed_locally(self):
+        self.assertTrue(load_environment(make_env("local", DJANGO_DEBUG="True")).debug)
+
+    def test_debug_outside_local_refuses_start(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DJANGO_DEBUG"):
+                    load_environment(make_env(app_env, DJANGO_DEBUG="True"))
+
+    def test_invalid_debug_value_refuses_start(self):
+        for value in ("1", "yes", "on", "maybe"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DJANGO_DEBUG"):
+                    load_environment(make_env("local", DJANGO_DEBUG=value))
+
+
+class SecretKeyTests(SimpleTestCase):
+    def test_missing_secret_key_refuses_start(self):
+        for app_env in ("local", "stage", "production"):
+            with self.subTest(app_env=app_env):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DJANGO_SECRET_KEY"):
+                    load_environment(make_env(app_env, DJANGO_SECRET_KEY=None))
+
+    def test_weak_secret_key_refused_outside_local(self):
+        weak_keys = ("short", "a" * 60, "django-insecure-" + STRONG_KEY)
+        for app_env in ("stage", "production"):
+            for key in weak_keys:
+                with self.subTest(app_env=app_env, key_length=len(key)):
+                    with self.assertRaises(ImproperlyConfigured):
+                        load_environment(make_env(app_env, DJANGO_SECRET_KEY=key))
+
+    def test_error_message_does_not_contain_secret_key(self):
+        key = "secret-value-that-is-too-short"
+        with self.assertRaises(ImproperlyConfigured) as context:
+            load_environment(make_env(DJANGO_SECRET_KEY=key))
+        self.assertNotIn(key, str(context.exception))
+
+    def test_repr_does_not_contain_secrets(self):
+        config = load_environment(make_env())
+        self.assertNotIn(STRONG_KEY, repr(config))
+        self.assertNotIn(TEST_DB_PASSWORD, repr(config))
+
+    def test_fallbacks_are_parsed_and_checked(self):
+        config = load_environment(make_env(DJANGO_SECRET_KEY_FALLBACKS=OTHER_STRONG_KEY))
+        self.assertEqual(config.secret_key_fallbacks, (OTHER_STRONG_KEY,))
+        with self.assertRaises(ImproperlyConfigured):
+            load_environment(make_env(DJANGO_SECRET_KEY_FALLBACKS="short"))
+
+
+class AllowedHostsTests(SimpleTestCase):
+    def test_wildcards_are_rejected(self):
+        for value in ("*", "*.example.org", ".example.org", "portal.example.org,*"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DJANGO_ALLOWED_HOSTS"):
+                    load_environment(make_env(DJANGO_ALLOWED_HOSTS=value))
+
+    def test_required_outside_local(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DJANGO_ALLOWED_HOSTS"):
+                    load_environment(make_env(app_env, DJANGO_ALLOWED_HOSTS=""))
+
+    def test_list_is_parsed(self):
+        config = load_environment(
+            make_env(DJANGO_ALLOWED_HOSTS=" portal.example.org , portal2.example.org ")
+        )
+        self.assertEqual(config.allowed_hosts, ("portal.example.org", "portal2.example.org"))
+
+
+class CsrfTrustedOriginsTests(SimpleTestCase):
+    def test_wildcard_origin_is_rejected(self):
+        for value in ("https://*.example.org", "https://*", "*"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "wildcards"):
+                    load_environment(make_env(DJANGO_CSRF_TRUSTED_ORIGINS=value))
+
+    def test_invalid_origins_are_rejected(self):
+        invalid = (
+            "portal.example.org",
+            "http://portal.example.org",
+            "https://portal.example.org/path",
+            "https://user@portal.example.org",
+            "ftp://portal.example.org",
+        )
+        for value in invalid:
+            with self.subTest(value=value):
+                with self.assertRaises(ImproperlyConfigured):
+                    load_environment(make_env(DJANGO_CSRF_TRUSTED_ORIGINS=value))
+
+    def test_valid_origins_are_accepted(self):
+        config = load_environment(
+            make_env(DJANGO_CSRF_TRUSTED_ORIGINS="https://portal.example.org:8443")
+        )
+        self.assertEqual(config.csrf_trusted_origins, ("https://portal.example.org:8443",))
+        local = load_environment(
+            make_env("local", DJANGO_CSRF_TRUSTED_ORIGINS="http://localhost:8000")
+        )
+        self.assertEqual(local.csrf_trusted_origins, ("http://localhost:8000",))
+
+    def test_empty_by_default(self):
+        self.assertEqual(load_environment(make_env()).csrf_trusted_origins, ())
+
+
+class EmailModeTests(SimpleTestCase):
+    def test_console_is_the_default(self):
+        config = load_environment(make_env("local", EMAIL_MODE=None))
+        self.assertEqual(config.email_mode, "console")
+
+    def test_unknown_mode_refuses_start(self):
+        with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
+            load_environment(make_env("local", EMAIL_MODE="smtp"))
+
+    def test_console_and_allowlist_refused_in_production(self):
+        for mode in ("console", "allowlist", None):
+            with self.subTest(mode=mode):
+                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
+                    load_environment(make_env("production", EMAIL_MODE=mode))
+
+    def test_graph_refused_outside_production(self):
+        for app_env in ("local", "stage"):
+            with self.subTest(app_env=app_env):
+                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
+                    load_environment(make_env(app_env, EMAIL_MODE="graph"))
+
+    def test_allowed_combinations(self):
+        allowed = {
+            "local": ("console", "allowlist"),
+            "stage": ("console", "allowlist"),
+            "production": ("graph",),
+        }
+        for app_env, modes in allowed.items():
+            for mode in modes:
+                with self.subTest(app_env=app_env, mode=mode):
+                    config = load_environment(make_env(app_env, EMAIL_MODE=mode))
+                    self.assertEqual(config.email_mode, mode)
+
+    def test_allowed_recipients_are_normalised(self):
+        config = load_environment(
+            make_env("stage", EMAIL_ALLOWED_RECIPIENTS=" Tester@Example.org ,b@example.org")
+        )
+        self.assertEqual(
+            config.email_allowed_recipients, ("tester@example.org", "b@example.org")
+        )
+
+    def test_backend_is_never_smtp_and_console_only_in_console_mode(self):
+        self.assertEqual(
+            email_backend(load_environment(make_env("local"))),
+            "django.core.mail.backends.console.EmailBackend",
+        )
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                backend = email_backend(load_environment(make_env(app_env)))
+                self.assertEqual(backend, "leg_platform.mail.GraphNotImplementedEmailBackend")
+
+
+class DatabaseSettingsTests(SimpleTestCase):
+    def test_missing_database_settings_refuse_start(self):
+        for name in ("DB_NAME", "DB_USER", "DB_PASSWORD"):
+            with self.subTest(name=name):
+                with self.assertRaisesMessage(ImproperlyConfigured, name):
+                    load_environment(make_env(**{name: None}))
+
+    def test_defaults_and_port_validation(self):
+        config = load_environment(make_env())
+        self.assertEqual((config.db_host, config.db_port), ("127.0.0.1", "3306"))
+        with self.assertRaisesMessage(ImproperlyConfigured, "DB_PORT"):
+            load_environment(make_env(DB_PORT="abc"))
+
+
+class SecuritySettingsTests(SimpleTestCase):
+    def test_stage_and_production_are_secure(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                settings = security_settings(load_environment(make_env(app_env)))
+                self.assertEqual(settings["SESSION_COOKIE_NAME"], "__Host-sessionid")
+                self.assertEqual(settings["CSRF_COOKIE_NAME"], "__Host-csrftoken")
+                self.assertIs(settings["SESSION_COOKIE_SECURE"], True)
+                self.assertIs(settings["CSRF_COOKIE_SECURE"], True)
+                self.assertIs(settings["SECURE_SSL_REDIRECT"], True)
+                self.assertEqual(settings["SECURE_HSTS_SECONDS"], DEFAULT_HSTS_SECONDS)
+                self.assertIs(settings["SECURE_HSTS_INCLUDE_SUBDOMAINS"], False)
+                self.assertIs(settings["SECURE_HSTS_PRELOAD"], False)
+                self.assertIsNone(settings["SECURE_PROXY_SSL_HEADER"])
+
+    def test_local_is_relaxed_explicitly(self):
+        settings = security_settings(load_environment(make_env("local")))
+        self.assertEqual(settings["SESSION_COOKIE_NAME"], "sessionid")
+        self.assertEqual(settings["CSRF_COOKIE_NAME"], "csrftoken")
+        self.assertIs(settings["SESSION_COOKIE_SECURE"], False)
+        self.assertIs(settings["CSRF_COOKIE_SECURE"], False)
+        self.assertIs(settings["SECURE_SSL_REDIRECT"], False)
+        self.assertEqual(settings["SECURE_HSTS_SECONDS"], 0)
+
+    def test_hsts_seconds_can_be_configured_but_not_disabled(self):
+        config = load_environment(make_env(DJANGO_SECURE_HSTS_SECONDS="3600"))
+        self.assertEqual(security_settings(config)["SECURE_HSTS_SECONDS"], 3600)
+        for value in ("0", "-1", "abc"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "HSTS"):
+                    load_environment(make_env(DJANGO_SECURE_HSTS_SECONDS=value))
+
+    def test_proxy_ssl_header_only_when_configured(self):
+        config = load_environment(
+            make_env(DJANGO_SECURE_PROXY_SSL_HEADER="HTTP_X_FORWARDED_PROTO,https")
+        )
+        self.assertEqual(
+            security_settings(config)["SECURE_PROXY_SSL_HEADER"],
+            ("HTTP_X_FORWARDED_PROTO", "https"),
+        )
+        for value in ("X_FORWARDED_PROTO,https", "HTTP_X_FORWARDED_PROTO", "HTTP_X,"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "PROXY_SSL_HEADER"):
+                    load_environment(make_env(DJANGO_SECURE_PROXY_SSL_HEADER=value))
