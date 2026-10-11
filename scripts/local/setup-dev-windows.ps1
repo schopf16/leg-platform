@@ -152,19 +152,57 @@ $ServerGroupPattern = '^(mysqld|server|mariadb|mariadbd|client-server|galera|emb
 $ClientGroupPattern = '^(client|client-server|client-mariadb|mysql|mariadb-client)$'
 # Server options that decide where the server listens; removed from server groups before the
 # block of this script is appended. Prefixes skip-, enable-, disable- and loose- are handled.
-$ListenerOptionPattern = '^((skip|enable|disable)-)?(named-pipe|skip-networking|bind-address|port|socket)$'
+$ListenerOptionPattern = '^((skip|enable|disable)-)?(named-pipe|skip-networking|bind-address|port|socket|shared-memory)$'
 
-# Server variables checked after the switch to TCP (MariaDB documentation, "Server System
-# Variables"; "The Information Schema PLUGINS Table").
-$ServerCheckSql = "SELECT CONCAT_WS('|', @@GLOBAL.bind_address, @@GLOBAL.skip_networking, @@GLOBAL.named_pipe, @@GLOBAL.port, COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'));"
+# DisplayName of MariaDB server products in the uninstall registry key: the MSI product name
+# "MariaDB <major>.<minor>" (x86) or "MariaDB <major>.<minor> (<arch>)" (CPACK_WIX_PACKAGE_NAME
+# in win/packaging/CMakeLists.txt of the MariaDB sources). Other MariaDB products (e.g.
+# connectors) do not match.
+$MariaDbProductPattern = '^MariaDB [0-9]+\.[0-9]+( \([A-Za-z0-9]+\))?$'
 
-# Checks after the hardening; each returns one line per problem (MariaDB stores the password
-# hash in the JSON column Priv of mysql.global_priv, key authentication_string).
+# Server variables checked after the switch to TCP and the restart, which also resets every
+# runtime change (SET GLOBAL) made during the phase without a root password (MariaDB has no
+# persisted system variables): bind_address|skip_networking|named_pipe|port|feedback plugin|
+# shared_memory|general_log|slow_query_log|log_output|general_log_file|slow_query_log_file.
+# Defaults (MariaDB documentation, "Server System Variables"): general_log 0, slow_query_log 0,
+# log_output FILE, general_log_file host_name.log; shared_memory has no documented default and
+# must be off. Log files must be plain file names (in the data directory).
+$ServerCheckSql = "SELECT CONCAT(COALESCE(@@GLOBAL.bind_address, 'NULL'), '|', @@GLOBAL.skip_networking, '|', @@GLOBAL.named_pipe, '|', @@GLOBAL.port, '|', COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'), '|', @@GLOBAL.shared_memory, '|', @@GLOBAL.general_log, '|', @@GLOBAL.slow_query_log, '|', @@GLOBAL.log_output, '|', COALESCE(@@GLOBAL.general_log_file, ''), '|', COALESCE(@@GLOBAL.slow_query_log_file, ''));"
+
+# Other client connections: every thread except the current one and background threads, which
+# MariaDB shows with COMMAND 'Daemon' (MariaDB documentation, "Information Schema PROCESSLIST
+# Table": example row "system user", COMMAND "Daemon").
+$OtherConnectionsSql = "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon';"
+
+# Checks after the hardening and before the application account is created; each returns one
+# line per problem. Expected state from the bootstrap SQL of the MariaDB sources (branch 12.3:
+# scripts/mariadb_system_tables.sql, mariadb_system_tables_data.sql, mariadb_test_db.sql,
+# sys_schema) after the hardening: system schemas only; no routines, events, triggers or views
+# outside sys and mysql; mysql.db, columns_priv, procs_priv and roles_mapping empty; tables_priv
+# only mariadb.sys@localhost with Select,Delete on mysql.global_priv; proxies_priv only the
+# root accounts kept; mariadb.sys locked; PUBLIC without global privileges; no account without
+# a password; no other client connection; general log and shared memory off. MariaDB stores
+# the account data as JSON in mysql.global_priv.Priv (authentication_string, account_locked,
+# access).
 $AccountListSql = "SELECT CONCAT(User, '@', Host) FROM mysql.global_priv ORDER BY 1;"
 $HardeningProblemSql = @'
 SELECT CONCAT('account without password: ', User, '@', Host) FROM mysql.global_priv WHERE User NOT IN ('mariadb.sys', 'PUBLIC') AND COALESCE(JSON_VALUE(Priv, '$.authentication_string'), '') = '';
-SELECT CONCAT('grant to everybody: ', User, '@', Host, ' on ', Db) FROM mysql.db WHERE User IN ('', 'PUBLIC');
-SELECT CONCAT('database: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'test';
+SELECT 'mariadb.sys is not locked' FROM mysql.global_priv WHERE User = 'mariadb.sys' AND Host = 'localhost' AND COALESCE(JSON_VALUE(Priv, '$.account_locked'), 'false') <> 'true';
+SELECT 'PUBLIC has global privileges' FROM mysql.global_priv WHERE User = 'PUBLIC' AND COALESCE(JSON_VALUE(Priv, '$.access'), '0') <> '0';
+SELECT CONCAT('database grant: ', User, '@', Host, ' on ', Db) FROM mysql.db;
+SELECT CONCAT('table grant: ', User, '@', Host, ' on ', Db, '.', Table_name) FROM mysql.tables_priv WHERE NOT (Host = 'localhost' AND User = 'mariadb.sys' AND Db = 'mysql' AND Table_name = 'global_priv' AND Table_priv = 'Select,Delete' AND Column_priv = '');
+SELECT CONCAT('column grant: ', User, '@', Host) FROM mysql.columns_priv;
+SELECT CONCAT('routine grant: ', User, '@', Host) FROM mysql.procs_priv;
+SELECT CONCAT('role mapping: ', User, '@', Host, ' ', Role) FROM mysql.roles_mapping;
+SELECT CONCAT('proxy grant: ', User, '@', Host, ' for ', Proxied_user, '@', Proxied_host) FROM mysql.proxies_priv WHERE NOT (User = 'root' AND Host IN ('localhost', '127.0.0.1', '::1') AND Proxied_user = '' AND Proxied_host = '');
+SELECT CONCAT('schema: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys');
+SELECT CONCAT('routine: ', ROUTINE_SCHEMA, '.', ROUTINE_NAME) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql');
+SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS WHERE EVENT_SCHEMA NOT IN ('sys', 'mysql');
+SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA NOT IN ('sys', 'mysql');
+SELECT CONCAT('view: ', TABLE_SCHEMA, '.', TABLE_NAME) FROM information_schema.VIEWS WHERE TABLE_SCHEMA NOT IN ('sys', 'mysql');
+SELECT CONCAT('other client connection: ', ID, ' ', USER, '@', HOST) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon';
+SELECT 'general log is on' FROM DUAL WHERE @@GLOBAL.general_log <> 0;
+SELECT 'shared memory is on' FROM DUAL WHERE @@GLOBAL.shared_memory <> 0;
 '@
 
 # The grants must be stored exactly with the escaped names; result "<matching>|<all>".
@@ -251,10 +289,49 @@ function Get-ClientArguments {
     return $arguments
 }
 
+function New-AdministratorsFileSecurity {
+    # Security descriptor of a file written by this script: no inheritance, full control for
+    # Administrators and SYSTEM only, owner Administrators.
+    $security = New-Object Security.AccessControl.FileSecurity
+    $security.SetAccessRuleProtection($true, $false)
+    foreach ($sid in @($SidAdministrators, $SidSystem)) {
+        $identity = New-Object Security.Principal.SecurityIdentifier($sid)
+        $security.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($identity, [Security.AccessControl.FileSystemRights]::FullControl, 'Allow')))
+    }
+    $security.SetOwner((New-Object Security.Principal.SecurityIdentifier($SidAdministrators)))
+    return $security
+}
+
+function New-ProtectedTemporaryFile {
+    # Creates a new file with an unpredictable name in the temporary folder, with its security
+    # descriptor set at creation (FileSystemAclExtensions.Create in .NET, the FileStream
+    # constructor with FileSecurity in .NET Framework; Microsoft Learn), and writes $Content as
+    # ASCII. FileMode.CreateNew fails if the file exists. Needs an elevated process (owner
+    # Administrators). Returns the path.
+    param([string]$Content)
+    $path = Join-Path ([IO.Path]::GetTempPath()) ('leg-setup-' + [Guid]::NewGuid().ToString('N') + '.cnf')
+    $security = New-AdministratorsFileSecurity
+    $rights = [Security.AccessControl.FileSystemRights]::FullControl
+    $extensions = 'System.IO.FileSystemAclExtensions' -as [type]
+    if ($extensions) {
+        $stream = $extensions::Create((New-Object IO.FileInfo($path)), [IO.FileMode]::CreateNew, $rights, [IO.FileShare]::None, 4096, [IO.FileOptions]::None, $security)
+    } else {
+        $stream = New-Object IO.FileStream($path, [IO.FileMode]::CreateNew, $rights, [IO.FileShare]::None, 4096, [IO.FileOptions]::None, $security)
+    }
+    try {
+        $bytes = [Text.Encoding]::ASCII.GetBytes($Content)
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally {
+        $stream.Dispose()
+    }
+    return $path
+}
+
 function Invoke-MariaDb {
     # Runs SQL with the mariadb client. With -Password, the password is passed through a
-    # temporary option file that only the current user can read, so that it appears neither
-    # on the command line nor in the process list. Without -Password, no password is sent.
+    # temporary option file that only Administrators and SYSTEM can read (created with its
+    # permissions set), so that it appears neither on the command line nor in the process
+    # list. Without -Password, no password is sent.
     param(
         [string]$Client,
         [string]$Sql,
@@ -264,15 +341,9 @@ function Invoke-MariaDb {
         [string]$Password
     )
     if ($Password) {
-        $optionFile = [IO.Path]::GetTempFileName()
+        # The passwords contain only printable ASCII (Get-RootPasswordProblem, New-RandomSecret).
+        $optionFile = New-ProtectedTemporaryFile -Content "[client]`npassword=$Password`n"
         try {
-            $acl = New-Object Security.AccessControl.FileSecurity
-            $acl.SetAccessRuleProtection($true, $false)
-            $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
-            $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'Allow')))
-            Set-Acl -LiteralPath $optionFile -AclObject $acl
-            # The passwords contain only printable ASCII (Get-RootPasswordProblem, New-RandomSecret).
-            Set-Content -LiteralPath $optionFile -Encoding ascii -Value "[client]`npassword=$Password"
             $arguments = Get-ClientArguments -Protocol $Protocol -PipeName $PipeName -User $User -OptionFile $optionFile
             $Sql | & $Client @arguments
         } finally {
@@ -468,6 +539,9 @@ function Get-InitialOptionFileProblems {
     if (-not (Test-IsSamePath -First $dataDir -Second $DataDirectory)) {
         $problems += "datadir is '$dataDir', not $DataDirectory"
     }
+    if (Test-IsOptionOn -Value (Get-ServerOptionValue -Entries $Entries -Key 'shared-memory')) {
+        $problems += 'shared memory connections are enabled'
+    }
     $feedback = Get-ServerOptionValue -Entries $Entries -Key 'feedback'
     if ($null -ne $feedback -and ($feedback -eq '' -or $feedback -notin @('0', 'OFF', 'off', 'Off'))) {
         $problems += 'the feedback plugin is enabled'
@@ -497,6 +571,7 @@ function Get-NetworkOptionFileText {
         'bind-address=127.0.0.1',
         'skip-networking=0',
         'named-pipe=OFF',
+        'shared-memory=OFF',
         ''
     )
     return ($kept -join $LineBreak)
@@ -526,7 +601,7 @@ function Get-TrustedInstallerSid {
 }
 
 function Get-MariaDbUninstallEntries {
-    # Installed MariaDB products (DisplayName 'MariaDB *') from the uninstall registry keys of
+    # Installed MariaDB server products (DisplayName matching $MariaDbProductPattern) from the uninstall registry keys of
     # both registry views, with their InstallLocation.
     $roots = @(
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
@@ -539,7 +614,7 @@ function Get-MariaDbUninstallEntries {
             $properties = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction SilentlyContinue
             if (-not $properties) { continue }
             $displayName = $properties.PSObject.Properties['DisplayName']
-            if (-not $displayName -or "$($displayName.Value)" -notlike 'MariaDB *') { continue }
+            if (-not $displayName -or "$($displayName.Value)" -cnotmatch $MariaDbProductPattern) { continue }
             $location = $properties.PSObject.Properties['InstallLocation']
             $entries += [pscustomobject]@{
                 DisplayName     = "$($displayName.Value)"
@@ -940,17 +1015,23 @@ function Assert-LoopbackOnly {
 }
 
 function Get-ServerCheckProblems {
-    # Checks the result line of $ServerCheckSql: bind_address|skip_networking|named_pipe|port|
-    # status of the feedback plugin.
+    # Checks the result line of $ServerCheckSql (field order documented there).
     param([string]$Line)
     $parts = "$Line".Trim().Split('|')
-    if ($parts.Count -ne 5) { return @("unexpected server check result '$Line'") }
+    if ($parts.Count -ne 11) { return @("unexpected server check result '$Line'") }
     $problems = @()
     if ($parts[0] -ne '127.0.0.1') { $problems += "bind_address is '$($parts[0])'" }
     if ($parts[1] -ne '0') { $problems += 'skip_networking is on' }
     if ($parts[2] -ne '0') { $problems += 'named_pipe is on' }
     if ($parts[3] -ne "$DatabasePort") { $problems += "port is $($parts[3])" }
     if ($parts[4] -eq 'ACTIVE') { $problems += 'the feedback plugin is active' }
+    if ($parts[5] -ne '0') { $problems += 'shared_memory is on' }
+    if ($parts[6] -ne '0') { $problems += 'general_log is on' }
+    if ($parts[7] -ne '0') { $problems += 'slow_query_log is on' }
+    if ($parts[8] -ne 'FILE') { $problems += "log_output is '$($parts[8])'" }
+    foreach ($index in @(9, 10)) {
+        if (-not $parts[$index] -or $parts[$index] -match '[\\/:]') { $problems += "log file '$($parts[$index])' is not a plain file name" }
+    }
     return $problems
 }
 
@@ -967,11 +1048,19 @@ function Get-HardeningSql {
     # other hosts than localhost, 127.0.0.1 and ::1 (the bootstrap creates root without a
     # password for localhost, the host name, 127.0.0.1 and ::1), the 'test' database and its
     # grants (scripts/mariadb_test_db.sql grants all on 'test' and 'test\_%' to PUBLIC, which
-    # would include test_leg_platform), then set the root password.
+    # would include test_leg_platform), then set the root password. The proxy grants of the
+    # removed root accounts are deleted as well. The first statement aborts the batch (SIGNAL;
+    # the client stops at the first error) if any other client is connected; it is a compound
+    # statement outside a stored program and needs its own delimiter (MariaDB documentation,
+    # "Using Compound Statements Outside of Stored Programs").
     param([string]$Password)
     return @"
+DELIMITER //
+IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Another client is connected; setup aborted.'; END IF //
+DELIMITER ;
 DELETE FROM mysql.global_priv WHERE User='';
 DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+DELETE FROM mysql.proxies_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
 DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 FLUSH PRIVILEGES;
@@ -988,7 +1077,7 @@ function Get-AppAccountSql {
     $grantDatabase = $DatabaseName.Replace('_', '\_')
     $grantTestDatabase = $TestDatabaseName.Replace('_', '\_')
     return @"
-CREATE DATABASE IF NOT EXISTS ``$DatabaseName`` CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;
+CREATE DATABASE ``$DatabaseName`` CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;
 CREATE USER '$AppUser'@'127.0.0.1' IDENTIFIED BY '$Password';
 GRANT $AppPrivileges ON ``$grantDatabase``.* TO '$AppUser'@'127.0.0.1';
 GRANT $AppPrivileges ON ``$grantTestDatabase``.* TO '$AppUser'@'127.0.0.1';
@@ -1323,6 +1412,99 @@ function Remove-FailedInstallation {
     }
 }
 
+function Get-MariaDbProductName {
+    # MSI product name of the 64-bit MariaDB server package of a version, e.g. 12.3.3 ->
+    # "MariaDB 12.3 (x64)" (CPACK_WIX_PACKAGE_NAME, win/packaging/CMakeLists.txt).
+    param([string]$Version)
+    if ($Version -notmatch '^([0-9]+)\.([0-9]+)(\.|$)') { throw "Invalid MariaDB version '$Version'." }
+    return "MariaDB $($Matches[1]).$($Matches[2]) (x64)"
+}
+
+function Get-SetupIncompleteReasons {
+    # A MariaDB installation of this script is complete only if the service starts
+    # automatically (set at the very end) and my.ini has networking on and the named pipe off
+    # (set in step 4f). Returns the reasons why it is not, or none.
+    param([string]$StartType, $Entries)
+    $reasons = @()
+    if ($StartType -ne 'Automatic') { $reasons += "the service start type is $StartType" }
+    if ($null -eq $Entries) {
+        $reasons += 'my.ini could not be read'
+    } else {
+        if (Test-IsOptionOn -Value (Get-ServerOptionValue -Entries $Entries -Key 'skip-networking')) { $reasons += 'networking is still skipped' }
+        if (Test-IsOptionOn -Value (Get-ServerOptionValue -Entries $Entries -Key 'named-pipe')) { $reasons += 'the named pipe is still on' }
+    }
+    return $reasons
+}
+
+function Stop-IncompleteSetup {
+    # On a repeated run: a MariaDB service whose setup did not complete (e.g. after Ctrl+C or a
+    # closed console window) may still run without a root password; it is stopped and disabled.
+    $service = Get-ServiceInfo -Name $ServiceName
+    if (-not $service) { return }
+    $entries = $null
+    try {
+        $optionFile = Get-DefaultsFileFromCommandLine -PathName $service.PathName
+        if ($optionFile -and (Test-IsFile -Path $optionFile)) { $entries = @(Get-OptionFileEntries -Text (Read-TextFile -Path $optionFile).Text) }
+    } catch {
+        $entries = $null
+    }
+    $reasons = @(Get-SetupIncompleteReasons -StartType "$((Get-Service -Name $ServiceName).StartType)" -Entries $entries)
+    if ($reasons.Count -gt 0) {
+        Write-Host "WARNING: The setup of the MariaDB service '$ServiceName' was not completed ($($reasons -join '; ')). It is stopped and disabled now." -ForegroundColor Red
+        Disable-DatabaseService
+    }
+}
+
+function Wait-WindowsInstallerIdle {
+    # Waits up to 10 minutes while Windows Installer runs an installation: the service is then
+    # running with SERVICE_ACCEPT_SHUTDOWN in its accepted controls (Microsoft Learn,
+    # "_MSIExecute Mutex"; ServiceController.CanShutdown). Used after an interruption, so that
+    # a service the installer creates or starts afterwards is still disabled.
+    $deadline = (Get-Date).AddMinutes(10)
+    while ((Get-Date) -lt $deadline) {
+        $installer = Get-Service -Name 'msiserver' -ErrorAction SilentlyContinue
+        if (-not $installer -or $installer.Status -ne 'Running' -or -not $installer.CanShutdown) { return }
+        Write-Host 'Waiting for Windows Installer to finish ...'
+        Start-Sleep -Seconds 5
+    }
+    Write-Warning 'Windows Installer is still busy. When it has finished, run as administrator: sc.exe stop MySQL; sc.exe config MySQL start= disabled'
+}
+
+function Disable-ServerFirewallRules {
+    # The MSI adds a Windows Firewall exception for mysqld.exe with Scope='any'
+    # (win/packaging/CPackWixConfig.cmake). Enabled inbound allow rules for the server program
+    # are disabled (not deleted, so that the uninstallation can still remove them), and the
+    # result is checked in the active store.
+    param([string]$Server)
+    $matching = {
+        param($Store)
+        @(Get-NetFirewallApplicationFilter -PolicyStore $Store -ErrorAction SilentlyContinue |
+            Where-Object { $_.Program -and $_.Program -ne 'Any' -and (Test-IsSamePath -First ([Environment]::ExpandEnvironmentVariables("$($_.Program)")) -Second $Server) } |
+            Get-NetFirewallRule -ErrorAction SilentlyContinue |
+            Where-Object { "$($_.Direction)" -eq 'Inbound' -and "$($_.Action)" -eq 'Allow' -and "$($_.Enabled)" -eq 'True' })
+    }
+    foreach ($rule in & $matching 'PersistentStore') {
+        Disable-NetFirewallRule -Name $rule.Name -PolicyStore PersistentStore
+        Write-Host "Disabled the inbound firewall rule '$($rule.DisplayName)' for $Server."
+    }
+    $remaining = @(& $matching 'ActiveStore')
+    if ($remaining.Count -gt 0) { throw "Inbound firewall rules allow connections to ${Server}: $(($remaining | ForEach-Object { $_.DisplayName }) -join ', ')." }
+}
+
+function Wait-NoOtherConnections {
+    # Waits up to 15 seconds until no other client is connected (e.g. the connection opened by
+    # the pipe check has been closed); the hardening checks it again in the same session.
+    param([string]$Client)
+    $deadline = (Get-Date).AddSeconds(15)
+    $count = $null
+    while ((Get-Date) -lt $deadline) {
+        $count = "$(@(Invoke-MariaDb -Client $Client -Protocol Pipe -PipeName $ServiceName -Sql $OtherConnectionsSql) | Select-Object -Last 1)".Trim()
+        if ($count -eq '0') { return }
+        Start-Sleep -Seconds 1
+    }
+    throw "Other clients are connected to the server ($count); setup aborted."
+}
+
 function Write-RecoveryInstructions {
     Write-Host ''
     Write-Host 'Recovery (docs/INSTALLATION.md, "Recovery after a failed setup"): fix the cause shown above and run as administrator:'
@@ -1335,9 +1517,10 @@ function Get-MariaDbInstallation {
     # %ProgramFiles% without reparse points, the service runs its bin\mysqld.exe or
     # bin\mariadbd.exe with --defaults-file=<data directory>\my.ini below the program folder,
     # and the client mariadb.exe exists.
-    param([string]$ProgramFiles)
+    param([string]$ProgramFiles, [string]$ProductName)
     $entries = @(Get-MariaDbUninstallEntries)
     if ($entries.Count -ne 1) { throw "Expected exactly one MariaDB installation, found $($entries.Count)." }
+    if ($entries[0].DisplayName -cne $ProductName) { throw "The installed MariaDB is '$($entries[0].DisplayName)', not '$ProductName'." }
     $installDir = $entries[0].InstallLocation.TrimEnd('\')
     if (-not (Test-IsStrictlyUnder -Path $installDir -Root $ProgramFiles)) { throw "MariaDB was installed to '$installDir', not below $ProgramFiles." }
     $reparse = Get-ReparsePointOnPath -Path $installDir -Root $ProgramFiles
@@ -1361,6 +1544,7 @@ function Get-MariaDbInstallation {
     if (-not $client) { throw "The client mariadb.exe was not found in $binDir." }
     return [pscustomobject]@{
         InstallDir  = $installDir
+        Server      = $server
         DataDir     = $dataDir
         OptionFile  = $optionFile
         Client      = $client
@@ -1432,6 +1616,7 @@ if ($kind -eq 'Legacy' -or $kind -eq 'Foreign') {
     throw 'A local database installation exists that this script does not remove automatically.'
 }
 if ($kind -eq 'MariaDb') {
+    Stop-IncompleteSetup
     if (-not $RemoveFailedInstallation) {
         throw "A local MariaDB installation already exists (e.g. from a failed run). To remove it and start over, run as administrator: $RetryCommand"
     }
@@ -1472,10 +1657,12 @@ if ($installedPython) {
 # 4. Install and configure MariaDB; on any failure, leave the server stopped and disabled
 
 $completed = $false
+$installStarted = $false
 $settings = $null
 try {
     # 4a. Install without networking (named pipe only) until the server is hardened.
 
+    $installStarted = $true
     choco install $MariaDbPackage --version $MariaDbVersion -y --no-progress "--install-arguments=$MsiInstallArguments"
     if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while installing MariaDB." }
     # The server must not start automatically before the setup has succeeded.
@@ -1483,7 +1670,8 @@ try {
 
     # 4b. Locate and verify the installation and the initial option file.
 
-    $installation = Get-MariaDbInstallation -ProgramFiles $programFiles
+    $installation = Get-MariaDbInstallation -ProgramFiles $programFiles -ProductName (Get-MariaDbProductName -Version $MariaDbVersion)
+    Disable-ServerFirewallRules -Server $installation.Server
     $optionFile = Read-TextFile -Path $installation.OptionFile
     $problems = @(Get-InitialOptionFileProblems -Entries (Get-OptionFileEntries -Text $optionFile.Text) -DataDirectory $installation.DataDir)
     if ($problems.Count -gt 0) { throw "Unexpected settings in $($installation.OptionFile): $($problems -join '; ')." }
@@ -1509,6 +1697,7 @@ try {
     $servicePid = Assert-PipeServedByService
     $problems = @(Get-ListenerProblems -Listeners (Get-ServiceListeners -ProcessId $servicePid) -ExpectNone)
     if ($problems.Count -gt 0) { throw "The server should not listen on TCP yet but $($problems -join '; ')." }
+    Wait-NoOtherConnections -Client $installation.Client
     Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Sql (Get-HardeningSql -Password $rootPassword)
     Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Password $rootPassword -Sql 'SELECT 1;' | Out-Null
     $unexpected = @(Get-UnexpectedAccounts -Lines @(Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Password $rootPassword -Sql $AccountListSql))
@@ -1567,6 +1756,8 @@ try {
     $rootPassword = $null
     $appPassword = $null
     if (-not $completed) {
+        # After an interruption, the installer may still be running and start the service.
+        if ($installStarted) { Wait-WindowsInstallerIdle }
         Disable-DatabaseService
         Write-RecoveryInstructions
     }

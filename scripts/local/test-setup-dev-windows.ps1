@@ -234,13 +234,23 @@ try {
     Assert-Throws { Get-ServiceAccountSid -StartName '.\someone' -Service 'MySQL' } '*expected NT SERVICE\MySQL*' 'Service account: other account is refused'
     Assert-Throws { Get-ServiceAccountSid -StartName 'NT SERVICE\Other' -Service 'MySQL' } '*expected NT SERVICE\MySQL*' 'Service account: virtual account of another service is refused'
 
-    # Named pipe server process
+    # Named pipe server process: the pipe is served by a child process, which must be reported
+    # (not this process). The child accepts connections for up to 60 seconds.
     $pipeName = 'leg-setup-test-' + [Guid]::NewGuid().ToString('N')
-    $pipe = New-Object IO.Pipes.NamedPipeServerStream($pipeName, [IO.Pipes.PipeDirection]::InOut, 1)
+    $childScript = "`$end = (Get-Date).AddSeconds(60); while ((Get-Date) -lt `$end) { `$p = New-Object IO.Pipes.NamedPipeServerStream('$pipeName', [IO.Pipes.PipeDirection]::InOut, 1); try { `$p.WaitForConnection() } finally { `$p.Dispose() } }"
+    $child = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', $childScript) -PassThru -WindowStyle Hidden
     try {
-        Assert-Equal (Get-NamedPipeServerProcessId -Name $pipeName) $PID 'Named pipe: server process of an existing pipe'
+        $serverPid = -1
+        $deadline = (Get-Date).AddSeconds(30)
+        while ($serverPid -le 0 -and (Get-Date) -lt $deadline) {
+            $serverPid = Get-NamedPipeServerProcessId -Name $pipeName
+            if ($serverPid -le 0) { Start-Sleep -Milliseconds 200 }
+        }
+        Assert-Equal $serverPid $child.Id 'Named pipe: server process is the child that created the pipe'
+        Assert-Equal ($serverPid -ne $PID) $true 'Named pipe: not the process of the test'
     } finally {
-        $pipe.Dispose()
+        Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
+        $child.WaitForExit(10000) | Out-Null
     }
     Assert-Equal (Get-NamedPipeServerProcessId -Name $pipeName) -1 'Named pipe: missing pipe'
     Assert-Throws { Get-NamedPipeServerProcessId -Name '..\x' } '*Invalid pipe name*' 'Named pipe: invalid name is refused'
@@ -254,11 +264,12 @@ try {
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306), (New-Listener '127.0.0.1' 33060))) -join ';') 'listens on 127.0.0.1:33060' 'Listeners: other port'
     Assert-Equal @(Get-ListenerProblems -Listeners @() -ExpectNone).Count 0 'Listeners: none expected'
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306)) -ExpectNone) -join ';') 'listens on 127.0.0.1:3306' 'Listeners: TCP while networking is skipped'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE').Count 0 'Server check: expected values'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED').Count 0 'Server check: feedback plugin disabled'
-    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active" 'Server check: every deviation reported'
-    Assert-Equal ((Get-ServerCheckProblems -Line 'NULL') -join ';') "unexpected server check result 'NULL'" 'Server check: malformed result'
-    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*') $true 'Server check: query order matches the parser'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log').Count 0 'Server check: expected values'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|0|0|0|FILE|mypc.log|mypc-slow.log').Count 0 'Server check: feedback plugin disabled'
+    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|1|1|1|TABLE|C:\x\g.log|/tmp/s.log') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is on;general_log is on;slow_query_log is on;log_output is 'TABLE';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
+    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE') -join ';') "unexpected server check result '127.0.0.1|0|0|3306|NONE'" 'Server check: malformed result'
+    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*@@GLOBAL.shared_memory*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*') $true 'Server check: query order matches the parser'
+    Assert-Equal ($OtherConnectionsSql -clike "*PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon'*") $true 'Other connections: background threads excluded'
 
     # SQL of the hardening and the application account
     $hardening = Get-HardeningSql -Password 'correct horse battery staple'
@@ -267,19 +278,43 @@ try {
         "DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');",
         'DROP DATABASE IF EXISTS test;',
         "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';",
-        'FLUSH PRIVILEGES;'
+        'FLUSH PRIVILEGES;',
+        "DELETE FROM mysql.proxies_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');",
+        'DELIMITER //',
+        'DELIMITER ;'
     )) {
         Assert-Equal ([bool](($hardening -split "`r?`n") -ccontains $expected)) $true "Hardening SQL: $expected"
     }
     Assert-Equal ([regex]::Matches($hardening, "IDENTIFIED BY 'correct horse battery staple'").Count) 3 'Hardening SQL: password for the three root accounts'
+    $hardeningLines = @($hardening -split "`r?`n" | Where-Object { $_ })
+    Assert-Equal ([bool]($hardeningLines[1] -clike "IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000'*END IF //")) $true 'Hardening SQL: aborts first if another client is connected'
+    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'information_schema.ROUTINES', 'information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.VIEWS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")) {
+        Assert-Equal $HardeningProblemSql.Contains($check) $true "Hardening check SQL: $check"
+    }
     $appSql = Get-AppAccountSql -Password 'generated-secret'
     # -like treats the backtick as escape character, so String.Contains is used here.
     Assert-Equal $appSql.Contains("GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX ON ``leg\_platform``.* TO 'leg_platform'@'127.0.0.1';") $true 'Application SQL: escaped grant on leg_platform'
     Assert-Equal $appSql.Contains("ON ``test\_leg\_platform``.* TO 'leg_platform'@'127.0.0.1';") $true 'Application SQL: escaped grant on the test database'
     Assert-Equal ([bool]($appSql -clike '*COLLATE utf8mb4_uca1400_ai_ci;*')) $true 'Application SQL: collation available from MariaDB 10.10.1'
+    Assert-Equal $appSql.Contains('CREATE DATABASE IF NOT EXISTS') $false 'Application SQL: the database must not exist yet'
     Assert-Equal ([bool]($appSql -like '*REFERENCES*')) $false 'Application SQL: no unused REFERENCES privilege'
     Assert-Equal ([bool]($AppGrantCheckSql -clike "*Db IN ('leg\\_platform', 'test\\_leg\\_platform')*User = 'leg_platform'*")) $true 'Grant check SQL: escaped names'
     Assert-Equal ([bool]($HardeningProblemSql -clike '*JSON_VALUE(Priv, ''$.authentication_string'')*')) $true 'Hardening check SQL: literal JSON path'
+
+    # Product name, incomplete setup, option file security
+    Assert-Equal (Get-MariaDbProductName -Version '12.3.3') 'MariaDB 12.3 (x64)' 'Product name: 12.3.3'
+    Assert-Throws { Get-MariaDbProductName -Version 'latest' } '*Invalid MariaDB version*' 'Product name: invalid version'
+    foreach ($name in @('MariaDB 12.3 (x64)', 'MariaDB 10.11', 'MariaDB 11.8 (arm64)')) { Assert-Equal ($name -cmatch $MariaDbProductPattern) $true "Product pattern: '$name'" }
+    foreach ($name in @('MariaDB Connector C 64-bit', 'MariaDB 12.3 (x64) Debug Symbols', 'mariadb 12.3 (x64)')) { Assert-Equal ($name -cmatch $MariaDbProductPattern) $false "Product pattern: not '$name'" }
+    Assert-Equal @(Get-SetupIncompleteReasons -StartType 'Automatic' -Entries $switchedEntries).Count 0 'Incomplete setup: completed installation'
+    Assert-Equal ((Get-SetupIncompleteReasons -StartType 'Manual' -Entries $entries) -join ';') 'the service start type is Manual;networking is still skipped;the named pipe is still on' 'Incomplete setup: interrupted before the switch'
+    Assert-Equal ((Get-SetupIncompleteReasons -StartType 'Disabled' -Entries $null) -join ';') 'the service start type is Disabled;my.ini could not be read' 'Incomplete setup: unreadable my.ini'
+    Assert-Equal ([bool](@(Get-InitialOptionFileProblems -Entries (Get-OptionFileEntries -Text ($initial + "[mysqld]`r`nshared_memory`r`n")) -DataDirectory $dataDir) -like '*shared memory*')) $true 'Initial option file refused: shared memory'
+    Assert-Equal (Get-ServerOptionValue -Entries $switchedEntries -Key 'shared-memory') 'OFF' 'Switched option file: shared memory off'
+    $fileSecurity = New-AdministratorsFileSecurity
+    Assert-Equal $fileSecurity.AreAccessRulesProtected $true 'Option file security: no inheritance'
+    Assert-Equal (($fileSecurity.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidAdministrators, $SidSystem) | Sort-Object) -join ',') 'Option file security: Administrators and SYSTEM only'
+    Assert-Equal $fileSecurity.GetOwner([Security.Principal.SecurityIdentifier]).Value $SidAdministrators 'Option file security: owner Administrators'
 
     # Accounts
     Assert-Equal @(Get-UnexpectedAccounts -Lines @('PUBLIC@', 'mariadb.sys@localhost', 'root@127.0.0.1', 'root@::1', 'root@localhost', '')).Count 0 'Accounts: reserved accounts only'
@@ -400,6 +435,22 @@ try {
     Assert-Equal (Get-RootPasswordProblem -Password "abcdefghijklmnop$([char]0xE4)") 'Use only printable ASCII characters (no umlauts or other non-ASCII characters).' 'Password: non-ASCII'
     Assert-Equal (Get-RootPasswordProblem -Password 'correct horse battery staple') $null 'Password: acceptable'
     Assert-Equal ((New-RandomSecret) -cmatch '^[A-Za-z0-9_-]{43}$') $true 'Random secret: URL-safe Base64 without padding'
+
+    # The temporary option file can only be created with the owner Administrators when elevated.
+    $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if ($elevated) {
+        $tempFile = New-ProtectedTemporaryFile -Content "[client]`npassword=test`n"
+        try {
+            $tempAcl = Get-Acl -LiteralPath $tempFile
+            Assert-Equal $tempAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value $SidAdministrators 'Temporary option file: owner Administrators'
+            Assert-Equal (($tempAcl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidAdministrators, $SidSystem) | Sort-Object) -join ',') 'Temporary option file: Administrators and SYSTEM only'
+            Assert-Equal ([IO.File]::ReadAllText($tempFile)) "[client]`npassword=test`n" 'Temporary option file: content'
+        } finally {
+            Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+        }
+    } else {
+        Write-Host 'SKIPPED: creation of the temporary option file (needs an elevated PowerShell).'
+    }
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
