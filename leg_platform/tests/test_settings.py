@@ -97,7 +97,10 @@ class HeaderTests(SimpleTestCase):
 
     @override_settings(ALLOWED_HOSTS=["portal.example.org"])
     def test_disallowed_host_header_is_rejected(self):
-        response = self.client.get("/admin/login/", headers={"host": "attacker.example"})
+        with self.assertLogs("django.security.DisallowedHost", "ERROR"):
+            response = self.client.get(
+                "/admin/login/", headers={"host": "attacker.example"}
+            )
         self.assertEqual(response.status_code, 400)
 
 
