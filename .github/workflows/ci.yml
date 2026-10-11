@@ -1,0 +1,122 @@
+# Continuous integration of LEG-Platform (docs/DECISIONS.md, D-015, D-026, D-027).
+#
+# Two jobs prove both ends of the supported range:
+# - minimum: the declared minimum versions (requirements/minimum-constraints.txt) with
+#   Python 3.11 and MySQL 8.4;
+# - latest: the newest compatible releases with Python 3.14 and MySQL 9.7 LTS.
+#
+# Hardening (GitHub documentation "Security hardening for GitHub Actions"): read-only
+# token, no repository secrets, third-party actions pinned to full commit SHAs.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: minimum (Python 3.11, Django 5.2, MySQL 8.4)
+            python-version: "3.11"
+            mysql-image: mysql:8.4
+            install: pip install -c requirements/minimum-constraints.txt -e .
+            django-series: "5.2"
+          - name: latest (Python 3.14, Django 6.1, MySQL 9.7)
+            python-version: "3.14"
+            mysql-image: mysql:9.7
+            install: pip install --upgrade -e .
+            django-series: "6.1"
+
+    services:
+      mysql:
+        image: ${{ matrix.mysql-image }}
+        env:
+          # Throwaway credentials of a service container that exists only during this job;
+          # not a secret of any environment.
+          MYSQL_ROOT_PASSWORD: ci-only-throwaway-password
+          MYSQL_DATABASE: leg_platform
+        ports:
+          - 3306:3306
+        # "mysqladmin ping" returns 0 as soon as the server accepts TCP connections, even on
+        # "Access denied" (MySQL 8.4 Reference Manual, mysqladmin).
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      APP_ENV: local
+      DJANGO_DEBUG: "False"
+      EMAIL_MODE: console
+      DB_NAME: leg_platform
+      # Root of the throwaway service container: Django's test runner must create the
+      # database test_leg_platform.
+      DB_USER: root
+      DB_PASSWORD: ci-only-throwaway-password
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      PYTHONWARNINGS: error::DeprecationWarning,error::PendingDeprecationWarning
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies of mysqlclient
+        # mysqlclient publishes no Linux wheels; packages as listed in its installation notes.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-dev default-libmysqlclient-dev build-essential pkg-config
+
+      - name: Install the project
+        env:
+          PYTHONWARNINGS: ""
+        run: |
+          python -m pip install --upgrade pip
+          ${{ matrix.install }}
+          python -m pip freeze
+
+      - name: Verify the Django release line
+        run: python -c "import django, sys; v = django.get_version(); print(v); sys.exit(0 if v.startswith('${{ matrix.django-series }}.') or v == '${{ matrix.django-series }}' else 1)"
+
+      - name: Generate a throwaway secret key
+        # Generated per job and masked; it protects nothing.
+        run: |
+          key="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+          echo "::add-mask::$key"
+          echo "DJANGO_SECRET_KEY=$key" >> "$GITHUB_ENV"
+
+      - name: System checks
+        run: python manage.py check --database default --fail-level WARNING
+
+      - name: Deployment checks with production settings
+        env:
+          APP_ENV: production
+          EMAIL_MODE: graph
+          DJANGO_ALLOWED_HOSTS: portal.example.org
+        run: python manage.py check --deploy --database default --fail-level WARNING
+
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        run: python manage.py test --verbosity 2
