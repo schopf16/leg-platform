@@ -605,6 +605,50 @@ function Get-SecurityViolations {
     return $violations
 }
 
+function Get-TreeItemsWithoutReparsePoints {
+    # Returns the full paths of $Path and every file and folder below it. Throws on the first
+    # reparse point, which is never followed.
+    param([string]$Path)
+    $items = @()
+    $pending = New-Object System.Collections.Generic.Queue[string]
+    $pending.Enqueue($Path)
+    while ($pending.Count -gt 0) {
+        $current = $pending.Dequeue()
+        $item = Get-Item -LiteralPath $current -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "$current is a symbolic link, junction or mount point."
+        }
+        $items += $current
+        if ($item.PSIsContainer) {
+            foreach ($child in @(Get-ChildItem -LiteralPath $current -Force)) { $pending.Enqueue($child.FullName) }
+        }
+    }
+    return $items
+}
+
+function Set-OwnerAdministrators {
+    # Sets the owner of $Path and every file and folder below it to Administrators. The owner
+    # of objects created by administrators depends on the policy "System objects: Default
+    # owner for objects created by members of the Administrators group", which may make the
+    # installing user the owner; an owner can always change the permissions. Uses
+    # ObjectSecurity.SetOwner and Set-Acl (Microsoft Learn), item by item: all items are
+    # first enumerated without following reparse points (any reparse point fails before
+    # anything is changed), and each item is checked again immediately before its change.
+    param([string]$Path)
+    $administrators = New-Object Security.Principal.SecurityIdentifier($SidAdministrators)
+    foreach ($itemPath in @(Get-TreeItemsWithoutReparsePoints -Path $Path)) {
+        $item = Get-Item -LiteralPath $itemPath -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "$itemPath became a symbolic link, junction or mount point."
+        }
+        $acl = Get-Acl -LiteralPath $itemPath
+        if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $SidAdministrators) {
+            $acl.SetOwner($administrators)
+            Set-Acl -LiteralPath $itemPath -AclObject $acl
+        }
+    }
+}
+
 function Assert-InstallationSecurity {
     # Every file and folder below C:\LEG-MySQL: owner Administrators or SYSTEM; access only
     # for Administrators and SYSTEM, and read and execute for Users below server.
@@ -912,6 +956,7 @@ try {
     New-Item -ItemType Directory -Path $ServerCurrent | Out-Null
     $optionFileContent = Get-ServerOptionFileContent
     [IO.File]::WriteAllText($ServerOptionFile, $optionFileContent, (New-Object Text.ASCIIEncoding))
+    Set-OwnerAdministrators -Path $InstallRoot
     Assert-InstallationSecurity
 
     # 4b. Install MySQL below C:\LEG-MySQL (package parameters /installLocation and
@@ -933,6 +978,9 @@ try {
     if (-not (Test-IsFile -Path (Join-Path $DataDirectory 'mysql.ibd'))) {
         throw "The data directory $DataDirectory was not initialised."
     }
+    # Owner Administrators for everything the package and the initialisation created, then
+    # the allowlist check (owner, permission entries, no reparse points).
+    Set-OwnerAdministrators -Path $InstallRoot
     Assert-InstallationSecurity
     Write-Host "Permissions below $InstallRoot verified (Administrators and SYSTEM; Users read and execute on server only)."
 

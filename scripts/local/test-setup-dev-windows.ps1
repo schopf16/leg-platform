@@ -214,14 +214,34 @@ try {
     Assert-Equal (Test-ContainsOnly -Path $treeRoot -Patterns @('bin', 'link')) $false 'ContainsOnly: reparse point'
     [IO.Directory]::Delete((Join-Path $treeRoot 'link'), $false)
 
-    # New-RestrictedDirectory sets the owner Administrators; only possible when elevated.
+    # Get-TreeItemsWithoutReparsePoints and Set-OwnerAdministrators
+    $ownerRoot = Join-Path $root 'owner'
+    New-Item -ItemType Directory -Path (Join-Path $ownerRoot 'bin') | Out-Null
+    Set-Content -LiteralPath (Join-Path $ownerRoot 'bin\mysqld.exe') -Value ''
+    $treeItems = @(Get-TreeItemsWithoutReparsePoints -Path $ownerRoot)
+    Assert-Equal $treeItems.Count 3 'Tree items: folder, subfolder and file'
+    $ownerTarget = Join-Path $root 'owner-target'
+    New-Item -ItemType Directory -Path $ownerTarget | Out-Null
+    New-Item -ItemType Junction -Path (Join-Path $ownerRoot 'link') -Target $ownerTarget | Out-Null
+    $ownerBefore = (Get-Acl -LiteralPath $ownerRoot).GetOwner([Security.Principal.SecurityIdentifier]).Value
+    $failed = $false
+    try { Set-OwnerAdministrators -Path $ownerRoot } catch { $failed = $_.Exception.Message -like '*link is a symbolic link*' }
+    Assert-Equal $failed $true 'Set-OwnerAdministrators: a reparse point fails before anything is changed'
+    Assert-Equal ((Get-Acl -LiteralPath $ownerRoot).GetOwner([Security.Principal.SecurityIdentifier]).Value) $ownerBefore 'Set-OwnerAdministrators: owner unchanged after the failure'
+    [IO.Directory]::Delete((Join-Path $ownerRoot 'link'), $false)
+
+    # New-RestrictedDirectory and Set-OwnerAdministrators set the owner Administrators; only
+    # possible when elevated.
     $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if ($elevated) {
         $restricted = Join-Path $root 'restricted'
         New-RestrictedDirectory -Path $restricted -UsersReadExecute
         Assert-Equal @(Get-SecurityViolations -Path $restricted -AllowUsersReadExecute -Recurse).Count 0 'New-RestrictedDirectory: passes the allowlist'
+        Set-OwnerAdministrators -Path $ownerRoot
+        $owners = @($treeItems | ForEach-Object { (Get-Acl -LiteralPath $_).GetOwner([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
+        Assert-Equal ($owners -join ',') $SidAdministrators 'Set-OwnerAdministrators: every item is owned by Administrators'
     } else {
-        Write-Host 'SKIPPED: New-RestrictedDirectory (needs an elevated PowerShell).'
+        Write-Host 'SKIPPED: New-RestrictedDirectory and Set-OwnerAdministrators owner change (need an elevated PowerShell).'
     }
 
     # Test-IsMySqlDataDirectory
