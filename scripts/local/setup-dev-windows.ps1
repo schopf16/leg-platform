@@ -845,8 +845,11 @@ function Protect-DataDirectory {
 function Get-NamedPipeServerProcessId {
     # Returns the process ID of the server of the named pipe \\.\pipe\<name>, or -1 if the pipe
     # cannot be opened. The pipe is opened with SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
-    # so that its server cannot impersonate this elevated process (Microsoft Learn,
-    # "CreateFileW", "GetNamedPipeServerProcessId").
+    # so that its server can only identify, not impersonate this elevated process (Microsoft
+    # Learn, "CreateFileW" and "Impersonation Levels"; flag values 0x00100000 and 1 << 16 as in
+    # dotnet/runtime Interop.SecurityOptions.cs). Microsoft Learn describes the handle of
+    # GetNamedPipeServerProcessId as one created by CreateNamedPipe; that it also works with the
+    # client handle is shown by scripts/local/test-setup-dev-windows.ps1.
     param([string]$Name)
     if (-not ('LegPlatformSetup.PipeInfo' -as [type])) {
         Add-Type -TypeDefinition @'
