@@ -46,13 +46,12 @@ PORT_MAX = 65535
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
 
-# The delivery mode each APP_ENV requires (docs/SECURITY.md, sections 8 and 11;
-# docs/ARCHITECTURE.md, "Email"): local delivery is controlled (console by default, or the
-# allowlist), stage delivery is restricted to allowed recipients, and production allows only
-# unrestricted Microsoft Graph delivery, so that security links never end up in console or
-# server logs.
+# The delivery mode each APP_ENV requires (docs/SECURITY.md, section 11; docs/ARCHITECTURE.md,
+# "Email"): local delivery is restricted to test output, stage delivery is restricted to
+# allowed recipients, and production allows only unrestricted Microsoft Graph delivery, so
+# that security links never end up in console or server logs (D-028).
 ALLOWED_EMAIL_MODES = {
-    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
+    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE,),
     APP_ENV_STAGE: (EMAIL_MODE_ALLOWLIST,),
     APP_ENV_PRODUCTION: (EMAIL_MODE_GRAPH,),
 }

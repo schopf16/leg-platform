@@ -148,8 +148,8 @@ Local development, stage and production have separate settings and credentials. 
 
 | Value | `local` | `stage` | `production` | Behaviour |
 | ----- | ------- | ------- | ------------ | --------- |
-| `console` | allowed (default) | refused | refused | Emails are only written to the console or test output. Outside local development, security links would end up in server logs. |
-| `allowlist` | allowed | required | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. |
+| `console` | required (default) | refused | refused | Emails are only written to the console or test output. Outside local development, security links would end up in server logs. |
+| `allowlist` | refused | required | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. |
 | `graph` | refused | refused | required | Emails are sent via Microsoft Graph without restriction. |
 
 "Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`. Until the Microsoft Graph backend exists (D-006), `allowlist` and `graph` use a placeholder backend that refuses to send (D-028).

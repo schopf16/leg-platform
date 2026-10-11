@@ -219,6 +219,12 @@ class EmailModeTests(SimpleTestCase):
                     with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
                         load_environment(make_env(app_env, EMAIL_MODE=value))
 
+    def test_local_allows_only_console(self):
+        for mode in ("allowlist", "graph"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=console"):
+                    load_environment(make_env("local", EMAIL_MODE=mode))
+
     def test_stage_requires_allowlist(self):
         for mode in ("console", "graph"):
             with self.subTest(mode=mode):
@@ -243,7 +249,7 @@ class EmailModeTests(SimpleTestCase):
 
     def test_allowed_combinations(self):
         allowed = {
-            "local": ("console", "allowlist"),
+            "local": ("console",),
             "stage": ("allowlist",),
             "production": ("graph",),
         }

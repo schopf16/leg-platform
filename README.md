@@ -90,7 +90,7 @@ On 2026-10-11 a security review of the skeleton was carried out. Its findings we
 Deployment gates: no stage or production instance is deployed before
 
 1. a Content Security Policy is in place (decision pending with the project owner; D-028);
-2. the Microsoft Graph email backend is implemented (D-006); until then, the placeholder backend raises an error on every send, so that a function sending email would answer with an error page and could reveal whether an account exists;
+2. the Microsoft Graph email backend is implemented (D-006); until then, the placeholder backend raises an error on every send, so that a function sending email would answer with an error page and could reveal whether an account exists. With `EMAIL_MODE=allowlist` and an empty `EMAIL_ALLOWED_RECIPIENTS`, the backend must deliver to nobody or refuse the start (D-028);
 3. two-factor authentication and `django-axes` protect the admin and the login (D-004, D-017);
 4. the custom user model exists before any persistent database is migrated (D-021);
 5. tokens in URLs are redacted from request logs: Django's `django.request` and `django.security.csrf` loggers write the request path of every response with status 400 or higher (`log_response` in the installed Django source), so a token in a path would end up in the logs. A redaction filter and a test are required when the first URL with a token is introduced (`docs/SECURITY.md`, section 10).
