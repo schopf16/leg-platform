@@ -1,0 +1,6 @@
+{% extends "admin/change_form_object_tools.html" %}
+{% comment %}
+The history of accounts is shown only to system administrators (UserAdmin.history_view, D-036),
+so the link is shown only to them.
+{% endcomment %}
+{% block object-tools-items %}{% if request.user.is_superuser %}{{ block.super }}{% endif %}{% endblock %}

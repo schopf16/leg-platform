@@ -365,7 +365,7 @@ class AdminPresentationTests(TestCase):
         self.client.force_login(self.administrator)
         with translation.override("de-ch"):
             response = self.client.post(reverse("admin:auth_group_add"), {"name": "Example group"})
-        self.assertContains(response, "Dieser Wert für «Name» wird bereits verwendet.")
+        self.assertContains(response, "Gruppe: Dieser Wert für «Name» wird bereits verwendet.")
 
 
 HIDDEN_FIELDS = {
@@ -623,3 +623,83 @@ class AdminProtectedFieldTests(TestCase):
         self.assertEqual(response.status_code, 302)
         after = User.objects.values().get(pk=member.pk)
         self.assertEqual(after, before)
+
+
+@tag("mariadb")
+class AdminHistoryAccessTests(TestCase):
+    """The history of accounts is shown only to system administrators (N-1, D-036)."""
+
+    def setUp(self):
+        self.administrator = create_active_user("admin@example.org")
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        self.member = create_active_user("member@example.org")
+        self.history_url = reverse("admin:accounts_user_history", args=(self.member.pk,))
+        self.change_url = reverse("admin:accounts_user_change", args=(self.member.pk,))
+
+    def create_staff_user(self, *codenames):
+        staff_user = create_active_user("staff@example.org")
+        staff_user.set_privileges(is_staff=True, is_superuser=False)
+        for app_label, codename in codenames:
+            staff_user.user_permissions.add(
+                Permission.objects.get(content_type__app_label=app_label, codename=codename)
+            )
+        return staff_user
+
+    def test_staff_users_cannot_open_the_account_history(self):
+        staff_user = self.create_staff_user()
+        self.client.force_login(staff_user)
+        missing = reverse("admin:accounts_user_history", args=(999999,))
+        for codename in ("view_user", "change_user"):
+            with self.subTest(codename=codename):
+                staff_user.user_permissions.set(
+                    [Permission.objects.get(content_type__app_label="accounts", codename=codename)]
+                )
+                self.assertEqual(self.client.get(self.history_url).status_code, 403)
+                self.assertEqual(self.client.get(missing).status_code, 403)
+
+    def test_staff_users_see_no_history_link(self):
+        self.client.force_login(self.create_staff_user(("accounts", "change_user")))
+        response = self.client.get(self.change_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "historylink")
+        self.assertNotContains(response, self.history_url)
+
+    def test_system_administrator_sees_the_history_with_swiss_german_labels(self):
+        self.client.force_login(self.administrator)
+        response = self.client.post(
+            self.change_url,
+            {
+                "first_name": "Berta",
+                "last_name": "Muster",
+                "town": "Bern",
+                "street": "Examplestrasse",
+                "house_number": "12a",
+                "country": "CH",
+                "postal_code": "3063",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        with translation.override("de-ch"):
+            self.assertContains(self.client.get(self.change_url), "historylink")
+            response = self.client.get(self.history_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vorname, Nachname und Postleitzahl geändert.")
+        self.assertContains(response, self.administrator.email)
+
+    def test_group_history_is_refused_to_staff_users(self):
+        group = Group.objects.create(name="Example group")
+        staff_user = self.create_staff_user(("auth", "view_group"), ("auth", "change_group"))
+        self.client.force_login(staff_user)
+        response = self.client.get(reverse("admin:auth_group_history", args=(group.pk,)))
+        self.assertEqual(response.status_code, 403)
+
+    def test_recent_actions_of_staff_users_show_no_other_actor(self):
+        model_admin = admin.site._registry[User]
+        request = RequestFactory().post("/")
+        request.user = self.administrator
+        model_admin.log_change(request, self.member, "")
+        self.client.force_login(self.create_staff_user(("accounts", "view_user")))
+        response = self.client.get(reverse("admin:index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.administrator.email)
+        self.assertNotContains(response, f"Konto mit interner Nummer {self.member.pk}")

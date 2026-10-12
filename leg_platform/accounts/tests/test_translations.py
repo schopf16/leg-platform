@@ -13,9 +13,10 @@ import django.contrib.auth
 import django_countries
 import phonenumber_field
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase, tag
+from django.test import RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import translation
 from django_countries import countries
@@ -157,6 +158,16 @@ class ProjectCatalogueTests(SimpleTestCase):
     def test_no_translation_contains_sharp_s(self):
         self.assertEqual([msgid for msgid, msgstr in self.catalogue.items() if SHARP_S in msgstr], [])
 
+    def test_translations_keep_every_placeholder(self):
+        # GNU msgfmt --check (CI) rejects a translation that omits or adds a placeholder.
+        placeholder = re.compile(r"%(?:\((\w+)\))?[#0\- +]*\d*(?:\.\d+)?([diouxXeEfFgGcrsa])")
+        mismatched = [
+            msgid
+            for msgid, msgstr in self.catalogue.items()
+            if sorted(placeholder.findall(msgid)) != sorted(placeholder.findall(msgstr))
+        ]
+        self.assertEqual(mismatched, [])
+
     def test_every_entry_is_translated(self):
         self.assertEqual([msgid for msgid, msgstr in self.catalogue.items() if not msgstr], [])
 
@@ -294,3 +305,39 @@ class AdminPageTranslationTests(TestCase):
         self.assertIn("column-customer_number_column", rendered["user list"])
         self.assertIn("Gruppe zur Änderung auswählen", rendered["group list"])
         self.assertIn("Berechtigungen", rendered["group form"])
+
+
+
+class ChangeMessageLabelTests(SimpleTestCase):
+    """Labels stored in admin change messages are shown in Swiss German (D-036).
+
+    Django stores the English form label of each changed field and translates it with gettext
+    when the history is shown (LogEntry.get_change_message()).
+    """
+
+    class SystemAdministrator:
+        is_active = True
+        is_staff = True
+        is_superuser = True
+        pk = -1
+
+        def has_perm(self, perm, obj=None):
+            return True
+
+    def test_every_editable_label_is_translated(self):
+        request = RequestFactory().get("/")
+        request.user = self.SystemAdministrator()
+        untranslated = []
+        for model, obj in ((User, User(pk=1)), (Group, Group(pk=1))):
+            form = admin.site._registry[model].get_form(request, obj, change=True)
+            with translation.override(None):
+                labels = [str(field.label or name) for name, field in form.base_fields.items()]
+            with translation.override("de-ch"):
+                for label in labels:
+                    german = translation.gettext(label)
+                    if german == label and label != "Name":
+                        untranslated.append(label)
+                    self.assertNotIn(SHARP_S, german)
+        self.assertEqual(untranslated, [])
+        with translation.override("de-ch"):
+            self.assertEqual(translation.gettext("First name"), "Vorname")

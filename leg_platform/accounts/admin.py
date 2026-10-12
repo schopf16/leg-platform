@@ -200,6 +200,15 @@ class UserAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def history_view(self, request, object_id, extra_context=None):
+        # Only system administrators see the history of accounts: it names the acting account
+        # by its email address (project owner, 2026-10-12; security review finding N-1). 403
+        # as for the other system-administrator-only admin pages (RestrictedGroupAdmin); the
+        # check comes first, so the response does not reveal whether the account exists.
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        return super().history_view(request, object_id, extra_context)
+
     # Admin log entries (LogEntry) keep object_repr permanently, also after the account is
     # deleted. For accounts it is a neutral text with the internal number, never the customer
     # number (it appears on invoices), the email address or the name (D-018, D-036). These

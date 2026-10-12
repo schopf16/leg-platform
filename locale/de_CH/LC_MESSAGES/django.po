@@ -99,7 +99,7 @@ msgstr "E-Mail-Adresse"
 #. Overrides Django's generic unique message with plain wording that fits every field.
 #, python-format
 msgid "%(model_name)s with this %(field_label)s already exists."
-msgstr "Dieser Wert für «%(field_label)s» wird bereits verwendet."
+msgstr "%(model_name)s: Dieser Wert für «%(field_label)s» wird bereits verwendet."
 
 msgid "status"
 msgstr "Status"
@@ -209,6 +209,50 @@ msgstr "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."
 #, python-format
 msgid "Ensure this value is greater than or equal to %(limit_value)s."
 msgstr "Dieser Wert muss grösser oder gleich %(limit_value)s sein."
+
+#. Field labels as Django stores them in admin change messages (capitalised English form
+#. labels, translated only when the history is shown: LogEntry.get_change_message()).
+msgid "Salutation"
+msgstr "Anrede"
+
+msgid "First name"
+msgstr "Vorname"
+
+msgid "Last name"
+msgstr "Nachname"
+
+msgid "Company name"
+msgstr "Firmenname"
+
+msgid "Address addition"
+msgstr "Adresszusatz"
+
+msgid "Street"
+msgstr "Strasse"
+
+msgid "House number"
+msgstr "Hausnummer"
+
+msgid "Post office box"
+msgstr "Postfach"
+
+msgid "Town"
+msgstr "Ort"
+
+msgid "Access to administration"
+msgstr "Zugang zur Verwaltung"
+
+msgid "Superuser status"
+msgstr "Systemadministrator"
+
+msgid "Groups"
+msgstr "Gruppen"
+
+msgid "User permissions"
+msgstr "Berechtigungen"
+
+msgid "Name"
+msgstr "Name"
 
 #. Overrides Django's German texts for the fields of PermissionsMixin, so that the user form
 #. uses the project's terms ("system administrator", "account"; D-012, D-036).
