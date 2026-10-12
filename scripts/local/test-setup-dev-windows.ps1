@@ -410,6 +410,30 @@ try {
     Assert-Equal (Test-ServiceBelongsToMariaDb -Executable 'C:\tools\mysql\current\bin\mysqld.exe' -Entries @($mariaDbEntry)) $false 'Service: other program'
     Assert-Equal (Test-ServiceBelongsToMariaDb -Executable $null -Entries @($mariaDbEntry)) $false 'Service: unresolved program'
 
+    # Select-MariaDbUninstallEntries: the hidden MSI entry is a duplicate only next to a matching visible entry.
+    $mariaDbName = 'MariaDB 12.3 (x64)'
+    $mariaDbLocation = 'C:\Program Files\MariaDB 12.3\'
+    $visibleEntry = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $false }
+    $hiddenEntry = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $true }
+    $hiddenNoSlash = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = 'C:\Program Files\MariaDB 12.3'; Hidden = $true }
+    $hiddenElsewhere = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = 'D:\MariaDB 12.3\'; Hidden = $true }
+    $hiddenNoLocation = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = ''; Hidden = $true }
+    $hiddenOtherCase = [pscustomobject]@{ DisplayName = 'MariaDB 12.3 (X64)'; InstallLocation = $mariaDbLocation; Hidden = $true }
+    $selectedEntries = @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenEntry))
+    Assert-Equal $selectedEntries.Count 1 'Uninstall entries: hidden duplicate of a visible entry skipped'
+    Assert-Equal (($selectedEntries | ForEach-Object { "$($_.DisplayName)|$($_.InstallLocation)|$(@($_.PSObject.Properties).Count)" }) -join ';') "$mariaDbName|$mariaDbLocation|2" 'Uninstall entries: visible entry returned with DisplayName and InstallLocation only'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($hiddenNoSlash, $visibleEntry)).Count 1 'Uninstall entries: trailing separator ignored'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenElsewhere)).Count 2 'Uninstall entries: hidden entry at another location counted'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($hiddenEntry)).Count 1 'Uninstall entries: hidden entry alone counted'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $visibleEntry)).Count 2 'Uninstall entries: two visible entries counted'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenNoLocation)).Count 2 'Uninstall entries: hidden entry without location counted'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenOtherCase)).Count 2 'Uninstall entries: hidden entry with other name case counted'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @()).Count 0 'Uninstall entries: none'
+    $visibleNoLocation = [pscustomobject]@{ DisplayName = $mariaDbName; InstallLocation = ''; Hidden = $false }
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleNoLocation, $hiddenEntry)).Count 2 'Uninstall entries: visible entry without location matches nothing'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenEntry, $hiddenNoSlash)).Count 2 'Uninstall entries: one visible entry absorbs only one hidden entry'
+    Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($hiddenEntry, $visibleEntry, $visibleEntry, $hiddenEntry)).Count 2 'Uninstall entries: two installations with two entries each'
+
     # Earlier MySQL installation: ownership of the service and manual removal commands
     $toolsRoot = Join-Path $root 'tools'
     $ownIni = Join-Path $toolsRoot 'mysql\current\my.ini'

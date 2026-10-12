@@ -781,6 +781,33 @@ function Get-TrustedInstallerSid {
 function Get-MariaDbUninstallEntries {
     # Installed MariaDB server products (DisplayName matching $MariaDbProductPattern) from the uninstall registry keys of
     # both registry views, with their InstallLocation.
+    return @(Select-MariaDbUninstallEntries -Entries @(Get-MariaDbUninstallRegistryEntries))
+}
+
+function Select-MariaDbUninstallEntries {
+    # Besides one visible entry per product name, the MSI writes a hidden ProductCode entry (ARPSYSTEMCOMPONENT=1,
+    # win/packaging/extra.wxs.in, branch 12.3); it is skipped only if a visible entry has the same name and location.
+    param([object[]]$Entries)
+    $visible = @($Entries | Where-Object { -not $_.Hidden })
+    # Each visible entry explains at most one hidden entry.
+    $absorbed = @{}
+    $selected = @()
+    foreach ($entry in $Entries) {
+        if ($entry.Hidden -and $entry.InstallLocation) {
+            $match = $null
+            for ($i = 0; $i -lt $visible.Count; $i++) {
+                if (-not $absorbed.ContainsKey($i) -and $visible[$i].DisplayName -ceq $entry.DisplayName -and
+                    (Test-IsSamePath -First $visible[$i].InstallLocation -Second $entry.InstallLocation)) { $match = $i; break }
+            }
+            if ($null -ne $match) { $absorbed[$match] = $true; continue }
+        }
+        $selected += [pscustomobject]@{ DisplayName = $entry.DisplayName; InstallLocation = $entry.InstallLocation }
+    }
+    return $selected
+}
+
+function Get-MariaDbUninstallRegistryEntries {
+    # Raw uninstall entries of MariaDB server products with DisplayName, InstallLocation and Hidden (SystemComponent 1).
     $roots = @(
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
         'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
@@ -793,10 +820,12 @@ function Get-MariaDbUninstallEntries {
             if (-not $properties) { continue }
             $displayName = $properties.PSObject.Properties['DisplayName']
             if (-not $displayName -or "$($displayName.Value)" -cnotmatch $MariaDbProductPattern) { continue }
+            $systemComponent = $properties.PSObject.Properties['SystemComponent']
             $location = $properties.PSObject.Properties['InstallLocation']
             $entries += [pscustomobject]@{
                 DisplayName     = "$($displayName.Value)"
                 InstallLocation = $(if ($location) { "$($location.Value)" } else { '' })
+                Hidden          = [bool]($systemComponent -and "$($systemComponent.Value)" -eq '1')
             }
         }
     }
