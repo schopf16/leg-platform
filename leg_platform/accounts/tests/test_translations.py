@@ -279,9 +279,11 @@ class AdminPageTranslationTests(TestCase):
             "Systemadministrator",
             "Die Gruppen, zu denen dieses Konto gehört.",
             "Berechtigungen, die diesem Konto direkt zugewiesen sind.",
-            "- Bitte auswählen -",
         ):
             self.assertIn(text, rendered["user form"])
+        if django.VERSION >= (6, 1):
+            # Empty choice label introduced in Django 6.1; Django 6.0 renders "---------".
+            self.assertIn("- Bitte auswählen -", rendered["user form"])
         for text in ("Administrator-Status", "Mitarbeiter", "Benutzer", "Select an option"):
             self.assertNotIn(text, rendered["user form"])
         # eCH-0010 fields that are kept but not shown (D-036).
