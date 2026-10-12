@@ -105,7 +105,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
             "SECURE_HSTS_INCLUDE_SUBDOMAINS": False,
             "SECURE_HSTS_PRELOAD": False,
             "SECURE_PROXY_SSL_HEADER": None,
-            "SILENCED_SYSTEM_CHECKS": ["security.W005", "security.W021"],
+            "SILENCED_SYSTEM_CHECKS": ["security.W005", "security.W021", "axes.W006"],
             "ALLOWED_HOSTS": ["portal.example.org"],
             "SECURE_CSP": {
                 "default-src": ["'self'"],
@@ -126,7 +126,7 @@ class ProductionSettingsModuleTests(SimpleTestCase):
     def test_include_subdomains_unsilences_w005(self):
         values = run_settings_in_child(DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS="True")
         self.assertIs(values["SECURE_HSTS_INCLUDE_SUBDOMAINS"], True)
-        self.assertEqual(values["SILENCED_SYSTEM_CHECKS"], ["security.W021"])
+        self.assertEqual(values["SILENCED_SYSTEM_CHECKS"], ["security.W021", "axes.W006"])
 
     def test_missing_email_mode_refuses_start(self):
         with self.assertRaisesMessage(AssertionError, "EMAIL_MODE"):

@@ -270,6 +270,27 @@ class EmailModeTests(SimpleTestCase):
                         with self.assertRaises(ImproperlyConfigured):
                             load_environment(env)
 
+
+class AxesProxyCountTests(SimpleTestCase):
+    def test_defaults_to_no_trusted_proxies(self):
+        self.assertEqual(load_environment(make_env()).axes_ipware_proxy_count, 0)
+
+    def test_accepts_non_negative_ascii_integer(self):
+        for value in ("0", "1", "2"):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    load_environment(make_env(AXES_IPWARE_PROXY_COUNT=value)).axes_ipware_proxy_count,
+                    int(value),
+                )
+
+    def test_rejects_invalid_proxy_counts(self):
+        for value in ("-1", "+1", "1.5", "one", "\u00b2"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(
+                    ImproperlyConfigured, "AXES_IPWARE_PROXY_COUNT"
+                ):
+                    load_environment(make_env(AXES_IPWARE_PROXY_COUNT=value))
+
     def test_allowed_recipients_are_normalised(self):
         for app_env in ("local", "stage"):
             with self.subTest(app_env=app_env):

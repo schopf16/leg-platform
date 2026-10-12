@@ -14,6 +14,7 @@ Licences as declared in the package metadata (`License-Expression`, `License` or
 | ------- | ------- | -------- |
 | Django | BSD-3-Clause | Web framework |
 | django-axes | MIT | Login abuse protection (D-017) |
+| django-ipware | MIT | Trusted-proxy-aware client IP resolution for login abuse protection (D-017) |
 | django-otp | Unlicense | Two-factor authentication (D-004) |
 | cryptography | Apache-2.0 OR BSD-3-Clause | Encryption of the Microsoft Graph client secret, keyed hashes (D-006, D-023) |
 | mysqlclient | GPL-2.0-or-later | Database driver of Django's MySQL backend, used for MariaDB (D-030); see the note on MariaDB Connector/C below |
@@ -39,6 +40,7 @@ Transitive dependencies:
 | cffi | MIT-0 | cryptography |
 | pycparser | BSD-3-Clause | cffi |
 | typing_extensions | PSF-2.0 | django-countries |
+| python-ipware | MIT | django-ipware |
 
 Notes:
 

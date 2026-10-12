@@ -789,3 +789,30 @@ class User(AbstractBaseUser, PermissionsMixin):
     def set_retention_obligation(self):
         """Set the retention obligation flag; it can never be unset (D-016)."""
         self._change(retention_obligation=True)
+
+
+class LoginIpBucket(models.Model):
+    """A pseudonymous lock row that serializes login attempts from one client IP."""
+
+    digest = models.CharField(
+        max_length=64,
+        primary_key=True,
+        db_collation=EXACT_COLLATION,
+        editable=False,
+    )
+
+
+class LoginIpAttempt(models.Model):
+    """A short-lived pending or failed login attempt for one pseudonymous IP bucket."""
+
+    bucket = models.ForeignKey(
+        LoginIpBucket,
+        on_delete=models.CASCADE,
+        related_name="attempts",
+        editable=False,
+    )
+    attempted_at = models.DateTimeField()
+    pending = models.BooleanField(default=True, editable=False)
+
+    class Meta:
+        indexes = [models.Index(fields=("bucket", "attempted_at"), name="accounts_lia_bucket_time")]

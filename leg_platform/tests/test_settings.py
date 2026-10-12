@@ -165,6 +165,26 @@ class ContentSecurityPolicyTests(SimpleTestCase):
         self.assertNotIn("javascript:", html)
 
 
+class LoginProtectionSettingsTests(SimpleTestCase):
+    def test_axes_uses_a_separate_normalised_account_bucket_and_ip_handler(self):
+        self.assertEqual(
+            settings.AUTHENTICATION_BACKENDS,
+            [
+                "axes.backends.AxesStandaloneBackend",
+                "leg_platform.accounts.backends.EmailModelBackend",
+            ],
+        )
+        self.assertEqual(
+            settings.AXES_HANDLER,
+            "leg_platform.accounts.axes_handler.LoginProtectionHandler",
+        )
+        self.assertEqual(settings.AXES_LOCKOUT_PARAMETERS, ["username"])
+        self.assertEqual(settings.AXES_FAILURE_LIMIT, 5)
+        self.assertEqual(settings.AXES_COOLOFF_TIME.total_seconds(), 900)
+        self.assertIn("axes.W006", settings.SILENCED_SYSTEM_CHECKS)
+        self.assertFalse(settings.AXES_ENABLE_ADMIN)
+
+
 class InternationalizationTests(SimpleTestCase):
     def test_language_and_time_zone(self):
         self.assertEqual(settings.LANGUAGE_CODE, "de-ch")

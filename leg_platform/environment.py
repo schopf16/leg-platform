@@ -70,6 +70,7 @@ class EnvironmentConfig:
     allowed_hosts: tuple[str, ...]
     csrf_trusted_origins: tuple[str, ...]
     secure_proxy_ssl_header: tuple[str, str] | None
+    axes_ipware_proxy_count: int
     hsts_seconds: int
     hsts_include_subdomains: bool
     email_mode: str
@@ -220,6 +221,23 @@ def parse_secure_proxy_ssl_header(env: Mapping[str, str]) -> tuple[str, str] | N
     return name, header_value
 
 
+def parse_axes_ipware_proxy_count(env: Mapping[str, str]) -> int:
+    """Return the trusted proxy count; zero trusts no forwarded client-IP headers."""
+    value = _get(env, "AXES_IPWARE_PROXY_COUNT")
+    if not value:
+        return 0
+    if not _is_ascii_number(value):
+        raise ImproperlyConfigured(
+            "AXES_IPWARE_PROXY_COUNT must be a non-negative ASCII integer."
+        )
+    try:
+        return int(value)
+    except ValueError:
+        raise ImproperlyConfigured(
+            "AXES_IPWARE_PROXY_COUNT must be a non-negative ASCII integer."
+        ) from None
+
+
 def parse_hsts_seconds(env: Mapping[str, str]) -> int:
     value = _get(env, "DJANGO_SECURE_HSTS_SECONDS")
     if not value:
@@ -312,6 +330,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         allowed_hosts=parse_allowed_hosts(env, app_env),
         csrf_trusted_origins=parse_csrf_trusted_origins(env, app_env),
         secure_proxy_ssl_header=parse_secure_proxy_ssl_header(env),
+        axes_ipware_proxy_count=parse_axes_ipware_proxy_count(env),
         hsts_seconds=parse_hsts_seconds(env),
         hsts_include_subdomains=parse_hsts_include_subdomains(env),
         email_mode=email_mode,

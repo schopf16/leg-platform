@@ -1,12 +1,16 @@
 """Tests of the user model that need no database (D-021, D-031, D-032, D-034)."""
 
+from unittest.mock import patch
+
 import phonenumbers
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.backends import ModelBackend
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
+from leg_platform.accounts.backends import EmailModelBackend
 from leg_platform.accounts.models import (
     EXACT_COLLATION,
     IssuedCustomerNumber,
@@ -14,6 +18,7 @@ from leg_platform.accounts.models import (
     format_customer_number,
 )
 from leg_platform.accounts.normalization import normalize_email_address
+from leg_platform.accounts.login_protection import axes_username, client_ip_digest
 
 
 def valid_profile(**overrides):
@@ -95,8 +100,17 @@ class UserModelConfigurationTests(SimpleTestCase):
         self.assertEqual(User.USERNAME_FIELD, "normalized_email")
         self.assertEqual(User.EMAIL_FIELD, "email")
         self.assertEqual(User.REQUIRED_FIELDS, ["email"])
+        self.assertEqual(
+            settings.AUTHENTICATION_BACKENDS,
+            [
+                "axes.backends.AxesStandaloneBackend",
+                "leg_platform.accounts.backends.EmailModelBackend",
+            ],
+        )
         field_names = {field.name for field in User._meta.get_fields()}
         self.assertNotIn("username", field_names)
+        self.assertIsInstance(EmailModelBackend(), ModelBackend)
+
 
     def test_identifier_columns_use_the_exact_collation(self):
         for model, name in (
@@ -137,6 +151,45 @@ class UserModelConfigurationTests(SimpleTestCase):
         self.assertIn("accounts.User", registered)
         self.assertNotIn("accounts.IssuedCustomerNumber", registered)
         self.assertEqual(registered, {"accounts.User", "auth.Group"})
+
+
+class AuthenticationBackendTests(SimpleTestCase):
+    def test_unknown_user_with_empty_password_returns_none(self):
+        with patch.object(
+            User._default_manager,
+            "get_by_natural_key",
+            side_effect=User.DoesNotExist,
+        ) as lookup:
+            result = EmailModelBackend().authenticate(
+                None,
+                username="unknown@example.org",
+                password="",
+            )
+
+        self.assertIsNone(result)
+        lookup.assert_called_once_with("unknown@example.org")
+
+
+class LoginProtectionIdentifierTests(SimpleTestCase):
+    def test_axes_username_is_normalised_and_not_stored_as_plaintext(self):
+        first = axes_username(None, {"username": " Person@Example.ORG "})
+        second = axes_username(None, {"username": "person@example.org"})
+
+        self.assertEqual(first, second)
+        self.assertNotIn("person@example.org", first)
+        self.assertRegex(first, r"\A[0-9a-f]{64}\Z")
+
+    def test_axes_username_rejects_unbounded_or_empty_values(self):
+        self.assertIsNone(axes_username(None, {"username": " "}))
+        self.assertIsNone(axes_username(None, {"username": "a" * 255}))
+
+    def test_client_ip_digest_canonicalises_ipv4_mapped_ipv6(self):
+        self.assertEqual(
+            client_ip_digest("::ffff:192.0.2.1"),
+            client_ip_digest("192.0.2.1"),
+        )
+        self.assertNotEqual(client_ip_digest("192.0.2.1"), client_ip_digest("192.0.2.2"))
+        self.assertIsNone(client_ip_digest("not-an-ip-address"))
 
 
 class ProfileValidationTests(SimpleTestCase):

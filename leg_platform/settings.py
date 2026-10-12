@@ -49,10 +49,37 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_countries",
     "phonenumber_field",
+    "axes",
 ]
 
 # Custom user model from the first migration (docs/DECISIONS.md, D-021).
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "leg_platform.accounts.backends.EmailModelBackend",
+]
+
+# Login abuse protection (docs/DECISIONS.md, D-017): independent normalised-email
+# locking in Axes and a separate IP counter ensure resetting one account preserves IP locks.
+from leg_platform.accounts.login_protection import LOGIN_COOLOFF, LOGIN_FAILURE_LIMIT
+
+AXES_COOLOFF_TIME = LOGIN_COOLOFF
+AXES_HANDLER = "leg_platform.accounts.axes_handler.LoginProtectionHandler"
+AXES_ENABLE_ADMIN = False
+AXES_DISABLE_ACCESS_LOG = True
+AXES_FAILURE_LIMIT = LOGIN_FAILURE_LIMIT
+AXES_CLIENT_IP_CALLABLE = "leg_platform.accounts.login_protection.axes_client_ip"
+AXES_IPWARE_META_PRECEDENCE_ORDER = ("HTTP_X_FORWARDED_FOR", "REMOTE_ADDR")
+AXES_IPWARE_PROXY_COUNT = ENVIRONMENT.axes_ipware_proxy_count
+AXES_HTTP_RESPONSE_CODE = 429
+AXES_LOCKOUT_PARAMETERS = ["username"]
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_RESET_ON_SUCCESS = False
+AXES_SENSITIVE_PARAMETERS = ["username", "ip_address", "otp_token", "otp_device"]
+AXES_USERNAME_CALLABLE = "leg_platform.accounts.login_protection.axes_username"
+AXES_USERNAME_FORM_FIELD = "username"
+AXES_USE_ATTEMPT_EXPIRATION = True
+AXES_VERBOSE = False
 
 # Phone numbers (D-034): numbers without an international prefix are read as Swiss numbers;
 # stored in E.164, the package's default, set explicitly so that it is visible.
@@ -70,6 +97,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "leg_platform.urls"
@@ -202,7 +230,10 @@ SECURE_CSP = {
 # HSTS preload is never set and includeSubDomains is left to the operator (D-028); the
 # corresponding deployment warnings are silenced (security.W005 only while includeSubDomains
 # is off), so that "check --deploy --fail-level WARNING" reports every other warning.
-SILENCED_SYSTEM_CHECKS = silenced_system_checks(ENVIRONMENT)
+# Axes' W006 assumes its own IP counter is enabled. This project deliberately keeps IP
+# failures in LoginIpAttempt so account resets cannot weaken IP lockouts; integration tests
+# exercise that independent counter and the trusted-proxy resolver.
+SILENCED_SYSTEM_CHECKS = [*silenced_system_checks(ENVIRONMENT), "axes.W006"]
 
 # Internationalization (D-010)
 
