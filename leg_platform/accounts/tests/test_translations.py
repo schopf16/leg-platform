@@ -13,8 +13,10 @@ import django.contrib.auth
 import django_countries
 import phonenumber_field
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, tag
+from django.urls import reverse
 from django.utils import translation
 from django_countries import countries
 from django_countries.fields import CountryField
@@ -89,7 +91,14 @@ def account_texts():
                     texts.add(str(validator.message))
         texts.add(str(IssuedCustomerNumber._meta.get_field("number").verbose_name))
         # String representations shown in the admin (User.__str__).
-        texts.update({"Account %(id)s", "New account"})
+        texts.update(
+            {
+                "Account %(id)s",
+                "New account",
+                "A system administrator must also be a staff user.",
+                "Only active accounts can receive staff privileges.",
+            }
+        )
         for profile in (
             User(country="", post_office_box_number=1),
             User(country="DE", swiss_postal_code=3000),
@@ -168,3 +177,60 @@ class PackageCatalogueTests(SimpleTestCase):
             names = [str(name) for _code, name in countries]
         self.assertGreater(len(names), 200)
         self.assertEqual([name for name in names if SHARP_S in name], [])
+
+
+@tag("mariadb")
+class AdminPageTranslationTests(TestCase):
+    def setUp(self):
+        self.administrator = User.objects.create_user(
+            "admin@example.org",
+            first_name="Anna",
+            last_name="Example",
+            street="Examplestrasse",
+            house_number="12a",
+            town="Bern",
+            swiss_postal_code=3000,
+        )
+        self.administrator.set_password("copper kettle hums beside quiet orchard")
+        with self.administrator._account_change("status"):
+            self.administrator.status = User.Status.ACTIVE
+            self.administrator.save()
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        self.member = User.objects.create_user(
+            "member@example.org",
+            first_name="Anna",
+            last_name="Example",
+            street="Examplestrasse",
+            house_number="12a",
+            town="Bern",
+            swiss_postal_code=3000,
+        )
+
+    def test_admin_login_user_and_group_pages_use_swiss_german_without_sharp_s(self):
+        with translation.override("de-ch"):
+            login_response = self.client.get(reverse("admin:login"))
+            self.assertEqual(login_response.status_code, 200)
+            login_content = login_response.content.decode()
+            self.assertNotIn(SHARP_S, login_content)
+            self.assertIn("Normalisierte E-Mail-Adresse", login_content)
+
+            self.client.force_login(self.administrator)
+            pages = {
+                "user list": reverse("admin:accounts_user_changelist"),
+                "user form": reverse("admin:accounts_user_change", args=(self.member.pk,)),
+                "group list": reverse("admin:auth_group_changelist"),
+                "group form": reverse("admin:auth_group_add"),
+            }
+            rendered = {}
+            for page_name, url in pages.items():
+                with self.subTest(page=page_name):
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    rendered[page_name] = response.content.decode()
+                    self.assertNotIn(SHARP_S, rendered[page_name])
+
+        self.assertIn("E-Mail-Adresse", rendered["user form"])
+        self.assertIn("Kundennummer", rendered["user form"])
+        self.assertIn("E-Mail-Adresse", rendered["user list"])
+        self.assertIn("Gruppe zur Änderung auswählen", rendered["group list"])
+        self.assertIn("Berechtigungen", rendered["group form"])

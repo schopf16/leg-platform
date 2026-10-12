@@ -132,13 +132,11 @@ class UserModelConfigurationTests(SimpleTestCase):
         self.assertEqual(settings.PHONENUMBER_DEFAULT_REGION, "CH")
         self.assertEqual(settings.PHONENUMBER_DB_FORMAT, "E164")
 
-    def test_user_model_is_not_registered_in_the_admin(self):
-        # The admin for accounts comes with the protection against self-promotion. Django's
-        # auth admin ignores the registration of the swapped auth.User.
+    def test_user_model_is_registered_with_issued_numbers_hidden(self):
         registered = {model._meta.label for model in admin.site._registry}
-        self.assertNotIn("accounts.User", registered)
+        self.assertIn("accounts.User", registered)
         self.assertNotIn("accounts.IssuedCustomerNumber", registered)
-        self.assertEqual(registered, {"auth.Group"})
+        self.assertEqual(registered, {"accounts.User", "auth.Group"})
 
 
 class ProfileValidationTests(SimpleTestCase):

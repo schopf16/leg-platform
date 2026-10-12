@@ -32,6 +32,12 @@ msgstr "Vergebene Kundennummern"
 msgid "Account %(id)s"
 msgstr "Konto %(id)s"
 
+msgid "A system administrator must also be a staff user."
+msgstr "Ein Systemadministrator muss auch ein Mitarbeitendenkonto sein."
+
+msgid "Only active accounts can receive staff privileges."
+msgstr "Nur aktive Konten dürfen Mitarbeitendenrechte erhalten."
+
 msgid "New account"
 msgstr "Neues Konto"
 

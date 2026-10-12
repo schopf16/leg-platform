@@ -750,6 +750,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Promote or demote the account (D-012); a system administrator is also a staff user."""
         self._change(is_staff=is_staff, is_superuser=is_superuser)
 
+    def set_access_relations(self, *, groups, user_permissions):
+        """Set group memberships and direct permissions through central account logic (D-012)."""
+        if self.pk is None:
+            raise AccountIntegrityError("Save the account before assigning access relations.")
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            self._locked_row(using)
+            self.groups.set(groups)
+            self.user_permissions.set(user_permissions)
+
     def change_email(self, email):
         """Replace the email address once the new address has been verified (D-016)."""
         email = str(email).strip() if email is not None else email
