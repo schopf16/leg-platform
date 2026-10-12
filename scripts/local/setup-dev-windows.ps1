@@ -152,7 +152,7 @@ $ServerGroupPattern = '^(mysqld|server|mariadb|mariadbd|client-server|galera|emb
 $ClientGroupPattern = '^(client|client-server|client-mariadb|mysql|mariadb-client)$'
 # Server options that decide where the server listens; removed from server groups before the
 # block of this script is appended. Prefixes skip-, enable-, disable- and loose- are handled.
-$ListenerOptionPattern = '^((skip|enable|disable)-)?(named-pipe|skip-networking|bind-address|port|socket|shared-memory)$'
+$ListenerOptionPattern = '^((skip|enable|disable)-)?(named-pipe|skip-networking|bind-address|port|socket|shared-memory|event-scheduler)$'
 
 # DisplayName of MariaDB server products in the uninstall registry key: the MSI product name
 # "MariaDB <major>.<minor>" (x86) or "MariaDB <major>.<minor> (<arch>)" (CPACK_WIX_PACKAGE_NAME
@@ -163,11 +163,12 @@ $MariaDbProductPattern = '^MariaDB [0-9]+\.[0-9]+( \([A-Za-z0-9]+\))?$'
 # Server variables checked after the switch to TCP and the restart, which also resets every
 # runtime change (SET GLOBAL) made during the phase without a root password (MariaDB has no
 # persisted system variables): bind_address|skip_networking|named_pipe|port|feedback plugin|
-# shared_memory|general_log|slow_query_log|log_output|general_log_file|slow_query_log_file.
+# shared_memory|general_log|slow_query_log|log_output|general_log_file|slow_query_log_file|
+# event_scheduler (default OFF; set to DISABLED in my.ini, which cannot be changed at runtime).
 # Defaults (MariaDB documentation, "Server System Variables"): general_log 0, slow_query_log 0,
 # log_output FILE, general_log_file host_name.log; shared_memory has no documented default and
 # must be off. Log files must be plain file names (in the data directory).
-$ServerCheckSql = "SELECT CONCAT(COALESCE(@@GLOBAL.bind_address, 'NULL'), '|', @@GLOBAL.skip_networking, '|', @@GLOBAL.named_pipe, '|', @@GLOBAL.port, '|', COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'), '|', @@GLOBAL.shared_memory, '|', @@GLOBAL.general_log, '|', @@GLOBAL.slow_query_log, '|', @@GLOBAL.log_output, '|', COALESCE(@@GLOBAL.general_log_file, ''), '|', COALESCE(@@GLOBAL.slow_query_log_file, ''));"
+$ServerCheckSql = "SELECT CONCAT(COALESCE(@@GLOBAL.bind_address, 'NULL'), '|', @@GLOBAL.skip_networking, '|', @@GLOBAL.named_pipe, '|', @@GLOBAL.port, '|', COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'), '|', @@GLOBAL.shared_memory, '|', @@GLOBAL.general_log, '|', @@GLOBAL.slow_query_log, '|', @@GLOBAL.log_output, '|', COALESCE(@@GLOBAL.general_log_file, ''), '|', COALESCE(@@GLOBAL.slow_query_log_file, ''), '|', @@GLOBAL.event_scheduler);"
 
 # Other client connections: every thread except the current one and background threads, which
 # MariaDB shows with COMMAND 'Daemon' (MariaDB documentation, "Information Schema PROCESSLIST
@@ -178,7 +179,8 @@ $OtherConnectionsSql = "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHER
 # line per problem. Expected state from the bootstrap SQL of the MariaDB sources (branch 12.3:
 # scripts/mariadb_system_tables.sql, mariadb_system_tables_data.sql, mariadb_test_db.sql,
 # sys_schema) after the hardening: system schemas only; no routines, events, triggers or views
-# outside sys and mysql; mysql.db, columns_priv, procs_priv, roles_mapping, plugin, func and
+# (only the bootstrap routines and views, $BootstrapObjects; no events or triggers at all);
+# mysql.db (only the application grants), columns_priv, procs_priv, roles_mapping, plugin, func and
 # servers empty (the Windows bootstrap installs no plugin: auth_root_socket is not set); tables_priv
 # only mariadb.sys@localhost with Select,Delete on mysql.global_priv; proxies_priv only the
 # root accounts kept; mariadb.sys locked; PUBLIC without global privileges; no account without
@@ -188,9 +190,11 @@ $OtherConnectionsSql = "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHER
 $AccountListSql = "SELECT CONCAT(User, '@', Host) FROM mysql.global_priv ORDER BY 1;"
 $HardeningProblemSql = @'
 SELECT CONCAT('account without password: ', User, '@', Host) FROM mysql.global_priv WHERE User NOT IN ('mariadb.sys', 'PUBLIC') AND COALESCE(JSON_VALUE(Priv, '$.authentication_string'), '') = '';
+SELECT CONCAT('unexpected authentication: ', User, '@', Host) FROM mysql.global_priv WHERE User NOT IN ('mariadb.sys', 'PUBLIC') AND (COALESCE(JSON_VALUE(Priv, '$.plugin'), '') <> 'mysql_native_password' OR JSON_EXISTS(Priv, '$.auth_or') = 1);
+SELECT 'root accounts have different passwords' FROM mysql.global_priv WHERE User = 'root' HAVING COUNT(DISTINCT JSON_VALUE(Priv, '$.authentication_string')) <> 1;
 SELECT 'mariadb.sys is not locked' FROM mysql.global_priv WHERE User = 'mariadb.sys' AND Host = 'localhost' AND COALESCE(JSON_VALUE(Priv, '$.account_locked'), 'false') <> 'true';
-SELECT 'PUBLIC has global privileges' FROM mysql.global_priv WHERE User = 'PUBLIC' AND COALESCE(JSON_VALUE(Priv, '$.access'), '0') <> '0';
-SELECT CONCAT('database grant: ', User, '@', Host, ' on ', Db) FROM mysql.db;
+SELECT CONCAT('global privileges: ', User, '@', Host) FROM mysql.global_priv WHERE User <> 'root' AND COALESCE(JSON_VALUE(Priv, '$.access'), '0') <> '0';
+SELECT CONCAT('database grant: ', User, '@', Host, ' on ', Db) FROM mysql.db WHERE NOT (User = 'leg_platform' AND Host = '127.0.0.1' AND Db IN ('leg\\_platform', 'test\\_leg\\_platform'));
 SELECT CONCAT('table grant: ', User, '@', Host, ' on ', Db, '.', Table_name) FROM mysql.tables_priv WHERE NOT (Host = 'localhost' AND User = 'mariadb.sys' AND Db = 'mysql' AND Table_name = 'global_priv' AND Table_priv = 'Select,Delete' AND Column_priv = '');
 SELECT CONCAT('column grant: ', User, '@', Host) FROM mysql.columns_priv;
 SELECT CONCAT('routine grant: ', User, '@', Host) FROM mysql.procs_priv;
@@ -199,15 +203,184 @@ SELECT CONCAT('proxy grant: ', User, '@', Host, ' for ', Proxied_user, '@', Prox
 SELECT CONCAT('installed plugin: ', name) FROM mysql.plugin;
 SELECT CONCAT('user-defined function: ', name) FROM mysql.func;
 SELECT CONCAT('federated server: ', Server_name) FROM mysql.servers;
-SELECT CONCAT('schema: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys');
-SELECT CONCAT('routine: ', ROUTINE_SCHEMA, '.', ROUTINE_NAME) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql');
-SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS WHERE EVENT_SCHEMA NOT IN ('sys', 'mysql');
-SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA NOT IN ('sys', 'mysql');
-SELECT CONCAT('view: ', TABLE_SCHEMA, '.', TABLE_NAME) FROM information_schema.VIEWS WHERE TABLE_SCHEMA NOT IN ('sys', 'mysql');
+SELECT CONCAT('schema: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform');
+SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS;
+SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS;
+SELECT CONCAT('event scheduler is ', @@GLOBAL.event_scheduler) FROM DUAL WHERE @@GLOBAL.event_scheduler NOT IN ('OFF', 'DISABLED');
 SELECT CONCAT('other client connection: ', ID, ' ', USER, '@', HOST) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon';
 SELECT 'general log is on' FROM DUAL WHERE @@GLOBAL.general_log <> 0;
 SELECT 'shared memory is on' FROM DUAL WHERE @@GLOBAL.shared_memory <> 0;
 '@
+
+# Stored routines and views of all schemas (schema:type:name:definer), compared with
+# $BootstrapObjects by Get-UnexpectedObjects.
+$StoredObjectSql = @'
+SELECT CONCAT(ROUTINE_SCHEMA, ':', ROUTINE_TYPE, ':', ROUTINE_NAME, ':', DEFINER) FROM information_schema.ROUTINES;
+SELECT CONCAT(TABLE_SCHEMA, ':VIEW:', TABLE_NAME, ':', DEFINER) FROM information_schema.VIEWS;
+'@
+
+# Routines and views that the Windows bootstrap of MariaDB 12.3.3 creates (schema:type:name),
+# all with the definer mariadb.sys@localhost: the view mysql.user
+# (scripts/mariadb_system_tables.sql) and the sys schema (the files listed in
+# scripts/sys_schema/CMakeLists.txt; its trigger files only drop triggers). Extracted from the
+# sources at the tag mariadb-12.3.3 on 2026-10-12. The bootstrap creates no events and no
+# triggers.
+$BootstrapObjectDefiner = 'mariadb.sys@localhost'
+$BootstrapObjects = @'
+mysql:VIEW:user
+sys:FUNCTION:extract_schema_from_file_name
+sys:FUNCTION:extract_table_from_file_name
+sys:FUNCTION:format_bytes
+sys:FUNCTION:format_path
+sys:FUNCTION:format_statement
+sys:FUNCTION:format_time
+sys:FUNCTION:list_add
+sys:FUNCTION:list_drop
+sys:FUNCTION:ps_is_account_enabled
+sys:FUNCTION:ps_is_consumer_enabled
+sys:FUNCTION:ps_is_instrument_default_enabled
+sys:FUNCTION:ps_is_instrument_default_timed
+sys:FUNCTION:ps_is_thread_instrumented
+sys:FUNCTION:ps_thread_account
+sys:FUNCTION:ps_thread_id
+sys:FUNCTION:ps_thread_stack
+sys:FUNCTION:ps_thread_trx_info
+sys:FUNCTION:quote_identifier
+sys:FUNCTION:sys_get_config
+sys:FUNCTION:version_major
+sys:FUNCTION:version_minor
+sys:FUNCTION:version_patch
+sys:PROCEDURE:create_synonym_db
+sys:PROCEDURE:diagnostics
+sys:PROCEDURE:execute_prepared_stmt
+sys:PROCEDURE:optimizer_switch_choice
+sys:PROCEDURE:optimizer_switch_off
+sys:PROCEDURE:optimizer_switch_on
+sys:PROCEDURE:ps_setup_disable_background_threads
+sys:PROCEDURE:ps_setup_disable_consumer
+sys:PROCEDURE:ps_setup_disable_instrument
+sys:PROCEDURE:ps_setup_disable_thread
+sys:PROCEDURE:ps_setup_enable_background_threads
+sys:PROCEDURE:ps_setup_enable_consumer
+sys:PROCEDURE:ps_setup_enable_instrument
+sys:PROCEDURE:ps_setup_enable_thread
+sys:PROCEDURE:ps_setup_reload_saved
+sys:PROCEDURE:ps_setup_reset_to_default
+sys:PROCEDURE:ps_setup_save
+sys:PROCEDURE:ps_setup_show_disabled
+sys:PROCEDURE:ps_setup_show_disabled_consumers
+sys:PROCEDURE:ps_setup_show_disabled_instruments
+sys:PROCEDURE:ps_setup_show_enabled
+sys:PROCEDURE:ps_setup_show_enabled_consumers
+sys:PROCEDURE:ps_setup_show_enabled_instruments
+sys:PROCEDURE:ps_statement_avg_latency_histogram
+sys:PROCEDURE:ps_trace_statement_digest
+sys:PROCEDURE:ps_trace_thread
+sys:PROCEDURE:ps_truncate_all_tables
+sys:PROCEDURE:statement_performance_analyzer
+sys:PROCEDURE:table_exists
+sys:VIEW:host_summary
+sys:VIEW:host_summary_by_file_io
+sys:VIEW:host_summary_by_file_io_type
+sys:VIEW:host_summary_by_stages
+sys:VIEW:host_summary_by_statement_latency
+sys:VIEW:host_summary_by_statement_type
+sys:VIEW:innodb_buffer_stats_by_schema
+sys:VIEW:innodb_buffer_stats_by_table
+sys:VIEW:innodb_lock_waits
+sys:VIEW:io_by_thread_by_latency
+sys:VIEW:io_global_by_file_by_bytes
+sys:VIEW:io_global_by_file_by_latency
+sys:VIEW:io_global_by_wait_by_bytes
+sys:VIEW:io_global_by_wait_by_latency
+sys:VIEW:latest_file_io
+sys:VIEW:memory_by_host_by_current_bytes
+sys:VIEW:memory_by_thread_by_current_bytes
+sys:VIEW:memory_by_user_by_current_bytes
+sys:VIEW:memory_global_by_current_bytes
+sys:VIEW:memory_global_total
+sys:VIEW:metrics
+sys:VIEW:privileges_by_table_by_level
+sys:VIEW:processlist
+sys:VIEW:ps_check_lost_instrumentation
+sys:VIEW:schema_auto_increment_columns
+sys:VIEW:schema_index_statistics
+sys:VIEW:schema_object_overview
+sys:VIEW:schema_redundant_indexes
+sys:VIEW:schema_table_lock_waits
+sys:VIEW:schema_table_statistics
+sys:VIEW:schema_table_statistics_with_buffer
+sys:VIEW:schema_tables_with_full_table_scans
+sys:VIEW:schema_unused_indexes
+sys:VIEW:session
+sys:VIEW:session_ssl_status
+sys:VIEW:statement_analysis
+sys:VIEW:statements_with_errors_or_warnings
+sys:VIEW:statements_with_full_table_scans
+sys:VIEW:statements_with_runtimes_in_95th_percentile
+sys:VIEW:statements_with_sorting
+sys:VIEW:statements_with_temp_tables
+sys:VIEW:user_summary
+sys:VIEW:user_summary_by_file_io
+sys:VIEW:user_summary_by_file_io_type
+sys:VIEW:user_summary_by_stages
+sys:VIEW:user_summary_by_statement_latency
+sys:VIEW:user_summary_by_statement_type
+sys:VIEW:version
+sys:VIEW:wait_classes_global_by_avg_latency
+sys:VIEW:wait_classes_global_by_latency
+sys:VIEW:waits_by_host_by_latency
+sys:VIEW:waits_by_user_by_latency
+sys:VIEW:waits_global_by_latency
+sys:VIEW:x$host_summary
+sys:VIEW:x$host_summary_by_file_io
+sys:VIEW:x$host_summary_by_file_io_type
+sys:VIEW:x$host_summary_by_stages
+sys:VIEW:x$host_summary_by_statement_latency
+sys:VIEW:x$host_summary_by_statement_type
+sys:VIEW:x$innodb_buffer_stats_by_schema
+sys:VIEW:x$innodb_buffer_stats_by_table
+sys:VIEW:x$innodb_lock_waits
+sys:VIEW:x$io_by_thread_by_latency
+sys:VIEW:x$io_global_by_file_by_bytes
+sys:VIEW:x$io_global_by_file_by_latency
+sys:VIEW:x$io_global_by_wait_by_bytes
+sys:VIEW:x$io_global_by_wait_by_latency
+sys:VIEW:x$latest_file_io
+sys:VIEW:x$memory_by_host_by_current_bytes
+sys:VIEW:x$memory_by_thread_by_current_bytes
+sys:VIEW:x$memory_by_user_by_current_bytes
+sys:VIEW:x$memory_global_by_current_bytes
+sys:VIEW:x$memory_global_total
+sys:VIEW:x$processlist
+sys:VIEW:x$ps_digest_95th_percentile_by_avg_us
+sys:VIEW:x$ps_digest_avg_latency_distribution
+sys:VIEW:x$ps_schema_table_statistics_io
+sys:VIEW:x$schema_flattened_keys
+sys:VIEW:x$schema_index_statistics
+sys:VIEW:x$schema_table_lock_waits
+sys:VIEW:x$schema_table_statistics
+sys:VIEW:x$schema_table_statistics_with_buffer
+sys:VIEW:x$schema_tables_with_full_table_scans
+sys:VIEW:x$session
+sys:VIEW:x$statement_analysis
+sys:VIEW:x$statements_with_errors_or_warnings
+sys:VIEW:x$statements_with_full_table_scans
+sys:VIEW:x$statements_with_runtimes_in_95th_percentile
+sys:VIEW:x$statements_with_sorting
+sys:VIEW:x$statements_with_temp_tables
+sys:VIEW:x$user_summary
+sys:VIEW:x$user_summary_by_file_io
+sys:VIEW:x$user_summary_by_file_io_type
+sys:VIEW:x$user_summary_by_stages
+sys:VIEW:x$user_summary_by_statement_latency
+sys:VIEW:x$user_summary_by_statement_type
+sys:VIEW:x$wait_classes_global_by_avg_latency
+sys:VIEW:x$wait_classes_global_by_latency
+sys:VIEW:x$waits_by_host_by_latency
+sys:VIEW:x$waits_by_user_by_latency
+sys:VIEW:x$waits_global_by_latency
+'@ -split "`r?`n" | Where-Object { $_ }
 
 # The grants must be stored exactly with the escaped names; result "<matching>|<all>".
 $AppGrantCheckSql = "SELECT CONCAT(SUM(Db IN ('$($DatabaseName.Replace('_', '\\_'))', '$($TestDatabaseName.Replace('_', '\\_'))')), '|', COUNT(*)) FROM mysql.db WHERE User = '$AppUser';"
@@ -576,6 +749,7 @@ function Get-NetworkOptionFileText {
         'skip-networking=0',
         'named-pipe=OFF',
         'shared-memory=OFF',
+        'event-scheduler=DISABLED',
         ''
     )
     return ($kept -join $LineBreak)
@@ -1022,7 +1196,7 @@ function Get-ServerCheckProblems {
     # Checks the result line of $ServerCheckSql (field order documented there).
     param([string]$Line)
     $parts = "$Line".Trim().Split('|')
-    if ($parts.Count -ne 11) { return @("unexpected server check result '$Line'") }
+    if ($parts.Count -ne 12) { return @("unexpected server check result '$Line'") }
     $problems = @()
     if ($parts[0] -ne '127.0.0.1') { $problems += "bind_address is '$($parts[0])'" }
     if ($parts[1] -ne '0') { $problems += 'skip_networking is on' }
@@ -1033,6 +1207,7 @@ function Get-ServerCheckProblems {
     if ($parts[6] -ne '0') { $problems += 'general_log is on' }
     if ($parts[7] -ne '0') { $problems += 'slow_query_log is on' }
     if ($parts[8] -ne 'FILE') { $problems += "log_output is '$($parts[8])'" }
+    if ($parts[11] -ne 'DISABLED') { $problems += "event_scheduler is '$($parts[11])'" }
     foreach ($index in @(9, 10)) {
         if (-not $parts[$index] -or $parts[$index] -match '[\\/:]') { $problems += "log file '$($parts[$index])' is not a plain file name" }
     }
@@ -1040,10 +1215,64 @@ function Get-ServerCheckProblems {
 }
 
 function Get-UnexpectedAccounts {
-    # Returns the accounts (user@host, one per line) that are not reserved accounts.
-    param([string[]]$Lines)
+    # Returns the accounts (user@host, one per line) that are neither reserved accounts nor in
+    # $Additional.
+    param([string[]]$Lines, [string[]]$Additional = @())
+    $allowed = @($ReservedAccounts) + @($Additional)
     $accounts = @($Lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
-    return @($accounts | Where-Object { $_ -cnotin $ReservedAccounts })
+    return @($accounts | Where-Object { $_ -cnotin $allowed })
+}
+
+function Get-UnexpectedObjects {
+    # Returns the stored routines and views (lines schema:type:name:definer of $StoredObjectSql)
+    # that are not bootstrap objects with the bootstrap definer.
+    param([string[]]$Lines)
+    $problems = @()
+    foreach ($line in @($Lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ })) {
+        $index = $line.LastIndexOf(':')
+        $object = if ($index -gt 0) { $line.Substring(0, $index) } else { $line }
+        $definer = if ($index -gt 0) { $line.Substring($index + 1) } else { '' }
+        if ($object -cnotin $BootstrapObjects -or $definer -cne $BootstrapObjectDefiner) { $problems += "stored object: $line" }
+    }
+    return $problems
+}
+
+function Get-GrantProblems {
+    # Checks the output of SHOW GRANTS for the application account: one USAGE grant on *.* and
+    # exactly the privileges $AppPrivileges on each of the two databases, nothing else. The
+    # lines are never included in the result (the USAGE line contains the password hash).
+    # mariadb --batch escapes a backslash as \.
+    param([string[]]$Lines)
+    $expected = @($AppPrivileges.Split(',') | ForEach-Object { $_.Trim() } | Sort-Object)
+    $databases = @{}
+    $problems = @()
+    foreach ($raw in @($Lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ })) {
+        $line = $raw.Replace('\\', '\')
+        if ($line -cmatch '^GRANT USAGE ON \*\.\* TO ') { continue }
+        $match = [regex]::Match($line, '^GRANT (.+) ON `([^`]+)`\.\* TO `' + [regex]::Escape($AppUser) + '`@`127\.0\.0\.1`$')
+        if (-not $match.Success) { $problems += 'unexpected grant line'; continue }
+        $privileges = @($match.Groups[1].Value.Split(',') | ForEach-Object { $_.Trim() } | Sort-Object)
+        if (($privileges -join ',') -cne ($expected -join ',')) { $problems += "unexpected privileges on $($match.Groups[2].Value)" }
+        $databases[$match.Groups[2].Value] = $true
+    }
+    foreach ($database in @($DatabaseName, $TestDatabaseName)) {
+        if (-not $databases.ContainsKey($database.Replace('_', '\_'))) { $problems += "no grant on $database" }
+    }
+    if ($databases.Count -gt 2) { $problems += 'grants on other databases' }
+    return $problems
+}
+
+function Assert-ServerState {
+    # Runs the account allowlist, the stored-object allowlist and the hardening checks. Used
+    # over the named pipe after the hardening and again over TCP after the restart.
+    param([string]$Client, [string]$Protocol, [string]$Password, [string[]]$AdditionalAccounts = @())
+    $connection = @{ Client = $Client; Protocol = $Protocol; Password = $Password }
+    if ($Protocol -eq 'Pipe') { $connection.PipeName = $ServiceName }
+    $unexpected = @(Get-UnexpectedAccounts -Lines @(Invoke-MariaDb @connection -Sql $AccountListSql) -Additional $AdditionalAccounts)
+    if ($unexpected.Count -gt 0) { throw "Unexpected accounts: $($unexpected -join ', ')." }
+    $problems = @(Get-UnexpectedObjects -Lines @(Invoke-MariaDb @connection -Sql $StoredObjectSql))
+    $problems += @(Invoke-MariaDb @connection -Sql $HardeningProblemSql | Where-Object { "$_".Trim() })
+    if ($problems.Count -gt 0) { throw "Unexpected server state: $($problems -join '; ')." }
 }
 
 function Get-HardeningSql {
@@ -1471,7 +1700,7 @@ function Wait-WindowsInstallerIdle {
         Write-Host 'Waiting for Windows Installer to finish ...'
         Start-Sleep -Seconds 5
     }
-    Write-Warning 'Windows Installer is still busy. When it has finished, run as administrator: sc.exe stop MySQL; sc.exe config MySQL start= disabled'
+    Write-Warning "Windows Installer is still busy. When it has finished, run as administrator: sc.exe stop $ServiceName; sc.exe config $ServiceName start= disabled"
 }
 
 function Disable-ServerFirewallRules {
@@ -1481,17 +1710,18 @@ function Disable-ServerFirewallRules {
     # result is checked in the active store.
     param([string]$Server)
     $matching = {
-        param($Store)
-        @(Get-NetFirewallApplicationFilter -PolicyStore $Store -ErrorAction SilentlyContinue |
+        param($Store, $ErrorAction)
+        @(Get-NetFirewallApplicationFilter -PolicyStore $Store -ErrorAction $ErrorAction |
             Where-Object { $_.Program -and $_.Program -ne 'Any' -and (Test-IsSamePath -First ([Environment]::ExpandEnvironmentVariables("$($_.Program)")) -Second $Server) } |
-            Get-NetFirewallRule -ErrorAction SilentlyContinue |
+            Get-NetFirewallRule -ErrorAction $ErrorAction |
             Where-Object { "$($_.Direction)" -eq 'Inbound' -and "$($_.Action)" -eq 'Allow' -and "$($_.Enabled)" -eq 'True' })
     }
-    foreach ($rule in & $matching 'PersistentStore') {
+    foreach ($rule in & $matching 'PersistentStore' 'SilentlyContinue') {
         Disable-NetFirewallRule -Name $rule.Name -PolicyStore PersistentStore
         Write-Host "Disabled the inbound firewall rule '$($rule.DisplayName)' for $Server."
     }
-    $remaining = @(& $matching 'ActiveStore')
+    # The check of the active store fails closed if it cannot be read.
+    $remaining = @(& $matching 'ActiveStore' 'Stop')
     if ($remaining.Count -gt 0) { throw "Inbound firewall rules allow connections to ${Server}: $(($remaining | ForEach-Object { $_.DisplayName }) -join ', ')." }
 }
 
@@ -1704,10 +1934,7 @@ try {
     Wait-NoOtherConnections -Client $installation.Client
     Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Sql (Get-HardeningSql -Password $rootPassword)
     Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Password $rootPassword -Sql 'SELECT 1;' | Out-Null
-    $unexpected = @(Get-UnexpectedAccounts -Lines @(Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Password $rootPassword -Sql $AccountListSql))
-    if ($unexpected.Count -gt 0) { throw "Unexpected accounts: $($unexpected -join ', ')." }
-    $problems = @(Invoke-MariaDb -Client $installation.Client -Protocol Pipe -PipeName $ServiceName -Password $rootPassword -Sql $HardeningProblemSql | Where-Object { "$_".Trim() })
-    if ($problems.Count -gt 0) { throw "Hardening incomplete: $($problems -join '; ')." }
+    Assert-ServerState -Client $installation.Client -Protocol Pipe -Password $rootPassword
 
     # 4e. Database and application account
 
@@ -1732,6 +1959,14 @@ try {
     $problems = @(Get-ServerCheckProblems -Line $check)
     if ($problems.Count -gt 0) { throw "Unexpected server settings: $($problems -join '; ')." }
     Invoke-MariaDb -Client $installation.Client -Protocol Tcp -User $AppUser -Password $appPassword -Sql 'SELECT 1;' | Out-Null
+    # Again after the restart, over TCP as root@127.0.0.1 (which also tests that login): an
+    # event or other object created during the passwordless phase could have acted between the
+    # first checks and the restart.
+    Assert-ServerState -Client $installation.Client -Protocol Tcp -Password $rootPassword -AdditionalAccounts @("$AppUser@127.0.0.1")
+    $grantCheck = "$(@(Invoke-MariaDb -Client $installation.Client -Protocol Tcp -Password $rootPassword -Sql $AppGrantCheckSql) | Select-Object -Last 1)".Trim()
+    if ($grantCheck -ne '2|2') { throw "The grants of '$AppUser' are not exactly on $DatabaseName and $TestDatabaseName ($grantCheck)." }
+    $problems = @(Get-GrantProblems -Lines @(Invoke-MariaDb -Client $installation.Client -Protocol Tcp -Password $rootPassword -Sql "SHOW GRANTS FOR '$AppUser'@'127.0.0.1';"))
+    if ($problems.Count -gt 0) { throw "Unexpected grants of '$AppUser': $($problems -join '; ')." }
     Write-Host "MariaDB listens only on 127.0.0.1:$DatabasePort; the named pipe is disabled; the application account can log in."
 
     # 4g. Store the local configuration as user environment variables

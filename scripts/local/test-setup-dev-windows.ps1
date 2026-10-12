@@ -264,11 +264,12 @@ try {
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306), (New-Listener '127.0.0.1' 33060))) -join ';') 'listens on 127.0.0.1:33060' 'Listeners: other port'
     Assert-Equal @(Get-ListenerProblems -Listeners @() -ExpectNone).Count 0 'Listeners: none expected'
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306)) -ExpectNone) -join ';') 'listens on 127.0.0.1:3306' 'Listeners: TCP while networking is skipped'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log').Count 0 'Server check: expected values'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|0|0|0|FILE|mypc.log|mypc-slow.log').Count 0 'Server check: feedback plugin disabled'
-    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|1|1|1|TABLE|C:\x\g.log|/tmp/s.log') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is on;general_log is on;slow_query_log is on;log_output is 'TABLE';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: expected values'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|0|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: feedback plugin disabled'
+    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|1|1|1|TABLE|C:\x\g.log|/tmp/s.log|ON') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is on;general_log is on;slow_query_log is on;log_output is 'TABLE';event_scheduler is 'ON';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
+    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log|OFF') -join ';') "event_scheduler is 'OFF'" 'Server check: event scheduler must be DISABLED after the restart'
     Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE') -join ';') "unexpected server check result '127.0.0.1|0|0|3306|NONE'" 'Server check: malformed result'
-    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*@@GLOBAL.shared_memory*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*') $true 'Server check: query order matches the parser'
+    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*@@GLOBAL.shared_memory*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*@@GLOBAL.event_scheduler*') $true 'Server check: query order matches the parser'
     Assert-Equal ($OtherConnectionsSql -clike "*PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon'*") $true 'Other connections: background threads excluded'
 
     # SQL of the hardening and the application account
@@ -288,7 +289,7 @@ try {
     Assert-Equal ([regex]::Matches($hardening, "IDENTIFIED BY 'correct horse battery staple'").Count) 3 'Hardening SQL: password for the three root accounts'
     $hardeningLines = @($hardening -split "`r?`n" | Where-Object { $_ })
     Assert-Equal ([bool]($hardeningLines[1] -clike "IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000'*END IF //")) $true 'Hardening SQL: aborts first if another client is connected'
-    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.ROUTINES', 'information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.VIEWS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")) {
+    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform')")) {
         Assert-Equal $HardeningProblemSql.Contains($check) $true "Hardening check SQL: $check"
     }
     $appSql = Get-AppAccountSql -Password 'generated-secret'
@@ -315,6 +316,42 @@ try {
     Assert-Equal $fileSecurity.AreAccessRulesProtected $true 'Option file security: no inheritance'
     Assert-Equal (($fileSecurity.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidAdministrators, $SidSystem) | Sort-Object) -join ',') 'Option file security: Administrators and SYSTEM only'
     Assert-Equal $fileSecurity.GetOwner([Security.Principal.SecurityIdentifier]).Value $SidAdministrators 'Option file security: owner Administrators'
+
+    # Events, triggers, stored objects, authentication
+    $hardeningCheckLines = @($HardeningProblemSql -split "`r?`n")
+    Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS;")) $true 'Hardening check SQL: every event, no schema excluded'
+    Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS;")) $true 'Hardening check SQL: every trigger, no schema excluded'
+    Assert-Equal $HardeningProblemSql.Contains("@@GLOBAL.event_scheduler NOT IN ('OFF', 'DISABLED')") $true 'Hardening check SQL: event scheduler off'
+    Assert-Equal $HardeningProblemSql.Contains("JSON_EXISTS(Priv, '`$.auth_or') = 1") $true 'Hardening check SQL: no authentication chain'
+    Assert-Equal $HardeningProblemSql.Contains("<> 'mysql_native_password'") $true 'Hardening check SQL: expected plugin'
+    Assert-Equal $HardeningProblemSql.Contains("HAVING COUNT(DISTINCT JSON_VALUE(Priv, '`$.authentication_string')) <> 1") $true 'Hardening check SQL: same password for the three root accounts'
+    Assert-Equal $HardeningProblemSql.Contains("WHERE User <> 'root' AND COALESCE(JSON_VALUE(Priv, '`$.access'), '0') <> '0'") $true 'Hardening check SQL: no global privileges except root'
+    Assert-Equal $HardeningProblemSql.Contains("WHERE NOT (User = 'leg_platform' AND Host = '127.0.0.1' AND Db IN ('leg\\_platform', 'test\\_leg\\_platform'))") $true 'Hardening check SQL: only the application grants'
+    Assert-Equal ($HardeningProblemSql -match 'NOT IN \(''sys'', ''mysql''\)') $false 'Hardening check SQL: no schema exclusions'
+    Assert-Equal $StoredObjectSql.Contains('FROM information_schema.ROUTINES;') $true 'Stored objects: all routines'
+    Assert-Equal $StoredObjectSql.Contains('FROM information_schema.VIEWS;') $true 'Stored objects: all views'
+    Assert-Equal @($BootstrapObjects).Count 153 'Bootstrap objects: 153 (1 mysql view, 101 sys views, 29 procedures, 22 functions)'
+    Assert-Equal ([bool]($BootstrapObjects -ccontains 'mysql:VIEW:user')) $true 'Bootstrap objects: mysql.user'
+    Assert-Equal ([bool]($BootstrapObjects -ccontains 'sys:VIEW:x$host_summary')) $true 'Bootstrap objects: names with $'
+    Assert-Equal ([bool]($BootstrapObjects -ccontains 'sys:PROCEDURE:create_synonym_db')) $true 'Bootstrap objects: sys procedure'
+    Assert-Equal @(Get-UnexpectedObjects -Lines @('mysql:VIEW:user:mariadb.sys@localhost', 'sys:FUNCTION:format_bytes:mariadb.sys@localhost', '')).Count 0 'Stored objects: bootstrap objects accepted'
+    Assert-Equal ((Get-UnexpectedObjects -Lines @('sys:FUNCTION:format_bytes:root@localhost', 'mysql:PROCEDURE:backdoor:mariadb.sys@localhost', 'leg_platform:VIEW:v:root@localhost')) -join ';') 'stored object: sys:FUNCTION:format_bytes:root@localhost;stored object: mysql:PROCEDURE:backdoor:mariadb.sys@localhost;stored object: leg_platform:VIEW:v:root@localhost' 'Stored objects: other definer, unknown name or schema refused'
+    $grants = @(
+        "GRANT USAGE ON *.* TO ``leg_platform``@``127.0.0.1`` IDENTIFIED BY PASSWORD '*0000'",
+        'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON `leg\\_platform`.* TO `leg_platform`@`127.0.0.1`',
+        'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER ON `test\\_leg\\_platform`.* TO `leg_platform`@`127.0.0.1`'
+    )
+    Assert-Equal @(Get-GrantProblems -Lines $grants).Count 0 'Grants: exactly the application privileges (batch escaping)'
+    Assert-Equal @(Get-GrantProblems -Lines @($grants[0], $grants[1].Replace('\\', '\'), $grants[2].Replace('\\', '\'))).Count 0 'Grants: unescaped output'
+    Assert-Equal ((Get-GrantProblems -Lines @($grants[0], $grants[1].Replace('INDEX, ALTER', 'INDEX, ALTER, EXECUTE'), $grants[2])) -join ';') 'unexpected privileges on leg\_platform' 'Grants: additional privilege refused'
+    Assert-Equal ((Get-GrantProblems -Lines @($grants[0], $grants[1])) -join ';') 'no grant on test_leg_platform' 'Grants: missing database'
+    $problems = @(Get-GrantProblems -Lines ($grants + @('GRANT SELECT ON `mysql`.* TO `leg_platform`@`127.0.0.1`')))
+    Assert-Equal ([bool]($problems -contains 'unexpected privileges on mysql')) $true 'Grants: other database refused'
+    Assert-Equal ([bool](@(Get-GrantProblems -Lines ($grants + @('GRANT PROXY ON ''root''@''localhost'' TO ''leg_platform''@''127.0.0.1''')) ) -contains 'unexpected grant line')) $true 'Grants: other grant refused'
+    Assert-Equal ([bool](((Get-GrantProblems -Lines @("GRANT USAGE ON *.* TO x IDENTIFIED BY PASSWORD '*SECRETHASH'", 'GRANT ALL PRIVILEGES ON *.* TO `leg_platform`@`127.0.0.1`')) -join ';') -notmatch 'SECRETHASH')) $true 'Grants: password hash never reported'
+    Assert-Equal @(Get-UnexpectedAccounts -Lines @('root@localhost', 'leg_platform@127.0.0.1') -Additional @('leg_platform@127.0.0.1')).Count 0 'Accounts: application account allowed after its creation'
+    Assert-Equal ((Get-UnexpectedAccounts -Lines @('root@localhost', 'leg_platform@127.0.0.1')) -join ',') 'leg_platform@127.0.0.1' 'Accounts: application account refused before its creation'
+    Assert-Equal (Get-ServerOptionValue -Entries $switchedEntries -Key 'event-scheduler') 'DISABLED' 'Switched option file: event scheduler disabled'
 
     # Accounts
     Assert-Equal @(Get-UnexpectedAccounts -Lines @('PUBLIC@', 'mariadb.sys@localhost', 'root@127.0.0.1', 'root@::1', 'root@localhost', '')).Count 0 'Accounts: reserved accounts only'
