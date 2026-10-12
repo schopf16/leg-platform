@@ -246,6 +246,11 @@ class EmailUniquenessTests(TestCase):
         with self.assertRaises(ValidationError) as context:
             user.full_clean()
         self.assertEqual(set(context.exception.message_dict), {"normalized_email"})
+        with translation.override("en"):
+            self.assertEqual(
+                context.exception.message_dict["normalized_email"],
+                ["This email address is already in use."],
+            )
 
     def test_deactivated_accounts_release_the_address(self):
         first = create_active_user("person@example.org")
@@ -597,15 +602,26 @@ class DeletionTests(TestCase):
 
 @tag("mariadb")
 class StringRepresentationTests(TestCase):
-    def test_no_email_address(self):
+    def test_customer_number_and_no_personal_data(self):
+        with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915]):
+            user = create_active_user("person@example.org", first_name="Anna", last_name="Muster")
+        unverified = User.objects.create_user("other@example.org", first_name="Beat")
+        with translation.override("en"):
+            self.assertEqual(str(user), "Account 482 915")
+            self.assertEqual(str(unverified), "Unconfirmed account")
+        with translation.override("de-ch"):
+            self.assertEqual(str(user), "Konto 482 915")
+            self.assertEqual(str(unverified), "Nicht bestätigtes Konto")
+        for instance in (user, unverified):
+            for personal_data in ("example.org", "Anna", "Muster", "Beat"):
+                self.assertNotIn(personal_data, str(instance))
+
+    def test_no_query_for_a_loaded_account(self):
         with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915]):
             user = create_active_user("person@example.org")
-        unverified = User.objects.create_user("other@example.org")
-        with translation.override("en"):
-            self.assertEqual(str(user), f"Account {user.pk}")
-            self.assertEqual(str(unverified), f"Account {unverified.pk}")
-        for instance in (user, unverified):
-            self.assertNotIn("example.org", str(instance))
+        loaded = User.objects.get(pk=user.pk)
+        with self.assertNumQueries(0):
+            self.assertIn("482 915", str(loaded))
 
     def test_customer_number_is_not_in_its_string_representation(self):
         number = IssuedCustomerNumber.objects.issue()

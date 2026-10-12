@@ -21,6 +21,7 @@ from django.utils import translation
 from django_countries import countries
 from django_countries.fields import CountryField
 
+from leg_platform.accounts.admin import UserAdminForm
 from leg_platform.accounts.models import IssuedCustomerNumber, User
 
 SHARP_S = "\u00df"
@@ -90,17 +91,30 @@ def account_texts():
                 if "message" in vars(validator):
                     texts.add(str(validator.message))
         texts.add(str(IssuedCustomerNumber._meta.get_field("number").verbose_name))
-        # String representations shown in the admin (User.__str__).
+        # Help texts and unique messages of the account fields.
+        for field in User._meta.get_fields():
+            if field.name in DJANGO_FIELDS or not hasattr(field, "verbose_name"):
+                continue
+            if field.help_text:
+                texts.add(str(field.help_text))
+        texts.add(str(User._meta.get_field("normalized_email").error_messages["unique"]))
+        # String representations (User.__str__), admin titles and admin form messages.
         texts.update(
             {
-                "Account %(id)s",
-                "New account",
-                "A system administrator must also be a staff user.",
-                "Only active accounts can receive staff privileges.",
+                "Account %(customer_number)s",
+                "Unconfirmed account",
+                "Account with internal number %(number)s",
+                "internal number",
+                "LEG Platform",
+                "Administration",
+                "A system administrator also needs access to the administration.",
+                "Only active accounts can receive access to the administration.",
             }
         )
+        # The postal code field of the admin form (D-036).
+        texts.add(str(UserAdminForm.base_fields["postal_code"].label))
         for profile in (
-            User(country="", post_office_box_number=1),
+            User(country=""),
             User(country="DE", swiss_postal_code=3000),
             User(country="CH", foreign_postal_code="10115"),
             User(email="a@" + "b" * 260 + ".org"),
@@ -109,6 +123,7 @@ def account_texts():
                 profile.clean()
             except ValidationError as error:
                 texts.update(message for messages in error.message_dict.values() for message in messages)
+            texts.update(str(message) for message in profile.postal_code_errors().values())
     return texts
 
 
@@ -234,8 +249,48 @@ class AdminPageTranslationTests(TestCase):
                     self.assertNotIn(SHARP_S, rendered[page_name])
 
         self.assertIn("E-Mail-Adresse", rendered["user form"])
-        self.assertNotIn("Normalisiert", rendered["user form"])
         self.assertIn("Kundennummer", rendered["user form"])
         self.assertIn("E-Mail-Adresse", rendered["user list"])
+        self.assertIn("Kundennummer", rendered["user list"])
+        for page_name, content in rendered.items():
+            with self.subTest(page=page_name):
+                self.assertNotIn("Normalisiert", content)
+                self.assertNotIn("Django", content)
+                self.assertIn("LEG-Plattform", content)
+        self.assertNotIn("Django", login_content)
+        for text in (
+            "Firmenname",
+            "Adresszusatz",
+            "Zum Beispiel eine zweite Person oder c/o.",
+            "Postfach",
+            "Postleitzahl",
+            "Zugang zur Verwaltung",
+            "Systemadministrator",
+            "Die Gruppen, zu denen dieses Konto gehört.",
+            "Berechtigungen, die diesem Konto direkt zugewiesen sind.",
+            "- Bitte auswählen -",
+        ):
+            self.assertIn(text, rendered["user form"])
+        for text in ("Administrator-Status", "Mitarbeiter", "Benutzer", "Select an option"):
+            self.assertNotIn(text, rendered["user form"])
+        # eCH-0010 fields that are kept but not shown (D-036).
+        for text in (
+            "Titel",
+            "Namenszusatz",
+            "Adresszeile",
+            "Wohnungsnummer",
+            "Postfachtext",
+            "Ortschaft",
+            "Schweizer Postleitzahl",
+            "Ausländische Postleitzahl",
+        ):
+            self.assertNotIn(text, rendered["user form"])
+        self.assertIn("Konten durchsuchen", rendered["user list"])
+        self.assertIn("Seitennavigation Konten", rendered["user list"])
+        self.assertNotIn("Search ", rendered["user list"])
+        self.assertNotIn("Pagination ", rendered["user list"])
+        # The "ID" column was replaced by the customer number (D-036).
+        self.assertNotIn('class="column-id', rendered["user list"])
+        self.assertIn("column-customer_number_column", rendered["user list"])
         self.assertIn("Gruppe zur Änderung auswählen", rendered["group list"])
         self.assertIn("Berechtigungen", rendered["group form"])

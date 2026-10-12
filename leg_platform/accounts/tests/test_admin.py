@@ -1,17 +1,20 @@
 """Admin authorization tests (AGENTS.md, section 6; docs/SECURITY.md, section 4)."""
 
 from django.contrib import admin
+from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
+from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase, tag
 from django.urls import reverse
+from django.utils import translation
 
 from leg_platform.accounts.models import User
 
 PASSWORD = "copper kettle hums beside quiet orchard"
 
 
-def create_active_user(email):
+def create_active_user(email, customer_number=True):
     user = User.objects.create_user(
         email,
         first_name="Anna",
@@ -25,6 +28,8 @@ def create_active_user(email):
     with user._account_change("status"):
         user.status = User.Status.ACTIVE
         user.save()
+    if customer_number:
+        user.assign_customer_number()
     return user
 
 
@@ -95,7 +100,7 @@ class AdminAuthorizationTests(TestCase):
                 "town": "Bern",
                 "street": "Examplestrasse",
                 "house_number": "12a",
-                "swiss_postal_code": "3000",
+                "postal_code": "3000",
                 "country": "CH",
                 "is_staff": "on",
             },
@@ -120,7 +125,7 @@ class AdminAuthorizationTests(TestCase):
                 "town": "Bern",
                 "street": "Examplestrasse",
                 "house_number": "12a",
-                "swiss_postal_code": "3000",
+                "postal_code": "3000",
                 "country": "CH",
                 "groups": [str(group.pk)],
                 "user_permissions": [str(permission.pk)],
@@ -145,7 +150,7 @@ class AdminAuthorizationTests(TestCase):
                 "town": "Bern",
                 "street": "Examplestrasse",
                 "house_number": "12a",
-                "swiss_postal_code": "3000",
+                "postal_code": "3000",
                 "country": "CH",
                 "groups": [str(group.pk)],
                 "user_permissions": [str(permission.pk)],
@@ -175,7 +180,7 @@ class AdminAuthorizationTests(TestCase):
                 "town": "Bern",
                 "street": "Examplestrasse",
                 "house_number": "12a",
-                "swiss_postal_code": "3000",
+                "postal_code": "3000",
                 "country": "CH",
                 "groups": [str(group.pk)],
                 "user_permissions": [str(permission.pk)],
@@ -219,3 +224,402 @@ class AdminAuthorizationTests(TestCase):
         account.refresh_from_db()
         self.assertTrue(account.is_staff)
         self.assertEqual(account.first_name, "Anna")
+
+
+@tag("mariadb")
+class AdminPresentationTests(TestCase):
+    """Titles, list columns, search and messages of the account admin (D-036)."""
+
+    def setUp(self):
+        self.administrator = create_active_user("admin@example.org")
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        self.member = create_active_user("member@example.org")
+        self.pending = User.objects.create_user("pending@example.org")
+
+    def test_site_titles_do_not_name_django(self):
+        with translation.override("en"):
+            self.assertEqual(str(admin.site.site_header), "LEG Platform")
+            self.assertEqual(str(admin.site.index_title), "Administration")
+        with translation.override("de-ch"):
+            self.assertEqual(str(admin.site.site_header), "LEG-Plattform")
+            self.assertEqual(str(admin.site.site_title), "LEG-Plattform")
+            self.assertEqual(str(admin.site.index_title), "Verwaltung")
+            content = self.client.get(reverse("admin:login")).content.decode()
+            self.assertIn("<title>Anmelden | LEG-Plattform</title>", content)
+            self.client.force_login(self.administrator)
+            content = self.client.get(reverse("admin:index")).content.decode()
+        self.assertNotIn("Django", content)
+        self.assertIn("Verwaltung", content)
+
+    def test_user_list_shows_the_customer_number_instead_of_the_id(self):
+        model_admin = admin.site._registry[User]
+        self.assertNotIn("id", model_admin.list_display)
+        self.assertEqual(model_admin.list_display[0], "customer_number_column")
+        self.client.force_login(self.administrator)
+        with translation.override("de-ch"):
+            response = self.client.get(reverse("admin:accounts_user_changelist"))
+        content = response.content.decode()
+        self.assertIn(self.member.customer_number_display, content)
+        self.assertIn("Kundennummer", content)
+        self.assertNotIn('class="column-id', content)
+
+    def test_user_list_sorts_by_customer_number(self):
+        self.client.force_login(self.administrator)
+        # "o" is the index of the column in list_display (no action column: no bulk actions).
+        for order, descending in (("0", False), ("-0", True)):
+            with self.subTest(order=order):
+                response = self.client.get(
+                    reverse("admin:accounts_user_changelist"), {"o": order}
+                )
+                self.assertEqual(response.status_code, 200)
+                numbers = [
+                    user.customer_number_id
+                    for user in response.context["cl"].result_list
+                    if user.customer_number_id
+                ]
+                self.assertEqual(len(numbers), 2)
+                self.assertEqual(numbers, sorted(numbers, reverse=descending))
+
+    def test_search_by_customer_number(self):
+        self.client.force_login(self.administrator)
+        url = reverse("admin:accounts_user_changelist")
+        for query in (self.member.customer_number_id, self.member.customer_number_display):
+            with self.subTest(query=query):
+                response = self.client.get(url, {"q": query})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(self.member, response.context["cl"].result_list)
+
+    def test_staff_search_by_customer_number_does_not_find_staff_accounts(self):
+        staff_user = create_active_user("staff@example.org")
+        staff_user.set_privileges(is_staff=True, is_superuser=False)
+        staff_user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="accounts", codename="view_user")
+        )
+        self.client.force_login(staff_user)
+        response = self.client.get(
+            reverse("admin:accounts_user_changelist"),
+            {"q": self.administrator.customer_number_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["cl"].result_list), [])
+
+    def test_change_form_shows_the_customer_number(self):
+        self.client.force_login(self.administrator)
+        with translation.override("de-ch"):
+            response = self.client.get(
+                reverse("admin:accounts_user_change", args=(self.member.pk,))
+            )
+        content = response.content.decode()
+        self.assertIn(self.member.customer_number_display, content)
+        self.assertIn(f"Konto {self.member.customer_number_display}", content)
+        for hidden in ("Titel", "Namenszusatz", "Wohnungsnummer", "Ortschaft", "Postfachtext",
+                       "Adresszeile", "Schweizer Postleitzahl", "Ausländische Postleitzahl",
+                       "Normalisiert", "Django"):
+            self.assertNotIn(hidden, content)
+
+    def test_privilege_messages_use_the_administration_wording(self):
+        self.client.force_login(self.administrator)
+        data = {
+            "first_name": "Anna",
+            "last_name": "Example",
+            "town": "Bern",
+            "street": "Examplestrasse",
+            "postal_code": "3000",
+            "country": "CH",
+        }
+        with translation.override("de-ch"):
+            response = self.client.post(
+                reverse("admin:accounts_user_change", args=(self.member.pk,)),
+                {**data, "is_superuser": "on"},
+            )
+            self.assertContains(
+                response, "Ein Systemadministrator braucht auch Zugang zur Verwaltung."
+            )
+            response = self.client.post(
+                reverse("admin:accounts_user_change", args=(self.pending.pk,)),
+                {**data, "is_staff": "on"},
+            )
+            self.assertContains(
+                response, "Nur aktive Konten können Zugang zur Verwaltung erhalten."
+            )
+        self.member.refresh_from_db()
+        self.pending.refresh_from_db()
+        self.assertFalse(self.member.is_staff or self.member.is_superuser)
+        self.assertFalse(self.pending.is_staff)
+
+    def test_profile_messages_in_the_change_form(self):
+        self.client.force_login(self.administrator)
+        with translation.override("de-ch"):
+            response = self.client.post(
+                reverse("admin:accounts_user_change", args=(self.member.pk,)),
+                {"first_name": "Anna", "last_name": "Example", "town": "Bern",
+                 "street": "", "postal_code": "300", "country": "CH"},
+            )
+        self.assertContains(response, "Geben Sie eine Strasse oder ein Postfach ein.")
+        self.assertContains(
+            response, "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."
+        )
+
+    def test_duplicate_group_name_message_is_plain(self):
+        Group.objects.create(name="Example group")
+        self.client.force_login(self.administrator)
+        with translation.override("de-ch"):
+            response = self.client.post(reverse("admin:auth_group_add"), {"name": "Example group"})
+        self.assertContains(response, "Dieser Wert für «Name» wird bereits verwendet.")
+
+
+HIDDEN_FIELDS = {
+    "title",
+    "organisation_name_add_on_1",
+    "organisation_name_add_on_2",
+    "address_line_2",
+    "dwelling_number",
+    "post_office_box_text",
+    "locality",
+    "swiss_postal_code",
+    "foreign_postal_code",
+}
+
+
+@tag("mariadb")
+class AdminPostalCodeTests(TestCase):
+    """One postal code form field instead of the two eCH-0010 fields (D-036)."""
+
+    def setUp(self):
+        self.administrator = create_active_user("admin@example.org")
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        self.member = create_active_user("member@example.org")
+        self.url = reverse("admin:accounts_user_change", args=(self.member.pk,))
+        self.client.force_login(self.administrator)
+
+    def post(self, country, postal_code):
+        return self.client.post(
+            self.url,
+            {
+                "first_name": "Anna",
+                "last_name": "Example",
+                "town": "Bern",
+                "street": "Examplestrasse",
+                "country": country,
+                "postal_code": postal_code,
+            },
+        )
+
+    def stored(self):
+        self.member.refresh_from_db()
+        return self.member.swiss_postal_code, self.member.foreign_postal_code
+
+    def test_hidden_fields_are_not_in_the_form(self):
+        model_admin = admin.site._registry[User]
+        request = RequestFactory().get("/admin/accounts/user/")
+        request.user = self.administrator
+        form = model_admin.get_form(request, self.member)
+        self.assertEqual(HIDDEN_FIELDS & set(form.base_fields), set())
+        self.assertIn("postal_code", form.base_fields)
+        shown = set(flatten_fieldsets(model_admin.get_fieldsets(request, self.member)))
+        self.assertEqual(HIDDEN_FIELDS & shown, set())
+
+    def test_saving_the_form_keeps_hidden_values(self):
+        hidden_values = {
+            "title": "Dr.",
+            "organisation_name_add_on_1": "Add-on 1",
+            "organisation_name_add_on_2": "Add-on 2",
+            "address_line_2": "Second line",
+            "dwelling_number": "5",
+            "post_office_box_text": "Postfach",
+            "locality": "Example locality",
+        }
+        for name, value in hidden_values.items():
+            setattr(self.member, name, value)
+        self.member.save()
+        self.assertEqual(self.post("CH", "3063").status_code, 302)
+        self.member.refresh_from_db()
+        for name, value in hidden_values.items():
+            with self.subTest(field=name):
+                self.assertEqual(getattr(self.member, name), value)
+        self.assertEqual(self.member.swiss_postal_code, 3063)
+
+    def test_initial_value_comes_from_the_stored_postal_code(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["adminform"].form["postal_code"].value(), "3000")
+        self.post("DE", "10115")
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["adminform"].form["postal_code"].value(), "10115")
+
+    def test_switzerland_writes_the_swiss_postal_code_and_clears_the_foreign_one(self):
+        self.assertEqual(self.post("DE", "10115").status_code, 302)
+        self.assertEqual(self.stored(), (None, "10115"))
+        self.assertEqual(self.post("CH", " 3063 ").status_code, 302)
+        self.assertEqual(self.stored(), (3063, ""))
+
+    def test_other_countries_write_the_foreign_postal_code(self):
+        for country, value in (("DE", "10115"), ("LI", "9490"), ("GB", "SW1A 1AA")):
+            with self.subTest(country=country):
+                self.assertEqual(self.post(country, value).status_code, 302)
+                self.assertEqual(self.stored(), (None, value))
+
+    def test_invalid_postal_codes_are_reported_on_the_form_field(self):
+        cases = (
+            ("CH", "", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
+            ("CH", "999", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
+            ("CH", "10115", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
+            ("CH", "30a0", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
+            ("DE", "", "Dieses Feld ist zwingend erforderlich."),
+            ("LI", "  ", "Dieses Feld ist zwingend erforderlich."),
+        )
+        for country, value, message in cases:
+            with self.subTest(country=country, value=value):
+                with translation.override("de-ch"):
+                    response = self.post(country, value)
+                self.assertEqual(response.status_code, 200)
+                form = response.context["adminform"].form
+                self.assertEqual(form.errors["postal_code"], [message])
+                self.assertEqual(set(form.errors), {"postal_code"})
+                self.assertEqual(self.stored(), (3000, ""))
+
+    def test_view_only_staff_user_sees_the_postal_code(self):
+        staff_user = create_active_user("staff@example.org")
+        staff_user.set_privileges(is_staff=True, is_superuser=False)
+        staff_user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="accounts", codename="view_user")
+        )
+        self.client.force_login(staff_user)
+        with translation.override("de-ch"):
+            response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Postleitzahl")
+        self.assertContains(response, "3000")
+        response = self.client.post(self.url, {"country": "DE", "postal_code": "10115"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.stored(), (3000, ""))
+
+
+
+@tag("mariadb")
+class AdminLogEntryTests(TestCase):
+    """Admin log entries of accounts store a neutral text with the internal number (D-018, D-036)."""
+
+    def setUp(self):
+        self.administrator = create_active_user("admin@example.org")
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        self.member = create_active_user("member@example.org")
+        self.client.force_login(self.administrator)
+        self.model_admin = admin.site._registry[User]
+        self.request = RequestFactory().post("/admin/accounts/user/")
+        self.request.user = self.administrator
+
+    def assert_neutral(self, entry, account):
+        self.assertEqual(entry.object_repr, f"Konto mit interner Nummer {account.pk}")
+        self.assertEqual(str(entry.object_id), str(account.pk))
+        for personal in (
+            account.customer_number_id,
+            account.customer_number_display,
+            account.email,
+            account.first_name,
+            account.last_name,
+        ):
+            self.assertNotIn(personal, entry.object_repr)
+
+    def test_change_through_the_admin_stores_a_neutral_entry(self):
+        response = self.client.post(
+            reverse("admin:accounts_user_change", args=(self.member.pk,)),
+            {
+                "first_name": "Berta",
+                "last_name": "Example",
+                "town": "Bern",
+                "street": "Examplestrasse",
+                "house_number": "12a",
+                "country": "CH",
+                "postal_code": "3000",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        entry = LogEntry.objects.get()
+        self.assertEqual(entry.action_flag, CHANGE)
+        self.assertEqual(entry.user, self.administrator)
+        self.member.refresh_from_db()
+        self.assert_neutral(entry, self.member)
+        # The change message names the changed fields, never their values.
+        self.assertEqual(entry.change_message, '[{"changed": {"fields": ["First name"]}}]')
+
+    def test_every_logging_hook_stores_a_neutral_entry(self):
+        entry = self.model_admin.log_addition(self.request, self.member, [{"added": {}}])
+        self.assertEqual(entry.action_flag, ADDITION)
+        self.assert_neutral(entry, self.member)
+        entry = self.model_admin.log_change(self.request, self.member, "")
+        self.assertEqual(entry.action_flag, CHANGE)
+        self.assert_neutral(entry, self.member)
+        entries = self.model_admin.log_deletions(
+            self.request, User.objects.filter(pk__in=[self.member.pk, self.administrator.pk])
+        )
+        self.assertEqual(len(entries), 2)
+        for entry in entries:
+            self.assertEqual(entry.action_flag, DELETION)
+        accounts = {self.member.pk: self.member, self.administrator.pk: self.administrator}
+        for entry in LogEntry.objects.filter(action_flag=DELETION):
+            self.assert_neutral(entry, accounts[int(entry.object_id)])
+
+    def test_stored_text_does_not_depend_on_the_viewer_language(self):
+        with translation.override("en"):
+            entry = self.model_admin.log_change(self.request, self.member, "")
+        self.assert_neutral(entry, self.member)
+
+    def test_recent_actions_and_history_show_the_neutral_text(self):
+        self.model_admin.log_change(self.request, self.member, "")
+        with translation.override("de-ch"):
+            index = self.client.get(reverse("admin:index")).content.decode()
+            history = self.client.get(
+                reverse("admin:accounts_user_history", args=(self.member.pk,))
+            ).content.decode()
+        self.assertIn(f"Konto mit interner Nummer {self.member.pk}", index)
+        self.assertNotIn(self.member.customer_number_display, index)
+        # The history page names the actor, read from the account at display time.
+        self.assertIn(self.administrator.email, history)
+
+    def test_change_form_shows_the_internal_number(self):
+        with translation.override("de-ch"):
+            response = self.client.get(
+                reverse("admin:accounts_user_change", args=(self.member.pk,))
+            )
+        content = response.content.decode()
+        self.assertIn("Interne Nummer:", content)
+        self.assertNotIn(">ID:<", content)
+        self.assertIn(f'<div class="readonly">{self.member.pk}</div>', content)
+
+
+@tag("mariadb")
+class AdminProtectedFieldTests(TestCase):
+    """Fields that are hidden or read-only in the admin cannot be changed by POST (D-036)."""
+
+    def test_hidden_and_read_only_fields_ignore_posted_values(self):
+        administrator = create_active_user("admin@example.org")
+        administrator.set_privileges(is_staff=True, is_superuser=True)
+        member = create_active_user("member@example.org")
+        before = User.objects.values().get(pk=member.pk)
+        self.client.force_login(administrator)
+        response = self.client.post(
+            reverse("admin:accounts_user_change", args=(member.pk,)),
+            {
+                "first_name": "Anna",
+                "last_name": "Example",
+                "town": "Bern",
+                "street": "Examplestrasse",
+                "house_number": "12a",
+                "country": "CH",
+                "postal_code": "3000",
+                "title": "Dr.",
+                "locality": "Elsewhere",
+                "swiss_postal_code": "9999",
+                "foreign_postal_code": "X",
+                "customer_number": "000001",
+                "retention_obligation": "on",
+                "email": "attacker@example.org",
+                "normalized_email": "attacker@example.org",
+                "status": "blocked",
+                "is_active": "",
+                "id": "999",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        after = User.objects.values().get(pk=member.pk)
+        self.assertEqual(after, before)

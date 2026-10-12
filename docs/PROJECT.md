@@ -88,8 +88,10 @@ The binding design language for all application views of all phases is defined i
 | Field | Required | Purpose |
 | ----- | -------- | ------- |
 | Customer number | generated when the registration is completed | Identification of the account; later reference on invoices |
-| Name: salutation, title, first name, last name; or organisation name with add-ons and optional contact person (D-032) | organisation name or first and last name | Identification; addressing invoices |
-| Postal address: two address lines, street, house number, dwelling number, post office box, locality, town, postal code, country (D-032) | postal code, town, country, and street or post office box | Sending invoices by post |
+| Name: salutation, first name, last name; or company name with optional contact person (D-032, D-036) | company name or first and last name | Identification; addressing invoices |
+| Postal address: address addition (e.g. a second person or c/o), street, house number, post office box, postal code, town, country (D-032, D-036) | postal code, town, country, and street or post office box | Sending invoices by post |
+
+The user model keeps all fields of the eCH-0010 structure (D-032). Fields that are not used are stored but not shown: title, organisation name add-ons, second address line, dwelling number, post office box text and locality (D-036).
 | Email address | yes | Login, account notifications, sending invoices by email |
 | Phone number | no | Queries |
 

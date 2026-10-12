@@ -1,4 +1,4 @@
-"""Custom user model and customer numbers (docs/DECISIONS.md, D-016, D-021, D-031, D-032, D-034).
+"""Custom user model and customer numbers (docs/DECISIONS.md, D-016, D-021, D-031, D-032, D-034, D-036).
 
 Invariants enforced here, independent of any view, form or admin:
 
@@ -23,6 +23,7 @@ administrators, never on their own account) is checked by the views and the admi
 """
 
 import ipaddress
+import re
 import secrets
 import unicodedata
 from contextlib import contextmanager
@@ -56,6 +57,16 @@ CUSTOMER_NUMBER_ATTEMPTS = 100
 SUPERUSER_LOCK_TIMEOUT = 10
 
 SWITZERLAND = "CH"
+
+# Swiss postal codes: four ASCII digits from 1000 to 9999 (D-032, D-036).
+SWISS_POSTAL_CODE = re.compile(r"\A[1-9][0-9]{3}\Z")
+SWISS_POSTAL_CODE_MESSAGE = _("Enter a postal code with 4 digits from 1000 to 9999.")
+
+
+def parse_swiss_postal_code(value):
+    """Return the Swiss postal code as an integer, or None unless it is four digits 1000-9999."""
+    value = (value or "").strip()
+    return int(value) if SWISS_POSTAL_CODE.match(value) else None
 
 
 class AccountIntegrityError(Exception):
@@ -175,7 +186,9 @@ class IssuedCustomerNumber(models.Model):
         verbose_name_plural = _("issued customer numbers")
 
     def __str__(self):
-        # Never the number itself: it would reach admin log entries and error output.
+        # Never the number itself: this table has no reference to a person (D-021), and its
+        # text could reach log entries or error output. Accounts show their customer number
+        # for display only (User.__str__); admin log entries use the internal number (D-036).
         return str(self._meta.verbose_name)
 
     def save(self, **kwargs):
@@ -357,6 +370,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Account
 
     email = models.EmailField(_("email address"), max_length=EMAIL_MAX_LENGTH)
+    # The unique message is intended for the later email change in the account's own profile
+    # (the admin cannot change email addresses). Public registration must NOT show it: it must
+    # answer duplicates generically, or it would reveal which addresses have an account
+    # (account enumeration; security review finding L-9, docs/SECURITY.md, section 3).
     normalized_email = models.EmailField(
         _("email address"),
         max_length=EMAIL_MAX_LENGTH,
@@ -365,6 +382,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         editable=False,
         db_collation=EXACT_COLLATION,
+        error_messages={"unique": _("This email address is already in use.")},
     )
     # A foreign key, so that the database accepts only issued numbers; the column keeps the
     # number itself and the collation of the referenced key (utf8mb4_bin).
@@ -382,12 +400,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         _("status"), max_length=11, choices=Status, default=Status.UNVERIFIED
     )
     is_active = models.BooleanField(_("active"), default=False, editable=False)
-    is_staff = models.BooleanField(_("staff status"), default=False)
+    is_staff = models.BooleanField(_("access to administration"), default=False)
     retention_obligation = models.BooleanField(
         _("retention obligation"), default=False, editable=False
     )
 
-    # Name (D-032, lengths of eCH-0010)
+    # Name and postal address: the structure and lengths of eCH-0010 (D-032). Fields that are
+    # not used are kept but not shown (title, organisation name add-ons, address line 2,
+    # dwelling number, post office box text, locality; D-036).
 
     salutation = models.CharField(
         _("salutation"), max_length=6, choices=Salutation, blank=True
@@ -395,7 +415,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     title = models.CharField(_("title"), max_length=50, blank=True)
     first_name = models.CharField(_("first name"), max_length=30, blank=True)
     last_name = models.CharField(_("last name"), max_length=30, blank=True)
-    organisation_name = models.CharField(_("organisation name"), max_length=60, blank=True)
+    organisation_name = models.CharField(_("company name"), max_length=60, blank=True)
     organisation_name_add_on_1 = models.CharField(
         _("organisation name add-on 1"), max_length=60, blank=True
     )
@@ -403,33 +423,39 @@ class User(AbstractBaseUser, PermissionsMixin):
         _("organisation name add-on 2"), max_length=60, blank=True
     )
 
-    # Postal address (D-032, lengths of eCH-0010)
-
-    address_line_1 = models.CharField(_("address line 1"), max_length=150, blank=True)
+    # addressLine1: e.g. a second person on the invoice or "c/o"; one account still belongs
+    # to exactly one person (D-032).
+    address_line_1 = models.CharField(
+        _("address addition"),
+        max_length=150,
+        blank=True,
+        help_text=_("For example a second person or c/o."),
+    )
     address_line_2 = models.CharField(_("address line 2"), max_length=150, blank=True)
     street = models.CharField(_("street"), max_length=150, blank=True)
     house_number = models.CharField(_("house number"), max_length=30, blank=True)
     dwelling_number = models.CharField(_("dwelling number"), max_length=30, blank=True)
     post_office_box_number = models.PositiveIntegerField(
-        _("post office box number"),
+        _("post office box"),
         null=True,
         blank=True,
         validators=[
             MaxValueValidator(
-                99_999_999, message=_("Enter a post office box number of at most 8 digits.")
+                99_999_999, message=_("Enter a post office box of at most 8 digits.")
             )
         ],
     )
     post_office_box_text = models.CharField(_("post office box text"), max_length=15, blank=True)
     locality = models.CharField(_("locality"), max_length=40, blank=True)
     town = models.CharField(_("town"), max_length=40, blank=True)
+    # Forms show one postal code field and write it into one of these two (D-036).
     swiss_postal_code = models.PositiveSmallIntegerField(
         _("Swiss postal code"),
         null=True,
         blank=True,
         validators=[
-            MinValueValidator(1000, message=_("Enter a Swiss postal code from 1000 to 9999.")),
-            MaxValueValidator(9999, message=_("Enter a Swiss postal code from 1000 to 9999.")),
+            MinValueValidator(1000, message=SWISS_POSTAL_CODE_MESSAGE),
+            MaxValueValidator(9999, message=SWISS_POSTAL_CODE_MESSAGE),
         ],
     )
     foreign_postal_code = models.CharField(_("foreign postal code"), max_length=15, blank=True)
@@ -463,14 +489,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         # See IssuedCustomerNumber.Meta: _base_manager must not bypass the bulk protection.
         base_manager_name = "objects"
-        verbose_name = _("user")
-        verbose_name_plural = _("users")
+        verbose_name = _("account")
+        verbose_name_plural = _("accounts")
 
     def __str__(self):
-        # Never the email address (personal data in admin log entries and error output).
-        if self.pk is not None:
-            return gettext("Account %(id)s") % {"id": self.pk}
-        return gettext("New account")
+        # For display (admin list, titles, error output): the customer number identifies the
+        # account for support (D-036); never the email address or the name. It is read from the
+        # row (customer_number_id), so no query is made. Admin log entries do not store this
+        # text: UserAdmin stores a neutral text with the internal number instead (D-018, D-036).
+        if self.customer_number_id:
+            return gettext("Account %(customer_number)s") % {
+                "customer_number": self.customer_number_display
+            }
+        return gettext("Unconfirmed account")
 
     @classmethod
     def from_db(cls, db, field_names, values, **kwargs):
@@ -482,6 +513,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def customer_number_display(self):
         return format_customer_number(self.customer_number_id)
+
+    @property
+    def postal_code_display(self):
+        """The postal code of the address, whichever of the two eCH-0010 fields holds it."""
+        if self.swiss_postal_code is not None:
+            return str(self.swiss_postal_code)
+        return self.foreign_postal_code
 
     def set_password(self, raw_password):
         if raw_password is not None and not raw_password:
@@ -656,15 +694,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         if not self.organisation_name.strip():
             if not self.first_name.strip():
-                errors["first_name"] = _("Enter a first name or an organisation name.")
+                errors["first_name"] = _("Enter a first name or a company name.")
             if not self.last_name.strip():
-                errors["last_name"] = _("Enter a last name or an organisation name.")
+                errors["last_name"] = _("Enter a last name or a company name.")
 
-        has_post_office_box = bool(self.post_office_box_text.strip())
-        if self.post_office_box_number is not None and not has_post_office_box:
-            errors["post_office_box_text"] = _(
-                "Enter the post office box text for a post office box number."
-            )
+        # Hidden fields are never required (D-036): a post office box number needs no text.
+        has_post_office_box = (
+            self.post_office_box_number is not None or bool(self.post_office_box_text.strip())
+        )
         if not self.street.strip() and not has_post_office_box:
             errors["street"] = _("Enter a street or a post office box.")
         if not self.town.strip():
@@ -673,24 +710,48 @@ class User(AbstractBaseUser, PermissionsMixin):
         country = self.country.code if self.country else ""
         if not country:
             errors["country"] = _("This field is required.")
-        elif country == SWITZERLAND:
+
+        if errors:
+            raise ValidationError(errors)
+
+    def postal_code_errors(self):
+        """Return {field name: message} for the two postal code fields (D-032, D-036).
+
+        Switzerland uses the Swiss postal code; every other country, Liechtenstein included,
+        the foreign one. Without a country, nothing is checked (the country is reported).
+        """
+        country = self.country.code if self.country else ""
+        errors = {}
+        if country == SWITZERLAND:
             if self.swiss_postal_code is None:
-                errors["swiss_postal_code"] = _(
-                    "Enter a Swiss postal code for an address in Switzerland."
-                )
+                errors["swiss_postal_code"] = SWISS_POSTAL_CODE_MESSAGE
             if self.foreign_postal_code.strip():
                 errors["foreign_postal_code"] = _(
                     "Leave the foreign postal code empty for an address in Switzerland."
                 )
-        else:
+        elif country:
             if not self.foreign_postal_code.strip():
-                errors["foreign_postal_code"] = _(
-                    "Enter a postal code for an address outside Switzerland."
-                )
+                errors["foreign_postal_code"] = _("This field is required.")
             if self.swiss_postal_code is not None:
                 errors["swiss_postal_code"] = _(
                     "Leave the Swiss postal code empty for an address outside Switzerland."
                 )
+        return errors
+
+    def clean_fields(self, exclude=None):
+        # The postal code rules are checked here because only clean_fields() receives the
+        # fields a form excludes: a form that shows one postal code field (instead of the two
+        # model fields) checks the rules itself and attaches them to that field (D-036).
+        # Django's documentation recommends this for rules on fields a form may exclude.
+        errors = {}
+        try:
+            super().clean_fields(exclude=exclude)
+        except ValidationError as error:
+            errors = error.update_error_dict(errors)
+        excluded = set(exclude or ())
+        for name, message in self.postal_code_errors().items():
+            if name not in excluded and name not in errors:
+                errors[name] = [message]
 
         if errors:
             raise ValidationError(errors)

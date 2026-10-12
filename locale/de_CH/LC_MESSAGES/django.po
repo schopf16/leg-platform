@@ -29,17 +29,42 @@ msgid "issued customer numbers"
 msgstr "Vergebene Kundennummern"
 
 #, python-format
-msgid "Account %(id)s"
-msgstr "Konto %(id)s"
+msgid "Account %(customer_number)s"
+msgstr "Konto %(customer_number)s"
 
-msgid "A system administrator must also be a staff user."
-msgstr "Ein Systemadministrator muss auch ein Mitarbeitendenkonto sein."
+msgid "Unconfirmed account"
+msgstr "Nicht bestätigtes Konto"
 
-msgid "Only active accounts can receive staff privileges."
-msgstr "Nur aktive Konten dürfen Mitarbeitendenrechte erhalten."
+#. Stored in admin log entries; never the customer number (D-018, D-036).
+#, python-format
+msgid "Account with internal number %(number)s"
+msgstr "Konto mit interner Nummer %(number)s"
 
-msgid "New account"
-msgstr "Neues Konto"
+msgid "internal number"
+msgstr "Interne Nummer"
+
+msgid "account"
+msgstr "Konto"
+
+msgid "accounts"
+msgstr "Konten"
+
+#: leg_platform/accounts/admin.py
+msgid "LEG Platform"
+msgstr "LEG-Plattform"
+
+msgid "Administration"
+msgstr "Verwaltung"
+
+msgid "A system administrator also needs access to the administration."
+msgstr "Ein Systemadministrator braucht auch Zugang zur Verwaltung."
+
+msgid "Only active accounts can receive access to the administration."
+msgstr "Nur aktive Konten können Zugang zur Verwaltung erhalten."
+
+#: leg_platform/accounts/models.py
+msgid "This email address is already in use."
+msgstr "Diese E-Mail-Adresse wird bereits verwendet."
 
 msgid "Enter an email address of at most 254 characters."
 msgstr "Geben Sie eine E-Mail-Adresse mit höchstens 254 Zeichen ein."
@@ -71,9 +96,10 @@ msgstr "Familie"
 msgid "email address"
 msgstr "E-Mail-Adresse"
 
+#. Overrides Django's generic unique message with plain wording that fits every field.
 #, python-format
 msgid "%(model_name)s with this %(field_label)s already exists."
-msgstr "%(model_name)s mit diesem Wert für das Feld %(field_label)s existiert bereits."
+msgstr "Dieser Wert für «%(field_label)s» wird bereits verwendet."
 
 msgid "status"
 msgstr "Status"
@@ -81,8 +107,8 @@ msgstr "Status"
 msgid "active"
 msgstr "Aktiv"
 
-msgid "staff status"
-msgstr "Mitarbeiter-Status"
+msgid "access to administration"
+msgstr "Zugang zur Verwaltung"
 
 msgid "retention obligation"
 msgstr "Aufbewahrungspflicht"
@@ -99,35 +125,21 @@ msgstr "Vorname"
 msgid "last name"
 msgstr "Nachname"
 
-msgid "organisation name"
-msgstr "Name der Organisation"
+msgid "company name"
+msgstr "Firmenname"
 
+#. eCH-0010 fields that are kept but not shown (D-036).
 msgid "organisation name add-on 1"
 msgstr "Namenszusatz 1 der Organisation"
 
 msgid "organisation name add-on 2"
 msgstr "Namenszusatz 2 der Organisation"
 
-msgid "address line 1"
-msgstr "Adresszeile 1"
-
 msgid "address line 2"
 msgstr "Adresszeile 2"
 
-msgid "street"
-msgstr "Strasse"
-
-msgid "house number"
-msgstr "Hausnummer"
-
 msgid "dwelling number"
 msgstr "Wohnungsnummer"
-
-msgid "post office box number"
-msgstr "Postfachnummer"
-
-msgid "Enter a post office box number of at most 8 digits."
-msgstr "Geben Sie eine Postfachnummer mit höchstens 8 Ziffern ein."
 
 msgid "post office box text"
 msgstr "Postfachtext"
@@ -135,17 +147,41 @@ msgstr "Postfachtext"
 msgid "locality"
 msgstr "Ortschaft"
 
-msgid "town"
-msgstr "Ort"
-
 msgid "Swiss postal code"
 msgstr "Schweizer Postleitzahl"
 
-msgid "Enter a Swiss postal code from 1000 to 9999."
-msgstr "Geben Sie eine Schweizer Postleitzahl von 1000 bis 9999 ein."
-
 msgid "foreign postal code"
 msgstr "Ausländische Postleitzahl"
+
+msgid "Leave the foreign postal code empty for an address in Switzerland."
+msgstr "Lassen Sie die ausländische Postleitzahl für eine Adresse in der Schweiz leer."
+
+msgid "Leave the Swiss postal code empty for an address outside Switzerland."
+msgstr "Lassen Sie die Schweizer Postleitzahl für eine Adresse ausserhalb der Schweiz leer."
+
+msgid "address addition"
+msgstr "Adresszusatz"
+
+msgid "For example a second person or c/o."
+msgstr "Zum Beispiel eine zweite Person oder c/o."
+
+msgid "street"
+msgstr "Strasse"
+
+msgid "house number"
+msgstr "Hausnummer"
+
+msgid "post office box"
+msgstr "Postfach"
+
+msgid "Enter a post office box of at most 8 digits."
+msgstr "Geben Sie ein Postfach mit höchstens 8 Ziffern ein."
+
+msgid "town"
+msgstr "Ort"
+
+msgid "postal code"
+msgstr "Postleitzahl"
 
 msgid "country"
 msgstr "Land"
@@ -153,20 +189,11 @@ msgstr "Land"
 msgid "phone number"
 msgstr "Telefonnummer"
 
-msgid "user"
-msgstr "Benutzer"
+msgid "Enter a first name or a company name."
+msgstr "Geben Sie einen Vornamen oder einen Firmennamen ein."
 
-msgid "users"
-msgstr "Benutzer"
-
-msgid "Enter a first name or an organisation name."
-msgstr "Geben Sie einen Vornamen oder den Namen einer Organisation ein."
-
-msgid "Enter a last name or an organisation name."
-msgstr "Geben Sie einen Nachnamen oder den Namen einer Organisation ein."
-
-msgid "Enter the post office box text for a post office box number."
-msgstr "Geben Sie zur Postfachnummer den Postfachtext ein."
+msgid "Enter a last name or a company name."
+msgstr "Geben Sie einen Nachnamen oder einen Firmennamen ein."
 
 msgid "Enter a street or a post office box."
 msgstr "Geben Sie eine Strasse oder ein Postfach ein."
@@ -174,23 +201,43 @@ msgstr "Geben Sie eine Strasse oder ein Postfach ein."
 msgid "This field is required."
 msgstr "Dieses Feld ist zwingend erforderlich."
 
-msgid "Enter a Swiss postal code for an address in Switzerland."
-msgstr "Geben Sie für eine Adresse in der Schweiz eine Schweizer Postleitzahl ein."
-
-msgid "Leave the foreign postal code empty for an address in Switzerland."
-msgstr "Lassen Sie die ausländische Postleitzahl für eine Adresse in der Schweiz leer."
-
-msgid "Enter a postal code for an address outside Switzerland."
-msgstr "Geben Sie für eine Adresse ausserhalb der Schweiz eine Postleitzahl ein."
-
-msgid "Leave the Swiss postal code empty for an address outside Switzerland."
-msgstr "Lassen Sie die Schweizer Postleitzahl für eine Adresse ausserhalb der Schweiz leer."
+msgid "Enter a postal code with 4 digits from 1000 to 9999."
+msgstr "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."
 
 #. Overrides Django's German text (django/conf/locale/de), which contains a sharp s; shown
 #. e.g. for negative values in positive integer fields.
 #, python-format
 msgid "Ensure this value is greater than or equal to %(limit_value)s."
 msgstr "Dieser Wert muss grösser oder gleich %(limit_value)s sein."
+
+#. Overrides Django's German texts for the fields of PermissionsMixin, so that the user form
+#. uses the project's terms ("system administrator", "account"; D-012, D-036).
+msgid "superuser status"
+msgstr "Systemadministrator"
+
+msgid "Designates that this user has all permissions without explicitly assigning them."
+msgstr "Hat alle Berechtigungen, ohne dass sie einzeln zugewiesen werden."
+
+msgid "The groups this user belongs to. A user will get all permissions granted to each of their groups."
+msgstr "Die Gruppen, zu denen dieses Konto gehört. Das Konto erhält alle Berechtigungen dieser Gruppen."
+
+msgid "Specific permissions for this user."
+msgstr "Berechtigungen, die diesem Konto direkt zugewiesen sind."
+
+#. Texts of Django 6.1 without a German translation in Django itself.
+msgid "- Select an option -"
+msgstr "- Bitte auswählen -"
+
+msgid "Run"
+msgstr "Ausführen"
+
+#, python-format
+msgid "Search %(name)s"
+msgstr "%(name)s durchsuchen"
+
+#, python-format
+msgid "Pagination %(name)s"
+msgstr "Seitennavigation %(name)s"
 
 #. Overrides the German country name of django-countries, which contains a sharp s.
 msgid "United Kingdom of Great Britain and Northern Ireland"

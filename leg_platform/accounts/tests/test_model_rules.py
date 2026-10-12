@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
+from django.utils import translation
 
 from leg_platform.accounts.backends import EmailModelBackend
 from leg_platform.accounts.models import (
@@ -38,6 +39,16 @@ def valid_profile(**overrides):
 def clean_errors(user):
     try:
         user.clean()
+    except ValidationError as error:
+        return error.message_dict
+    return {}
+
+
+def field_errors(user, exclude=()):
+    """Return the errors of clean_fields(), which checks the postal code rules (D-036)."""
+    try:
+        # The password hash is set by the account logic, not by profile forms.
+        user.clean_fields(exclude={"password", *exclude})
     except ValidationError as error:
         return error.message_dict
     return {}
@@ -203,43 +214,122 @@ class ProfileValidationTests(SimpleTestCase):
         errors = clean_errors(valid_profile(first_name="", last_name=" "))
         self.assertEqual(set(errors), {"first_name", "last_name"})
 
-    def test_organisation_without_person(self):
+    def test_company_without_person(self):
         user = valid_profile(first_name="", last_name="", organisation_name="Example AG")
         self.assertEqual(clean_errors(user), {})
+
+    def test_person_or_company_message(self):
+        with translation.override("en"):
+            errors = clean_errors(valid_profile(first_name="", last_name=""))
+        self.assertEqual(errors["first_name"], ["Enter a first name or a company name."])
+        self.assertEqual(errors["last_name"], ["Enter a last name or a company name."])
 
     def test_street_or_post_office_box_is_required(self):
         errors = clean_errors(valid_profile(street="", house_number=""))
         self.assertEqual(set(errors), {"street"})
-        user = valid_profile(street="", house_number="", post_office_box_text="Postfach")
-        self.assertEqual(clean_errors(user), {})
-        user.post_office_box_number = 1234
+        user = valid_profile(street="", house_number="", post_office_box_number=1234)
         self.assertEqual(clean_errors(user), {})
 
-    def test_post_office_box_number_needs_the_text(self):
-        errors = clean_errors(valid_profile(street="", post_office_box_number=1234))
-        self.assertEqual(set(errors), {"street", "post_office_box_text"})
+    def test_hidden_fields_are_never_required(self):
+        # D-036: a post office box number needs no post office box text.
+        user = valid_profile(street="", post_office_box_number=1234)
+        self.assertEqual(clean_errors(user), {})
+        self.assertEqual(field_errors(user), {})
 
     def test_town_and_country_are_required(self):
         errors = clean_errors(valid_profile(town="", country=""))
         self.assertEqual(set(errors), {"town", "country"})
 
-    def test_swiss_address_needs_a_swiss_postal_code(self):
-        errors = clean_errors(valid_profile(swiss_postal_code=None, foreign_postal_code="3000"))
-        self.assertEqual(set(errors), {"swiss_postal_code", "foreign_postal_code"})
+    def test_valid_postal_codes(self):
+        for values in (
+            {"swiss_postal_code": 1000},
+            {"swiss_postal_code": 9999},
+            {"country": "DE", "swiss_postal_code": None, "foreign_postal_code": "10115"},
+            {"country": "GB", "swiss_postal_code": None, "foreign_postal_code": "SW1A 1AA"},
+            {"country": "LI", "swiss_postal_code": None, "foreign_postal_code": "9490"},
+        ):
+            with self.subTest(values=values):
+                self.assertEqual(field_errors(valid_profile(**values)), {})
+
+    def test_swiss_address_needs_a_swiss_postal_code_from_1000_to_9999(self):
+        message = ["Enter a postal code with 4 digits from 1000 to 9999."]
+        with translation.override("en"):
+            for value in (None, 999, 10000):
+                with self.subTest(value=value):
+                    errors = field_errors(valid_profile(swiss_postal_code=value))
+                    self.assertEqual(errors, {"swiss_postal_code": message})
+            errors = field_errors(valid_profile(foreign_postal_code="3000"))
+        self.assertEqual(set(errors), {"foreign_postal_code"})
 
     def test_foreign_address_needs_a_foreign_postal_code(self):
-        user = valid_profile(country="DE", swiss_postal_code=None, foreign_postal_code="10115")
-        self.assertEqual(clean_errors(user), {})
-        errors = clean_errors(valid_profile(country="DE"))
-        self.assertEqual(set(errors), {"swiss_postal_code", "foreign_postal_code"})
+        for country in ("DE", "LI"):
+            with self.subTest(country=country):
+                errors = field_errors(valid_profile(country=country))
+                self.assertEqual(set(errors), {"swiss_postal_code", "foreign_postal_code"})
 
-    def test_swiss_postal_code_range(self):
-        field = User._meta.get_field("swiss_postal_code")
-        for value in (1000, 9999):
-            field.run_validators(value)
-        for value in (999, 10000):
-            with self.subTest(value=value), self.assertRaises(ValidationError):
-                field.run_validators(value)
+    def test_postal_code_rules_skip_excluded_fields(self):
+        # A form that shows one postal code field excludes both model fields and checks the
+        # rules itself; errors for excluded fields would raise ValueError in the form.
+        user = valid_profile(country="DE")
+        self.assertEqual(
+            field_errors(user, exclude={"swiss_postal_code", "foreign_postal_code"}), {}
+        )
+
+    def test_without_country_no_postal_code_rule(self):
+        user = valid_profile(country="", swiss_postal_code=None)
+        self.assertEqual(field_errors(user), {})
+        self.assertEqual(set(clean_errors(user)), {"country"})
+
+    def test_postal_code_display(self):
+        self.assertEqual(valid_profile().postal_code_display, "3000")
+        user = valid_profile(country="DE", swiss_postal_code=None, foreign_postal_code="10115")
+        self.assertEqual(user.postal_code_display, "10115")
+        self.assertEqual(User().postal_code_display, "")
+
+    def test_ech_0010_fields_are_kept(self):
+        field_names = {field.name for field in User._meta.get_fields()}
+        self.assertLessEqual(
+            {
+                "title",
+                "organisation_name",
+                "organisation_name_add_on_1",
+                "organisation_name_add_on_2",
+                "address_line_1",
+                "address_line_2",
+                "dwelling_number",
+                "post_office_box_number",
+                "post_office_box_text",
+                "locality",
+                "swiss_postal_code",
+                "foreign_postal_code",
+                "phone_number",
+            },
+            field_names,
+        )
+
+    def test_labels(self):
+        expected = {
+            "organisation_name": ("company name", "Firmenname"),
+            "address_line_1": ("address addition", "Adresszusatz"),
+            "post_office_box_number": ("post office box", "Postfach"),
+            "town": ("town", "Ort"),
+            "is_staff": ("access to administration", "Zugang zur Verwaltung"),
+            "is_superuser": ("superuser status", "Systemadministrator"),
+        }
+        for name, (english, swiss_german) in expected.items():
+            field = User._meta.get_field(name)
+            with self.subTest(field=name):
+                with translation.override("en"):
+                    self.assertEqual(str(field.verbose_name), english)
+                with translation.override("de-ch"):
+                    self.assertEqual(str(field.verbose_name), swiss_german)
+        with translation.override("de-ch"):
+            self.assertEqual(
+                str(User._meta.get_field("address_line_1").help_text),
+                "Zum Beispiel eine zweite Person oder c/o.",
+            )
+            self.assertEqual(str(User._meta.verbose_name), "Konto")
+            self.assertEqual(str(User._meta.verbose_name_plural), "Konten")
 
     def test_maximum_lengths_follow_ech_0010(self):
         expected = {
@@ -264,8 +354,12 @@ class ProfileValidationTests(SimpleTestCase):
                 self.assertEqual(User._meta.get_field(name).max_length, length)
         box_number = User._meta.get_field("post_office_box_number")
         box_number.run_validators(99_999_999)
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(ValidationError) as context:
             box_number.run_validators(100_000_000)
+        with translation.override("en"):
+            self.assertEqual(
+                context.exception.messages, ["Enter a post office box of at most 8 digits."]
+            )
 
     def test_salutation_choices(self):
         field = User._meta.get_field("salutation")
@@ -274,6 +368,27 @@ class ProfileValidationTests(SimpleTestCase):
             field.clean(value, User())
         with self.assertRaises(ValidationError):
             field.clean("dr", User())
+
+
+class StringRepresentationWithoutDatabaseTests(SimpleTestCase):
+    """SimpleTestCase rejects database queries, so these tests also show that none is made."""
+
+    def test_customer_number_is_read_from_the_row(self):
+        user = User(
+            pk=17, email="person@example.org", first_name="Anna", customer_number_id="686821"
+        )
+        with translation.override("en"):
+            self.assertEqual(str(user), "Account 686 821")
+        with translation.override("de-ch"):
+            self.assertEqual(str(user), "Konto 686 821")
+
+    def test_account_without_customer_number(self):
+        for user in (User(), User(pk=17, email="person@example.org")):
+            with self.subTest(pk=user.pk):
+                with translation.override("en"):
+                    self.assertEqual(str(user), "Unconfirmed account")
+                with translation.override("de-ch"):
+                    self.assertEqual(str(user), "Nicht bestätigtes Konto")
 
 
 class PhoneNumberTests(SimpleTestCase):
