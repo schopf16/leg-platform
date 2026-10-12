@@ -93,7 +93,7 @@ On 2026-10-11 a security review of the skeleton was carried out. Its findings we
 
 On 2026-10-11 the project owner decided: the setup script failed on the first run right after the MySQL installation; the path resolution was fixed and a switch `-RemoveFailedInstallation` was added for a retry (D-027). The minimum versions were raised to Django 6.0 and Python 3.12 to use Django's built-in Content Security Policy, which is now set (D-026, D-028). Local email delivery may use `allowlist` with a dedicated development app registration besides `console` (D-028). The project is licensed under the BSD 3-Clause License (D-029).
 
-On 2026-10-11 the project owner decided to use MariaDB instead of MySQL and to run production of the Ittigen instance on an Infomaniak "VPS Lite 1" (D-002, D-008, D-030). The minimum version is MariaDB 10.11, the newest long-term support release 12.3 is used; MySQL is no longer supported. Settings, database tests, continuous integration and the local setup script were changed accordingly; the setup script has not yet been run on the development machine.
+On 2026-10-11 the project owner decided to use MariaDB instead of MySQL and to run production of the Ittigen instance on an Infomaniak "VPS Lite 1" (D-002, D-008, D-030). The minimum version is MariaDB 10.11, the newest long-term support release 12.3 is used; MySQL is no longer supported. Settings, database tests, continuous integration and the local setup script were changed accordingly. On 2026-10-12 the setup script completed on the development machine after several fixes of its checks (D-030).
 
 Deployment gates: no stage or production instance is deployed before
 
@@ -106,5 +106,5 @@ Deployment gates: no stage or production instance is deployed before
 Next steps:
 
 1. Done: D-028 and D-031 were confirmed by the project owner on 2026-10-12. Decided on 2026-10-11: Content Security Policy with Django's built-in support (D-026, D-028), local email delivery with `console` or `allowlist` (`docs/SECURITY.md`, sections 8 and 11; D-028), licence BSD-3-Clause (D-029).
-2. On the development machine: manual removal of the earlier, failed MySQL installation, first run of the MariaDB setup script (`docs/INSTALLATION.md`) and a local test run against MariaDB with the restricted application account.
+2. Done on 2026-10-12: the MariaDB setup script completed on the development machine (`docs/INSTALLATION.md`). With Python 3.14.8, Django 6.1.2 and MariaDB 12.3.3, `check --database default` and `makemigrations --check --dry-run` reported no issues, and all 100 tests passed against MariaDB with the restricted application account.
 3. Custom user model (D-021), before any persistent database is migrated.
