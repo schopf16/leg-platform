@@ -264,12 +264,17 @@ try {
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306), (New-Listener '127.0.0.1' 33060))) -join ';') 'listens on 127.0.0.1:33060' 'Listeners: other port'
     Assert-Equal @(Get-ListenerProblems -Listeners @() -ExpectNone).Count 0 'Listeners: none expected'
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306)) -ExpectNone) -join ';') 'listens on 127.0.0.1:3306' 'Listeners: TCP while networking is skipped'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: expected values'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|0|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: feedback plugin disabled'
-    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|1|1|1|TABLE|C:\x\g.log|/tmp/s.log|ON') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is on;general_log is on;slow_query_log is on;log_output is 'TABLE';event_scheduler is 'ON';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
-    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|0|0|0|FILE|mypc.log|mypc-slow.log|OFF') -join ';') "event_scheduler is 'OFF'" 'Server check: event scheduler must be DISABLED after the restart'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: expected values (no shared_memory variable, MariaDB 12.3)'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|OFF|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: shared memory off'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: feedback plugin disabled'
+    foreach ($value in @('ON', 'off', '0', '1', '')) {
+        Assert-Equal ((Get-ServerCheckProblems -Line "127.0.0.1|0|0|3306|NONE|$value|0|0|FILE|mypc.log|mypc-slow.log|DISABLED") -join ';') "shared_memory is '$value'" "Server check: shared memory value '$value' refused"
+    }
+    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|ON|1|1|TABLE|C:\x\g.log|/tmp/s.log|ON') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is 'ON';general_log is on;slow_query_log is on;log_output is 'TABLE';event_scheduler is 'ON';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
+    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|OFF') -join ';') "event_scheduler is 'OFF'" 'Server check: event scheduler must be DISABLED after the restart'
     Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE') -join ';') "unexpected server check result '127.0.0.1|0|0|3306|NONE'" 'Server check: malformed result'
-    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*@@GLOBAL.shared_memory*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*@@GLOBAL.event_scheduler*') $true 'Server check: query order matches the parser'
+    Assert-Equal ($ServerCheckSql -like "*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*COALESCE((SELECT COALESCE(VARIABLE_VALUE, 'NULL') FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY'), 'ABSENT')*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*@@GLOBAL.event_scheduler*") $true 'Server check: query order matches the parser'
+    Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.shared_memory*') $false 'Server check: no direct reference to shared_memory (absent in MariaDB 12.3)'
     Assert-Equal ($OtherConnectionsSql -clike "*PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon'*") $true 'Other connections: background threads excluded'
 
     # SQL of the hardening and the application account
@@ -289,7 +294,7 @@ try {
     Assert-Equal ([regex]::Matches($hardening, "IDENTIFIED BY 'correct horse battery staple'").Count) 3 'Hardening SQL: password for the three root accounts'
     $hardeningLines = @($hardening -split "`r?`n" | Where-Object { $_ })
     Assert-Equal ([bool]($hardeningLines[1] -clike "IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000'*END IF //")) $true 'Hardening SQL: aborts first if another client is connected'
-    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', '@@GLOBAL.shared_memory', "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform')")) {
+    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', "FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY' AND (VARIABLE_VALUE IS NULL OR VARIABLE_VALUE <> 'OFF')", "'`$.account_locked'", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform')")) {
         Assert-Equal $HardeningProblemSql.Contains($check) $true "Hardening check SQL: $check"
     }
     $appSql = Get-AppAccountSql -Password 'generated-secret'
@@ -311,7 +316,9 @@ try {
     Assert-Equal ((Get-SetupIncompleteReasons -StartType 'Manual' -Entries $entries) -join ';') 'the service start type is Manual;networking is still skipped;the named pipe is still on' 'Incomplete setup: interrupted before the switch'
     Assert-Equal ((Get-SetupIncompleteReasons -StartType 'Disabled' -Entries $null) -join ';') 'the service start type is Disabled;my.ini could not be read' 'Incomplete setup: unreadable my.ini'
     Assert-Equal ([bool](@(Get-InitialOptionFileProblems -Entries (Get-OptionFileEntries -Text ($initial + "[mysqld]`r`nshared_memory`r`n")) -DataDirectory $dataDir) -like '*shared memory*')) $true 'Initial option file refused: shared memory'
-    Assert-Equal (Get-ServerOptionValue -Entries $switchedEntries -Key 'shared-memory') 'OFF' 'Switched option file: shared memory off'
+    Assert-Equal (Get-ServerOptionValue -Entries $switchedEntries -Key 'shared-memory') $null 'Switched option file: no shared-memory option (unknown in MariaDB 12.3)'
+    $switchedLeftover = @(Get-OptionFileEntries -Text (Get-NetworkOptionFileText -Text ($initial.Replace('port=3306', "port=3306`r`nshared-memory=OFF")) -LineBreak "`r`n"))
+    Assert-Equal (Get-ServerOptionValue -Entries $switchedLeftover -Key 'shared-memory') $null 'Switched option file: leftover shared-memory line removed'
     $fileSecurity = New-AdministratorsFileSecurity
     Assert-Equal $fileSecurity.AreAccessRulesProtected $true 'Option file security: no inheritance'
     Assert-Equal (($fileSecurity.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object) -join ',') ((@($SidAdministrators, $SidSystem) | Sort-Object) -join ',') 'Option file security: Administrators and SYSTEM only'
@@ -322,6 +329,7 @@ try {
     Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS;")) $true 'Hardening check SQL: every event, no schema excluded'
     Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS;")) $true 'Hardening check SQL: every trigger, no schema excluded'
     Assert-Equal $HardeningProblemSql.Contains("@@GLOBAL.event_scheduler NOT IN ('OFF', 'DISABLED')") $true 'Hardening check SQL: event scheduler off'
+    Assert-Equal $HardeningProblemSql.Contains('@@GLOBAL.shared_memory') $false 'Hardening check SQL: no direct reference to shared_memory (absent in MariaDB 12.3)'
     Assert-Equal $HardeningProblemSql.Contains("JSON_EXISTS(Priv, '`$.auth_or') = 1") $true 'Hardening check SQL: no authentication chain'
     Assert-Equal $HardeningProblemSql.Contains("<> 'mysql_native_password'") $true 'Hardening check SQL: expected plugin'
     Assert-Equal $HardeningProblemSql.Contains("HAVING COUNT(DISTINCT JSON_VALUE(Priv, '`$.authentication_string')) <> 1") $true 'Hardening check SQL: same password for the three root accounts'
