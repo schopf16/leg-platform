@@ -39,13 +39,26 @@ CSRF_TRUSTED_ORIGINS = list(ENVIRONMENT.csrf_trusted_origins)
 # Application definition
 
 INSTALLED_APPS = [
+    # First, so that its createsuperuser command replaces Django's (D-005, D-034).
+    "leg_platform.accounts",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_countries",
+    "phonenumber_field",
 ]
+
+# Custom user model from the first migration (docs/DECISIONS.md, D-021).
+AUTH_USER_MODEL = "accounts.User"
+
+# Phone numbers (D-034): numbers without an international prefix are read as Swiss numbers;
+# stored in E.164, the package's default, set explicitly so that it is visible.
+# https://django-phonenumber-field.readthedocs.io/en/latest/reference.html#settings
+PHONENUMBER_DEFAULT_REGION = "CH"
+PHONENUMBER_DB_FORMAT = "E164"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

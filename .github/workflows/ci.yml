@@ -95,9 +95,29 @@ jobs:
 
       - name: Install build dependencies of mysqlclient
         # mysqlclient publishes no Linux wheels; packages as listed in its installation notes.
+        # gettext provides msgfmt and msgunfmt for the translation check.
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends python3-dev default-libmysqlclient-dev build-essential pkg-config
+          sudo apt-get install -y --no-install-recommends python3-dev default-libmysqlclient-dev build-essential pkg-config gettext
+
+      - name: Check that the committed compiled translations match their sources
+        # The .mo files are committed (D-034). Their decompiled content is compared, because
+        # the binary layout can differ between gettext versions (GNU gettext manual, sections
+        # "Invoking the msgfmt Program" and "Invoking the msgunfmt Program").
+        run: |
+          set -euo pipefail
+          mapfile -t catalogues < <(git ls-files 'locale/*.po')
+          if [ "${#catalogues[@]}" -eq 0 ]; then
+            echo "No translation catalogue is tracked in Git." >&2
+            exit 1
+          fi
+          for po in "${catalogues[@]}"; do
+            mo="${po%.po}.mo"
+            test -f "$mo" || { echo "Missing compiled catalogue: $mo" >&2; exit 1; }
+            msgfmt --check -o "$RUNNER_TEMP/compiled.mo" "$po"
+            diff <(msgunfmt "$mo") <(msgunfmt "$RUNNER_TEMP/compiled.mo") \
+              || { echo "Outdated compiled catalogue: $mo (run compilemessages)" >&2; exit 1; }
+          done
 
       - name: Install the project
         env:

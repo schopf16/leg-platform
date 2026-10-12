@@ -3,7 +3,8 @@
 # reduced to entries relevant for this project and extended with project-specific entries.
 # Deviations from the template:
 # - "instance/" (Flask) is not ignored, because it could hide a Django app of that name.
-# - "*.mo" is not ignored yet; whether compiled translations are committed is open (docs/ARCHITECTURE.md).
+# - "*.mo" is not ignored: compiled translations are committed and CI checks that they match
+#   their .po sources (docs/DECISIONS.md, D-034).
 
 # Secrets and local environment
 

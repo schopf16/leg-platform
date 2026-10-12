@@ -28,6 +28,14 @@ dependencies = [
     "cryptography>=50.0.2",
     "segno>=1.6.6",
     "msal>=1.39.0",
+    # Profile fields of the user model (D-034).
+    "django-countries>=9.1.0",
+    "django-phonenumber-field>=8.5.0",
+    # Declared directly instead of the extra "django-phonenumber-field[phonenumberslite]",
+    # so that the minimum job pins it.
+    "phonenumberslite>=9.0.41",
+    # Canonicalise internationalised email domains using UTS #46 (D-034).
+    "idna>=3.15",
 ]
 
 [tool.setuptools.packages.find]
