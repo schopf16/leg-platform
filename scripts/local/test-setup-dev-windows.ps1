@@ -434,6 +434,28 @@ try {
     Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($visibleEntry, $hiddenEntry, $hiddenNoSlash)).Count 2 'Uninstall entries: one visible entry absorbs only one hidden entry'
     Assert-Equal @(Select-MariaDbUninstallEntries -Entries @($hiddenEntry, $visibleEntry, $visibleEntry, $hiddenEntry)).Count 2 'Uninstall entries: two installations with two entries each'
 
+    # Select-MariaDbProductCode: the key name of exactly one hidden entry with the same name and location.
+    $productCode = '{6C540262-B017-40F4-8657-ADDC6A1270BC}'
+    $visibleKey = [pscustomobject]@{ KeyName = $mariaDbName; DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $false }
+    $hiddenKey = [pscustomobject]@{ KeyName = $productCode; DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $true }
+    $hiddenKeyNoSlash = [pscustomobject]@{ KeyName = $productCode.ToLowerInvariant(); DisplayName = $mariaDbName; InstallLocation = 'C:\Program Files\MariaDB 12.3'; Hidden = $true }
+    $hiddenKeyOther = [pscustomobject]@{ KeyName = '{11111111-2222-3333-4444-555555555555}'; DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $true }
+    Assert-Equal (Select-MariaDbProductCode -Entries @($visibleKey, $hiddenKey) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation) $productCode 'Product code: one hidden entry'
+    Assert-Equal (Select-MariaDbProductCode -Entries @($hiddenKeyNoSlash, $visibleKey) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation) $productCode.ToLowerInvariant() 'Product code: trailing separator and lower-case GUID'
+    Assert-Throws { Select-MariaDbProductCode -Entries @($visibleKey) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' 'Product code: none'
+    Assert-Throws { Select-MariaDbProductCode -Entries @() -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' 'Product code: no entries'
+    Assert-Throws { Select-MariaDbProductCode -Entries @($hiddenKey, $hiddenKeyOther) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 2*' 'Product code: two'
+    foreach ($badKey in @('6C540262-B017-40F4-8657-ADDC6A1270BC', '{6C540262-B017-40F4-8657-ADDC6A1270B}', '{6C540262-B017-40F4-8657-ADDC6A1270BG}', '{6C540262B01740F48657ADDC6A1270BC}', "$productCode`n", " $productCode", $mariaDbName)) {
+        $badEntry = [pscustomobject]@{ KeyName = $badKey; DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $true }
+        Assert-Throws { Select-MariaDbProductCode -Entries @($badEntry) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' "Product code: wrong GUID format '$badKey'"
+    }
+    $otherLocation = [pscustomobject]@{ KeyName = $productCode; DisplayName = $mariaDbName; InstallLocation = 'C:\Program Files\MariaDB 11.4\'; Hidden = $true }
+    Assert-Throws { Select-MariaDbProductCode -Entries @($otherLocation) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' 'Product code: different location'
+    $otherCase = [pscustomobject]@{ KeyName = $productCode; DisplayName = 'MariaDB 12.3 (X64)'; InstallLocation = $mariaDbLocation; Hidden = $true }
+    Assert-Throws { Select-MariaDbProductCode -Entries @($otherCase) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' 'Product code: different DisplayName case'
+    $visibleGuid = [pscustomobject]@{ KeyName = $productCode; DisplayName = $mariaDbName; InstallLocation = $mariaDbLocation; Hidden = $false }
+    Assert-Throws { Select-MariaDbProductCode -Entries @($visibleGuid) -DisplayName $mariaDbName -InstallLocation $mariaDbLocation } '*found 0*' 'Product code: visible entry is not used'
+
     # Earlier MySQL installation: ownership of the service and manual removal commands
     $toolsRoot = Join-Path $root 'tools'
     $ownIni = Join-Path $toolsRoot 'mysql\current\my.ini'
@@ -479,6 +501,12 @@ try {
     $pathValue = 'C:\a;C:\tools\mysql\current\bin;%USERPROFILE%\bin;;C:\TOOLS\MySQL\current\bin\;C:\b;C:\Program Files\MariaDB 12.3\bin'
     Assert-Equal (Remove-PathListEntry -Value $pathValue -Directories @($LegacyPathEntry)) 'C:\a;%USERPROFILE%\bin;;C:\b;C:\Program Files\MariaDB 12.3\bin' 'PATH: legacy entry removed in all spellings, others kept'
     Assert-Equal ((Get-MySqlPathEntries -Value $pathValue) -join '|') 'C:\tools\mysql\current\bin|C:\TOOLS\MySQL\current\bin\' 'PATH: MySQL bin entries are found, MariaDB is not reported'
+    # Machine PATH after the MariaDB removal: only <InstallLocation>\bin, in every spelling; empty segments are kept.
+    $mariaDbBin = Join-Path 'C:\Program Files\MariaDB 12.3\' 'bin'
+    $machinePath = '%SystemRoot%\system32;C:\Program Files\MariaDB 12.3\bin;;C:\x;C:\PROGRAM FILES\mariadb 12.3\BIN\;C:\Program Files\MariaDB 11.4\bin;C:\Program Files\MariaDB 12.3\bin2;C:\Program Files\MariaDB 12.3;'
+    Assert-Equal (Remove-PathListEntry -Value $machinePath -Directories @($mariaDbBin)) '%SystemRoot%\system32;;C:\x;C:\Program Files\MariaDB 11.4\bin;C:\Program Files\MariaDB 12.3\bin2;C:\Program Files\MariaDB 12.3;' 'PATH: MariaDB bin removed with and without trailing separator and in other case; other versions, similar names and empty segments kept'
+    Assert-Equal (Remove-PathListEntry -Value 'C:\a;C:\b' -Directories @($mariaDbBin)) 'C:\a;C:\b' 'PATH: unchanged without MariaDB bin'
+    Assert-Equal (Remove-PathListEntry -Value 'C:\Program Files\MariaDB 12.3\bin' -Directories @($mariaDbBin)) '' 'PATH: only entry removed'
 
     # Option files and Chocolatey output
     $presentFile = Join-Path $root 'my.cnf'

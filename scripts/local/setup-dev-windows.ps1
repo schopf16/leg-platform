@@ -159,6 +159,8 @@ $ListenerOptionPattern = '^((skip|enable|disable)-)?(named-pipe|skip-networking|
 # in win/packaging/CMakeLists.txt of the MariaDB sources). Other MariaDB products (e.g.
 # connectors) do not match.
 $MariaDbProductPattern = '^MariaDB [0-9]+\.[0-9]+( \([A-Za-z0-9]+\))?$'
+# Key name of the hidden uninstall entry that the MSI registers under its ProductCode.
+$ProductCodePattern = '^\{[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}\}\z'
 
 # Server variables checked after the switch to TCP and the restart, which also resets every
 # runtime change (SET GLOBAL) made during the phase without a root password (MariaDB has no
@@ -806,8 +808,23 @@ function Select-MariaDbUninstallEntries {
     return $selected
 }
 
+function Select-MariaDbProductCode {
+    # ProductCode of the installed MSI: the key name of the one hidden uninstall entry with the given DisplayName
+    # and InstallLocation (win/packaging/extra.wxs.in, branch 12.3). Throws unless exactly one entry matches.
+    param([object[]]$Entries, [string]$DisplayName, [string]$InstallLocation)
+    $matching = @($Entries | Where-Object {
+        $_.Hidden -and "$($_.KeyName)" -cmatch $ProductCodePattern -and $_.DisplayName -ceq $DisplayName -and
+        (Test-IsSamePath -First $_.InstallLocation -Second $InstallLocation)
+    })
+    if ($matching.Count -ne 1) {
+        throw "Expected exactly one Windows Installer product '$DisplayName' in $InstallLocation, found $($matching.Count)."
+    }
+    return "$($matching[0].KeyName)"
+}
+
 function Get-MariaDbUninstallRegistryEntries {
-    # Raw uninstall entries of MariaDB server products with DisplayName, InstallLocation and Hidden (SystemComponent 1).
+    # Raw uninstall entries of MariaDB server products with KeyName, DisplayName, InstallLocation and Hidden
+    # (SystemComponent 1).
     $roots = @(
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
         'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
@@ -823,6 +840,7 @@ function Get-MariaDbUninstallRegistryEntries {
             $systemComponent = $properties.PSObject.Properties['SystemComponent']
             $location = $properties.PSObject.Properties['InstallLocation']
             $entries += [pscustomobject]@{
+                KeyName         = $key.PSChildName
                 DisplayName     = "$($displayName.Value)"
                 InstallLocation = $(if ($location) { "$($location.Value)" } else { '' })
                 Hidden          = [bool]($systemComponent -and "$($systemComponent.Value)" -eq '1')
@@ -1365,8 +1383,8 @@ function Get-PresentOptionFiles {
 
 function Remove-PathListEntry {
     # Returns the PATH value without the entries that are the same path as one of
-    # $Directories; all other entries, including unexpanded ones such as %USERPROFILE%\bin,
-    # are kept unchanged and in order.
+    # $Directories (Test-IsSamePath); all other entries, including unexpanded ones such as
+    # %USERPROFILE%\bin and empty segments, are kept unchanged and in order.
     param([string]$Value, [string[]]$Directories)
     if (-not $Value) { return $Value }
     $kept = @($Value.Split(';') | Where-Object {
@@ -1415,8 +1433,28 @@ function Remove-UserPathEntry {
     }
 }
 
+function Remove-MachinePathEntry {
+    # Removes $Directory from the machine PATH. The package mariadb.install adds
+    # <InstallLocation>\bin there (Install-ChocolateyPath ... 'Machine'); its uninstall script,
+    # which would remove it, is skipped. New terminals see the change.
+    param([string]$Directory)
+    $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SYSTEM\CurrentControlSet\Control\Session Manager\Environment', $true)
+    try {
+        $path = Read-PathValue -Key $key
+        if (-not $path) { return }
+        $newValue = Remove-PathListEntry -Value $path.Value -Directories @($Directory)
+        if ($newValue -cne $path.Value) {
+            $key.SetValue('Path', $newValue, $path.Kind)
+            Write-Host "Removed $Directory from the machine PATH; sign out and in again (or restart Windows) so that new terminals use the new PATH."
+        }
+    } finally {
+        if ($key) { $key.Dispose() }
+    }
+}
+
 function Write-MachinePathWarning {
-    # Machine-wide PATH entries are not changed by this script; MySQL entries there are
+    # Apart from the bin folder of a removed MariaDB installation (Remove-MachinePathEntry),
+    # machine-wide PATH entries are not changed by this script; MySQL entries there are
     # reported. (The MariaDB package adds <program folder>\bin to the machine PATH; that
     # folder is below %ProgramFiles% and not writable by ordinary users.)
     $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SYSTEM\CurrentControlSet\Control\Session Manager\Environment', $false)
@@ -1612,9 +1650,11 @@ function Confirm-FailedInstallationRemoval {
     Write-Host ''
     Write-Host 'The following local MariaDB installation will be removed:' -ForegroundColor Yellow
     if ($State.ServiceExists) { Write-Host "  - Windows service '$ServiceName' (stopped and disabled first)" }
-    if ($State.MariaDbMetaVersion) { Write-Host "  - Chocolatey package '$MariaDbMetaPackage' $($State.MariaDbMetaVersion)" }
-    Write-Host "  - Chocolatey package '$MariaDbPackage' $($State.MariaDbPackageVersion) (uninstalls MariaDB)"
+    Write-Host "  - MariaDB product '$(@($State.MariaDbEntries)[0].DisplayName)' (uninstalled with Windows Installer)"
+    if ($State.MariaDbMetaVersion) { Write-Host "  - Chocolatey package '$MariaDbMetaPackage' $($State.MariaDbMetaVersion) (package record only)" }
+    Write-Host "  - Chocolatey package '$MariaDbPackage' $($State.MariaDbPackageVersion) (package record only)"
     Write-Host "  - $location with programs, option file and ALL local MariaDB databases" -ForegroundColor Yellow
+    Write-Host "  - machine PATH entry $(Join-Path $location 'bin')"
     Write-Host 'This cannot be undone.' -ForegroundColor Yellow
     $answer = Read-Host 'Type DELETE to remove all items listed above'
     if ($answer -cne 'DELETE') {
@@ -1635,20 +1675,33 @@ function Remove-FailedInstallation {
     }
     $reparse = Get-ReparsePointOnPath -Path $InstallLocation -Root $ProgramFiles
     if ($reparse) { throw "$reparse is a symbolic link, junction or mount point. Nothing was changed." }
+    $productCode = Select-MariaDbProductCode -Entries @(Get-MariaDbUninstallRegistryEntries) `
+        -DisplayName @($current.MariaDbEntries)[0].DisplayName -InstallLocation $InstallLocation
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         Disable-DatabaseService
         if ("$((Get-Service -Name $ServiceName).Status)" -ne 'Stopped') {
             throw "The service '$ServiceName' could not be stopped. Nothing else was changed."
         }
     }
-    if (Get-InstalledChocolateyPackageVersion -Name $MariaDbMetaPackage) {
-        choco uninstall $MariaDbMetaPackage -y --no-progress
-        if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while uninstalling $MariaDbMetaPackage." }
+    # The package's chocolateyUninstall.ps1 (12.3.3) passes the uninstall string as -File, which
+    # Uninstall-ChocolateyPackage ignores for MSI files (msiexec /x without a product, exit code
+    # 1619; D-030). The MSI is therefore removed directly, by its ProductCode.
+    $msiexec = Join-Path ([Environment]::GetFolderPath('System')) 'msiexec.exe'
+    $process = Start-Process -FilePath $msiexec -ArgumentList @('/x', $productCode, '/qn', '/norestart') -Wait -PassThru
+    # 3010: success, restart required (Microsoft Learn, "MsiExec.exe and InstMsi.exe error messages").
+    $restartRequired = $process.ExitCode -eq 3010
+    if (-not $restartRequired -and $process.ExitCode -ne 0) {
+        throw "msiexec exited with code $($process.ExitCode) while uninstalling $productCode."
     }
-    if (Get-InstalledChocolateyPackageVersion -Name $MariaDbPackage) {
-        choco uninstall $MariaDbPackage -y --no-progress
-        if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while uninstalling $MariaDbPackage." }
+    # -n skips the package scripts, --skip-autouninstaller the automatic uninstaller: only the
+    # package records are removed (Chocolatey documentation, "Uninstall").
+    foreach ($package in @($MariaDbMetaPackage, $MariaDbPackage)) {
+        if (Get-InstalledChocolateyPackageVersion -Name $package) {
+            choco uninstall $package -y --no-progress -n --skip-autouninstaller
+            if ($LASTEXITCODE -ne 0) { throw "Chocolatey exited with code $LASTEXITCODE while removing the package $package." }
+        }
     }
+    Remove-MachinePathEntry -Directory (Join-Path $InstallLocation 'bin')
     # The MSI removes its service and, by default (CLEANUPDATA=1), its data directory
     # (win/packaging/extra.wxs.in). Leftovers are removed only if they belong to the folder
     # recorded above.
@@ -1668,9 +1721,18 @@ function Remove-FailedInstallation {
         if ($reparse) { throw "$reparse is a symbolic link, junction or mount point; $InstallLocation was not deleted." }
         # Below %ProgramFiles%, ordinary users cannot have changed the folder. [IO.Directory]::Delete
         # with recursive=true "does not recurse through the reparse point" (Microsoft Learn).
-        [IO.Directory]::Delete($InstallLocation, $true)
+        try {
+            [IO.Directory]::Delete($InstallLocation, $true)
+        } catch {
+            # Files may stay locked until the restart that Windows Installer asked for.
+            if ($restartRequired) { throw "Windows Installer requires a restart and $InstallLocation could not be deleted yet. Restart Windows, delete $InstallLocation as administrator, then run this script again." }
+            throw
+        }
         if (Test-Path -LiteralPath $InstallLocation) { throw "$InstallLocation could not be deleted." }
         Write-Host "$InstallLocation was deleted."
+    }
+    if ($restartRequired) {
+        throw 'MariaDB was removed, but Windows Installer requires a restart. Restart Windows, then run this script again without -RemoveFailedInstallation.'
     }
 }
 
