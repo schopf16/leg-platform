@@ -143,8 +143,8 @@ The application account receives only `SELECT, INSERT, UPDATE, DELETE, CREATE, D
 
 Pattern for stage and production: the same privileges, only on the instance's own database, no test database and no global privileges, for an account that can connect only from the application host. `DROP` on the database level also allows dropping the whole database; a stricter split into a migration account (schema privileges) and a runtime account (`SELECT`, `INSERT`, `UPDATE`, `DELETE` only) is decided together with the hosting details (D-008).
 
-The privileges were taken from the sources above; whether Django's test suite and later migrations run with exactly these privileges is verified when the script is first run on a development machine (not yet done).
+The privileges were taken from the sources above and verified on 2026-10-12 on the development machine: creating the test database (which runs all migrations) and the full test suite ran with this account (D-030).
 
-Do not run `manage.py migrate` against the local database yet: the custom user model (D-021) must exist before the first migration of a persistent database. The test runner creates and removes its own test database.
+Apply migrations with `python manage.py migrate` only to a database created for this project; the custom user model `accounts` (D-021) is part of the migrations. The test runner creates and removes its own test database.
 
 Continuous integration (`.github/workflows/ci.yml`) runs the same checks and tests with the minimum versions (Python 3.12, Django 6.0, MariaDB 10.11) and with the newest versions (Python 3.14, Django 6.1, MariaDB 12.3), with an application account that has exactly the privileges above (created by root in a CI step).
