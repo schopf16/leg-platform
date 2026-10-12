@@ -200,7 +200,7 @@ $HardeningProblemSql = @'
 SELECT CONCAT('account without password: ', User, '@', Host) FROM mysql.global_priv WHERE User NOT IN ('mariadb.sys', 'PUBLIC') AND COALESCE(JSON_VALUE(Priv, '$.authentication_string'), '') = '';
 SELECT CONCAT('unexpected authentication: ', User, '@', Host) FROM mysql.global_priv WHERE User NOT IN ('mariadb.sys', 'PUBLIC') AND (COALESCE(JSON_VALUE(Priv, '$.plugin'), '') <> 'mysql_native_password' OR JSON_EXISTS(Priv, '$.auth_or') = 1);
 SELECT 'root accounts have different passwords' FROM mysql.global_priv WHERE User = 'root' HAVING COUNT(DISTINCT JSON_VALUE(Priv, '$.authentication_string')) <> 1;
-SELECT 'mariadb.sys is not locked' FROM mysql.global_priv WHERE User = 'mariadb.sys' AND Host = 'localhost' AND COALESCE(JSON_VALUE(Priv, '$.account_locked'), 'false') <> 'true';
+SELECT 'mariadb.sys is not locked' FROM mysql.global_priv WHERE User = 'mariadb.sys' AND Host = 'localhost' AND (COALESCE(JSON_VALUE(Priv, '$.account_locked'), '0') <> '1' OR COALESCE(JSON_TYPE(JSON_EXTRACT(Priv, '$.account_locked')), '') <> 'BOOLEAN');
 SELECT CONCAT('global privileges: ', User, '@', Host) FROM mysql.global_priv WHERE User <> 'root' AND COALESCE(JSON_VALUE(Priv, '$.access'), '0') <> '0';
 SELECT CONCAT('database grant: ', User, '@', Host, ' on ', Db) FROM mysql.db WHERE NOT (User = 'leg_platform' AND Host = '127.0.0.1' AND Db IN ('leg\\_platform', 'test\\_leg\\_platform'));
 SELECT CONCAT('table grant: ', User, '@', Host, ' on ', Db, '.', Table_name) FROM mysql.tables_priv WHERE NOT (Host = 'localhost' AND User = 'mariadb.sys' AND Db = 'mysql' AND Table_name = 'global_priv' AND Table_priv = 'Select,Delete' AND Column_priv = '');
