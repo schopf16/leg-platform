@@ -567,7 +567,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 ## D-028: Baseline Settings of the Django Project Skeleton
 
 * Date: 2026-10-11
-* Status: Partly decided. The Content Security Policy and local email delivery were decided by the project owner on 2026-10-11; all other parts are proposed (implemented in the project skeleton; confirmation by the project owner pending).
+* Status: Decided. The Content Security Policy and local email delivery were decided by the project owner on 2026-10-11. On 2026-10-12 the project owner delegated the remaining parts to established practice with priority on security; the main session reviewed them against the sources listed below (checked on 2026-10-11, not re-fetched on 2026-10-12) and kept them unchanged.
 * Context: README "Current Status", next step: create the Django project skeleton. `docs/SECURITY.md` (sections 3 and 6) requires secure defaults, but leaves several details of the settings open.
 * Decision:
   * The environment variables are validated in one place (`leg_platform/environment.py`); invalid or unsafe values prevent the start. Beyond `APP_ENV`, `DJANGO_DEBUG` and `EMAIL_MODE`: outside `APP_ENV=local`, `DJANGO_SECRET_KEY` and every fallback key must meet the criteria of Django's deployment check `security.W009` (at least 50 characters, at least 5 unique characters, no `django-insecure-` prefix), `DJANGO_ALLOWED_HOSTS` must be set, and `DJANGO_CSRF_TRUSTED_ORIGINS` accepts only `https://` origins. Wildcards (`*`, leading `.`) are rejected in `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` in all environments.
@@ -688,7 +688,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 ## D-031: Collations
 
 * Date: 2026-10-11
-* Status: Proposed (security review of 2026-10-11, M-2; confirmation by the project owner pending). Applies when the custom user model and the token tables are implemented (D-021).
+* Status: Decided (project owner, 2026-10-12; proposed after the security review of 2026-10-11, M-2). Applies when the custom user model and the token tables are implemented (D-021).
 * Context: The databases use the character set `utf8mb4` with the collation `utf8mb4_uca1400_ai_ci` (D-028, D-030), which is case- and accent-insensitive ("_ai" accent insensitive, "_ci" case insensitive). Comparisons in such a collation treat different strings as equal, e.g. `josé@example.org` and `jose@example.org`. For identifiers this would make a unique index reject a different address and a lookup find another account.
 * Decision:
   * Columns that hold identifiers and are compared exactly use the binary collation `utf8mb4_bin` through Django's `db_collation` field option: the normalised email address of the uniqueness column (D-016), token and keyed-hash values (D-023), and the customer number (D-021). Normalisation (D-021: surrounding white space removed, lower case) stays in the application.

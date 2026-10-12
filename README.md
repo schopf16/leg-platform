@@ -105,6 +105,6 @@ Deployment gates: no stage or production instance is deployed before
 
 Next steps:
 
-1. Confirmation of D-028 by the project owner. Decided on 2026-10-11: Content Security Policy with Django's built-in support (D-026, D-028), local email delivery with `console` or `allowlist` (`docs/SECURITY.md`, sections 8 and 11; D-028), licence BSD-3-Clause (D-029).
+1. Done: D-028 and D-031 were confirmed by the project owner on 2026-10-12. Decided on 2026-10-11: Content Security Policy with Django's built-in support (D-026, D-028), local email delivery with `console` or `allowlist` (`docs/SECURITY.md`, sections 8 and 11; D-028), licence BSD-3-Clause (D-029).
 2. On the development machine: manual removal of the earlier, failed MySQL installation, first run of the MariaDB setup script (`docs/INSTALLATION.md`) and a local test run against MariaDB with the restricted application account.
 3. Custom user model (D-021), before any persistent database is migrated.
