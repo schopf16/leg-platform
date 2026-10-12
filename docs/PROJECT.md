@@ -67,6 +67,7 @@ No assumptions are made. Requirements, technical statements and legal requiremen
 * Password change
 * Password reset via a single-use, time-limited link
 * Viewing and editing one's own profile
+* Validation of Swiss addresses and address autocompletion with a local copy of the official directory of building addresses (D-033)
 * Changing one's own email address (effective only after the new address is verified)
 * Deleting one's own account (with re-authentication)
 * Display of an understandable account status
@@ -87,8 +88,8 @@ The binding design language for all application views of all phases is defined i
 | Field | Required | Purpose |
 | ----- | -------- | ------- |
 | Customer number | generated when the registration is completed | Identification of the account; later reference on invoices |
-| Name | yes | Identification; addressing invoices |
-| Postal address | yes | Sending invoices by post |
+| Name: salutation, title, first name, last name; or organisation name with add-ons and optional contact person (D-032) | organisation name or first and last name | Identification; addressing invoices |
+| Postal address: two address lines, street, house number, dwelling number, post office box, locality, town, postal code, country (D-032) | postal code, town, country, and street or post office box | Sending invoices by post |
 | Email address | yes | Login, account notifications, sending invoices by email |
 | Phone number | no | Queries |
 
