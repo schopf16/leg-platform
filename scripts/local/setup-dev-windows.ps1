@@ -175,7 +175,7 @@ $ProductCodePattern = '^\{[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}\}\z
 # @@GLOBAL.shared_memory fails there with ERROR 1193; it is therefore read from
 # information_schema.GLOBAL_VARIABLES (upper-case names, booleans as ON/OFF: sql/sql_show.cc)
 # and reported as ABSENT if missing. Only OFF and ABSENT are accepted.
-$ServerCheckSql = "SELECT CONCAT(COALESCE(@@GLOBAL.bind_address, 'NULL'), '|', @@GLOBAL.skip_networking, '|', @@GLOBAL.named_pipe, '|', @@GLOBAL.port, '|', COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'), '|', COALESCE((SELECT COALESCE(VARIABLE_VALUE, 'NULL') FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY'), 'ABSENT'), '|', @@GLOBAL.general_log, '|', @@GLOBAL.slow_query_log, '|', @@GLOBAL.log_output, '|', COALESCE(@@GLOBAL.general_log_file, ''), '|', COALESCE(@@GLOBAL.slow_query_log_file, ''), '|', @@GLOBAL.event_scheduler);"
+$ServerCheckSql = "SELECT CONCAT(COALESCE(@@GLOBAL.bind_address, 'NULL'), '|', IF(@@GLOBAL.skip_networking = 0, 'OFF', 'ON'), '|', IF(@@GLOBAL.named_pipe = 0, 'OFF', 'ON'), '|', @@GLOBAL.port, '|', COALESCE((SELECT UPPER(PLUGIN_STATUS) FROM information_schema.PLUGINS WHERE UPPER(PLUGIN_NAME) = 'FEEDBACK'), 'NONE'), '|', COALESCE((SELECT COALESCE(VARIABLE_VALUE, 'NULL') FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY'), 'ABSENT'), '|', IF(@@GLOBAL.general_log = 0, 'OFF', 'ON'), '|', IF(@@GLOBAL.slow_query_log = 0, 'OFF', 'ON'), '|', @@GLOBAL.log_output, '|', COALESCE(@@GLOBAL.general_log_file, ''), '|', COALESCE(@@GLOBAL.slow_query_log_file, ''), '|', @@GLOBAL.event_scheduler);"
 
 # Other client connections: every thread except the current one and background threads, which
 # MariaDB shows with COMMAND 'Daemon' (MariaDB documentation, "Information Schema PROCESSLIST
@@ -1251,13 +1251,13 @@ function Get-ServerCheckProblems {
     if ($parts.Count -ne 12) { return @("unexpected server check result '$Line'") }
     $problems = @()
     if ($parts[0] -ne '127.0.0.1') { $problems += "bind_address is '$($parts[0])'" }
-    if ($parts[1] -ne '0') { $problems += 'skip_networking is on' }
-    if ($parts[2] -ne '0') { $problems += 'named_pipe is on' }
+    # The query maps the boolean variables to OFF/ON itself (a NULL becomes ON).
+    foreach ($field in @(@{ Index = 1; Name = 'skip_networking' }, @{ Index = 2; Name = 'named_pipe' }, @{ Index = 6; Name = 'general_log' }, @{ Index = 7; Name = 'slow_query_log' })) {
+        if ($parts[$field.Index] -cne 'OFF') { $problems += "$($field.Name) is '$($parts[$field.Index])'" }
+    }
     if ($parts[3] -ne "$DatabasePort") { $problems += "port is $($parts[3])" }
     if ($parts[4] -eq 'ACTIVE') { $problems += 'the feedback plugin is active' }
     if ($parts[5] -cne 'OFF' -and $parts[5] -cne 'ABSENT') { $problems += "shared_memory is '$($parts[5])'" }
-    if ($parts[6] -ne '0') { $problems += 'general_log is on' }
-    if ($parts[7] -ne '0') { $problems += 'slow_query_log is on' }
     if ($parts[8] -ne 'FILE') { $problems += "log_output is '$($parts[8])'" }
     if ($parts[11] -ne 'DISABLED') { $problems += "event_scheduler is '$($parts[11])'" }
     foreach ($index in @(9, 10)) {

@@ -264,16 +264,21 @@ try {
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306), (New-Listener '127.0.0.1' 33060))) -join ';') 'listens on 127.0.0.1:33060' 'Listeners: other port'
     Assert-Equal @(Get-ListenerProblems -Listeners @() -ExpectNone).Count 0 'Listeners: none expected'
     Assert-Equal ((Get-ListenerProblems -Listeners @((New-Listener '127.0.0.1' 3306)) -ExpectNone) -join ';') 'listens on 127.0.0.1:3306' 'Listeners: TCP while networking is skipped'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: expected values (no shared_memory variable, MariaDB 12.3)'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|OFF|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: shared memory off'
-    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|DISABLED|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: feedback plugin disabled'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|OFF|OFF|3306|NONE|ABSENT|OFF|OFF|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: expected values (no shared_memory variable, MariaDB 12.3)'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|OFF|OFF|3306|NONE|OFF|OFF|OFF|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: shared memory off'
+    Assert-Equal @(Get-ServerCheckProblems -Line '127.0.0.1|OFF|OFF|3306|DISABLED|ABSENT|OFF|OFF|FILE|mypc.log|mypc-slow.log|DISABLED').Count 0 'Server check: feedback plugin disabled'
     foreach ($value in @('ON', 'off', '0', '1', '')) {
-        Assert-Equal ((Get-ServerCheckProblems -Line "127.0.0.1|0|0|3306|NONE|$value|0|0|FILE|mypc.log|mypc-slow.log|DISABLED") -join ';') "shared_memory is '$value'" "Server check: shared memory value '$value' refused"
+        Assert-Equal ((Get-ServerCheckProblems -Line "127.0.0.1|OFF|OFF|3306|NONE|$value|OFF|OFF|FILE|mypc.log|mypc-slow.log|DISABLED") -join ';') "shared_memory is '$value'" "Server check: shared memory value '$value' refused"
+        foreach ($field in @(@{ Index = 1; Name = 'skip_networking' }, @{ Index = 2; Name = 'named_pipe' }, @{ Index = 6; Name = 'general_log' }, @{ Index = 7; Name = 'slow_query_log' })) {
+            $parts = '127.0.0.1|OFF|OFF|3306|NONE|ABSENT|OFF|OFF|FILE|mypc.log|mypc-slow.log|DISABLED'.Split('|')
+            $parts[$field.Index] = $value
+            Assert-Equal ((Get-ServerCheckProblems -Line ($parts -join '|')) -join ';') "$($field.Name) is '$value'" "Server check: $($field.Name) value '$value' refused"
+        }
     }
-    Assert-Equal ((Get-ServerCheckProblems -Line '*|1|1|3307|ACTIVE|ON|1|1|TABLE|C:\x\g.log|/tmp/s.log|ON') -join ';') "bind_address is '*';skip_networking is on;named_pipe is on;port is 3307;the feedback plugin is active;shared_memory is 'ON';general_log is on;slow_query_log is on;log_output is 'TABLE';event_scheduler is 'ON';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
-    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE|ABSENT|0|0|FILE|mypc.log|mypc-slow.log|OFF') -join ';') "event_scheduler is 'OFF'" 'Server check: event scheduler must be DISABLED after the restart'
+    Assert-Equal ((Get-ServerCheckProblems -Line '*|ON|ON|3307|ACTIVE|ON|ON|ON|TABLE|C:\x\g.log|/tmp/s.log|ON') -join ';') "bind_address is '*';skip_networking is 'ON';named_pipe is 'ON';general_log is 'ON';slow_query_log is 'ON';port is 3307;the feedback plugin is active;shared_memory is 'ON';log_output is 'TABLE';event_scheduler is 'ON';log file 'C:\x\g.log' is not a plain file name;log file '/tmp/s.log' is not a plain file name" 'Server check: every deviation reported'
+    Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|OFF|OFF|3306|NONE|ABSENT|OFF|OFF|FILE|mypc.log|mypc-slow.log|OFF') -join ';') "event_scheduler is 'OFF'" 'Server check: event scheduler must be DISABLED after the restart'
     Assert-Equal ((Get-ServerCheckProblems -Line '127.0.0.1|0|0|3306|NONE') -join ';') "unexpected server check result '127.0.0.1|0|0|3306|NONE'" 'Server check: malformed result'
-    Assert-Equal ($ServerCheckSql -like "*@@GLOBAL.bind_address*@@GLOBAL.skip_networking*@@GLOBAL.named_pipe*@@GLOBAL.port*FEEDBACK*COALESCE((SELECT COALESCE(VARIABLE_VALUE, 'NULL') FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY'), 'ABSENT')*@@GLOBAL.general_log*@@GLOBAL.slow_query_log*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*@@GLOBAL.event_scheduler*") $true 'Server check: query order matches the parser'
+    Assert-Equal ($ServerCheckSql -like "*@@GLOBAL.bind_address*IF(@@GLOBAL.skip_networking = 0, 'OFF', 'ON')*IF(@@GLOBAL.named_pipe = 0, 'OFF', 'ON')*@@GLOBAL.port*FEEDBACK*COALESCE((SELECT COALESCE(VARIABLE_VALUE, 'NULL') FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY'), 'ABSENT')*IF(@@GLOBAL.general_log = 0, 'OFF', 'ON')*IF(@@GLOBAL.slow_query_log = 0, 'OFF', 'ON')*@@GLOBAL.log_output*@@GLOBAL.general_log_file*@@GLOBAL.slow_query_log_file*@@GLOBAL.event_scheduler*") $true 'Server check: query order matches the parser'
     Assert-Equal ($ServerCheckSql -like '*@@GLOBAL.shared_memory*') $false 'Server check: no direct reference to shared_memory (absent in MariaDB 12.3)'
     Assert-Equal ($OtherConnectionsSql -clike "*PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon'*") $true 'Other connections: background threads excluded'
 
