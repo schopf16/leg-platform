@@ -113,16 +113,16 @@ class CreateUserTests(TestCase):
         self.assertFalse(User.objects.exists())
 
     def test_unicode_and_punycode_domain_spellings_share_one_account(self):
-        user = User.objects.create_user("person@bücher.de")
-        self.assertEqual(user.email, "person@xn--bcher-kva.de")
-        self.assertEqual(user.normalized_email, "person@xn--bcher-kva.de")
+        user = User.objects.create_user("person@bücher.test")
+        self.assertEqual(user.email, "person@xn--bcher-kva.test")
+        self.assertEqual(user.normalized_email, "person@xn--bcher-kva.test")
         with self.assertRaises(IntegrityError):
-            User.objects.create_user("person@xn--bcher-kva.de")
+            User.objects.create_user("person@xn--bcher-kva.test")
 
     def test_stored_address_is_the_canonical_form(self):
-        user = User.objects.create_user(" Person.Name@Bücher.DE ")
+        user = User.objects.create_user(" Person.Name@Bücher.TEST ")
         user.refresh_from_db()
-        self.assertEqual(user.email, "person.name@xn--bcher-kva.de")
+        self.assertEqual(user.email, "person.name@xn--bcher-kva.test")
         self.assertEqual(user.normalized_email, user.email)
 
     def test_email_address_longer_than_the_column_is_rejected(self):

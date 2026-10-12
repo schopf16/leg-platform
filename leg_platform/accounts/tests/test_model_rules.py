@@ -66,9 +66,9 @@ class NormalizationTests(SimpleTestCase):
         )
 
     def test_unicode_domain_and_punycode_domain_are_equal(self):
-        self.assertEqual(normalize_email_address("person@bücher.de"), "person@xn--bcher-kva.de")
+        self.assertEqual(normalize_email_address("person@bücher.test"), "person@xn--bcher-kva.test")
         self.assertEqual(
-            normalize_email_address("person@xn--bcher-kva.de"), "person@xn--bcher-kva.de"
+            normalize_email_address("person@xn--bcher-kva.test"), "person@xn--bcher-kva.test"
         )
 
     def test_empty_values_become_none(self):

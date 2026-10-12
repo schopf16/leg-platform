@@ -93,7 +93,7 @@ Phase 1 is in progress. The remaining work is:
 * Microsoft Graph configuration and delivery, a read-only system-administrator security-log view, retention cleanup and scheduling of `cleanup_login_ip_attempts`.
 * Instance-specific branding/configuration, complete Swiss German UI translations for new workflows and documented supported browsers.
 * Owner decisions: retain or remove the redundant `normalized_email` column; reconfirm lower-casing of email local parts against RFC 5321 section 2.4, including the account-takeover risk documented in D-035.
-* Verification: CI for the current changes remains unverified. The full local suite has one known failure: `test_repository_uses_only_reserved_email_domains` reports six existing fixtures outside reserved test domains.
+* Verification: CI for the current changes remains unverified. The fixtures that `test_repository_uses_only_reserved_email_domains` reported now use the reserved `.test` domain, and `User.from_db()` accepts the `fetch_mode` argument that Django 6.1 passes; the full suite has not yet been rerun against a database with these changes.
 
 Deployment gates: no stage or production instance is deployed before
 

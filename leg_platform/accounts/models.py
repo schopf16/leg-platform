@@ -473,8 +473,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         return gettext("New account")
 
     @classmethod
-    def from_db(cls, db, field_names, values):
-        instance = super().from_db(db, field_names, values)
+    def from_db(cls, db, field_names, values, **kwargs):
+        # Django 6.1 passes fetch_mode as a keyword argument, Django 6.0 does not.
+        instance = super().from_db(db, field_names, values, **kwargs)
         instance._persisted_pk = instance.pk
         return instance
 
