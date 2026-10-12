@@ -299,7 +299,7 @@ try {
     Assert-Equal ([regex]::Matches($hardening, "IDENTIFIED BY 'correct horse battery staple'").Count) 3 'Hardening SQL: password for the three root accounts'
     $hardeningLines = @($hardening -split "`r?`n" | Where-Object { $_ })
     Assert-Equal ([bool]($hardeningLines[1] -clike "IF (SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon') > 0 THEN SIGNAL SQLSTATE '45000'*END IF //")) $true 'Hardening SQL: aborts first if another client is connected'
-    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','information_schema.EVENTS', 'information_schema.TRIGGERS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', "FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY' AND (VARIABLE_VALUE IS NULL OR VARIABLE_VALUE <> 'OFF')", "'`$.account_locked'), '0') <> '1' OR COALESCE(JSON_TYPE(JSON_EXTRACT(Priv, '`$.account_locked')), '') <> 'BOOLEAN')", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform')")) {
+    foreach ($check in @('mysql.tables_priv', 'mysql.columns_priv', 'mysql.procs_priv', 'mysql.roles_mapping', 'mysql.proxies_priv', 'mysql.db', 'mysql.plugin', 'mysql.func', 'mysql.servers','mysql.event', 'information_schema.TRIGGERS', 'information_schema.PROCESSLIST', '@@GLOBAL.general_log', "FROM information_schema.GLOBAL_VARIABLES WHERE VARIABLE_NAME = 'SHARED_MEMORY' AND (VARIABLE_VALUE IS NULL OR VARIABLE_VALUE <> 'OFF')", "'`$.account_locked'), '0') <> '1' OR COALESCE(JSON_TYPE(JSON_EXTRACT(Priv, '`$.account_locked')), '') <> 'BOOLEAN')", "SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform')")) {
         Assert-Equal $HardeningProblemSql.Contains($check) $true "Hardening check SQL: $check"
     }
     $appSql = Get-AppAccountSql -Password 'generated-secret'
@@ -331,7 +331,8 @@ try {
 
     # Events, triggers, stored objects, authentication
     $hardeningCheckLines = @($HardeningProblemSql -split "`r?`n")
-    Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS;")) $true 'Hardening check SQL: every event, no schema excluded'
+    Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('event: ', db, '.', name) FROM mysql.event;")) $true 'Hardening check SQL: every event, no schema excluded'
+    Assert-Equal $HardeningProblemSql.Contains('information_schema.EVENTS') $false 'Hardening check SQL: no information_schema.EVENTS (error 1577 with the scheduler disabled)'
     Assert-Equal ([bool]($hardeningCheckLines -ccontains "SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS;")) $true 'Hardening check SQL: every trigger, no schema excluded'
     Assert-Equal $HardeningProblemSql.Contains("@@GLOBAL.event_scheduler NOT IN ('OFF', 'DISABLED')") $true 'Hardening check SQL: event scheduler off'
     Assert-Equal $HardeningProblemSql.Contains('@@GLOBAL.shared_memory') $false 'Hardening check SQL: no direct reference to shared_memory (absent in MariaDB 12.3)'

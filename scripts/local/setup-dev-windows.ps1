@@ -212,7 +212,7 @@ SELECT CONCAT('installed plugin: ', name) FROM mysql.plugin;
 SELECT CONCAT('user-defined function: ', name) FROM mysql.func;
 SELECT CONCAT('federated server: ', Server_name) FROM mysql.servers;
 SELECT CONCAT('schema: ', SCHEMA_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'leg_platform');
-SELECT CONCAT('event: ', EVENT_SCHEMA, '.', EVENT_NAME) FROM information_schema.EVENTS;
+SELECT CONCAT('event: ', db, '.', name) FROM mysql.event;
 SELECT CONCAT('trigger: ', TRIGGER_SCHEMA, '.', TRIGGER_NAME) FROM information_schema.TRIGGERS;
 SELECT CONCAT('event scheduler is ', @@GLOBAL.event_scheduler) FROM DUAL WHERE @@GLOBAL.event_scheduler NOT IN ('OFF', 'DISABLED');
 SELECT CONCAT('other client connection: ', ID, ' ', USER, '@', HOST) FROM information_schema.PROCESSLIST WHERE ID <> CONNECTION_ID() AND COMMAND <> 'Daemon';
