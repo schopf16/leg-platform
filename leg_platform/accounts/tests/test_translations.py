@@ -212,7 +212,11 @@ class AdminPageTranslationTests(TestCase):
             self.assertEqual(login_response.status_code, 200)
             login_content = login_response.content.decode()
             self.assertNotIn(SHARP_S, login_content)
-            self.assertIn("Normalisierte E-Mail-Adresse", login_content)
+            self.assertIn("E-Mail-Adresse", login_content)
+            self.assertNotIn("Normalisiert", login_content)
+            self.assertEqual(
+                str(login_response.context["form"].fields["username"].label), "E-Mail-Adresse"
+            )
 
             self.client.force_login(self.administrator)
             pages = {
@@ -230,6 +234,7 @@ class AdminPageTranslationTests(TestCase):
                     self.assertNotIn(SHARP_S, rendered[page_name])
 
         self.assertIn("E-Mail-Adresse", rendered["user form"])
+        self.assertNotIn("Normalisiert", rendered["user form"])
         self.assertIn("Kundennummer", rendered["user form"])
         self.assertIn("E-Mail-Adresse", rendered["user list"])
         self.assertIn("Gruppe zur Änderung auswählen", rendered["group list"])

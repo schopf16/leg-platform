@@ -43,7 +43,6 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = (
         "id",
         "email",
-        "normalized_email",
         "customer_number",
         "retention_obligation",
         "status",
@@ -57,7 +56,6 @@ class UserAdmin(admin.ModelAdmin):
                 "fields": (
                     "id",
                     "email",
-                    "normalized_email",
                     "status",
                     "is_active",
                     "customer_number",

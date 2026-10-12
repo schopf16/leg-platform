@@ -71,9 +71,6 @@ msgstr "Familie"
 msgid "email address"
 msgstr "E-Mail-Adresse"
 
-msgid "normalised email address"
-msgstr "Normalisierte E-Mail-Adresse"
-
 #, python-format
 msgid "%(model_name)s with this %(field_label)s already exists."
 msgstr "%(model_name)s mit diesem Wert für das Feld %(field_label)s existiert bereits."

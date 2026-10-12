@@ -358,7 +358,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(_("email address"), max_length=EMAIL_MAX_LENGTH)
     normalized_email = models.EmailField(
-        _("normalised email address"),
+        _("email address"),
         max_length=EMAIL_MAX_LENGTH,
         unique=True,
         null=True,
