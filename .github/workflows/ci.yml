@@ -57,7 +57,6 @@ jobs:
           # not a secret of any environment. Variables of the official image (Docker Hub,
           # library/mariadb).
           MARIADB_ROOT_PASSWORD: ci-only-throwaway-password
-          MARIADB_DATABASE: leg_platform
         ports:
           - 3306:3306
         # healthcheck.sh is part of the official image: --connect is "Active when an external
@@ -74,7 +73,7 @@ jobs:
       DJANGO_DEBUG: "False"
       EMAIL_MODE: console
       DB_NAME: leg_platform
-      # DB_USER and DB_PASSWORD are set by the step "Create the application account": the
+      # DB_USER and DB_PASSWORD are set by the step "Create the database and the application account": the
       # checks and tests run with the narrow privileges of the application account.
       DB_HOST: 127.0.0.1
       DB_PORT: "3306"
@@ -125,8 +124,9 @@ jobs:
           echo "::add-mask::$key"
           echo "DJANGO_SECRET_KEY=$key" >> "$GITHUB_ENV"
 
-      - name: Create the application account
-        # Same privileges as the local setup (docs/INSTALLATION.md, "Database privileges"), on
+      - name: Create the database and the application account
+        # The database is created with utf8mb4 and utf8mb4_uca1400_ai_ci, as every database of
+        # an instance (D-031). Same privileges as the local setup (docs/INSTALLATION.md, "Database privileges"), on
         # leg_platform and Django's test database only, with "_" escaped. The host is '%'
         # because the job reaches the service container through Docker's network. The
         # generated password is masked and protects nothing beyond this job.
@@ -150,6 +150,7 @@ jobs:
               password=os.environ["ROOT_PASSWORD"],
           )
           cursor = connection.cursor()
+          cursor.execute("CREATE DATABASE `leg_platform` CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci")
           cursor.execute(f"CREATE USER 'leg_platform'@'%' IDENTIFIED BY '{password}'")
           for database in databases:
               cursor.execute(f"GRANT {privileges} ON `{database}`.* TO 'leg_platform'@'%'")
