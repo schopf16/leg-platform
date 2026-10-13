@@ -1,0 +1,14 @@
+# SHA-256 of the third-party files in this directory (docs/THIRD_PARTY_LICENSES.md, D-037).
+# Tabler: @tabler/core 1.6.1 from the npm registry (tarball checked against the registry's SHA-512 integrity value).
+# Fonts: github.com/google/fonts (ofl/...), unmodified. Tabler Icons: github.com/tabler/tabler-icons, tag v3.49.0.
+# Check with: Get-FileHash -Algorithm SHA256 <file>
+413e7357809ddd12fd80a96a8a396de0e401638d4acd3cb3e37532f0472ac682  fonts/BricolageGrotesque.ttf
+6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46  fonts/IBMPlexMono-Regular.ttf
+4b5a7d8f37f5602621c8a8d7358a6a2e71317e6c231c661e15aef0275d3e07ba  fonts/OFL-BricolageGrotesque.txt
+7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da  fonts/OFL-IBMPlexMono.txt
+09746787287a289323b0ec3cff4d1a4a801331b82b7207c1e186f5d26619a392  fonts/OFL-SourceSans3.txt
+042fe2cc0b933e328410d7acbd0aa6a1873dca5aef81875f4bc214b08825c7b9  fonts/SourceSans3.ttf
+b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db  tabler-icons/LICENSE
+407856048124fdd63239f75a3640ca8f20a9acbc1f49cac9de0bcdb1cb42ec5f  tabler-icons/lock.svg
+370a2d4e608ae518351d10528fc7dbe19b354ae5062c51b2a9cb294850d65403  tabler/css/tabler.min.css
+04a8a85b13c917ed03bfaec3275f23c8251bf1ba1cc2876d15ead67699772d31  tabler/LICENSE
