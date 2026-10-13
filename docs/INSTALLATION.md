@@ -133,7 +133,11 @@ Web server and reverse proxy access logs are outside the application. The verifi
 
 `AXES_IPWARE_PROXY_COUNT` defaults to `0`: login abuse protection uses the address of the direct TCP peer (`REMOTE_ADDR`) and ignores `X-Forwarded-For`. If Django is reached only through reverse proxies, set this variable to the exact number of proxies between the client and Django. Set it only after verifying that each proxy removes or validates client-supplied forwarding headers and appends its own address. IPware validates the chain strictly; an unexpected or malformed chain produces no client IP and the login is refused. A wrong value can group users under a proxy address or refuse logins, so the deployment value must be verified against the actual proxy topology before enabling a stage or production instance. Client IPs are not stored in Axes; the independent lockout counter stores only a keyed digest (D-017, D-023).
 
-The `cleanup_login_ip_attempts` management command removes expired pseudonymous IP attempts and empty buckets. A stage or production scheduler must run it regularly; the schedule is not yet configured because the hosting setup is still open (D-008, D-018).
+The `cleanup_login_ip_attempts` management command removes expired pseudonymous IP attempts, empty buckets, expired account attempts of the abuse protection and second factor setups that were never confirmed. It takes each bucket in a short transaction and skips one that a request holds, so it never waits for a request. A stage or production scheduler must run it regularly (for example every 15 minutes); the schedule is not yet configured because the hosting setup is still open (D-008, D-018, D-040).
+
+### Changing `SECRET_KEY`
+
+Second factor keys are encrypted with a key derived from `SECRET_KEY` and recovery codes are stored as digests under it (D-040). When `SECRET_KEY` is replaced, put the old value into `DJANGO_SECRET_KEY_FALLBACKS`: keys and recovery codes then keep working, and a key is encrypted again with the new one the next time it is used. Do not remove the old value from the fallbacks before every active account with a second factor has logged in with it once; the accounts that did not need their second factor reset by a system administrator. A command that encrypts all keys again at once is not available yet (it is planned together with the emergency command, D-005). The Microsoft Graph secret has the same rule (D-006).
 
 ### Recovery after a failed setup
 

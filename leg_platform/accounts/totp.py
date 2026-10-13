@@ -40,6 +40,15 @@ RECOVERY_CODE_COUNT = 10
 RECOVERY_CODE_LENGTH = 8
 # An unconfirmed secret is usable only shortly and only in the session that started the setup.
 ENROLMENT_LIFETIME = timedelta(minutes=15)
+# Budget of wrong codes per account (D-040): a window of 24 hours from the first wrong code. At
+# the notice the owner gets an email, at the pause code entry stops until the window ends or the
+# password is reset, which leaves the budget at the relief value. NIST SP 800-63B-4, section
+# 3.2.2 allows at most 100 consecutive failures per authenticator; this is much stricter, and
+# the Axes lockout (5 failures, 15 minutes) applies in addition.
+CODE_BUDGET_WINDOW = timedelta(hours=24)
+CODE_NOTICE_AT = 10
+CODE_PAUSE_AT = 15
+CODE_RELIEF_TO = 10
 
 
 class SecondFactorError(Exception):
@@ -83,6 +92,62 @@ def remaining_recovery_codes(user):
 
 def is_recovery_code_device(device):
     return isinstance(device, RecoveryCodeDevice)
+
+
+def _current_failures(device, now):
+    since = device.failed_codes_since
+    if since is None or now - since >= CODE_BUDGET_WINDOW:
+        return 0
+    return device.failed_codes
+
+
+def code_attempts_paused(user):
+    """Whether the budget of wrong codes of the account is used up (D-040)."""
+    device = confirmed_totp_device(user)
+    return device is not None and _current_failures(device, timezone.now()) >= CODE_PAUSE_AT
+
+
+def record_failed_code(user):
+    """Count a wrong code against the budget; call it under the lock on the account row.
+
+    The owner is notified once per window, without any link, when the notice is reached.
+    """
+    device = AuthenticatorDevice.objects.select_for_update().filter(user=user, confirmed=True).first()
+    if device is None:
+        return
+    now = timezone.now()
+    count = _current_failures(device, now)
+    if count == 0:
+        device.failed_codes_since = now
+        device.code_budget_relieved = False
+    device.failed_codes = count + 1
+    device.save(
+        update_fields=["failed_codes", "failed_codes_since", "code_budget_relieved"]
+    )
+    if device.failed_codes == CODE_NOTICE_AT:
+        enqueue(MailJob.Kind.CODE_ATTEMPTS_WARNING, user.email)
+        security_logger.warning("Many wrong codes were entered (account %d).", user.pk)
+    elif device.failed_codes == CODE_PAUSE_AT:
+        security_logger.warning("Code entry is paused (account %d).", user.pk)
+
+
+def relieve_code_budget(user):
+    """After a password reset the budget is at most the relief value, once per window.
+
+    Never more attempts than before, and a second reset in the same window gives none: a person
+    who controls the mailbox gets no more than that.
+    """
+    AuthenticatorDevice.objects.filter(
+        user=user, failed_codes__gt=CODE_RELIEF_TO, code_budget_relieved=False
+    ).update(failed_codes=CODE_RELIEF_TO, code_budget_relieved=True)
+
+
+def delete_abandoned_enrolments(now=None):
+    """Delete secrets whose setup was never confirmed; return their number."""
+    count, _ = AuthenticatorDevice.objects.filter(
+        confirmed=False, created_at__lt=(now or timezone.now()) - ENROLMENT_LIFETIME
+    ).delete()
+    return count
 
 
 def start_enrolment(user):

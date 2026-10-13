@@ -21,6 +21,7 @@ from django.contrib.auth.signals import user_login_failed
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import redirect
+from django.utils.crypto import constant_time_compare
 from django.utils.translation import gettext
 
 from leg_platform.accounts import totp
@@ -109,7 +110,13 @@ def pending_login(request):
         request.session.pop(PENDING_SESSION_KEY, None)
         return None
     user = User.objects.filter(pk=pending["user"], status=User.Status.ACTIVE).first()
-    if user is None or not has_second_factor(user):
+    # A password change or reset between the two steps ends the pending login.
+    if (
+        user is None
+        or not has_second_factor(user)
+        or not pending.get("auth_hash")
+        or not constant_time_compare(user.get_session_auth_hash(), pending["auth_hash"])
+    ):
         request.session.pop(PENDING_SESSION_KEY, None)
         return None
     return PendingLogin(user, pending["next"])
@@ -126,6 +133,7 @@ def begin_pending_login(request, user, next_url):
         "user": user.pk,
         "started": time.time(),
         "next": next_url,
+        "auth_hash": user.get_session_auth_hash(),
     }
     # The password was right: the IP slot of this attempt is released. The code step reserves
     # its own slot and keeps it if the code is wrong (D-017).
@@ -150,8 +158,16 @@ def verify_second_factor(request, user, code):
         except PermissionDenied:
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
             return None
+        if totp.code_attempts_paused(user):
+            # The budget of wrong codes is used up: even a correct code is refused. Like a
+            # lockout of Axes, so that nothing is recorded and no lockout is extended.
+            request.axes_locked_out = True
+            request.second_factor_paused = True
+            user_login_failed.send(sender=__name__, credentials=credentials, request=request)
+            return None
         device = totp.verify_code(user, code)
         if device is None:
+            totp.record_failed_code(user)
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
             return None
     settle_client_ip_attempt(request, succeeded=True)

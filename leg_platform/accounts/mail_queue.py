@@ -55,6 +55,7 @@ HANDLERS = {
     MailJob.Kind.TWO_FACTOR_DISABLED: _notification(emails.send_two_factor_disabled),
     MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),
     MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
+    MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
 }
 
 DONE = "done"

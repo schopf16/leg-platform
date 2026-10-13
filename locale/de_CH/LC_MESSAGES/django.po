@@ -811,6 +811,45 @@ msgstr "Hinweis: Wiederherstellungscodes erneuert"
 msgid "Notification: recovery code used"
 msgstr "Hinweis: Wiederherstellungscode verwendet"
 
+msgid "Notification: many wrong codes entered"
+msgstr "Hinweis: Viele falsche Codes eingegeben"
+
+#, python-format
+msgid "Wrong codes were entered for your account at %(instance_name)s"
+msgstr "Für Ihr Konto bei %(instance_name)s wurden falsche Codes eingegeben"
+
+#: leg_platform/accounts/templates/accounts/email/code_attempts_warning.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"Several wrong codes were entered for your account at %(instance_name)s after the correct password was given. Code entry is paused if this continues.\n"
+"\n"
+"If this was you, check that the clock of your phone is set automatically. If it was not you, someone may know your password: choose a new password with \"Forgot password\" on the login page."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für Ihr Konto bei %(instance_name)s wurden mehrere falsche Codes eingegeben, nachdem das richtige Passwort angegeben worden war. Wenn das so weitergeht, wird die Code-Eingabe pausiert.\n"
+"\n"
+"Wenn Sie das waren, prüfen Sie, ob die Uhr Ihres Telefons automatisch eingestellt ist. Wenn Sie es nicht waren, kennt möglicherweise jemand Ihr Passwort: Wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
+
+#, python-format
+msgid ""
+"If you need help, contact the operator. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr ""
+"Wenn Sie Hilfe brauchen, wenden Sie sich an die Betreiber. Kontaktangaben finden Sie hier:\n"
+"\n"
+"%(contact_url)s"
+
+msgid "If you need help, contact the operator of this portal."
+msgstr "Wenn Sie Hilfe brauchen, wenden Sie sich an die Betreiber dieses Portals."
+
+#: leg_platform/accounts/templates/accounts/lockout.html
+msgid "Too many wrong codes were entered for this account. Code entry is paused. The pause ends within 24 hours, or when a new password has been chosen."
+msgstr "Für dieses Konto wurden zu viele falsche Codes eingegeben. Die Code-Eingabe ist pausiert. Die Pause endet innerhalb von 24 Stunden oder sobald ein neues Passwort gewählt wurde."
+
 #: leg_platform/accounts/email_texts.py
 #, python-format
 msgid "Two-factor authentication was set up at %(instance_name)s"

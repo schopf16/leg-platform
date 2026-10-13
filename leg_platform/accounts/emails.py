@@ -148,3 +148,8 @@ def send_recovery_codes_renewed(address):
 def send_recovery_code_used(address):
     """Tell the owner that a recovery code was used to log in; contains no link."""
     _send(address, Key.RECOVERY_CODE_USED, {})
+
+
+def send_code_attempts_warning(address):
+    """Tell the owner that many wrong codes were entered after the correct password."""
+    _send(address, Key.CODE_ATTEMPTS_WARNING, {})

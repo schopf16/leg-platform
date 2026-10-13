@@ -83,6 +83,10 @@ def complete_reset(token, form):
             user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
         ).delete()
         _end_account_lockout(user)
+        # The pause of code entry ends, but the budget is not reset completely (D-040).
+        from leg_platform.accounts import totp
+
+        totp.relieve_code_budget(user)
     return user
 
 

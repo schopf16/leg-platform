@@ -6,12 +6,15 @@ import re
 import threading
 import time
 from base64 import b32encode
+from datetime import timedelta
+from io import StringIO
 from unittest import mock
 
-from axes.models import AccessAttempt
+from axes.models import AccessAttempt, AccessAttemptExpiration
 from django.conf import settings
 from django.contrib import admin
 from django.core import mail
+from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
 from django.test import (
     Client,
@@ -23,6 +26,7 @@ from django.test import (
     tag,
 )
 from django.urls import reverse
+from django.utils import timezone
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 
@@ -31,12 +35,16 @@ from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     LoginIpAttempt,
+    LoginIpBucket,
     MailJob,
+    RateLimitEvent,
     RecoveryCode,
     RecoveryCodeDevice,
     User,
+    VerificationToken,
     recovery_code_digest,
 )
+from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
@@ -1363,3 +1371,419 @@ class DeviceRulesTests(TestCase):
         self.assertEqual(RecoveryCodeDevice.objects.get().persistent_id, before)
         self.assertEqual(len(stored_digests()), totp.RECOVERY_CODE_COUNT)
 
+
+
+def set_budget(device, failures, hours_ago=0):
+    AuthenticatorDevice.objects.filter(pk=device.pk).update(
+        failed_codes=failures, failed_codes_since=timezone.now() - timedelta(hours=hours_ago)
+    )
+
+
+def budget_of(device):
+    return AuthenticatorDevice.objects.get(pk=device.pk).failed_codes
+
+
+@tag("mariadb")
+class CodeBudgetTests(TestCase):
+    """The budget of wrong codes per account: notice, pause, relief (D-040)."""
+
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def test_the_owner_is_notified_once_when_the_notice_is_reached(self):
+        for _attempt in range(totp.CODE_NOTICE_AT - 1):
+            totp.record_failed_code(self.user)
+        self.assertFalse(MailJob.objects.exists())
+
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            totp.record_failed_code(self.user)
+        for _attempt in range(3):
+            totp.record_failed_code(self.user)
+
+        job = MailJob.objects.get()
+        self.assertEqual(job.kind, MailJob.Kind.CODE_ATTEMPTS_WARNING)
+        self.assertEqual(len(logs.output), 1)
+        self.assertNotIn(self.user.email, logs.output[0])
+        run_mail_queue()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertNotIn("http", mail.outbox[0].body)
+        self.assertFalse(RateLimitEvent.objects.exists())
+
+    def test_the_budget_restarts_after_the_window_and_warns_again(self):
+        set_budget(self.device, totp.CODE_NOTICE_AT - 1, hours_ago=25)
+
+        totp.record_failed_code(self.user)
+
+        self.assertEqual(budget_of(self.device), 1)
+        self.assertFalse(MailJob.objects.exists())
+
+    def test_a_password_lockout_neither_counts_nor_sends_mail(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            log_in(Client(), self.user.email, "wrong password for this account", address="10.8.0.9")
+
+        self.assertEqual(budget_of(self.device), 0)
+        self.assertFalse(MailJob.objects.exists())
+
+    def test_a_wrong_code_counts(self):
+        log_in(self.client, self.user.email, address="10.8.0.1")
+        send_code(self.client, "000000", address="10.8.0.1")
+        self.assertEqual(budget_of(self.device), 1)
+
+    def test_a_wrong_recovery_code_counts_and_a_right_one_does_not(self):
+        log_in(self.client, self.user.email, address="10.8.0.2")
+
+        send_code(self.client, "zzzz2222", address="10.8.0.2")
+        self.assertEqual(budget_of(self.device), 1)
+        send_code(self.client, "abcd2345", address="10.8.0.2")
+
+        self.assertEqual(budget_of(self.device), 1)
+
+    def test_a_successful_login_does_not_reset_the_budget(self):
+        set_budget(self.device, 3)
+        log_in(self.client, self.user.email, address="10.8.0.3")
+
+        send_code(self.client, code_for(self.device), address="10.8.0.3")
+
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(budget_of(self.device), 3)
+
+    def test_the_forms_that_ask_for_a_code_count_against_the_same_budget(self):
+        self.client.force_login(self.user)
+        complete_second_factor(self.client, self.user)
+
+        self.client.post(
+            reverse("accounts:two_factor_disable"),
+            {"current_password": PASSWORD, "otp_token": "000000"},
+            REMOTE_ADDR="10.8.0.4",
+        )
+
+        self.assertEqual(budget_of(self.device), 1)
+
+    def test_attempts_that_the_lockout_refuses_do_not_count(self):
+        log_in(self.client, self.user.email, address="10.8.0.5")
+        for _attempt in range(LOGIN_FAILURE_LIMIT + 3):
+            send_code(self.client, "000000", address="10.8.0.5")
+
+        self.assertEqual(budget_of(self.device), LOGIN_FAILURE_LIMIT)
+
+    def test_a_used_up_budget_pauses_code_entry_even_for_a_correct_code(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        log_in(self.client, self.user.email, address="10.8.0.6")
+
+        response = send_code(self.client, code_for(self.device), address="10.8.0.6")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, "pausiert", status_code=429)
+        self.assertNotContains(response, "\u00df", status_code=429)
+        self.assertContains(response, reverse("accounts:password_reset"), status_code=429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(budget_of(self.device), totp.CODE_PAUSE_AT)
+        # Nothing is recorded by Axes, so its lockout is not extended; the IP attempt is kept.
+        self.assertFalse(AccessAttempt.objects.exists())
+        self.assertEqual(LoginIpAttempt.objects.filter(pending=False).count(), 1)
+        self.assertFalse(MailJob.objects.exists())
+
+    def test_the_pause_ends_with_the_window(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT, hours_ago=25)
+        log_in(self.client, self.user.email, address="10.8.0.7")
+
+        response = send_code(self.client, code_for(self.device), address="10.8.0.7")
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+
+    def test_the_pause_does_not_affect_other_accounts(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        other, other_device = create_user_with_totp("other.person@example.org")
+        client = Client()
+        log_in(client, other.email, address="10.8.0.8")
+
+        response = send_code(client, code_for(other_device), address="10.8.0.8")
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+
+    def test_the_normal_lockout_page_has_no_pause_text(self):
+        log_in(self.client, self.user.email, address="10.8.0.10")
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            response = send_code(self.client, "000000", address="10.8.0.10")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertNotContains(response, "pausiert", status_code=429)
+
+    def reset_password(self):
+        raw = VerificationToken.objects.issue(
+            self.user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
+        )
+        client = Client()
+        client.get(reverse("accounts:password_reset_verify", args=[raw]))
+        client.post(
+            reverse("accounts:password_reset_set"),
+            {"new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD},
+        )
+
+    def test_a_password_reset_ends_the_pause_but_leaves_a_few_attempts(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+
+        self.reset_password()
+
+        self.assertEqual(budget_of(self.device), totp.CODE_RELIEF_TO)
+        self.assertFalse(totp.code_attempts_paused(self.user))
+
+    def test_a_password_reset_never_gives_more_attempts_than_the_budget_has(self):
+        set_budget(self.device, 3)
+
+        self.reset_password()
+
+        self.assertEqual(budget_of(self.device), 3)
+
+    def test_a_new_setup_starts_with_a_new_budget(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        totp.disable(self.user)
+
+        device = totp.start_enrolment(self.user)
+
+        self.assertEqual(device.failed_codes, 0)
+
+    def test_an_account_without_a_second_factor_is_not_touched(self):
+        plain = create_active_user("plain.person@example.org")
+
+        totp.record_failed_code(plain)
+
+        self.assertFalse(MailJob.objects.exists())
+        self.assertFalse(totp.code_attempts_paused(plain))
+
+
+@tag("mariadb")
+class PendingLoginBindingTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def test_a_password_change_between_the_two_steps_ends_the_pending_login(self):
+        log_in(self.client, self.user.email, address="10.9.0.1")
+        self.user.set_password(OTHER_PASSWORD)
+        self.user.save()
+
+        response = send_code(self.client, code_for(self.device), address="10.9.0.1")
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_without_a_change_the_pending_login_still_works(self):
+        log_in(self.client, self.user.email, address="10.9.0.2")
+
+        response = send_code(self.client, code_for(self.device), address="10.9.0.2")
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+
+
+@tag("mariadb")
+class CleanupTests(TestCase):
+    def test_abandoned_setups_are_deleted_and_the_others_kept(self):
+        user = create_active_user()
+        stale = AuthenticatorDevice.objects.create_device(user, confirmed=False)
+        AuthenticatorDevice.objects.filter(pk=stale.pk).update(
+            created_at=timezone.now() - totp.ENROLMENT_LIFETIME * 2
+        )
+        young_user = create_active_user("young.person@example.org")
+        young = AuthenticatorDevice.objects.create_device(young_user, confirmed=False)
+        _owner, confirmed = create_user_with_totp("confirmed.person@example.org")
+        AuthenticatorDevice.objects.filter(pk=confirmed.pk).update(
+            created_at=timezone.now() - totp.ENROLMENT_LIFETIME * 2
+        )
+        output = StringIO()
+
+        call_command("cleanup_login_ip_attempts", stdout=output)
+
+        self.assertIn("1 abandoned second factor setups", output.getvalue())
+        self.assertEqual(
+            set(AuthenticatorDevice.objects.values_list("pk", flat=True)),
+            {young.pk, confirmed.pk},
+        )
+
+    def test_expired_account_attempts_of_the_abuse_protection_are_deleted(self):
+        log_in(Client(), "unknown.person@example.org", "wrong", address="10.9.1.1")
+        AccessAttemptExpiration.objects.update(expires_at=timezone.now() - timedelta(minutes=1))
+
+        call_command("cleanup_login_ip_attempts", stdout=StringIO())
+
+        self.assertFalse(AccessAttempt.objects.exists())
+
+
+class CleanupConcurrencyTests(TransactionTestCase):
+    def test_a_bucket_held_by_a_request_is_skipped_and_never_waited_for(self):
+        digest = "a" * 64
+        bucket = LoginIpBucket.objects.create(digest=digest)
+        LoginIpAttempt.objects.create(
+            bucket=bucket, attempted_at=timezone.now() - timedelta(days=1), pending=False
+        )
+        locked, release = threading.Event(), threading.Event()
+
+        def hold():
+            try:
+                with transaction.atomic():
+                    LoginIpBucket.objects.select_for_update().get(digest=digest)
+                    locked.set()
+                    release.wait(20)
+            finally:
+                connection.close()
+
+        thread = threading.Thread(target=hold)
+        thread.start()
+        self.assertTrue(locked.wait(10))
+        try:
+            call_command("cleanup_login_ip_attempts", stdout=StringIO())
+            self.assertTrue(LoginIpBucket.objects.filter(digest=digest).exists())
+        finally:
+            release.set()
+            thread.join()
+
+        call_command("cleanup_login_ip_attempts", stdout=StringIO())
+        self.assertFalse(LoginIpBucket.objects.filter(digest=digest).exists())
+        self.assertFalse(LoginIpAttempt.objects.exists())
+
+
+@tag("mariadb")
+class CodeBudgetPauseTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def reset_password(self):
+        raw = VerificationToken.objects.issue(
+            self.user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
+        )
+        client = Client()
+        client.get(reverse("accounts:password_reset_verify", args=[raw]))
+        client.post(
+            reverse("accounts:password_reset_set"),
+            {"new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD},
+        )
+
+    def test_a_recovery_code_is_refused_during_the_pause(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        log_in(self.client, self.user.email, address="10.8.1.1")
+
+        response = send_code(self.client, "abcd2345", address="10.8.1.1")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(len(stored_digests()), len(RECOVERY_CODES))
+
+    def test_the_forms_that_ask_for_a_code_refuse_a_correct_code_during_the_pause(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        self.client.force_login(self.user)
+        complete_second_factor(self.client, self.user)
+
+        response = self.client.post(
+            reverse("accounts:two_factor_disable"),
+            {"current_password": PASSWORD, "otp_token": code_for(self.device)},
+            REMOTE_ADDR="10.8.1.2",
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(AuthenticatorDevice.objects.exists())
+
+    def test_the_pause_is_logged_once(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT - 1)
+
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            totp.record_failed_code(self.user)
+
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn(f"account {self.user.pk}", logs.output[0])
+
+    def test_a_second_reset_in_the_same_window_gives_no_more_attempts(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        self.reset_password()
+        self.assertEqual(budget_of(self.device), totp.CODE_RELIEF_TO)
+        AuthenticatorDevice.objects.filter(pk=self.device.pk).update(
+            failed_codes=totp.CODE_PAUSE_AT
+        )
+
+        self.reset_password()
+
+        self.assertEqual(budget_of(self.device), totp.CODE_PAUSE_AT)
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.CODE_ATTEMPTS_WARNING).exists())
+
+    def test_relief_is_available_again_in_a_new_window(self):
+        set_budget(self.device, totp.CODE_PAUSE_AT)
+        self.reset_password()
+        set_budget(self.device, totp.CODE_PAUSE_AT - 1, hours_ago=25)
+
+        totp.record_failed_code(self.user)
+        for _attempt in range(totp.CODE_PAUSE_AT):
+            totp.record_failed_code(self.user)
+        self.reset_password()
+
+        self.assertEqual(budget_of(self.device), totp.CODE_RELIEF_TO)
+
+    def test_a_real_password_reset_between_the_two_steps_ends_the_pending_login(self):
+        log_in(self.client, self.user.email, address="10.8.1.3")
+
+        self.reset_password()
+        response = send_code(self.client, code_for(self.device), address="10.8.1.3")
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_a_pending_login_without_a_stored_hash_ends_without_an_error(self):
+        log_in(self.client, self.user.email, address="10.8.1.4")
+        session = self.client.session
+        del session[second_factor.PENDING_SESSION_KEY]["auth_hash"]
+        session.save()
+
+        response = send_code(self.client, code_for(self.device), address="10.8.1.4")
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+
+
+@tag("mariadb")
+class ParallelBudgetTests(TransactionTestCase):
+    def run_all(self, functions):
+        barrier = threading.Barrier(len(functions))
+        results = []
+
+        def work(function):
+            try:
+                barrier.wait()
+                results.append(function())
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return results
+
+    def wrong_codes_in_parallel(self, user):
+        clients = []
+        for number in range(8):
+            address = f"10.8.2.{number + 1}"
+            client = Client()
+            log_in(client, user.email, address=address)
+            clients.append((client, address))
+        return self.run_all(
+            [
+                lambda client=client, address=address: send_code(client, "000000", address).status_code
+                for client, address in clients
+            ]
+        )
+
+    def test_parallel_wrong_codes_send_one_mail_when_the_notice_is_crossed(self):
+        user, device = create_user_with_totp()
+        set_budget(device, totp.CODE_NOTICE_AT - 3)
+
+        results = self.wrong_codes_in_parallel(user)
+
+        self.assertNotIn(500, results)
+        self.assertEqual(
+            MailJob.objects.filter(kind=MailJob.Kind.CODE_ATTEMPTS_WARNING).count(), 1
+        )
+
+    def test_parallel_wrong_codes_cannot_pass_the_pause(self):
+        user, device = create_user_with_totp()
+        set_budget(device, totp.CODE_PAUSE_AT - 2)
+
+        results = self.wrong_codes_in_parallel(user)
+
+        self.assertNotIn(500, results)
+        self.assertEqual(budget_of(device), totp.CODE_PAUSE_AT)

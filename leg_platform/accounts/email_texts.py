@@ -120,6 +120,12 @@ DEFINITIONS = {
         (),
         (),
     ),
+    Key.CODE_ATTEMPTS_WARNING: Definition(
+        "accounts/email/code_attempts_warning.txt",
+        lambda: gettext("Wrong codes were entered for your account at %(instance_name)s"),
+        (),
+        (),
+    ),
 }
 
 MAX_BODY_LENGTH = 5000

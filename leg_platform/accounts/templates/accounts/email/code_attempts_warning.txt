@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+Several wrong codes were entered for your account at {{ instance_name }} after the correct password was given. Code entry is paused if this continues.
+
+If this was you, check that the clock of your phone is set automatically. If it was not you, someone may know your password: choose a new password with "Forgot password" on the login page.{% endblocktranslate %}
+
+{% if contact_url %}{% blocktranslate %}If you need help, contact the operator. You will find contact information here:
+
+{{ contact_url }}{% endblocktranslate %}{% else %}{% translate "If you need help, contact the operator of this portal." %}{% endif %}
+{% endautoescape %}

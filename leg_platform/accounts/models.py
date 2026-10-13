@@ -1046,6 +1046,7 @@ class MailJob(models.Model):
         TWO_FACTOR_DISABLED = "two_factor_disabled", "Two-factor authentication removed"
         RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
         RECOVERY_CODE_USED = "recovery_code_used", "Recovery code used"
+        CODE_ATTEMPTS_WARNING = "code_attempts_warning", "Many wrong codes"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1055,6 +1056,7 @@ class MailJob(models.Model):
         Kind.TWO_FACTOR_DISABLED,
         Kind.RECOVERY_CODES_RENEWED,
         Kind.RECOVERY_CODE_USED,
+        Kind.CODE_ATTEMPTS_WARNING,
     )
 
     kind = models.CharField(max_length=24, choices=Kind, editable=False)
@@ -1102,6 +1104,9 @@ class EmailText(models.Model):
             "Notification: recovery codes renewed"
         )
         RECOVERY_CODE_USED = "recovery_code_used", _("Notification: recovery code used")
+        CODE_ATTEMPTS_WARNING = "code_attempts_warning", _(
+            "Notification: many wrong codes entered"
+        )
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False
@@ -1191,6 +1196,12 @@ class AuthenticatorDevice(TimestampMixin, Device):
     encrypted_key = models.CharField(max_length=255, editable=False)
     drift = models.SmallIntegerField(default=0, editable=False)
     last_t = models.BigIntegerField(default=-1, editable=False)
+    # Wrong codes in a window of 24 hours that starts with the first one (D-040). Not cleared by
+    # a successful login, so that the budget of an attacker does not grow with the owner's logins.
+    failed_codes = models.PositiveSmallIntegerField(default=0, editable=False)
+    failed_codes_since = models.DateTimeField(null=True, editable=False)
+    # A password reset lowers the budget once per window (D-040).
+    code_budget_relieved = models.BooleanField(default=False, editable=False)
 
     objects = AuthenticatorDeviceManager()
 
@@ -1225,7 +1236,8 @@ class AuthenticatorDevice(TimestampMixin, Device):
         if not is_current(self.encrypted_key, AUTHENTICATOR_SECRET_PURPOSE):
             self.encrypted_key = reencrypt(self.encrypted_key, AUTHENTICATOR_SECRET_PURPOSE)
         self.set_last_used_timestamp(commit=False)
-        self.save()
+        # Not the budget fields: they change only under their own lock (D-040).
+        self.save(update_fields=["last_t", "drift", "encrypted_key", "last_used_at"])
         return True
 
     @property
