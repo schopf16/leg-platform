@@ -18,7 +18,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext, override
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.accounts import email_texts, emails, rate_limits
+from leg_platform.accounts import email_texts, emails
 from leg_platform.accounts.forms import clean_postal_code, postal_code_field
 from leg_platform.accounts.models import (
     CUSTOMER_NUMBER_SPACE,
@@ -468,13 +468,6 @@ class EmailTextAdmin(admin.ModelAdmin):
 
     def _send_test(self, request, obj):
         # Only to the address of the person who asks, never to a typed address.
-        if not rate_limits.consume(
-            rate_limits.SCOPE_TEST_EMAIL, str(request.user.pk), rate_limits.TEST_EMAIL_LIMITS
-        ):
-            self.message_user(
-                request, _("Too many test emails. Try again later."), messages.ERROR
-            )
-            return
         try:
             emails.send_test(request.user.email, obj.key, obj.subject, obj.body)
         except Exception as error:  # noqa: BLE001 - any delivery error; only its class is logged

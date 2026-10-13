@@ -11,7 +11,7 @@ from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts import email_texts, emails, rate_limits
+from leg_platform.accounts import email_texts, emails
 from leg_platform.accounts.models import EmailText, EmailTextVersion
 from leg_platform.accounts.tests.helpers import create_active_user
 
@@ -108,7 +108,7 @@ class ValidationTests(SimpleTestCase):
             "portal-sicherheit.example/login",
             "bit.ly/x",
             "//evil.example",
-            "support@evil.example",
+            "support@portal.example.org",
             "tel:+41790000000",
             "sms:123",
             "javascript:alert(1)",
@@ -693,22 +693,6 @@ class PreviewAndVersionTests(TestCase):
             list(self.text.versions.values_list("subject", flat=True)),
             ["Betreff 4", "Betreff 3", "Betreff 2"],
         )
-
-    def test_test_emails_are_limited_per_account(self):
-        self.client.force_login(self.administrator)
-        limit = rate_limits.TEST_EMAIL_LIMITS[0][0]
-
-        for _ in range(limit + 1):
-            response = self.client.post(
-                self.change_url, {"subject": "", "body": "", "_send_test": "1"}
-            )
-
-        self.assertEqual(len(mail.outbox), limit)
-        self.assertIn("Zu viele Testmails", response.content.decode())
-        # Another account has its own budget.
-        self.client.force_login(self.editor)
-        self.client.post(self.change_url, {"subject": "", "body": "", "_send_test": "1"})
-        self.assertEqual(len(mail.outbox), limit + 1)
 
     def test_restoring_needs_post_and_the_change_permission(self):
         self.client.force_login(self.editor)

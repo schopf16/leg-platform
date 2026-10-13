@@ -34,11 +34,6 @@ MAIL_GLOBAL_LIMITS = ((300, timedelta(hours=1)),)
 # The information email to the owner of an existing address is static, so repeating it within a
 # day adds nothing; it is checked in the background job, invisible to the requester.
 EXISTING_ACCOUNT_NOTICE_LIMITS = ((1, timedelta(hours=24)),)
-# Test emails of the email text editor go to the address of the administrator who asks (D-039).
-TEST_EMAIL_LIMITS = ((10, timedelta(hours=1)),)
-
-SCOPE_TEST_EMAIL = "test-email"
-
 SCOPE_MAIL_ADDRESS = "mail-address"
 SCOPE_MAIL_IP = "mail-ip"
 SCOPE_MAIL_GLOBAL = "mail-global"

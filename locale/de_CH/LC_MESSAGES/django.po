@@ -338,9 +338,6 @@ msgstr "Vorschau: %(name)s"
 msgid "The test email could not be sent."
 msgstr "Die Testmail konnte nicht gesendet werden."
 
-msgid "Too many test emails. Try again later."
-msgstr "Zu viele Testmails. Versuchen Sie es später erneut."
-
 #, python-format
 msgid "A test email was sent to %(address)s."
 msgstr "Eine Testmail wurde an %(address)s gesendet."
