@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+You or someone else entered this email address to register at {{ instance_name }}.
+
+To confirm your address and choose your password, open this link within {{ lifetime_hours }} hours:
+
+{{ verification_url }}
+
+The link can be used once. If you did not register, you can ignore this email; nothing will happen.{% endblocktranslate %}
+{% endautoescape %}

@@ -1,0 +1,10 @@
+{% extends "admin/change_form_object_tools.html" %}
+{% load i18n admin_urls %}
+{% comment %}
+The history lists the acting accounts and is shown to system administrators only
+(EmailTextAdmin.history_view, D-039); the versions show the texts, not the accounts.
+{% endcomment %}
+{% block object-tools-items %}
+<li><a href="{% url opts|admin_urlname:'versions' original.pk|admin_urlquote %}" class="historylink">{% translate "Versions" %}</a></li>
+{% if request.user.is_superuser %}{{ block.super }}{% endif %}
+{% endblock %}

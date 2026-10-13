@@ -158,7 +158,11 @@ Local development, stage and production have separate settings and credentials. 
 
 Links in emails (verification, password reset, email change) are built from the canonical base URL in the instance configuration, not from the request. This also works for emails that are not triggered by a request (e.g. management commands). `ALLOWED_HOSTS` still lists only the host names of the application (not the instance's website; D-025).
 
-Security notifications ask the person to reply if they did not request the change; replies go to the sender mailbox.
+Security notifications tell the person to contact the operator if they did not request the change (contact information from `INSTANCE_WEBSITE_URL` where configured); automatic emails do not invite a reply, and the sender address (default `noreply@<host>`) is not presented as a contact address (D-038).
+
+Editable texts (D-039): `EmailText` holds an optional subject and body per email; empty means the default. `accounts/email_texts.py` defines the placeholders per email, validates a text when it is saved and renders it when the email is sent, by plain substitution of `{name}` markers without the template engine; a stored text that is no longer valid is replaced by the default.
+
+Sending in the background (D-038): requests for registration and password reset count the request against the limits and store one `MailJob`; the worker `process_mail_queue` looks up the address, issues the token, sends the email outside any database transaction and deletes the job. This makes the request path and the response identical for every address. Counters are rows (`RateLimitBucket`, `RateLimitEvent`) locked per key in the database, shared by all processes. The modules are `accounts/rate_limits.py`, `mail_queue.py`, `registration.py` and `password_reset.py`.
 
 Sources: https://docs.djangoproject.com/en/stable/topics/auth/default/, https://docs.djangoproject.com/en/stable/ref/settings/#allowed-hosts, https://docs.djangoproject.com/en/stable/ref/settings/#secret-key, https://django-otp-official.readthedocs.io/en/stable/overview.html (checked on 2026-10-09)
 
@@ -215,7 +219,7 @@ Not yet decided:
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025)
 * which instance-specific values are kept in environment variables and which in the database
 * scheduling of the automatic deletion of expired log entries and of unverified accounts whose verification link has expired
-* redaction of tokens in request logs: Django's request logging writes the path of every response with status 400 or higher; a logging filter that removes tokens from paths, with a test, is required when the first URL with a token is introduced (`docs/SECURITY.md`, sections 6 and 10)
+* redaction of tokens in request logs: Django's request logging writes the path of every response with status 400 or higher; a logging filter that removes tokens from paths is in place for the registration link (`leg_platform/log_filters.py`, D-037) and must be extended, with a test, for every further URL with a token (`docs/SECURITY.md`, sections 6 and 10)
 * an optional guard in the settings that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (security review of 2026-10-11, I-6; not implemented, the deployment gates in the README apply instead)
 * imprint (legal notice) and the content of the privacy notice (D-022)
 * which functions are restricted on mobile phones in later phases

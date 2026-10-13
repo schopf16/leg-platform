@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Complete your registration" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Complete your registration" %}</h1>
+      <p>{% translate "Enter your data and choose a password. A passphrase of several words is a good choice." %}</p>
+      <p>{% translate "Your data is used to identify you and, later, to send invoices by post or email." %}
+        {% if instance_privacy_url %}
+          <a href="{{ instance_privacy_url }}" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>
+        {% endif %}
+      </p>
+      <dl class="mb-3">
+        <dt>{% translate "Email address" %}</dt>
+        <dd>{{ account_email }}</dd>
+      </dl>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="registration" value="{{ registration_ref }}">
+        {% include "accounts/_form_fields.html" with mark_required=True %}
+        <button type="submit" class="btn btn-primary w-100">{% translate "Activate account" %}</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

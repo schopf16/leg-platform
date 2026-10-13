@@ -22,8 +22,9 @@ from django.utils import translation
 from django_countries import countries
 from django_countries.fields import CountryField
 
-from leg_platform.accounts.admin import UserAdminForm
-from leg_platform.accounts.models import IssuedCustomerNumber, User
+from leg_platform.accounts import email_texts
+from leg_platform.accounts.admin import EmailTextForm, UserAdminForm
+from leg_platform.accounts.models import EmailText, IssuedCustomerNumber, User
 
 SHARP_S = "\u00df"
 PROJECT_CATALOGUE = Path(settings.BASE_DIR) / "locale" / "de_CH" / "LC_MESSAGES" / "django.po"
@@ -92,6 +93,18 @@ def account_texts():
                 if "message" in vars(validator):
                     texts.add(str(validator.message))
         texts.add(str(IssuedCustomerNumber._meta.get_field("number").verbose_name))
+        # The editable email texts (D-039): model, fields, choices, placeholders and the form.
+        texts.update(
+            {str(EmailText._meta.verbose_name), str(EmailText._meta.verbose_name_plural)}
+        )
+        for name in ("key", "subject", "body", "updated_at"):
+            texts.add(str(EmailText._meta.get_field(name).verbose_name))
+        texts.update(str(label) for value, label in EmailText._meta.get_field("key").flatchoices)
+        for key in EmailText.Key.values:
+            texts.update(str(p.description) for p in email_texts.placeholders_of(key))
+        for name in ("reset_to_default",):
+            field = EmailTextForm.base_fields[name]
+            texts.update({str(field.label), str(field.help_text)})
         # Help texts and unique messages of the account fields.
         for field in User._meta.get_fields():
             if field.name in DJANGO_FIELDS or not hasattr(field, "verbose_name"):

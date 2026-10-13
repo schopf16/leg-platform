@@ -23,6 +23,7 @@ administrators, never on their own account) is checked by the views and the admi
 """
 
 import ipaddress
+import logging
 import re
 import secrets
 import unicodedata
@@ -36,12 +37,16 @@ from django.contrib.auth.models import PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, MaxValueValidator, MinValueValidator
 from django.db import IntegrityError, connections, models, router, transaction
+from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_countries.fields import CountryField
 from phonenumber_field.modelfields import PhoneNumberField
 
+from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.normalization import normalize_email_address
+
+logger = logging.getLogger(__name__)
 
 # Exact comparison for identifier columns (D-031).
 EXACT_COLLATION = "utf8mb4_bin"
@@ -52,6 +57,9 @@ CUSTOMER_NUMBER_DIGITS = 6
 CUSTOMER_NUMBER_SPACE = 10**CUSTOMER_NUMBER_DIGITS
 # With half of all numbers issued, 100 collisions in a row have a probability of 2**-100.
 CUSTOMER_NUMBER_ATTEMPTS = 100
+# From this share of issued numbers on, issuing logs a warning and the administration shows a
+# notice, so that the operator can act before the numbers run out (D-021, D-038).
+CUSTOMER_NUMBER_WARNING_PERCENT = 90
 
 # Seconds create_superuser() waits for a concurrent call (MariaDB GET_LOCK).
 SUPERUSER_LOCK_TIMEOUT = 10
@@ -129,6 +137,11 @@ def format_customer_number(number):
     return f"{number[:3]} {number[3:]}"
 
 
+def customer_numbers_nearly_exhausted(issued):
+    """Return whether the share of issued customer numbers reaches the warning level."""
+    return issued * 100 >= CUSTOMER_NUMBER_SPACE * CUSTOMER_NUMBER_WARNING_PERCENT
+
+
 class IssuedCustomerNumberQuerySet(models.QuerySet):
     def update(self, **kwargs):
         raise AccountIntegrityError("Issued customer numbers cannot be changed.")
@@ -146,8 +159,16 @@ class IssuedCustomerNumberManager(models.Manager.from_queryset(IssuedCustomerNum
 
         Must run inside a transaction together with the assignment to an account.
         """
-        if self.count() >= CUSTOMER_NUMBER_SPACE:
+        issued = self.count()
+        if issued >= CUSTOMER_NUMBER_SPACE:
             raise CustomerNumberUnavailableError("All customer numbers have been issued.")
+        if customer_numbers_nearly_exhausted(issued):
+            logger.warning(
+                "%d of %d customer numbers have been issued (%d%%).",
+                issued,
+                CUSTOMER_NUMBER_SPACE,
+                issued * 100 // CUSTOMER_NUMBER_SPACE,
+            )
         for _attempt in range(CUSTOMER_NUMBER_ATTEMPTS):
             candidate = f"{secrets.randbelow(CUSTOMER_NUMBER_SPACE):0{CUSTOMER_NUMBER_DIGITS}d}"
             try:
@@ -852,6 +873,34 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Set the retention obligation flag; it can never be unset (D-016)."""
         self._change(retention_obligation=True)
 
+    def complete_registration(self, raw_password):
+        """Activate an unverified account with the password chosen after verification.
+
+        The password, the status and the customer number are written together (D-016, D-021):
+        an account is never active without a usable password. The caller validates the
+        password and decides whether the verification link is valid.
+        """
+        if self.pk is None:
+            raise AccountIntegrityError("Save the account before completing its registration.")
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            stored = self._locked_row(using)
+            if stored["status"] != self.Status.UNVERIFIED:
+                raise AccountIntegrityError("Only unverified accounts complete a registration.")
+            previous_password = self.password
+            previous_status = self.status
+            self.set_password(raw_password)
+            self.status = self.Status.ACTIVE
+            try:
+                with self._account_change("status"):
+                    self.save(using=using, update_fields=["status", "password"])
+            except BaseException:
+                self.password = previous_password
+                self.status = previous_status
+                self._apply_derived_fields()
+                raise
+            self.assign_customer_number()
+
 
 class LoginIpBucket(models.Model):
     """A pseudonymous lock row that serializes login attempts from one client IP."""
@@ -878,3 +927,184 @@ class LoginIpAttempt(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=("bucket", "attempted_at"), name="accounts_lia_bucket_time")]
+
+
+# 256 bits from the operating system's random generator (Python "secrets"); the URL-safe text
+# has 43 characters.
+VERIFICATION_TOKEN_BYTES = 32
+VERIFICATION_TOKEN_LENGTH = 43
+VERIFICATION_TOKEN_PURPOSE = b"LEG-Platform verification token v1"
+
+
+def verification_token_digest(raw_token):
+    """Return the keyed digest under which a token is stored; the token itself never is."""
+    return keyed_digest(raw_token, VERIFICATION_TOKEN_PURPOSE)
+
+
+class VerificationTokenManager(models.Manager):
+    def issue(self, user, purpose, lifetime):
+        """Create a token for the user and return its raw value, which is stored nowhere.
+
+        Only the keyed digest is stored, so a copy of the database yields no usable link.
+        """
+        raw_token = secrets.token_urlsafe(VERIFICATION_TOKEN_BYTES)
+        self.create(
+            user=user,
+            purpose=purpose,
+            digest=verification_token_digest(raw_token),
+            expires_at=timezone.now() + lifetime,
+        )
+        return raw_token
+
+    def find_valid(self, raw_token, purpose):
+        """Return the unexpired token with this raw value and purpose, or None."""
+        if len(raw_token or "") != VERIFICATION_TOKEN_LENGTH:
+            return None
+        return self.find_valid_by_digest(verification_token_digest(raw_token), purpose)
+
+    def find_valid_by_digest(self, digest, purpose):
+        return self.filter(
+            digest=digest, purpose=purpose, expires_at__gt=timezone.now()
+        ).select_related("user").first()
+
+
+class VerificationToken(models.Model):
+    """A single-use, time-limited token that a link sent by email carries (D-016).
+
+    The token is deleted when it is used, together with the account it belongs to when that
+    account is deleted.
+    """
+
+    class Purpose(models.TextChoices):
+        REGISTRATION = "registration", "Registration"
+        PASSWORD_RESET = "password_reset", "Password reset"
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="verification_tokens", editable=False
+    )
+    purpose = models.CharField(max_length=20, choices=Purpose, editable=False)
+    digest = models.CharField(
+        max_length=64, unique=True, db_collation=EXACT_COLLATION, editable=False
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    objects = VerificationTokenManager()
+
+
+class RateLimitBucket(models.Model):
+    """A pseudonymous lock row that serialises the requests counted for one key (D-037).
+
+    The key is an HMAC of the scope and the normalised address or client IP; the address or IP
+    itself is never stored.
+    """
+
+    digest = models.CharField(
+        max_length=64, primary_key=True, db_collation=EXACT_COLLATION, editable=False
+    )
+    last_seen_at = models.DateTimeField()
+
+
+class RateLimitEvent(models.Model):
+    """One counted request of a bucket; deleted when it is older than every window."""
+
+    bucket = models.ForeignKey(
+        RateLimitBucket, on_delete=models.CASCADE, related_name="events", editable=False
+    )
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        indexes = [models.Index(fields=("bucket", "occurred_at"), name="accounts_rle_bucket_time")]
+
+
+class MailJob(models.Model):
+    """A request for an email that a background worker processes (outbox, D-037).
+
+    The request path only stores the job, so that it does the same work for every address.
+    The address of a person without an account is stored only until the job is processed.
+    """
+
+    class Kind(models.TextChoices):
+        REGISTRATION = "registration", "Registration"
+        PASSWORD_RESET = "password_reset", "Password reset"
+        PASSWORD_CHANGED = "password_changed", "Password changed"
+
+    kind = models.CharField(max_length=20, choices=Kind, editable=False)
+    # Empty for a suppressed job: it is discarded unseen, so it need not keep the address of a
+    # person who may have no account.
+    address = models.EmailField(max_length=EMAIL_MAX_LENGTH, blank=True, editable=False)
+    # A request above a limit is stored like any other and discarded by the worker.
+    suppressed = models.BooleanField(default=False, editable=False)
+    attempts = models.PositiveSmallIntegerField(default=0, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    next_attempt_at = models.DateTimeField(db_index=True)
+
+
+class EmailTextManager(models.Manager):
+    def ensure_all(self):
+        """Create the missing rows, so that the administration lists every email text."""
+        for key in EmailText.Key.values:
+            self.get_or_create(key=key)
+
+
+class EmailText(models.Model):
+    """The subject and body that the administrator wrote for one email (D-039).
+
+    One row per email, created empty. An empty subject or body means that the default text of
+    the application is used. The texts are plain text with ``{placeholder}`` markers that are
+    validated when saved and replaced without a template engine when the email is sent.
+    """
+
+    class Key(models.TextChoices):
+        REGISTRATION_VERIFICATION = "registration_verification", _(
+            "Registration: link to confirm the address"
+        )
+        REGISTRATION_EXISTING_ACCOUNT = "registration_existing_account", _(
+            "Registration: the address already has an account"
+        )
+        PASSWORD_RESET = "password_reset", _("Password reset: link to choose a new password")
+        PASSWORD_CHANGED = "password_changed", _("Notification: password changed")
+
+    key = models.CharField(
+        _("email"), max_length=40, choices=Key, unique=True, editable=False
+    )
+    subject = models.CharField(_("subject"), max_length=150, blank=True)
+    body = models.TextField(_("text"), max_length=5000, blank=True)
+    updated_at = models.DateTimeField(_("last changed"), auto_now=True)
+
+    objects = EmailTextManager()
+
+    class Meta:
+        default_permissions = ("view", "change")
+        verbose_name = _("email text")
+        verbose_name_plural = _("email texts")
+
+    def __str__(self):
+        return str(self.get_key_display())
+
+
+class EmailTextVersion(models.Model):
+    """A saved state of an email text, kept so that an earlier text can be restored (D-039).
+
+    Written with every change of the subject or body. An empty subject and body is the
+    default text. The account that made the change is kept for the audit and is not shown;
+    it is cleared when the account is deleted.
+    """
+
+    email_text = models.ForeignKey(
+        EmailText, on_delete=models.CASCADE, related_name="versions", editable=False
+    )
+    subject = models.CharField(max_length=150, blank=True, editable=False)
+    body = models.TextField(max_length=5000, blank=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    changed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="+",
+        editable=False,
+    )
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("-created_at", "-id")

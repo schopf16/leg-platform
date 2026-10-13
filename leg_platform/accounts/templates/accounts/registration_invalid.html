@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Link not valid" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Link not valid" %}</h1>
+      <p>{% translate "This link is not valid or has expired. You can register again." %}</p>
+      <a href="{% url 'accounts:registration' %}">{% translate "Register" %}</a>
+    </div>
+  </div>
+{% endblock %}

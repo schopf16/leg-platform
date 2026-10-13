@@ -1,14 +1,11 @@
 """Privacy-preserving identifiers for login abuse protection (D-017, D-023)."""
 
-import hashlib
-import hmac
 import ipaddress
 from datetime import timedelta
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from django.conf import settings
 
+from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.normalization import normalize_email_address
 
 EMAIL_MAX_LENGTH = 254
@@ -17,14 +14,7 @@ LOGIN_COOLOFF = timedelta(minutes=15)
 IP_ATTEMPT_WINDOW = LOGIN_COOLOFF
 
 
-def _identifier_digest(value, purpose):
-    key = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=purpose,
-    ).derive(settings.SECRET_KEY.encode("utf-8"))
-    return hmac.new(key, value.encode("utf-8"), hashlib.sha256).hexdigest()
+_identifier_digest = keyed_digest
 
 
 def axes_username(request, credentials):

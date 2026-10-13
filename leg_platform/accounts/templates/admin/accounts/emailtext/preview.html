@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:accounts_emailtext_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; {% translate "Preview" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>{% translate "The preview shows the text as it would be sent, with example links. Nothing has been saved yet." %}</p>
+  <h2>{% translate "Subject" %}</h2>
+  <p><strong>{{ subject }}</strong></p>
+  <h2>{% translate "Text" %}</h2>
+  <pre>{{ body }}</pre>
+  <form method="post" action="{{ change_url }}">
+    {% csrf_token %}
+    {% for name, value in posted %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    <div class="submit-row">
+      <input type="submit" value="{% translate 'Save this text' %}" class="default" name="_save">
+      <input type="submit" value="{% blocktranslate with address=test_address %}Send a test email to {{ address }}{% endblocktranslate %}" name="_send_test">
+      <a href="{{ change_url }}" class="closelink">{% translate "Back to the email" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

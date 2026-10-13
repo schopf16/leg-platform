@@ -101,6 +101,34 @@ Without a running MariaDB server, only the tests that need no database can run: 
 
 Email: locally, emails are written to the console by default (`EMAIL_MODE=console`). To test delivery via Microsoft Graph locally, use `EMAIL_MODE=allowlist` with a dedicated development app registration and sender mailbox, never the credentials of stage or production, and set the allowed recipient addresses only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). Delivery via Microsoft Graph is not implemented yet; until it is, every send attempt in this mode fails with an error. Automated tests never send real email.
 
+### Instance Configuration
+
+Each instance sets its own values in the environment (`.env.example`, D-013, D-037). They are validated at startup, and invalid values prevent the start:
+
+* `INSTANCE_NAME`: shown in pages and email subjects (optional, default "LEG Platform").
+* `INSTANCE_BASE_URL`: the canonical `https://` origin of the application, e.g. `https://portal.example.org` (no path). Links in emails are built from it, never from the request, so it must be correct before any email is sent. Its host must also be in `DJANGO_ALLOWED_HOSTS`. Required outside `APP_ENV=local`.
+* `INSTANCE_PRIVACY_URL`: absolute `https://` URL of the instance's privacy notice, linked at registration and on all pages without login. Required outside `APP_ENV=local`.
+* `INSTANCE_WEBSITE_URL`: absolute `https://` URL of the instance's website (optional).
+* `EMAIL_SENDER_ADDRESS`: sender address of all emails (optional; default `noreply@<host of INSTANCE_BASE_URL>`, locally `noreply@localhost`). If it is set, it replaces the default; the emails never invite a reply (D-038).
+
+Email delivery (D-038):
+
+* Emails are not sent during the request. The worker `python manage.py process_mail_queue --loop` must run as a supervised service (restart on failure); without it, no registration, reset or notification email is sent. Without `--loop` it processes the queue once and exits. Delivery is at least once: after a crash an email can be sent twice. A job is tried three times and then given up; unprocessed jobs are deleted after one hour (they hold the address in plain text until then).
+* The sender domain needs SPF, DKIM and DMARC records for the sending service, and the sender address must be one the service may use. Automatic emails do not invite a reply, so the sender mailbox need not be monitored; a mailbox that does receive replies can contain personal data.
+* The Microsoft Graph backend must apply a connection timeout (Django forbids `EMAIL_TIMEOUT` together with `MAILERS`); it is not implemented yet.
+
+Scheduled tasks (not scheduled automatically yet; the scheduling is decided with the hosting, D-008, D-037, D-038):
+
+* `python manage.py delete_expired_registrations`: deletes unverified accounts whose verification link expired or does not exist.
+* `python manage.py cleanup_mail_requests`: deletes unused request counters, expired reset links and unprocessed jobs. Run it at least hourly.
+* `python manage.py cleanup_login_ip_attempts` (see below).
+
+Customer numbers: from 90 % of the six-digit numbers issued, each issue logs a warning (logger `leg_platform.accounts.models`, "N of 1000000 customer numbers have been issued"); set up an alarm on it in the log monitoring, because the administration notice is visible only where the administration is reachable (D-038).
+
+Request limits per client IP address use the address that Django sees (`AXES_IPWARE_PROXY_COUNT`, see below); with a wrong proxy count every request counts against one shared budget or, without any resolvable address, one strict shared budget (a warning is logged). The reverse proxy should additionally limit the plain request rate, because the application limits only the functions that send email.
+
+Web server and reverse proxy access logs are outside the application. The verification link contains a secret token in its path (`/register/verify/<token>/`); the application removes it from its own logs, but the operator must configure the web server and proxy so that their access logs do not keep it (or restrict and rotate them).
+
 ### Trusted Proxies for Login IP Protection
 
 `AXES_IPWARE_PROXY_COUNT` defaults to `0`: login abuse protection uses the address of the direct TCP peer (`REMOTE_ADDR`) and ignores `X-Forwarded-For`. If Django is reached only through reverse proxies, set this variable to the exact number of proxies between the client and Django. Set it only after verifying that each proxy removes or validates client-supplied forwarding headers and appends its own address. IPware validates the chain strictly; an unexpected or malformed chain produces no client IP and the login is refused. A wrong value can group users under a proxy address or refuse logins, so the deployment value must be verified against the actual proxy topology before enabling a stage or production instance. Client IPs are not stored in Axes; the independent lockout counter stores only a keyed digest (D-017, D-023).

@@ -161,7 +161,7 @@ class UserModelConfigurationTests(SimpleTestCase):
         registered = {model._meta.label for model in admin.site._registry}
         self.assertIn("accounts.User", registered)
         self.assertNotIn("accounts.IssuedCustomerNumber", registered)
-        self.assertEqual(registered, {"accounts.User", "auth.Group"})
+        self.assertEqual(registered, {"accounts.User", "accounts.EmailText", "auth.Group"})
 
 
 class AuthenticationBackendTests(SimpleTestCase):

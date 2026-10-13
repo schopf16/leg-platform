@@ -27,6 +27,8 @@ def make_env(app_env="production", **overrides):
         "APP_ENV": app_env,
         "DJANGO_SECRET_KEY": STRONG_KEY,
         "DJANGO_ALLOWED_HOSTS": "portal.example.org",
+        "INSTANCE_BASE_URL": "https://portal.example.org",
+        "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
         "EMAIL_MODE": DEFAULT_EMAIL_MODE.get(app_env, "console"),
         "EMAIL_ALLOWED_RECIPIENTS": TEST_RECIPIENT if app_env == "stage" else None,
         "DB_NAME": "leg_platform",

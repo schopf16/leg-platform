@@ -11,8 +11,8 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 
 * [ ] The login page is the entry point of the application; it offers login, password reset and registration and links to the instance's privacy notice and website. All other pages accessible without login link to the privacy notice as well (D-022, D-025).
 * [ ] The application has no public home page; the root URL leads to the login page or, for logged-in users, to their profile, subject to the central second-factor check (staff users and system administrators without a completed second factor are led to its setup).
-* [ ] A person can register; the required profile data is collected, and the privacy notice is linked.
-* [ ] Via the link sent, the email address is verified and the password is set; the account is then active.
+* [ ] A person can register with the email address only; the privacy notice is linked.
+* [ ] Via the link sent, the email address is verified, the required profile data is entered and the password is set; the account is then active.
 * [ ] A customer number is assigned when the registration is completed, i.e. when the password form is submitted successfully via the verification link (not at registration and not when the link is merely opened; D-021), and displayed in the profile in two blocks of three digits.
 * [ ] Login works with the email address; the customer number is not a login identifier (D-021).
 * [ ] Logout works.
@@ -64,7 +64,9 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 * [ ] The Django admin has a dedicated section for the Microsoft Graph configuration (tenant ID, client ID, sender address, client secret, expiry date).
 * [ ] The admin shows "set" and the expiry date of the client secret and warns before expiry.
 * [ ] A test send provides understandable feedback.
-* [ ] Security notifications ask the person to reply to the email if they did not request the change.
+* [ ] The administration lists all emails with editable subject and text and a placeholder cheat sheet; the editor refuses unknown placeholders, a missing personal link, typed web or email addresses and template syntax; the default can be restored; users without the permission cannot read or change the texts (D-039).
+* [ ] The editor offers a preview of the typed text with example links and a test email that goes only to the address of the logged-in account; neither saves anything. Every change of a text is kept as a version that can be restored; a version that is no longer valid is refused (D-039).
+* [ ] Security notifications tell the person to contact the operator immediately if they did not request the change, with the contact information of the instance where configured; they do not invite a reply.
 * [ ] The installation guide explains how to restrict the Microsoft application to the sender mailbox ("RBAC for Applications") and that the sender mailbox must be monitored.
 
 ## 9. Security Logging
@@ -118,7 +120,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 * [ ] Setup of the first system administrator documented.
 * [ ] Setup of a new instance documented.
 * [ ] Microsoft Graph setup, including the restriction to the sender mailbox, documented.
-* [ ] Procedure after a reply to a security notification documented (block the account, verify identity, restore, log), including who monitors the sender mailbox.
+* [ ] Procedure after a report of an unrequested change documented (block the account, verify identity, restore, log).
 * [ ] Procedure for a lost second factor documented: for users the confirmation via the registered email address; for staff users and system administrators the identity check in person or by calling back a phone number known independently of the account; for the last system administrator the management command (`docs/SECURITY.md`, section 3).
 * [ ] Operator responsibilities documented: security updates, backups (including that deleted data remains in backups until they expire), monitoring of the sender mailbox, reverse proxy configuration, provision of the privacy notice.
 * [ ] Procedure for generating and compiling translations documented.

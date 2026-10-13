@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Profile" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Profile" %}</h1>
+      <dl class="row">
+        <dt class="col-sm-5">{% translate "Customer number" %}</dt>
+        <dd class="col-sm-7 identifier">{{ account.customer_number_display }}</dd>
+        <dt class="col-sm-5">{% translate "Status" %}</dt>
+        <dd class="col-sm-7"><span class="status-dot status-{{ account.status }}" aria-hidden="true"></span> {{ account.get_status_display }}</dd>
+        <dt class="col-sm-5">{% translate "Email address" %}</dt>
+        <dd class="col-sm-7">{{ account.email }}</dd>
+        <dt class="col-sm-5">{% translate "Name" %}</dt>
+        <dd class="col-sm-7">{% if account.organisation_name %}{{ account.organisation_name }}<br>{% endif %}{{ account.first_name }} {{ account.last_name }}</dd>
+        <dt class="col-sm-5">{% translate "Address" %}</dt>
+        <dd class="col-sm-7">
+          {% if account.address_line_1 %}{{ account.address_line_1 }}<br>{% endif %}
+          {% if account.street %}{{ account.street }} {{ account.house_number }}<br>{% endif %}
+          {% if account.post_office_box_number %}{% translate "Post office box" %} {{ account.post_office_box_number }}<br>{% endif %}
+          {{ account.postal_code_display }} {{ account.town }}<br>
+          {{ account.country.name }}
+        </dd>
+        {% if account.phone_number %}
+          <dt class="col-sm-5">{% translate "Phone number" %}</dt>
+          <dd class="col-sm-7">{{ account.phone_number }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+{% endblock %}

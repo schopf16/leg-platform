@@ -36,6 +36,14 @@ SECRET_KEY_FALLBACKS = list(ENVIRONMENT.secret_key_fallbacks)
 ALLOWED_HOSTS = list(ENVIRONMENT.allowed_hosts)
 CSRF_TRUSTED_ORIGINS = list(ENVIRONMENT.csrf_trusted_origins)
 
+# Instance configuration (docs/PROJECT.md, "Instance configuration"; D-013). Never hard-coded.
+# INSTANCE_BASE_URL is the canonical origin used for links in emails.
+
+INSTANCE_NAME = ENVIRONMENT.instance_name
+INSTANCE_BASE_URL = ENVIRONMENT.instance_base_url
+INSTANCE_PRIVACY_URL = ENVIRONMENT.instance_privacy_url
+INSTANCE_WEBSITE_URL = ENVIRONMENT.instance_website_url
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -80,6 +88,13 @@ AXES_USERNAME_CALLABLE = "leg_platform.accounts.login_protection.axes_username"
 AXES_USERNAME_FORM_FIELD = "username"
 AXES_USE_ATTEMPT_EXPIRATION = True
 AXES_VERBOSE = False
+# The lockout page is the same for every cause and never shows the submitted value.
+AXES_LOCKOUT_TEMPLATE = "accounts/lockout.html"
+
+# Login and logout (D-025: the login page is the entry point of the application).
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "accounts:profile"
+LOGOUT_REDIRECT_URL = "accounts:login"
 
 # Phone numbers (D-034): numbers without an international prefix are read as Swiss numbers;
 # stored in E.164, the package's default, set explicitly so that it is visible.
@@ -105,13 +120,14 @@ ROOT_URLCONF = "leg_platform.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "leg_platform" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "leg_platform.context_processors.instance",
             ],
         },
     },
@@ -248,6 +264,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "leg_platform" / "static"]
 
 # Email (docs/ARCHITECTURE.md, "Email")
 # Django 6.1 replaces EMAIL_BACKEND with MAILERS and deprecates EMAIL_BACKEND; Django 6.0 only
@@ -258,6 +275,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 EMAIL_MODE = ENVIRONMENT.email_mode
 EMAIL_ALLOWED_RECIPIENTS = list(ENVIRONMENT.email_allowed_recipients)
+# The sender of every email; the Microsoft Graph configuration of the administrator will take
+# over this role (D-006).
+DEFAULT_FROM_EMAIL = ENVIRONMENT.email_sender_address
 # Masks EMAIL_ALLOWED_RECIPIENTS (personal addresses on development machines) on debug pages
 # and in error reports, in addition to Django's default sensitive names (D-028).
 DEFAULT_EXCEPTION_REPORTER_FILTER = "leg_platform.debug.ExceptionReporterFilter"
@@ -276,14 +296,29 @@ else:
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        # Removes tokens of verification links from the request logs (docs/SECURITY.md,
+        # section 10).
+        "redact_tokens": {"()": "leg_platform.log_filters.TokenRedactionFilter"},
+    },
     "formatters": {
         "default": {"format": "{asctime} {levelname} {name} {message}", "style": "{"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "default"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "default",
+            "filters": ["redact_tokens"],
+        },
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
         "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        # The development server's request log names every requested path.
+        "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }

@@ -85,19 +85,20 @@ LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same li
 
 Phase 1 is in progress. The remaining work is:
 
-* Registration, email verification, the portal login/logout views, password change/reset and the TOTP flow. Registration must handle duplicates without account enumeration; reset lookup must use the normalised email column (security review findings L-9 and L-10; `docs/SECURITY.md`, section 3).
+* Password change and the TOTP flow.
 * Central two-factor enforcement for staff and system administrators, recovery codes, re-authentication and OTP-protected admin access. The initial administrator must change the bootstrap password and complete the profile before using protected functions (D-004, D-005).
-* Profile pages and account lifecycle workflows: editing and deleting one's own account, email change/verification, block/deactivation/reactivation, session invalidation and last-administrator protection.
-* Swiss address-directory validation and autocompletion (D-032, D-033), plus responsive Tabler views for all phase 1 user workflows and their privacy-notice links.
-* Per-IP and per-normalised-address rate limits for registration, password reset and email changes; generic, timing-comparable responses; token redaction before the first token-bearing URL is introduced.
-* Microsoft Graph configuration and delivery, a read-only system-administrator security-log view, retention cleanup and scheduling of `cleanup_login_ip_attempts`.
-* Instance-specific branding/configuration, complete Swiss German UI translations for new workflows and documented supported browsers.
-* Owner decisions: retain or remove the redundant `normalized_email` column; reconfirm lower-casing of email local parts against RFC 5321 section 2.4, including the account-takeover risk documented in D-035.
-* Verification: CI run 38273753482 (commit 8da72f3, 2026-10-12) passed both jobs, minimum (Python 3.12, Django 6.0, MariaDB 10.11) and latest (Python 3.14, Django 6.1, MariaDB 12.3), with deprecation warnings treated as errors.
+* Profile editing and account lifecycle workflows: editing and deleting one's own account, email change/verification, block/deactivation/reactivation, session invalidation and last-administrator protection.
+* Swiss address-directory validation and autocompletion (D-032, D-033), plus the remaining responsive views for phase 1 user workflows (member navigation with menu and tab bar, dark mode and colour mode switch, print stylesheet).
+* Email change must use the same request budget (D-038); token redaction for every further token-bearing URL (the password reset URL is covered).
+* Microsoft Graph configuration and delivery, a read-only system-administrator security-log view, and the scheduling of the worker `process_mail_queue --loop` and of the cleanup commands `cleanup_login_ip_attempts`, `cleanup_mail_requests` and `delete_expired_registrations`.
+* Instance branding from the configuration (logo, accent and highlight colour), the imprint (D-022) and documented supported browsers.
+* Owner decision: retain or remove the redundant `normalized_email` column (the lower-casing of local parts was re-confirmed on 2026-10-13, D-035).
+* Verification: CI run 38273753482 (commit 8da72f3, 2026-10-12) passed both jobs, minimum (Python 3.12, Django 6.0, MariaDB 10.11) and latest (Python 3.14, Django 6.1, MariaDB 12.3), with deprecation warnings treated as errors. The changes of 2026-10-13 (D-037 to D-039) were run locally only (Python 3.14, Django 6.1.2, MariaDB 12.3: 519 tests with deprecation warnings as errors; Django 6.0.9 and `check --deploy` were last run before D-039); no CI run covers them yet.
 
 Deployment gates: no stage or production instance is deployed before
 
 1. Microsoft Graph email delivery is implemented with allowlist restrictions outside production (D-006, D-028).
-2. TOTP and the central second-factor check protect the complete login and admin flows (D-004, D-017).
-3. Token-bearing URLs are redacted from request logs and covered by tests before they are introduced (`docs/SECURITY.md`, section 10).
+2. TOTP and the central second-factor check protect the complete login and admin flows (D-004, D-017); until then staff users and system administrators can log in with the password alone.
+3. Token-bearing URLs are redacted from request logs and covered by tests (`docs/SECURITY.md`, section 10); fulfilled for the registration link by `leg_platform/log_filters.py`, to be repeated for every further token URL.
 4. Axes and separate IP-attempt retention are configured and scheduled; the TOTP flow calls Django `login()` only after every required factor is verified (D-017, D-018).
+5. The worker `process_mail_queue --loop` runs as a supervised service (without it, no email is sent), and the cleanup commands `delete_expired_registrations`, `cleanup_mail_requests` and `cleanup_login_ip_attempts` are scheduled (D-037, D-038). The rate limits and the timing-comparable requests of registration and password reset are implemented (D-038).

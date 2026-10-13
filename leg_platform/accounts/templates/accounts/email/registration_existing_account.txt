@@ -1,0 +1,16 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+Someone entered this email address to register at {{ instance_name }}. There is already an account for this address, so no new account was created.
+
+You can log in here:
+
+{{ login_url }}
+
+If you do not know the password, you can request a new one on the login page.{% endblocktranslate %}
+{% if contact_url %}
+{% blocktranslate %}If that does not help, you will find contact information here:
+
+{{ contact_url }}{% endblocktranslate %}
+{% endif %}
+{% translate "If you did not try to register, you can ignore this email." %}
+{% endautoescape %}

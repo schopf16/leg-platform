@@ -1,5 +1,7 @@
 """Admin authorization tests (AGENTS.md, section 6; docs/SECURITY.md, section 4)."""
 
+from unittest import mock
+
 from django.contrib import admin
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.admin.utils import flatten_fieldsets
@@ -262,6 +264,35 @@ class AdminPresentationTests(TestCase):
         self.assertIn(self.member.customer_number_display, content)
         self.assertIn("Kundennummer", content)
         self.assertNotIn('class="column-id', content)
+
+    def test_the_user_list_warns_system_administrators_when_customer_numbers_run_out(self):
+        url = reverse("admin:accounts_user_changelist")
+        self.client.force_login(self.administrator)
+        with translation.override("de-ch"):
+            quiet = self.client.get(url).content.decode()
+            with mock.patch(
+                "leg_platform.accounts.admin.customer_numbers_nearly_exhausted", return_value=True
+            ):
+                warned = self.client.get(url).content.decode()
+
+        self.assertNotIn("Die Kundennummern gehen aus", quiet)
+        self.assertIn("Die Kundennummern gehen aus", warned)
+        self.assertIn("von 1000000 sind vergeben", warned)
+
+    def test_the_customer_number_warning_is_not_shown_to_staff_users(self):
+        staff_user = create_active_user("staff@example.org")
+        staff_user.set_privileges(is_staff=True, is_superuser=False)
+        staff_user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="accounts", codename="view_user")
+        )
+        self.client.force_login(staff_user)
+        with translation.override("de-ch"):
+            with mock.patch(
+                "leg_platform.accounts.admin.customer_numbers_nearly_exhausted", return_value=True
+            ):
+                content = self.client.get(reverse("admin:accounts_user_changelist")).content.decode()
+
+        self.assertNotIn("Die Kundennummern gehen aus", content)
 
     def test_user_list_sorts_by_customer_number(self):
         self.client.force_login(self.administrator)

@@ -67,6 +67,8 @@ def run_settings_in_child(**overrides):
             "APP_ENV": "production",
             "DJANGO_SECRET_KEY": STRONG_KEY,
             "DJANGO_ALLOWED_HOSTS": "portal.example.org",
+            "INSTANCE_BASE_URL": "https://portal.example.org",
+            "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
             "EMAIL_MODE": "graph",
             "DB_NAME": "leg_platform",
             "DB_USER": "leg_platform",

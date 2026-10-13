@@ -1,0 +1,130 @@
+"""Emails of the account functions (docs/ARCHITECTURE.md, "Email").
+
+All sending goes through Django's email framework, so that the configured backend decides
+about delivery (console or Graph, D-006, D-028) and tests use the in-memory backend. Messages
+are plain text. Links are built from the canonical base URL of the instance configuration,
+never from the request (docs/SECURITY.md, section 4). Neither messages nor tokens are logged.
+"""
+
+from datetime import timedelta
+
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.urls import reverse
+from django.utils import translation
+from django.utils.translation import gettext
+
+from leg_platform.accounts import email_texts
+from leg_platform.accounts.models import EmailText
+
+Key = EmailText.Key
+
+# The emails are written in the default language of the instance, not in the language of the
+# request that triggered them.
+
+
+def absolute_url(path):
+    """Return the link for a path of the application, built from the instance configuration."""
+    return f"{settings.INSTANCE_BASE_URL}{path}"
+
+
+def _values(specific):
+    return {
+        "instance_name": settings.INSTANCE_NAME,
+        "contact_url": settings.INSTANCE_WEBSITE_URL or "",
+        "privacy_url": settings.INSTANCE_PRIVACY_URL or "",
+        "login_url": absolute_url(reverse("accounts:login")),
+        **specific,
+    }
+
+
+def _send(address, key, values):
+    """Send the email; ``values`` holds the placeholders that are specific to this email."""
+    with translation.override(settings.LANGUAGE_CODE):
+        subject, body = email_texts.render(key, _values(values))
+    _deliver(address, subject, body)
+
+
+def _deliver(address, subject, body):
+    # Marks an automatic message that answers no email (RFC 3834, section 5.2), so that
+    # automatic replies are not sent to it.
+    EmailMessage(
+        subject=subject, body=body, to=[address], headers={"Auto-Submitted": "auto-generated"}
+    ).send(fail_silently=False)
+
+
+# The personal links of a preview and of a test email carry a token that does not exist.
+EXAMPLE_TOKEN = "x" * 43
+
+
+def _sample_values(key):
+    specific = {}
+    for placeholder in email_texts.DEFINITIONS[key].placeholders:
+        if placeholder is email_texts.LIFETIME_HOURS:
+            specific[placeholder.name] = "24"
+        elif placeholder is email_texts.VERIFICATION_URL:
+            specific[placeholder.name] = absolute_url(
+                reverse("accounts:registration_verify", kwargs={"token": EXAMPLE_TOKEN})
+            )
+        elif placeholder is email_texts.RESET_URL:
+            specific[placeholder.name] = absolute_url(
+                reverse("accounts:password_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
+            )
+    return _values(specific)
+
+
+def preview(key, subject, body):
+    """Return the subject and body as they would be sent, with example links (D-039)."""
+    with translation.override(settings.LANGUAGE_CODE):
+        return email_texts.compose(key, subject, body, _sample_values(key))
+
+
+def send_test(address, key, subject, body):
+    """Send the given text with example links to the address of the administrator (D-039)."""
+    with translation.override(settings.LANGUAGE_CODE):
+        subject, body = email_texts.compose(key, subject, body, _sample_values(key))
+        notice = gettext("This is a test email. The personal link in it does not work.")
+        subject = f"[{gettext('Test')}] {subject}"
+    _deliver(address, subject, f"{notice}\n\n{body}")
+
+
+def send_registration_verification(address, raw_token, lifetime: timedelta):
+    """Send the link with which the person verifies the address and sets the password."""
+    _send(
+        address,
+        Key.REGISTRATION_VERIFICATION,
+        {
+            "verification_url": absolute_url(
+                reverse("accounts:registration_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_registration_existing_account(address):
+    """Tell the owner of an address with an account that someone tried to register it.
+
+    Contains no link that changes anything (docs/PROJECT.md, "Registration"). Nobody is asked
+    to reply: third parties can trigger this email.
+    """
+    _send(address, Key.REGISTRATION_EXISTING_ACCOUNT, {})
+
+
+def send_password_reset(address, raw_token, lifetime: timedelta):
+    """Send the link with which the owner of an account chooses a new password."""
+    _send(
+        address,
+        Key.PASSWORD_RESET,
+        {
+            "reset_url": absolute_url(
+                reverse("accounts:password_reset_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_password_changed(address):
+    """Tell the owner that the password was changed; contains no link (docs/SECURITY.md)."""
+    _send(address, Key.PASSWORD_CHANGED, {})

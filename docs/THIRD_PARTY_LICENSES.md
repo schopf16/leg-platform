@@ -52,7 +52,17 @@ Notes:
 
 ## Bundled Assets
 
-No third-party assets are bundled yet. Tabler and Tabler Icons (MIT) and the fonts (SIL Open Font License 1.1) are planned to be served by the instance itself (D-024, `docs/SECURITY.md`, section 6). When they are added to the repository, their licence texts (and those of any library they bundle) are added next to them and listed here, because both licences require the copyright notice and licence to be included with copies.
+The following third-party assets are part of this repository, below `leg_platform/static/vendor/`, each with its licence text next to it (the licences require the copyright notice and licence to be included with copies):
+
+| Asset | Version and source | Licence | Used for |
+| ----- | ------------------ | ------- | -------- |
+| Tabler (`css/tabler.min.css`) | 1.6.1, `@tabler/core` from the npm registry; the tarball matched the registry's SHA-512 integrity value; SHA-256 of the file: `370A2D4E608AE518351D10528FC7DBE19B354AE5062C51B2A9CB294850D65403` | MIT (`tabler/LICENSE`) | Application interface (D-003, D-024) |
+| Source Sans 3 (`fonts/SourceSans3.ttf`) | repository `google/fonts`, `ofl/sourcesans3`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Source" (`fonts/OFL-SourceSans3.txt`) | Text typeface (D-024) |
+| Bricolage Grotesque (`fonts/BricolageGrotesque.ttf`) | repository `google/fonts`, `ofl/bricolagegrotesque`, unmodified | SIL Open Font License 1.1 (`fonts/OFL-BricolageGrotesque.txt`) | Headings in the register "Warm" (D-024) |
+| IBM Plex Mono (`fonts/IBMPlexMono-Regular.ttf`) | repository `google/fonts`, `ofl/ibmplexmono`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Plex" (`fonts/OFL-IBMPlexMono.txt`) | Identifiers such as the customer number (D-024) |
+| Tabler Icons (`tabler-icons/lock.svg`, inlined in `leg_platform/templates/icons/lock.html`) | v3.49.0, repository `tabler/tabler-icons`, `icons/outline/lock.svg` | MIT (`tabler-icons/LICENSE`) | Icons (D-024); further icons are added with the pages that use them |
+
+The fonts are used unmodified, as `docs/DESIGN.md`, section 4, requires (OFL condition 3 forbids a modified version under a Reserved Font Name). The own file `leg_platform/static/img/select-arrow.svg` replaces a `data:` image of Tabler's stylesheet (D-037) and is part of this project's BSD 3-Clause licence.
 
 ## Sources
 

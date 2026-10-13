@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Log in" %}{% endblock %}
+{% block body %}
+  <div class="login-split">
+    <section class="login-welcome register-warm">
+      <span class="portal-brand">{{ instance_name }}</span>
+      <h1>{% blocktranslate %}Welcome to {{ instance_name }}{% endblocktranslate %}</h1>
+      <p>{% translate "Here you manage your account and, later, your locations, energy data and invoices." %}</p>
+    </section>
+    <main class="login-form-area">
+      <div class="login-card">
+        {% include "_messages.html" %}
+        <div class="card card-md">
+          <div class="card-body">
+            <h2 class="mb-4">{% translate "Log in" %}</h2>
+            <form method="post" novalidate>
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ next }}">
+              {% include "accounts/_form_fields.html" %}
+              <div class="mb-3 text-end"><a href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a></div>
+              <button type="submit" class="btn btn-primary w-100">{% include "icons/lock.html" %}{% translate "Log in" %}</button>
+            </form>
+            <div class="hr-text hr-text-plain">{% translate "No account yet?" %}</div>
+            <a class="btn btn-secondary-action w-100" href="{% url 'accounts:registration' %}">{% translate "Register as a new user" %}</a>
+          </div>
+        </div>
+      </div>
+      <nav class="login-links d-print-none">{% include "_footer_links.html" %}</nav>
+    </main>
+  </div>
+{% endblock %}

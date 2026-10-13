@@ -1,0 +1,44 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}
+<html lang="{{ LANGUAGE_CODE }}" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# The portal is not a public page (docs/PROJECT.md, "Instances"). #}
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}{% endblock %} – {{ instance_name }}</title>
+  <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+</head>
+<body class="register-clear">
+  {% block body %}
+    <div class="page">
+      <header class="portal-header navbar navbar-expand-md d-print-none">
+        <div class="container-xl">
+          <a class="portal-brand" href="{% url 'home' %}">{{ instance_name }}</a>
+          {% if user.is_authenticated %}
+            <div class="navbar-nav flex-row">
+              <a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>
+              <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link nav-link">{% translate "Log out" %}</button>
+              </form>
+            </div>
+          {% endif %}
+        </div>
+      </header>
+      <main class="page-body">
+        <div class="container-tight py-4">
+          {% include "_messages.html" %}
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+      <footer class="footer footer-transparent d-print-none">
+        <div class="container-xl text-center">
+          {% include "_footer_links.html" %}
+        </div>
+      </footer>
+    </div>
+  {% endblock %}
+</body>
+</html>

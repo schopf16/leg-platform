@@ -95,14 +95,14 @@ The user model keeps all fields of the eCH-0010 structure (D-032). Fields that a
 | Email address | yes | Login, account notifications, sending invoices by email |
 | Phone number | no | Queries |
 
-All required fields are collected at registration, so that the profile is complete as a basis for the later LEG functions. Invoicing itself is not part of the first phase; the purposes are recorded so that only necessary data is collected, and they are communicated to the person in the privacy notice (DSG Art. 6 para. 3 and Art. 19; D-022).
+All required fields are collected when the registration is completed, i.e. on the page reached through the verification link (section "Registration"), so that the profile is complete as a basis for the later LEG functions. Invoicing itself is not part of the first phase; the purposes are recorded so that only necessary data is collected, and they are communicated to the person in the privacy notice (DSG Art. 6 para. 3 and Art. 19; D-022).
 
 ## Registration
 
-* The registration form collects the required profile data and links to the privacy notice.
+* The registration form asks only for the email address and links to the privacy notice (project owner, 2026-10-13). Until the address is verified, only the address is stored.
 * After submission, the response is always the same generic message, e.g. "A link to activate your account has been emailed to the address provided." (OWASP Authentication Cheat Sheet).
 * If the email address does not belong to an active, temporarily locked or blocked account, an unverified account without a customer number is created and a time-limited, single-use verification link is sent. An earlier pending registration with the same address is replaced.
-* Via the verification link, the person checks and, if necessary, corrects the profile data and sets the password. Only when the password form has been submitted successfully is the account active, and only then is a customer number assigned and shown in the profile; the link is consumed only at that point. Unverified registrations do not use up customer numbers (D-021). Verification therefore never activates a password that the person clicking the link did not choose.
+* Via the verification link, the person enters the profile data (name, postal address, optional phone number) and sets the password. The link is valid for a limited time (proposal: 24 hours) and stays valid after an unsuccessful submission, e.g. a rejected password. Only when the form has been submitted successfully is the account active, and only then is a customer number assigned and shown in the profile; the link is consumed only at that point. Unverified registrations do not use up customer numbers (D-021). Verification therefore never activates a password that the person clicking the link did not choose.
 * Unverified accounts and their data are deleted automatically when the verification link expires.
 * If the email address already belongs to an active, temporarily locked or blocked account, no account is created. An email to that address points to login and password reset.
 * Registration and the emails it triggers are rate-limited, so that the function cannot be used to flood mailboxes. A new verification email is obtained by registering again; there is no separate function to resend it.
@@ -115,7 +115,7 @@ Users can change their email address themselves (D-016). The email address is on
 * A time-limited, single-use verification link is sent to the new address.
 * Until the new address is verified, the account continues to use the old address unchanged.
 * Only after successful verification is the old address replaced; the account continues under the new address.
-* The old address receives a notification that the email address was changed, without a link that could undo or confirm anything. The notification states: "If you did not request this change, reply to this email." Replies go to the sender mailbox.
+* The old address receives a notification that the email address was changed, without a link that could undo or confirm anything. The notification states that the person should contact the operator immediately if they did not request the change; it does not invite a reply.
 * Only the most recent pending change can be confirmed; earlier links become invalid.
 * If the new address belongs to an active, temporarily locked or blocked account, the change is not performed. The user sees the same generic message as for a successful request; the new address receives an information email instead of a verification link. The check is repeated when the link is confirmed.
 * If the new address belongs to an unverified account, the verification link is sent as usual; confirming it deletes the pending registration, because the confirmation proves control of the address.
@@ -207,7 +207,7 @@ Intended use:
 * security notifications: changes of email address, password and two-factor authentication
 * account notifications where needed
 
-Security notifications state: "If you did not request this change, reply to this email." Replies go to the sender mailbox; the operator must monitor it. The installation guide states this and describes the procedure after such a reply (block the account, verify the person's identity, restore the email address or password, log the incident).
+Security notifications state that the person should contact the operator immediately if they did not request the change, and name the instance's contact information where configured; they do not invite a reply (D-038). The installation guide describes the procedure after such a report (block the account, verify the person's identity, restore the email address or password, log the incident).
 
 The system administrator configures Microsoft Graph in a dedicated section of the Django admin:
 

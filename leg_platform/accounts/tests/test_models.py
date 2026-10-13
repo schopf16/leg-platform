@@ -753,6 +753,19 @@ class CustomerNumberTests(TestCase):
         self.assertIsNone(other.customer_number_id)
         self.assertIsNotNone(user.customer_number_id)
 
+    def test_issuing_warns_from_ninety_percent_of_the_numbers_on(self):
+        with mock.patch.object(account_models, "CUSTOMER_NUMBER_SPACE", 10):
+            for index in range(8):
+                IssuedCustomerNumber.objects.create(number=f"00000{index}")
+            with self.assertNoLogs("leg_platform.accounts.models", "WARNING"):
+                IssuedCustomerNumber.objects.issue()  # 8 issued before this one
+            with self.assertLogs("leg_platform.accounts.models", "WARNING") as logs:
+                IssuedCustomerNumber.objects.issue()  # 9 of 10 issued before this one
+
+        self.assertEqual(
+            logs.records[0].getMessage(), "9 of 10 customer numbers have been issued (90%)."
+        )
+
     def test_exhaustion_fails_without_searching(self):
         with mock.patch.object(account_models, "CUSTOMER_NUMBER_SPACE", 3):
             for index in range(3):

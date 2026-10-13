@@ -1,0 +1,7 @@
+{% load i18n %}
+{% if instance_privacy_url %}
+  <a href="{{ instance_privacy_url }}" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>
+{% endif %}
+{% if instance_website_url %}
+  <a href="{{ instance_website_url }}" rel="noopener noreferrer" class="ms-3">{% translate "To the website" %} <span aria-hidden="true">&#8599;</span></a>
+{% endif %}

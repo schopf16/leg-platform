@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:accounts_emailtext_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; {% translate "Versions" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% for version, is_current in versions %}
+  <h2>{{ version.created_at }}{% if is_current %} &ndash; {% translate "Current" %}{% endif %}</h2>
+  {% if version.subject or version.body %}
+  <p><strong>{{ version.subject|default:"" }}</strong></p>
+  <pre>{{ version.body }}</pre>
+  {% else %}
+  <p>{% translate "The default text of the application is used." %}</p>
+  {% endif %}
+  {% if can_restore and not is_current %}
+  <form method="post" action="{% url 'admin:accounts_emailtext_restore' original.pk version.pk %}">
+    {% csrf_token %}
+    <input type="submit" value="{% translate 'Restore this version' %}">
+  </form>
+  {% endif %}
+  {% empty %}
+  <p>{% translate "No version has been saved yet." %}</p>
+  {% endfor %}
+  <h2>{% translate "Default text" %}</h2>
+  <p>{% translate "The default text of the application is used." %}</p>
+  {% if default_is_current %}<p>{% translate "Current" %}</p>{% endif %}
+  {% if can_restore and not default_is_current %}
+  <form method="post" action="{% url 'admin:accounts_emailtext_restore' original.pk 0 %}">
+    {% csrf_token %}
+    <input type="submit" value="{% translate 'Restore this version' %}">
+  </form>
+  {% endif %}
+  <p><a href="{{ change_url }}">{% translate "Back to the email" %}</a></p>
+</div>
+{% endblock %}
