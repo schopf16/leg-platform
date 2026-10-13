@@ -44,6 +44,8 @@ UNRESTRICTED_VIEWS = frozenset(
         "accounts:two_factor_qr",
     }
 )
+# The same for an account that must replace its password first (D-005, D-041).
+PASSWORD_CHANGE_VIEWS = frozenset({"accounts:logout", "accounts:password_change"})
 
 
 def requires_second_factor(user):
@@ -71,6 +73,9 @@ class SecondFactorMiddleware:
     Must come after ``AuthenticationMiddleware``, ``OTPMiddleware`` and ``MessageMiddleware``.
     A session without a completed second factor can only log out and set the factor up. If the
     account has a factor, the session is ended and the person logs in again, which asks for it.
+    An account that must replace its password (the initial system administrator) can only log
+    out and change the password, before anything else, also before the second factor is set up
+    (D-005).
     """
 
     def __init__(self, get_response):
@@ -81,6 +86,11 @@ class SecondFactorMiddleware:
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         user = request.user
+        if user.is_authenticated and user.password_change_required:
+            if request.resolver_match.view_name in PASSWORD_CHANGE_VIEWS:
+                return None
+            # The password change page itself explains why it is shown.
+            return redirect("accounts:password_change")
         if not requires_second_factor(user) or is_second_factor_complete(user):
             return None
         if request.resolver_match.view_name in UNRESTRICTED_VIEWS:

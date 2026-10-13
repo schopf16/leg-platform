@@ -9,13 +9,12 @@ from django.core.management.base import BaseCommand, CommandError
 
 class Command(BaseCommand):
     help = (
-        "Disabled. The first system administrator is created with the setup command of the "
-        "instance (docs/DECISIONS.md, D-005)."
+        "Disabled. The first system administrator is created with the command "
+        "setup_initial_administrator (docs/DECISIONS.md, D-005)."
     )
 
     def handle(self, *args, **options):
         raise CommandError(
-            "createsuperuser is disabled. The first system administrator is created with the "
-            "setup command of the instance (docs/DECISIONS.md, D-005), which is not "
-            "implemented yet."
+            "createsuperuser is disabled. The first system administrator is created with "
+            "'manage.py setup_initial_administrator' (docs/DECISIONS.md, D-005)."
         )

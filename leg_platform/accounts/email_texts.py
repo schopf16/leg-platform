@@ -54,6 +54,9 @@ VERIFICATION_URL = Placeholder(
     _("Personal link to confirm the email address and to choose a password."),
 )
 RESET_URL = Placeholder("reset_url", _("Personal link to choose a new password."))
+TWO_FACTOR_RESET_URL = Placeholder(
+    "two_factor_reset_url", _("Personal link to remove two-factor authentication.")
+)
 LIFETIME_HOURS = Placeholder(
     "lifetime_hours", _("Number of hours for which the personal link can be used.")
 )
@@ -123,6 +126,18 @@ DEFINITIONS = {
     Key.CODE_ATTEMPTS_WARNING: Definition(
         "accounts/email/code_attempts_warning.txt",
         lambda: gettext("Wrong codes were entered for your account at %(instance_name)s"),
+        (),
+        (),
+    ),
+    Key.TWO_FACTOR_RESET_LINK: Definition(
+        "accounts/email/two_factor_reset_link.txt",
+        lambda: gettext("Remove two-factor authentication at %(instance_name)s"),
+        (TWO_FACTOR_RESET_URL, LIFETIME_HOURS),
+        (TWO_FACTOR_RESET_URL,),
+    ),
+    Key.TWO_FACTOR_RESET: Definition(
+        "accounts/email/two_factor_reset.txt",
+        lambda: gettext("Two-factor authentication was reset at %(instance_name)s"),
         (),
         (),
     ),

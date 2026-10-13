@@ -272,6 +272,8 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
 class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
     """Change the password of the logged-in account; asks for the current password first."""
 
+    different_password_message = _("Choose a password that is different from the current one.")
+
     current_password = forms.CharField(
         label=_("Current password"),
         strip=False,
@@ -292,3 +294,19 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
         if not second_factor.verify_password(self.request, self.user, password):
             raise ValidationError(ReauthenticationForm.password_error, code="password_incorrect")
         return password
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # An initial password that must be replaced is not replaced by itself (D-005).
+        if (
+            self.user.password_change_required
+            and "current_password" in cleaned_data
+            and "new_password2" in cleaned_data
+            and cleaned_data["new_password2"] == cleaned_data["current_password"]
+        ):
+            self.add_error("new_password1", self.different_password_message)
+        return cleaned_data
+
+
+class ConfirmForm(PortalFormMixin, forms.Form):
+    """A page without fields that only asks the person to confirm with a button."""

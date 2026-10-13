@@ -18,7 +18,7 @@
           <a class="portal-brand" href="{% url 'home' %}">{{ instance_name }}</a>
           {% if user.is_authenticated %}
             <div class="navbar-nav flex-row">
-              <a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>
+              {% if not user.password_change_required %}<a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>{% endif %}
               <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-link nav-link">{% translate "Log out" %}</button>

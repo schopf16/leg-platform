@@ -319,6 +319,33 @@ class AxesProxyCountTests(SimpleTestCase):
                 self.assertEqual(backend, "leg_platform.mail.GraphNotImplementedEmailBackend")
 
 
+class SecurityLogRetentionTests(SimpleTestCase):
+    def test_defaults_are_the_minimum(self):
+        config = load_environment(make_env())
+        self.assertEqual(config.security_log_retention_days, 30)
+        self.assertEqual(config.security_log_long_retention_days, 365)
+
+    def test_longer_retention_is_accepted(self):
+        config = load_environment(
+            make_env(SECURITY_LOG_RETENTION_DAYS="90", SECURITY_LOG_LONG_RETENTION_DAYS="730")
+        )
+        self.assertEqual(config.security_log_retention_days, 90)
+        self.assertEqual(config.security_log_long_retention_days, 730)
+
+    def test_shorter_than_the_minimum_and_invalid_values_refuse_start(self):
+        for name, value in (
+            ("SECURITY_LOG_RETENTION_DAYS", "29"),
+            ("SECURITY_LOG_LONG_RETENTION_DAYS", "364"),
+            ("SECURITY_LOG_RETENTION_DAYS", "0"),
+            ("SECURITY_LOG_RETENTION_DAYS", "-30"),
+            ("SECURITY_LOG_RETENTION_DAYS", "thirty"),
+            ("SECURITY_LOG_LONG_RETENTION_DAYS", "36501"),
+        ):
+            with self.subTest(name=name, value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, name):
+                    load_environment(make_env(**{name: value}))
+
+
 class AllowedRecipientsTests(SimpleTestCase):
     def test_allowlist_without_recipients_refuses_start(self):
         for app_env in ("local", "stage"):

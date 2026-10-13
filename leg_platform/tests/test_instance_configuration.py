@@ -150,6 +150,14 @@ class TokenRedactionTests(SimpleTestCase):
             redact_tokens(f"Not Found: {path}"), f"Not Found: /password-reset/verify/{REDACTED}/"
         )
 
+    def test_the_pattern_matches_the_url_of_the_second_factor_reset_view(self):
+        path = reverse("accounts:two_factor_reset_verify", args=[SECRET])
+
+        self.assertEqual(
+            redact_tokens(f"Not Found: {path}"),
+            f"Not Found: /two-factor-reset/verify/{REDACTED}/",
+        )
+
     def test_the_request_lines_of_the_development_server_are_redacted(self):
         line = f'"GET /register/verify/{SECRET}/ HTTP/1.1" 302 0'
 

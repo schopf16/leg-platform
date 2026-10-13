@@ -26,7 +26,13 @@ from datetime import timedelta
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from leg_platform.accounts import emails, password_reset, rate_limits, registration
+from leg_platform.accounts import (
+    emails,
+    password_reset,
+    rate_limits,
+    registration,
+    second_factor_reset,
+)
 from leg_platform.accounts.login_protection import axes_client_ip
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.normalization import normalize_email_address
@@ -56,6 +62,8 @@ HANDLERS = {
     MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),
     MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
     MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
+    MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
+    MailJob.Kind.TWO_FACTOR_RESET: _notification(emails.send_two_factor_reset),
 }
 
 DONE = "done"

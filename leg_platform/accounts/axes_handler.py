@@ -2,10 +2,14 @@
 
 from axes.handlers.database import AxesDatabaseHandler
 
+from leg_platform.accounts import security_log
 from leg_platform.accounts.login_protection import (
+    LOGIN_FAILURE_LIMIT,
     reserve_client_ip_attempt,
     settle_client_ip_attempt,
 )
+from leg_platform.accounts.models import SecurityEvent, User
+from leg_platform.accounts.normalization import normalize_email_address
 
 
 class LoginProtectionHandler(AxesDatabaseHandler):
@@ -22,11 +26,31 @@ class LoginProtectionHandler(AxesDatabaseHandler):
         if request is not None:
             request.axes_ip_address = None
         try:
-            return super().user_login_failed(sender, credentials, request, **kwargs)
+            result = super().user_login_failed(sender, credentials, request, **kwargs)
+            if request is not None:
+                self._record_lockout(credentials, request)
+            return result
         finally:
             if request is not None:
                 request.axes_ip_address = client_ip
                 settle_client_ip_attempt(request, succeeded=False)
+
+    @staticmethod
+    def _record_lockout(credentials, request):
+        # Only the failure that reaches the limit, once per lockout; not the refused attempts
+        # during it (D-018).
+        if (
+            not getattr(request, "axes_locked_out", False)
+            or getattr(request, "axes_failures_since_start", None) != LOGIN_FAILURE_LIMIT
+        ):
+            return
+        address = normalize_email_address((credentials or {}).get("username"))
+        account = (
+            User._base_manager.filter(normalized_email=address).values_list("pk", flat=True).first()
+            if address
+            else None
+        )
+        security_log.record(SecurityEvent.Event.LOGIN_LOCKOUT, account=account)
 
     def user_logged_in(self, sender, request, user, **kwargs):
         try:

@@ -10,6 +10,7 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import django
@@ -128,6 +129,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # After the messages middleware: ends sessions that are idle for too long or too old (D-041).
+    "leg_platform.accounts.session_timeout.SessionTimeoutMiddleware",
     # After OTPMiddleware and MessageMiddleware: no privileges without the second factor.
     "leg_platform.accounts.second_factor.SecondFactorMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -218,6 +221,18 @@ AUTH_PASSWORD_VALIDATORS = [
 # None), so that the cookies are host-only. SameSite stays at Django's default "Lax".
 
 SESSION_COOKIE_HTTPONLY = True
+
+# Idle and absolute session timeouts (docs/SECURITY.md, section 3; D-041). OWASP Session
+# Management Cheat Sheet: idle timeouts of 15-30 minutes for low-risk applications (2-5 minutes
+# for high-value ones) and 4-8 hours absolute for an application that is used for a working
+# day. Staff users and system administrators have the shorter values. The cookie lives as long
+# as the longest absolute timeout; the timeouts themselves are enforced on the server by
+# leg_platform.accounts.session_timeout.
+SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
+SESSION_ABSOLUTE_TIMEOUT = timedelta(hours=8)
+SESSION_PRIVILEGED_IDLE_TIMEOUT = timedelta(minutes=15)
+SESSION_PRIVILEGED_ABSOLUTE_TIMEOUT = timedelta(hours=4)
+SESSION_COOKIE_AGE = int(SESSION_ABSOLUTE_TIMEOUT.total_seconds())
 # No JavaScript reads the CSRF cookie. Django's documentation states that HttpOnly offers
 # little practical protection for this cookie; it is set because docs/SECURITY.md (section 3)
 # requires HttpOnly where possible. Scripts that need the token must read it from the form
@@ -305,6 +320,10 @@ if django.VERSION >= (6, 1):
     MAILERS = {"default": {"BACKEND": email_backend(ENVIRONMENT)}}
 else:
     EMAIL_BACKEND = email_backend(ENVIRONMENT)
+
+# Security log retention in days (docs/SECURITY.md, section 10; D-018, D-041).
+SECURITY_LOG_RETENTION_DAYS = ENVIRONMENT.security_log_retention_days
+SECURITY_LOG_LONG_RETENTION_DAYS = ENVIRONMENT.security_log_long_retention_days
 
 # Logging
 # Warnings and errors go to standard error, where the hosting collects them. Django's default

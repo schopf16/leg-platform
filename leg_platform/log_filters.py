@@ -8,9 +8,11 @@ the token is removed from every log message before it is written.
 import logging
 import re
 
-# The paths of the token views (registration link, password reset link); a test checks that the
-# pattern matches the URL configuration.
-TOKEN_URL_PATTERN = re.compile(r"(/(?:register|password-reset)/verify/)[^/\s\"'?#]+")
+# The paths of the token views (registration link, password reset link, link to remove the
+# second factor); a test checks that the pattern matches the URL configuration.
+TOKEN_URL_PATTERN = re.compile(
+    r"(/(?:register|password-reset|two-factor-reset)/verify/)[^/\s\"'?#]+"
+)
 REDACTED = "<redacted>"
 
 

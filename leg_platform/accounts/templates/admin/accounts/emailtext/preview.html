@@ -2,12 +2,12 @@
 {% load i18n %}
 
 {% block breadcrumbs %}
-<div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
-  &rsaquo; <a href="{% url 'admin:accounts_emailtext_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
-  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
-  &rsaquo; {% translate "Preview" %}
-</div>
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  <li><a href="{% url 'admin:accounts_emailtext_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a></li>
+  <li><a href="{{ change_url }}">{{ original }}</a></li>
+  <li aria-current="page">{% translate "Preview" %}</li>
+</ol>
 {% endblock %}
 
 {% block content %}

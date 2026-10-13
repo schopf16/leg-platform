@@ -5,8 +5,6 @@ logged-in persons only ever use ``request.user``; no view takes an account ident
 URL or the request (docs/SECURITY.md, section 4).
 """
 
-import logging
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -26,11 +24,18 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, TemplateView
 from django_otp import login as otp_login
 
-from leg_platform.accounts import password_reset, second_factor, totp
+from leg_platform.accounts import (
+    password_reset,
+    second_factor,
+    second_factor_reset,
+    security_log,
+    totp,
+)
 from leg_platform.accounts.forms import (
     ChangePasswordForm,
     CodeForm,
     CompleteRegistrationForm,
+    ConfirmForm,
     LoginForm,
     NewPasswordForm,
     PasswordResetRequestForm,
@@ -38,15 +43,14 @@ from leg_platform.accounts.forms import (
     RegistrationForm,
 )
 from leg_platform.accounts.mail_queue import submit_mail_request
-from leg_platform.accounts.models import MailJob, User, VerificationToken
-
-security_logger = logging.getLogger("leg_platform.security")
+from leg_platform.accounts.models import MailJob, SecurityEvent, User, VerificationToken
 
 # The verification token's digest is kept in the session between the link and the form, so that
 # the token itself is not in the URL of the page that is shown (docs/SECURITY.md, section 6;
 # the approach of Django's password reset view).
 REGISTRATION_SESSION_KEY = "registration_token_digest"
 PASSWORD_RESET_SESSION_KEY = "password_reset_token_digest"
+TWO_FACTOR_RESET_SESSION_KEY = "two_factor_reset_token_digest"
 ENROLMENT_SESSION_KEY = "two_factor_enrolment_device"
 
 
@@ -298,6 +302,44 @@ class PasswordResetSetView(NeverCacheMixin, FormView):
         return redirect(self.get_success_url())
 
 
+class TwoFactorResetVerifyView(TokenPageMixin, View):
+    """Opening the link changes nothing; it only remembers the token and leaves the URL."""
+
+    def get(self, request, token):
+        found = second_factor_reset.find_link(token)
+        if found is None:
+            return render(request, "accounts/two_factor_reset_invalid.html")
+        request.session[TWO_FACTOR_RESET_SESSION_KEY] = found.digest
+        return redirect("accounts:two_factor_reset_confirm")
+
+
+class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
+    """The owner confirms the removal of the second factor that an administrator started (D-004)."""
+
+    template_name = "accounts/two_factor_reset_confirm.html"
+    form_class = ConfirmForm
+    success_url = reverse_lazy("accounts:login")
+
+    @method_decorator(never_cache)
+    @method_decorator(no_referrer)
+    def dispatch(self, request, *args, **kwargs):
+        digest = request.session.get(TWO_FACTOR_RESET_SESSION_KEY)
+        self.token = second_factor_reset.find_link_by_digest(digest) if digest else None
+        if self.token is None:
+            return render(request, "accounts/two_factor_reset_invalid.html")
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        if second_factor_reset.confirm_link(self.token) is None:
+            return render(self.request, "accounts/two_factor_reset_invalid.html")
+        self.request.session.pop(TWO_FACTOR_RESET_SESSION_KEY, None)
+        messages.success(
+            self.request,
+            _("Two-factor authentication was removed. You can now log in with your password."),
+        )
+        return redirect(self.get_success_url())
+
+
 class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
     """The person's own profile, read only; the account is always request.user."""
 
@@ -330,19 +372,26 @@ class PasswordChangeView(NeverCacheMixin, LoginRequiredMixin, FormView):
         kwargs["request"] = self.request
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            required=self.request.user.password_change_required, **kwargs
+        )
+
     def form_valid(self, form):
         with transaction.atomic():
             # The row is locked and read again, so that the new password is written to the
             # current state of the account.
             user = User._base_manager.select_for_update().get(pk=self.request.user.pk)
             form.user = user
+            # An initial password that had to be replaced is replaced (D-005).
+            user.password_change_required = False
             form.save()
             # Links of earlier password resets must not work after the change.
             VerificationToken.objects.filter(
                 user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
             ).delete()
             password_reset.notify_password_changed(user)
-        security_logger.warning("The password was changed (account %d).", user.pk)
+            security_log.record(SecurityEvent.Event.PASSWORD_CHANGED, account=user)
         # Renews the session ID and keeps this session; Django derives the session hash from
         # the password, so every other session of the account ends (docs/SECURITY.md).
         update_session_auth_hash(self.request, user)

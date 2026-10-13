@@ -18,8 +18,13 @@ class PortalAdminSite(AdminSite):
         from leg_platform.accounts.second_factor import is_second_factor_complete
 
         # In addition to the middleware: the administration never opens for a session without a
-        # completed second factor, also if the middleware is changed or removed by mistake.
-        return super().has_permission(request) and is_second_factor_complete(request.user)
+        # completed second factor or for an account that must replace its password first, also
+        # if the middleware is changed or removed by mistake.
+        return (
+            super().has_permission(request)
+            and not request.user.password_change_required
+            and is_second_factor_complete(request.user)
+        )
 
     def login(self, request, extra_context=None):
         from django.contrib.auth.views import redirect_to_login

@@ -11,7 +11,6 @@ of each; the account row is locked while they change, so that two requests canno
 """
 
 import io
-import logging
 import secrets
 from base64 import b32encode
 from datetime import timedelta
@@ -22,6 +21,7 @@ from django.utils import timezone
 from django.views.decorators.debug import sensitive_variables
 from django_otp import devices_for_user
 
+from leg_platform.accounts import security_log
 from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.mail_queue import enqueue
 from leg_platform.accounts.models import (
@@ -29,10 +29,11 @@ from leg_platform.accounts.models import (
     MailJob,
     RecoveryCode,
     RecoveryCodeDevice,
+    SecurityEvent,
     User,
 )
 
-security_logger = logging.getLogger("leg_platform.security")
+Event = SecurityEvent.Event
 
 RECOVERY_DEVICE_NAME = "recovery codes"
 # Ten single-use codes of 40 bits each; every attempt is counted by the abuse protection.
@@ -126,9 +127,9 @@ def record_failed_code(user):
     )
     if device.failed_codes == CODE_NOTICE_AT:
         enqueue(MailJob.Kind.CODE_ATTEMPTS_WARNING, user.email)
-        security_logger.warning("Many wrong codes were entered (account %d).", user.pk)
+        security_log.record(Event.CODE_ATTEMPTS_WARNING, account=user)
     elif device.failed_codes == CODE_PAUSE_AT:
-        security_logger.warning("Code entry is paused (account %d).", user.pk)
+        security_log.record(Event.CODE_ATTEMPTS_PAUSED, account=user)
 
 
 def relieve_code_budget(user):
@@ -181,7 +182,7 @@ def confirm_enrolment(user, device_id, code):
         device.save()
         codes = _replace_recovery_codes(user)
         enqueue(MailJob.Kind.TWO_FACTOR_ENABLED, user.email)
-    security_logger.warning("Two-factor authentication was set up (account %d).", user.pk)
+        security_log.record(Event.TWO_FACTOR_ENABLED, account=user)
     return device, codes
 
 
@@ -210,7 +211,7 @@ def renew_recovery_codes(user):
             raise SecondFactorError("The account has no second factor.")
         codes = _replace_recovery_codes(user)
         enqueue(MailJob.Kind.RECOVERY_CODES_RENEWED, user.email)
-    security_logger.warning("The recovery codes were renewed (account %d).", user.pk)
+        security_log.record(Event.RECOVERY_CODES_RENEWED, account=user)
     return codes
 
 
@@ -229,7 +230,7 @@ def disable(user):
         for device in list(devices_for_user(user, confirmed=None)):
             device.delete()
         enqueue(MailJob.Kind.TWO_FACTOR_DISABLED, user.email)
-    security_logger.warning("Two-factor authentication was removed (account %d).", user.pk)
+        security_log.record(Event.TWO_FACTOR_DISABLED, account=user)
 
 
 def verify_code(user, raw_code):
@@ -254,11 +255,10 @@ def verify_code(user, raw_code):
                 if is_recovery_code_device(device):
                     # In the same transaction as the use of the code.
                     enqueue(MailJob.Kind.RECOVERY_CODE_USED, user.email)
+                    security_log.record(Event.RECOVERY_CODE_USED, account=user)
                 break
         else:
             return None
-    if is_recovery_code_device(device):
-        security_logger.warning("A recovery code was used (account %d).", user.pk)
     return device
 
 

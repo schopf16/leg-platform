@@ -35,6 +35,16 @@ urlpatterns = [
         views.PasswordResetVerifyView.as_view(),
         name="password_reset_verify",
     ),
+    path(
+        "two-factor-reset/verify/<slug:token>/",
+        views.TwoFactorResetVerifyView.as_view(),
+        name="two_factor_reset_verify",
+    ),
+    path(
+        "two-factor-reset/confirm/",
+        views.TwoFactorResetConfirmView.as_view(),
+        name="two_factor_reset_confirm",
+    ),
     path("profile/", views.ProfileView.as_view(), name="profile"),
     path("profile/password/", views.PasswordChangeView.as_view(), name="password_change"),
     path("profile/two-factor/", views.TwoFactorOverviewView.as_view(), name="two_factor"),

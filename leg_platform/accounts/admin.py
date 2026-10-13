@@ -18,18 +18,22 @@ from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext, override
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.accounts import email_texts, emails
+from leg_platform.accounts import email_texts, emails, second_factor_reset, security_log
 from leg_platform.accounts.forms import clean_postal_code, postal_code_field
 from leg_platform.accounts.models import (
     CUSTOMER_NUMBER_SPACE,
+    AuthenticatorDevice,
     EmailText,
     EmailTextVersion,
     IssuedCustomerNumber,
+    SecurityEvent,
     User,
     customer_numbers_nearly_exhausted,
 )
 
 logger = logging.getLogger(__name__)
+
+Event = SecurityEvent.Event
 
 # Versions of an email text that are kept per email (D-039).
 MAX_EMAIL_TEXT_VERSIONS = 100
@@ -72,6 +76,22 @@ class UserAdminForm(forms.ModelForm):
                 self.add_error(
                     "is_staff", _("Only active accounts can receive access to the administration.")
                 )
+
+
+class ResetSecondFactorForm(forms.Form):
+    """Asks a system administrator to confirm the identity check for a privileged account."""
+
+    identity_verified = forms.BooleanField(
+        label=_(
+            "I have verified the identity of this person in person, or by calling back a phone "
+            "number that I know independently of the account."
+        )
+    )
+
+    def __init__(self, *args, privileged, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not privileged:
+            del self.fields["identity_verified"]
 
 
 class UserAdmin(admin.ModelAdmin):
@@ -222,6 +242,65 @@ class UserAdmin(admin.ModelAdmin):
             raise PermissionDenied
         return super().history_view(request, object_id, extra_context)
 
+    # Reset of a lost second factor (D-004, D-041): only system administrators, never for their
+    # own account. A user receives a link by email and confirms it; a staff user or system
+    # administrator is reset at once after the administrator confirmed the identity check.
+
+    def get_urls(self):
+        info = self.opts.app_label, self.opts.model_name
+        # Before the default patterns: their last pattern would accept this path.
+        return [
+            path(
+                "<path:object_id>/reset-second-factor/",
+                self.admin_site.admin_view(self.reset_second_factor_view),
+                name="%s_%s_reset_second_factor" % info,
+            ),
+            *super().get_urls(),
+        ]
+
+    def reset_second_factor_view(self, request, object_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None:
+            raise Http404
+        if obj.pk == request.user.pk:
+            raise PermissionDenied
+        privileged = obj.is_staff or obj.is_superuser
+        has_factor = AuthenticatorDevice.objects.filter(user=obj, confirmed=True).exists()
+        change_url = reverse("admin:accounts_user_change", args=(obj.pk,))
+        form = ResetSecondFactorForm(
+            request.POST if request.method == "POST" else None, privileged=privileged
+        )
+        if request.method == "POST" and has_factor and form.is_valid():
+            try:
+                if privileged:
+                    second_factor_reset.reset_privileged(request.user, obj)
+                else:
+                    second_factor_reset.request_link(request.user, obj)
+            except second_factor_reset.ResetRefused:
+                self.message_user(request, _("The change could not be made."), messages.ERROR)
+            else:
+                note = (
+                    gettext("Two-factor authentication was reset.")
+                    if privileged
+                    else gettext("The link for removing two-factor authentication was requested.")
+                )
+                self.log_change(request, obj, note)
+                self.message_user(request, note, messages.SUCCESS)
+            return HttpResponseRedirect(change_url)
+        context = {
+            **self.admin_site.each_context(request),
+            "title": gettext("Reset two-factor authentication"),
+            "opts": self.opts,
+            "original": obj,
+            "form": form,
+            "privileged": privileged,
+            "has_factor": has_factor,
+            "change_url": change_url,
+        }
+        return TemplateResponse(request, "admin/accounts/user/reset_second_factor.html", context)
+
     # Admin log entries (LogEntry) keep object_repr permanently, also after the account is
     # deleted. For accounts it is a neutral text with the internal number, never the customer
     # number (it appears on invoices), the email address or the name (D-018, D-036). These
@@ -269,6 +348,11 @@ class UserAdmin(admin.ModelAdmin):
                 if not request.user.is_superuser and (stored.is_staff or stored.is_superuser):
                     raise PermissionDenied
             privileges = None
+            if change:
+                # The form instance can be stale; these values change only elsewhere (D-041).
+                obj.password = stored.password
+                obj.session_version = stored.session_version
+                obj.password_change_required = stored.password_change_required
             if change and "is_staff" in form.fields:
                 privileges = (obj.is_staff, obj.is_superuser)
                 obj.is_staff = stored.is_staff
@@ -276,6 +360,8 @@ class UserAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
             if privileges is not None and privileges != (obj.is_staff, obj.is_superuser):
                 obj.set_privileges(is_staff=privileges[0], is_superuser=privileges[1])
+                obj.end_all_sessions()
+                security_log.record(Event.PRIVILEGES_CHANGED, account=obj, actor=request.user)
 
     def save_related(self, request, form, formsets, change):
         if (
@@ -283,17 +369,43 @@ class UserAdmin(admin.ModelAdmin):
             and form.instance.pk != request.user.pk
             and {"groups", "user_permissions"} & form.fields.keys()
         ):
-            form.instance.set_access_relations(
-                groups=form.cleaned_data.get("groups", form.instance.groups.all()),
+            instance = form.instance
+            before = self._access_relations(instance)
+            instance.set_access_relations(
+                groups=form.cleaned_data.get("groups", instance.groups.all()),
                 user_permissions=form.cleaned_data.get(
-                    "user_permissions", form.instance.user_permissions.all()
+                    "user_permissions", instance.user_permissions.all()
                 ),
             )
+            if before != self._access_relations(instance):
+                instance.end_all_sessions()
+                security_log.record(
+                    Event.ACCESS_RELATIONS_CHANGED, account=instance, actor=request.user
+                )
         for formset in formsets:
             self.save_formset(request, form, formset, change=change)
 
+    @staticmethod
+    def _access_relations(user):
+        return (
+            set(user.groups.values_list("pk", flat=True)),
+            set(user.user_permissions.values_list("pk", flat=True)),
+        )
+
 
 class RestrictedGroupAdmin(DjangoGroupAdmin):
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        security_log.record(Event.ACCESS_RELATIONS_CHANGED, actor=request.user)
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        security_log.record(Event.ACCESS_RELATIONS_CHANGED, actor=request.user)
+
+    def delete_queryset(self, request, queryset):
+        super().delete_queryset(request, queryset)
+        security_log.record(Event.ACCESS_RELATIONS_CHANGED, actor=request.user)
+
     def has_module_permission(self, request):
         return request.user.is_superuser and super().has_module_permission(request)
 
@@ -567,7 +679,57 @@ class EmailTextAdmin(admin.ModelAdmin):
         return super().history_view(request, object_id, extra_context)
 
 
+class SecurityEventAdmin(admin.ModelAdmin):
+    """The security log: read only, for system administrators only (D-018, D-041).
+
+    Nobody can add, change or delete an entry here; entries leave only through the retention.
+    """
+
+    list_display = ("occurred_at", "event", "account_number", "actor_number", "retention")
+    list_filter = ("event", "long_retention")
+    ordering = ("-occurred_at", "-id")
+    list_per_page = 100
+    show_full_result_count = False
+    fields = readonly_fields = ("occurred_at", "event", "account_id", "actor_id", "long_retention")
+
+    @admin.display(description=_("account (internal number)"), ordering="account_id")
+    def account_number(self, obj):
+        return obj.account_id if obj.account_id is not None else "-"
+
+    @admin.display(description=_("performed by (internal number)"), ordering="actor_id")
+    def actor_number(self, obj):
+        return obj.actor_id if obj.actor_id is not None else "-"
+
+    @admin.display(description=_("kept"))
+    def retention(self, obj):
+        days = (
+            settings.SECURITY_LOG_LONG_RETENTION_DAYS
+            if obj.long_retention
+            else settings.SECURITY_LOG_RETENTION_DAYS
+        )
+        return gettext("%(days)d days") % {"days": days}
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_actions(self, request):
+        return {}
+
+
 admin.site.unregister(Group)
 admin.site.register(Group, RestrictedGroupAdmin)
 admin.site.register(User, UserAdmin)
 admin.site.register(EmailText, EmailTextAdmin)
+admin.site.register(SecurityEvent, SecurityEventAdmin)

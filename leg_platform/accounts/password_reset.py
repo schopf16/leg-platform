@@ -11,9 +11,9 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from leg_platform.accounts import emails
+from leg_platform.accounts import emails, security_log
 from leg_platform.accounts.login_protection import axes_username
-from leg_platform.accounts.models import MailJob, User, VerificationToken
+from leg_platform.accounts.models import MailJob, SecurityEvent, User, VerificationToken
 from leg_platform.accounts.normalization import normalize_email_address
 
 # The link stays valid as long as the longest window of the per-address limit (24 hours), so
@@ -46,9 +46,12 @@ def process_password_changed(address):
 
 
 def delete_expired_reset_tokens(now=None):
-    """Delete reset links that expired; return their number."""
+    """Delete reset links (of the password and of the second factor) that expired."""
     count, _ = VerificationToken.objects.filter(
-        purpose=VerificationToken.Purpose.PASSWORD_RESET,
+        purpose__in=(
+            VerificationToken.Purpose.PASSWORD_RESET,
+            VerificationToken.Purpose.TWO_FACTOR_RESET,
+        ),
         expires_at__lte=now or timezone.now(),
     ).delete()
     return count
@@ -78,6 +81,7 @@ def complete_reset(token, form):
         if user is None or locked_token is None:
             return None
         form.user = user
+        user.password_change_required = False
         form.save()
         VerificationToken.objects.filter(
             user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
@@ -87,6 +91,7 @@ def complete_reset(token, form):
         from leg_platform.accounts import totp
 
         totp.relieve_code_budget(user)
+        security_log.record(SecurityEvent.Event.PASSWORD_RESET, account=user)
     return user
 
 

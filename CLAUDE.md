@@ -58,8 +58,9 @@ The subagents in `.claude/agents/` and the workflow between them are defined in 
 * `developer` implements.
 * `tester` plans and runs tests and checks.
 * `security-reviewer` reviews read-only. It cannot edit files, run commands, start subagents or instruct other agents.
+* `designer` leads the look and feel (entry pages and application, `docs/DESIGN.md`): it inspects the running application and delivers design specifications and findings. It works read-only by instruction and never starts or instructs other agents.
 
-Of the three agents, only `developer` and `tester` run commands; the main session can also run commands. `developer` and `tester` may delegate clearly bounded tasks to subagents under the rules in `AGENTS.md`, section 11, and must review the results before using them.
+Of the agents, only `developer` and `tester` run commands to build and test; the main session can also run commands. `designer` only starts and observes the local application. `developer` and `tester` may delegate clearly bounded tasks to subagents under the rules in `AGENTS.md`, section 11, and must review the results before using them.
 
 The main session coordinates: it passes review findings to the developer, has a new review run check the corrections, and reports findings, corrections and re-checks to the project owner. Critical findings and decisions go to the project owner.
 

@@ -1008,3 +1008,226 @@ msgstr "Bewahren Sie diese Codes an einem sicheren Ort auf, zum Beispiel in eine
 
 msgid "I have saved the codes"
 msgstr "Ich habe die Codes gespeichert"
+
+#: leg_platform/accounts/session_timeout.py
+msgid "You were logged out for security reasons. Please log in again."
+msgstr "Sie wurden aus Sicherheitsgründen abgemeldet. Bitte melden Sie sich erneut an."
+
+#: leg_platform/accounts/models.py (security log, D-041)
+msgid "Password changed"
+msgstr "Passwort geändert"
+
+msgid "Password reset by link"
+msgstr "Passwort über Link zurückgesetzt"
+
+msgid "Two-factor authentication set up"
+msgstr "Zwei-Faktor-Authentifizierung eingerichtet"
+
+msgid "Two-factor authentication removed by the account itself"
+msgstr "Zwei-Faktor-Authentifizierung vom Konto selbst entfernt"
+
+msgid "Two-factor authentication reset by link or by a system administrator"
+msgstr "Zwei-Faktor-Authentifizierung per Link oder durch Systemadministrator zurückgesetzt"
+
+msgid "Recovery codes renewed"
+msgstr "Wiederherstellungscodes erneuert"
+
+msgid "Recovery code used"
+msgstr "Wiederherstellungscode verwendet"
+
+msgid "Many wrong codes entered"
+msgstr "Viele falsche Codes eingegeben"
+
+msgid "Code entry paused"
+msgstr "Codeeingabe pausiert"
+
+msgid "Account locked after failed logins"
+msgstr "Konto nach fehlgeschlagenen Anmeldungen gesperrt"
+
+msgid "Access to the administration changed"
+msgstr "Zugang zur Verwaltung geändert"
+
+msgid "Roles or permissions changed"
+msgstr "Rollen oder Berechtigungen geändert"
+
+msgid "Initial system administrator created"
+msgstr "Erster Systemadministrator erstellt"
+
+msgid "Link for removing two-factor authentication requested"
+msgstr "Link zum Entfernen der Zwei-Faktor-Authentifizierung veranlasst"
+
+msgid "Two-factor authentication reset by the emergency command"
+msgstr "Zwei-Faktor-Authentifizierung per Notfallbefehl zurückgesetzt"
+
+msgid "Account unblocked by the emergency command"
+msgstr "Konto per Notfallbefehl entsperrt"
+
+msgid "Second factor keys encrypted again by the emergency command"
+msgstr "Schlüssel des zweiten Faktors per Notfallbefehl neu verschlüsselt"
+
+msgid "time"
+msgstr "Zeitpunkt"
+
+msgid "password change required"
+msgstr "Passwortänderung erforderlich"
+
+msgid "kept for the long period"
+msgstr "Lange aufbewahrt"
+
+msgid "session version"
+msgstr "Sitzungsversion"
+
+msgid "event"
+msgstr "Ereignis"
+
+msgid "performed by"
+msgstr "Ausgeführt von"
+
+msgid "security log entry"
+msgstr "Sicherheitsprotokoll-Eintrag"
+
+msgid "security log"
+msgstr "Sicherheitsprotokoll"
+
+#: leg_platform/accounts/admin.py
+msgid "account (internal number)"
+msgstr "Konto (interne Nummer)"
+
+msgid "performed by (internal number)"
+msgstr "Ausgeführt von (interne Nummer)"
+
+msgid "kept"
+msgstr "Aufbewahrt"
+
+#, python-format
+msgid "%(days)d days"
+msgstr "%(days)d Tage"
+
+#: leg_platform/accounts/models.py (second factor reset, D-004, D-041)
+msgid "Lost second factor: link to remove it"
+msgstr "Verlorener zweiter Faktor: Link zum Entfernen"
+
+msgid "Notification: two-factor authentication reset"
+msgstr "Hinweis: Zwei-Faktor-Authentifizierung zurückgesetzt"
+
+#: leg_platform/accounts/email_texts.py
+msgid "Personal link to remove two-factor authentication."
+msgstr "Persönlicher Link, um die Zwei-Faktor-Authentifizierung zu entfernen."
+
+#, python-format
+msgid "Remove two-factor authentication at %(instance_name)s"
+msgstr "Zwei-Faktor-Authentifizierung bei %(instance_name)s entfernen"
+
+#, python-format
+msgid "Two-factor authentication was reset at %(instance_name)s"
+msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde zurückgesetzt"
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_reset_link.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"The operator started the removal of two-factor authentication for your account at %(instance_name)s.\n"
+"\n"
+"To remove it, open this link within %(lifetime_hours)s hours:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Die Betreiber haben das Entfernen der Zwei-Faktor-Authentifizierung für Ihr Konto bei %(instance_name)s veranlasst.\n"
+"\n"
+"Um sie zu entfernen, öffnen Sie innerhalb von %(lifetime_hours)s Stunden diesen Link:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"Der Link kann nur einmal verwendet werden. Wenn Sie das nicht veranlasst haben, öffnen Sie den Link nicht; Ihre Zwei-Faktor-Authentifizierung bleibt dann unverändert."
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_reset.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Die Zwei-Faktor-Authentifizierung Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Authentifizierung erneut einrichten."
+
+#, python-format
+msgid ""
+"If you did not expect this, contact the operator immediately. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr ""
+"Wenn Sie das nicht erwartet haben, wenden Sie sich sofort an die Betreiber. Kontaktangaben finden Sie hier:\n"
+"\n"
+"%(contact_url)s"
+
+msgid "If you did not expect this, contact the operator of this portal immediately."
+msgstr "Wenn Sie das nicht erwartet haben, wenden Sie sich sofort an die Betreiber dieses Portals."
+
+#: leg_platform/accounts/views.py
+msgid "Two-factor authentication was removed. You can now log in with your password."
+msgstr "Die Zwei-Faktor-Authentifizierung wurde entfernt. Sie können sich jetzt mit Ihrem Passwort anmelden."
+
+#: leg_platform/accounts/templates/accounts/two_factor_reset_confirm.html
+msgid "Remove two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung entfernen"
+
+#, python-format
+msgid "%(instance_name)s started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile."
+msgstr "%(instance_name)s hat veranlasst, dass die Zwei-Faktor-Authentifizierung für Ihr Konto entfernt wird. Danach genügt Ihr Passwort zur Anmeldung. Ihre Authenticator-App und Ihre Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen Ihres Kontos werden beendet. Sie können die Zwei-Faktor-Authentifizierung in Ihrem Profil jederzeit neu einrichten."
+
+msgid "Did you not expect this? Then close this page. Nothing changes."
+msgstr "Haben Sie das nicht erwartet? Dann schliessen Sie diese Seite. Es ändert sich nichts."
+
+msgid "Remove now"
+msgstr "Jetzt entfernen"
+
+#: leg_platform/accounts/templates/accounts/two_factor_reset_invalid.html
+#, python-format
+msgid "This link is not valid or has expired. If you still need to remove two-factor authentication, please contact %(instance_name)s. The removal can be started again there."
+msgstr "Dieser Link ist ungültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Authentifizierung noch entfernen müssen, wenden Sie sich bitte an %(instance_name)s. Dort kann das Entfernen erneut veranlasst werden."
+
+msgid "Back to the login"
+msgstr "Zurück zur Anmeldung"
+
+#: leg_platform/accounts/templates/accounts/password_change.html
+msgid "You must choose a new password before you can continue. The current password was only meant for the first login."
+msgstr "Sie müssen ein neues Passwort wählen, bevor Sie weitermachen können. Das aktuelle Passwort war nur für die erste Anmeldung gedacht."
+
+#: leg_platform/accounts/forms.py
+msgid "Choose a password that is different from the current one."
+msgstr "Wählen Sie ein Passwort, das sich vom aktuellen unterscheidet."
+
+#: leg_platform/accounts/admin.py
+msgid "I have verified the identity of this person in person, or by calling back a phone number that I know independently of the account."
+msgstr "Ich habe die Identität dieser Person persönlich geprüft oder durch einen Rückruf auf eine Telefonnummer, die ich unabhängig vom Konto kenne."
+
+msgid "Two-factor authentication was reset."
+msgstr "Die Zwei-Faktor-Authentifizierung wurde zurückgesetzt."
+
+msgid "The link for removing two-factor authentication was requested."
+msgstr "Der Link zum Entfernen der Zwei-Faktor-Authentifizierung wurde angefordert."
+
+msgid "Reset two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung zurücksetzen"
+
+#: leg_platform/accounts/templates/admin/accounts/user/reset_second_factor.html
+msgid "This account has no two-factor authentication."
+msgstr "Dieses Konto hat keine Zwei-Faktor-Authentifizierung."
+
+msgid "The second factor of this account is removed at once. The authenticator app and the recovery codes stop working and all sessions of the account end. The person sets up two-factor authentication again at the next login. Do this only after you have verified the identity of the person."
+msgstr "Der zweite Faktor dieses Kontos wird sofort entfernt. Die Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen des Kontos werden beendet. Die Person richtet die Zwei-Faktor-Authentifizierung bei der nächsten Anmeldung neu ein. Tun Sie das erst, nachdem Sie die Identität der Person geprüft haben."
+
+msgid "A link for removing two-factor authentication is sent to the email address of this account. The second factor is removed only when the person opens the link and confirms it. Nothing changes until then."
+msgstr "An die E-Mail-Adresse dieses Kontos wird ein Link zum Entfernen der Zwei-Faktor-Authentifizierung gesendet. Der zweite Faktor wird erst entfernt, wenn die Person den Link öffnet und bestätigt. Bis dahin ändert sich nichts."
+
+msgid "Send the link"
+msgstr "Link senden"
+
+msgid "Back to the account"
+msgstr "Zurück zum Konto"

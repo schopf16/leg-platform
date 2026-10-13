@@ -1,6 +1,10 @@
 {% extends "admin/change_form_object_tools.html" %}
+{% load i18n %}
 {% comment %}
 The history of accounts is shown only to system administrators (UserAdmin.history_view, D-036),
-so the link is shown only to them.
+so the link is shown only to them. The same holds for the reset of the second factor (D-041),
+which is not offered for the own account.
 {% endcomment %}
-{% block object-tools-items %}{% if request.user.is_superuser %}{{ block.super }}{% endif %}{% endblock %}
+{% block object-tools-items %}{% if request.user.is_superuser %}{% if original and original.pk != request.user.pk %}
+<li><a href="{% url 'admin:accounts_user_reset_second_factor' original.pk %}">{% translate "Reset two-factor authentication" %}</a></li>
+{% endif %}{{ block.super }}{% endif %}{% endblock %}

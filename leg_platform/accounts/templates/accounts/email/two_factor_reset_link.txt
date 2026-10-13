@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+The operator started the removal of two-factor authentication for your account at {{ instance_name }}.
+
+To remove it, open this link within {{ lifetime_hours }} hours:
+
+{{ two_factor_reset_url }}
+
+The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged.{% endblocktranslate %}
+{% endautoescape %}

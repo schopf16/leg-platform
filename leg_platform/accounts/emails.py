@@ -70,6 +70,10 @@ def _sample_values(key):
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:password_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
             )
+        elif placeholder is email_texts.TWO_FACTOR_RESET_URL:
+            specific[placeholder.name] = absolute_url(
+                reverse("accounts:two_factor_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
+            )
     return _values(specific)
 
 
@@ -153,3 +157,22 @@ def send_recovery_code_used(address):
 def send_code_attempts_warning(address):
     """Tell the owner that many wrong codes were entered after the correct password."""
     _send(address, Key.CODE_ATTEMPTS_WARNING, {})
+
+
+def send_two_factor_reset_link(address, raw_token, lifetime: timedelta):
+    """Send the link with which the owner confirms the removal of the second factor (D-004)."""
+    _send(
+        address,
+        Key.TWO_FACTOR_RESET_LINK,
+        {
+            "two_factor_reset_url": absolute_url(
+                reverse("accounts:two_factor_reset_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_two_factor_reset(address):
+    """Tell the owner that the second factor was reset; contains no link."""
+    _send(address, Key.TWO_FACTOR_RESET, {})

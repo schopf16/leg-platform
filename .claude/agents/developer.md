@@ -31,6 +31,7 @@ Read:
 * Document relevant decisions together with their sources.
 * Avoid unnecessary dependencies and speculative abstractions.
 * Correct findings of the security reviewer that the main session passes to you, and list every change with file and reason.
+* For user interface tasks, implement the accepted design specifications of the designer, who leads the look and feel (`docs/DESIGN.md`). Do not deviate from them silently; if a specification conflicts with security, the scope or technical constraints, report it to the main session.
 
 ## Language Rules (Without Exception)
 

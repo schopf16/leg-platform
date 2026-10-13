@@ -45,6 +45,11 @@ SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
 PORT_MIN = 1
 PORT_MAX = 65535
 
+# Security log retention in days (docs/SECURITY.md, section 10; D-018). The defaults are also the
+# minimum: an instance can keep entries longer, never shorter.
+SECURITY_LOG_RETENTION_DAYS = 30
+SECURITY_LOG_LONG_RETENTION_DAYS = 365
+
 # Neutral platform default; instance values belong to the configuration (D-013, D-014).
 DEFAULT_INSTANCE_NAME = "LEG Platform"
 INSTANCE_NAME_MAX_LENGTH = 100
@@ -93,6 +98,8 @@ class EnvironmentConfig:
     db_password: str
     db_host: str
     db_port: str
+    security_log_retention_days: int
+    security_log_long_retention_days: int
 
     @property
     def is_local(self) -> bool:
@@ -415,6 +422,23 @@ def parse_email_sender_address(env: Mapping[str, str], base_url: str) -> str:
     return "noreply@localhost"
 
 
+def parse_security_log_retention(env: Mapping[str, str]) -> tuple[int, int]:
+    """Return the retention in days of the usual and of the long-kept entries (D-018)."""
+    result = []
+    for name, minimum in (
+        ("SECURITY_LOG_RETENTION_DAYS", SECURITY_LOG_RETENTION_DAYS),
+        ("SECURITY_LOG_LONG_RETENTION_DAYS", SECURITY_LOG_LONG_RETENTION_DAYS),
+    ):
+        value = _get(env, name)
+        if not value:
+            result.append(minimum)
+            continue
+        if not _is_ascii_number(value) or not minimum <= int(value) <= 36500:
+            raise ImproperlyConfigured(f"{name} must be a number of days from {minimum} to 36500.")
+        result.append(int(value))
+    return result[0], result[1]
+
+
 def parse_database(env: Mapping[str, str]) -> dict[str, str]:
     values = {name: _get(env, name) for name in ("DB_NAME", "DB_USER", "DB_PASSWORD")}
     missing = [name for name, value in values.items() if not value]
@@ -435,6 +459,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     secret_key, secret_key_fallbacks = parse_secret_keys(env, app_env)
     email_mode, email_allowed_recipients = parse_email(env, app_env)
     database = parse_database(env)
+    security_log_retention = parse_security_log_retention(env)
     allowed_hosts = parse_allowed_hosts(env, app_env)
     base_url = parse_instance_base_url(env, app_env, allowed_hosts)
     return EnvironmentConfig(
@@ -464,6 +489,8 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         db_password=database["DB_PASSWORD"],
         db_host=database["DB_HOST"],
         db_port=database["DB_PORT"],
+        security_log_retention_days=security_log_retention[0],
+        security_log_long_retention_days=security_log_retention[1],
     )
 
 

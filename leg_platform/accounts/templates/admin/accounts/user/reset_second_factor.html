@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  <li><a href="{% url 'admin:accounts_user_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a></li>
+  <li><a href="{{ change_url }}">{{ original }}</a></li>
+  <li aria-current="page">{% translate "Reset two-factor authentication" %}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% if not has_factor %}
+    <p>{% translate "This account has no two-factor authentication." %}</p>
+  {% else %}
+    {% if privileged %}
+      <p>{% translate "The second factor of this account is removed at once. The authenticator app and the recovery codes stop working and all sessions of the account end. The person sets up two-factor authentication again at the next login. Do this only after you have verified the identity of the person." %}</p>
+    {% else %}
+      <p>{% translate "A link for removing two-factor authentication is sent to the email address of this account. The second factor is removed only when the person opens the link and confirms it. Nothing changes until then." %}</p>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <input type="submit" class="default" value="{% if privileged %}{% translate 'Reset two-factor authentication' %}{% else %}{% translate 'Send the link' %}{% endif %}">
+    </form>
+  {% endif %}
+  <p><a href="{{ change_url }}">{% translate "Back to the account" %}</a></p>
+</div>
+{% endblock %}

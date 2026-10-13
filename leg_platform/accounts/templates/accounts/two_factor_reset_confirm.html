@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Remove two-factor authentication" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Remove two-factor authentication" %}</h1>
+      <p>{% blocktranslate %}{{ instance_name }} started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile.{% endblocktranslate %}</p>
+      <p>{% translate "Did you not expect this? Then close this page. Nothing changes." %}</p>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100">{% translate "Remove now" %}</button>
+      </form>
+      <p class="mt-3 mb-0"><a href="{% url 'accounts:login' %}">{% translate "Cancel" %}</a></p>
+    </div>
+  </div>
+{% endblock %}

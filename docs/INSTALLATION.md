@@ -99,9 +99,13 @@ py -3.14 -m venv .venv
 
 Without a running MariaDB server, only the tests that need no database can run: `manage.py test --exclude-tag mariadb`. With Django 6.1, the system checks that `check` and other commands such as `makemigrations` run also access the database ("The check management command now supplies all databases if not specified", Django 6.1 release notes), so these commands need a running MariaDB server.
 
+Local development server (for design reviews and manual tests): `python manage.py runserver --noreload` needs `DJANGO_DEBUG=True` or `DJANGO_ALLOWED_HOSTS` (for example `127.0.0.1,localhost`) in the environment of that process, because Django refuses to start the server with `DEBUG` off and no allowed hosts; both are only allowed with `APP_ENV=local`. Set them for the process only (in PowerShell: `$env:DJANGO_DEBUG = 'True'` in the terminal that starts the server). The server listens on `http://127.0.0.1:8000/`, the value `INSTANCE_BASE_URL` has locally by default. Pages that need an account use the throw-away accounts of `seed_design_accounts` (see "Instance Configuration").
+
 Email: locally, emails are written to the console by default (`EMAIL_MODE=console`). To test delivery via Microsoft Graph locally, use `EMAIL_MODE=allowlist` with a dedicated development app registration and sender mailbox, never the credentials of stage or production, and set the allowed recipient addresses only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). Delivery via Microsoft Graph is not implemented yet; until it is, every send attempt in this mode fails with an error. Automated tests never send real email.
 
 ### Instance Configuration
+
+Design test accounts: for design reviews, `python manage.py seed_design_accounts` creates one throw-away account per access level (an authenticated user, a staff user without any role, a system administrator; addresses under `example.org`) in the local database. It refuses to run unless `APP_ENV=local`, writes the generated passwords and the authenticator keys of the two privileged accounts to a file outside the repository (default `.leg-platform-design-accounts.json` in the home directory; created once, never overwritten, owner-only on POSIX systems) and prints no secret. `--code` prints the current authenticator codes. Never run it against a database with real data (D-019).
 
 Each instance sets its own values in the environment (`.env.example`, D-013, D-037). They are validated at startup, and invalid values prevent the start:
 
@@ -117,11 +121,22 @@ Email delivery (D-038):
 * The sender domain needs SPF, DKIM and DMARC records for the sending service, and the sender address must be one the service may use. Automatic emails do not invite a reply, so the sender mailbox need not be monitored; a mailbox that does receive replies can contain personal data.
 * The Microsoft Graph backend must apply a connection timeout (Django forbids `EMAIL_TIMEOUT` together with `MAILERS`); it is not implemented yet.
 
-Scheduled tasks (not scheduled automatically yet; the scheduling is decided with the hosting, D-008, D-037, D-038):
+Scheduled tasks (the scheduler itself is decided with the hosting, D-008, D-037, D-038, D-041):
 
-* `python manage.py delete_expired_registrations`: deletes unverified accounts whose verification link expired or does not exist.
-* `python manage.py cleanup_mail_requests`: deletes unused request counters, expired reset links and unprocessed jobs. Run it at least hourly.
-* `python manage.py cleanup_login_ip_attempts` (see below).
+* `python manage.py run_scheduled_tasks` runs every cleanup task once: `delete_expired_registrations` (unverified accounts whose verification link expired or does not exist), `cleanup_mail_requests` (unused request counters, expired reset links, unprocessed jobs), `cleanup_login_ip_attempts` (see below), `cleanup_security_log` (security log entries after their retention) and Django's `clearsessions` (expired sessions). Schedule this one command, for example every 15 minutes, with the scheduler of the server (cron or a systemd timer on Linux, the task scheduler on Windows); the exact setup is written down when the hosting is decided. A failing task does not stop the others; the command then exits with an error, which the scheduler must report. A test makes sure that every `cleanup_*` and `delete_expired_*` command is part of it.
+* The worker `process_mail_queue --loop` is not part of it; it runs as a supervised service (see above).
+
+Initial system administrator (D-005, D-041): set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` in the environment of the instance and run `python manage.py setup_initial_administrator` in a terminal on the server. The command asks for the password twice with hidden input (it refuses to read it from a pipe or a file), runs only while no system administrator exists, never changes an existing account and logs its use. Give the person the initial password through a secure channel; at the first login the password must be replaced and two-factor authentication must be set up before anything else is possible. Remove `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` afterwards.
+
+Emergency commands (D-004, D-005, D-041), only on the server, each use is logged (kept for the long period) and asks for confirmation (`--no-input`, given before the action, skips it). The accounts are named by their internal number, shown on the change form of an account in the administration:
+
+* `python manage.py emergency_access reset-second-factor N`: removes the second factor of any account, also of the last system administrator; all sessions of the account end and its owner is notified by email.
+* `python manage.py emergency_access unblock-account N`: sets a blocked account active again.
+* `python manage.py emergency_access reencrypt-second-factor-keys`: encrypts all second factor keys again with the current `SECRET_KEY` (see "Changing `SECRET_KEY`"); it reports the keys that cannot be decrypted.
+
+Security log (D-018, D-041): the system administrators see it in the administration; nobody can change or delete entries there. Entries are deleted only by `cleanup_security_log` (part of `run_scheduled_tasks`) after `SECURITY_LOG_RETENTION_DAYS` (default 30) or, for changes of rights and roles, resets of the second factor and emergency commands, `SECURITY_LOG_LONG_RETENTION_DAYS` (default 365). Persons with direct database access can change the table; this is accepted, because whoever can log in to the server can do everything anyway (D-041).
+
+Session timeouts (D-041): users are logged out after 30 minutes without a request or 8 hours after the login; staff users and system administrators after 15 minutes and 4 hours. They are set in `leg_platform/settings.py` (not per instance).
 
 Customer numbers: from 90 % of the six-digit numbers issued, each issue logs a warning (logger `leg_platform.accounts.models`, "N of 1000000 customer numbers have been issued"); set up an alarm on it in the log monitoring, because the administration notice is visible only where the administration is reachable (D-038).
 
@@ -133,11 +148,11 @@ Web server and reverse proxy access logs are outside the application. The verifi
 
 `AXES_IPWARE_PROXY_COUNT` defaults to `0`: login abuse protection uses the address of the direct TCP peer (`REMOTE_ADDR`) and ignores `X-Forwarded-For`. If Django is reached only through reverse proxies, set this variable to the exact number of proxies between the client and Django. Set it only after verifying that each proxy removes or validates client-supplied forwarding headers and appends its own address. IPware validates the chain strictly; an unexpected or malformed chain produces no client IP and the login is refused. A wrong value can group users under a proxy address or refuse logins, so the deployment value must be verified against the actual proxy topology before enabling a stage or production instance. Client IPs are not stored in Axes; the independent lockout counter stores only a keyed digest (D-017, D-023).
 
-The `cleanup_login_ip_attempts` management command removes expired pseudonymous IP attempts, empty buckets, expired account attempts of the abuse protection and second factor setups that were never confirmed. It takes each bucket in a short transaction and skips one that a request holds, so it never waits for a request. A stage or production scheduler must run it regularly (for example every 15 minutes); the schedule is not yet configured because the hosting setup is still open (D-008, D-018, D-040).
+The `cleanup_login_ip_attempts` management command removes expired pseudonymous IP attempts, empty buckets, expired account attempts of the abuse protection and second factor setups that were never confirmed. It takes each bucket in a short transaction and skips one that a request holds, so it never waits for a request. A stage or production scheduler must run it regularly (for example every 15 minutes) as part of `run_scheduled_tasks`; the schedule is not yet configured because the hosting setup is still open (D-008, D-018, D-040, D-041).
 
 ### Changing `SECRET_KEY`
 
-Second factor keys are encrypted with a key derived from `SECRET_KEY` and recovery codes are stored as digests under it (D-040). When `SECRET_KEY` is replaced, put the old value into `DJANGO_SECRET_KEY_FALLBACKS`: keys and recovery codes then keep working, and a key is encrypted again with the new one the next time it is used. Do not remove the old value from the fallbacks before every active account with a second factor has logged in with it once; the accounts that did not need their second factor reset by a system administrator. A command that encrypts all keys again at once is not available yet (it is planned together with the emergency command, D-005). The Microsoft Graph secret has the same rule (D-006).
+Second factor keys are encrypted with a key derived from `SECRET_KEY` and recovery codes are stored as digests under it (D-040). When `SECRET_KEY` is replaced, put the old value into `DJANGO_SECRET_KEY_FALLBACKS`: keys and recovery codes then keep working, and a key is encrypted again with the new one the next time it is used. Do not remove the old value from the fallbacks before every active account with a second factor has logged in with it once; the accounts that did not need their second factor reset by a system administrator. To encrypt all keys again at once, run `python manage.py emergency_access reencrypt-second-factor-keys` (D-041); after it, the old value can be removed from the fallbacks once the command reports no key that cannot be decrypted (recovery codes cannot be converted: they keep working only while the old value stays in the fallbacks; after it is removed they stop working, and their owners create new ones after logging in with the app). The Microsoft Graph secret has the same rule (D-006).
 
 ### Recovery after a failed setup
 

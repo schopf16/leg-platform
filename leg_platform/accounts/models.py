@@ -30,6 +30,7 @@ import time
 import unicodedata
 from base64 import b32encode
 from contextlib import contextmanager
+from datetime import timedelta
 from urllib.parse import quote, urlencode
 
 import idna
@@ -42,6 +43,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, MaxValueValidator, MinValueValidator
 from django.db import IntegrityError, connections, models, router, transaction
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.debug import sensitive_variables
@@ -439,6 +441,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     retention_obligation = models.BooleanField(
         _("retention obligation"), default=False, editable=False
     )
+    # Set for an account whose password the person must replace before anything else, e.g. the
+    # initial system administrator (D-005, D-041); cleared by the password change or reset.
+    password_change_required = models.BooleanField(
+        _("password change required"), default=False, editable=False
+    )
+    # Part of the session hash, so that raising it ends every session of the account (D-041).
+    session_version = models.PositiveIntegerField(
+        _("session version"), default=0, editable=False
+    )
 
     # Name and postal address: the structure and lengths of eCH-0010 (D-032). Fields that are
     # not used are kept but not shown (title, organisation name add-ons, address line 2,
@@ -560,6 +571,27 @@ class User(AbstractBaseUser, PermissionsMixin):
         if raw_password is not None and not raw_password:
             raise AccountIntegrityError("An empty password is not allowed.")
         super().set_password(raw_password)
+
+    def _get_session_auth_hash(self, secret=None):
+        # Django's session hash covers the password; the version lets the application end every
+        # session of the account without a password change (D-041).
+        return salted_hmac(
+            "leg_platform.accounts.models.User.session_auth_hash",
+            f"{self.password}:{self.session_version}",
+            secret=secret,
+            algorithm="sha256",
+        ).hexdigest()
+
+    def end_all_sessions(self):
+        """End every session of the account; call it in the transaction of the change.
+
+        A session that must go on (the one that made the change) takes the new hash with
+        ``update_session_auth_hash()``.
+        """
+        type(self)._base_manager.filter(pk=self.pk).update(
+            session_version=models.F("session_version") + 1
+        )
+        self.refresh_from_db(fields=["session_version"])
 
     # Central account logic
 
@@ -992,6 +1024,7 @@ class VerificationToken(models.Model):
     class Purpose(models.TextChoices):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
+        TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="verification_tokens", editable=False
@@ -1047,6 +1080,8 @@ class MailJob(models.Model):
         RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
         RECOVERY_CODE_USED = "recovery_code_used", "Recovery code used"
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", "Many wrong codes"
+        TWO_FACTOR_RESET_LINK = "two_factor_reset_link", "Link to reset two-factor authentication"
+        TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1057,6 +1092,8 @@ class MailJob(models.Model):
         Kind.RECOVERY_CODES_RENEWED,
         Kind.RECOVERY_CODE_USED,
         Kind.CODE_ATTEMPTS_WARNING,
+        Kind.TWO_FACTOR_RESET_LINK,
+        Kind.TWO_FACTOR_RESET,
     )
 
     kind = models.CharField(max_length=24, choices=Kind, editable=False)
@@ -1106,6 +1143,12 @@ class EmailText(models.Model):
         RECOVERY_CODE_USED = "recovery_code_used", _("Notification: recovery code used")
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", _(
             "Notification: many wrong codes entered"
+        )
+        TWO_FACTOR_RESET_LINK = "two_factor_reset_link", _(
+            "Lost second factor: link to remove it"
+        )
+        TWO_FACTOR_RESET = "two_factor_reset", _(
+            "Notification: two-factor authentication reset"
         )
 
     key = models.CharField(
@@ -1299,3 +1342,125 @@ class RecoveryCode(models.Model):
 
     class Meta:
         default_permissions = ()
+
+
+# Security log (D-018, D-041): append-only within the application; entries leave only through
+# the automatic retention. An entry names the accounts by their internal number and holds no
+# other personal data.
+
+
+class SecurityEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise AccountIntegrityError("Security log entries cannot be changed.")
+
+    def delete(self):
+        raise AccountIntegrityError("Security log entries are deleted only by the retention.")
+
+    def bulk_create(self, objs, *args, **kwargs):
+        raise AccountIntegrityError("Security log entries are written only with record().")
+
+    def bulk_update(self, *args, **kwargs):
+        raise AccountIntegrityError("Security log entries cannot be changed.")
+
+    def _delete_unprotected(self):
+        return super().delete()
+
+
+class SecurityEventManager(models.Manager.from_queryset(SecurityEventQuerySet)):
+    def record(self, event, *, account=None, actor=None, long_retention=False):
+        """Write one entry; call it in the transaction of the change that it records."""
+        return self.create(
+            event=event,
+            account_id=getattr(account, "pk", account),
+            actor_id=getattr(actor, "pk", actor),
+            long_retention=long_retention or event in SecurityEvent.LONG_RETENTION,
+        )
+
+    def delete_expired(self, now=None):
+        """Delete the entries whose retention has passed (D-018); return their number."""
+        now = now or timezone.now()
+        expired = models.Q(
+            long_retention=False,
+            occurred_at__lt=now - timedelta(days=settings.SECURITY_LOG_RETENTION_DAYS),
+        ) | models.Q(
+            long_retention=True,
+            occurred_at__lt=now - timedelta(days=settings.SECURITY_LOG_LONG_RETENTION_DAYS),
+        )
+        deleted, _unused = self.get_queryset().filter(expired)._delete_unprotected()
+        return deleted
+
+
+class SecurityEvent(models.Model):
+    class Event(models.TextChoices):
+        PASSWORD_CHANGED = "password_changed", _("Password changed")
+        PASSWORD_RESET = "password_reset", _("Password reset by link")
+        TWO_FACTOR_ENABLED = "two_factor_enabled", _("Two-factor authentication set up")
+        TWO_FACTOR_DISABLED = "two_factor_disabled", _(
+            "Two-factor authentication removed by the account itself"
+        )
+        TWO_FACTOR_RESET = "two_factor_reset", _(
+            "Two-factor authentication reset by link or by a system administrator"
+        )
+        TWO_FACTOR_RESET_REQUESTED = "two_factor_reset_requested", _(
+            "Link for removing two-factor authentication requested"
+        )
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _("Recovery codes renewed")
+        RECOVERY_CODE_USED = "recovery_code_used", _("Recovery code used")
+        CODE_ATTEMPTS_WARNING = "code_attempts_warning", _("Many wrong codes entered")
+        CODE_ATTEMPTS_PAUSED = "code_attempts_paused", _("Code entry paused")
+        LOGIN_LOCKOUT = "login_lockout", _("Account locked after failed logins")
+        PRIVILEGES_CHANGED = "privileges_changed", _("Access to the administration changed")
+        ACCESS_RELATIONS_CHANGED = "access_relations_changed", _("Roles or permissions changed")
+        INITIAL_ADMINISTRATOR_CREATED = "initial_administrator_created", _(
+            "Initial system administrator created"
+        )
+        EMERGENCY_TWO_FACTOR_RESET = "emergency_two_factor_reset", _(
+            "Two-factor authentication reset by the emergency command"
+        )
+        EMERGENCY_ACCOUNT_UNBLOCKED = "emergency_account_unblocked", _(
+            "Account unblocked by the emergency command"
+        )
+        EMERGENCY_KEYS_REENCRYPTED = "emergency_keys_reencrypted", _(
+            "Second factor keys encrypted again by the emergency command"
+        )
+
+    # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
+    # a second factor is long only for staff users and system administrators; the caller says so.
+    LONG_RETENTION = frozenset(
+        {
+            Event.PRIVILEGES_CHANGED,
+            Event.ACCESS_RELATIONS_CHANGED,
+            Event.INITIAL_ADMINISTRATOR_CREATED,
+            Event.EMERGENCY_TWO_FACTOR_RESET,
+            Event.EMERGENCY_ACCOUNT_UNBLOCKED,
+            Event.EMERGENCY_KEYS_REENCRYPTED,
+        }
+    )
+
+    occurred_at = models.DateTimeField(_("time"), default=timezone.now, db_index=True, editable=False)
+    event = models.CharField(_("event"), max_length=40, choices=Event, editable=False)
+    # Internal numbers, not foreign keys: the entries outlive the accounts and then refer to
+    # nobody (D-018, D-036).
+    account_id = models.PositiveBigIntegerField(_("account"), null=True, editable=False)
+    actor_id = models.PositiveBigIntegerField(_("performed by"), null=True, editable=False)
+    long_retention = models.BooleanField(
+        _("kept for the long period"), default=False, editable=False
+    )
+
+    objects = SecurityEventManager()
+
+    class Meta:
+        base_manager_name = "objects"
+        default_permissions = ()
+        ordering = ("-occurred_at", "-id")
+        verbose_name = _("security log entry")
+        verbose_name_plural = _("security log")
+
+    def save(self, **kwargs):
+        if not self._state.adding or kwargs.get("update_fields") is not None:
+            raise AccountIntegrityError("Security log entries cannot be changed.")
+        kwargs["force_insert"] = True
+        super().save(**kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise AccountIntegrityError("Security log entries are deleted only by the retention.")
