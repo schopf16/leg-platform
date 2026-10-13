@@ -12,7 +12,12 @@ from django.utils import timezone
 
 from leg_platform.accounts import security_log
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
-from leg_platform.accounts.models import AccountIntegrityError, SecurityEvent, User
+from leg_platform.accounts.models import (
+    AccountIntegrityError,
+    AuthenticatorDevice,
+    SecurityEvent,
+    User,
+)
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
@@ -147,9 +152,13 @@ class SecurityLogAdminTests(TestCase):
         response = self.client.get(reverse("admin:accounts_securityevent_changelist"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, str(self.staff_user.pk))
+        # No actions, not even the site-wide "delete selected".
+        self.assertIsNone(response.context["action_form"])
         entry = SecurityEvent.objects.get()
         detail = self.client.get(reverse("admin:accounts_securityevent_change", args=(entry.pk,)))
         self.assertEqual(detail.status_code, 200)
+        # Django 6.1 also offers actions on the change page; 6.0 has no such context entry.
+        self.assertIsNone(detail.context.get("action_form"))
 
     def test_staff_user_cannot_see_the_log(self):
         entry = SecurityEvent.objects.get()
@@ -215,6 +224,8 @@ class RecordedEventsTests(TestCase):
     def test_changes_of_privileges_and_access_are_recorded_with_the_actor(self):
         admin_user = administrator()
         account = create_active_user("member@example.org")
+        # Rights in the administration need a second factor first (D-042).
+        AuthenticatorDevice.objects.create_device(account, confirmed=True)
         group = Group.objects.create(name="Log test group")
         self.client.force_login(admin_user)
         data = {

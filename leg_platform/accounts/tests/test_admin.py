@@ -12,10 +12,33 @@ from django.test import RequestFactory, TestCase, tag
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts.models import User
+from leg_platform.accounts.admin import SECOND_FACTOR_REQUIRED_MESSAGE
+from leg_platform.accounts.models import (
+    AuthenticatorDevice,
+    RecoveryCodeDevice,
+    SecurityEvent,
+    User,
+)
 from leg_platform.accounts.tests.helpers import VerifiedClient
 
 PASSWORD = "copper kettle hums beside quiet orchard"
+
+
+def german_message():
+    with translation.override("de-ch"):
+        return str(SECOND_FACTOR_REQUIRED_MESSAGE)
+
+
+# The fields of the account form that every change in these tests sends unchanged.
+PROFILE_DATA = {
+    "first_name": "Anna",
+    "last_name": "Example",
+    "town": "Bern",
+    "street": "Examplestrasse",
+    "house_number": "12a",
+    "postal_code": "3000",
+    "country": "CH",
+}
 
 
 def create_active_user(email, customer_number=True):
@@ -97,24 +120,85 @@ class AdminAuthorizationTests(TestCase):
 
     def test_system_administrator_can_promote_another_active_account(self):
         account = create_active_user("member@example.org")
+        AuthenticatorDevice.objects.create_device(account, confirmed=True)
         self.client.force_login(self.administrator)
         response = self.client.post(
             reverse("admin:accounts_user_change", args=(account.pk,)),
-            {
-                "first_name": "Anna",
-                "last_name": "Example",
-                "town": "Bern",
-                "street": "Examplestrasse",
-                "house_number": "12a",
-                "postal_code": "3000",
-                "country": "CH",
-                "is_staff": "on",
-            },
+            {**PROFILE_DATA, "is_staff": "on"},
         )
         self.assertEqual(response.status_code, 302)
         account.refresh_from_db()
         self.assertTrue(account.is_staff)
         self.assertFalse(account.is_superuser)
+
+    def test_an_account_without_a_second_factor_cannot_receive_rights(self):
+        # Otherwise whoever knows the password could set up their own authenticator app at the
+        # next login (D-042). An unconfirmed app or recovery codes alone do not count.
+        account = create_active_user("member@example.org")
+        AuthenticatorDevice.objects.create_device(account, confirmed=False)
+        RecoveryCodeDevice.objects.create(user=account, name="recovery codes", confirmed=True)
+        self.client.force_login(self.administrator)
+        url = reverse("admin:accounts_user_change", args=(account.pk,))
+        for privileges in ({"is_staff": "on"}, {"is_staff": "on", "is_superuser": "on"}):
+            with self.subTest(privileges=privileges):
+                response = self.client.post(url, {**PROFILE_DATA, **privileges})
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response, "Nur Konten mit eingerichteter Zwei-Faktor-Authentifizierung"
+                )
+                self.assertEqual(
+                    response.context["adminform"].form.errors["is_staff"], [german_message()]
+                )
+                account.refresh_from_db()
+                self.assertFalse(account.is_staff or account.is_superuser)
+        self.assertFalse(SecurityEvent.objects.filter(account_id=account.pk).exists())
+
+    def test_a_staff_user_without_a_second_factor_cannot_become_a_system_administrator(self):
+        # E.g. a staff user whose second factor was reset, or promoted before the rule.
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.staff_user).exists())
+        self.client.force_login(self.administrator)
+
+        response = self.client.post(
+            reverse("admin:accounts_user_change", args=(self.staff_user.pk,)),
+            {**PROFILE_DATA, "is_staff": "on", "is_superuser": "on"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["adminform"].form.errors["is_superuser"], [german_message()]
+        )
+        self.staff_user.refresh_from_db()
+        self.assertFalse(self.staff_user.is_superuser)
+
+    def test_rights_can_still_be_removed_from_an_account_without_a_second_factor(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.post(
+            reverse("admin:accounts_user_change", args=(self.staff_user.pk,)), PROFILE_DATA
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.staff_user.refresh_from_db()
+        self.assertFalse(self.staff_user.is_staff)
+
+    def test_a_second_factor_removed_after_the_form_check_refuses_the_promotion(self):
+        account = create_active_user("member@example.org")
+        device = AuthenticatorDevice.objects.create_device(account, confirmed=True)
+        model_admin = admin.site._registry[User]
+        request = RequestFactory().post(reverse("admin:accounts_user_change", args=(account.pk,)))
+        request.user = self.administrator
+        form = model_admin.get_form(request, account)(
+            {**PROFILE_DATA, "is_staff": "on"}, instance=account
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        device.delete()
+
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(request, form.instance, form, change=True)
+
+        account.refresh_from_db()
+        self.assertFalse(account.is_staff)
 
     def test_system_administrator_can_assign_groups_and_direct_permissions(self):
         account = create_active_user("member@example.org")

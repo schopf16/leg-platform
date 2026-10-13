@@ -62,6 +62,15 @@ msgstr "Ein Systemadministrator braucht auch Zugang zur Verwaltung."
 msgid "Only active accounts can receive access to the administration."
 msgstr "Nur aktive Konten können Zugang zur Verwaltung erhalten."
 
+msgid ""
+"Only accounts that have set up two-factor authentication can receive these "
+"rights. The person must first set up two-factor authentication in their "
+"profile."
+msgstr ""
+"Nur Konten mit eingerichteter Zwei-Faktor-Authentifizierung können diese "
+"Rechte erhalten. Die Person muss die Zwei-Faktor-Authentifizierung zuerst in "
+"ihrem Profil einrichten."
+
 #, python-format
 msgid ""
 "Customer numbers are running out: %(issued)d of %(total)d have been issued "

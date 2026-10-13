@@ -18,7 +18,13 @@ from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext, override
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.accounts import email_texts, emails, second_factor_reset, security_log
+from leg_platform.accounts import (
+    email_texts,
+    emails,
+    second_factor,
+    second_factor_reset,
+    security_log,
+)
 from leg_platform.accounts.forms import clean_postal_code, postal_code_field
 from leg_platform.accounts.models import (
     CUSTOMER_NUMBER_SPACE,
@@ -43,6 +49,20 @@ MAX_EMAIL_TEXT_VERSIONS = 100
 admin.site.site_header = _("LEG Platform")
 admin.site.site_title = _("LEG Platform")
 admin.site.index_title = _("Administration")
+
+
+# Rights in the administration are granted only to an account that already uses two-factor
+# authentication; otherwise whoever knows its password could set up their own authenticator
+# app at the next login (docs/SECURITY.md, section 4; D-042).
+SECOND_FACTOR_REQUIRED_MESSAGE = _(
+    "Only accounts that have set up two-factor authentication can receive these rights. The "
+    "person must first set up two-factor authentication in their profile."
+)
+
+
+def privileges_granted(account, is_staff, is_superuser):
+    """Whether the new values give the account access or rights it does not have yet."""
+    return (is_staff and not account.is_staff) or (is_superuser and not account.is_superuser)
 
 
 class UserAdminForm(forms.ModelForm):
@@ -71,11 +91,17 @@ class UserAdminForm(forms.ModelForm):
             self.add_error(
                 "is_staff", _("A system administrator also needs access to the administration.")
             )
-        elif cleaned_data["is_staff"] and not self.instance.is_staff:
+            return
+        if cleaned_data["is_staff"] and not self.instance.is_staff:
             if self.instance.status != User.Status.ACTIVE:
                 self.add_error(
                     "is_staff", _("Only active accounts can receive access to the administration.")
                 )
+                return
+        if privileges_granted(self.instance, cleaned_data["is_staff"], cleaned_data["is_superuser"]):
+            if not second_factor.has_second_factor(self.instance):
+                field = "is_staff" if not self.instance.is_staff else "is_superuser"
+                self.add_error(field, SECOND_FACTOR_REQUIRED_MESSAGE)
 
 
 class ResetSecondFactorForm(forms.Form):
@@ -357,6 +383,14 @@ class UserAdmin(admin.ModelAdmin):
                 privileges = (obj.is_staff, obj.is_superuser)
                 obj.is_staff = stored.is_staff
                 obj.is_superuser = stored.is_superuser
+            if (
+                privileges is not None
+                and privileges_granted(stored, *privileges)
+                and not second_factor.has_second_factor(stored)
+            ):
+                # The form checked it; checked again on the locked row, because the person
+                # could have turned the second factor off in the meantime (that also locks it).
+                raise PermissionDenied
             super().save_model(request, obj, form, change)
             if privileges is not None and privileges != (obj.is_staff, obj.is_superuser):
                 obj.set_privileges(is_staff=privileges[0], is_superuser=privileges[1])
@@ -685,6 +719,9 @@ class SecurityEventAdmin(admin.ModelAdmin):
     Nobody can add, change or delete an entry here; entries leave only through the retention.
     """
 
+    # No actions, not even the site-wide "delete selected" (Django documentation, "Admin
+    # actions": "actions = None" disables them for the model; works on Django 6.0 and 6.1).
+    actions = None
     list_display = ("occurred_at", "event", "account_number", "actor_number", "retention")
     list_filter = ("event", "long_retention")
     ordering = ("-occurred_at", "-id")
@@ -723,9 +760,6 @@ class SecurityEventAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-    def get_actions(self, request):
-        return {}
 
 
 admin.site.unregister(Group)

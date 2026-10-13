@@ -82,8 +82,9 @@ class Command(BaseCommand):
                 user.complete_registration(password)
                 entry = {"email": email, "password": password}
                 if is_staff or is_superuser:
-                    user.set_privileges(is_staff=is_staff, is_superuser=is_superuser)
+                    # The second factor first, as the administration requires (D-042).
                     device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
+                    user.set_privileges(is_staff=is_staff, is_superuser=is_superuser)
                     entry["authenticator_secret"] = b32encode(device.bin_key).decode("ascii")
                 credentials[key] = entry
             # Inside the transaction: if the file cannot be written, no account remains.

@@ -33,6 +33,12 @@ def process_reset_request(address):
     ).first()
     if user is None:
         return None
+    # Only the newest link is valid: earlier links of the account stop working, as for the
+    # removal of the second factor. A request above the per-address limit never reaches this
+    # function, so links already sent stay valid then (docs/SECURITY.md, section 3).
+    VerificationToken.objects.filter(
+        user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
+    ).delete()
     raw_token = VerificationToken.objects.issue(
         user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
     )

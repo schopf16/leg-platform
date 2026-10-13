@@ -237,19 +237,53 @@ class ResetFlowTests(TestCase):
         self.assertTemplateUsed(self.open_link(), INVALID_PAGE)
         self.assertTemplateUsed(self.client.get(SET_URL), INVALID_PAGE)
 
-    def test_every_outstanding_reset_link_of_the_account_is_removed(self):
+    def test_a_new_request_makes_the_earlier_link_invalid_and_the_new_link_works(self):
         request_reset(self.user.email)
         second = reset_path(mail.outbox[-1])
         self.assertNotEqual(second, self.path)
-        # An earlier link stays valid until the password is changed.
-        self.assertRedirects(
-            Client().get(self.path), SET_URL, fetch_redirect_response=False
+
+        self.assertTemplateUsed(Client().get(self.path), INVALID_PAGE)
+        self.assertEqual(VerificationToken.objects.filter(purpose="password_reset").count(), 1)
+        self.assertRedirects(self.client.get(second), SET_URL, fetch_redirect_response=False)
+        self.assertRedirects(self.set_password(), LOGIN_URL)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
+
+    def test_a_session_that_opened_the_earlier_link_cannot_set_the_password(self):
+        self.open_link()
+        request_reset(self.user.email)
+
+        response = self.set_password()
+
+        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(PASSWORD))
+
+    def test_the_last_link_stays_valid_when_the_address_limit_is_reached(self):
+        limit = rate_limits.MAIL_ADDRESS_LIMITS[0][0]
+        # setUp sent the first email of the budget.
+        for _ in range(limit - 1):
+            request_reset(self.user.email)
+        last = reset_path(mail.outbox[-1])
+        sent = len(mail.outbox)
+
+        request_reset(self.user.email)
+
+        self.assertEqual(len(mail.outbox), sent)
+        self.assertRedirects(Client().get(last), SET_URL, fetch_redirect_response=False)
+
+    def test_every_outstanding_reset_link_of_the_account_is_removed(self):
+        # A link that was never consumed (e.g. created before earlier links were replaced).
+        stale = VerificationToken.objects.issue(
+            self.user, VerificationToken.Purpose.PASSWORD_RESET, timedelta(hours=1)
         )
         self.open_link()
 
         self.set_password()
 
-        self.assertTemplateUsed(Client().get(second), INVALID_PAGE)
+        self.assertTemplateUsed(
+            Client().get(reverse("accounts:password_reset_verify", args=(stale,))), INVALID_PAGE
+        )
         self.assertEqual(VerificationToken.objects.count(), 0)
 
     def test_an_expired_link_is_invalid(self):

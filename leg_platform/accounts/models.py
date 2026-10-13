@@ -1336,12 +1336,19 @@ class RecoveryCode(models.Model):
     device = models.ForeignKey(
         RecoveryCodeDevice, on_delete=models.CASCADE, related_name="codes", editable=False
     )
-    digest = models.CharField(
-        max_length=64, unique=True, db_collation=EXACT_COLLATION, editable=False
-    )
+    digest = models.CharField(max_length=64, db_collation=EXACT_COLLATION, editable=False)
 
     class Meta:
         default_permissions = ()
+        # Unique per device, not across the instance: codes are only ever checked against the
+        # codes of the account's own device (RecoveryCodeDevice.verify_token), and a random
+        # match with a code of another account (40 bits each) must not make the setup or the
+        # renewal fail.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "digest"], name="accounts_recovery_code_unique_per_device"
+            )
+        ]
 
 
 # Security log (D-018, D-041): append-only within the application; entries leave only through

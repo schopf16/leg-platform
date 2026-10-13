@@ -1371,6 +1371,32 @@ class DeviceRulesTests(TestCase):
         self.assertEqual(RecoveryCodeDevice.objects.get().persistent_id, before)
         self.assertEqual(len(stored_digests()), totp.RECOVERY_CODE_COUNT)
 
+    def test_a_recovery_code_that_another_account_also_has_does_not_break_the_renewal(self):
+        other, _device = create_user_with_totp("other.person@example.org")
+        shared = recovery_codes_of(other.email)
+        codes = [
+            *shared,
+            *("mnop2345", "qrst2345", "uvwx2345", "yzab2345", "cdef2345", "ghij2345", "klmn2345"),
+        ]
+        self.assertEqual(len(set(codes)), totp.RECOVERY_CODE_COUNT)
+
+        with mock.patch.object(totp, "_new_recovery_code", side_effect=codes):
+            renewed = totp.renew_recovery_codes(self.user)
+
+        self.assertEqual(sorted(renewed), sorted(codes))
+        # Each account uses only its own codes: using the shared code for one account leaves
+        # the code of the other account untouched.
+        self.assertIsNotNone(totp.verify_code(self.user, shared[0]))
+        self.assertIsNone(totp.verify_code(self.user, shared[0]))
+        self.assertIsNotNone(totp.verify_code(other, shared[0]))
+        self.assertIsNone(totp.verify_code(other, shared[0]))
+
+    def test_a_device_cannot_hold_the_same_recovery_code_twice(self):
+        device = RecoveryCodeDevice.objects.get(user=self.user)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            RecoveryCode.objects.create(device=device, digest=recovery_code_digest(RECOVERY_CODES[0]))
+
 
 
 def set_budget(device, failures, hours_ago=0):
