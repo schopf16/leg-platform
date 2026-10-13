@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Recovery codes" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      {% if enrolled %}
+        <div class="alert alert-success" role="status">{% translate "Two-factor authentication is on." %}</div>
+      {% endif %}
+      <h1 class="h2 mb-3">{% translate "Your recovery codes" %}</h1>
+      <p>{% translate "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone. They are shown only now." %}</p>
+      <ul class="list-unstyled identifier text-center">
+        {% for code in codes %}<li>{{ code }}</li>{% endfor %}
+      </ul>
+      <a class="btn btn-primary w-100" href="{% url 'accounts:two_factor' %}">{% translate "I have saved the codes" %}</a>
+    </div>
+  </div>
+{% endblock %}

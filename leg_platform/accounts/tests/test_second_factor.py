@@ -1,0 +1,1365 @@
+"""Password change, two-factor authentication and the central second factor check
+(docs/SECURITY.md, sections 3 and 11; D-004, D-017, D-040)."""
+
+import hashlib
+import re
+import threading
+import time
+from base64 import b32encode
+from unittest import mock
+
+from axes.models import AccessAttempt
+from django.conf import settings
+from django.contrib import admin
+from django.core import mail
+from django.db import IntegrityError, connection, transaction
+from django.test import (
+    Client,
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+    tag,
+)
+from django.urls import reverse
+from django_otp import DEVICE_ID_SESSION_KEY
+from django_otp.oath import TOTP
+
+from leg_platform.accounts import encryption, second_factor, totp
+from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
+from leg_platform.accounts.models import (
+    AuthenticatorDevice,
+    LoginIpAttempt,
+    MailJob,
+    RecoveryCode,
+    RecoveryCodeDevice,
+    User,
+    recovery_code_digest,
+)
+from leg_platform.accounts.tests.helpers import (
+    OTHER_PASSWORD,
+    PASSWORD,
+    code_for,
+    complete_second_factor,
+    create_active_user,
+    run_mail_queue,
+)
+
+LOGIN_URL = reverse("accounts:login")
+CODE_URL = reverse("accounts:login_second_factor")
+RECOVERY_CODES = ["abcd2345", "efgh6723", "ijkl4567"]
+SECRET_SENTINEL = "otp-sentinel-654321"
+DEFAULT_EMAIL = "active.person@example.org"
+RECOVERY_DIGESTS = {recovery_code_digest(code) for code in RECOVERY_CODES}
+
+
+def recovery_codes_of(email):
+    """The codes of an account; the default account has the fixed ones, others their own."""
+    if email == DEFAULT_EMAIL:
+        return RECOVERY_CODES
+    return [
+        b32encode(hashlib.sha256(f"{email}{number}".encode()).digest()[:5]).decode().lower()
+        for number in range(3)
+    ]
+
+
+def stored_digests(user=None):
+    codes = RecoveryCode.objects.all()
+    if user is not None:
+        codes = codes.filter(device__user=user)
+    return set(codes.values_list("digest", flat=True))
+
+
+def codes_in(response):
+    """The recovery codes that a page shows (the only place they are ever readable)."""
+    found = re.findall(r"<li>([a-z2-7]{4})-([a-z2-7]{4})</li>", response.content.decode())
+    return [first + second for first, second in found]
+
+
+def create_user_with_totp(email=DEFAULT_EMAIL, **profile):
+    user = create_active_user(email, **profile)
+    device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
+    recovery = RecoveryCodeDevice.objects.create(user=user, name="recovery codes", confirmed=True)
+    recovery.add_codes(recovery_codes_of(email))
+    return user, device
+
+
+def promote(user):
+    user.set_privileges(is_staff=True, is_superuser=False)
+    return user
+
+
+def create_totp_device(user):
+    return AuthenticatorDevice.objects.create_device(user, confirmed=True)
+
+
+MIDDLEWARE_WITHOUT_SECOND_FACTOR = [
+    name for name in settings.MIDDLEWARE if "SecondFactorMiddleware" not in name
+]
+
+
+def log_in(client, email, password=PASSWORD, address="10.1.0.1", **extra):
+    return client.post(
+        LOGIN_URL, {"username": email, "password": password}, REMOTE_ADDR=address, **extra
+    )
+
+
+def send_code(client, code, address="10.1.0.1"):
+    return client.post(CODE_URL, {"otp_token": code}, REMOTE_ADDR=address)
+
+
+@tag("mariadb")
+class SecondFactorLoginTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def test_the_password_alone_does_not_log_in(self):
+        response = log_in(self.client, self.user.email)
+
+        self.assertRedirects(response, CODE_URL)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertRedirects(
+            self.client.get(reverse("accounts:profile")), f"{LOGIN_URL}?next=/profile/"
+        )
+
+    def test_the_password_and_the_code_log_in(self):
+        log_in(self.client, self.user.email)
+
+        response = send_code(self.client, code_for(self.device))
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
+        self.assertEqual(self.client.session[DEVICE_ID_SESSION_KEY], self.device.persistent_id)
+        self.assertEqual(self.client.get(reverse("accounts:profile")).status_code, 200)
+
+    def test_a_wrong_code_does_not_log_in(self):
+        log_in(self.client, self.user.email)
+
+        response = send_code(self.client, "000000")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertContains(response, "alert-danger", count=0)
+        self.assertContains(response, "invalid-feedback")
+
+    def test_the_code_page_needs_the_password_step(self):
+        self.assertRedirects(self.client.get(CODE_URL), LOGIN_URL, fetch_redirect_response=False)
+        response = send_code(self.client, code_for(self.device))
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_the_password_step_of_another_account_is_not_enough_for_a_code_of_this_one(self):
+        other, other_device = create_user_with_totp("other.person@example.org")
+        log_in(self.client, other.email)
+
+        send_code(self.client, code_for(self.device))
+
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_the_pending_login_expires(self):
+        log_in(self.client, self.user.email)
+        session = self.client.session
+        session[second_factor.PENDING_SESSION_KEY]["started"] -= 301
+        session.save()
+
+        response = send_code(self.client, code_for(self.device))
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_the_pending_login_ends_when_the_account_is_blocked(self):
+        log_in(self.client, self.user.email)
+        self.user.set_status(User.Status.BLOCKED)
+
+        response = send_code(self.client, code_for(self.device))
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_the_pending_login_ends_when_the_second_factor_was_removed(self):
+        log_in(self.client, self.user.email)
+        AuthenticatorDevice.objects.all().delete()
+
+        self.assertRedirects(self.client.get(CODE_URL), LOGIN_URL, fetch_redirect_response=False)
+
+    def test_a_code_cannot_be_used_twice(self):
+        log_in(self.client, self.user.email)
+        code = code_for(self.device)
+        send_code(self.client, code)
+        other_client = Client()
+        log_in(other_client, self.user.email, address="10.1.0.2")
+
+        send_code(other_client, code, address="10.1.0.2")
+
+        self.assertNotIn("_auth_user_id", other_client.session)
+
+    def test_a_recovery_code_works_once_and_in_any_notation(self):
+        log_in(self.client, self.user.email)
+
+        response = send_code(self.client, " ABCD-2345 ")
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertEqual(
+            self.client.session[DEVICE_ID_SESSION_KEY],
+            RecoveryCodeDevice.objects.get().persistent_id,
+        )
+        self.assertEqual(len(stored_digests()), len(RECOVERY_CODES) - 1)
+        again = Client()
+        log_in(again, self.user.email, address="10.1.0.2")
+        send_code(again, "abcd2345", address="10.1.0.2")
+        self.assertNotIn("_auth_user_id", again.session)
+
+    def test_the_use_of_a_recovery_code_is_logged_without_the_code(self):
+        log_in(self.client, self.user.email)
+
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            send_code(self.client, "abcd2345")
+
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn(f"account {self.user.pk}", logs.output[0])
+        self.assertNotIn("abcd", logs.output[0])
+
+    def test_the_session_id_changes_with_the_password_and_with_the_code(self):
+        session = self.client.session
+        session["probe"] = "value"
+        session.save()
+        planted = self.client.session.session_key
+
+        log_in(self.client, self.user.email)
+        after_password = self.client.session.session_key
+        send_code(self.client, code_for(self.device))
+        after_code = self.client.session.session_key
+
+        self.assertNotEqual(planted, after_password)
+        self.assertNotEqual(after_password, after_code)
+
+    def test_an_internal_redirect_target_is_followed_and_an_external_one_ignored(self):
+        for target, expected in (("/profile/", "/profile/"), ("https://attacker.example.net/", "/profile/")):
+            with self.subTest(target=target):
+                client = Client()
+                client.post(
+                    LOGIN_URL,
+                    {"username": self.user.email, "password": PASSWORD, "next": target},
+                    REMOTE_ADDR="10.1.1.1",
+                )
+                response = send_code(client, code_for(self.device), address="10.1.1.1")
+                self.assertRedirects(response, expected, fetch_redirect_response=False)
+
+    def test_a_wrong_password_never_reaches_the_code_step(self):
+        response = log_in(self.client, self.user.email, "wrong password for this account")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(second_factor.PENDING_SESSION_KEY, self.client.session)
+
+    def test_an_account_without_a_second_factor_logs_in_with_the_password_alone(self):
+        plain = create_active_user("plain.person@example.org")
+
+        response = log_in(self.client, plain.email)
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertEqual(self.client.session["_auth_user_id"], str(plain.pk))
+
+    def test_the_ip_slot_is_released_after_a_complete_login(self):
+        log_in(self.client, self.user.email)
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
+
+        send_code(self.client, code_for(self.device))
+
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
+
+    def test_a_wrong_code_keeps_its_ip_attempt(self):
+        log_in(self.client, self.user.email)
+
+        send_code(self.client, "000000")
+
+        self.assertEqual(LoginIpAttempt.objects.filter(pending=False).count(), 1)
+        self.assertEqual(LoginIpAttempt.objects.filter(pending=True).count(), 0)
+
+    def test_wrong_codes_lock_the_account_and_a_correct_code_is_then_refused(self):
+        log_in(self.client, self.user.email)
+        responses = [send_code(self.client, "000000") for _ in range(LOGIN_FAILURE_LIMIT)]
+
+        self.assertEqual(responses[-1].status_code, 429)
+        response = send_code(self.client, code_for(self.device))
+
+        self.assertEqual(response.status_code, 429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        # The same account is locked at the password step as well.
+        self.assertEqual(log_in(Client(), self.user.email, address="10.1.9.9").status_code, 429)
+
+    def test_wrong_codes_from_one_address_lock_that_address(self):
+        others = [create_user_with_totp(f"person{n}@example.org")[0] for n in range(LOGIN_FAILURE_LIMIT)]
+        for other in others:
+            client = Client()
+            log_in(client, other.email, address="10.1.8.1")
+            send_code(client, "000000", address="10.1.8.1")
+
+        response = log_in(Client(), self.user.email, address="10.1.8.1")
+
+        self.assertEqual(response.status_code, 429)
+
+    def test_the_code_is_not_stored_by_the_abuse_protection(self):
+        log_in(self.client, self.user.email)
+
+        send_code(self.client, SECRET_SENTINEL)
+
+        self.assertTrue(AccessAttempt.objects.exists())
+        for attempt in AccessAttempt.objects.all():
+            self.assertNotIn(SECRET_SENTINEL, attempt.post_data)
+
+    def test_the_code_step_needs_a_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+
+        self.assertEqual(client.post(CODE_URL, {"otp_token": "123456"}).status_code, 403)
+
+    def test_the_code_page_is_not_cached(self):
+        log_in(self.client, self.user.email)
+
+        self.assertIn("no-store", self.client.get(CODE_URL)["Cache-Control"])
+
+
+@tag("mariadb")
+class CentralCheckTests(TestCase):
+    def setUp(self):
+        self.staff = promote(create_active_user("staff.person@example.org"))
+        self.administrator = create_active_user("admin.person@example.org")
+        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+
+    def test_the_check_fails_closed_without_the_middleware(self):
+        request = RequestFactory().get("/")
+        request.user = self.staff
+
+        self.assertFalse(second_factor.is_second_factor_complete(request.user))
+
+    def test_staff_users_and_administrators_must_use_the_second_factor(self):
+        plain = create_active_user("plain.person@example.org")
+
+        self.assertTrue(second_factor.requires_second_factor(self.staff))
+        self.assertTrue(second_factor.requires_second_factor(self.administrator))
+        self.assertFalse(second_factor.requires_second_factor(plain))
+
+    def test_a_staff_session_without_a_second_factor_can_only_set_it_up(self):
+        client = Client()
+        log_in(client, self.staff.email)
+
+        self.assertEqual(client.session["_auth_user_id"], str(self.staff.pk))
+        for url in (
+            reverse("accounts:profile"),
+            reverse("accounts:password_change"),
+            reverse("accounts:two_factor"),
+            reverse("accounts:recovery_codes"),
+            "/admin/",
+            "/",
+        ):
+            with self.subTest(url=url):
+                response = client.get(url)
+                self.assertRedirects(
+                    response,
+                    reverse("accounts:two_factor_setup"),
+                    fetch_redirect_response=False,
+                )
+        self.assertEqual(client.get(reverse("accounts:two_factor_setup")).status_code, 200)
+
+    def test_such_a_session_can_log_out(self):
+        client = Client()
+        log_in(client, self.staff.email)
+
+        client.post(reverse("accounts:logout"))
+
+        self.assertNotIn("_auth_user_id", client.session)
+
+    def test_a_staff_session_with_a_second_factor_that_was_not_completed_is_ended(self):
+        create_totp_device(self.staff)
+        client = Client()
+        client.force_login(self.staff)
+
+        response = client.get(reverse("accounts:profile"))
+
+        self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", client.session)
+
+    def test_a_staff_session_with_a_completed_second_factor_has_its_privileges(self):
+        client = Client()
+        client.force_login(self.administrator)
+        complete_second_factor(client, self.administrator)
+
+        self.assertEqual(client.get(reverse("accounts:profile")).status_code, 200)
+        self.assertEqual(client.get("/admin/").status_code, 200)
+
+    def test_a_promotion_takes_effect_in_the_open_session(self):
+        user = create_active_user("promoted.person@example.org")
+        client = Client()
+        client.force_login(user)
+        self.assertEqual(client.get(reverse("accounts:profile")).status_code, 200)
+
+        promote(user)
+
+        self.assertRedirects(
+            client.get(reverse("accounts:profile")),
+            reverse("accounts:two_factor_setup"),
+            fetch_redirect_response=False,
+        )
+
+    @override_settings(MIDDLEWARE=MIDDLEWARE_WITHOUT_SECOND_FACTOR)
+    def test_the_administration_stays_closed_without_the_middleware(self):
+        client = Client()
+        client.force_login(self.administrator)
+
+        response = client.get("/admin/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(reverse("admin:login")))
+
+    def test_the_administration_login_and_password_change_are_the_portal_pages(self):
+        client = Client()
+
+        login_response = client.get(reverse("admin:login"), {"next": "/admin/"})
+        client.force_login(self.administrator)
+        complete_second_factor(client, self.administrator)
+        password_response = client.get(reverse("admin:password_change"))
+
+        self.assertRedirects(
+            login_response, f"{LOGIN_URL}?next=/admin/", fetch_redirect_response=False
+        )
+        self.assertRedirects(
+            password_response, reverse("accounts:password_change"), fetch_redirect_response=False
+        )
+
+    def test_the_devices_are_not_in_the_administration(self):
+        registered = {model._meta.label for model in admin.site._registry}
+
+        self.assertNotIn("accounts.AuthenticatorDevice", registered)
+        self.assertNotIn("accounts.RecoveryCodeDevice", registered)
+        self.assertNotIn("accounts.RecoveryCode", registered)
+        client = Client()
+        client.force_login(self.administrator)
+        complete_second_factor(client, self.administrator)
+        self.assertEqual(client.get("/admin/accounts/authenticatordevice/").status_code, 404)
+        self.assertEqual(client.get("/admin/accounts/recoverycodedevice/").status_code, 404)
+
+
+@tag("mariadb")
+class EnrolmentTests(TestCase):
+    def setUp(self):
+        self.user = create_active_user()
+        self.client.force_login(self.user)
+
+    def start(self, password=PASSWORD):
+        return self.client.post(
+            reverse("accounts:two_factor_setup"),
+            {"current_password": password},
+            REMOTE_ADDR="10.2.0.1",
+        )
+
+    def test_the_setup_asks_for_the_password_first(self):
+        response = self.start("wrong password for this account")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AuthenticatorDevice.objects.exists())
+
+    def test_the_setup_creates_an_unconfirmed_secret(self):
+        response = self.start()
+
+        self.assertRedirects(response, reverse("accounts:two_factor_confirm"))
+        device = AuthenticatorDevice.objects.get()
+        self.assertFalse(device.confirmed)
+        self.assertFalse(second_factor.has_second_factor(self.user))
+        self.assertEqual(len(device.bin_key), 20)
+
+    def test_starting_again_replaces_the_unconfirmed_secret(self):
+        self.start()
+        first = AuthenticatorDevice.objects.get().bin_key
+
+        self.start()
+
+        self.assertNotEqual(AuthenticatorDevice.objects.get().bin_key, first)
+
+    def test_the_confirmation_page_shows_the_secret_and_a_qr_code_of_its_own(self):
+        self.start()
+        device = AuthenticatorDevice.objects.get()
+
+        response = self.client.get(reverse("accounts:two_factor_confirm"))
+
+        self.assertContains(response, reverse("accounts:two_factor_qr"))
+        self.assertContains(response, totp.secret_for_display(device))
+        self.assertNotContains(response, "data:image")
+        self.assertIn("no-store", response["Cache-Control"])
+
+    def test_the_qr_code_is_an_svg_that_is_not_cached(self):
+        self.start()
+        device = AuthenticatorDevice.objects.get()
+
+        response = self.client.get(reverse("accounts:two_factor_qr"))
+
+        self.assertEqual(response["Content-Type"], "image/svg+xml")
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertTrue(response.content.startswith(b"<svg"))
+        self.assertNotIn(b"<script", response.content)
+        self.assertTrue(device.config_url.startswith("otpauth://totp/"))
+        self.assertIn("issuer=", device.config_url)
+
+    def test_the_qr_code_of_another_account_cannot_be_reached(self):
+        other = create_active_user("other.person@example.org")
+        AuthenticatorDevice.objects.create_device(other, confirmed=False)
+
+        response = self.client.get(reverse("accounts:two_factor_qr"))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_the_confirmation_without_a_secret_leads_to_the_start(self):
+        response = self.client.get(reverse("accounts:two_factor_confirm"))
+
+        self.assertRedirects(response, reverse("accounts:two_factor_setup"))
+
+    def test_a_wrong_code_does_not_turn_the_second_factor_on(self):
+        self.start()
+
+        response = self.client.post(reverse("accounts:two_factor_confirm"), {"otp_token": "000000"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AuthenticatorDevice.objects.get().confirmed)
+        self.assertFalse(RecoveryCodeDevice.objects.exists())
+
+    def test_the_right_code_turns_it_on_and_shows_the_recovery_codes_once(self):
+        self.start()
+        device = AuthenticatorDevice.objects.get()
+
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            response = self.client.post(
+                reverse("accounts:two_factor_confirm"), {"otp_token": code_for(device)}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(AuthenticatorDevice.objects.get().confirmed)
+        codes = codes_in(response)
+        self.assertEqual(len(codes), totp.RECOVERY_CODE_COUNT)
+        self.assertEqual(stored_digests(), {recovery_code_digest(code) for code in codes})
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertEqual(self.client.session[DEVICE_ID_SESSION_KEY], device.persistent_id)
+        self.assertEqual(len(logs.output), 1)
+        for text in (device.bin_key.hex(), *codes):
+            self.assertNotIn(text, logs.output[0])
+        overview = self.client.get(reverse("accounts:two_factor"))
+        self.assertNotContains(overview, totp.format_recovery_code(codes[0]))
+        self.assertContains(overview, "10 Wiederherstellungscodes")
+
+    def test_the_session_id_changes_when_the_second_factor_is_turned_on(self):
+        self.start()
+        before = self.client.session.session_key
+
+        self.client.post(
+            reverse("accounts:two_factor_confirm"), {"otp_token": code_for(AuthenticatorDevice.objects.get())}
+        )
+
+        self.assertNotEqual(self.client.session.session_key, before)
+
+    def test_the_account_is_notified_without_a_link(self):
+        self.start()
+        self.client.post(
+            reverse("accounts:two_factor_confirm"), {"otp_token": code_for(AuthenticatorDevice.objects.get())}
+        )
+
+        self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_ENABLED)
+        run_mail_queue()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+        self.assertNotIn("http", mail.outbox[0].body)
+
+    def test_the_setup_is_refused_when_a_second_factor_exists(self):
+        create_totp_device(self.user)
+
+        response = self.client.get(reverse("accounts:two_factor_setup"))
+
+        self.assertRedirects(response, reverse("accounts:two_factor"))
+        with self.assertRaises(totp.SecondFactorError):
+            totp.start_enrolment(self.user)
+
+    def test_the_setup_password_check_is_under_the_abuse_protection(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            response = self.start("wrong password for this account")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(self.start().status_code, 429)
+        self.assertFalse(AuthenticatorDevice.objects.exists())
+
+    def test_the_pages_need_a_login(self):
+        anonymous = Client()
+        for name in (
+            "two_factor",
+            "two_factor_setup",
+            "two_factor_confirm",
+            "two_factor_qr",
+            "recovery_codes",
+            "two_factor_disable",
+            "password_change",
+        ):
+            with self.subTest(name=name):
+                url = reverse(f"accounts:{name}")
+                self.assertRedirects(
+                    anonymous.get(url), f"{LOGIN_URL}?next={url}", fetch_redirect_response=False
+                )
+                self.assertRedirects(
+                    anonymous.post(url, {}), f"{LOGIN_URL}?next={url}", fetch_redirect_response=False
+                )
+
+    def test_the_posts_need_a_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        for name in (
+            "two_factor_setup",
+            "two_factor_confirm",
+            "recovery_codes",
+            "two_factor_disable",
+            "password_change",
+        ):
+            with self.subTest(name=name):
+                self.assertEqual(client.post(reverse(f"accounts:{name}"), {}).status_code, 403)
+
+    def test_the_pages_are_not_cached(self):
+        for name in ("two_factor", "two_factor_setup", "password_change"):
+            with self.subTest(name=name):
+                self.assertIn("no-store", self.client.get(reverse(f"accounts:{name}"))["Cache-Control"])
+
+    def test_a_staff_user_turns_the_second_factor_on_in_the_restricted_session(self):
+        staff = promote(create_active_user("staff.person@example.org"))
+        client = Client()
+        log_in(client, staff.email, address="10.2.0.5")
+        client.post(
+            reverse("accounts:two_factor_setup"), {"current_password": PASSWORD}, REMOTE_ADDR="10.2.0.5"
+        )
+
+        response = client.post(
+            reverse("accounts:two_factor_confirm"),
+            {"otp_token": code_for(AuthenticatorDevice.objects.get(user=staff))},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client.get(reverse("accounts:profile")).status_code, 200)
+
+
+@tag("mariadb")
+class RecoveryCodesAndRemovalTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+        self.client.force_login(self.user)
+        complete_second_factor(self.client, self.user)
+
+    def data(self, **overrides):
+        return {"current_password": PASSWORD, "otp_token": code_for(self.device), **overrides}
+
+    def test_new_recovery_codes_need_the_password_and_a_code(self):
+        url = reverse("accounts:recovery_codes")
+        for name, data in (
+            ("wrong password", self.data(current_password="wrong password for this account")),
+            ("wrong code", self.data(otp_token="000000")),
+            ("no code", {"current_password": PASSWORD}),
+        ):
+            with self.subTest(name=name):
+                self.assertEqual(self.client.post(url, data).status_code, 200)
+                self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
+
+    def test_new_recovery_codes_replace_the_old_ones(self):
+        response = self.client.post(reverse("accounts:recovery_codes"), self.data())
+
+        self.assertEqual(response.status_code, 200)
+        codes = codes_in(response)
+        self.assertEqual(len(codes), totp.RECOVERY_CODE_COUNT)
+        self.assertEqual(stored_digests(), {recovery_code_digest(code) for code in codes})
+        self.assertFalse(set(codes) & set(RECOVERY_CODES))
+        client = Client()
+        log_in(client, self.user.email, address="10.3.0.1")
+        send_code(client, RECOVERY_CODES[0], address="10.3.0.1")
+        self.assertNotIn("_auth_user_id", client.session)
+        run_mail_queue()
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_the_second_factor_can_be_turned_off_by_a_user(self):
+        response = self.client.post(reverse("accounts:two_factor_disable"), self.data())
+
+        self.assertRedirects(response, reverse("accounts:two_factor"))
+        self.assertFalse(AuthenticatorDevice.objects.exists())
+        self.assertFalse(RecoveryCodeDevice.objects.exists())
+        client = Client()
+        self.assertRedirects(
+            log_in(client, self.user.email, address="10.3.0.2"), reverse("accounts:profile")
+        )
+        self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_DISABLED)
+
+    def test_turning_it_off_needs_the_password_and_a_code(self):
+        url = reverse("accounts:two_factor_disable")
+        for data in (
+            self.data(current_password="wrong password for this account"),
+            self.data(otp_token="000000"),
+            {"current_password": PASSWORD},
+            {},
+        ):
+            self.client.post(url, data)
+
+        self.assertTrue(AuthenticatorDevice.objects.exists())
+        self.assertTrue(RecoveryCodeDevice.objects.exists())
+
+    def test_turning_it_off_does_not_touch_other_accounts(self):
+        other, other_device = create_user_with_totp("other.person@example.org")
+
+        self.client.post(reverse("accounts:two_factor_disable"), self.data())
+
+        self.assertTrue(AuthenticatorDevice.objects.filter(pk=other_device.pk).exists())
+        self.assertEqual(len(stored_digests()), len(RECOVERY_CODES))
+
+    def test_staff_users_and_administrators_cannot_turn_it_off(self):
+        promote(self.user)
+
+        response = self.client.post(reverse("accounts:two_factor_disable"), self.data())
+
+        self.assertRedirects(
+            response, reverse("accounts:two_factor"), fetch_redirect_response=False
+        )
+        self.assertTrue(AuthenticatorDevice.objects.exists())
+        with self.assertRaises(totp.SecondFactorError):
+            totp.disable(self.user)
+        self.assertTrue(AuthenticatorDevice.objects.exists())
+
+    def test_without_a_second_factor_the_pages_lead_back_to_the_overview(self):
+        AuthenticatorDevice.objects.all().delete()
+        for name in ("recovery_codes", "two_factor_disable"):
+            with self.subTest(name=name):
+                self.assertRedirects(
+                    self.client.get(reverse(f"accounts:{name}")),
+                    reverse("accounts:two_factor"),
+                    fetch_redirect_response=False,
+                )
+
+    def test_the_password_check_of_the_forms_is_under_the_abuse_protection(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            response = self.client.post(
+                reverse("accounts:two_factor_disable"),
+                self.data(current_password="wrong password for this account"),
+                REMOTE_ADDR="10.3.0.3",
+            )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(
+            self.client.post(
+                reverse("accounts:two_factor_disable"), self.data(), REMOTE_ADDR="10.3.0.3"
+            ).status_code,
+            429,
+        )
+        self.assertTrue(AuthenticatorDevice.objects.exists())
+
+    def test_the_code_check_of_the_forms_is_under_the_abuse_protection(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            response = self.client.post(
+                reverse("accounts:recovery_codes"),
+                self.data(otp_token="000000"),
+                REMOTE_ADDR="10.3.0.4",
+            )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
+
+    def test_the_data_of_a_failed_check_is_not_stored_by_the_abuse_protection(self):
+        self.client.post(
+            reverse("accounts:two_factor_disable"),
+            {"current_password": "password-sentinel-1", "otp_token": SECRET_SENTINEL},
+        )
+
+        self.assertTrue(AccessAttempt.objects.exists())
+        for attempt in AccessAttempt.objects.all():
+            self.assertNotIn("password-sentinel-1", attempt.post_data)
+            self.assertNotIn(SECRET_SENTINEL, attempt.post_data)
+
+    def test_a_successful_check_releases_its_ip_slots(self):
+        self.client.post(reverse("accounts:recovery_codes"), self.data())
+
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
+
+
+@tag("mariadb")
+class VerifyCodeTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def test_a_code_of_the_app_is_accepted_once(self):
+        code = code_for(self.device)
+
+        self.assertEqual(totp.verify_code(self.user, code), AuthenticatorDevice.objects.get())
+        self.assertIsNone(totp.verify_code(self.user, code))
+
+    def test_codes_of_the_wrong_kind_or_length_are_rejected(self):
+        for code in ("", "12345", "1234567", "abcd23", "abcd234", "abcd23456", "ABCD2345X"):
+            with self.subTest(code=code):
+                self.assertIsNone(totp.verify_code(self.user, code))
+
+    def test_another_account_has_its_own_codes(self):
+        other, _device = create_user_with_totp("other.person@example.org")
+
+        self.assertIsNone(totp.verify_code(self.user, "wxyz2345"))
+        self.assertIsNotNone(totp.verify_code(other, recovery_codes_of(other.email)[0]))
+        # Only the recovery code of the account that used it is gone.
+        self.assertEqual(len(stored_digests()), len(RECOVERY_CODES) * 2 - 1)
+        self.assertEqual(len(stored_digests(self.user)), len(RECOVERY_CODES))
+
+    def test_recovery_codes_without_an_authenticator_app_are_no_factor(self):
+        AuthenticatorDevice.objects.all().delete()
+
+        self.assertFalse(second_factor.has_second_factor(self.user))
+        self.assertIsNone(totp.verify_code(self.user, "abcd2345"))
+        self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
+
+    def test_an_unconfirmed_device_does_not_verify(self):
+        AuthenticatorDevice.objects.all().delete()
+        pending = AuthenticatorDevice.objects.create_device(self.user, confirmed=False)
+
+        self.assertIsNone(totp.verify_code(self.user, code_for(pending)))
+
+    def test_failures_do_not_lock_the_device_itself(self):
+        # Repeated failures are limited by the abuse protection of the login, so that someone
+        # who knows the password cannot keep the owner out for as long as they like (D-040).
+        for _attempt in range(4):
+            self.assertIsNone(totp.verify_code(self.user, "000000"))
+
+        self.assertIsNotNone(totp.verify_code(self.user, code_for(self.device)))
+
+    def test_the_key_is_stored_encrypted_and_the_recovery_codes_only_as_digests(self):
+        key = self.device.bin_key
+        row = AuthenticatorDevice.objects.values().get()
+
+        self.assertNotIn(key.hex(), str(row))
+        self.assertNotIn(b32encode(key).decode(), str(row))
+        for digest in RecoveryCode.objects.values_list("digest", flat=True):
+            self.assertNotIn(digest, RECOVERY_CODES)
+            self.assertEqual(len(digest), 64)
+        for code in RECOVERY_CODES:
+            self.assertNotIn(code, str(list(RecoveryCode.objects.values())))
+
+    def test_a_key_that_cannot_be_decrypted_verifies_nothing(self):
+        AuthenticatorDevice.objects.update(encrypted_key="damaged")
+
+        with self.assertLogs("leg_platform.accounts.models", "ERROR"):
+            self.assertIsNone(totp.verify_code(self.user, "123456"))
+
+    def test_a_key_under_an_old_secret_key_still_works_and_is_encrypted_again(self):
+        old_key = "old-secret-key-that-is-long-enough-for-the-tests-0123456789"
+        with override_settings(SECRET_KEY=old_key):
+            user, device = create_user_with_totp("rotated.person@example.org")
+            old_token = device.encrypted_key
+            key = device.bin_key
+
+        with override_settings(SECRET_KEY_FALLBACKS=[old_key]):
+            device.refresh_from_db()
+            self.assertEqual(device.bin_key, key)
+            code = code_for(device)
+            self.assertIsNotNone(totp.verify_code(user, code))
+
+        device.refresh_from_db()
+        self.assertNotEqual(device.encrypted_key, old_token)
+        self.assertEqual(device.bin_key, key)
+
+    def test_the_secret_is_shown_in_groups_and_decodes_to_the_key(self):
+        device = AuthenticatorDevice.objects.get()
+        text = totp.secret_for_display(device)
+
+        self.assertRegex(text, r"^([A-Z2-7]{4} )+[A-Z2-7]{4}$")
+        self.assertEqual(len(text.replace(" ", "")), 32)
+
+
+@tag("mariadb")
+class PasswordChangeTests(TestCase):
+    def setUp(self):
+        self.user = create_active_user()
+        self.client.force_login(self.user)
+        self.url = reverse("accounts:password_change")
+
+    def post(self, client=None, **overrides):
+        data = {
+            "current_password": PASSWORD,
+            "new_password1": OTHER_PASSWORD,
+            "new_password2": OTHER_PASSWORD,
+            **overrides,
+        }
+        return (client or self.client).post(self.url, data, REMOTE_ADDR="10.4.0.1")
+
+    def test_the_page_needs_a_login(self):
+        self.assertRedirects(Client().get(self.url), f"{LOGIN_URL}?next={self.url}")
+
+    def test_the_password_is_changed(self):
+        response = self.post()
+
+        self.assertRedirects(response, reverse("accounts:profile"))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(OTHER_PASSWORD))
+        self.assertFalse(self.user.check_password(PASSWORD))
+
+    def test_the_current_password_is_required_and_checked(self):
+        for name, overrides in (
+            ("wrong", {"current_password": "wrong password for this account"}),
+            ("empty", {"current_password": ""}),
+        ):
+            with self.subTest(name=name):
+                response = self.post(**overrides)
+                self.assertEqual(response.status_code, 200)
+                self.user.refresh_from_db()
+                self.assertTrue(self.user.check_password(PASSWORD))
+
+    def test_the_rules_for_passwords_apply(self):
+        for name, overrides in (
+            ("short", {"new_password1": "kettle orchard", "new_password2": "kettle orchard"}),
+            ("numeric", {"new_password1": "1234567890123456", "new_password2": "1234567890123456"}),
+            ("different", {"new_password2": "another lantern rests under silver rain"}),
+            ("similar to the address", {"new_password1": self.user.email, "new_password2": self.user.email}),
+        ):
+            with self.subTest(name=name):
+                response = self.post(**overrides)
+                self.assertEqual(response.status_code, 200)
+                self.user.refresh_from_db()
+                self.assertTrue(self.user.check_password(PASSWORD))
+
+    def test_this_session_stays_and_every_other_session_ends(self):
+        other = Client()
+        other.force_login(self.user)
+        self.assertEqual(other.get(reverse("accounts:profile")).status_code, 200)
+        before = self.client.session.session_key
+
+        self.post()
+
+        self.assertEqual(self.client.get(reverse("accounts:profile")).status_code, 200)
+        self.assertNotEqual(self.client.session.session_key, before)
+        self.assertRedirects(
+            other.get(reverse("accounts:profile")),
+            f"{LOGIN_URL}?next=/profile/",
+            fetch_redirect_response=False,
+        )
+
+    def test_the_second_factor_of_the_session_is_kept(self):
+        user, device = create_user_with_totp("second.person@example.org")
+        client = Client()
+        client.force_login(user)
+        complete_second_factor(client, user)
+
+        self.post(client)
+
+        self.assertEqual(client.session[DEVICE_ID_SESSION_KEY], device.persistent_id)
+
+    def test_the_account_is_notified_without_a_link(self):
+        self.post()
+        run_mail_queue()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+        self.assertNotIn("http", mail.outbox[0].body.replace("http://127.0.0.1:8000", ""))
+
+    def test_the_new_password_works_for_the_login_and_the_old_one_does_not(self):
+        self.post()
+
+        self.assertEqual(
+            log_in(Client(), self.user.email, PASSWORD, address="10.4.0.2").status_code, 200
+        )
+        self.assertRedirects(
+            log_in(Client(), self.user.email, OTHER_PASSWORD, address="10.4.0.3"),
+            reverse("accounts:profile"),
+        )
+
+    def test_the_current_password_check_is_under_the_abuse_protection(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            response = self.post(current_password="wrong password for this account")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(self.post().status_code, 429)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(PASSWORD))
+
+    def test_passwords_are_not_stored_by_the_abuse_protection(self):
+        self.post(
+            current_password="current-sentinel-1",
+            new_password1="new-sentinel-2",
+            new_password2="new-sentinel-3",
+        )
+
+        self.assertTrue(AccessAttempt.objects.exists())
+        for attempt in AccessAttempt.objects.all():
+            for sentinel in ("current-sentinel-1", "new-sentinel-2", "new-sentinel-3"):
+                self.assertNotIn(sentinel, attempt.post_data)
+
+    def test_a_blocked_account_cannot_change_its_password(self):
+        self.user.set_status(User.Status.BLOCKED)
+
+        response = self.post()
+
+        self.assertRedirects(response, f"{LOGIN_URL}?next={self.url}", fetch_redirect_response=False)
+
+    def test_the_profile_links_to_the_pages(self):
+        response = self.client.get(reverse("accounts:profile"))
+
+        self.assertContains(response, self.url)
+        self.assertContains(response, reverse("accounts:two_factor"))
+        self.assertTrue(re.search(r"Zwei-Faktor-Authentifizierung", response.content.decode()))
+
+
+@tag("mariadb")
+class EnrolmentBindingTests(TestCase):
+    """Only the session that started the setup, and only for a short time, can finish it."""
+
+    def setUp(self):
+        self.user = create_active_user()
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("accounts:two_factor_setup"),
+            {"current_password": PASSWORD},
+            REMOTE_ADDR="10.5.0.1",
+        )
+        self.device = AuthenticatorDevice.objects.get()
+
+    def test_another_session_of_the_account_cannot_see_or_confirm_the_secret(self):
+        other = Client()
+        other.force_login(self.user)
+
+        self.assertRedirects(
+            other.get(reverse("accounts:two_factor_confirm")),
+            reverse("accounts:two_factor_setup"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(other.get(reverse("accounts:two_factor_qr")).status_code, 404)
+        response = other.post(
+            reverse("accounts:two_factor_confirm"), {"otp_token": code_for(self.device)}
+        )
+        self.assertRedirects(response, reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
+        self.assertFalse(AuthenticatorDevice.objects.get().confirmed)
+        self.assertFalse(RecoveryCodeDevice.objects.exists())
+
+    def test_an_old_secret_cannot_be_used(self):
+        AuthenticatorDevice.objects.filter(pk=self.device.pk).update(
+            created_at=self.device.created_at - totp.ENROLMENT_LIFETIME * 2
+        )
+
+        self.assertRedirects(
+            self.client.get(reverse("accounts:two_factor_confirm")),
+            reverse("accounts:two_factor_setup"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.client.get(reverse("accounts:two_factor_qr")).status_code, 404)
+        self.assertIsNone(totp.confirm_enrolment(self.user, self.device.pk, code_for(self.device)))
+
+    def test_the_secret_of_another_account_cannot_be_confirmed(self):
+        other = create_active_user("other.person@example.org")
+
+        self.assertIsNone(totp.confirm_enrolment(other, self.device.pk, code_for(self.device)))
+
+
+@tag("mariadb")
+class SupportingBehaviourTests(TestCase):
+    def test_a_password_reset_does_not_remove_or_bypass_the_second_factor(self):
+        from leg_platform.accounts.models import VerificationToken
+        from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
+
+        user, device = create_user_with_totp()
+        raw = VerificationToken.objects.issue(
+            user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
+        )
+        client = Client()
+        client.get(reverse("accounts:password_reset_verify", args=[raw]))
+
+        client.post(
+            reverse("accounts:password_reset_set"),
+            {"new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD},
+        )
+
+        user.refresh_from_db()
+        self.assertTrue(user.check_password(OTHER_PASSWORD))
+        self.assertTrue(AuthenticatorDevice.objects.filter(pk=device.pk, confirmed=True).exists())
+        self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
+        self.assertNotIn("_auth_user_id", client.session)
+        response = log_in(Client(), user.email, OTHER_PASSWORD, address="10.5.1.1")
+        self.assertRedirects(response, CODE_URL)
+
+    def test_a_password_change_is_logged_and_ends_the_reset_links(self):
+        from leg_platform.accounts.models import VerificationToken
+        from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
+
+        user = create_active_user()
+        VerificationToken.objects.issue(
+            user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
+        )
+        self.client.force_login(user)
+
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            self.client.post(
+                reverse("accounts:password_change"),
+                {
+                    "current_password": PASSWORD,
+                    "new_password1": OTHER_PASSWORD,
+                    "new_password2": OTHER_PASSWORD,
+                },
+            )
+
+        self.assertIn(f"account {user.pk}", logs.output[0])
+        self.assertNotIn(OTHER_PASSWORD, logs.output[0])
+        self.assertFalse(VerificationToken.objects.exists())
+
+    def test_a_refused_change_leads_back_to_the_overview(self):
+        user, _device = create_user_with_totp()
+        self.client.force_login(user)
+        complete_second_factor(self.client, user)
+
+        with mock.patch.object(totp, "renew_recovery_codes", side_effect=totp.SecondFactorError):
+            response = self.client.post(
+                reverse("accounts:recovery_codes"),
+                {"current_password": PASSWORD, "otp_token": code_for(_device)},
+            )
+
+        self.assertRedirects(response, reverse("accounts:two_factor"), fetch_redirect_response=False)
+
+
+@tag("mariadb")
+class RecoveryCodeNotificationTests(TestCase):
+    def test_the_owner_is_notified_without_a_link_when_a_recovery_code_is_used(self):
+        user, _device = create_user_with_totp()
+        log_in(self.client, user.email)
+
+        send_code(self.client, "abcd2345")
+
+        self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.RECOVERY_CODE_USED)
+        run_mail_queue()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+        self.assertNotIn("http", mail.outbox[0].body)
+        self.assertNotIn("abcd", mail.outbox[0].body)
+
+    def test_a_code_of_the_app_and_a_wrong_code_send_nothing(self):
+        user, device = create_user_with_totp()
+        log_in(self.client, user.email)
+
+        send_code(self.client, "ijkl4568")
+        send_code(self.client, code_for(device))
+
+        self.assertFalse(MailJob.objects.exists())
+
+
+@tag("mariadb")
+class ParallelUseTests(TransactionTestCase):
+    """The same code used by parallel requests succeeds once (docs/SECURITY.md, section 11)."""
+
+    def run_in_threads(self, function, count=4):
+        barrier = threading.Barrier(count)
+        results = []
+
+        def work():
+            try:
+                barrier.wait()
+                results.append(function())
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work) for _number in range(count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return results
+
+    def test_a_recovery_code_works_once_in_parallel(self):
+        user, _device = create_user_with_totp()
+
+        results = self.run_in_threads(lambda: totp.verify_code(user, "abcd2345"))
+
+        self.assertEqual(len(results), 4)
+        self.assertEqual(sum(result is not None for result in results), 1)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.RECOVERY_CODE_USED).count(), 1)
+
+    def test_a_code_of_the_app_works_once_in_parallel(self):
+        user, device = create_user_with_totp()
+        code = code_for(device)
+
+        results = self.run_in_threads(lambda: totp.verify_code(user, code))
+
+        self.assertEqual(sum(result is not None for result in results), 1)
+
+    def run_all(self, functions):
+        barrier = threading.Barrier(len(functions))
+        results = []
+
+        def work(function):
+            try:
+                barrier.wait()
+                results.append(function())
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return results
+
+    def test_parallel_wrong_codes_cannot_exceed_the_limit(self):
+        user, device = create_user_with_totp()
+        clients = []
+        for number in range(8):
+            address = f"10.7.0.{number + 1}"
+            client = Client()
+            log_in(client, user.email, address=address)
+            clients.append((client, address))
+
+        results = self.run_all(
+            [
+                lambda client=client, address=address: send_code(client, "000000", address).status_code
+                for client, address in clients
+            ]
+        )
+
+        failures = sum(AccessAttempt.objects.values_list("failures_since_start", flat=True))
+        self.assertEqual(len(results), 8)
+        self.assertLessEqual(failures, LOGIN_FAILURE_LIMIT)
+        self.assertNotIn(500, results)
+        self.assertIn(429, results)
+        client, address = clients[0]
+        self.assertEqual(send_code(client, code_for(device), address).status_code, 429)
+        self.assertNotIn("_auth_user_id", client.session)
+
+    def test_parallel_wrong_passwords_of_the_password_forms_cannot_exceed_the_limit(self):
+        user = create_active_user()
+        clients = []
+        for number in range(8):
+            client = Client()
+            client.force_login(user)
+            clients.append((client, f"10.7.1.{number + 1}"))
+
+        results = self.run_all(
+            [
+                lambda client=client, address=address: client.post(
+                    reverse("accounts:password_change"),
+                    {
+                        "current_password": "wrong password for this account",
+                        "new_password1": OTHER_PASSWORD,
+                        "new_password2": OTHER_PASSWORD,
+                    },
+                    REMOTE_ADDR=address,
+                ).status_code
+                for client, address in clients
+            ]
+        )
+
+        failures = sum(AccessAttempt.objects.values_list("failures_since_start", flat=True))
+        self.assertLessEqual(failures, LOGIN_FAILURE_LIMIT)
+        self.assertNotIn(500, results)
+        self.assertIn(429, results)
+
+
+class EncryptionTests(SimpleTestCase):
+    PURPOSE = b"LEG-Platform test purpose v1"
+
+    def test_a_value_round_trips_and_is_not_readable(self):
+        token = encryption.encrypt(b"secret-bytes-12345", self.PURPOSE)
+
+        self.assertNotIn("secret-bytes", token)
+        self.assertEqual(encryption.decrypt(token, self.PURPOSE), b"secret-bytes-12345")
+        self.assertTrue(encryption.is_current(token, self.PURPOSE))
+
+    def test_every_encryption_gives_a_different_token(self):
+        self.assertNotEqual(
+            encryption.encrypt(b"same", self.PURPOSE), encryption.encrypt(b"same", self.PURPOSE)
+        )
+
+    def test_another_purpose_a_damaged_token_and_odd_input_are_refused(self):
+        token = encryption.encrypt(b"value", self.PURPOSE)
+        damaged = token[:-4] + ("AAAA" if not token.endswith("AAAA") else "BBBB")
+        for name, value, purpose in (
+            ("other purpose", token, b"LEG-Platform other purpose v1"),
+            ("damaged", damaged, self.PURPOSE),
+            ("empty", "", self.PURPOSE),
+            ("not ascii", "\u00e4\u00f6\u00fc", self.PURPOSE),
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(encryption.DecryptionError):
+                    encryption.decrypt(value, purpose)
+
+    def test_a_replaced_secret_key_refuses_unless_the_old_one_is_a_fallback(self):
+        old_key = "old-secret-key-that-is-long-enough-for-the-tests-0123456789"
+        with override_settings(SECRET_KEY=old_key):
+            token = encryption.encrypt(b"value", self.PURPOSE)
+
+        with self.assertRaises(encryption.DecryptionError):
+            encryption.decrypt(token, self.PURPOSE)
+        with override_settings(SECRET_KEY_FALLBACKS=[old_key]):
+            self.assertEqual(encryption.decrypt(token, self.PURPOSE), b"value")
+            self.assertFalse(encryption.is_current(token, self.PURPOSE))
+            renewed = encryption.reencrypt(token, self.PURPOSE)
+            self.assertTrue(encryption.is_current(renewed, self.PURPOSE))
+        self.assertEqual(encryption.decrypt(renewed, self.PURPOSE), b"value")
+
+    def test_errors_do_not_contain_the_value_or_the_key(self):
+        try:
+            encryption.decrypt("gAAAAA-damaged-token", self.PURPOSE)
+        except encryption.DecryptionError as error:
+            self.assertNotIn("damaged-token", str(error))
+            self.assertNotIn(settings.SECRET_KEY, str(error))
+            self.assertIsNone(error.__cause__)
+
+    def test_the_purpose_labels_are_different(self):
+        from leg_platform.accounts import models
+
+        labels = [
+            models.AUTHENTICATOR_SECRET_PURPOSE,
+            models.RECOVERY_CODE_PURPOSE,
+            models.VERIFICATION_TOKEN_PURPOSE,
+        ]
+        self.assertEqual(len(labels), len(set(labels)))
+
+
+@tag("mariadb")
+class DeviceRulesTests(TestCase):
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+
+    def test_other_forms_of_a_code_are_refused(self):
+        for code in ("+12345", "1_2345", "\u0661\u0662\u0663\u0664\u0665\u0666", "\u00b2\u00b2\u00b2\u00b2\u00b2\u00b2", " 12345", "123456\n"):
+            with self.subTest(code=code):
+                self.assertFalse(self.device.verify_token(code))
+
+    def test_a_code_of_a_step_two_away_or_of_an_earlier_step_is_refused(self):
+        generator = TOTP(self.device.bin_key, 30, 0, 6, self.device.drift)
+        for offset in (-2, 2):
+            generator.time = time.time() + offset * 30
+            with self.subTest(offset=offset):
+                self.assertFalse(self.device.verify_token(str(generator.token()).zfill(6)))
+        current = code_for(self.device)
+        self.assertTrue(self.device.verify_token(current))
+        generator.time = time.time() - 30
+        self.assertFalse(self.device.verify_token(str(generator.token()).zfill(6)))
+
+    def test_a_second_device_per_account_is_refused_by_the_database(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AuthenticatorDevice.objects.create_device(self.user, confirmed=False)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            RecoveryCodeDevice.objects.create(user=self.user, name="again", confirmed=True)
+
+    def test_deleting_the_account_removes_its_devices_and_codes(self):
+        other, _device = create_user_with_totp("other.person@example.org")
+
+        self.user.delete()
+
+        self.assertFalse(AuthenticatorDevice.objects.filter(user_id=self.user.pk).exists())
+        self.assertEqual(stored_digests(), stored_digests(other))
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=other).exists())
+
+    def test_recovery_codes_still_work_after_the_secret_key_was_rotated(self):
+        old_key = "old-secret-key-that-is-long-enough-for-the-tests-0123456789"
+        with override_settings(SECRET_KEY=old_key):
+            user, _device = create_user_with_totp("rotated.person@example.org")
+
+        with override_settings(SECRET_KEY_FALLBACKS=[old_key]):
+            code = recovery_codes_of(user.email)[0]
+            self.assertIsNotNone(totp.verify_code(user, code))
+            self.assertIsNone(totp.verify_code(user, code))
+
+    def test_renewing_the_codes_keeps_the_device_of_a_session_that_a_code_verified(self):
+        before = RecoveryCodeDevice.objects.get().persistent_id
+
+        totp.renew_recovery_codes(self.user)
+
+        self.assertEqual(RecoveryCodeDevice.objects.get().persistent_id, before)
+        self.assertEqual(len(stored_digests()), totp.RECOVERY_CODE_COUNT)
+

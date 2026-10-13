@@ -26,7 +26,13 @@
           <dt class="col-sm-5">{% translate "Phone number" %}</dt>
           <dd class="col-sm-7">{{ account.phone_number }}</dd>
         {% endif %}
+        <dt class="col-sm-5">{% translate "Two-factor authentication" %}</dt>
+        <dd class="col-sm-7">{% if second_factor_active %}{% translate "On" %}{% else %}{% translate "Off" %}{% endif %}</dd>
       </dl>
+      <div class="d-grid gap-2 d-print-none">
+        <a class="btn btn-secondary-action" href="{% url 'accounts:password_change' %}">{% translate "Change password" %}</a>
+        <a class="btn btn-secondary-action" href="{% url 'accounts:two_factor' %}">{% translate "Two-factor authentication" %}</a>
+      </div>
     </div>
   </div>
 {% endblock %}

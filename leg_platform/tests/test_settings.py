@@ -145,24 +145,11 @@ class ContentSecurityPolicyTests(SimpleTestCase):
         self.assertNotIn("<CSP_NONCE_SENTINEL>", values)
 
     @override_settings(ALLOWED_HOSTS=["testserver"])
-    def test_header_on_admin_login_page(self):
+    def test_header_on_the_redirect_from_the_admin_login_page(self):
+        # The administration has no login page of its own; it leads to the portal login (D-040).
         response = self.client.get("/admin/login/")
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Content-Security-Policy"], EXPECTED_CSP)
-
-    @override_settings(ALLOWED_HOSTS=["testserver"])
-    def test_admin_login_page_needs_no_inline_code(self):
-        # The admin login page must work under the policy: no inline scripts, styles,
-        # style attributes or event handler attributes.
-        html = self.client.get("/admin/login/").content.decode()
-        scripts = re.findall(r"<script\b[^>]*>", html)
-        self.assertTrue(scripts)
-        for tag in scripts:
-            self.assertIn("src=", tag)
-        self.assertNotRegex(html, r"<style\b")
-        self.assertNotRegex(html, r"\sstyle\s*=")
-        self.assertNotRegex(html, r"\son[a-z]+\s*=")
-        self.assertNotIn("javascript:", html)
 
 
 class LoginProtectionSettingsTests(SimpleTestCase):

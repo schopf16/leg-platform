@@ -750,3 +750,222 @@ msgstr "Adresse"
 
 msgid "Phone number"
 msgstr "Telefonnummer"
+
+#: leg_platform/accounts/templates/accounts/profile.html
+msgid "Two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung"
+
+msgid "On"
+msgstr "Ein"
+
+msgid "Off"
+msgstr "Aus"
+
+msgid "Change password"
+msgstr "Passwort ändern"
+
+#: leg_platform/accounts/templates/accounts/password_change.html
+msgid "Back to the profile"
+msgstr "Zurück zum Profil"
+
+#: leg_platform/accounts/forms.py
+msgid "Code"
+msgstr "Code"
+
+msgid "The code is incorrect or has already been used."
+msgstr "Der Code ist falsch oder wurde bereits verwendet."
+
+msgid "Current password"
+msgstr "Aktuelles Passwort"
+
+msgid "The password is incorrect."
+msgstr "Das Passwort ist falsch."
+
+#: leg_platform/accounts/views.py
+msgid "Your password was changed."
+msgstr "Ihr Passwort wurde geändert."
+
+msgid "Two-factor authentication was removed."
+msgstr "Die Zwei-Faktor-Authentifizierung wurde entfernt."
+
+msgid "The change could not be made."
+msgstr "Die Änderung konnte nicht vorgenommen werden."
+
+#: leg_platform/accounts/second_factor.py
+msgid "Please log in again."
+msgstr "Bitte melden Sie sich erneut an."
+
+msgid "Your account needs two-factor authentication. Set it up to continue."
+msgstr "Ihr Konto braucht die Zwei-Faktor-Authentifizierung. Richten Sie sie ein, um fortzufahren."
+
+#: leg_platform/accounts/models.py
+msgid "Notification: two-factor authentication set up"
+msgstr "Hinweis: Zwei-Faktor-Authentifizierung eingerichtet"
+
+msgid "Notification: two-factor authentication removed"
+msgstr "Hinweis: Zwei-Faktor-Authentifizierung entfernt"
+
+msgid "Notification: recovery codes renewed"
+msgstr "Hinweis: Wiederherstellungscodes erneuert"
+
+msgid "Notification: recovery code used"
+msgstr "Hinweis: Wiederherstellungscode verwendet"
+
+#: leg_platform/accounts/email_texts.py
+#, python-format
+msgid "Two-factor authentication was set up at %(instance_name)s"
+msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde eingerichtet"
+
+#, python-format
+msgid "Two-factor authentication was removed at %(instance_name)s"
+msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde entfernt"
+
+#, python-format
+msgid "New recovery codes were created at %(instance_name)s"
+msgstr "Bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt"
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_enabled.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or a recovery code, to log in."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
+
+#, python-format
+msgid ""
+"If you did not do this, contact the operator immediately. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr ""
+"Wenn Sie das nicht veranlasst haben, wenden Sie sich sofort an die Betreiber. Kontaktangaben finden Sie hier:\n"
+"\n"
+"%(contact_url)s"
+
+msgid "If you did not do this, contact the operator of this portal immediately."
+msgstr "Wenn Sie das nicht veranlasst haben, wenden Sie sich sofort an die Betreiber dieses Portals."
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_disabled.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"Two-factor authentication was removed from your account at %(instance_name)s. All recovery codes became invalid."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Von Ihrem Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung entfernt. Alle Wiederherstellungscodes sind ungültig geworden."
+
+#, python-format
+msgid "A recovery code was used at %(instance_name)s"
+msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
+
+#: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
+
+#: leg_platform/accounts/templates/accounts/email/recovery_codes_renewed.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"New recovery codes were created for your account at %(instance_name)s. The earlier recovery codes became invalid."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für Ihr Konto bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt. Die früheren Wiederherstellungscodes sind ungültig geworden."
+
+#: leg_platform/accounts/templates/accounts/login_second_factor.html
+msgid "Log in: second step"
+msgstr "Anmelden: zweiter Schritt"
+
+msgid "Enter the code from your authenticator app. If you cannot use the app, enter one of your recovery codes."
+msgstr "Geben Sie den Code aus Ihrer Authenticator-App ein. Wenn Sie die App nicht verwenden können, geben Sie einen Ihrer Wiederherstellungscodes ein."
+
+msgid "Start again"
+msgstr "Neu beginnen"
+
+#: leg_platform/accounts/templates/accounts/two_factor.html
+msgid "Two-factor authentication is on. You need a code from your authenticator app to log in."
+msgstr "Die Zwei-Faktor-Authentifizierung ist eingeschaltet. Für die Anmeldung brauchen Sie einen Code aus Ihrer Authenticator-App."
+
+#, python-format
+msgid "%(counter)s recovery code is still unused."
+msgid_plural "%(counter)s recovery codes are still unused."
+msgstr[0] "%(counter)s Wiederherstellungscode ist noch nicht verwendet."
+msgstr[1] "%(counter)s Wiederherstellungscodes sind noch nicht verwendet."
+
+msgid "Create new recovery codes"
+msgstr "Neue Wiederherstellungscodes erstellen"
+
+msgid "Turn off two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung ausschalten"
+
+msgid "Your account must use two-factor authentication. It cannot be turned off."
+msgstr "Ihr Konto muss die Zwei-Faktor-Authentifizierung verwenden. Sie kann nicht ausgeschaltet werden."
+
+msgid "Two-factor authentication is off. With it, a code from an authenticator app is needed in addition to your password to log in."
+msgstr "Die Zwei-Faktor-Authentifizierung ist ausgeschaltet. Mit ihr brauchen Sie zusätzlich zum Passwort einen Code aus einer Authenticator-App, um sich anzumelden."
+
+msgid "Set up two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung einrichten"
+
+#: leg_platform/accounts/templates/accounts/two_factor_setup.html
+msgid "You need an authenticator app on your phone, for example Google Authenticator or Microsoft Authenticator. Enter your password to continue."
+msgstr "Sie brauchen eine Authenticator-App auf Ihrem Telefon, zum Beispiel Google Authenticator oder Microsoft Authenticator. Geben Sie Ihr Passwort ein, um fortzufahren."
+
+msgid "Continue"
+msgstr "Weiter"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: leg_platform/accounts/templates/accounts/two_factor_confirm.html
+msgid "Open your authenticator app and scan this QR code."
+msgstr "Öffnen Sie Ihre Authenticator-App und scannen Sie diesen QR-Code."
+
+msgid "QR code for the authenticator app"
+msgstr "QR-Code für die Authenticator-App"
+
+msgid "If you cannot scan the code, enter this key in your app instead:"
+msgstr "Wenn Sie den Code nicht scannen können, geben Sie stattdessen diesen Schlüssel in Ihrer App ein:"
+
+msgid "Enter the six-digit code that the app shows."
+msgstr "Geben Sie den sechsstelligen Code ein, den die App anzeigt."
+
+msgid "Turn on two-factor authentication"
+msgstr "Zwei-Faktor-Authentifizierung einschalten"
+
+#: leg_platform/accounts/templates/accounts/two_factor_disable.html
+msgid "After this you only need your password to log in, and your recovery codes become invalid. Enter your password and a code to confirm."
+msgstr "Danach brauchen Sie für die Anmeldung nur noch Ihr Passwort, und Ihre Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
+
+#: leg_platform/accounts/templates/accounts/recovery_codes_new.html
+msgid "Your earlier recovery codes become invalid. Enter your password and a code to confirm."
+msgstr "Ihre früheren Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
+
+#: leg_platform/accounts/templates/accounts/recovery_codes.html
+msgid "Recovery codes"
+msgstr "Wiederherstellungscodes"
+
+msgid "Two-factor authentication is on."
+msgstr "Die Zwei-Faktor-Authentifizierung ist eingeschaltet."
+
+msgid "Your recovery codes"
+msgstr "Ihre Wiederherstellungscodes"
+
+msgid "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone. They are shown only now."
+msgstr "Bewahren Sie diese Codes an einem sicheren Ort auf, zum Beispiel in einem Passwortmanager oder auf Papier. Jeder Code gilt einmal und ersetzt die App, wenn Sie Ihr Telefon verlieren. Sie werden nur jetzt angezeigt."
+
+msgid "I have saved the codes"
+msgstr "Ich habe die Codes gespeichert"

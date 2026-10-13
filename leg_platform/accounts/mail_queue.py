@@ -26,7 +26,7 @@ from datetime import timedelta
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from leg_platform.accounts import password_reset, rate_limits, registration
+from leg_platform.accounts import emails, password_reset, rate_limits, registration
 from leg_platform.accounts.login_protection import axes_client_ip
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.normalization import normalize_email_address
@@ -41,10 +41,20 @@ RETRY_DELAY = timedelta(minutes=2)
 STALE_AFTER = timedelta(hours=1)
 NOTIFICATION_STALE_AFTER = timedelta(hours=24)
 
+
+def _notification(sender):
+    """A handler for an email that tells the owner of an account about a change."""
+    return lambda address: lambda: sender(address)
+
+
 HANDLERS = {
     MailJob.Kind.REGISTRATION: registration.process_registration,
     MailJob.Kind.PASSWORD_RESET: password_reset.process_reset_request,
     MailJob.Kind.PASSWORD_CHANGED: password_reset.process_password_changed,
+    MailJob.Kind.TWO_FACTOR_ENABLED: _notification(emails.send_two_factor_enabled),
+    MailJob.Kind.TWO_FACTOR_DISABLED: _notification(emails.send_two_factor_disabled),
+    MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),
+    MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
 }
 
 DONE = "done"
@@ -158,11 +168,11 @@ def delete_stale_jobs(now=None):
     """
     now = now or timezone.now()
     count, _ = (
-        MailJob.objects.exclude(kind=MailJob.Kind.PASSWORD_CHANGED)
+        MailJob.objects.exclude(kind__in=MailJob.NOTIFICATION_KINDS)
         .filter(created_at__lt=now - STALE_AFTER)
         .delete()
     )
     notifications, _ = MailJob.objects.filter(
-        kind=MailJob.Kind.PASSWORD_CHANGED, created_at__lt=now - NOTIFICATION_STALE_AFTER
+        kind__in=MailJob.NOTIFICATION_KINDS, created_at__lt=now - NOTIFICATION_STALE_AFTER
     ).delete()
     return count + notifications

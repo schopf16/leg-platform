@@ -49,7 +49,8 @@ INSTANCE_WEBSITE_URL = ENVIRONMENT.instance_website_url
 INSTALLED_APPS = [
     # First, so that its createsuperuser command replaces Django's (D-005, D-034).
     "leg_platform.accounts",
-    "django.contrib.admin",
+    # The administration with the second factor check (D-040); replaces django.contrib.admin.
+    "leg_platform.admin_site.PortalAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -58,6 +59,8 @@ INSTALLED_APPS = [
     "django_countries",
     "phonenumber_field",
     "axes",
+    # Only its middleware and device functions; the devices are models of this project (D-040).
+    "django_otp",
 ]
 
 # Custom user model from the first migration (docs/DECISIONS.md, D-021).
@@ -83,7 +86,17 @@ AXES_HTTP_RESPONSE_CODE = 429
 AXES_LOCKOUT_PARAMETERS = ["username"]
 AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_RESET_ON_SUCCESS = False
-AXES_SENSITIVE_PARAMETERS = ["username", "ip_address", "otp_token", "otp_device"]
+AXES_SENSITIVE_PARAMETERS = [
+    "username",
+    "ip_address",
+    "otp_token",
+    "otp_device",
+    "current_password",
+    "new_password1",
+    "new_password2",
+    # The CSRF token of a request holds its secret in masked form.
+    "csrfmiddlewaretoken",
+]
 AXES_USERNAME_CALLABLE = "leg_platform.accounts.login_protection.axes_username"
 AXES_USERNAME_FORM_FIELD = "username"
 AXES_USE_ATTEMPT_EXPIRATION = True
@@ -102,6 +115,9 @@ LOGOUT_REDIRECT_URL = "accounts:login"
 PHONENUMBER_DEFAULT_REGION = "CH"
 PHONENUMBER_DB_FORMAT = "E164"
 
+# Two-factor authentication with an authenticator app (docs/DECISIONS.md, D-004, D-040): the
+# device models and their settings (30 seconds, six digits, SHA-1) are in accounts/models.py.
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
@@ -110,7 +126,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # After OTPMiddleware and MessageMiddleware: no privileges without the second factor.
+    "leg_platform.accounts.second_factor.SecondFactorMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
 ]
@@ -316,6 +335,13 @@ LOGGING = {
         "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         # The development server's request log names every requested path.
         "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Security events (docs/SECURITY.md, section 10). Until the security log of D-018 exists,
+        # they are written only here, with the internal number of the account and nothing else.
+        "leg_platform.security": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

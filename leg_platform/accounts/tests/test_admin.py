@@ -1,5 +1,6 @@
 """Admin authorization tests (AGENTS.md, section 6; docs/SECURITY.md, section 4)."""
 
+import re
 from unittest import mock
 
 from django.contrib import admin
@@ -12,6 +13,7 @@ from django.urls import reverse
 from django.utils import translation
 
 from leg_platform.accounts.models import User
+from leg_platform.accounts.tests.helpers import VerifiedClient
 
 PASSWORD = "copper kettle hums beside quiet orchard"
 
@@ -37,6 +39,8 @@ def create_active_user(email, customer_number=True):
 
 @tag("mariadb")
 class AdminAuthorizationTests(TestCase):
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -232,6 +236,8 @@ class AdminAuthorizationTests(TestCase):
 class AdminPresentationTests(TestCase):
     """Titles, list columns, search and messages of the account admin (D-036)."""
 
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -246,12 +252,27 @@ class AdminPresentationTests(TestCase):
             self.assertEqual(str(admin.site.site_header), "LEG-Plattform")
             self.assertEqual(str(admin.site.site_title), "LEG-Plattform")
             self.assertEqual(str(admin.site.index_title), "Verwaltung")
-            content = self.client.get(reverse("admin:login")).content.decode()
-            self.assertIn("<title>Anmelden | LEG-Plattform</title>", content)
             self.client.force_login(self.administrator)
             content = self.client.get(reverse("admin:index")).content.decode()
         self.assertNotIn("Django", content)
         self.assertIn("Verwaltung", content)
+
+    def test_admin_pages_need_no_inline_code(self):
+        # The pages must work under the Content Security Policy: no inline scripts or styles,
+        # style attributes or event handler attributes (docs/SECURITY.md, section 6).
+        self.client.force_login(self.administrator)
+        for url in (reverse("admin:index"), reverse("admin:accounts_user_changelist")):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                html = response.content.decode()
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("default-src 'self'", response["Content-Security-Policy"])
+                for script in re.findall(r"<script\b[^>]*>", html):
+                    self.assertIn("src=", script)
+                self.assertNotRegex(html, r"<style\b")
+                self.assertNotRegex(html, r"\sstyle\s*=")
+                self.assertNotRegex(html, r"\son[a-z]+\s*=")
+                self.assertNotIn("javascript:", html)
 
     def test_user_list_shows_the_customer_number_instead_of_the_id(self):
         model_admin = admin.site._registry[User]
@@ -416,6 +437,8 @@ HIDDEN_FIELDS = {
 class AdminPostalCodeTests(TestCase):
     """One postal code form field instead of the two eCH-0010 fields (D-036)."""
 
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -530,6 +553,8 @@ class AdminPostalCodeTests(TestCase):
 class AdminLogEntryTests(TestCase):
     """Admin log entries of accounts store a neutral text with the internal number (D-018, D-036)."""
 
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -622,6 +647,8 @@ class AdminLogEntryTests(TestCase):
 class AdminProtectedFieldTests(TestCase):
     """Fields that are hidden or read-only in the admin cannot be changed by POST (D-036)."""
 
+    client_class = VerifiedClient
+
     def test_hidden_and_read_only_fields_ignore_posted_values(self):
         administrator = create_active_user("admin@example.org")
         administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -659,6 +686,8 @@ class AdminProtectedFieldTests(TestCase):
 @tag("mariadb")
 class AdminHistoryAccessTests(TestCase):
     """The history of accounts is shown only to system administrators (N-1, D-036)."""
+
+    client_class = VerifiedClient
 
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")

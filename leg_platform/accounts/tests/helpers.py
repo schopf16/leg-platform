@@ -1,11 +1,15 @@
 """Helpers of the portal tests. Test addresses use reserved domains only (RFC 2606)."""
 
 import re
+import time
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.test import Client
+from django_otp import DEVICE_ID_SESSION_KEY
+from django_otp.oath import TOTP
 
-from leg_platform.accounts.models import User
+from leg_platform.accounts.models import AuthenticatorDevice, User
 
 PASSWORD = "copper kettle hums beside quiet orchard"
 OTHER_PASSWORD = "paper lantern rests under silver rain"
@@ -71,3 +75,34 @@ def run_mail_queue():
     done, failed = process_pending()
     assert failed == 0, "A mail job failed."
     return done
+
+
+def complete_second_factor(client, user):
+    """Give the session of the client a verified TOTP device of the account."""
+    device = AuthenticatorDevice.objects.filter(user=user, confirmed=True).first()
+    if device is None:
+        device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
+    session = client.session
+    session[DEVICE_ID_SESSION_KEY] = device.persistent_id
+    session.save()
+    return device
+
+
+class VerifiedClient(Client):
+    """A client whose forced logins have completed the second factor (staff users need it)."""
+
+    def force_login(self, user, backend=None):
+        super().force_login(user, backend)
+        if user.is_staff or user.is_superuser:
+            complete_second_factor(self, user)
+
+
+def code_for(device):
+    """The code that the device accepts now; an earlier use of a code is forgotten first."""
+    AuthenticatorDevice.objects.filter(pk=device.pk).update(last_t=-1)
+    device.refresh_from_db()
+    generator = TOTP(
+        device.bin_key, device.STEP, 0, device.DIGITS, device.drift
+    )
+    generator.time = time.time()
+    return str(generator.token()).zfill(device.DIGITS)

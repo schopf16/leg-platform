@@ -26,10 +26,14 @@ import ipaddress
 import logging
 import re
 import secrets
+import time
 import unicodedata
+from base64 import b32encode
 from contextlib import contextmanager
+from urllib.parse import quote, urlencode
 
 import idna
+from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.hashers import identify_hasher, is_password_usable
@@ -40,10 +44,20 @@ from django.db import IntegrityError, connections, models, router, transaction
 from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
+from django.views.decorators.debug import sensitive_variables
 from django_countries.fields import CountryField
+from django_otp.models import Device, DeviceManager, TimestampMixin
+from django_otp.oath import TOTP
 from phonenumber_field.modelfields import PhoneNumberField
 
-from leg_platform.accounts.digests import keyed_digest
+from leg_platform.accounts.digests import keyed_digest, keyed_digests_with_fallbacks
+from leg_platform.accounts.encryption import (
+    DecryptionError,
+    decrypt,
+    encrypt,
+    is_current,
+    reencrypt,
+)
 from leg_platform.accounts.normalization import normalize_email_address
 
 logger = logging.getLogger(__name__)
@@ -1028,8 +1042,22 @@ class MailJob(models.Model):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
         PASSWORD_CHANGED = "password_changed", "Password changed"
+        TWO_FACTOR_ENABLED = "two_factor_enabled", "Two-factor authentication set up"
+        TWO_FACTOR_DISABLED = "two_factor_disabled", "Two-factor authentication removed"
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
+        RECOVERY_CODE_USED = "recovery_code_used", "Recovery code used"
 
-    kind = models.CharField(max_length=20, choices=Kind, editable=False)
+    # The notifications about a change of the account, as opposed to the requests of a person
+    # who may have no account (D-038, D-040).
+    NOTIFICATION_KINDS = (
+        Kind.PASSWORD_CHANGED,
+        Kind.TWO_FACTOR_ENABLED,
+        Kind.TWO_FACTOR_DISABLED,
+        Kind.RECOVERY_CODES_RENEWED,
+        Kind.RECOVERY_CODE_USED,
+    )
+
+    kind = models.CharField(max_length=24, choices=Kind, editable=False)
     # Empty for a suppressed job: it is discarded unseen, so it need not keep the address of a
     # person who may have no account.
     address = models.EmailField(max_length=EMAIL_MAX_LENGTH, blank=True, editable=False)
@@ -1064,6 +1092,16 @@ class EmailText(models.Model):
         )
         PASSWORD_RESET = "password_reset", _("Password reset: link to choose a new password")
         PASSWORD_CHANGED = "password_changed", _("Notification: password changed")
+        TWO_FACTOR_ENABLED = "two_factor_enabled", _(
+            "Notification: two-factor authentication set up"
+        )
+        TWO_FACTOR_DISABLED = "two_factor_disabled", _(
+            "Notification: two-factor authentication removed"
+        )
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _(
+            "Notification: recovery codes renewed"
+        )
+        RECOVERY_CODE_USED = "recovery_code_used", _("Notification: recovery code used")
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False
@@ -1108,3 +1146,144 @@ class EmailTextVersion(models.Model):
     class Meta:
         default_permissions = ()
         ordering = ("-created_at", "-id")
+
+# Second factor (D-040). The devices follow the interface of django-otp (``Device``), so that its
+# middleware and device functions work with them, but the secrets are not stored in plain text:
+# the TOTP key is encrypted with a key derived from SECRET_KEY (like the Microsoft Graph secret,
+# D-006) and a recovery code is stored only as a keyed digest. Neither can be read back from the
+# database or shown again.
+
+AUTHENTICATOR_SECRET_PURPOSE = b"LEG-Platform authenticator secret v1"
+RECOVERY_CODE_PURPOSE = b"LEG-Platform recovery code v1"
+AUTHENTICATOR_KEY_BYTES = 20
+
+
+def recovery_code_digest(code):
+    return keyed_digest(code, RECOVERY_CODE_PURPOSE)
+
+
+AUTHENTICATOR_CODE = re.compile(r"[0-9]{6}")
+
+
+class AuthenticatorDeviceManager(DeviceManager):
+    def create_device(self, user, *, confirmed):
+        """Create a device with a new random key (160 bits, RFC 4226, section 4)."""
+        return self.create(
+            user=user,
+            name="authenticator app",
+            confirmed=confirmed,
+            encrypted_key=encrypt(secrets.token_bytes(AUTHENTICATOR_KEY_BYTES), AUTHENTICATOR_SECRET_PURPOSE),
+        )
+
+
+class AuthenticatorDevice(TimestampMixin, Device):
+    """An authenticator app (TOTP, RFC 6238): 30 seconds, six digits, SHA-1.
+
+    These are the values authenticator apps support. One step of tolerance in each direction; a
+    code at or below the step of the last accepted one is refused, so that a code works once.
+    Failures are limited by the abuse protection of the login (D-017), not by the device.
+    """
+
+    STEP = 30
+    DIGITS = 6
+    TOLERANCE = 1
+
+    encrypted_key = models.CharField(max_length=255, editable=False)
+    drift = models.SmallIntegerField(default=0, editable=False)
+    last_t = models.BigIntegerField(default=-1, editable=False)
+
+    objects = AuthenticatorDeviceManager()
+
+    class Meta:
+        default_permissions = ()
+        # The account row lock keeps this, the constraint makes the database refuse a second one.
+        constraints = [
+            models.UniqueConstraint(fields=["user"], name="accounts_one_authenticator_per_user")
+        ]
+
+    @property
+    def bin_key(self):
+        return decrypt(self.encrypted_key, AUTHENTICATOR_SECRET_PURPOSE)
+
+    @sensitive_variables()
+    def verify_token(self, token):
+        # Exactly six ASCII digits: int() would also accept signs, underscores and other scripts.
+        if not isinstance(token, str) or not AUTHENTICATOR_CODE.fullmatch(token):
+            return False
+        try:
+            key = self.bin_key
+        except DecryptionError:
+            logger.error("An authenticator secret cannot be decrypted (SECRET_KEY changed?).")
+            return False
+        number = int(token)
+        generator = TOTP(key, self.STEP, 0, self.DIGITS, self.drift)
+        generator.time = time.time()
+        if not generator.verify(number, self.TOLERANCE, self.last_t + 1):
+            return False
+        self.last_t = generator.t()
+        self.drift = generator.drift
+        if not is_current(self.encrypted_key, AUTHENTICATOR_SECRET_PURPOSE):
+            self.encrypted_key = reencrypt(self.encrypted_key, AUTHENTICATOR_SECRET_PURPOSE)
+        self.set_last_used_timestamp(commit=False)
+        self.save()
+        return True
+
+    @property
+    @sensitive_variables()
+    def config_url(self):
+        """The ``otpauth`` URL of the key URI format that authenticator apps read from the QR code.
+
+        https://github.com/google/google-authenticator/wiki/Key-Uri-Format
+        """
+        issuer = settings.INSTANCE_NAME.replace(":", "")
+        label = f"{issuer}:{self.user.get_username()}"
+        parameters = urlencode(
+            {
+                "secret": b32encode(self.bin_key),
+                "algorithm": "SHA1",
+                "digits": self.DIGITS,
+                "period": self.STEP,
+                "issuer": issuer,
+            },
+            quote_via=quote,
+        )
+        return f"otpauth://totp/{quote(label)}?{parameters}"
+
+
+class RecoveryCodeDevice(TimestampMixin, Device):
+    """The recovery codes of an account; each code is deleted when it is used."""
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(fields=["user"], name="accounts_one_recovery_device_per_user")
+        ]
+
+    def verify_token(self, token):
+        # Digests under the keys of SECRET_KEY_FALLBACKS also match, so that a rotation of the
+        # key does not invalidate the codes. The delete is one statement: of two parallel
+        # requests with the same code only one deletes a row.
+        digests = keyed_digests_with_fallbacks(token, RECOVERY_CODE_PURPOSE)
+        deleted, _unused = self.codes.filter(digest__in=digests).delete()
+        if not deleted:
+            return False
+        self.set_last_used_timestamp(commit=False)
+        self.save()
+        return True
+
+    def add_codes(self, codes):
+        RecoveryCode.objects.bulk_create(
+            RecoveryCode(device=self, digest=recovery_code_digest(code)) for code in codes
+        )
+
+
+class RecoveryCode(models.Model):
+    device = models.ForeignKey(
+        RecoveryCodeDevice, on_delete=models.CASCADE, related_name="codes", editable=False
+    )
+    digest = models.CharField(
+        max_length=64, unique=True, db_collation=EXACT_COLLATION, editable=False
+    )
+
+    class Meta:
+        default_permissions = ()

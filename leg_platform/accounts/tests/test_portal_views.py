@@ -7,9 +7,10 @@ from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
-from leg_platform.accounts.models import User, VerificationToken
+from leg_platform.accounts.models import AuthenticatorDevice, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    code_for,
     completion_data,
     create_active_user,
     registration_data,
@@ -239,6 +240,7 @@ class PageSecurityAndLanguageTests(TestCase):
             pages[f"complete {name} password"] = complete(password)
         return {
             **pages,
+            **self.second_factor_pages(member),
             "login": anonymous.get(LOGIN_URL),
             "password reset": anonymous.get(reverse("accounts:password_reset")),
             "password reset invalid address": anonymous.post(
@@ -256,6 +258,57 @@ class PageSecurityAndLanguageTests(TestCase):
             "profile": member.get(reverse("accounts:profile")),
             "lockout": self.lockout_response(),
         }
+    def second_factor_pages(self, member):
+        """Password change and the pages of the second factor (D-040)."""
+        holder = create_active_user("holder.person@example.org")
+        device = AuthenticatorDevice.objects.create_device(holder, confirmed=True)
+        holder_client = Client()
+        holder_client.force_login(holder)
+        step = Client()
+        login(step, holder.email, address="10.0.6.1")
+        enrolling = create_active_user("enrolling.person@example.org")
+        enrolling_client = Client()
+        enrolling_client.force_login(enrolling)
+        enrolling_client.post(
+            reverse("accounts:two_factor_setup"),
+            {"current_password": PASSWORD},
+            REMOTE_ADDR="10.0.6.2",
+        )
+        pages = {
+            "password change": member.get(reverse("accounts:password_change")),
+            "password change failed": member.post(
+                reverse("accounts:password_change"),
+                {"current_password": "wrong", "new_password1": "x", "new_password2": "y"},
+                REMOTE_ADDR="10.0.6.3",
+            ),
+            "two-factor off": member.get(reverse("accounts:two_factor")),
+            "two-factor setup": member.get(reverse("accounts:two_factor_setup")),
+            "two-factor setup failed": member.post(
+                reverse("accounts:two_factor_setup"),
+                {"current_password": "wrong"},
+                REMOTE_ADDR="10.0.6.4",
+            ),
+            "two-factor on": holder_client.get(reverse("accounts:two_factor")),
+            "recovery codes new": holder_client.get(reverse("accounts:recovery_codes")),
+            "two-factor disable": holder_client.get(reverse("accounts:two_factor_disable")),
+            "second step": step.get(reverse("accounts:login_second_factor")),
+            "second step failed": step.post(
+                reverse("accounts:login_second_factor"),
+                {"otp_token": "000000"},
+                REMOTE_ADDR="10.0.6.1",
+            ),
+            "two-factor confirm": enrolling_client.get(reverse("accounts:two_factor_confirm")),
+            "two-factor confirm failed": enrolling_client.post(
+                reverse("accounts:two_factor_confirm"), {"otp_token": "000000"}
+            ),
+        }
+        pages["recovery codes"] = holder_client.post(
+            reverse("accounts:recovery_codes"),
+            {"current_password": PASSWORD, "otp_token": code_for(device)},
+            REMOTE_ADDR="10.0.6.5",
+        )
+        return pages
+
     def lockout_response(self):
         for attempt in range(LOGIN_FAILURE_LIMIT):
             login(Client(), f"person{attempt}@example.org", "wrong", address="10.0.5.9")

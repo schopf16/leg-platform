@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from leg_platform.accounts import second_factor
 from leg_platform.accounts.models import (
     EMAIL_MAX_LENGTH,
     SWISS_POSTAL_CODE_MESSAGE,
@@ -206,3 +207,88 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
     def confirm_login_allowed(self, user):
         if not user.is_active:
             raise ValidationError(self.error_messages["inactive"], code="inactive")
+
+
+class CodeForm(PortalFormMixin, forms.Form):
+    """A code of the authenticator app or a recovery code.
+
+    The field is named ``otp_token`` because the abuse protection masks that name when it
+    stores the data of a failed attempt (``AXES_SENSITIVE_PARAMETERS``).
+    """
+
+    otp_token = forms.CharField(
+        label=_("Code"),
+        max_length=32,
+        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "autofocus": True}),
+    )
+    invalid_code_message = _("The code is incorrect or has already been used.")
+
+
+class ReauthenticationForm(PortalFormMixin, forms.Form):
+    """Asks the logged-in person for the password and, if set up, the second factor again.
+
+    For changes that a hijacked session must not be able to make (docs/SECURITY.md, section 3).
+    Both checks run under the abuse protection of the login, so that the form cannot be used to
+    guess the password or a code.
+    """
+
+    current_password = forms.CharField(
+        label=_("Current password"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
+    )
+    # Removed for an account without a second factor.
+    otp_token = forms.CharField(
+        label=_("Code"),
+        max_length=32,
+        widget=forms.TextInput(attrs={"autocomplete": "one-time-code"}),
+    )
+    password_error = _("The password is incorrect.")
+
+    def __init__(self, *args, request, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.request = request
+        self.user = request.user
+        if not second_factor.has_second_factor(self.user):
+            del self.fields["otp_token"]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("current_password")
+        if password is None:
+            return cleaned_data
+        if not second_factor.verify_password(self.request, self.user, password):
+            self.add_error("current_password", self.password_error)
+            return cleaned_data
+        # The code is checked only after the password was right.
+        if "otp_token" in self.fields and "otp_token" in cleaned_data:
+            if second_factor.verify_second_factor(
+                self.request, self.user, cleaned_data["otp_token"]
+            ) is None:
+                self.add_error("otp_token", CodeForm.invalid_code_message)
+        return cleaned_data
+
+
+class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
+    """Change the password of the logged-in account; asks for the current password first."""
+
+    current_password = forms.CharField(
+        label=_("Current password"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
+    )
+    field_order = ("current_password", "new_password1", "new_password2")
+
+    def __init__(self, user, *args, request, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        self.request = request
+        self.fields["new_password1"].widget.attrs.pop("autofocus", None)
+        self.fields["new_password1"].help_text = mark_safe(
+            str(password_validation.password_validators_help_text_html())
+        )
+
+    def clean_current_password(self):
+        password = self.cleaned_data["current_password"]
+        if not second_factor.verify_password(self.request, self.user, password):
+            raise ValidationError(ReauthenticationForm.password_error, code="password_incorrect")
+        return password

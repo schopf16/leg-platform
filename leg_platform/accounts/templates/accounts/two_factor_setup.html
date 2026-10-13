@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Set up two-factor authentication" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Set up two-factor authentication" %}</h1>
+      <p>{% translate "You need an authenticator app on your phone, for example Google Authenticator or Microsoft Authenticator. Enter your password to continue." %}</p>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_form_fields.html" %}
+        <button type="submit" class="btn btn-primary w-100">{% translate "Continue" %}</button>
+      </form>
+      <p class="mt-3 mb-0"><a href="{% url 'accounts:two_factor' %}">{% translate "Cancel" %}</a></p>
+    </div>
+  </div>
+{% endblock %}

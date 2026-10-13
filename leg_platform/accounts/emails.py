@@ -128,3 +128,23 @@ def send_password_reset(address, raw_token, lifetime: timedelta):
 def send_password_changed(address):
     """Tell the owner that the password was changed; contains no link (docs/SECURITY.md)."""
     _send(address, Key.PASSWORD_CHANGED, {})
+
+
+def send_two_factor_enabled(address):
+    """Tell the owner that two-factor authentication was set up; contains no link."""
+    _send(address, Key.TWO_FACTOR_ENABLED, {})
+
+
+def send_two_factor_disabled(address):
+    """Tell the owner that two-factor authentication was removed; contains no link."""
+    _send(address, Key.TWO_FACTOR_DISABLED, {})
+
+
+def send_recovery_codes_renewed(address):
+    """Tell the owner that new recovery codes were created; contains no link."""
+    _send(address, Key.RECOVERY_CODES_RENEWED, {})
+
+
+def send_recovery_code_used(address):
+    """Tell the owner that a recovery code was used to log in; contains no link."""
+    _send(address, Key.RECOVERY_CODE_USED, {})

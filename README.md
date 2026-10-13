@@ -85,8 +85,9 @@ LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same li
 
 Phase 1 is in progress. The remaining work is:
 
-* Password change and the TOTP flow.
-* Central two-factor enforcement for staff and system administrators, recovery codes, re-authentication and OTP-protected admin access. The initial administrator must change the bootstrap password and complete the profile before using protected functions (D-004, D-005).
+* Password change and the TOTP flow are implemented and await the security review and the owner's confirmations (D-040).
+* Remaining second-factor work: reset of a lost second factor by a system administrator and the emergency management command (D-004, D-005), the forced password change and setup at the first login of the initial administrator (D-005), session timeouts, and ending other sessions when a user turns the second factor on or off. The TOTP keys are stored encrypted and the recovery codes as digests (D-040).
+* Open checks and decisions from the second-factor reviews (D-040): the limit of guesses at the code step without device throttling (notification and longer cool-off after repeated lockouts), purging abandoned unconfirmed devices, a command that encrypts all devices again after a key change, a run with Django 6.0.9, and the CI check of the compiled catalogue (`msgunfmt`).
 * Profile editing and account lifecycle workflows: editing and deleting one's own account, email change/verification, block/deactivation/reactivation, session invalidation and last-administrator protection.
 * Swiss address-directory validation and autocompletion (D-032, D-033), plus the remaining responsive views for phase 1 user workflows (member navigation with menu and tab bar, dark mode and colour mode switch, print stylesheet).
 * Email change must use the same request budget (D-038); token redaction for every further token-bearing URL (the password reset URL is covered).
@@ -98,7 +99,7 @@ Phase 1 is in progress. The remaining work is:
 Deployment gates: no stage or production instance is deployed before
 
 1. Microsoft Graph email delivery is implemented with allowlist restrictions outside production (D-006, D-028).
-2. TOTP and the central second-factor check protect the complete login and admin flows (D-004, D-017); until then staff users and system administrators can log in with the password alone.
+2. TOTP and the central second-factor check protect the complete login and admin flows (D-004, D-017): implemented in D-040, still to be reviewed by the `security-reviewer`; the reset of a lost second factor and the first-login setup of the initial administrator are missing.
 3. Token-bearing URLs are redacted from request logs and covered by tests (`docs/SECURITY.md`, section 10); fulfilled for the registration link by `leg_platform/log_filters.py`, to be repeated for every further token URL.
 4. Axes and separate IP-attempt retention are configured and scheduled; the TOTP flow calls Django `login()` only after every required factor is verified (D-017, D-018).
 5. The worker `process_mail_queue --loop` runs as a supervised service (without it, no email is sent), and the cleanup commands `delete_expired_registrations`, `cleanup_mail_requests` and `cleanup_login_ip_attempts` are scheduled (D-037, D-038). The rate limits and the timing-comparable requests of registration and password reset are implemented (D-038).

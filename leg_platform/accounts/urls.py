@@ -8,6 +8,11 @@ app_name = "accounts"
 
 urlpatterns = [
     path("login/", views.PortalLoginView.as_view(), name="login"),
+    path(
+        "login/two-factor/",
+        views.SecondFactorLoginView.as_view(),
+        name="login_second_factor",
+    ),
     path("logout/", views.PortalLogoutView.as_view(), name="logout"),
     path("register/", views.RegistrationView.as_view(), name="registration"),
     path("register/sent/", views.EmailSentView.as_view(), name="registration_sent"),
@@ -31,4 +36,23 @@ urlpatterns = [
         name="password_reset_verify",
     ),
     path("profile/", views.ProfileView.as_view(), name="profile"),
+    path("profile/password/", views.PasswordChangeView.as_view(), name="password_change"),
+    path("profile/two-factor/", views.TwoFactorOverviewView.as_view(), name="two_factor"),
+    path("profile/two-factor/setup/", views.TwoFactorSetupView.as_view(), name="two_factor_setup"),
+    path(
+        "profile/two-factor/setup/confirm/",
+        views.TwoFactorConfirmView.as_view(),
+        name="two_factor_confirm",
+    ),
+    path("profile/two-factor/setup/qr.svg", views.TwoFactorQrView.as_view(), name="two_factor_qr"),
+    path(
+        "profile/two-factor/recovery-codes/",
+        views.RecoveryCodesView.as_view(),
+        name="recovery_codes",
+    ),
+    path(
+        "profile/two-factor/disable/",
+        views.TwoFactorDisableView.as_view(),
+        name="two_factor_disable",
+    ),
 ]

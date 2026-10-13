@@ -147,6 +147,7 @@ Sources: https://docs.djangoproject.com/en/6.0/ref/settings/ (`SECURE_REFERRER_P
 * No secrets in source code, documentation, logs or error messages.
 * Local secrets in ignored files or environment variables.
 * Server secrets via protected environment variables or a suitable secret store.
+* The TOTP key of the second factor is encrypted in the same way (own HKDF label, Fernet, fallback keys tried and the key encrypted again when used); recovery codes are stored only as keyed digests, also checked against the digests of the fallback keys (D-040). No security value is displayed again.
 * Exception by decision D-006: the Microsoft Graph client secret is maintained in the Django admin and stored encrypted in the database:
   * The encryption key is derived from `SECRET_KEY` with HKDF and a fixed, purpose-specific label; encryption uses Fernet. Both come from the established `cryptography` library; no custom cryptographic primitives are developed.
   * Keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption; the secret is then encrypted again with the current key.

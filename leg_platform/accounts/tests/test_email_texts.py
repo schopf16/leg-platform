@@ -13,7 +13,7 @@ from django.utils import translation
 
 from leg_platform.accounts import email_texts, emails
 from leg_platform.accounts.models import EmailText, EmailTextVersion
-from leg_platform.accounts.tests.helpers import create_active_user
+from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 
 Key = EmailText.Key
 BODY_WITH_LINK = "Guten Tag\n\nHier: {verification_url}\n\nGültig: {lifetime_hours} Stunden."
@@ -269,6 +269,8 @@ class RenderTests(TestCase):
 
 @tag("mariadb")
 class AdminTests(TestCase):
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
@@ -458,6 +460,8 @@ class AdminTests(TestCase):
 
 @tag("mariadb")
 class PreviewAndVersionTests(TestCase):
+    client_class = VerifiedClient
+
     def setUp(self):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
