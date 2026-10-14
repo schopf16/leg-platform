@@ -4,7 +4,10 @@ Every event is stored in the append-only security log and also written to the lo
 ``leg_platform.security``. Both name the account only by its internal number.
 """
 
+import functools
 import logging
+
+from django.db import transaction
 
 from leg_platform.accounts.models import SecurityEvent
 
@@ -15,6 +18,13 @@ Event = SecurityEvent.Event
 MESSAGES = {
     Event.PASSWORD_CHANGED: "The password was changed",
     Event.PASSWORD_RESET: "The password was reset by link",
+    Event.EMAIL_CHANGE_REQUESTED: "An email address change was requested",
+    Event.EMAIL_CHANGED: "The email address was changed",
+    Event.ACCOUNT_BLOCKED: "The account was blocked",
+    Event.ACCOUNT_UNBLOCKED: "The account was unblocked",
+    Event.ACCOUNT_DEACTIVATED: "The account was deactivated",
+    Event.ACCOUNT_REACTIVATED: "The account was reactivated",
+    Event.ACCOUNT_DELETED: "The account was deleted",
     Event.TWO_FACTOR_ENABLED: "Two-factor authentication was set up",
     Event.TWO_FACTOR_DISABLED: "Two-factor authentication was removed",
     Event.TWO_FACTOR_RESET: "Two-factor authentication was reset",
@@ -30,16 +40,34 @@ MESSAGES = {
     Event.EMERGENCY_TWO_FACTOR_RESET: "Two-factor authentication was reset by the emergency command",
     Event.EMERGENCY_ACCOUNT_UNBLOCKED: "An account was unblocked by the emergency command",
     Event.EMERGENCY_KEYS_REENCRYPTED: "Second factor keys were encrypted again by the emergency command",
+    Event.GRAPH_CONFIGURATION_CHANGED: "The Microsoft Graph configuration was changed",
+    Event.GRAPH_CERTIFICATE_UPLOADED: "A Microsoft Graph certificate was uploaded",
+    Event.GRAPH_TEST_EMAIL_REQUESTED: "A Microsoft Graph test email was requested",
 }
 
 
 def record(event, *, account=None, actor=None, long_retention=False):
-    """Store the event and log it; call it in the transaction of the change it records."""
+    """Store the event and log it; call it in the transaction of the change it records.
+
+    The log line is written only when the transaction commits, so a rolled-back change leaves
+    neither a stored event nor a log line (D-018).
+    """
     SecurityEvent.objects.record(
         event, account=account, actor=actor, long_retention=long_retention
     )
     account_id = getattr(account, "pk", account)
-    if account_id is None:
-        logger.warning("%s.", MESSAGES[event])
+    actor_id = getattr(actor, "pk", actor)
+    # Internal numbers only (D-018): no name, address or other personal data.
+    references = [
+        f"{label} {value}"
+        for label, value in (("account", account_id), ("actor", actor_id))
+        if value is not None
+    ]
+    if references:
+        transaction.on_commit(
+            functools.partial(
+                logger.warning, "%s (%s).", MESSAGES[event], ", ".join(references)
+            )
+        )
     else:
-        logger.warning("%s (account %d).", MESSAGES[event], account_id)
+        transaction.on_commit(functools.partial(logger.warning, "%s.", MESSAGES[event]))

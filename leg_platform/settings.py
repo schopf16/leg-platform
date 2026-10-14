@@ -23,10 +23,13 @@ from leg_platform.environment import (
     security_settings,
     silenced_system_checks,
 )
+from leg_platform.branding import instance_static_directory, load_branding
+from leg_platform.address_configuration import address_database, validate_process_credentials
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 ENVIRONMENT = load_environment(os.environ)
+validate_process_credentials(os.environ)
 
 # Environment
 
@@ -44,12 +47,15 @@ INSTANCE_NAME = ENVIRONMENT.instance_name
 INSTANCE_BASE_URL = ENVIRONMENT.instance_base_url
 INSTANCE_PRIVACY_URL = ENVIRONMENT.instance_privacy_url
 INSTANCE_WEBSITE_URL = ENVIRONMENT.instance_website_url
+INSTANCE_BRANDING = load_branding(os.environ)
+COLOUR_MODE_COOKIE_NAME = "colour_mode" if APP_ENV == "local" else "__Host-colour_mode"
 
 # Application definition
 
 INSTALLED_APPS = [
     # First, so that its createsuperuser command replaces Django's (D-005, D-034).
     "leg_platform.accounts",
+    "leg_platform.addresses.apps.AddressesConfig",
     # The administration with the second factor check (D-040); replaces django.contrib.admin.
     "leg_platform.admin_site.PortalAdminConfig",
     "django.contrib.auth",
@@ -122,7 +128,8 @@ PHONENUMBER_DB_FORMAT = "E164"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
-    "leg_platform.middleware.LocalAdminOnlyMiddleware",
+    # Before anything reads a request body (sessions, CSRF): bounded bodies for open endpoints.
+    "leg_platform.middleware.RequestBodyLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -198,6 +205,11 @@ DATABASES = {
         },
     }
 }
+
+_address_database = address_database(os.environ, DATABASE_SQL_MODE)
+if _address_database is not None:
+    DATABASES["addresses"] = _address_database
+DATABASE_ROUTERS = ["leg_platform.addresses.router.AddressRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -299,6 +311,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "leg_platform" / "static"]
+_instance_static_directory = instance_static_directory(os.environ)
+if _instance_static_directory is not None:
+    STATICFILES_DIRS.append(_instance_static_directory)
 
 # Email (docs/ARCHITECTURE.md, "Email")
 # Django 6.1 replaces EMAIL_BACKEND with MAILERS and deprecates EMAIL_BACKEND; Django 6.0 only
@@ -363,6 +378,19 @@ LOGGING = {
         "leg_platform.security": {
             "handlers": ["console"],
             "level": "INFO",
+            "propagate": False,
+        },
+        # MSAL logs a token response that is not JSON at ERROR level, with the response body
+        # (msal/oauth2cli/oauth2.py, self.logger.exception). The body can contain tenant details,
+        # so only CRITICAL is written for this logger (D-048).
+        "msal.oauth2cli.oauth2": {
+            "handlers": ["console"],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        "msal.oauth2cli.assertion": {
+            "handlers": ["console"],
+            "level": "CRITICAL",
             "propagate": False,
         },
     },

@@ -5,9 +5,10 @@ logged-in persons only ever use ``request.user``; no view takes an account ident
 URL or the request (docs/SECURITY.md, section 4).
 """
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import transaction
@@ -24,7 +25,9 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, TemplateView
 from django_otp import login as otp_login
 
+from leg_platform.addresses.services import check_address
 from leg_platform.accounts import (
+    email_change,
     password_reset,
     second_factor,
     second_factor_reset,
@@ -36,14 +39,22 @@ from leg_platform.accounts.forms import (
     CodeForm,
     CompleteRegistrationForm,
     ConfirmForm,
+    EmailChangeForm,
     LoginForm,
     NewPasswordForm,
     PasswordResetRequestForm,
+    ProfileForm,
     ReauthenticationForm,
     RegistrationForm,
 )
 from leg_platform.accounts.mail_queue import submit_mail_request
-from leg_platform.accounts.models import MailJob, SecurityEvent, User, VerificationToken
+from leg_platform.accounts.models import (
+    AccountIntegrityError,
+    MailJob,
+    SecurityEvent,
+    User,
+    VerificationToken,
+)
 
 # The verification token's digest is kept in the session between the link and the form, so that
 # the token itself is not in the URL of the page that is shown (docs/SECURITY.md, section 6;
@@ -51,6 +62,7 @@ from leg_platform.accounts.models import MailJob, SecurityEvent, User, Verificat
 REGISTRATION_SESSION_KEY = "registration_token_digest"
 PASSWORD_RESET_SESSION_KEY = "password_reset_token_digest"
 TWO_FACTOR_RESET_SESSION_KEY = "two_factor_reset_token_digest"
+EMAIL_CHANGE_SESSION_KEY = "email_change_token_digest"
 ENROLMENT_SESSION_KEY = "two_factor_enrolment_device"
 
 
@@ -235,8 +247,20 @@ class RegistrationCompleteView(NeverCacheMixin, FormView):
             user.complete_registration(form.cleaned_data["password1"])
             token.delete()
         self.request.session.pop(REGISTRATION_SESSION_KEY, None)
+        self._show_address_warning(form.cleaned_data)
         messages.success(self.request, _("Your account is active. You can now log in."))
         return redirect(self.get_success_url())
+
+    def _show_address_warning(self, cleaned_data):
+        result = check_address(
+            street=cleaned_data.get("street", ""),
+            house_number=cleaned_data.get("house_number", ""),
+            postal_code=cleaned_data.get("postal_code", ""),
+            locality=cleaned_data.get("town", ""),
+            country=cleaned_data.get("country", "CH"),
+        )
+        if result["warning"]:
+            messages.warning(self.request, result["warning"])
 
 
 class PasswordResetRequestView(NeverCacheMixin, FormView):
@@ -302,6 +326,65 @@ class PasswordResetSetView(NeverCacheMixin, FormView):
         return redirect(self.get_success_url())
 
 
+class EmailChangeVerifyView(TokenPageMixin, View):
+    """Opening the link remembers the digest and removes the token from the address bar."""
+
+    def get(self, request, token):
+        found = VerificationToken.objects.find_valid(token, VerificationToken.Purpose.EMAIL_CHANGE)
+        if found is None or found.user.status != User.Status.ACTIVE:
+            return render(request, "accounts/email_change_invalid.html")
+        request.session[EMAIL_CHANGE_SESSION_KEY] = found.digest
+        return redirect("accounts:email_change_confirm")
+
+
+class EmailChangeConfirmView(NeverCacheMixin, FormView):
+    template_name = "accounts/email_change_confirm.html"
+    form_class = ConfirmForm
+
+    @method_decorator(never_cache)
+    @method_decorator(no_referrer)
+    def dispatch(self, request, *args, **kwargs):
+        digest = request.session.get(EMAIL_CHANGE_SESSION_KEY)
+        self.token = (
+            VerificationToken.objects.find_valid_by_digest(
+                digest, VerificationToken.Purpose.EMAIL_CHANGE
+            )
+            if digest
+            else None
+        )
+        if self.token is None or self.token.user.status != User.Status.ACTIVE:
+            return render(request, "accounts/email_change_invalid.html")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(new_email=self.token.target_email, **kwargs)
+
+    def form_valid(self, form):
+        user = email_change.confirm_change(self.token)
+        self.request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
+        if user is None:
+            return render(self.request, "accounts/email_change_invalid.html")
+        messages.success(self.request, _("Your email address was changed. Please log in again."))
+        return redirect("accounts:login")
+
+
+class TwoFactorMixin(NeverCacheMixin, LoginRequiredMixin):
+    """Pages of the second factor; the account is always request.user."""
+
+    @method_decorator(sensitive_post_parameters("current_password", "otp_token"))
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ReauthenticationMixin(TwoFactorMixin):
+    """A form view whose form asks for the password and the second factor again."""
+
+    form_class = ReauthenticationForm
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "request": self.request}
+
+
 class TwoFactorResetVerifyView(TokenPageMixin, View):
     """Opening the link changes nothing; it only remembers the token and leaves the URL."""
 
@@ -353,6 +436,89 @@ class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
         )
 
 
+class ProfileEditView(NeverCacheMixin, LoginRequiredMixin, FormView):
+    """Edit only the permitted profile fields of the logged-in account."""
+
+    template_name = "accounts/profile_edit.html"
+    form_class = ProfileForm
+    success_url = reverse_lazy("accounts:profile")
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "instance": self.request.user}
+
+    def form_valid(self, form):
+        form.save()
+        result = check_address(
+            street=form.cleaned_data.get("street", ""),
+            house_number=form.cleaned_data.get("house_number", ""),
+            postal_code=form.cleaned_data.get("postal_code", ""),
+            locality=form.cleaned_data.get("town", ""),
+            country=form.cleaned_data.get("country", "CH"),
+        )
+        if result["warning"]:
+            messages.warning(self.request, result["warning"])
+        messages.success(self.request, _("Your profile was updated."))
+        return redirect(self.get_success_url())
+
+
+class EmailChangeRequestView(ReauthenticationMixin, FormView):
+    """Queue an email change request with a generic response for every target address."""
+
+    template_name = "accounts/email_change_request.html"
+    form_class = EmailChangeForm
+    success_url = reverse_lazy("accounts:email_change_sent")
+
+    def form_valid(self, form):
+        submit_mail_request(
+            self.request,
+            MailJob.Kind.EMAIL_CHANGE_REQUEST,
+            form.cleaned_data["email"],
+            account=self.request.user,
+        )
+        security_log.record(
+            SecurityEvent.Event.EMAIL_CHANGE_REQUESTED, account=self.request.user
+        )
+        return super().form_valid(form)
+
+
+class EmailChangeSentView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
+    template_name = "accounts/email_change_sent.html"
+
+
+class AccountDeleteForm(ReauthenticationForm):
+    confirm = forms.BooleanField(label=_("I understand that this action cannot be undone."))
+
+
+class AccountDeleteView(ReauthenticationMixin, FormView):
+    """Delete the logged-in account or deactivate it under the retention rule."""
+
+    template_name = "accounts/account_delete.html"
+    form_class = AccountDeleteForm
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            retention_obligation=self.request.user.retention_obligation, **kwargs
+        )
+
+    def form_valid(self, form):
+        user = self.request.user
+        try:
+            with transaction.atomic():
+                outcome = user.delete_or_deactivate()
+                event = (
+                    SecurityEvent.Event.ACCOUNT_DEACTIVATED
+                    if outcome == "deactivated"
+                    else SecurityEvent.Event.ACCOUNT_DELETED
+                )
+                security_log.record(event, account=user, actor=user)
+        except AccountIntegrityError:
+            messages.error(self.request, _("The account could not be deleted."))
+            return redirect("accounts:profile")
+        logout(self.request)
+        messages.success(self.request, _("Your account was deleted or deactivated."))
+        return redirect("accounts:login")
+
+
 class PasswordChangeView(NeverCacheMixin, LoginRequiredMixin, FormView):
     """Change the password of the logged-in account after asking for the current one."""
 
@@ -379,41 +545,33 @@ class PasswordChangeView(NeverCacheMixin, LoginRequiredMixin, FormView):
 
     def form_valid(self, form):
         with transaction.atomic():
-            # The row is locked and read again, so that the new password is written to the
-            # current state of the account.
+            # The row is locked and read again, so that the current password is checked and the
+            # new password is written to the current state of the account. The form checked the
+            # current password before the lock; a parallel change of the password in between
+            # must not be overwritten by a request that gave the old password (D-040).
             user = User._base_manager.select_for_update().get(pk=self.request.user.pk)
-            form.user = user
-            # An initial password that had to be replaced is replaced (D-005).
-            user.password_change_required = False
-            form.save()
-            # Links of earlier password resets must not work after the change.
-            VerificationToken.objects.filter(
-                user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
-            ).delete()
-            password_reset.notify_password_changed(user)
-            security_log.record(SecurityEvent.Event.PASSWORD_CHANGED, account=user)
+            verified = second_factor.verify_password(
+                self.request, user, form.cleaned_data["current_password"]
+            )
+            if verified:
+                form.user = user
+                # An initial password that had to be replaced is replaced (D-005).
+                user.password_change_required = False
+                form.save()
+                # Links of earlier password resets must not work after the change.
+                VerificationToken.objects.filter(
+                    user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
+                ).delete()
+                password_reset.notify_password_changed(user)
+                security_log.record(SecurityEvent.Event.PASSWORD_CHANGED, account=user)
+        if not verified:
+            form.add_error("current_password", ReauthenticationForm.password_error)
+            return self.form_invalid(form)
         # Renews the session ID and keeps this session; Django derives the session hash from
         # the password, so every other session of the account ends (docs/SECURITY.md).
         update_session_auth_hash(self.request, user)
         messages.success(self.request, _("Your password was changed."))
         return redirect(self.get_success_url())
-
-
-class TwoFactorMixin(NeverCacheMixin, LoginRequiredMixin):
-    """Pages of the second factor; the account is always request.user."""
-
-    @method_decorator(sensitive_post_parameters("current_password", "otp_token"))
-    def dispatch(self, request, *args, **kwargs):
-        return super().dispatch(request, *args, **kwargs)
-
-
-class ReauthenticationMixin(TwoFactorMixin):
-    """A form view whose form asks for the password and the second factor again."""
-
-    form_class = ReauthenticationForm
-
-    def get_form_kwargs(self):
-        return {**super().get_form_kwargs(), "request": self.request}
 
 
 class TwoFactorOverviewView(TwoFactorMixin, TemplateView):
@@ -475,6 +633,8 @@ class TwoFactorConfirmView(TwoFactorMixin, FormView):
             form.add_error("otp_token", CodeForm.invalid_code_message)
             return self.form_invalid(form)
         device, codes = result
+        # Other sessions of the account ended with the confirmation; this session stays (D-044).
+        update_session_auth_hash(self.request, self.request.user)
         self.request.session.pop(ENROLMENT_SESSION_KEY, None)
         # The person just proved to own the app: this session has completed the second factor.
         # The session ID is renewed, as after every second factor.
@@ -512,6 +672,8 @@ class RecoveryCodesView(ReauthenticationMixin, FormView):
             codes = totp.renew_recovery_codes(self.request.user)
         except totp.SecondFactorError:
             return refused_change(self.request)
+        # Other sessions ended with the renewal; this session stays (D-044).
+        update_session_auth_hash(self.request, self.request.user)
         return render_recovery_codes(self.request, codes, enrolled=False)
 
 
@@ -535,6 +697,8 @@ class TwoFactorDisableView(ReauthenticationMixin, FormView):
             totp.disable(self.request.user)
         except totp.SecondFactorError:
             return refused_change(self.request)
+        # Other sessions ended with the removal; this session stays (D-044).
+        update_session_auth_hash(self.request, self.request.user)
         messages.success(self.request, _("Two-factor authentication was removed."))
         return redirect(self.get_success_url())
 

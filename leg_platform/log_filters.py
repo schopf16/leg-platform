@@ -11,7 +11,7 @@ import re
 # The paths of the token views (registration link, password reset link, link to remove the
 # second factor); a test checks that the pattern matches the URL configuration.
 TOKEN_URL_PATTERN = re.compile(
-    r"(/(?:register|password-reset|two-factor-reset)/verify/)[^/\s\"'?#]+"
+    r"(/(?:register|password-reset|two-factor-reset|email-change)/verify/)[^/\s\"'?#]+"
 )
 REDACTED = "<redacted>"
 

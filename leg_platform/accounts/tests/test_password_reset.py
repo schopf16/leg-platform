@@ -432,6 +432,37 @@ class ResetFlowTests(TestCase):
         self.assertEqual(password_reset.delete_expired_reset_tokens(), 1)
         self.assertEqual(VerificationToken.objects.count(), 0)
 
+    def test_expired_email_change_links_and_their_target_address_are_deleted_by_the_cleanup(self):
+        user = VerificationToken.objects.get().user
+        VerificationToken.objects.issue(
+            user,
+            VerificationToken.Purpose.EMAIL_CHANGE,
+            timedelta(hours=24),
+            target_email="proposed.address@example.org",
+        )
+        VerificationToken.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
+
+        self.assertEqual(password_reset.delete_expired_reset_tokens(), 2)
+        self.assertFalse(
+            VerificationToken.objects.filter(target_email="proposed.address@example.org").exists()
+        )
+
+    def test_unexpired_email_change_links_are_kept_by_the_cleanup(self):
+        user = VerificationToken.objects.get().user
+        VerificationToken.objects.issue(
+            user,
+            VerificationToken.Purpose.EMAIL_CHANGE,
+            timedelta(hours=24),
+            target_email="proposed.address@example.org",
+        )
+
+        self.assertEqual(password_reset.delete_expired_reset_tokens(), 0)
+        self.assertTrue(
+            VerificationToken.objects.filter(
+                purpose=VerificationToken.Purpose.EMAIL_CHANGE
+            ).exists()
+        )
+
     def test_the_pages_are_in_swiss_german_without_sharp_s(self):
         pages = [
             Client().get(REQUEST_URL),

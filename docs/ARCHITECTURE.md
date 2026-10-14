@@ -178,6 +178,7 @@ Security-relevant events are logged centrally (D-018). Logs contain no passwords
 * Tabler's README states minimum browser versions (Chrome/Edge 123, Firefox 128, Safari 17.5, Opera 109) because it uses CSS features without fallbacks. Older devices whose browser cannot be updated beyond these versions (e.g. older iPhones) are therefore not supported. The supported browsers are documented for operators and users.
 * Static assets, including Tabler, fonts and icons, are served by the instance itself in fixed versions.
 * The design language is defined in `docs/DESIGN.md` (D-024). It is implemented through Tabler's CSS variables and attributes (section 9 there); instance branding (logo, accent colours) comes from the instance configuration.
+* Instance branding uses validated environment variables and a same-origin generated stylesheet (D-051). The colour mode is rendered from an allowlisted, host-only presentation cookie; changing it requires a CSRF-protected POST. No inline CSS, theme URL parameters or third-party assets are introduced.
 * The application has no public home page; its entry point is the login page. It runs on its own host name, never under a path of another website (D-025). A subdomain of the website's registrable domain provides origin isolation but is still the same site; the cookie rules in `docs/SECURITY.md`, section 3, apply.
 
 Sources: https://github.com/tabler/tabler, https://getbootstrap.com/docs/5.3/getting-started/introduction/ (checked on 2026-10-09)
@@ -215,7 +216,7 @@ Not yet decided:
 * whether AGOV may be used as the second factor (request by the project owner pending), AGOV integration details, and whether password login can later be disabled for system administrators
 * architecture of the later billing and financial modules
 * concrete roles and their permissions, and whether they use the Django admin or application views; decided per function in phase 2: pure data maintenance is a candidate for the Django admin, frequent guided work of the LEG's management for application views in the Clear register (`docs/DESIGN.md`)
-* whether instance branding values (logo files, accent colours) are kept in environment variables, files or the database; storing logos in the database would imply a web upload, which needs its own security design (`docs/SECURITY.md`, section 6, secure uploads)
+* any later web upload for instance branding (phase 1 uses environment variables and self-hosted static logo files, D-051); uploads require a separate security design (`docs/SECURITY.md`, section 6)
 * whether Django's `redirect_authenticated_user` option of the login view is used to send logged-in users from the login page to their profile; Django's documentation warns that enabling it can allow social media fingerprinting (https://docs.djangoproject.com/en/5.2/topics/auth/default/, as cited in the security review of 2026-10-11); decided at implementation
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025)
 * which instance-specific values are kept in environment variables and which in the database

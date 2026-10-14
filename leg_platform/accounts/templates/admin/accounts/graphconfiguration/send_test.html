@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  <li><a href="{{ change_url }}">{{ opts.verbose_name|capfirst }}</a></li>
+  <li aria-current="page">{% translate "Send test email" %}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% if refusal %}
+    <p>{{ refusal }}</p>
+  {% else %}
+    <p>{% translate "The test email is sent through Microsoft Graph to your own address:" %} <strong>{{ address }}</strong></p>
+    <p>{% translate "A successful send confirms only that Microsoft Graph accepted the email. Check the inbox to confirm that it arrived." %}</p>
+    <form method="post" action="{% url 'admin:accounts_graphconfiguration_send_test' %}">
+      {% csrf_token %}
+      <input type="submit" class="default" value="{% translate 'Send test email' %}">
+    </form>
+  {% endif %}
+  <p><a href="{{ change_url }}">{% translate "Back to the configuration" %}</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "admin/change_form_object_tools.html" %}
+{% load i18n %}
+{% comment %}
+The test email of the Microsoft Graph configuration is offered to system administrators only (D-006).
+{% endcomment %}
+{% block object-tools-items %}{% if original %}
+<li><a href="{% url 'admin:accounts_graphconfiguration_send_test' %}">{% translate "Send test email" %}</a></li>
+{% endif %}{{ block.super }}{% endblock %}

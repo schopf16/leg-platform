@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Email change link is invalid" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Email change link is invalid" %}</h1>
+      <p>{% translate "This link is invalid, expired, or has already been used. Your email address has not been changed." %}</p>
+      <a href="{% url 'accounts:login' %}">{% translate "Back to the login page" %}</a>
+    </div>
+  </div>
+{% endblock %}

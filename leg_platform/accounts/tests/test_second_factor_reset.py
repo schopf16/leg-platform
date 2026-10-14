@@ -192,18 +192,36 @@ class AdministrationResetTests(TestCase):
         plain = create_active_user("plain@example.org")
         MailJob.objects.create(
             kind=MailJob.Kind.TWO_FACTOR_RESET_LINK,
+            account=plain,
             address=plain.email,
             next_attempt_at=timezone.now(),
         )
         self.user.set_privileges(is_staff=True, is_superuser=False)
         MailJob.objects.create(
             kind=MailJob.Kind.TWO_FACTOR_RESET_LINK,
+            account=self.user,
             address=self.user.email,
             next_attempt_at=timezone.now(),
         )
         run_mail_queue()
         self.assertEqual(mail.outbox, [])
         self.assertFalse(VerificationToken.objects.exists())
+
+    def test_a_link_does_not_reach_another_account_after_the_address_changed(self):
+        self.client.force_login(self.administrator)
+        self.client.post(reset_url(self.user), {})
+        requested_address = self.user.email
+        self.user.change_email("moved.person@example.org")
+        # Another person now holds the address of the request and has a second factor.
+        taker = create_active_user(requested_address)
+        with_second_factor(taker)
+
+        run_mail_queue()
+
+        self.assertEqual(mail.outbox, [])
+        self.assertFalse(VerificationToken.objects.exists())
+        self.assertFalse(MailJob.objects.exists())
+        self.assertTrue(has_second_factor(taker))
 
     def test_a_staff_user_is_reset_at_once_after_the_identity_confirmation(self):
         staff = create_active_user("staff@example.org")
@@ -373,9 +391,13 @@ class SessionEndTests(TestCase):
 
 @tag("mariadb")
 class EmergencyCommandTests(TestCase):
-    def run_command(self, *arguments):
+    def run_command(self, *arguments, answer=None):
         out = StringIO()
-        call_command("emergency_access", "--no-input", *arguments, stdout=out)
+        if answer is None:
+            call_command("emergency_access", "--no-input", *arguments, stdout=out)
+        else:
+            with mock.patch("builtins.input", return_value=answer):
+                call_command("emergency_access", *arguments, stdout=out)
         return out.getvalue()
 
     def test_it_resets_the_second_factor_of_the_last_system_administrator(self):
@@ -383,9 +405,11 @@ class EmergencyCommandTests(TestCase):
         client = VerifiedClient()
         client.force_login(last)
         self.assertEqual(client.get(reverse("admin:index")).status_code, 200)
-        output = self.run_command("reset-second-factor", str(last.pk))
-        self.assertIn(f"account {last.pk}", output)
-        self.assertNotIn(last.email, output)
+        output = self.run_command(
+            "reset-second-factor", str(last.pk), "--allow-last-administrator", answer=last.email
+        )
+        self.assertIn(last.email, output)
+        self.assertEqual(output.splitlines()[-1], f"The second factor of account {last.pk} was removed.")
         self.assertFalse(has_second_factor(last))
         self.assertEqual(client.get(reverse("admin:index")).status_code, 302)
         entry = SecurityEvent.objects.get()
@@ -403,26 +427,56 @@ class EmergencyCommandTests(TestCase):
             self.run_command("reset-second-factor", str(plain.pk))
         self.assertFalse(SecurityEvent.objects.exists())
 
+    def test_it_refuses_the_last_system_administrator_without_the_explicit_flag(self):
+        last = administrator()
+        with self.assertRaisesMessage(CommandError, "last active system administrator"):
+            self.run_command("reset-second-factor", str(last.pk), answer=last.email)
+        self.assertTrue(has_second_factor(last))
+        self.assertFalse(SecurityEvent.objects.exists())
+
+    def test_it_does_not_allow_unattended_changes_to_privileged_accounts(self):
+        last = administrator()
+        with self.assertRaisesMessage(CommandError, "can only be changed interactively"):
+            self.run_command("reset-second-factor", str(last.pk), "--allow-last-administrator")
+        self.assertTrue(has_second_factor(last))
+
+    def test_it_requires_the_typed_email_address_for_privileged_accounts(self):
+        administrator()
+        other = administrator("other.admin@example.org")
+        other.set_status(User.Status.BLOCKED)
+        with self.assertRaisesMessage(CommandError, "Cancelled."):
+            self.run_command("unblock-account", str(other.pk), answer="yes")
+        self.assertEqual(User.objects.get(pk=other.pk).status, User.Status.BLOCKED)
+
+    def test_it_cancels_cleanly_when_no_input_is_available(self):
+        plain = create_active_user()
+        with_second_factor(plain)
+        with mock.patch("builtins.input", side_effect=EOFError):
+            with self.assertRaisesMessage(CommandError, "Cancelled."):
+                call_command("emergency_access", "reset-second-factor", str(plain.pk), stdout=StringIO())
+        self.assertTrue(has_second_factor(plain))
+
     def test_it_unblocks_a_blocked_system_administrator_only(self):
         admin_user = administrator()
         other = administrator("other.admin@example.org")
         other.set_status(User.Status.BLOCKED)
         with self.assertRaisesMessage(CommandError, "is not blocked"):
-            self.run_command("unblock-account", str(admin_user.pk))
-        self.run_command("unblock-account", str(other.pk))
+            self.run_command("unblock-account", str(admin_user.pk), answer=admin_user.email)
+        self.run_command("unblock-account", str(other.pk), answer=other.email)
         self.assertEqual(User.objects.get(pk=other.pk).status, User.Status.ACTIVE)
         entry = SecurityEvent.objects.get()
         self.assertEqual((entry.event, entry.account_id, entry.long_retention), ("emergency_account_unblocked", other.pk, True))
 
     def test_it_asks_for_confirmation_unless_told_not_to(self):
-        last = administrator()
+        user = create_active_user()
+        with_second_factor(user)
         with mock.patch("builtins.input", return_value="no"):
             with self.assertRaisesMessage(CommandError, "Cancelled."):
-                call_command("emergency_access", "reset-second-factor", str(last.pk), stdout=StringIO())
-        self.assertTrue(has_second_factor(last))
+                call_command("emergency_access", "reset-second-factor", str(user.pk), stdout=StringIO())
+        self.assertTrue(has_second_factor(user))
         with mock.patch("builtins.input", return_value="yes"):
-            call_command("emergency_access", "reset-second-factor", str(last.pk), stdout=StringIO())
-        self.assertFalse(has_second_factor(last))
+            call_command("emergency_access", "reset-second-factor", str(user.pk), stdout=StringIO())
+        self.assertFalse(has_second_factor(user))
 
     def test_it_encrypts_the_keys_again_after_the_secret_key_was_replaced(self):
         old, new = "old-key-" + "a1" * 30, "new-key-" + "b2" * 30
@@ -548,6 +602,8 @@ class InitialAdministratorTests(TransactionTestCase):
                 )
         page = client.get(password_change)
         self.assertContains(page, "Sie müssen ein neues Passwort wählen")
+        # The page can be rendered: the branding stylesheet is presentation only.
+        self.assertEqual(client.get(reverse("instance_stylesheet")).status_code, 200)
         # The new password must differ from the initial one.
         same = client.post(
             password_change,

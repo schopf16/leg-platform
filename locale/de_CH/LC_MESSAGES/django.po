@@ -4,6 +4,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: LEG-Platform\n"
+"PO-Revision-Date: 2026-10-14 14:00+0200\n"
+"Last-Translator: LEG-Platform contributors\n"
+"Language-Team: Swiss German\n"
 "Language: de_CH\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -13,6 +16,303 @@ msgstr ""
 #: leg_platform/settings.py
 msgid "Swiss German"
 msgstr "Schweizerdeutsch"
+
+msgid "Colour mode"
+msgstr "Darstellung"
+
+msgid "Device setting"
+msgstr "Geräteeinstellung"
+
+msgid "Light"
+msgstr "Hell"
+
+msgid "Dark"
+msgstr "Dunkel"
+
+msgid "Apply"
+msgstr "Übernehmen"
+
+msgid "Menu"
+msgstr "Menü"
+
+msgid "Account navigation"
+msgstr "Kontonavigation"
+
+msgid "Main navigation"
+msgstr "Hauptnavigation"
+
+msgid "Choose a valid colour mode."
+msgstr "Wählen Sie eine gültige Darstellung."
+
+msgid "Address count"
+msgstr "Anzahl Adressen"
+
+msgid "Federal Office of Topography swisstopo"
+msgstr "Bundesamt für Landestopografie swisstopo"
+
+msgid "Address directory"
+msgstr "Adressverzeichnis"
+
+msgid "Address directory import"
+msgstr "Import des Adressverzeichnisses"
+
+msgid "Address directory imports"
+msgstr "Importe des Adressverzeichnisses"
+
+msgid "Address suggestions"
+msgstr "Adressvorschläge"
+
+msgid "Address suggestions are temporarily limited. You can continue with the address as entered."
+msgstr "Adressvorschläge sind vorübergehend eingeschränkt. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "Address suggestions need JavaScript. You can continue with the address as entered."
+msgstr "Adressvorschläge benötigen JavaScript. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "An import is already queued, running or was requested within the last hour."
+msgstr "Ein Import ist bereits vorgemerkt, läuft oder wurde innerhalb der letzten Stunde angefordert."
+
+msgid "Can request an address directory import"
+msgstr "Kann einen Import des Adressverzeichnisses anfordern"
+
+msgid "Completed"
+msgstr "Abgeschlossen"
+
+msgid "Data date"
+msgstr "Datenstand"
+
+msgid "Failed"
+msgstr "Fehlgeschlagen"
+
+msgid "Finished at"
+msgstr "Abgeschlossen am"
+
+msgid "Imported at"
+msgstr "Importiert am"
+
+msgid "Last automatic attempt at"
+msgstr "Letzter automatischer Versuch am"
+
+msgid "An import is already queued or running."
+msgstr "Ein Import ist bereits vorgemerkt oder läuft."
+
+msgid "A retention obligation applies to this account. Continuing will deactivate it instead of deleting its retained data. The email address will become available for a new registration."
+msgstr "Für dieses Konto besteht eine Aufbewahrungspflicht. Beim Fortfahren wird es deaktiviert, statt die aufbewahrungspflichtigen Daten zu löschen. Die E-Mail-Adresse wird für eine neue Registrierung freigegeben."
+
+msgid "Account blocked"
+msgstr "Konto gesperrt"
+
+msgid "Account deactivated"
+msgstr "Konto deaktiviert"
+
+msgid "Account deleted"
+msgstr "Konto gelöscht"
+
+msgid "Account reactivated"
+msgstr "Konto reaktiviert"
+
+msgid "Account unblocked"
+msgstr "Konto entsperrt"
+
+msgid "An email address change was attempted at %(instance_name)s"
+msgstr "Versuchte Änderung einer E-Mail-Adresse bei %(instance_name)s"
+
+msgid "Block account"
+msgstr "Konto sperren"
+
+msgid "Blocked the account."
+msgstr "Das Konto wurde gesperrt."
+
+msgid "Cancel and return to profile"
+msgstr "Abbrechen und zum Profil zurückkehren"
+
+msgid "Change email address"
+msgstr "E-Mail-Adresse ändern"
+
+msgid "Check the new email address"
+msgstr "Neue E-Mail-Adresse prüfen"
+
+msgid "Confirm email address change"
+msgstr "Änderung der E-Mail-Adresse bestätigen"
+
+msgid "Confirm new email address"
+msgstr "Neue E-Mail-Adresse bestätigen"
+
+msgid "Confirm that %(email)s should become the email address for your account."
+msgstr "Bestätigen Sie, dass %(email)s als E-Mail-Adresse für Ihr Konto verwendet werden soll."
+
+msgid "Confirm with your current password and, if enabled, a code from your authenticator app."
+msgstr "Bestätigen Sie mit Ihrem aktuellen Passwort und, falls aktiviert, einem Code aus Ihrer Authenticator-App."
+
+msgid "Confirm your new email address at %(instance_name)s"
+msgstr "Neue E-Mail-Adresse bei %(instance_name)s bestätigen"
+
+msgid "Contact information for the operator:\n\n%(contact_url)s"
+msgstr "Kontaktinformationen des Betreibers:\n\n%(contact_url)s"
+
+msgid "Continuing will permanently delete your account and its data. This action cannot be undone."
+msgstr "Beim Fortfahren werden Ihr Konto und dessen Daten endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+
+msgid "Deactivated the account under the retention rule."
+msgstr "Das Konto wurde aufgrund der Aufbewahrungspflicht deaktiviert."
+
+msgid "Delete account"
+msgstr "Konto löschen"
+
+msgid "Delete or deactivate account"
+msgstr "Konto löschen oder deaktivieren"
+
+msgid "Deleted the account."
+msgstr "Das Konto wurde gelöscht."
+
+msgid "Edit profile"
+msgstr "Profil bearbeiten"
+
+msgid "Email address change requested"
+msgstr "Änderung der E-Mail-Adresse angefordert"
+
+msgid "Email address change: link to confirm the new address"
+msgstr "Änderung der E-Mail-Adresse: Link zur Bestätigung der neuen Adresse"
+
+msgid "Email address change: the new address already has an account"
+msgstr "Änderung der E-Mail-Adresse: Die neue Adresse hat bereits ein Konto"
+
+msgid "Email address changed"
+msgstr "E-Mail-Adresse geändert"
+
+msgid "Email change link is invalid"
+msgstr "Der Link zur Änderung der E-Mail-Adresse ist ungültig"
+
+msgid "Hello\n\nSomeone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n\n%(email_change_url)s\n\nThe link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
+msgstr "Guten Tag\n\nBei %(instance_name)s wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Öffnen Sie diesen Link, um die neue Adresse zu bestätigen:\n\n%(email_change_url)s\n\nDer Link ist %(lifetime_hours)s Stunden gültig. Die neue Adresse wird erst nach Ihrer Bestätigung verwendet."
+
+msgid "Hello\n\nSomeone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
+msgstr "Guten Tag\n\nBei %(instance_name)s wurde versucht, die E-Mail-Adresse eines Kontos in diese Adresse zu ändern. Es wurde keine Änderung vorgenommen. Falls Sie dies veranlasst haben, melden Sie sich mit der bereits registrierten E-Mail-Adresse an oder kontaktieren Sie den Betreiber."
+
+msgid "Hello\n\nThe email address for your account at %(instance_name)s was changed. All other sessions were ended."
+msgstr "Guten Tag\n\nDie E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Alle anderen Sitzungen wurden beendet."
+
+msgid "Home"
+msgstr "Startseite"
+
+msgid "I confirm this account change."
+msgstr "Ich bestätige diese Kontoänderung."
+
+msgid "I understand that this action cannot be undone."
+msgstr "Ich verstehe, dass diese Aktion nicht rückgängig gemacht werden kann."
+
+msgid "If the address can be used, we have sent a message to it. Follow the instructions in the message. Your current email address remains unchanged until you verify the new one."
+msgstr "Wenn die Adresse verwendet werden kann, haben wir eine Nachricht dorthin gesendet. Folgen Sie den Anweisungen in der Nachricht. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
+
+msgid "New email address"
+msgstr "Neue E-Mail-Adresse"
+
+msgid "Notification: email address changed"
+msgstr "Benachrichtigung: E-Mail-Adresse geändert"
+
+msgid "Personal link to confirm the new email address."
+msgstr "Persönlicher Link zur Bestätigung der neuen E-Mail-Adresse."
+
+msgid "Reactivate account"
+msgstr "Konto reaktivieren"
+
+msgid "Reactivated the account."
+msgstr "Das Konto wurde reaktiviert."
+
+msgid "Save profile"
+msgstr "Profil speichern"
+
+msgid "Send verification link"
+msgstr "Bestätigungslink senden"
+
+msgid "The account change could not be made. It may be the last system administrator or its email address may be in use."
+msgstr "Die Kontoänderung konnte nicht durchgeführt werden. Möglicherweise handelt es sich um den letzten Systemadministrator oder die E-Mail-Adresse ist bereits in Verwendung."
+
+msgid "The account could not be deleted."
+msgstr "Das Konto konnte nicht gelöscht werden."
+
+msgid "The account is deleted if no retention obligation applies. Otherwise it is deactivated and its email address becomes available for a new registration."
+msgstr "Das Konto wird gelöscht, wenn keine Aufbewahrungspflicht besteht. Andernfalls wird es deaktiviert und seine E-Mail-Adresse für eine neue Registrierung freigegeben."
+
+msgid "The account will be able to log in and reset its password again."
+msgstr "Das Konto kann sich wieder anmelden und sein Passwort zurücksetzen."
+
+msgid "The account will be reactivated if no active, temporarily locked, or blocked account uses its email address. Any pending registration at that address will be removed."
+msgstr "Das Konto wird reaktiviert, wenn kein aktives, vorübergehend gesperrtes oder gesperrtes Konto seine E-Mail-Adresse verwendet. Eine ausstehende Registrierung mit dieser Adresse wird entfernt."
+
+msgid "The account will not be able to log in or reset its password."
+msgstr "Das Konto kann sich nicht anmelden und sein Passwort nicht zurücksetzen."
+
+msgid "The test email limit has been reached. Try again later."
+msgstr "Das Limit für Test-E-Mails wurde erreicht. Versuchen Sie es später erneut."
+
+msgid "This link is invalid, expired, or has already been used. Your email address has not been changed."
+msgstr "Dieser Link ist ungültig, abgelaufen oder wurde bereits verwendet. Ihre E-Mail-Adresse wurde nicht geändert."
+
+msgid "Unblock account"
+msgstr "Konto entsperren"
+
+msgid "Unblocked the account."
+msgstr "Das Konto wurde entsperrt."
+
+msgid "We will keep your current email address until you verify the new one. Enter your password and, if enabled, a code from your authenticator app."
+msgstr "Ihre aktuelle E-Mail-Adresse bleibt bestehen, bis Sie die neue bestätigen. Geben Sie Ihr Passwort und, falls aktiviert, einen Code aus Ihrer Authenticator-App ein."
+
+msgid "Your account was deleted or deactivated."
+msgstr "Ihr Konto wurde gelöscht oder deaktiviert."
+
+msgid "Your email address at %(instance_name)s was changed"
+msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
+
+msgid "Your email address was changed. Please log in again."
+msgstr "Ihre E-Mail-Adresse wurde geändert. Bitte melden Sie sich erneut an."
+
+msgid "Your name and postal address are required. The phone number is optional."
+msgstr "Ihr Name und Ihre Postadresse sind erforderlich. Die Telefonnummer ist optional."
+
+msgid "Your profile was updated."
+msgstr "Ihr Profil wurde aktualisiert."
+
+msgid "No import requested"
+msgstr "Kein Import angefordert"
+
+msgid "Official address directory"
+msgstr "Amtliches Adressverzeichnis"
+
+msgid "Queued"
+msgstr "Vorgemerkt"
+
+msgid "Request directory update"
+msgstr "Aktualisierung des Verzeichnisses anfordern"
+
+msgid "Requested at"
+msgstr "Angefordert am"
+
+msgid "Running"
+msgstr "Läuft"
+
+msgid "Started at"
+msgstr "Gestartet am"
+
+msgid "The address could not be checked. You can continue with the address as entered."
+msgstr "Die Adresse konnte nicht geprüft werden. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "The address directory import has been queued."
+msgstr "Der Import des Adressverzeichnisses wurde vorgemerkt."
+
+msgid "The address directory is more than 92 days old. You can continue with the address as entered."
+msgstr "Das Adressverzeichnis ist mehr als 92 Tage alt. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "The address directory is unavailable. You can continue with the address as entered."
+msgstr "Das Adressverzeichnis ist nicht verfügbar. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "The import runs in a separate background worker. Addresses already entered are not changed."
+msgstr "Der Import läuft in einem separaten Hintergrundprozess. Bereits eingegebene Adressen werden nicht verändert."
+
+msgid "This address was not found in the official directory. Please check it. You can continue with the address as entered."
+msgstr "Diese Adresse wurde im amtlichen Verzeichnis nicht gefunden. Bitte prüfen Sie sie. Sie können mit der eingegebenen Adresse fortfahren."
+
+msgid "Too many import requests. Please try again later."
+msgstr "Zu viele Importanfragen. Bitte versuchen Sie es später erneut."
 
 #: leg_platform/accounts/apps.py
 msgid "Accounts"
@@ -1258,3 +1558,111 @@ msgstr "Link senden"
 
 msgid "Back to the account"
 msgstr "Zurück zum Konto"
+
+msgid "tenant ID"
+msgstr "Mandanten-ID"
+
+msgid "client ID"
+msgstr "Client-ID"
+
+msgid "sender mailbox"
+msgstr "Absender-Postfach"
+
+msgid "Microsoft Graph configuration"
+msgstr "Microsoft-Graph-Konfiguration"
+
+msgid "Microsoft Graph configuration changed"
+msgstr "Microsoft-Graph-Konfiguration geändert"
+
+msgid "Microsoft Graph certificate uploaded"
+msgstr "Microsoft-Graph-Zertifikat hochgeladen"
+
+msgid "Microsoft Graph test email requested"
+msgstr "Test-E-Mail über Microsoft Graph angefordert"
+
+msgid "The certificate or the private key cannot be read (PEM, no password)."
+msgstr "Das Zertifikat oder der private Schlüssel kann nicht gelesen werden (PEM, ohne Passwort)."
+
+msgid "The private key must be an RSA key with at least 2048 bits."
+msgstr "Der private Schlüssel muss ein RSA-Schlüssel mit mindestens 2048 Bit sein."
+
+msgid "The private key does not belong to the certificate."
+msgstr "Der private Schlüssel gehört nicht zum Zertifikat."
+
+msgid "The certificate has expired."
+msgstr "Das Zertifikat ist abgelaufen."
+
+msgid "Certificate file (PEM)"
+msgstr "Zertifikatsdatei (PEM)"
+
+msgid "The public certificate. Upload it together with the private key."
+msgstr "Das öffentliche Zertifikat. Laden Sie es zusammen mit dem privaten Schlüssel hoch."
+
+msgid "Private key file (PEM)"
+msgstr "Datei des privaten Schlüssels (PEM)"
+
+msgid "Stored encrypted and never shown again. Upload it together with the certificate."
+msgstr "Verschlüsselt gespeichert und nie wieder angezeigt. Laden Sie ihn zusammen mit dem Zertifikat hoch."
+
+msgid "Upload the certificate and the private key together."
+msgstr "Laden Sie Zertifikat und privaten Schlüssel nur zusammen hoch."
+
+msgid "The file is too large."
+msgstr "Die Datei ist zu gross."
+
+msgid "Certificate"
+msgstr "Zertifikat"
+
+msgid "ready to send"
+msgstr "bereit zum Versand"
+
+msgid "certificate subject"
+msgstr "Zertifikatsinhaber"
+
+msgid "No certificate stored."
+msgstr "Kein Zertifikat gespeichert."
+
+msgid "SHA-1 thumbprint"
+msgstr "SHA-1-Fingerabdruck"
+
+msgid "SHA-256 thumbprint"
+msgstr "SHA-256-Fingerabdruck"
+
+msgid "expires on"
+msgstr "läuft ab am"
+
+msgid "The certificate has expired. Upload a new certificate."
+msgstr "Das Zertifikat ist abgelaufen. Laden Sie ein neues Zertifikat hoch."
+
+msgid "The certificate expires within %(days)d days. Upload a new certificate before it expires."
+msgstr "Das Zertifikat läuft innerhalb von %(days)d Tagen ab. Laden Sie vor dem Ablauf ein neues Zertifikat hoch."
+
+msgid "Send test email"
+msgstr "Test-E-Mail senden"
+
+msgid "The Microsoft Graph configuration is incomplete. Save the settings and upload a certificate first."
+msgstr "Die Microsoft-Graph-Konfiguration ist unvollständig. Speichern Sie zuerst die Einstellungen und laden Sie ein Zertifikat hoch."
+
+msgid "In this mode, email goes only to the allowed recipients. Your address is not one of them, so no test email was sent."
+msgstr "In diesem Modus geht E-Mail nur an die erlaubten Empfänger. Ihre Adresse gehört nicht dazu, daher wurde keine Test-E-Mail gesendet."
+
+msgid "In console mode, no test email is sent, so the Microsoft Graph delivery is not tested."
+msgstr "Im Konsolenmodus wird keine Test-E-Mail gesendet, die Zustellung über Microsoft Graph wird daher nicht geprüft."
+
+msgid "The test email could not be sent. The reason is in the server log."
+msgstr "Die Test-E-Mail konnte nicht gesendet werden. Der Grund steht im Server-Log."
+
+msgid "Test email of the Microsoft Graph configuration"
+msgstr "Test-E-Mail der Microsoft-Graph-Konfiguration"
+
+msgid "This is a test email of the Microsoft Graph email delivery. No action is needed."
+msgstr "Dies ist eine Test-E-Mail des Versands über Microsoft Graph. Es ist keine Handlung nötig."
+
+msgid "Back to the configuration"
+msgstr "Zurück zur Konfiguration"
+
+msgid "The test email is sent through Microsoft Graph to your own address:"
+msgstr "Die Test-E-Mail wird über Microsoft Graph an Ihre eigene Adresse gesendet:"
+
+msgid "A successful send confirms only that Microsoft Graph accepted the email. Check the inbox to confirm that it arrived."
+msgstr "Ein erfolgreicher Versand bestätigt nur, dass Microsoft Graph die E-Mail angenommen hat. Prüfen Sie den Posteingang, ob sie angekommen ist."

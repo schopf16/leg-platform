@@ -7,4 +7,15 @@ which is not offered for the own account.
 {% endcomment %}
 {% block object-tools-items %}{% if request.user.is_superuser %}{% if original and original.pk != request.user.pk %}
 <li><a href="{% url 'admin:accounts_user_reset_second_factor' original.pk %}">{% translate "Reset two-factor authentication" %}</a></li>
+{% endif %}{% if original %}
+  {% if original.status == "active" %}
+    <li><a href="{% url 'admin:accounts_user_lifecycle' original.pk 'block' %}">{% translate "Block account" %}</a></li>
+  {% elif original.status == "blocked" %}
+    <li><a href="{% url 'admin:accounts_user_lifecycle' original.pk 'unblock' %}">{% translate "Unblock account" %}</a></li>
+  {% endif %}
+  {% if original.status != "deactivated" %}
+    <li><a href="{% url 'admin:accounts_user_lifecycle' original.pk 'delete' %}">{% translate "Delete or deactivate account" %}</a></li>
+  {% else %}
+    <li><a href="{% url 'admin:accounts_user_lifecycle' original.pk 'reactivate' %}">{% translate "Reactivate account" %}</a></li>
+  {% endif %}
 {% endif %}{{ block.super }}{% endif %}{% endblock %}

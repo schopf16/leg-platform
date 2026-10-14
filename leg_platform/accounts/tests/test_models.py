@@ -864,6 +864,8 @@ class BulkChangeTests(TestCase):
             "customer_number": None,
             "customer_number_id": None,
             "password": "!",
+            "session_version": 99,
+            "password_change_required": True,
         }
         for name, value in values.items():
             with self.subTest(field=name), self.assertRaises(AccountIntegrityError):
@@ -871,6 +873,19 @@ class BulkChangeTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.ACTIVE)
         self.assertFalse(self.user.is_staff)
+        self.assertEqual(self.user.session_version, 0)
+        self.assertFalse(self.user.password_change_required)
+
+    def test_bulk_update_of_session_fields_is_rejected_through_bulk_update(self):
+        self.user.password_change_required = True
+        with self.assertRaises(AccountIntegrityError), transaction.atomic():
+            User.objects.bulk_update([self.user], ["password_change_required"])
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.password_change_required)
+
+    def test_ending_all_sessions_is_still_possible_through_the_account_logic(self):
+        self.user.end_all_sessions()
+        self.assertEqual(User.objects.get(pk=self.user.pk).session_version, 1)
 
     def test_bulk_update_through_bulk_update_is_rejected(self):
         self.user.is_staff = True

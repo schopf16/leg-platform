@@ -64,10 +64,10 @@ def _lock(*users):
     return [rows.get(user.pk) for user in users]
 
 
-def _enqueue(kind, address):
+def _enqueue(kind, address, account=None):
     from leg_platform.accounts.mail_queue import enqueue
 
-    enqueue(kind, address)
+    enqueue(kind, address, account=account)
 
 
 def _check_administrator(actor, target):
@@ -112,7 +112,7 @@ def request_link(actor, target):
         _check_administrator(actor_row, target_row)
         if _privileged(target_row):
             raise ResetRefused
-        _enqueue(MailJob.Kind.TWO_FACTOR_RESET_LINK, target_row.email)
+        _enqueue(MailJob.Kind.TWO_FACTOR_RESET_LINK, target_row.email, account=target_row)
         security_log.record(Event.TWO_FACTOR_RESET_REQUESTED, account=target_row, actor=actor_row)
 
 
@@ -130,17 +130,22 @@ def reset_privileged(actor, target):
         remove_second_factor(target_row, Event.TWO_FACTOR_RESET, actor=actor_row)
 
 
-def process_reset_link(address):
+def process_reset_link(account_id, address):
     """Handle the request for a link in the background worker; return the sending function.
 
-    The token is created here and sent at once; it is never stored in a job (D-037). An earlier
-    link of the account becomes invalid.
+    The account is found by the key of the job, not by the address: an address can have been
+    given to another person since the request. The link is sent only if the account still has
+    the address of the request, so that it never reaches an address that did not request it
+    (D-044). The token is created here and sent at once; it is never stored in a job (D-037).
+    An earlier link of the account becomes invalid.
     """
-    normalized = normalize_email_address(address)
-    user = User._base_manager.filter(
-        normalized_email=normalized, status=User.Status.ACTIVE
-    ).first()
-    if user is None or _privileged(user) or not _has_second_factor(user):
+    user = User._base_manager.filter(pk=account_id, status=User.Status.ACTIVE).first()
+    if (
+        user is None
+        or user.normalized_email != normalize_email_address(address)
+        or _privileged(user)
+        or not _has_second_factor(user)
+    ):
         return None
     VerificationToken.objects.filter(
         user=user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET

@@ -54,6 +54,9 @@ VERIFICATION_URL = Placeholder(
     _("Personal link to confirm the email address and to choose a password."),
 )
 RESET_URL = Placeholder("reset_url", _("Personal link to choose a new password."))
+EMAIL_CHANGE_URL = Placeholder(
+    "email_change_url", _("Personal link to confirm the new email address.")
+)
 TWO_FACTOR_RESET_URL = Placeholder(
     "two_factor_reset_url", _("Personal link to remove two-factor authentication.")
 )
@@ -92,6 +95,24 @@ DEFINITIONS = {
         lambda: gettext("Choose a new password for %(instance_name)s"),
         (RESET_URL, LIFETIME_HOURS),
         (RESET_URL,),
+    ),
+    Key.EMAIL_CHANGE_VERIFICATION: Definition(
+        "accounts/email/email_change_verification.txt",
+        lambda: gettext("Confirm your new email address at %(instance_name)s"),
+        (EMAIL_CHANGE_URL, LIFETIME_HOURS),
+        (EMAIL_CHANGE_URL,),
+    ),
+    Key.EMAIL_CHANGE_EXISTING_ACCOUNT: Definition(
+        "accounts/email/email_change_existing_account.txt",
+        lambda: gettext("An email address change was attempted at %(instance_name)s"),
+        (CONTACT_URL,),
+        (),
+    ),
+    Key.EMAIL_CHANGED: Definition(
+        "accounts/email/email_changed.txt",
+        lambda: gettext("Your email address at %(instance_name)s was changed"),
+        (CONTACT_URL,),
+        (),
     ),
     Key.PASSWORD_CHANGED: Definition(
         "accounts/email/password_changed.txt",

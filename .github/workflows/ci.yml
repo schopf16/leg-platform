@@ -199,4 +199,4 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: Run tests
-        run: python manage.py test --verbosity 2
+        run: python manage.py test --settings=leg_platform.test_settings --verbosity 2

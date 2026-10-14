@@ -269,6 +269,21 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         return cleaned_data
 
 
+class EmailChangeForm(ReauthenticationForm):
+    """Propose a new address and prove control of the current credentials."""
+
+    email = forms.EmailField(label=_("New email address"), max_length=EMAIL_MAX_LENGTH)
+    field_order = ("email", "current_password", "otp_token")
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+        try:
+            validate_account_email(email)
+        except ValueError:
+            raise ValidationError(_("Enter a valid email address."), code="invalid") from None
+        return email
+
+
 class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
     """Change the password of the logged-in account; asks for the current password first."""
 

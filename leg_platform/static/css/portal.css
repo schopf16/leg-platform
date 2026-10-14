@@ -1,6 +1,4 @@
-/* Platform defaults of the design language (docs/DESIGN.md). Instance branding (accent colour,
-   logo) will override these values (docs/DESIGN.md, 3.2). Fonts are served by the instance
-   itself (docs/DESIGN.md, section 4; docs/SECURITY.md, section 6). */
+/* Self-hosted design assets and neutral platform defaults (docs/DESIGN.md). */
 
 @font-face {
   font-family: "Source Sans 3";
@@ -27,9 +25,6 @@
   font-display: swap;
 }
 
-/* Light values are the default. The colour mode follows the device setting: the server renders no
-   data-bs-theme attribute, so Tabler's light-dark() tokens (vendor tabler.min.css, first :root rule)
-   follow the device too. Dark values are below (docs/DESIGN.md, sections 3 and 7). */
 :root {
   color-scheme: light dark;
   --tblr-font-sans-serif: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -38,33 +33,31 @@
   --tblr-primary: #2f6b4f;
   --tblr-primary-rgb: 47, 107, 79;
   --tblr-primary-fg: #ffffff;
-  --tblr-body-bg: #f5f5f4;
-  --tblr-body-color: #1c1917;
-  --tblr-secondary-color: #57534e;
-  --tblr-border-color: #e7e5e4;
-  --tblr-danger: #b42318;
+  --tblr-body-bg: light-dark(#f5f5f4, #0c0a09);
+  --tblr-body-color: light-dark(#1c1917, #f5f5f4);
+  --tblr-bg-surface: light-dark(#ffffff, #1c1917);
+  --tblr-secondary-color: light-dark(#57534e, #a8a29e);
+  --tblr-border-color: light-dark(#e7e5e4, #44403c);
+  --tblr-danger: light-dark(#b42318, #f0948a);
   --tblr-danger-rgb: 180, 35, 24;
   /* Light tint of the accent for the "Warm" areas (docs/DESIGN.md, section 2). */
-  --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, #ffffff);
-  --portal-surface: #ffffff;
-  --portal-field-border: #78716c;
+  --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, var(--portal-surface));
+  --portal-surface: light-dark(#ffffff, #1c1917);
+  --portal-field-border: light-dark(#78716c, #8a817b);
+}
+
+:root[data-bs-theme="light"] { color-scheme: light; }
+:root[data-bs-theme="dark"] {
+  color-scheme: dark;
+  --tblr-danger-rgb: 240, 148, 138;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-bs-theme="light"]) {
     --tblr-primary: #74c59a;
     --tblr-primary-rgb: 116, 197, 154;
     --tblr-primary-fg: #0c0a09;
-    --tblr-body-bg: #0c0a09;
-    --tblr-body-color: #f5f5f4;
-    --tblr-bg-surface: #1c1917;
-    --tblr-secondary-color: #a8a29e;
-    --tblr-border-color: #44403c;
-    --tblr-danger: #f0948a;
     --tblr-danger-rgb: 240, 148, 138;
-    --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, #1c1917);
-    --portal-surface: #1c1917;
-    --portal-field-border: #8a817b;
   }
 }
 
@@ -176,6 +169,7 @@
   justify-content: center;
   gap: 1.5rem;
   padding: 2rem 1.5rem;
+  border-bottom: 0.5rem solid var(--portal-highlight, transparent);
 }
 
 .login-welcome h1 {
@@ -239,15 +233,15 @@
 }
 
 .status-active {
-  background: #2f8f5b;
+  background: light-dark(#2f8f5b, #5dbb86);
 }
 
 .status-unverified {
-  background: #b7791f;
+  background: light-dark(#b7791f, #e8b34a);
 }
 
 .status-blocked {
-  background: #b42318;
+  background: var(--tblr-danger);
 }
 
 .status-deactivated {
@@ -260,4 +254,74 @@
   footer {
     display: none;
   }
+  :root { color-scheme: light; }
+  body, .card, .login-welcome {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  a, h1, h2, p, dt, dd { color: #000000 !important; }
+  form, button, .btn, .member-menu, .member-tabs { display: none !important; }
+  .print-heading { display: block !important; margin-bottom: 1rem; }
+  .page-body { padding-bottom: 0 !important; }
+}
+
+.print-heading { display: none; }
+.portal-logo { max-width: min(14rem, 55vw); max-height: 4rem; object-fit: contain; }
+.portal-header .portal-brand { max-width: 55%; overflow-wrap: anywhere; }
+.portal-logo-dark { display: none; }
+:root[data-bs-theme="dark"] .portal-logo-light { display: none; }
+:root[data-bs-theme="dark"] .portal-logo-dark { display: inline-block; }
+
+.colour-mode-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.colour-mode-form .form-select { width: auto; }
+.member-menu summary { cursor: pointer; padding: 0.75rem; min-height: 3rem; }
+.member-menu { order: -1; }
+.member-menu nav { gap: 0.5rem; }
+.member-top-navigation { display: none; }
+.member-tabs {
+  position: fixed;
+  bottom: 0;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  background: var(--portal-surface);
+  border-top: 1px solid var(--tblr-border-color);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.member-tabs a { padding: 0.75rem 1.5rem; min-height: 3rem; }
+[data-address-results] ul { list-style: none; padding: 0; }
+[data-address-results] button {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+  text-align: left;
+  white-space: normal;
+  background: var(--portal-surface);
+  color: var(--tblr-body-color);
+  border: 1px solid var(--portal-field-border);
+  border-radius: 6px;
+}
+.page-body { padding-bottom: 4rem; }
+a:focus-visible, button:focus-visible, summary:focus-visible,
+input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--tblr-primary);
+  outline-offset: 3px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-bs-theme="light"]) .portal-logo-light { display: none; }
+  :root:not([data-bs-theme="light"]) .portal-logo-dark { display: inline-block; }
+}
+@media (min-width: 768px) {
+  .member-tabs { display: none; }
+  .member-top-navigation { display: flex; }
+  .page-body { padding-bottom: 0; }
 }

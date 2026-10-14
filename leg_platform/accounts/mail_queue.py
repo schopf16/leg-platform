@@ -57,20 +57,25 @@ HANDLERS = {
     MailJob.Kind.REGISTRATION: registration.process_registration,
     MailJob.Kind.PASSWORD_RESET: password_reset.process_reset_request,
     MailJob.Kind.PASSWORD_CHANGED: password_reset.process_password_changed,
+    MailJob.Kind.EMAIL_CHANGED: _notification(emails.send_email_changed),
     MailJob.Kind.TWO_FACTOR_ENABLED: _notification(emails.send_two_factor_enabled),
     MailJob.Kind.TWO_FACTOR_DISABLED: _notification(emails.send_two_factor_disabled),
     MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),
     MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
     MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
-    MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
     MailJob.Kind.TWO_FACTOR_RESET: _notification(emails.send_two_factor_reset),
+}
+
+# Handlers of jobs about an account get the account key and the address of the request (D-044).
+ACCOUNT_HANDLERS = {
+    MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
 }
 
 DONE = "done"
 FAILED = "failed"
 
 
-def submit_mail_request(request, kind, email):
+def submit_mail_request(request, kind, email, *, account=None):
     """Count a request for an email and store the job; the same work for every address.
 
     The request is counted at the address, the client IP address and the whole instance only if
@@ -95,14 +100,17 @@ def submit_mail_request(request, kind, email):
     MailJob.objects.create(
         kind=kind,
         address="" if suppressed else address,
+        account=None if suppressed else account,
         suppressed=suppressed,
         next_attempt_at=timezone.now(),
     )
 
 
-def enqueue(kind, address):
+def enqueue(kind, address, account=None):
     """Queue an email that no request limit applies to (e.g. a notification)."""
-    MailJob.objects.create(kind=kind, address=address, next_attempt_at=timezone.now())
+    MailJob.objects.create(
+        kind=kind, address=address, account=account, next_attempt_at=timezone.now()
+    )
 
 
 def process_pending(limit=50):
@@ -126,7 +134,7 @@ def process_pending(limit=50):
 
 
 def _claim():
-    """Take the next due job; return (id, kind, address), DONE/FAILED for a discarded one."""
+    """Take the next due job; return (id, kind, address, account id), DONE/FAILED if discarded."""
     now = timezone.now()
     with transaction.atomic():
         job = (
@@ -147,17 +155,26 @@ def _claim():
         job.attempts += 1
         job.next_attempt_at = now + RETRY_DELAY * job.attempts
         job.save(update_fields=["attempts", "next_attempt_at"])
-        return job.pk, job.kind, job.address
+        return job.pk, job.kind, job.address, job.account_id
 
 
 def _process_next():
     claimed = _claim()
     if claimed is None or isinstance(claimed, str):
         return claimed
-    job_id, kind, address = claimed
+    job_id, kind, address, account_id = claimed
     try:
         with transaction.atomic():
-            send = HANDLERS[kind](address)
+            if kind == MailJob.Kind.EMAIL_CHANGE_REQUEST:
+                # Imported only while processing to avoid a module cycle: email_change enqueues
+                # the notification through this module after it commits the address change.
+                from leg_platform.accounts import email_change
+
+                send = email_change.process_request(account_id, address)
+            elif kind in ACCOUNT_HANDLERS:
+                send = ACCOUNT_HANDLERS[kind](account_id, address)
+            else:
+                send = HANDLERS[kind](address)
         if send is not None:
             send()
     except Exception as error:

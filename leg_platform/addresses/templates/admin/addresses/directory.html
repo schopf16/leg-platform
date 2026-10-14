@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block content %}
+<section aria-labelledby="directory-heading">
+  <h2 id="directory-heading">{% translate "Address directory" %}</h2>
+  <p>{{ directory_status.attribution }}</p>
+  {% if directory %}
+    <dl>
+      <dt>{% translate "Data date" %}</dt><dd>{{ directory.data_date|date:"DATE_FORMAT" }}</dd>
+      <dt>{% translate "Imported at" %}</dt><dd>{{ directory.imported_at|date:"DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Address count" %}</dt><dd>{{ directory.row_count }}</dd>
+    </dl>
+  {% endif %}
+  {% if directory_status.warning %}<p role="status">{{ directory_status.warning }}</p>{% endif %}
+  {% if import_job %}
+    <dl>
+      <dt>{% translate "Status" %}</dt><dd>{{ import_job.get_state_display }}</dd>
+      <dt>{% translate "Requested at" %}</dt><dd>{{ import_job.requested_at|date:"DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Started at" %}</dt><dd>{{ import_job.started_at|date:"DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Finished at" %}</dt><dd>{{ import_job.finished_at|date:"DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Last automatic attempt at" %}</dt><dd>{{ import_job.last_automatic_attempt_at|date:"DATETIME_FORMAT" }}</dd>
+    </dl>
+  {% endif %}
+  <p>{% translate "The import runs in a separate background worker. Addresses already entered are not changed." %}</p>
+  <form method="post">{% csrf_token %}
+    <button type="submit">{% translate "Request directory update" %}</button>
+  </form>
+</section>
+{% endblock %}

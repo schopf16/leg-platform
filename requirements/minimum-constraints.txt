@@ -14,3 +14,4 @@ django-countries==9.1.0
 django-phonenumber-field==8.5.0
 phonenumberslite==9.0.41
 idna==3.15
+requests==2.34.2

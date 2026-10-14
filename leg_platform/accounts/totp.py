@@ -181,6 +181,8 @@ def confirm_enrolment(user, device_id, code):
         device.confirmed = True
         device.save()
         codes = _replace_recovery_codes(user)
+        # Other sessions end; the view keeps the session that made the change (D-044).
+        user.end_all_sessions()
         enqueue(MailJob.Kind.TWO_FACTOR_ENABLED, user.email)
         security_log.record(Event.TWO_FACTOR_ENABLED, account=user)
     return device, codes
@@ -210,6 +212,8 @@ def renew_recovery_codes(user):
         if confirmed_totp_device(user) is None:
             raise SecondFactorError("The account has no second factor.")
         codes = _replace_recovery_codes(user)
+        # Other sessions end; the view keeps the session that made the change (D-044).
+        user.end_all_sessions()
         enqueue(MailJob.Kind.RECOVERY_CODES_RENEWED, user.email)
         security_log.record(Event.RECOVERY_CODES_RENEWED, account=user)
     return codes
@@ -229,6 +233,8 @@ def disable(user):
             raise SecondFactorError("Staff users and system administrators need a second factor.")
         for device in list(devices_for_user(user, confirmed=None)):
             device.delete()
+        # Other sessions end; the view keeps the session that made the change (D-044).
+        user.end_all_sessions()
         enqueue(MailJob.Kind.TWO_FACTOR_DISABLED, user.email)
         security_log.record(Event.TWO_FACTOR_DISABLED, account=user)
 

@@ -322,7 +322,10 @@ class PageSecurityAndLanguageTests(TestCase):
         for name, response in self.pages().items():
             html = response.content.decode()
             with self.subTest(name):
-                self.assertNotIn("<script", html.lower())
+                # Only external scripts from the instance itself are allowed (address widget);
+                # inline scripts are not (docs/SECURITY.md, section 6).
+                self.assertNotRegex(html.lower(), r"<script(?![^>]*\ssrc=)")
+                self.assertNotRegex(html.lower(), r"<script[^>]*\ssrc=\"(?!/static/)")
                 self.assertNotIn("<style", html.lower())
                 self.assertNotRegex(html, r"(?i)\sstyle\s*=")
                 self.assertNotRegex(html, r"(?i)\son[a-z]+\s*=")

@@ -158,6 +158,14 @@ class TokenRedactionTests(SimpleTestCase):
             f"Not Found: /two-factor-reset/verify/{REDACTED}/",
         )
 
+    def test_the_pattern_matches_the_url_of_the_email_change_view(self):
+        path = reverse("accounts:email_change_verify", args=[SECRET])
+
+        self.assertEqual(
+            redact_tokens(f"Not Found: {path}"),
+            f"Not Found: /email-change/verify/{REDACTED}/",
+        )
+
     def test_the_request_lines_of_the_development_server_are_redacted(self):
         line = f'"GET /register/verify/{SECRET}/ HTTP/1.1" 302 0'
 
@@ -200,3 +208,22 @@ class TokenRedactionTests(SimpleTestCase):
         for name in ("django", "django.server"):
             self.assertEqual(settings.LOGGING["loggers"][name]["handlers"], ["console"])
         self.assertEqual(settings.LOGGING["root"]["handlers"], ["console"])
+
+    def test_msal_response_bodies_are_not_logged_below_critical(self):
+        from django.conf import settings
+
+        # msal/oauth2cli/oauth2.py logs a non-JSON token response body at ERROR level.
+        entry = settings.LOGGING["loggers"]["msal.oauth2cli.oauth2"]
+        self.assertEqual(entry["level"], "CRITICAL")
+        self.assertEqual(entry["handlers"], ["console"])
+        self.assertFalse(entry["propagate"])
+        self.assertFalse(logging.getLogger("msal.oauth2cli.oauth2").isEnabledFor(logging.ERROR))
+
+    def test_msal_signing_exception_details_are_not_logged_below_critical(self):
+        from django.conf import settings
+
+        entry = settings.LOGGING["loggers"]["msal.oauth2cli.assertion"]
+        self.assertEqual(entry["level"], "CRITICAL")
+        self.assertEqual(entry["handlers"], ["console"])
+        self.assertFalse(entry["propagate"])
+        self.assertFalse(logging.getLogger("msal.oauth2cli.assertion").isEnabledFor(logging.ERROR))

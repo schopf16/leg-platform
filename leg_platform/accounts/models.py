@@ -35,7 +35,8 @@ from urllib.parse import quote, urlencode
 
 import idna
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.conf import settings
 from django.contrib.auth import password_validation
@@ -262,6 +263,10 @@ class UserQuerySet(models.QuerySet):
             "customer_number",
             "customer_number_id",
             "password",
+            # The session fields end sessions and force a password change; only the account
+            # logic may write them (end_all_sessions, the password change, the administration).
+            "session_version",
+            "password_change_required",
         }
     )
 
@@ -273,6 +278,14 @@ class UserQuerySet(models.QuerySet):
                 "change each account through the account logic."
             )
         return super().update(**kwargs)
+
+    def increase_session_version(self):
+        """End the sessions of the accounts in the queryset; only the account logic calls it.
+
+        The protected-field check of ``update()`` is bypassed on purpose: this is the one bulk
+        write of the session version, called from ``User.end_all_sessions()`` (D-041).
+        """
+        return models.QuerySet.update(self, session_version=models.F("session_version") + 1)
 
     def delete(self):
         raise AccountIntegrityError(
@@ -591,9 +604,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         A session that must go on (the one that made the change) takes the new hash with
         ``update_session_auth_hash()``.
         """
-        type(self)._base_manager.filter(pk=self.pk).update(
-            session_version=models.F("session_version") + 1
-        )
+        type(self)._base_manager.filter(pk=self.pk).increase_session_version()
         self.refresh_from_db(fields=["session_version"])
 
     # Central account logic
@@ -875,8 +886,59 @@ class User(AbstractBaseUser, PermissionsMixin):
             return super().delete(using=using, keep_parents=keep_parents)
 
     def set_status(self, status):
-        """Change the account status (D-016); is_active and the normalised address follow it."""
-        self._change(status=status)
+        """Change the account status and end its existing sessions (D-016)."""
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
+            account._change(status=status)
+            account.end_all_sessions()
+            self.refresh_from_db(using=using)
+
+    def delete_or_deactivate(self):
+        """Apply the account deletion rule: retain-and-deactivate, otherwise erase (D-016)."""
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
+            if account.retention_obligation:
+                account._change(status=self.Status.DEACTIVATED)
+                account.end_all_sessions()
+                self.refresh_from_db(using=using)
+                return "deactivated"
+            account.delete(using=using)
+            return "deleted"
+
+    def reactivate(self):
+        """Reactivate a retained account if its email address is available (D-016)."""
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
+            if account.status != self.Status.DEACTIVATED:
+                raise AccountIntegrityError("Only deactivated accounts can be reactivated.")
+            duplicate = (
+                type(self)
+                ._base_manager.using(using)
+                .select_for_update()
+                .filter(
+                    normalized_email=account.normalized_email
+                    or normalize_email_address(account.email)
+                )
+                .exclude(pk=account.pk)
+                .order_by("pk")
+                .first()
+            )
+            if duplicate is not None and duplicate.status == self.Status.UNVERIFIED:
+                duplicate.delete(using=using)
+            elif duplicate is not None:
+                raise AccountIntegrityError("The email address is already in use.")
+            try:
+                with transaction.atomic(using=using):
+                    account._change(status=self.Status.ACTIVE)
+            except IntegrityError:
+                raise AccountIntegrityError(
+                    "The email address is already in use."
+                ) from None
+            account.end_all_sessions()
+            self.refresh_from_db(using=using)
 
     def set_privileges(self, *, is_staff, is_superuser):
         """Promote or demote the account (D-012); a system administrator is also a staff user."""
@@ -991,7 +1053,7 @@ def verification_token_digest(raw_token):
 
 
 class VerificationTokenManager(models.Manager):
-    def issue(self, user, purpose, lifetime):
+    def issue(self, user, purpose, lifetime, *, target_email=""):
         """Create a token for the user and return its raw value, which is stored nowhere.
 
         Only the keyed digest is stored, so a copy of the database yields no usable link.
@@ -1002,6 +1064,7 @@ class VerificationTokenManager(models.Manager):
             purpose=purpose,
             digest=verification_token_digest(raw_token),
             expires_at=timezone.now() + lifetime,
+            target_email=target_email,
         )
         return raw_token
 
@@ -1028,6 +1091,7 @@ class VerificationToken(models.Model):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
+        EMAIL_CHANGE = "email_change", "Email address change"
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="verification_tokens", editable=False
@@ -1038,6 +1102,9 @@ class VerificationToken(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(db_index=True)
+    target_email = models.EmailField(
+        max_length=EMAIL_MAX_LENGTH, blank=True, editable=False
+    )
 
     objects = VerificationTokenManager()
 
@@ -1077,7 +1144,13 @@ class MailJob(models.Model):
     class Kind(models.TextChoices):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
+        EMAIL_CHANGE = "email_change", "Email address change"
+        EMAIL_CHANGE_REQUEST = "email_change_request", "Email address change request"
         PASSWORD_CHANGED = "password_changed", "Password changed"
+        EMAIL_CHANGED = "email_changed", "Email address changed"
+        EMAIL_CHANGE_EXISTING_ACCOUNT = "email_change_existing_account", (
+            "Email change: target address already has an account"
+        )
         TWO_FACTOR_ENABLED = "two_factor_enabled", "Two-factor authentication set up"
         TWO_FACTOR_DISABLED = "two_factor_disabled", "Two-factor authentication removed"
         RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
@@ -1090,6 +1163,7 @@ class MailJob(models.Model):
     # who may have no account (D-038, D-040).
     NOTIFICATION_KINDS = (
         Kind.PASSWORD_CHANGED,
+        Kind.EMAIL_CHANGED,
         Kind.TWO_FACTOR_ENABLED,
         Kind.TWO_FACTOR_DISABLED,
         Kind.RECOVERY_CODES_RENEWED,
@@ -1099,10 +1173,20 @@ class MailJob(models.Model):
         Kind.TWO_FACTOR_RESET,
     )
 
-    kind = models.CharField(max_length=24, choices=Kind, editable=False)
+    kind = models.CharField(max_length=32, choices=Kind, editable=False)
     # Empty for a suppressed job: it is discarded unseen, so it need not keep the address of a
     # person who may have no account.
     address = models.EmailField(max_length=EMAIL_MAX_LENGTH, blank=True, editable=False)
+    # Set for a job about an existing account: the worker finds the account by its key, not by
+    # the address, which may have changed or been taken by someone else since the request (D-044).
+    account = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="mail_jobs",
+    )
     # A request above a limit is stored like any other and discarded by the worker.
     suppressed = models.BooleanField(default=False, editable=False)
     attempts = models.PositiveSmallIntegerField(default=0, editable=False)
@@ -1134,6 +1218,13 @@ class EmailText(models.Model):
         )
         PASSWORD_RESET = "password_reset", _("Password reset: link to choose a new password")
         PASSWORD_CHANGED = "password_changed", _("Notification: password changed")
+        EMAIL_CHANGE_VERIFICATION = "email_change_verification", _(
+            "Email address change: link to confirm the new address"
+        )
+        EMAIL_CHANGE_EXISTING_ACCOUNT = "email_change_existing_account", _(
+            "Email address change: the new address already has an account"
+        )
+        EMAIL_CHANGED = "email_changed", _("Notification: email address changed")
         TWO_FACTOR_ENABLED = "two_factor_enabled", _(
             "Notification: two-factor authentication set up"
         )
@@ -1206,6 +1297,14 @@ class EmailTextVersion(models.Model):
 
 GRAPH_CERTIFICATE_KEY_PURPOSE = b"LEG-Platform Microsoft Graph certificate key v1"
 GRAPH_MIN_RSA_KEY_BITS = 2048
+# A certificate that expires within this many days is shown as expiring. Microsoft does not state a
+# certificate lifetime or renewal period (docs/DECISIONS.md, D-006), so the value is a project
+# decision.
+GRAPH_CERTIFICATE_WARNING_DAYS = 30
+CERTIFICATE_NONE = "none"
+CERTIFICATE_VALID = "valid"
+CERTIFICATE_EXPIRING = "expiring"
+CERTIFICATE_EXPIRED = "expired"
 
 
 class GraphConfiguration(models.Model):
@@ -1222,11 +1321,16 @@ class GraphConfiguration(models.Model):
 
     class Meta:
         default_permissions = ()
+        verbose_name = _("Microsoft Graph configuration")
+        verbose_name_plural = _("Microsoft Graph configuration")
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(id=1), name="accounts_graph_configuration_singleton"
             )
         ]
+
+    def __str__(self):
+        return str(self._meta.verbose_name)
 
     @classmethod
     def load(cls):
@@ -1243,17 +1347,25 @@ class GraphConfiguration(models.Model):
             and self.encrypted_private_key
         )
 
+    @staticmethod
     @sensitive_variables("private_key_pem")
-    def set_certificate(self, private_key_pem, certificate_pem):
-        """Store a certificate and its private key (both PEM, as bytes) after checking them.
+    def check_certificate(private_key_pem, certificate_pem):
+        """Check a certificate and its private key (both PEM, as bytes) and return the expiry time.
 
         The key must be RSA with at least GRAPH_MIN_RSA_KEY_BITS, belong to the certificate and
-        the certificate must not have expired. Nothing is stored when a check fails.
+        the certificate must not have expired. Raises ``ValidationError`` when a check fails.
         """
+        # Non-ASCII input is not PEM. The check keeps set_certificate() from failing when it stores
+        # the certificate as text, and private_key_pem() from failing when it decodes the key.
+        if not private_key_pem.isascii() or not certificate_pem.isascii():
+            raise ValidationError(
+                _("The certificate or the private key cannot be read (PEM, no password).")
+            )
         try:
             private_key = serialization.load_pem_private_key(private_key_pem, password=None)
             certificate = x509.load_pem_x509_certificate(certificate_pem)
-        except (TypeError, ValueError):
+            certificate_key = certificate.public_key()
+        except (TypeError, ValueError, UnsupportedAlgorithm):
             raise ValidationError(
                 _("The certificate or the private key cannot be read (PEM, no password).")
             ) from None
@@ -1264,15 +1376,47 @@ class GraphConfiguration(models.Model):
             raise ValidationError(
                 _("The private key must be an RSA key with at least 2048 bits.")
             )
-        if certificate.public_key().public_numbers() != private_key.public_key().public_numbers():
+        if certificate_key.public_numbers() != private_key.public_key().public_numbers():
             raise ValidationError(_("The private key does not belong to the certificate."))
         expires_on = certificate.not_valid_after_utc
         if expires_on <= timezone.now():
             raise ValidationError(_("The certificate has expired."))
+        return expires_on
+
+    @sensitive_variables("private_key_pem")
+    def set_certificate(self, private_key_pem, certificate_pem):
+        """Store a certificate and its private key (both PEM, as bytes) after checking them.
+
+        Nothing is stored when a check fails (see ``check_certificate``).
+        """
+        expires_on = self.check_certificate(private_key_pem, certificate_pem)
         self.certificate_pem = certificate_pem.decode("ascii")
         self.encrypted_private_key = encrypt(private_key_pem, GRAPH_CERTIFICATE_KEY_PURPOSE)
         self.certificate_expires_on = expires_on
         self.save()
+
+    def certificate_status(self, now=None):
+        """Return CERTIFICATE_NONE, CERTIFICATE_VALID, CERTIFICATE_EXPIRING or CERTIFICATE_EXPIRED."""
+        if self.certificate_expires_on is None:
+            return CERTIFICATE_NONE
+        now = now or timezone.now()
+        if self.certificate_expires_on <= now:
+            return CERTIFICATE_EXPIRED
+        if self.certificate_expires_on - now <= timedelta(days=GRAPH_CERTIFICATE_WARNING_DAYS):
+            return CERTIFICATE_EXPIRING
+        return CERTIFICATE_VALID
+
+    def certificate_details(self):
+        """Return the subject and the SHA-1 and SHA-256 thumbprints of the stored public certificate.
+
+        Only the public certificate is read; the private key is never decrypted here.
+        """
+        certificate = x509.load_pem_x509_certificate(self.certificate_pem.encode("ascii"))
+        return {
+            "subject": certificate.subject.rfc4514_string(),
+            "sha1": certificate.fingerprint(hashes.SHA1()).hex().upper(),
+            "sha256": certificate.fingerprint(hashes.SHA256()).hex().upper(),
+        }
 
     @sensitive_variables()
     def private_key_pem(self):
@@ -1496,6 +1640,13 @@ class SecurityEvent(models.Model):
     class Event(models.TextChoices):
         PASSWORD_CHANGED = "password_changed", _("Password changed")
         PASSWORD_RESET = "password_reset", _("Password reset by link")
+        EMAIL_CHANGE_REQUESTED = "email_change_requested", _("Email address change requested")
+        EMAIL_CHANGED = "email_changed", _("Email address changed")
+        ACCOUNT_BLOCKED = "account_blocked", _("Account blocked")
+        ACCOUNT_UNBLOCKED = "account_unblocked", _("Account unblocked")
+        ACCOUNT_DEACTIVATED = "account_deactivated", _("Account deactivated")
+        ACCOUNT_REACTIVATED = "account_reactivated", _("Account reactivated")
+        ACCOUNT_DELETED = "account_deleted", _("Account deleted")
         TWO_FACTOR_ENABLED = "two_factor_enabled", _("Two-factor authentication set up")
         TWO_FACTOR_DISABLED = "two_factor_disabled", _(
             "Two-factor authentication removed by the account itself"
@@ -1525,9 +1676,19 @@ class SecurityEvent(models.Model):
         EMERGENCY_KEYS_REENCRYPTED = "emergency_keys_reencrypted", _(
             "Second factor keys encrypted again by the emergency command"
         )
+        GRAPH_CONFIGURATION_CHANGED = "graph_configuration_changed", _(
+            "Microsoft Graph configuration changed"
+        )
+        GRAPH_CERTIFICATE_UPLOADED = "graph_certificate_uploaded", _(
+            "Microsoft Graph certificate uploaded"
+        )
+        GRAPH_TEST_EMAIL_REQUESTED = "graph_test_email_requested", _(
+            "Microsoft Graph test email requested"
+        )
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
+    # Changes of the mail delivery are kept long for the same reason (D-006).
     LONG_RETENTION = frozenset(
         {
             Event.PRIVILEGES_CHANGED,
@@ -1536,6 +1697,8 @@ class SecurityEvent(models.Model):
             Event.EMERGENCY_TWO_FACTOR_RESET,
             Event.EMERGENCY_ACCOUNT_UNBLOCKED,
             Event.EMERGENCY_KEYS_REENCRYPTED,
+            Event.GRAPH_CONFIGURATION_CHANGED,
+            Event.GRAPH_CERTIFICATE_UPLOADED,
         }
     )
 

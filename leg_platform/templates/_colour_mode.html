@@ -1,0 +1,12 @@
+{% load i18n %}
+<form method="post" action="{% url 'colour_mode' %}" class="colour-mode-form d-print-none">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <label for="colour-mode">{% translate "Colour mode" %}</label>
+  <select name="mode" id="colour-mode" class="form-select">
+    <option value="auto"{% if colour_mode == "auto" %} selected{% endif %}>{% translate "Device setting" %}</option>
+    <option value="light"{% if colour_mode == "light" %} selected{% endif %}>{% translate "Light" %}</option>
+    <option value="dark"{% if colour_mode == "dark" %} selected{% endif %}>{% translate "Dark" %}</option>
+  </select>
+  <button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button>
+</form>

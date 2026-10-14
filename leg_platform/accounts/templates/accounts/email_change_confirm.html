@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Confirm email address change" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Confirm email address change" %}</h1>
+      <p>{% blocktranslate with email=new_email %}Confirm that {{ email }} should become the email address for your account.{% endblocktranslate %}</p>
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100">{% translate "Confirm new email address" %}</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

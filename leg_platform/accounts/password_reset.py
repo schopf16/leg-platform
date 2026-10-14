@@ -56,11 +56,16 @@ def process_password_changed(address):
 
 
 def delete_expired_reset_tokens(now=None):
-    """Delete reset links (of the password and of the second factor) that expired."""
+    """Delete reset and email change links that expired.
+
+    Email change links are included so that the proposed address they hold (``target_email``)
+    does not stay in the database after the link expired (D-016, data minimisation).
+    """
     count, _ = VerificationToken.objects.filter(
         purpose__in=(
             VerificationToken.Purpose.PASSWORD_RESET,
             VerificationToken.Purpose.TWO_FACTOR_RESET,
+            VerificationToken.Purpose.EMAIL_CHANGE,
         ),
         expires_at__lte=now or timezone.now(),
     ).delete()

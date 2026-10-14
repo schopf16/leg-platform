@@ -36,6 +36,26 @@ urlpatterns = [
         name="password_reset_verify",
     ),
     path(
+        "email-change/verify/<slug:token>/",
+        views.EmailChangeVerifyView.as_view(),
+        name="email_change_verify",
+    ),
+    path(
+        "email-change/confirm/",
+        views.EmailChangeConfirmView.as_view(),
+        name="email_change_confirm",
+    ),
+    path(
+        "email-change/request/",
+        views.EmailChangeRequestView.as_view(),
+        name="email_change_request",
+    ),
+    path(
+        "email-change/sent/",
+        views.EmailChangeSentView.as_view(),
+        name="email_change_sent",
+    ),
+    path(
         "two-factor-reset/verify/<slug:token>/",
         views.TwoFactorResetVerifyView.as_view(),
         name="two_factor_reset_verify",
@@ -46,6 +66,8 @@ urlpatterns = [
         name="two_factor_reset_confirm",
     ),
     path("profile/", views.ProfileView.as_view(), name="profile"),
+    path("profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"),
+    path("profile/delete/", views.AccountDeleteView.as_view(), name="account_delete"),
     path("profile/password/", views.PasswordChangeView.as_view(), name="password_change"),
     path("profile/two-factor/", views.TwoFactorOverviewView.as_view(), name="two_factor"),
     path("profile/two-factor/setup/", views.TwoFactorSetupView.as_view(), name="two_factor_setup"),

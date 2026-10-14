@@ -2,6 +2,105 @@
 
 This guide grows with the project. Installation of stage and production instances is documented once the hosting details are decided (D-008).
 
+## Instance Presentation
+
+Branding is configured through the variables documented in `.env.example` (D-051).
+Leave them empty to use the neutral platform defaults. Colours are six-digit hexadecimal
+values. The application refuses to start if the accent lacks 4.5:1 contrast with its text,
+the page background or the surface, or if highlight text would lack contrast.
+
+Before deploying, the operator also checks that accents are not red and cannot be confused
+with the status or energy colours in `docs/DESIGN.md`. The automatic contrast check does
+not verify the meaning of colours.
+
+Provide both the light and dark logo as local static `.svg` or `.png` files. Use relative
+static paths, never an absolute path or an external URL. Logos are embedded as images, not
+inline SVG. Set `INSTANCE_STATIC_DIRECTORY` to an existing absolute directory outside
+the repository containing these files. Its contents are public: never put configuration,
+personal data or secrets there. Check every SVG for scripts, event handlers and external references before
+deployment; serve static files with a restrictive CSP. Run Django's `collectstatic` using
+the instance's configured static directories before serving the files. A missing file is
+an operator error; the startup path validation does not prove that the file exists.
+
+Colour mode defaults to the device setting. The user can select light, dark or automatic
+mode without JavaScript. The preference cookie contains no account data and can be deleted
+to restore the device setting. Print output hides navigation and interactive controls and
+shows the instance name and date.
+
+Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, Safari 17.5
+or newer, and Opera 109 or newer. Devices that cannot update to these versions are not
+supported. Responsive checks do not establish full WCAG 2.2 AA conformity.
+
+## Local Address Directory
+
+The application never sends profile addresses to an external service. Suggestions query
+only a local copy of the official directory, attributed to the
+Federal Office of Topography swisstopo in the Swiss German translation (D-049). A missing, stale or unavailable
+directory gives an explicit advisory warning and never blocks registration or saving.
+Foreign addresses and post office boxes are not checked against building addresses.
+
+The operator creates a separate MariaDB database with
+`CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci` and InnoDB tables.
+Give each environment/instance its own account with **SELECT only** on that directory.
+Configure the `ADDRESS_DB_*` variables. Do not reuse the application account.
+The public directory may be shared across instances and is not part of application
+backups. It can be reconstructed from the official source.
+
+Create a different importer account for this same database with schema and write
+privileges. Put `ADDRESS_IMPORT_DB_USER` and `ADDRESS_IMPORT_DB_PASSWORD` only in the
+protected environment of the isolated importer, never in the web service. Normal settings
+refuse to start if importer credentials are present. Importer settings cannot run a web server.
+Apply the traceable migrations:
+
+```powershell
+python manage.py migrate --database=default
+python manage.py migrate addresses --database=address_import --settings=leg_platform.import_settings
+```
+
+The first command runs with the web/migration environment without importer credentials.
+The second runs with the isolated importer environment. The router creates the queue only
+in the application database and the directory tables only in the address database.
+Actual grants and MariaDB directory migration/import must be checked by the operator;
+local synthetic SQLite tests do not verify these.
+
+Run a supervised isolated worker:
+
+```powershell
+python manage.py process_address_imports --settings=leg_platform.import_settings
+```
+
+It handles queued manual imports and, once implemented and verified under D-052, makes
+one automatic attempt every 90 days. Failed automatic attempts are logged and wait
+another 90 days; manual attempts do not alter that clock. A user with the runtime permission
+`addresses.request_directory_import` can request a manual import in the admin.
+Concurrent requests are coalesced. The web request itself performs no download.
+The public lookup `POST /addresses/lookup/` accepts at most 4096 bytes of body; the application
+refuses more before parsing it, but the web server or reverse proxy must also limit request
+bodies for the whole instance (for example `client_max_body_size` in Nginx), because Django's
+own limits are applied only after the request has been received (under ASGI also the body limit
+of the application's middleware); this limit is a mandatory step before any stage or production
+deployment.
+An operator can also run:
+
+```powershell
+python manage.py import_address_directory --settings=leg_platform.import_settings
+```
+
+Allow outbound HTTPS only to `data.geo.admin.ch` for the importer. It verifies the official
+SHA-256 multihash before parsing, bounds the download/archive/rows and publishes atomically.
+Existing directory generations are retained; reserve disk capacity for them and for temporary
+downloads and database transaction logs. A hard-killed running job requires investigation;
+confirm no importer remains active before operator recovery. Do not blindly reset its state.
+
+Run the complete local tests sequentially:
+
+```powershell
+python -W error::DeprecationWarning -W error::PendingDeprecationWarning manage.py test --settings=leg_platform.test_settings --noinput
+```
+
+The application tests use the configured local MariaDB test database; address tests use
+isolated synthetic SQLite databases. Never use production credentials or data.
+
 ## Local Development
 
 For Windows development machines (D-027, D-030). Never use these steps or their credentials for stage or production. The database is MariaDB (D-002); MySQL is not supported. Chocolatey 2 or later is required.
@@ -120,10 +219,31 @@ Email delivery (D-038):
 * Emails are not sent during the request. The worker `python manage.py process_mail_queue --loop` must run as a supervised service (restart on failure); without it, no registration, reset or notification email is sent. Without `--loop` it processes the queue once and exits. Delivery is at least once: after a crash an email can be sent twice. A job is tried three times and then given up; unprocessed jobs are deleted after one hour (they hold the address in plain text until then).
 * The sender domain needs SPF, DKIM and DMARC records for the sending service, and the sender address must be one the service may use. Automatic emails do not invite a reply, so the sender mailbox need not be monitored; a mailbox that does receive replies can contain personal data.
 * The Microsoft Graph backend applies a timeout of 30 seconds to its requests (`GRAPH_TIMEOUT_SECONDS` in `leg_platform/mail.py`); Django forbids `EMAIL_TIMEOUT` together with `MAILERS`.
+* The Microsoft Graph backend does not send the header `Auto-Submitted`. Microsoft Learn (message resource type, https://learn.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0, checked 2026-10-14) states: "Add custom headers only when creating a message, and name them starting with "x-"." (D-048). Automatic replies (out-of-office) of the sender mailbox must therefore stay switched off (D-006).
+
+Microsoft Graph sender (D-006; the steps are done by the operator in Microsoft Entra ID and Exchange Online; the configuration and the test send are in the section "Microsoft Graph configuration" of the Django administration, which only system administrators see: enter tenant ID, client ID and sender address, then upload the certificate and the private key together; the private key is never shown again; the test send goes only to the address of the logged-in administrator and is limited to 12 per hour and 24 per 24 hours). Sources: Microsoft Learn, RBAC for Applications (https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac) and New-ManagementScope (https://learn.microsoft.com/en-us/powershell/module/exchangepowershell/new-managementscope), checked 2026-10-14.
+
+1. In Microsoft Entra ID, register one application for the instance, upload its certificate (public part only), and add the application permission `Mail.Send` with admin consent. The permission is removed again in step 5.
+2. Note the application (client) ID and the object ID of the enterprise application (service principal). Do not use the IDs of the app registration page; they differ.
+3. Connect to Exchange Online PowerShell as a member of the Organization Management role group, and replace the placeholders with the values of the instance:
+
+   ```powershell
+   New-ServicePrincipal -AppId <application (client) ID> -ObjectId <object ID of the enterprise application> -DisplayName "LEG-Platform sender"
+   New-ManagementScope -Name "LEG-Platform sender mailbox" -RecipientRestrictionFilter "EmailAddresses -eq 'smtp:<sender address>'"
+   New-ManagementRoleAssignment -App <application (client) ID> -Role "Application Mail.Send" -CustomResourceScope "LEG-Platform sender mailbox"
+   ```
+
+4. Test the assignment: `Test-ServicePrincipalAuthorization -Identity <application (client) ID> -Resource <sender address>` must show the `Mail.Send` permission with `InScope` set to `True`. Changes take effect for sending after the cache of Exchange Online is refreshed (30 minutes to 2 hours).
+5. In Microsoft Entra ID, remove the unscoped `Mail.Send` permission. Otherwise the permission of Entra ID and the scoped permission add up to access to all mailboxes.
+6. Switch off automatic replies of the sender mailbox (see above); the cmdlet is `Set-MailboxAutoReplyConfiguration -Identity <sender address> -AutoReplyState Disabled` (Microsoft Learn, checked 2026-10-14).
+
+The sender address receives replies and bounces. Its mailbox content must therefore be protected like the other mailboxes of the instance. The sender address configured in the application must be the same address as the mailbox in step 3.
+
+Upload size of the certificate (D-048): the administration accepts the certificate and the private key as files of at most 16 KiB (16384 bytes) each. The application checks this only after the whole request has been received. Django's `DATA_UPLOAD_MAX_MEMORY_SIZE` does not limit file uploads, and under ASGI the entire request may be spooled to disk before Django enforces its limit (Django documentation, https://docs.djangoproject.com/en/6.0/ref/settings/#data-upload-max-memory-size, checked 2026-10-14). The web server or reverse proxy in front of the application must therefore limit the request body size of the instance. The value of this limit is not decided yet (D-048).
 
 Scheduled tasks (the scheduler itself is decided with the hosting, D-008, D-037, D-038, D-041):
 
-* `python manage.py run_scheduled_tasks` runs every cleanup task once: `delete_expired_registrations` (unverified accounts whose verification link expired or does not exist), `cleanup_mail_requests` (unused request counters, expired reset links, unprocessed jobs), `cleanup_login_ip_attempts` (see below), `cleanup_security_log` (security log entries after their retention) and Django's `clearsessions` (expired sessions). Schedule this one command, for example every 15 minutes, with the scheduler of the server (cron or a systemd timer on Linux, the task scheduler on Windows); the exact setup is written down when the hosting is decided. A failing task does not stop the others; the command then exits with an error, which the scheduler must report. A test makes sure that every `cleanup_*` and `delete_expired_*` command is part of it.
+* `python manage.py run_scheduled_tasks` runs every cleanup task once: `delete_expired_registrations` (unverified accounts whose verification link expired or does not exist), `cleanup_mail_requests` (unused request counters, expired reset and email change links, unprocessed jobs), `cleanup_login_ip_attempts` (see below), `cleanup_security_log` (security log entries after their retention) and Django's `clearsessions` (expired sessions). Schedule this one command, for example every 15 minutes, with the scheduler of the server (cron or a systemd timer on Linux, the task scheduler on Windows); the exact setup is written down when the hosting is decided. A failing task does not stop the others; the command then exits with an error, which the scheduler must report. A test makes sure that every `cleanup_*` and `delete_expired_*` command is part of it.
 * The worker `process_mail_queue --loop` is not part of it; it runs as a supervised service (see above).
 
 Initial system administrator (D-005, D-041): set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` in the environment of the instance and run `python manage.py setup_initial_administrator` in a terminal on the server. The command asks for the password twice with hidden input (it refuses to read it from a pipe or a file), runs only while no system administrator exists, never changes an existing account and logs its use. Give the person the initial password through a secure channel; at the first login the password must be replaced and two-factor authentication must be set up before anything else is possible. Remove `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` afterwards.
@@ -134,11 +254,19 @@ Emergency commands (D-004, D-005, D-041), only on the server, each use is logged
 * `python manage.py emergency_access unblock-account N`: sets a blocked account active again.
 * `python manage.py emergency_access reencrypt-second-factor-keys`: encrypts all second factor keys again with the current `SECRET_KEY` (see "Changing `SECRET_KEY`"); it reports the keys that cannot be decrypted.
 
+Which path applies when an account is locked out (D-044):
+
+* Password forgotten, second factor available: the person clicks "Forgot password?" on the login page, opens the link in the email (single use, valid 24 hours), sets a new password and logs in with the second factor. No operator action is needed.
+* Second factor lost: a system administrator resets it on the change form of the account in the administration. For users, the reset is sent as a link to the owner; for staff users and system administrators it takes effect at once.
+* Second factor lost and no other system administrator available: run `python manage.py emergency_access reset-second-factor N` on the server. The person then logs in with the password (set with "Forgot password?" if it is lost too) and sets up a new second factor; staff users and system administrators need one (D-042).
+* Account blocked: run `python manage.py emergency_access unblock-account N` on the server. A blocked account receives no password reset email.
+* Staff users and system administrators must type their email address to confirm an emergency command; `--no-input` is refused for them. Use `--allow-last-administrator` only if losing the last system administrator's second factor is intended.
+
 Security log (D-018, D-041): the system administrators see it in the administration; nobody can change or delete entries there. Entries are deleted only by `cleanup_security_log` (part of `run_scheduled_tasks`) after `SECURITY_LOG_RETENTION_DAYS` (default 30) or, for changes of rights and roles, resets of the second factor and emergency commands, `SECURITY_LOG_LONG_RETENTION_DAYS` (default 365). Persons with direct database access can change the table; this is accepted, because whoever can log in to the server can do everything anyway (D-041).
 
 Session timeouts (D-041): users are logged out after 30 minutes without a request or 8 hours after the login; staff users and system administrators after 15 minutes and 4 hours. They are set in `leg_platform/settings.py` (not per instance).
 
-Customer numbers: from 90 % of the six-digit numbers issued, each issue logs a warning (logger `leg_platform.accounts.models`, "N of 1000000 customer numbers have been issued"); set up an alarm on it in the log monitoring, because the administration notice is visible only where the administration is reachable (D-038).
+Customer numbers: from 90 % of the six-digit numbers issued, each issue logs a warning (logger `leg_platform.accounts.models`, "N of 1000000 customer numbers have been issued"); set up an alarm on it in the log monitoring, because the administration notice is visible only to system administrators who are logged in (D-038, D-052).
 
 Request limits per client IP address use the address that Django sees (`AXES_IPWARE_PROXY_COUNT`, see below); with a wrong proxy count every request counts against one shared budget or, without any resolvable address, one strict shared budget (a warning is logged). The reverse proxy should additionally limit the plain request rate, because the application limits only the functions that send email.
 

@@ -1,6 +1,6 @@
 {% load i18n static %}<!doctype html>
 {% get_current_language as LANGUAGE_CODE %}
-<html lang="{{ LANGUAGE_CODE }}">
+<html lang="{{ LANGUAGE_CODE }}" data-bs-theme="{{ colour_mode }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,21 +10,31 @@
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+  <link rel="stylesheet" href="{% url 'instance_stylesheet' %}">
 </head>
 <body class="register-clear">
+  <div class="print-heading">{{ instance_name }} — {{ print_date|date:"d.m.Y" }}</div>
   {% block body %}
     <div class="page">
       <header class="portal-header navbar navbar-expand-md d-print-none">
         <div class="container-xl">
-          <a class="portal-brand" href="{% url 'home' %}">{{ instance_name }}</a>
           {% if user.is_authenticated %}
-            <div class="navbar-nav flex-row">
+            <details class="member-menu">
+              <summary>{% translate "Menu" %}</summary>
+              <nav aria-label="{% translate 'Account navigation' %}" class="navbar-nav">
               {% if not user.password_change_required %}<a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>{% endif %}
               <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-link nav-link">{% translate "Log out" %}</button>
               </form>
-            </div>
+              </nav>
+            </details>
+          {% endif %}
+          <a class="portal-brand" href="{% url 'home' %}">{% include "_brand.html" %}</a>
+          {% if user.is_authenticated and not user.password_change_required %}
+            <nav class="member-top-navigation" aria-label="{% translate 'Main navigation' %}">
+              <a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>
+            </nav>
           {% endif %}
         </div>
       </header>
@@ -36,10 +46,17 @@
       </main>
       <footer class="footer footer-transparent d-print-none">
         <div class="container-xl text-center">
+          {% include "_colour_mode.html" %}
           {% include "_footer_links.html" %}
         </div>
       </footer>
+      {% if user.is_authenticated and not user.password_change_required %}
+        <nav class="member-tabs d-print-none" aria-label="{% translate 'Main navigation' %}">
+          <a href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>
+        </nav>
+      {% endif %}
     </div>
   {% endblock %}
+  {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -83,25 +83,34 @@ LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same li
 
 ## Current Status
 
-Phase 1 is in progress. The remaining work is:
+Phase 1 is functionally complete in the local worktree and verified locally. It is **not yet formally accepted**: items that need real infrastructure, a human review or CI are open (below). Nothing is committed, pushed or deployed (the owner declined publication for CI on 2026-10-14).
 
-* Password change and the TOTP flow are implemented and await the security review and the owner's confirmations (D-040).
-* Implemented on 2026-10-13, confirmed by the owner and awaiting the security review (D-041): the persistent security log with retention and a read-only administration view, idle and absolute session timeouts, the reset of a lost second factor by system administrators (link for users, immediate for staff users and administrators), the emergency command `emergency_access` (including the command that encrypts the second factor keys again), the command `setup_initial_administrator` with the forced password change and second factor setup at the first login, and `run_scheduled_tasks`, which bundles the cleanup commands.
-* Implemented on 2026-10-13 after the review before the push, awaiting a new review by the `security-reviewer` (D-042): `is_staff` and `is_superuser` are granted only to accounts that already have a second factor; a new password reset request makes the earlier reset links invalid; recovery codes are unique per account instead of across the instance (migration `0009`); the administration of the security log no longer overrides `get_actions()` (Django 6.1 deprecation that failed CI run 38466208248). Decided in D-043 (2026-10-14): the rule for rights stays in the administration only and is not enforced centrally in the account logic (`User._check_privilege_grant()`); the review findings N-1, N-2 and I-1 are fixed there as well.
-* Remaining second-factor work: ending other sessions when a user turns the second factor on or off (the mechanism exists, D-041). The TOTP keys are stored encrypted and the recovery codes as digests (D-040).
-* Open checks and decisions from the second-factor reviews (D-040): a third review of the code budget, and the CI check of the compiled catalogue (`msgunfmt`).
-* Profile editing and account lifecycle workflows: editing and deleting one's own account, email change/verification, block/deactivation/reactivation, session invalidation and last-administrator protection.
-* Swiss address-directory validation and autocompletion (D-032, D-033), plus the remaining responsive views for phase 1 user workflows (member navigation with menu and tab bar, dark mode and colour mode switch, print stylesheet).
-* Email change must use the same request budget (D-038); token redaction for every further token-bearing URL (the registration, password reset and second factor removal URLs are covered).
-* Microsoft Graph configuration in the Django admin, including a test send (the delivery backend is implemented with certificate authentication, D-006); a read-only view of the failed-login and lockout records of the abuse protection package (D-017); the security log events of functions that do not exist yet (blocking, deactivation, deletion, changes of another account's password or email address, Graph configuration; D-041); the scheduling itself of the worker `process_mail_queue --loop` and of `run_scheduled_tasks` with the hosting (D-008).
-* Instance branding from the configuration (logo, accent and highlight colour), the imprint (D-022) and documented supported browsers.
-* Owner decision: retain or remove the redundant `normalized_email` column (the lower-casing of local parts was re-confirmed on 2026-10-13, D-035).
-* Verification: CI run 38273753482 (commit 8da72f3, 2026-10-12) passed both jobs, minimum (Python 3.12, Django 6.0, MariaDB 10.11) and latest (Python 3.14, Django 6.1, MariaDB 12.3), with deprecation warnings treated as errors. The changes of 2026-10-13 (D-037 to D-039) were run locally only (Python 3.14, Django 6.1.2, MariaDB 12.3: 519 tests with deprecation warnings as errors; Django 6.0.9 and `check --deploy` were last run before D-039); no CI run covers them yet. The changes of D-040 and D-041 (2026-10-13) were run locally with Python 3.14, Django 6.1.2 and MariaDB 12.3: 725 tests passed with deprecation warnings as errors; Django 6.0.9, `check --deploy` and the CI check of the compiled catalogue were not run for D-041.
+Implemented and verified locally (decisions in `docs/DECISIONS.md`, D-004 to D-052):
+
+* Login page as the entry point, registration with email verification, login with abuse protection, TOTP second factor (mandatory for staff users and system administrators) with recovery codes, password change and reset, session timeouts, reset of a lost second factor, emergency commands, initial administrator setup with forced password change.
+* Profile editing, verified email change, self-service deletion with the retention rule, block/unblock/delete/reactivate by system administrators with the last-administrator protection, session invalidation (D-016, D-044).
+* User, group and permission management in the Django administration, security log with retention, read-only view of the abuse protection records, Microsoft Graph configuration with certificate upload, certificate expiry warning and a rate-limited test send (D-006, D-048).
+* Local copy of the official Swiss address directory (swisstopo) with advisory validation and autocompletion, background import started from the administration or by the operator, one automatic attempt every 90 days (D-033, D-049 to D-052).
+* Instance branding (accent, optional highlight, logo) from the configuration with a contrast check, light/dark/automatic colour mode, member navigation, print stylesheet, documented supported browsers (D-051).
+* The temporary local-only gate of the administration was removed on the owner's conditional approval after the full test run and a security re-check (D-052).
+
+Verification on 2026-10-14 (local; Python 3.14.8, Django 6.1.2, MariaDB 12.3 for the application database; synthetic SQLite databases for the address directory, because the real directory database and its SELECT-only grants are not provisioned locally):
+
+* Full suite: 909 tests OK with deprecation warnings as errors (`python manage.py test --settings=leg_platform.test_settings --noinput`).
+* `check --deploy --fail-level WARNING` with synthetic production settings: no issues; `makemigrations --check`: no changes; compiled translation catalogue equals its source (`msgunfmt` comparison); `pip check` and the minimum pins: consistent; no PyPI vulnerability reported for the declared minimums (snapshot, D-051).
+* Security reviews by the `security-reviewer` (read-only, ran no tests): no critical, high or medium findings after two corrections (D-052). This is not a statement that the application is secure; critical changes still need a human review (D-019).
+
+Open (not verified or not possible locally):
+
+* CI: the minimum job (Python 3.12, Django 6.0, MariaDB 10.11) and the latest job have not run for the current code (Python 3.12 and Docker are not available on the development machine). The last passed CI run is 38273753482 (2026-10-12).
+* Real Microsoft Graph delivery, the Entra/Exchange setup, the real address-directory database with SELECT-only grants and a real import, the web server/proxy body limit, HTTPS/HSTS and cookies on a real host, the supervised services and the scheduler (D-008), and the browser and mobile-phone check of the pages. WCAG 2.2 AA conformity is not established by automated tests.
+* Owner and operator items: AGOV answer (D-004), imprint and privacy notice content (D-022), the operator of stage and production, hosting details (D-008), a human review of the security-critical changes (D-019), and the import account credentials (D-049).
+* Later: the security reviewer's remaining low items (ASGI body limit is only a proxy duty, a new admin URL must be wrapped with `admin_site.admin_view()`), and the lower `requests` minimum (needs a support source, D-048).
 
 Deployment gates: no stage or production instance is deployed before
 
-1. Microsoft Graph email delivery: the backend is implemented with certificate authentication (D-006); the admin configuration and the test send are still open. Until then, outside production, the allowlist restrictions apply (D-028).
-2. TOTP and the central second-factor check protect the complete login and admin flows (D-004, D-017): implemented in D-040, the reset of a lost second factor and the first-login setup of the initial administrator in D-041; both still to be reviewed by the `security-reviewer`.
-3. Token-bearing URLs are redacted from request logs and covered by tests (`docs/SECURITY.md`, section 10): `leg_platform/log_filters.py` covers the registration, password reset and second factor removal links; to be repeated for every further token URL.
-4. Axes and separate IP-attempt retention are configured and scheduled; the TOTP flow calls Django `login()` only after every required factor is verified (D-017, D-018).
-5. The worker `process_mail_queue --loop` runs as a supervised service (without it, no email is sent), and `run_scheduled_tasks` (which bundles `delete_expired_registrations`, `cleanup_mail_requests`, `cleanup_login_ip_attempts`, `cleanup_security_log` and `clearsessions`) is scheduled (D-037, D-038, D-041). The rate limits and the timing-comparable requests of registration and password reset are implemented (D-038).
+1. Microsoft Graph email delivery is tested with real credentials (a real test send) and restricted to the sender mailbox (D-006, D-028).
+2. A human review of the second-factor, reset, lifecycle and administration changes (D-019) and a passed CI run of the current code on both jobs.
+3. HTTPS, secure cookies, HSTS and a request body size limit of the web server are confirmed on the real host (`docs/INSTALLATION.md`, D-052).
+4. Token-bearing URLs stay redacted from request logs (`leg_platform/log_filters.py` covers the registration, password reset, second factor removal and email change links); repeat for every further token URL (`docs/SECURITY.md`, section 10).
+5. The worker `process_mail_queue --loop` and the address worker `process_address_imports` run as supervised services (separate settings and credentials for the importer), and `run_scheduled_tasks` is scheduled (D-008, D-037, D-038, D-041, D-052).

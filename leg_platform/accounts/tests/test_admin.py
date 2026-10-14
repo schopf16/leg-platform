@@ -3,6 +3,7 @@
 import re
 from unittest import mock
 
+from axes.models import AccessAttempt, AccessFailureLog
 from django.contrib import admin
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.admin.utils import flatten_fieldsets
@@ -79,6 +80,20 @@ class AdminAuthorizationTests(TestCase):
         for url in (reverse("admin:auth_group_changelist"), reverse("admin:auth_group_add")):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_axes_lockout_records_are_system_administrator_only_and_read_only(self):
+        model_request = RequestFactory().get("/admin/")
+        for model in (AccessAttempt, AccessFailureLog):
+            with self.subTest(model=model.__name__):
+                model_admin = admin.site._registry[model]
+                model_request.user = self.staff_user
+                self.assertFalse(model_admin.has_view_permission(model_request))
+                model_request.user = self.administrator
+                self.assertTrue(model_admin.has_view_permission(model_request))
+                self.assertFalse(model_admin.has_add_permission(model_request))
+                self.assertFalse(model_admin.has_change_permission(model_request))
+                self.assertFalse(model_admin.has_delete_permission(model_request))
+                self.assertIsNone(model_admin.actions)
 
     def test_staff_user_cannot_change_staff_or_administrator_by_direct_url(self):
         self.client.force_login(self.staff_user)
@@ -285,12 +300,29 @@ class AdminAuthorizationTests(TestCase):
         self.assertFalse(account.groups.exists())
         self.assertFalse(account.user_permissions.exists())
 
-    def test_admin_is_unavailable_outside_local_development(self):
-        from django.test import override_settings
+    def test_the_administration_does_not_depend_on_the_environment_name(self):
+        # The temporary local-only gate is gone (D-052): what protects the administration
+        # (login, second factor, permissions) is the same in every environment; the walk of
+        # every route is in test_admin_exposure.py.
+        from django.test import Client, override_settings
 
-        with override_settings(APP_ENV="production"):
-            response = self.client.get("/admin/login/")
-        self.assertEqual(response.status_code, 404)
+        for app_env in ("local", "stage", "production"):
+            with self.subTest(app_env=app_env), override_settings(APP_ENV=app_env):
+                anonymous = Client().get("/admin/")
+                self.assertEqual(anonymous.status_code, 302)
+                self.assertTrue(anonymous["Location"].startswith(reverse("admin:login")))
+                unverified = Client()
+                unverified.force_login(self.staff_user)
+                self.assertRedirects(
+                    unverified.get("/admin/"),
+                    reverse("accounts:two_factor_setup"),
+                    fetch_redirect_response=False,
+                )
+        # Only after the loop: the verified login creates the staff user's second factor.
+        for app_env in ("local", "stage", "production"):
+            with self.subTest(app_env=app_env, verified=True), override_settings(APP_ENV=app_env):
+                self.client.force_login(self.staff_user)
+                self.assertEqual(self.client.get("/admin/").status_code, 200)
 
     def test_staff_cannot_save_account_promoted_after_permission_check(self):
         account = create_active_user("member@example.org")

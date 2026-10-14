@@ -18,9 +18,11 @@ from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import msal
+import requests
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
 from django.views.decorators.debug import sensitive_variables
+from requests.adapters import HTTPAdapter
 
 from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.models import GraphConfiguration
@@ -34,6 +36,9 @@ LOGIN_AUTHORITY_URL = "https://login.microsoftonline.com/{tenant_id}"
 # Applies to the token request (MSAL) and to each sendMail request.
 GRAPH_TIMEOUT_SECONDS = 30
 MAX_ERROR_BODY_BYTES = 4096
+# Generic text for a token request that fails. The cause is never passed on, because it can contain
+# tenant details or URLs.
+TOKEN_UNAVAILABLE_MESSAGE = "Microsoft did not answer the token request; no email was sent."
 
 
 class GraphEmailError(Exception):
@@ -47,6 +52,20 @@ class _RefuseRedirects(HTTPRedirectHandler):
 
 # A redirect answer raises HTTPError instead of repeating the request with the bearer token.
 urlopen = build_opener(_RefuseRedirects).open
+
+
+class _TokenSession(requests.Session):
+    """HTTP session for the MSAL token request.
+
+    MSAL's default session follows redirects and would send the client assertion to the
+    redirect target. Here a redirect is returned unchanged, and every request has the timeout.
+    """
+
+    def request(self, method, url, **kwargs):
+        kwargs["allow_redirects"] = False
+        # Assigned, not set by default: an explicit timeout=None from the caller would disable it.
+        kwargs["timeout"] = GRAPH_TIMEOUT_SECONDS
+        return super().request(method, url, **kwargs)
 
 
 class GraphEmailBackend(BaseEmailBackend):
@@ -88,6 +107,16 @@ def _access_token(configuration):
         raise GraphEmailError(
             "The Microsoft Graph private key cannot be decrypted; no email was sent."
         ) from None
+    except UnicodeDecodeError:
+        # A key that is not ASCII PEM is refused; its content is not part of the message.
+        raise GraphEmailError(
+            "The Microsoft Graph private key cannot be read; no email was sent."
+        ) from None
+    session = _TokenSession()
+    # The retry policy of MSAL's default session (msal/application.py: HTTPAdapter(max_retries=1)).
+    adapter = HTTPAdapter(max_retries=1)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     try:
         application = msal.ConfidentialClientApplication(
             str(configuration.client_id),
@@ -96,13 +125,26 @@ def _access_token(configuration):
                 "private_key": private_key,
                 "public_certificate": configuration.certificate_pem,
             },
-            timeout=GRAPH_TIMEOUT_SECONDS,
+            # MSAL ignores its own timeout argument when http_client is given, so the session
+            # applies GRAPH_TIMEOUT_SECONDS.
+            http_client=session,
         )
+    except OSError:
+        # MSAL runs the tenant discovery in its constructor, so a connection error can occur here.
+        raise GraphEmailError(TOKEN_UNAVAILABLE_MESSAGE) from None
     except ValueError:
         raise GraphEmailError(
             "The Microsoft Graph certificate cannot be used; no email was sent."
         ) from None
-    result = application.acquire_token_for_client(scopes=[GRAPH_SCOPE])
+    except Exception:
+        # Other discovery errors (RuntimeError, msal/authority.py line 305) can carry the URL.
+        raise GraphEmailError(TOKEN_UNAVAILABLE_MESSAGE) from None
+    try:
+        result = application.acquire_token_for_client(scopes=[GRAPH_SCOPE])
+    except (OSError, ValueError):
+        # ValueError: MSAL cannot read the token response, for example a refused redirect.
+        # OSError: no connection. The cause is not passed on, because it can contain tenant details.
+        raise GraphEmailError(TOKEN_UNAVAILABLE_MESSAGE) from None
     token = result.get("access_token")
     if not token:
         # The error description can contain tenant details; only the error code is kept.
@@ -140,7 +182,7 @@ def _payload(message):
     to = _allowed(message.to)
     if not to:
         return None
-    if "Auto-Submitted" in message.extra_headers:
+    if any(name.lower() == "auto-submitted" for name in message.extra_headers):
         logger.warning("Header Auto-Submitted is not sent by the Microsoft Graph backend.")
     html = next(
         (
@@ -175,6 +217,9 @@ def _error_code(error):
         return str(body["error"]["code"])[:64]
     except (OSError, ValueError, KeyError, TypeError):
         return "unknown"
+    finally:
+        # Releases the connection of the HTTP error response.
+        error.close()
 
 
 @sensitive_variables("token")

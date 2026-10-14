@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Check the new email address" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Check the new email address" %}</h1>
+      <p>{% translate "If the address can be used, we have sent a message to it. Follow the instructions in the message. Your current email address remains unchanged until you verify the new one." %}</p>
+      <a href="{% url 'accounts:profile' %}">{% translate "Back to the profile" %}</a>
+    </div>
+  </div>
+{% endblock %}

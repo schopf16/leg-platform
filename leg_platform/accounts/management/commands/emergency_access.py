@@ -1,11 +1,14 @@
 """Restore access in an emergency (docs/DECISIONS.md, D-004, D-005, D-041).
 
 Run only on the server, in a terminal. Every use is written to the security log (kept for the
-long period) and printed without personal data. The accounts are named by their internal
-number, which the administration shows on the change form of an account.
+long period). The result line names the account only by its internal number, which the
+administration shows on the change form of an account. The confirmation prompt shows the email
+address and the rights of the account to the operator. Accounts with staff or administrator rights
+must be confirmed by typing their email address and cannot be changed with ``--no-input``.
 
-* ``reset-second-factor N``: remove the second factor of an account, also of the last system
-  administrator; ends all sessions of the account and notifies its owner by email.
+* ``reset-second-factor N``: remove the second factor of an account; ends all sessions of the
+  account and notifies its owner by email. The last active system administrator needs the
+  explicit option ``--allow-last-administrator``.
 * ``unblock-account N``: set a blocked account active again.
 * ``reencrypt-second-factor-keys``: encrypt the second factor keys again with the current
   ``SECRET_KEY`` after it was replaced and the old one is listed in ``SECRET_KEY_FALLBACKS``.
@@ -52,6 +55,12 @@ class Command(BaseCommand):
         for name in ("reset-second-factor", "unblock-account"):
             action = actions.add_parser(name, help=SUMMARIES[name].format(number="N"))
             action.add_argument("internal_number", type=int)
+            if name == "reset-second-factor":
+                action.add_argument(
+                    "--allow-last-administrator",
+                    action="store_true",
+                    help="Allow the reset of the second factor of the last active system administrator.",
+                )
         actions.add_parser(
             "reencrypt-second-factor-keys", help=SUMMARIES["reencrypt-second-factor-keys"]
         )
@@ -59,16 +68,50 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         action = options["action"]
         number = options.get("internal_number")
-        if options["interactive"]:
-            self.stdout.write(f"This will {SUMMARIES[action].format(number=number)}.")
-            if input("Type 'yes' to continue: ") != "yes":
-                raise CommandError("Cancelled.")
-        if action == "reset-second-factor":
-            self.reset_second_factor(number)
-        elif action == "unblock-account":
-            self.unblock_account(number)
-        else:
+        interactive = options["interactive"]
+        if action == "reencrypt-second-factor-keys":
+            if interactive:
+                self.stdout.write(f"This will {SUMMARIES[action]}.")
+                self._confirm_text("Type 'yes' to continue: ", "yes")
             self.reencrypt_keys()
+            return
+        account = User._base_manager.filter(pk=number).first()
+        if account is None:
+            raise CommandError(f"No account has the internal number {number}.")
+        privileged = account.is_staff or account.is_superuser
+        if privileged and not interactive:
+            raise CommandError(
+                "Accounts with staff or administrator rights can only be changed interactively."
+            )
+        if interactive:
+            self._confirm_account(action, account, number, privileged)
+        if action == "reset-second-factor":
+            self.reset_second_factor(number, options.get("allow_last_administrator", False))
+        else:
+            self.unblock_account(number)
+
+    def _confirm_account(self, action, account, number, privileged):
+        """Show the account before the change; privileged accounts need their email typed."""
+        if account.is_superuser:
+            rights = "system administrator"
+        elif account.is_staff:
+            rights = "staff user"
+        else:
+            rights = "user"
+        self.stdout.write(f"Account {number}: {account.email} ({rights}).")
+        self.stdout.write(f"This will {SUMMARIES[action].format(number=number)}.")
+        if privileged:
+            self._confirm_text("Type the email address of the account to continue: ", account.email)
+        else:
+            self._confirm_text("Type 'yes' to continue: ", "yes")
+
+    def _confirm_text(self, prompt, expected):
+        try:
+            answer = input(prompt)
+        except EOFError:
+            raise CommandError("Cancelled.") from None
+        if answer.strip().lower() != expected.lower():
+            raise CommandError("Cancelled.")
 
     def _locked_account(self, number):
         account = User._base_manager.select_for_update().filter(pk=number).first()
@@ -76,7 +119,7 @@ class Command(BaseCommand):
             raise CommandError(f"No account has the internal number {number}.")
         return account
 
-    def reset_second_factor(self, number):
+    def reset_second_factor(self, number, allow_last_administrator):
         with transaction.atomic():
             account = self._locked_account(number)
             has_devices = (
@@ -85,6 +128,16 @@ class Command(BaseCommand):
             )
             if not has_devices:
                 raise CommandError(f"Account {number} has no second factor.")
+            other_administrators = (
+                User._base_manager.filter(is_superuser=True, status=User.Status.ACTIVE)
+                .exclude(pk=account.pk)
+                .exists()
+            )
+            if account.is_superuser and not other_administrators and not allow_last_administrator:
+                raise CommandError(
+                    f"Account {number} is the last active system administrator. Repeat the command "
+                    "with --allow-last-administrator only if this is intended."
+                )
             second_factor_reset.remove_second_factor(account, Event.EMERGENCY_TWO_FACTOR_RESET)
         self.stdout.write(f"The second factor of account {number} was removed.")
 

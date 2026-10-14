@@ -70,6 +70,10 @@ def _sample_values(key):
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:password_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
             )
+        elif placeholder is email_texts.EMAIL_CHANGE_URL:
+            specific[placeholder.name] = absolute_url(
+                reverse("accounts:email_change_verify", kwargs={"token": EXAMPLE_TOKEN})
+            )
         elif placeholder is email_texts.TWO_FACTOR_RESET_URL:
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:two_factor_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
@@ -90,6 +94,20 @@ def send_test(address, key, subject, body):
         notice = gettext("This is a test email. The personal link in it does not work.")
         subject = f"[{gettext('Test')}] {subject}"
     _deliver(address, subject, f"{notice}\n\n{body}")
+
+
+def graph_test_message(address, sender_address):
+    """Return the test email of the Microsoft Graph configuration (D-006). It contains no secret.
+
+    The sender is the configured mailbox. The message is sent with GraphEmailBackend by the
+    administration, not through the email framework.
+    """
+    with translation.override(settings.LANGUAGE_CODE):
+        subject = gettext("Test email of the Microsoft Graph configuration")
+        body = gettext(
+            "This is a test email of the Microsoft Graph email delivery. No action is needed."
+        )
+    return EmailMessage(subject=subject, body=body, from_email=sender_address, to=[address])
 
 
 def send_registration_verification(address, raw_token, lifetime: timedelta):
@@ -132,6 +150,30 @@ def send_password_reset(address, raw_token, lifetime: timedelta):
 def send_password_changed(address):
     """Tell the owner that the password was changed; contains no link (docs/SECURITY.md)."""
     _send(address, Key.PASSWORD_CHANGED, {})
+
+
+def send_email_change_verification(address, raw_token, lifetime: timedelta):
+    """Send the single-use link that verifies the proposed address."""
+    _send(
+        address,
+        Key.EMAIL_CHANGE_VERIFICATION,
+        {
+            "email_change_url": absolute_url(
+                reverse("accounts:email_change_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_email_change_existing_account(address):
+    """Notify the target address that an email change was attempted; no reply is requested."""
+    _send(address, Key.EMAIL_CHANGE_EXISTING_ACCOUNT, {})
+
+
+def send_email_changed(address):
+    """Notify the former address that the account email changed; contains no link."""
+    _send(address, Key.EMAIL_CHANGED, {})
 
 
 def send_two_factor_enabled(address):

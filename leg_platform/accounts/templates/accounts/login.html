@@ -4,7 +4,7 @@
 {% block body %}
   <div class="login-split">
     <section class="login-welcome register-warm">
-      <span class="portal-brand">{{ instance_name }}</span>
+      <span class="portal-brand">{% include "_brand.html" %}</span>
       <h1>{% blocktranslate %}Welcome to {{ instance_name }}{% endblocktranslate %}</h1>
       <p>{% translate "Here you manage your account and, later, your locations, energy data and invoices." %}</p>
     </section>
@@ -26,7 +26,10 @@
           </div>
         </div>
       </div>
-      <nav class="login-links d-print-none">{% include "_footer_links.html" %}</nav>
+      <nav class="login-links d-print-none">
+        {% include "_colour_mode.html" %}
+        {% include "_footer_links.html" %}
+      </nav>
     </main>
   </div>
 {% endblock %}

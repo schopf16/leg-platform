@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  <li><a href="{% url 'admin:accounts_user_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a></li>
+  <li><a href="{{ change_url }}">{{ original }}</a></li>
+  <li aria-current="page">{{ title }}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>{{ description }}</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" class="default" value="{{ title }}">
+  </form>
+  <p><a href="{{ change_url }}">{% translate "Back to the account" %}</a></p>
+</div>
+{% endblock %}

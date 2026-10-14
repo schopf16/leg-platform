@@ -13,6 +13,7 @@ from unittest.mock import patch
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.contrib.messages import get_messages
 from django.db import IntegrityError, OperationalError, connections
 from django.test import Client, TestCase, TransactionTestCase, override_settings, tag
 from django.urls import reverse
@@ -354,6 +355,8 @@ class RegistrationTests(TestCase):
 
 @tag("mariadb")
 class VerificationTests(TestCase):
+    # Completing the registration reads the address directory (advisory check, D-033).
+    databases = {"default", "addresses", "address_import"}
     def setUp(self):
         register(self.client)
         self.path = verification_path(mail.outbox[0])
@@ -386,6 +389,9 @@ class VerificationTests(TestCase):
 
         self.assertContains(response, "new.person@example.org")
         self.assertNotContains(response, self.path.rsplit("/", 2)[-2])
+        self.assertContains(response, "data-address-directory")
+        self.assertContains(response, "/addresses/lookup/")
+        self.assertContains(response, "js/address-directory.js")
 
     def test_completing_activates_the_account_and_issues_the_customer_number(self):
         self.open_link()
@@ -399,6 +405,31 @@ class VerificationTests(TestCase):
         self.assertRegex(self.user.customer_number_id, r"\A[0-9]{6}\Z")
         self.assertEqual(VerificationToken.objects.count(), 0)
         self.assertNotIn(REGISTRATION_SESSION_KEY, self.client.session)
+
+    def test_address_matching_warning_does_not_block_registration(self):
+        self.open_link()
+        with patch(
+            "leg_platform.accounts.views.check_address",
+            return_value={"warning": "Address could not be confirmed."},
+        ) as check:
+            response = self.complete()
+
+        self.assertRedirects(response, reverse("accounts:login"))
+        check.assert_called_once_with(
+            street="Examplestrasse",
+            house_number="12a",
+            postal_code="3000",
+            locality="Bern",
+            country="CH",
+        )
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.status, User.Status.ACTIVE)
+        self.assertTrue(
+            any(
+                "Address could not be confirmed." in str(message)
+                for message in get_messages(response.wsgi_request)
+            )
+        )
 
     def test_the_link_can_be_used_only_once(self):
         self.open_link()
@@ -595,6 +626,7 @@ class VerificationTests(TestCase):
 
 @tag("mariadb")
 class ConcurrentCompletionTests(TransactionTestCase):
+    databases = {"default", "addresses", "address_import"}
     def test_two_simultaneous_submissions_activate_the_account_once(self):
         register(Client())
         path = verification_path(mail.outbox[0])

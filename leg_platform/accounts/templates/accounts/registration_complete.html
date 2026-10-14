@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Complete your registration" %}{% endblock %}
 {% block content %}
   <div class="card card-md">
@@ -19,8 +19,13 @@
         {% csrf_token %}
         <input type="hidden" name="registration" value="{{ registration_ref }}">
         {% include "accounts/_form_fields.html" with mark_required=True %}
+        {% include "addresses/widget.html" %}
         <button type="submit" class="btn btn-primary w-100">{% translate "Activate account" %}</button>
       </form>
     </div>
   </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/address-directory.js' %}"></script>
 {% endblock %}

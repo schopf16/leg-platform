@@ -3,9 +3,11 @@
 
 from datetime import timedelta
 from io import StringIO
+from unittest import mock
 
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
+from django.db import transaction
 from django.test import TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone
@@ -39,12 +41,50 @@ class SecurityEventStorageTests(TestCase):
     def test_record_stores_the_internal_numbers_and_logs_without_personal_data(self):
         user = create_active_user()
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            security_log.record(Event.PASSWORD_CHANGED, account=user, actor=user.pk)
+            with self.captureOnCommitCallbacks(execute=True):
+                security_log.record(Event.PASSWORD_CHANGED, account=user, actor=user.pk)
         entry = SecurityEvent.objects.get()
-        self.assertEqual((entry.event, entry.account_id, entry.actor_id), ("password_changed", user.pk, user.pk))
+        self.assertEqual(
+            (entry.event, entry.account_id, entry.actor_id),
+            ("password_changed", user.pk, user.pk),
+        )
         self.assertEqual(len(logs.output), 1)
         self.assertIn(f"account {user.pk}", logs.output[0])
         self.assertNotIn(user.email, logs.output[0])
+
+    def test_actor_is_logged_by_internal_number_only(self):
+        account = create_active_user()
+        actor = create_active_user("second.admin@example.org")
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                security_log.record(Event.PASSWORD_CHANGED, account=account, actor=actor)
+        self.assertIn(f"account {account.pk}, actor {actor.pk}", logs.output[0])
+        self.assertNotIn(account.email, logs.output[0])
+        self.assertNotIn(actor.email, logs.output[0])
+
+    def test_a_rolled_back_change_leaves_no_stored_event_and_no_log_line(self):
+        user = create_active_user()
+        with mock.patch.object(security_log.logger, "warning") as warning:
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                with self.assertRaises(RuntimeError):
+                    with transaction.atomic():
+                        security_log.record(Event.PASSWORD_CHANGED, account=user)
+                        raise RuntimeError("the change failed")
+        self.assertFalse(SecurityEvent.objects.filter(event="password_changed").exists())
+        self.assertEqual(callbacks, [])
+        warning.assert_not_called()
+
+    def test_a_committed_change_logs_once_after_the_commit(self):
+        user = create_active_user()
+        with mock.patch.object(security_log.logger, "warning") as warning:
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                with transaction.atomic():
+                    security_log.record(Event.PASSWORD_CHANGED, account=user)
+                warning.assert_not_called()
+            self.assertEqual(len(callbacks), 1)
+            for callback in callbacks:
+                callback()
+        warning.assert_called_once()
 
     def test_long_retention_follows_the_event_or_the_caller(self):
         for event in Event:

@@ -223,7 +223,8 @@ class SecondFactorLoginTests(TestCase):
         log_in(self.client, self.user.email)
 
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            send_code(self.client, "abcd2345")
+            with self.captureOnCommitCallbacks(execute=True):
+                send_code(self.client, "abcd2345")
 
         self.assertEqual(len(logs.output), 1)
         self.assertIn(f"account {self.user.pk}", logs.output[0])
@@ -535,9 +536,10 @@ class EnrolmentTests(TestCase):
         device = AuthenticatorDevice.objects.get()
 
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            response = self.client.post(
-                reverse("accounts:two_factor_confirm"), {"otp_token": code_for(device)}
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    reverse("accounts:two_factor_confirm"), {"otp_token": code_for(device)}
+                )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(AuthenticatorDevice.objects.get().confirmed)
@@ -695,6 +697,20 @@ class RecoveryCodesAndRemovalTests(TestCase):
             log_in(client, self.user.email, address="10.3.0.2"), reverse("accounts:profile")
         )
         self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_DISABLED)
+
+    def test_turning_off_the_second_factor_ends_every_other_session(self):
+        other = Client()
+        other.force_login(self.user)
+        self.assertEqual(other.get(reverse("accounts:profile")).status_code, 200)
+
+        self.client.post(reverse("accounts:two_factor_disable"), self.data())
+
+        self.assertEqual(self.client.get(reverse("accounts:profile")).status_code, 200)
+        self.assertRedirects(
+            other.get(reverse("accounts:profile")),
+            f"{LOGIN_URL}?next=/profile/",
+            fetch_redirect_response=False,
+        )
 
     def test_turning_it_off_needs_the_password_and_a_code(self):
         url = reverse("accounts:two_factor_disable")
@@ -1093,14 +1109,15 @@ class SupportingBehaviourTests(TestCase):
         self.client.force_login(user)
 
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            self.client.post(
-                reverse("accounts:password_change"),
-                {
-                    "current_password": PASSWORD,
-                    "new_password1": OTHER_PASSWORD,
-                    "new_password2": OTHER_PASSWORD,
-                },
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(
+                    reverse("accounts:password_change"),
+                    {
+                        "current_password": PASSWORD,
+                        "new_password1": OTHER_PASSWORD,
+                        "new_password2": OTHER_PASSWORD,
+                    },
+                )
 
         self.assertIn(f"account {user.pk}", logs.output[0])
         self.assertNotIn(OTHER_PASSWORD, logs.output[0])
@@ -1429,7 +1446,8 @@ class CodeBudgetTests(TestCase):
         self.assertFalse(MailJob.objects.exists())
 
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            totp.record_failed_code(self.user)
+            with self.captureOnCommitCallbacks(execute=True):
+                totp.record_failed_code(self.user)
         for _attempt in range(3):
             totp.record_failed_code(self.user)
 
@@ -1717,7 +1735,8 @@ class CodeBudgetPauseTests(TestCase):
         set_budget(self.device, totp.CODE_PAUSE_AT - 1)
 
         with self.assertLogs("leg_platform.security", "WARNING") as logs:
-            totp.record_failed_code(self.user)
+            with self.captureOnCommitCallbacks(execute=True):
+                totp.record_failed_code(self.user)
 
         self.assertEqual(len(logs.output), 1)
         self.assertIn(f"account {self.user.pk}", logs.output[0])

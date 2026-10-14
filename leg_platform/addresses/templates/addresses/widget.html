@@ -1,0 +1,16 @@
+{% load i18n %}
+{# Include inside the existing profile/registration form. Fields stay authoritative. #}
+<section data-address-directory
+         data-endpoint="{% url 'addresses:lookup' %}"
+         data-unavailable="{% translate 'The address directory is unavailable. You can continue with the address as entered.' %}"
+         data-suggestions="{% translate 'Address suggestions' %}"
+         data-street-id="{{ address_street_id|default:'id_street' }}"
+         data-house-number-id="{{ address_house_number_id|default:'id_house_number' }}"
+         data-postal-code-id="{{ address_postal_code_id|default:'id_postal_code' }}"
+         data-locality-id="{{ address_locality_id|default:'id_town' }}"
+         data-country-id="{{ address_country_id|default:'id_country' }}">
+  <p data-address-status role="status" aria-live="polite"></p>
+  <div data-address-results></div>
+  <p>{% translate "Official address directory" %}: {% translate "Federal Office of Topography swisstopo" %}</p>
+  <noscript><p>{% translate "Address suggestions need JavaScript. You can continue with the address as entered." %}</p></noscript>
+</section>
