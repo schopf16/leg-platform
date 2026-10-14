@@ -6,9 +6,12 @@ reserved domain example.com (RFC 2606).
 
 import io
 import json
+import threading
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 from urllib.error import HTTPError, URLError
+from urllib.request import Request
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -16,11 +19,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from django.core import mail
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from leg_platform.accounts.encryption import DecryptionError, is_current
 from leg_platform.accounts.models import GRAPH_CERTIFICATE_KEY_PURPOSE, GraphConfiguration
-from leg_platform.mail import GRAPH_TIMEOUT_SECONDS, GraphEmailBackend, GraphEmailError
+from leg_platform.mail import GRAPH_TIMEOUT_SECONDS, GraphEmailBackend, GraphEmailError, urlopen
 
 TENANT_ID = "6f1f6b5e-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
 CLIENT_ID = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
@@ -106,7 +109,7 @@ class GraphConfigurationTests(TestCase):
                 GraphConfiguration.objects.get(id=1).private_key_pem()
 
 
-@override_settings(EMAIL_MODE="graph", EMAIL_ALLOWED_RECIPIENTS=[])
+@override_settings(EMAIL_MODE="graph", EMAIL_ALLOWED_RECIPIENTS=[], DEFAULT_FROM_EMAIL=SENDER)
 class GraphEmailBackendTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -283,3 +286,45 @@ class GraphEmailBackendTests(TestCase):
         with self.assertRaisesMessage(GraphEmailError, "To recipient"):
             self.send(self.message(to=[], bcc=["recipient@example.com"]))
         self.urlopen.assert_not_called()
+
+    @override_settings(DEFAULT_FROM_EMAIL="other@example.com")
+    def test_sender_differing_from_configuration_is_refused(self):
+        with self.assertRaisesMessage(GraphEmailError, "sender address differs"):
+            self.send(self.message())
+        self.msal.assert_not_called()
+        self.urlopen.assert_not_called()
+
+    def test_auto_submitted_header_is_not_sent_and_is_logged(self):
+        message = self.message(headers={"Auto-Submitted": "auto-generated"})
+        with self.assertLogs("leg_platform.mail", level="WARNING") as logs:
+            self.send(message)
+        _request, payload = self.sent_payload()
+        self.assertNotIn("internetMessageHeaders", payload["message"])
+        self.assertIn("Auto-Submitted", logs.output[0])
+
+
+class GraphRedirectTests(SimpleTestCase):
+    def test_redirect_is_refused_and_not_followed(self):
+        requested = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                requested.append(self.path)
+                self.send_response(302 if self.path == "/start" else 202)
+                self.send_header("Location", "/second")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, format, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{server.server_address[1]}/start"
+
+        with self.assertRaises(HTTPError) as context:
+            urlopen(Request(url, data=b"{}", method="POST"), timeout=5)
+        self.assertEqual(context.exception.code, 302)
+        self.assertEqual(requested, ["/start"])

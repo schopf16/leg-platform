@@ -12,9 +12,10 @@ Messages are never logged; log entries name no address, token or key.
 
 import json
 import logging
+from email.utils import parseaddr
 from urllib.error import HTTPError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import msal
 from django.conf import settings
@@ -39,6 +40,15 @@ class GraphEmailError(Exception):
     """An email could not be sent through Microsoft Graph. The text contains no secret."""
 
 
+class _RefuseRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# A redirect answer raises HTTPError instead of repeating the request with the bearer token.
+urlopen = build_opener(_RefuseRedirects).open
+
+
 class GraphEmailBackend(BaseEmailBackend):
     """Sends email through Microsoft Graph with the certificate of ``GraphConfiguration``."""
 
@@ -51,6 +61,11 @@ class GraphEmailBackend(BaseEmailBackend):
         # All messages are checked before the first one is sent.
         payloads = []
         for message in email_messages:
+            if parseaddr(message.from_email)[1].lower() != configuration.sender_address.lower():
+                raise GraphEmailError(
+                    "The sender address differs from the configured Microsoft Graph sender; "
+                    "no email was sent."
+                )
             payload = _payload(message)
             if payload is None:
                 logger.info("Email discarded: no To recipient is on the allowlist.")
@@ -125,6 +140,8 @@ def _payload(message):
     to = _allowed(message.to)
     if not to:
         return None
+    if "Auto-Submitted" in message.extra_headers:
+        logger.warning("Header Auto-Submitted is not sent by the Microsoft Graph backend.")
     html = next(
         (
             content

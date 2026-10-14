@@ -76,7 +76,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 ## D-006: Email Delivery via Microsoft Graph
 
 * Date: 2026-10-09 (updated 2026-10-14)
-* Status: Decided; amended on 2026-10-14 (certificate instead of client secret, see the last bullets of "Open")
+* Status: Decided; amended on 2026-10-14 (certificate instead of client secret, see the bullet "Amendment of 2026-10-14" below)
 * Decision:
   * Outgoing email is sent via Microsoft Graph: email verification, password reset, security notifications and account notifications where needed.
   * The system administrator maintains the configuration in a dedicated section of the Django admin: tenant ID, client ID, sender address, certificate and its private key, plus a test send with understandable feedback. The section is not implemented yet.
@@ -98,6 +98,8 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   * "Microsoft recommends that you use a certificate instead of a client secret before moving the application to a production environment." A client secret "should **not be used** in production environments".
   * The client credentials flow accepts a certificate in place of `client_secret`: the request contains `client_assertion_type` `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a `client_assertion`, a JWT signed with the certificate's private key.
   * The permission `Mail.Send` and the endpoint `sendMail` are unchanged.
+* Open, requires the project owner (2026-10-14): D-037 states that automatic emails carry `Auto-Submitted: auto-generated`. The Graph backend does not send this header; it logs a warning instead. Whether Microsoft Graph accepts it through `internetMessageHeaders` is not verified yet. Until the project owner decides, a mailbox auto-reply loop is not excluded by the application.
+* Open, requires the project owner (2026-10-14): the sender address in the configuration must match `EMAIL_SENDER_ADDRESS`. The Graph backend refuses to send when the two differ (fail closed); the sender check at start-up is not built.
   * Microsoft recommends, for production, a certificate signed by a well-known certificate authority, and self-signed certificates for testing. The application cannot check this; the installation guide must describe it, and the admin must warn before the certificate expires.
 * Implemented (commit 88ee6ae): `GraphConfiguration` stores the certificate and the encrypted private key; `GraphEmailBackend` requests a token with `msal` (`ConfidentialClientApplication`, client credentials, scope `https://graph.microsoft.com/.default`) and sends with `POST /v1.0/users/{sender}/sendMail`, which returns HTTP 202 when the message is accepted, not when it is delivered. Tests replace msal and the HTTP request with mocks.
 * Sources: https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac, https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials, https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow, https://learn.microsoft.com/en-us/graph/api/user-sendmail, https://docs.djangoproject.com/en/stable/ref/settings/#secret-key, https://pypi.org/project/cryptography/
