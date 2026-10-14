@@ -10,6 +10,7 @@ from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import AuthenticatorDevice, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    age_authentication,
     code_for,
     completion_data,
     create_active_user,
@@ -269,12 +270,17 @@ class PageSecurityAndLanguageTests(TestCase):
         enrolling = create_active_user("enrolling.person@example.org")
         enrolling_client = Client()
         enrolling_client.force_login(enrolling)
-        enrolling_client.post(
-            reverse("accounts:two_factor_setup"),
-            {"current_password": PASSWORD},
-            REMOTE_ADDR="10.0.6.2",
-        )
+        enrolling_client.post(reverse("accounts:two_factor_setup"), {})
+        # A session that logged in just now starts the setup without the password; an older one
+        # is asked for it (D-055).
+        fresh = Client()
+        fresh.force_login(create_active_user("fresh.person@example.org"))
         pages = {
+            "two-factor setup without password": fresh.get(reverse("accounts:two_factor_setup")),
+            "welcome": fresh.get(reverse("accounts:welcome")),
+        }
+        age_authentication(member)
+        pages |= {
             "password change": member.get(reverse("accounts:password_change")),
             "password change failed": member.post(
                 reverse("accounts:password_change"),

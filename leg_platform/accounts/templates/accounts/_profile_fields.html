@@ -1,0 +1,50 @@
+{% load i18n %}{% comment %}
+The fields of the profile in groups (docs/DESIGN.md, D-054). Used by the completion of the
+registration (with the password fields) and by the profile form. Optional fields say so in their
+label; every other field is required. The two fields of the name and the street are required
+only under a condition that the text next to them states, so they carry no HTML ``required``.
+The address suggestions (addresses/widget.html) belong directly after the street and the house
+number; their contract is unchanged.
+{% endcomment %}
+<fieldset class="form-section">
+  <legend>{% translate "Name" %}</legend>
+  <p class="form-hint">{% translate "First name and last name are required, unless you enter a company name below." %}</p>
+  {% include "accounts/_field.html" with field=form.salutation optional=True %}
+  {% include "accounts/_field.html" with field=form.first_name %}
+  {% include "accounts/_field.html" with field=form.last_name %}
+</fieldset>
+
+<fieldset class="form-section">
+  <legend>{% translate "Company" %}</legend>
+  <p class="form-hint">{% translate "Only fill in if invoices should be addressed to a company." %}</p>
+  {% include "accounts/_field.html" with field=form.organisation_name optional=True %}
+</fieldset>
+
+<fieldset class="form-section">
+  <legend>{% translate "Postal address" %}</legend>
+  {% include "accounts/_field.html" with field=form.address_line_1 optional=True %}
+  <div class="field-row field-row-street">
+    <div>{% include "accounts/_field.html" with field=form.street %}</div>
+    <div>{% include "accounts/_field.html" with field=form.house_number optional=True %}</div>
+  </div>
+  {% include "addresses/widget.html" %}
+  <div class="field-row field-row-locality">
+    <div>{% include "accounts/_field.html" with field=form.postal_code %}</div>
+    <div>{% include "accounts/_field.html" with field=form.town %}</div>
+  </div>
+  {% include "accounts/_field.html" with field=form.country %}
+  {% include "accounts/_field.html" with field=form.post_office_box_number optional=True hint=_("Only if you have no street address.") %}
+</fieldset>
+
+<fieldset class="form-section">
+  <legend>{% translate "Phone" %}</legend>
+  {% include "accounts/_field.html" with field=form.phone_number optional=True %}
+</fieldset>
+
+{% if form.password1 %}
+  <fieldset class="form-section">
+    <legend>{% translate "Password" %}</legend>
+    {% include "accounts/_field.html" with field=form.password1 %}
+    {% include "accounts/_field.html" with field=form.password2 %}
+  </fieldset>
+{% endif %}

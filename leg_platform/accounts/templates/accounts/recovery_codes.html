@@ -1,23 +1,30 @@
 {% extends "base.html" %}
-{% load i18n %}
-{% block title %}{% translate "Recovery codes" %}{% endblock %}
+{% load i18n static %}
+{% block title %}{% translate "Emergency codes" %}{% endblock %}
 {% block content %}
   <div class="card card-md">
     <div class="card-body">
       {% if enrolled %}
-        <div class="alert alert-success" role="status">{% translate "Two-factor authentication is on." %}</div>
+        {% include "accounts/_setup_steps.html" with current=2 %}
+        <div class="alert alert-success" role="status">{% translate "Extra protection is turned on." %}</div>
       {% endif %}
-      <h1 class="h2 mb-3">{% translate "Your recovery codes" %}</h1>
-      <div class="alert alert-warning">{% translate "These codes are shown only now. Save them before you leave this page." %}</div>
-      <p>{% translate "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone." %}</p>
-      <ul class="list-unstyled identifier text-center">
+      <h1 class="h2 mb-3">{% translate "Your emergency codes" %}</h1>
+      <div class="alert alert-warning">{% translate "The codes are shown only now. Save them before you leave this page." %}</div>
+      <p>{% translate "If you lose your phone or cannot open the app, you can log in with one of these codes instead of the app code. Each code works only once. Write them down or print them now. They are not shown again." %}</p>
+      <ol class="recovery-codes" id="emergency-codes">
         {% for code in codes %}<li>{{ code }}</li>{% endfor %}
-      </ul>
-      <label class="form-check mb-3">
-        <input class="form-check-input" type="checkbox">
-        <span class="form-check-label">{% translate "I have stored the recovery codes" %}</span>
-      </label>
-      <a class="btn btn-primary w-100" href="{% url 'accounts:two_factor' %}">{% translate "I have saved the codes" %}</a>
+      </ol>
+      <div class="d-grid gap-2 mb-3 d-print-none">
+        <button type="button" class="btn btn-secondary-action" data-codes-print hidden>{% translate "Print this page" %}</button>
+        <button type="button" class="btn btn-secondary-action" data-codes-copy hidden aria-controls="emergency-codes"
+                data-done="{% translate 'The codes were copied.' %}" data-failed="{% translate 'The codes could not be copied. Please write them down.' %}">{% translate "Copy codes" %}</button>
+      </div>
+      <p class="form-hint d-print-none" role="status" data-codes-status></p>
+      <a class="btn btn-primary w-100 d-print-none" href="{% url 'accounts:two_factor' %}">{% translate "I have saved the codes - continue" %}</a>
     </div>
   </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/recovery-codes.js' %}"></script>
 {% endblock %}

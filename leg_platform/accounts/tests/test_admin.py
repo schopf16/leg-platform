@@ -634,8 +634,8 @@ class AdminPostalCodeTests(TestCase):
             ("CH", "999", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ("CH", "10115", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ("CH", "30a0", "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
-            ("DE", "", "Dieses Feld ist zwingend erforderlich."),
-            ("LI", "  ", "Dieses Feld ist zwingend erforderlich."),
+            ("DE", "", "Bitte füllen Sie dieses Feld aus."),
+            ("LI", "  ", "Bitte füllen Sie dieses Feld aus."),
         )
         for country, value, message in cases:
             with self.subTest(country=country, value=value):

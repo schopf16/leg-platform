@@ -46,6 +46,7 @@ from leg_platform.accounts.models import (
 )
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.tests.helpers import (
+    age_authentication,
     OTHER_PASSWORD,
     PASSWORD,
     code_for,
@@ -454,6 +455,9 @@ class EnrolmentTests(TestCase):
     def setUp(self):
         self.user = create_active_user()
         self.client.force_login(self.user)
+        # These tests are about the password prompt; the five minutes without it have their own
+        # tests (RecentAuthenticationTests).
+        age_authentication(self.client)
 
     def start(self, password=PASSWORD):
         return self.client.post(
@@ -553,7 +557,7 @@ class EnrolmentTests(TestCase):
             self.assertNotIn(text, logs.output[0])
         overview = self.client.get(reverse("accounts:two_factor"))
         self.assertNotContains(overview, totp.format_recovery_code(codes[0]))
-        self.assertContains(overview, "10 Wiederherstellungscodes")
+        self.assertContains(overview, "Sie haben 10 unbenutzte Notfallcodes.")
 
     def test_the_session_id_changes_when_the_second_factor_is_turned_on(self):
         self.start()

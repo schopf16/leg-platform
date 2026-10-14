@@ -1,0 +1,11 @@
+{% extends "error_base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your entry could not be processed" %}{% endblock %}
+{% block heading %}{% translate "Your entry could not be processed" %}{% endblock %}
+{% block message %}
+  <p>{% translate "The page was open for too long, or your browser blocked a security check. Nothing has been saved. Please go back, reload the page and try again." %}</p>
+{% endblock %}
+{% block action %}
+  {% url 'accounts:login' as login_url %}
+  <a class="btn btn-primary w-100" href="{{ login_url|default:'/' }}">{% translate "Back to the login page" %}</a>
+{% endblock %}

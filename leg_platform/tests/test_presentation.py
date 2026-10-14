@@ -81,7 +81,8 @@ class PresentationTests(SimpleTestCase):
         self.assertIn("Darstellung", content)
         self.assertNotIn("Colour mode", content)
         self.assertNotIn("ß", content)
-        self.assertNotIn("<script", content)
+        # Only the external script of the instance itself (show password), never an inline one.
+        self.assertNotRegex(content, r"<script(?![^>]*\ssrc=\"/static/)")
         self.assertNotIn("style=", content)
 
     def test_stylesheet_is_self_hosted_css_with_validated_values(self):

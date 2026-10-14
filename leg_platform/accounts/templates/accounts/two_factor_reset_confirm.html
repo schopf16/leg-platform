@@ -5,7 +5,7 @@
   <div class="card card-md">
     <div class="card-body">
       <h1 class="h2 mb-3">{% translate "Remove two-factor authentication" %}</h1>
-      <p>{% blocktranslate %}{{ instance_name }} started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile.{% endblocktranslate %}</p>
+      <p>{% blocktranslate %}{{ instance_name }} started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your emergency codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile.{% endblocktranslate %}</p>
       <p>{% translate "Did you not expect this? Then close this page. Nothing changes." %}</p>
       <form method="post" novalidate>
         {% csrf_token %}

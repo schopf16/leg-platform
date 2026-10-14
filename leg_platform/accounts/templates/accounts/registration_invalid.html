@@ -5,8 +5,11 @@
   <div class="card card-md">
     <div class="card-body">
       <h1 class="h2 mb-3">{% translate "Link not valid" %}</h1>
-      <p>{% translate "This link is not valid or has expired. You can register again." %}</p>
-      <a href="{% url 'accounts:registration' %}">{% translate "Register" %}</a>
+      <p>{% translate "This link is invalid, expired or was already used. If you have already finished the registration, please log in." %}</p>
+      <div class="d-grid gap-2">
+        <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
+        <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}">{% translate "Register again" %}</a>
+      </div>
     </div>
   </div>
 {% endblock %}

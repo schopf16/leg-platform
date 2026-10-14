@@ -3,10 +3,5 @@
 {% endfor %}
 {% for field in form.hidden_fields %}{{ field }}{% endfor %}
 {% for field in form.visible_fields %}
-  <div class="mb-3">
-    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if mark_required and field.field.required %} <span class="text-secondary fw-normal">({% translate "required" %})</span>{% endif %}</label>
-    {{ field }}
-    {% if field.help_text %}<div class="form-hint">{{ field.help_text }}</div>{% endif %}
-    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-  </div>
+  {% include "accounts/_field.html" %}
 {% endfor %}

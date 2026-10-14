@@ -4,7 +4,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: LEG-Platform\n"
-"PO-Revision-Date: 2026-10-14 14:00+0200\n"
+"PO-Revision-Date: 2026-10-14 18:00+0200\n"
 "Last-Translator: LEG-Platform contributors\n"
 "Language-Team: Swiss German\n"
 "Language: de_CH\n"
@@ -95,20 +95,11 @@ msgstr "Letzter automatischer Versuch am"
 msgid "An import is already queued or running."
 msgstr "Ein Import ist bereits vorgemerkt oder läuft."
 
-msgid "A retention obligation applies to this account. Continuing will deactivate it instead of deleting its retained data. The email address will become available for a new registration."
-msgstr "Für dieses Konto besteht eine Aufbewahrungspflicht. Beim Fortfahren wird es deaktiviert, statt die aufbewahrungspflichtigen Daten zu löschen. Die E-Mail-Adresse wird für eine neue Registrierung freigegeben."
-
 msgid "Account blocked"
 msgstr "Konto gesperrt"
 
-msgid "Account deactivated"
-msgstr "Konto deaktiviert"
-
 msgid "Account deleted"
 msgstr "Konto gelöscht"
-
-msgid "Account reactivated"
-msgstr "Konto reaktiviert"
 
 msgid "Account unblocked"
 msgstr "Konto entsperrt"
@@ -149,17 +140,8 @@ msgstr "Neue E-Mail-Adresse bei %(instance_name)s bestätigen"
 msgid "Contact information for the operator:\n\n%(contact_url)s"
 msgstr "Kontaktinformationen des Betreibers:\n\n%(contact_url)s"
 
-msgid "Continuing will permanently delete your account and its data. This action cannot be undone."
-msgstr "Beim Fortfahren werden Ihr Konto und dessen Daten endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
-
-msgid "Deactivated the account under the retention rule."
-msgstr "Das Konto wurde aufgrund der Aufbewahrungspflicht deaktiviert."
-
 msgid "Delete account"
 msgstr "Konto löschen"
-
-msgid "Delete or deactivate account"
-msgstr "Konto löschen oder deaktivieren"
 
 msgid "Deleted the account."
 msgstr "Das Konto wurde gelöscht."
@@ -197,11 +179,11 @@ msgstr "Startseite"
 msgid "I confirm this account change."
 msgstr "Ich bestätige diese Kontoänderung."
 
-msgid "I understand that this action cannot be undone."
-msgstr "Ich verstehe, dass diese Aktion nicht rückgängig gemacht werden kann."
-
-msgid "If the address can be used, we have sent a message to it. Follow the instructions in the message. Your current email address remains unchanged until you verify the new one."
-msgstr "Wenn die Adresse verwendet werden kann, haben wir eine Nachricht dorthin gesendet. Folgen Sie den Anweisungen in der Nachricht. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
+#, python-format
+msgid "Open the link in the message to confirm the new address. The link is valid for %(counter)s hour. Your current email address remains unchanged until you confirm the new one."
+msgid_plural "Open the link in the message to confirm the new address. The link is valid for %(counter)s hours. Your current email address remains unchanged until you confirm the new one."
+msgstr[0] "Öffnen Sie in der Nachricht den Link, um die neue Adresse zu bestätigen. Der Link ist %(counter)s Stunde gültig. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
+msgstr[1] "Öffnen Sie in der Nachricht den Link, um die neue Adresse zu bestätigen. Der Link ist %(counter)s Stunden gültig. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
 
 msgid "New email address"
 msgstr "Neue E-Mail-Adresse"
@@ -211,12 +193,6 @@ msgstr "Benachrichtigung: E-Mail-Adresse geändert"
 
 msgid "Personal link to confirm the new email address."
 msgstr "Persönlicher Link zur Bestätigung der neuen E-Mail-Adresse."
-
-msgid "Reactivate account"
-msgstr "Konto reaktivieren"
-
-msgid "Reactivated the account."
-msgstr "Das Konto wurde reaktiviert."
 
 msgid "Save profile"
 msgstr "Profil speichern"
@@ -230,14 +206,11 @@ msgstr "Die Kontoänderung konnte nicht durchgeführt werden. Möglicherweise ha
 msgid "The account could not be deleted."
 msgstr "Das Konto konnte nicht gelöscht werden."
 
-msgid "The account is deleted if no retention obligation applies. Otherwise it is deactivated and its email address becomes available for a new registration."
-msgstr "Das Konto wird gelöscht, wenn keine Aufbewahrungspflicht besteht. Andernfalls wird es deaktiviert und seine E-Mail-Adresse für eine neue Registrierung freigegeben."
-
 msgid "The account will be able to log in and reset its password again."
 msgstr "Das Konto kann sich wieder anmelden und sein Passwort zurücksetzen."
 
-msgid "The account will be reactivated if no active, temporarily locked, or blocked account uses its email address. Any pending registration at that address will be removed."
-msgstr "Das Konto wird reaktiviert, wenn kein aktives, vorübergehend gesperrtes oder gesperrtes Konto seine E-Mail-Adresse verwendet. Eine ausstehende Registrierung mit dieser Adresse wird entfernt."
+msgid "The account will be restored if no active, temporarily locked, or blocked account uses its email address. Any pending registration at that address will be removed."
+msgstr "Das Konto wird wiederhergestellt, wenn kein aktives, vorübergehend gesperrtes oder blockiertes Konto dessen E-Mail-Adresse verwendet. Eine ausstehende Registrierung mit dieser Adresse wird entfernt."
 
 msgid "The account will not be able to log in or reset its password."
 msgstr "Das Konto kann sich nicht anmelden und sein Passwort nicht zurücksetzen."
@@ -257,8 +230,8 @@ msgstr "Das Konto wurde entsperrt."
 msgid "We will keep your current email address until you verify the new one. Enter your password and, if enabled, a code from your authenticator app."
 msgstr "Ihre aktuelle E-Mail-Adresse bleibt bestehen, bis Sie die neue bestätigen. Geben Sie Ihr Passwort und, falls aktiviert, einen Code aus Ihrer Authenticator-App ein."
 
-msgid "Your account was deleted or deactivated."
-msgstr "Ihr Konto wurde gelöscht oder deaktiviert."
+msgid "Your account has been deleted."
+msgstr "Ihr Konto wurde gelöscht."
 
 msgid "Your email address at %(instance_name)s was changed"
 msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
@@ -266,8 +239,8 @@ msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
 msgid "Your email address was changed. Please log in again."
 msgstr "Ihre E-Mail-Adresse wurde geändert. Bitte melden Sie sich erneut an."
 
-msgid "Your name and postal address are required. The phone number is optional."
-msgstr "Ihr Name und Ihre Postadresse sind erforderlich. Die Telefonnummer ist optional."
+msgid "Fields marked optional may stay empty. All other fields are required."
+msgstr "Felder mit dem Hinweis «freiwillig» dürfen leer bleiben. Alle anderen Felder müssen ausgefüllt werden."
 
 msgid "Your profile was updated."
 msgstr "Ihr Profil wurde aktualisiert."
@@ -398,9 +371,6 @@ msgstr "Aktiv"
 
 msgid "Blocked"
 msgstr "Gesperrt"
-
-msgid "Deactivated"
-msgstr "Deaktiviert"
 
 msgid "Mrs"
 msgstr "Frau"
@@ -714,7 +684,7 @@ msgid "Enter a street or a post office box."
 msgstr "Geben Sie eine Strasse oder ein Postfach ein."
 
 msgid "This field is required."
-msgstr "Dieses Feld ist zwingend erforderlich."
+msgstr "Bitte füllen Sie dieses Feld aus."
 
 msgid "Enter a postal code with 4 digits from 1000 to 9999."
 msgstr "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."
@@ -943,15 +913,16 @@ msgstr "Link senden"
 msgid "Choose a new password"
 msgstr "Neues Passwort wählen"
 
-msgid "A passphrase of several words is a good choice."
-msgstr "Ein Satz aus mehreren Wörtern ist eine gute Wahl."
+#, python-format
+msgid "Choose at least %(min_length)d characters. A sentence of several words is easy to remember and hard to guess, for example «My cat drinks milk every morning». Please do not use this exact example."
+msgstr "Wählen Sie mindestens %(min_length)d Zeichen. Ein Satz aus mehreren Wörtern ist leicht zu merken und schwer zu erraten, zum Beispiel «Meine Katze trinkt jeden Morgen Milch». Verwenden Sie bitte nicht genau dieses Beispiel."
 
 msgid "Save password"
 msgstr "Passwort speichern"
 
 #: leg_platform/accounts/templates/accounts/password_reset_invalid.html
-msgid "This link is not valid or has expired. You can request a new one."
-msgstr "Dieser Link ist ungültig oder abgelaufen. Sie können einen neuen anfordern."
+msgid "This link is invalid, expired or was already used. If you have already chosen a new password, please log in."
+msgstr "Dieser Link ist ungültig, abgelaufen oder wurde schon verwendet. Wenn Sie schon ein neues Passwort gewählt haben, melden Sie sich bitte an."
 
 #: leg_platform/accounts/views.py
 msgid "Your password was changed. You can now log in."
@@ -962,10 +933,6 @@ msgstr "Die E-Mail-Adresse oder das Passwort ist falsch."
 
 msgid "Email address"
 msgstr "E-Mail-Adresse"
-
-#: leg_platform/accounts/views.py
-msgid "Your account is active. You can now log in."
-msgstr "Ihr Konto ist aktiv. Sie können sich jetzt anmelden."
 
 #: leg_platform/templates/base.html
 msgid "Profile"
@@ -980,8 +947,8 @@ msgstr "Datenschutz"
 msgid "To the website"
 msgstr "Zur Website"
 
-msgid "required"
-msgstr "Pflichtfeld"
+msgid "optional"
+msgstr "freiwillig"
 
 #: leg_platform/accounts/templates/accounts/login.html
 msgid "Log in"
@@ -1007,8 +974,11 @@ msgstr "Hier verwalten Sie Ihr Konto und später Ihre Standorte, Energiedaten un
 msgid "Too many attempts"
 msgstr "Zu viele Versuche"
 
-msgid "There were too many failed login attempts. Please try again later."
-msgstr "Es gab zu viele fehlgeschlagene Anmeldeversuche. Bitte versuchen Sie es später erneut."
+#, python-format
+msgid "There were too many failed login attempts. Please wait about %(counter)s minute and try again."
+msgid_plural "There were too many failed login attempts. Please wait about %(counter)s minutes and try again."
+msgstr[0] "Es gab zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie etwa %(counter)s Minute und versuchen Sie es dann erneut."
+msgstr[1] "Es gab zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie etwa %(counter)s Minuten und versuchen Sie es dann erneut."
 
 msgid "Back to the login page"
 msgstr "Zurück zur Anmeldeseite"
@@ -1027,22 +997,22 @@ msgstr "Bereits registriert?"
 msgid "Check your email"
 msgstr "Prüfen Sie Ihre E-Mails"
 
-msgid "If this address can be used, we have sent an email to it. Please follow the instructions in the email."
-msgstr "Wenn diese Adresse verwendet werden kann, haben wir ihr eine E-Mail gesendet. Bitte folgen Sie den Anweisungen in der E-Mail."
+msgid "If we can use the address you entered, we have sent a message to it. It should arrive within a few minutes. Please also look in your spam folder."
+msgstr "Wenn wir die angegebene Adresse verwenden können, haben wir eine Nachricht an diese Adresse gesendet. Sie sollte innerhalb weniger Minuten ankommen. Schauen Sie bitte auch im Spam-Ordner nach."
 
 #: leg_platform/accounts/templates/accounts/registration_invalid.html
 msgid "Link not valid"
 msgstr "Link ungültig"
 
-msgid "This link is not valid or has expired. You can register again."
-msgstr "Dieser Link ist ungültig oder abgelaufen. Sie können sich erneut registrieren."
+msgid "This link is invalid, expired or was already used. If you have already finished the registration, please log in."
+msgstr "Dieser Link ist ungültig, abgelaufen oder wurde schon verwendet. Wenn Sie die Registrierung schon abgeschlossen haben, melden Sie sich bitte an."
 
 #: leg_platform/accounts/templates/accounts/registration_complete.html
 msgid "Complete your registration"
 msgstr "Registrierung abschliessen"
 
-msgid "Enter your data and choose a password. A passphrase of several words is a good choice."
-msgstr "Geben Sie Ihre Angaben ein und wählen Sie ein Passwort. Ein Satz aus mehreren Wörtern ist eine gute Wahl."
+msgid "Enter your data and choose a password."
+msgstr "Geben Sie Ihre Angaben ein und wählen Sie ein Passwort."
 
 msgid "Activate account"
 msgstr "Konto aktivieren"
@@ -1094,9 +1064,6 @@ msgstr "Das Passwort ist falsch."
 msgid "Your password was changed."
 msgstr "Ihr Passwort wurde geändert."
 
-msgid "Two-factor authentication was removed."
-msgstr "Die Zwei-Faktor-Authentifizierung wurde entfernt."
-
 msgid "The change could not be made."
 msgstr "Die Änderung konnte nicht vorgenommen werden."
 
@@ -1111,14 +1078,14 @@ msgstr "Ihr Konto braucht die Zwei-Faktor-Authentifizierung. Richten Sie sie ein
 msgid "Notification: two-factor authentication set up"
 msgstr "Hinweis: Zwei-Faktor-Authentifizierung eingerichtet"
 
-msgid "Notification: two-factor authentication removed"
-msgstr "Hinweis: Zwei-Faktor-Authentifizierung entfernt"
+msgid "Notification: two-factor authentication turned off"
+msgstr "Hinweis: Zwei-Faktor-Authentifizierung ausgeschaltet"
 
-msgid "Notification: recovery codes renewed"
-msgstr "Hinweis: Wiederherstellungscodes erneuert"
+msgid "Notification: emergency codes renewed"
+msgstr "Hinweis: Notfallcodes erneuert"
 
-msgid "Notification: recovery code used"
-msgstr "Hinweis: Wiederherstellungscode verwendet"
+msgid "Notification: emergency code used"
+msgstr "Hinweis: Notfallcode verwendet"
 
 msgid "Notification: many wrong codes entered"
 msgstr "Hinweis: Viele falsche Codes eingegeben"
@@ -1165,23 +1132,23 @@ msgid "Two-factor authentication was set up at %(instance_name)s"
 msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde eingerichtet"
 
 #, python-format
-msgid "Two-factor authentication was removed at %(instance_name)s"
-msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde entfernt"
+msgid "Two-factor authentication was turned off at %(instance_name)s"
+msgstr "Die Zwei-Faktor-Authentifizierung bei %(instance_name)s wurde ausgeschaltet"
 
 #, python-format
-msgid "New recovery codes were created at %(instance_name)s"
-msgstr "Bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt"
+msgid "New emergency codes were created at %(instance_name)s"
+msgstr "Bei %(instance_name)s wurden neue Notfallcodes erstellt"
 
 #: leg_platform/accounts/templates/accounts/email/two_factor_enabled.txt
 #, python-format
 msgid ""
 "Hello\n"
 "\n"
-"Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or a recovery code, to log in."
+"Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or an emergency code, to log in."
 msgstr ""
 "Guten Tag\n"
 "\n"
-"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
+"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Notfallcode."
 
 #, python-format
 msgid ""
@@ -1201,37 +1168,37 @@ msgstr "Wenn Sie das nicht veranlasst haben, wenden Sie sich sofort an die Betre
 msgid ""
 "Hello\n"
 "\n"
-"Two-factor authentication was removed from your account at %(instance_name)s. All recovery codes became invalid."
+"Two-factor authentication was turned off for your account at %(instance_name)s. All emergency codes became invalid."
 msgstr ""
 "Guten Tag\n"
 "\n"
-"Von Ihrem Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung entfernt. Alle Wiederherstellungscodes sind ungültig geworden."
+"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung ausgeschaltet. Alle Notfallcodes sind ungültig geworden."
 
 #, python-format
-msgid "A recovery code was used at %(instance_name)s"
-msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
+msgid "An emergency code was used at %(instance_name)s"
+msgstr "Bei %(instance_name)s wurde ein Notfallcode verwendet"
 
 #: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
 #, python-format
 msgid ""
 "Hello\n"
 "\n"
-"A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
+"An emergency code was used to log in to your account at %(instance_name)s. This code cannot be used again."
 msgstr ""
 "Guten Tag\n"
 "\n"
-"Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
+"Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Notfallcode verwendet. Dieser Code kann nicht mehr verwendet werden."
 
 #: leg_platform/accounts/templates/accounts/email/recovery_codes_renewed.txt
 #, python-format
 msgid ""
 "Hello\n"
 "\n"
-"New recovery codes were created for your account at %(instance_name)s. The earlier recovery codes became invalid."
+"New emergency codes were created for your account at %(instance_name)s. The earlier emergency codes became invalid."
 msgstr ""
 "Guten Tag\n"
 "\n"
-"Für Ihr Konto bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt. Die früheren Wiederherstellungscodes sind ungültig geworden."
+"Für Ihr Konto bei %(instance_name)s wurden neue Notfallcodes erstellt. Die früheren Notfallcodes sind ungültig geworden."
 
 #: leg_platform/accounts/templates/accounts/login_second_factor.html
 msgid "Step 2 of 2"
@@ -1240,101 +1207,98 @@ msgstr "Schritt 2 von 2"
 msgid "Confirm sign-in"
 msgstr "Anmeldung bestätigen"
 
-msgid "A recovery code has the form xxxx-xxxx. The hyphen can be left out."
-msgstr "Ein Wiederherstellungscode hat die Form xxxx-xxxx. Der Bindestrich kann weggelassen werden."
+msgid "An emergency code has the form xxxx-xxxx. The hyphen can be left out."
+msgstr "Ein Notfallcode hat die Form xxxx-xxxx. Der Bindestrich kann weggelassen werden."
 
-msgid "Enter the code from your authenticator app. If you cannot use the app, enter one of your recovery codes."
-msgstr "Geben Sie den Code aus Ihrer Authenticator-App ein. Wenn Sie die App nicht verwenden können, geben Sie einen Ihrer Wiederherstellungscodes ein."
+msgid "Enter the code from your authenticator app. If you cannot use the app, enter one of your emergency codes."
+msgstr "Geben Sie den Code aus Ihrer Authenticator-App ein. Wenn Sie die App nicht verwenden können, geben Sie einen Ihrer Notfallcodes ein."
 
 msgid "Start again"
 msgstr "Neu beginnen"
 
 #: leg_platform/accounts/templates/accounts/two_factor.html
-msgid "Two-factor authentication is on. You need a code from your authenticator app to log in."
-msgstr "Die Zwei-Faktor-Authentifizierung ist eingeschaltet. Für die Anmeldung brauchen Sie einen Code aus Ihrer Authenticator-App."
+msgid "Extra protection is turned on. After your password, you enter the code that your authenticator app shows."
+msgstr "Der zusätzliche Schutz ist eingeschaltet. Nach dem Passwort geben Sie den Code ein, den Ihre Authenticator-App anzeigt."
 
 #, python-format
-msgid "%(counter)s recovery code is still unused."
-msgid_plural "%(counter)s recovery codes are still unused."
-msgstr[0] "%(counter)s Wiederherstellungscode ist noch nicht verwendet."
-msgstr[1] "%(counter)s Wiederherstellungscodes sind noch nicht verwendet."
+msgid "You have %(counter)s unused emergency code."
+msgid_plural "You have %(counter)s unused emergency codes."
+msgstr[0] "Sie haben %(counter)s unbenutzten Notfallcode."
+msgstr[1] "Sie haben %(counter)s unbenutzte Notfallcodes."
 
-msgid "Create new recovery codes"
-msgstr "Neue Wiederherstellungscodes erstellen"
+msgid "Create new emergency codes"
+msgstr "Neue Notfallcodes erstellen"
 
-msgid "Turn off two-factor authentication"
-msgstr "Zwei-Faktor-Authentifizierung ausschalten"
+msgid "Turn off extra protection"
+msgstr "Zusätzlichen Schutz ausschalten"
 
 msgid "Your account must use two-factor authentication. It cannot be turned off."
 msgstr "Ihr Konto muss die Zwei-Faktor-Authentifizierung verwenden. Sie kann nicht ausgeschaltet werden."
 
-msgid "Two-factor authentication is off. With it, a code from an authenticator app is needed in addition to your password to log in."
-msgstr "Die Zwei-Faktor-Authentifizierung ist ausgeschaltet. Mit ihr brauchen Sie zusätzlich zum Passwort einen Code aus einer Authenticator-App, um sich anzumelden."
+msgid "At the moment you log in with your password only. You can add a second step: after your password you enter a six-digit code that an app on your phone shows. This is voluntary. It protects your account even if someone learns your password."
+msgstr "Zurzeit melden Sie sich nur mit Ihrem Passwort an. Sie können einen zweiten Schritt hinzufügen: Nach dem Passwort geben Sie einen sechsstelligen Code ein, den eine App auf Ihrem Smartphone anzeigt. Das ist freiwillig. Es schützt Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt."
 
-msgid "Set up two-factor authentication"
-msgstr "Zwei-Faktor-Authentifizierung einrichten"
+msgid "Set up extra protection"
+msgstr "Zusätzlichen Schutz einrichten"
 
 #: leg_platform/accounts/templates/accounts/two_factor_setup.html
-msgid "You need an authenticator app on your phone, for example Google Authenticator or Microsoft Authenticator. Enter your password to continue."
-msgstr "Sie brauchen eine Authenticator-App auf Ihrem Telefon, zum Beispiel Google Authenticator oder Microsoft Authenticator. Geben Sie Ihr Passwort ein, um fortzufahren."
+msgid "Enter your password to continue. On the next page you connect an authenticator app on your phone."
+msgstr "Geben Sie Ihr Passwort ein, um fortzufahren. Auf der nächsten Seite verbinden Sie eine Authenticator-App auf Ihrem Smartphone."
 
-msgid "Continue to setup"
-msgstr "Weiter zur Einrichtung"
-
-msgid "Your authenticator app shows a new six-digit code every 30 seconds. You need a current code on the next page."
-msgstr "Ihre Authenticator-App zeigt alle 30 Sekunden einen neuen sechsstelligen Code an. Auf der nächsten Seite brauchen Sie einen aktuellen Code."
+msgid "Continue"
+msgstr "Weiter"
 
 msgid "Cancel"
 msgstr "Abbrechen"
 
 #: leg_platform/accounts/templates/accounts/two_factor_confirm.html
-msgid "Open your authenticator app and scan this QR code."
-msgstr "Öffnen Sie Ihre Authenticator-App und scannen Sie diesen QR-Code."
+msgid "Open the app and scan this QR code with its camera (look for «+» or «Add account»)."
+msgstr "Öffnen Sie die App und scannen Sie diesen QR-Code mit der Kamera (suchen Sie nach «+» oder «Konto hinzufügen»)."
 
 msgid "QR code for the authenticator app"
 msgstr "QR-Code für die Authenticator-App"
 
-msgid "If you cannot scan the code, enter this key in your app instead:"
-msgstr "Wenn Sie den Code nicht scannen können, geben Sie stattdessen diesen Schlüssel in Ihrer App ein:"
+msgid "Cannot scan? Enter this key instead"
+msgstr "Scannen nicht möglich? Geben Sie stattdessen diesen Schlüssel ein"
 
-msgid "Enter the six-digit code that the app shows."
-msgstr "Geben Sie den sechsstelligen Code ein, den die App anzeigt."
+msgid "Enter the code the app shows now."
+msgstr "Geben Sie den Code ein, den die App jetzt anzeigt."
 
-msgid "Turn on two-factor authentication"
-msgstr "Zwei-Faktor-Authentifizierung einschalten"
+msgid "Turn on extra protection"
+msgstr "Zusätzlichen Schutz einschalten"
 
 #: leg_platform/accounts/templates/accounts/two_factor_disable.html
-msgid "After this you only need your password to log in, and your recovery codes become invalid. Enter your password and a code to confirm."
-msgstr "Danach brauchen Sie für die Anmeldung nur noch Ihr Passwort, und Ihre Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
+msgid "After this you only need your password to log in, and your emergency codes become invalid. Enter your password and a code to confirm."
+msgstr "Danach brauchen Sie für die Anmeldung nur noch Ihr Passwort, und Ihre Notfallcodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
 
 #: leg_platform/accounts/templates/accounts/recovery_codes_new.html
-msgid "Your earlier recovery codes become invalid. Enter your password and a code to confirm."
-msgstr "Ihre früheren Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
+msgid "Your earlier emergency codes become invalid. Enter your password and a code to confirm."
+msgstr "Ihre früheren Notfallcodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
 
 msgid "The new codes are shown only once, on the next page."
 msgstr "Die neuen Codes werden nur einmal auf der nächsten Seite angezeigt."
 
 #: leg_platform/accounts/templates/accounts/recovery_codes.html
-msgid "Recovery codes"
-msgstr "Wiederherstellungscodes"
+msgid "Emergency codes"
+msgstr "Notfallcodes"
 
-msgid "Two-factor authentication is on."
-msgstr "Die Zwei-Faktor-Authentifizierung ist eingeschaltet."
+msgid "Extra protection is turned on."
+msgstr "Der zusätzliche Schutz ist eingeschaltet."
 
-msgid "Your recovery codes"
-msgstr "Ihre Wiederherstellungscodes"
+msgid "Your emergency codes"
+msgstr "Ihre Notfallcodes"
 
-msgid "These codes are shown only now. Save them before you leave this page."
-msgstr "Diese Codes werden nur jetzt angezeigt. Speichern Sie sie, bevor Sie diese Seite verlassen."
+msgid "The codes are shown only now. Save them before you leave this page."
+msgstr "Die Codes werden nur jetzt angezeigt. Speichern Sie sie, bevor Sie diese Seite verlassen."
 
-msgid "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone."
-msgstr "Bewahren Sie diese Codes an einem sicheren Ort auf, zum Beispiel in einem Passwortmanager oder auf Papier. Jeder Code gilt einmal und ersetzt die App, wenn Sie Ihr Telefon verlieren."
+msgid "If you lose your phone or cannot open the app, you can log in with one of these codes instead of the app code. Each code works only once. Write them down or print them now. They are not shown again."
+msgstr "Wenn Sie Ihr Smartphone verlieren oder die App nicht öffnen können, melden Sie sich mit einem dieser Codes an, anstelle des App-Codes. Jeder Code gilt nur einmal. Schreiben Sie die Codes jetzt auf oder drucken Sie sie aus. Sie werden nicht noch einmal angezeigt."
 
-msgid "I have stored the recovery codes"
-msgstr "Ich habe die Wiederherstellungscodes gespeichert"
+msgid "Copy codes"
+msgstr "Codes kopieren"
 
-msgid "I have saved the codes"
-msgstr "Ich habe die Codes gespeichert"
+msgid "I have saved the codes - continue"
+msgstr "Ich habe die Codes gespeichert – weiter"
 
 #: leg_platform/accounts/session_timeout.py
 msgid "You were logged out for security reasons. Please log in again."
@@ -1356,11 +1320,11 @@ msgstr "Zwei-Faktor-Authentifizierung vom Konto selbst entfernt"
 msgid "Two-factor authentication reset by link or by a system administrator"
 msgstr "Zwei-Faktor-Authentifizierung per Link oder durch Systemadministrator zurückgesetzt"
 
-msgid "Recovery codes renewed"
-msgstr "Wiederherstellungscodes erneuert"
+msgid "Emergency codes renewed"
+msgstr "Notfallcodes erneuert"
 
-msgid "Recovery code used"
-msgstr "Wiederherstellungscode verwendet"
+msgid "Emergency code used"
+msgstr "Notfallcode verwendet"
 
 msgid "Many wrong codes entered"
 msgstr "Viele falsche Codes eingegeben"
@@ -1477,11 +1441,11 @@ msgstr ""
 msgid ""
 "Hello\n"
 "\n"
-"Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
+"Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and emergency codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
 msgstr ""
 "Guten Tag\n"
 "\n"
-"Die Zwei-Faktor-Authentifizierung Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Authentifizierung erneut einrichten."
+"Die Zwei-Faktor-Authentifizierung Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Notfallcodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Authentifizierung erneut einrichten."
 
 #, python-format
 msgid ""
@@ -1505,8 +1469,8 @@ msgid "Remove two-factor authentication"
 msgstr "Zwei-Faktor-Authentifizierung entfernen"
 
 #, python-format
-msgid "%(instance_name)s started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile."
-msgstr "%(instance_name)s hat veranlasst, dass die Zwei-Faktor-Authentifizierung für Ihr Konto entfernt wird. Danach genügt Ihr Passwort zur Anmeldung. Ihre Authenticator-App und Ihre Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen Ihres Kontos werden beendet. Sie können die Zwei-Faktor-Authentifizierung in Ihrem Profil jederzeit neu einrichten."
+msgid "%(instance_name)s started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your emergency codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile."
+msgstr "%(instance_name)s hat veranlasst, dass die Zwei-Faktor-Authentifizierung für Ihr Konto entfernt wird. Danach genügt Ihr Passwort zur Anmeldung. Ihre Authenticator-App und Ihre Notfallcodes funktionieren nicht mehr, und alle Sitzungen Ihres Kontos werden beendet. Sie können die Zwei-Faktor-Authentifizierung in Ihrem Profil jederzeit neu einrichten."
 
 msgid "Did you not expect this? Then close this page. Nothing changes."
 msgstr "Haben Sie das nicht erwartet? Dann schliessen Sie diese Seite. Es ändert sich nichts."
@@ -1547,8 +1511,8 @@ msgstr "Zwei-Faktor-Authentifizierung zurücksetzen"
 msgid "This account has no two-factor authentication."
 msgstr "Dieses Konto hat keine Zwei-Faktor-Authentifizierung."
 
-msgid "The second factor of this account is removed at once. The authenticator app and the recovery codes stop working and all sessions of the account end. The person sets up two-factor authentication again at the next login. Do this only after you have verified the identity of the person."
-msgstr "Der zweite Faktor dieses Kontos wird sofort entfernt. Die Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen des Kontos werden beendet. Die Person richtet die Zwei-Faktor-Authentifizierung bei der nächsten Anmeldung neu ein. Tun Sie das erst, nachdem Sie die Identität der Person geprüft haben."
+msgid "The second factor of this account is removed at once. The authenticator app and the emergency codes stop working and all sessions of the account end. The person sets up two-factor authentication again at the next login. Do this only after you have verified the identity of the person."
+msgstr "Der zweite Faktor dieses Kontos wird sofort entfernt. Die Authenticator-App und die Notfallcodes funktionieren nicht mehr, und alle Sitzungen des Kontos werden beendet. Die Person richtet die Zwei-Faktor-Authentifizierung bei der nächsten Anmeldung neu ein. Tun Sie das erst, nachdem Sie die Identität der Person geprüft haben."
 
 msgid "A link for removing two-factor authentication is sent to the email address of this account. The second factor is removed only when the person opens the link and confirms it. Nothing changes until then."
 msgstr "An die E-Mail-Adresse dieses Kontos wird ein Link zum Entfernen der Zwei-Faktor-Authentifizierung gesendet. Der zweite Faktor wird erst entfernt, wenn die Person den Link öffnet und bestätigt. Bis dahin ändert sich nichts."
@@ -1666,3 +1630,248 @@ msgstr "Die Test-E-Mail wird über Microsoft Graph an Ihre eigene Adresse gesend
 
 msgid "A successful send confirms only that Microsoft Graph accepted the email. Check the inbox to confirm that it arrived."
 msgstr "Ein erfolgreicher Versand bestätigt nur, dass Microsoft Graph die E-Mail angenommen hat. Prüfen Sie den Posteingang, ob sie angekommen ist."
+
+msgid "Enter a town."
+msgstr "Geben Sie einen Ort ein."
+
+msgid "Select a country."
+msgstr "Wählen Sie ein Land aus."
+
+msgid "Enter a postal code."
+msgstr "Geben Sie eine Postleitzahl ein."
+
+msgid "Enter your email address."
+msgstr "Geben Sie Ihre E-Mail-Adresse ein."
+
+msgid "Enter the new email address."
+msgstr "Geben Sie die neue E-Mail-Adresse ein."
+
+msgid "Enter a password."
+msgstr "Geben Sie ein Passwort ein."
+
+msgid "Enter the password again."
+msgstr "Geben Sie das Passwort noch einmal ein."
+
+msgid "Enter your password."
+msgstr "Geben Sie Ihr Passwort ein."
+
+msgid "Enter your current password."
+msgstr "Geben Sie Ihr aktuelles Passwort ein."
+
+msgid "Enter the code."
+msgstr "Geben Sie den Code ein."
+
+msgid "The code is wrong, expired or was already used. The app shows a new code every 30 seconds: wait for the next one and try again."
+msgstr "Der Code ist falsch, abgelaufen oder wurde schon verwendet. Die App zeigt alle 30 Sekunden einen neuen Code an: Warten Sie auf den nächsten und versuchen Sie es erneut."
+
+#, python-format
+msgid "Questions or problems: %(contact_url)s"
+msgstr "Fragen oder Probleme: %(contact_url)s"
+
+msgid "Please check your entries"
+msgstr "Bitte prüfen Sie Ihre Angaben"
+
+msgid "Show password"
+msgstr "Passwort anzeigen"
+
+msgid "Hide password"
+msgstr "Passwort verbergen"
+
+msgid "First name and last name are required, unless you enter a company name below."
+msgstr "Vorname und Nachname sind erforderlich, ausser Sie geben unten einen Firmennamen ein."
+
+msgid "Company"
+msgstr "Firma"
+
+msgid "Only fill in if invoices should be addressed to a company."
+msgstr "Nur ausfüllen, wenn die Rechnung auf eine Firma lauten soll."
+
+msgid "Postal address"
+msgstr "Postadresse"
+
+msgid "Only if you have no street address."
+msgstr "Nur, wenn Sie keine Strasse angeben."
+
+msgid "Phone"
+msgstr "Telefon"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "You have been logged out."
+msgstr "Sie wurden abgemeldet."
+
+#, python-format
+msgid "Open the link in the message to continue. The link is valid for %(counter)s hour."
+msgid_plural "Open the link in the message to continue. The link is valid for %(counter)s hours."
+msgstr[0] "Öffnen Sie in der Nachricht den Link, um fortzufahren. Der Link ist %(counter)s Stunde gültig."
+msgstr[1] "Öffnen Sie in der Nachricht den Link, um fortzufahren. Der Link ist %(counter)s Stunden gültig."
+
+msgid "If nothing arrives, check the spelling of the address and try again."
+msgstr "Kommt nichts an, prüfen Sie die Schreibweise der Adresse und versuchen Sie es erneut."
+
+msgid "Register again"
+msgstr "Erneut registrieren"
+
+msgid "Request a new link"
+msgstr "Neuen Link anfordern"
+
+msgid "Change email address again"
+msgstr "E-Mail-Adresse erneut ändern"
+
+msgid "If you forgot your password, you can choose a new one."
+msgstr "Wenn Sie Ihr Passwort vergessen haben, können Sie ein neues wählen."
+
+msgid "Protect your account even better?"
+msgstr "Möchten Sie Ihr Konto zusätzlich schützen?"
+
+msgid "Set up now"
+msgstr "Jetzt einrichten"
+
+msgid "Not now"
+msgstr "Jetzt nicht"
+
+msgid "Extra protection when logging in"
+msgstr "Zusätzlicher Schutz bei der Anmeldung"
+
+msgid "You have no unused emergency codes left. Create new ones."
+msgstr "Sie haben keine unbenutzten Notfallcodes mehr. Erstellen Sie neue."
+
+msgid "Turn off"
+msgstr "Ausschalten"
+
+msgid "A free app for your smartphone that shows a new number code every 30 seconds. You can get one from the App Store or Google Play, for example Google Authenticator or Microsoft Authenticator."
+msgstr "Eine kostenlose App für Ihr Smartphone, die alle 30 Sekunden einen neuen Zahlencode anzeigt. Sie finden sie im App Store oder bei Google Play, zum Beispiel «Google Authenticator» oder «Microsoft Authenticator»."
+
+msgid "What is an authenticator app?"
+msgstr "Was ist eine Authenticator-App?"
+
+msgid "Two-factor authentication is mandatory for your role."
+msgstr "Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht."
+
+msgid "Steps of the setup"
+msgstr "Schritte der Einrichtung"
+
+msgid "Connect the app"
+msgstr "App verbinden"
+
+msgid "Save emergency codes"
+msgstr "Notfallcodes speichern"
+
+msgid "Install an authenticator app if you do not have one yet."
+msgstr "Installieren Sie eine Authenticator-App, falls Sie noch keine haben."
+
+msgid "Scan with the camera inside your authenticator app."
+msgstr "Scannen Sie den Code mit der Kamera in Ihrer Authenticator-App."
+
+msgid "Two-factor authentication was turned off."
+msgstr "Die Zwei-Faktor-Authentifizierung wurde ausgeschaltet."
+
+msgid "Print this page"
+msgstr "Seite drucken"
+
+msgid "The codes were copied."
+msgstr "Die Codes wurden kopiert."
+
+msgid "The codes could not be copied. Please write them down."
+msgstr "Die Codes konnten nicht kopiert werden. Bitte schreiben Sie sie auf."
+
+#, python-format
+msgid "You used an emergency code. %(count)d code is left. You can create new codes in your profile."
+msgid_plural "You used an emergency code. %(count)d codes are left. You can create new codes in your profile."
+msgstr[0] "Sie haben einen Notfallcode verwendet. Es ist noch %(count)d Code übrig. Neue Codes können Sie in Ihrem Profil erstellen."
+msgstr[1] "Sie haben einen Notfallcode verwendet. Es sind noch %(count)d Codes übrig. Neue Codes können Sie in Ihrem Profil erstellen."
+
+msgid "You used an emergency code. You have no emergency codes left. Create new codes in your profile."
+msgstr "Sie haben einen Notfallcode verwendet. Sie haben keine Notfallcodes mehr. Erstellen Sie in Ihrem Profil neue Codes."
+
+msgid "Please tick the box to confirm that you want to delete your account."
+msgstr "Bitte setzen Sie das Häkchen, um zu bestätigen, dass Sie Ihr Konto löschen möchten."
+
+msgid "Page not found"
+msgstr "Seite nicht gefunden"
+
+msgid "The page does not exist or was moved. Check the address or go to the start page."
+msgstr "Die Seite gibt es nicht oder sie wurde verschoben. Prüfen Sie die Adresse oder gehen Sie zur Startseite."
+
+msgid "Go to the start page"
+msgstr "Zur Startseite"
+
+msgid "Access denied"
+msgstr "Zugriff verweigert"
+
+msgid "You do not have permission to open this page."
+msgstr "Sie dürfen diese Seite nicht öffnen."
+
+msgid "Your entry could not be processed"
+msgstr "Ihre Eingabe konnte nicht verarbeitet werden"
+
+msgid "The page was open for too long, or your browser blocked a security check. Nothing has been saved. Please go back, reload the page and try again."
+msgstr "Die Seite war zu lange geöffnet, oder Ihr Browser hat eine Sicherheitsprüfung blockiert. Es wurde nichts gespeichert. Gehen Sie bitte zurück, laden Sie die Seite neu und versuchen Sie es noch einmal."
+
+msgid "Something went wrong"
+msgstr "Etwas ist schiefgelaufen"
+
+msgid "We are sorry. Please try again later."
+msgstr "Das tut uns leid. Bitte versuchen Sie es später noch einmal."
+
+#, python-format
+msgid "Step %(step)s of 2"
+msgstr "Schritt %(step)s von 2"
+
+msgid "Your account is ready"
+msgstr "Ihr Konto ist bereit"
+
+msgid "Protect your account even better"
+msgstr "Schützen Sie Ihr Konto noch besser"
+
+msgid "Extra protection keeps your account safe even if someone learns your password."
+msgstr "Der zusätzliche Schutz sichert Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt."
+
+msgid "A free app on your phone shows a code that you enter after your password."
+msgstr "Eine kostenlose App auf Ihrem Smartphone zeigt einen Code an, den Sie nach Ihrem Passwort eingeben."
+
+msgid "Set up extra protection now (about 2 minutes)"
+msgstr "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)"
+
+msgid "Later"
+msgstr "Später"
+
+msgid "This is voluntary and takes about 2 minutes. You can turn it off again later."
+msgstr "Das ist freiwillig und dauert etwa 2 Minuten. Sie können den Schutz später wieder ausschalten."
+
+msgid "On the next page you connect an authenticator app on your phone."
+msgstr "Auf der nächsten Seite verbinden Sie eine Authenticator-App auf Ihrem Smartphone."
+
+msgid "With a code from an app on your phone, nobody can log in with your password alone. This is voluntary and takes about 2 minutes."
+msgstr "Mit einem Code aus einer App auf Ihrem Smartphone kann sich niemand nur mit Ihrem Passwort anmelden. Das ist freiwillig und dauert etwa 2 Minuten."
+
+msgid "Your account will be deleted. You will no longer be able to log in. This cannot be undone. You can register again later with the same email address."
+msgstr "Ihr Konto wird gelöscht. Sie können sich danach nicht mehr anmelden. Das kann nicht rückgängig gemacht werden. Sie können sich später mit derselben E-Mail-Adresse neu registrieren."
+
+msgid "I understand that my account will be deleted."
+msgstr "Ich verstehe, dass mein Konto gelöscht wird."
+
+msgid "Deleted (retention obligation)"
+msgstr "Gelöscht (Aufbewahrungspflicht)"
+
+msgid "Account deleted (retention obligation)"
+msgstr "Konto gelöscht (Aufbewahrungspflicht)"
+
+msgid "Account restored"
+msgstr "Konto wiederhergestellt"
+
+msgid "Restore account"
+msgstr "Konto wiederherstellen"
+
+msgid "Restored the account."
+msgstr "Das Konto wurde wiederhergestellt."
+
+msgid "Deleted the account; it is kept under the retention obligation."
+msgstr "Das Konto wurde gelöscht; es wird wegen der Aufbewahrungspflicht aufbewahrt."
+
+msgid "The account is deleted if no retention obligation applies. Otherwise it is kept as \"Deleted (retention obligation)\" and its email address becomes available for a new registration."
+msgstr "Das Konto wird gelöscht, wenn keine Aufbewahrungspflicht besteht. Andernfalls bleibt es als «Gelöscht (Aufbewahrungspflicht)» erhalten, und seine E-Mail-Adresse wird für eine neue Registrierung frei."
+
+msgid "Enter the same password as before, for verification."
+msgstr "Geben Sie zur Bestätigung dasselbe Passwort noch einmal ein."

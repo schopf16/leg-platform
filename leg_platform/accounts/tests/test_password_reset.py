@@ -376,15 +376,26 @@ class ResetFlowTests(TestCase):
         )
 
     def test_the_token_pages_send_no_referrer_and_are_not_cached(self):
+        # Only the pages whose URL contains the token send no referrer.
         pages = [
             self.open_link(),
-            self.client.get(SET_URL),
-            self.set_password("short"),
-            Client().get(SET_URL),
             Client().get(reverse("accounts:password_reset_verify", args=["x"])),
         ]
         for response in pages:
             self.assertEqual(response["Referrer-Policy"], "no-referrer")
+            self.assertIn("no-store", response["Cache-Control"])
+
+    def test_the_pages_with_a_form_use_the_project_policy_and_are_not_cached(self):
+        # The form of these pages is submitted with an Origin header only if the policy is not
+        # "no-referrer"; the URL of these pages contains no token (D-054).
+        self.open_link()
+        pages = [
+            self.client.get(SET_URL),
+            self.set_password("short"),
+            Client().get(SET_URL),
+        ]
+        for response in pages:
+            self.assertEqual(response["Referrer-Policy"], "same-origin")
             self.assertIn("no-store", response["Cache-Control"])
 
     def test_the_password_fields_are_masked_in_error_reports(self):

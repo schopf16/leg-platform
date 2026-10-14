@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-Two-factor authentication was removed from your account at {{ instance_name }}. All recovery codes became invalid.{% endblocktranslate %}
+Two-factor authentication was turned off for your account at {{ instance_name }}. All emergency codes became invalid.{% endblocktranslate %}
 
 {% if contact_url %}{% blocktranslate %}If you did not do this, contact the operator immediately. You will find contact information here:
 

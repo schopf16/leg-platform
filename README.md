@@ -90,29 +90,18 @@ LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same li
 
 ## Current Status
 
-Phase 1 is functionally complete in the local worktree and verified locally. It is **not yet formally accepted**: items that need real infrastructure, a human review or CI are open (below). Nothing is committed, pushed or deployed (the owner declined publication for CI on 2026-10-14).
+Phase 1 is implemented and its automated tests pass locally (1038 tests, 2026-10-14). It is **not yet formally accepted**: the items below are open. Everything else is in the code, the tests and `docs/DECISIONS.md`; `docs/ACCEPTANCE.md` is ticked only for what has been verified on a real system.
 
-Implemented and verified locally (decisions in `docs/DECISIONS.md`, D-004 to D-052):
+Open work:
 
-* Login page as the entry point, registration with email verification, login with abuse protection, TOTP second factor (mandatory for staff users and system administrators) with recovery codes, password change and reset, session timeouts, reset of a lost second factor, emergency commands, initial administrator setup with forced password change.
-* Profile editing, verified email change, self-service deletion with the retention rule, block/unblock/delete/reactivate by system administrators with the last-administrator protection, session invalidation (D-016, D-044).
-* User, group and permission management in the Django administration, security log with retention, read-only view of the abuse protection records, Microsoft Graph configuration with certificate upload, certificate expiry warning and a rate-limited test send (D-006, D-048).
-* Local copy of the official Swiss address directory (swisstopo) with advisory validation and autocompletion, background import started from the administration or by the operator, one automatic attempt every 90 days (D-033, D-049 to D-052).
-* Instance branding (accent, optional highlight, logo) from the configuration with a contrast check, light/dark/automatic colour mode, member navigation, print stylesheet, documented supported browsers (D-051).
-* The temporary local-only gate of the administration was removed on the owner's conditional approval after the full test run and a security re-check (D-052).
-
-Verification on 2026-10-14 (local; Python 3.14.8, Django 6.1.2, MariaDB 12.3 for the application database; synthetic SQLite databases for the address directory, because the real directory database and its SELECT-only grants are not provisioned locally):
-
-* Full suite: 909 tests OK with deprecation warnings as errors (`python manage.py test --settings=leg_platform.test_settings --noinput`).
-* `check --deploy --fail-level WARNING` with synthetic production settings: no issues; `makemigrations --check`: no changes; compiled translation catalogue equals its source (`msgunfmt` comparison); `pip check` and the minimum pins: consistent; no PyPI vulnerability reported for the declared minimums (snapshot, D-051).
-* Security reviews by the `security-reviewer` (read-only, ran no tests): no critical, high or medium findings after two corrections (D-052). This is not a statement that the application is secure; critical changes still need a human review (D-019).
-
-Open (not verified or not possible locally):
-
-* CI: the minimum job (Python 3.12, Django 6.0, MariaDB 10.11) and the latest job have not run for the current code (Python 3.12 and Docker are not available on the development machine). The last passed CI run is 38273753482 (2026-10-12).
-* Real Microsoft Graph delivery, the Entra/Exchange setup, the real address-directory database with SELECT-only grants and a real import, the web server/proxy body limit, HTTPS/HSTS and cookies on a real host, the supervised services and the scheduler (D-008), and the browser and mobile-phone check of the pages. WCAG 2.2 AA conformity is not established by automated tests.
-* Owner and operator items: AGOV answer (D-004), imprint and privacy notice content (D-022), the operator of stage and production, hosting details (D-008), a human review of the security-critical changes (D-019), and the import account credentials (D-049).
-* Later: the security reviewer's remaining low items (ASGI body limit is only a proxy duty, a new admin URL must be wrapped with `admin_site.admin_view()`), and the lower `requests` minimum (needs a support source, D-048).
+* **Address suggestions** (designer review R-04, R-05, R-21, `docs/DECISIONS.md` D-054): the suggestion list stands far from the street field; only prefix matching works, so a typing error finds no suggestion; the warning after saving is far from the fields. A fuzzy fallback on a public endpoint needs a security check.
+* **Mails:** greeting by name in security notifications (R-13, needs a new placeholder, D-039).
+* **Design documents:** apply the proposed changes of the designer review to `docs/DESIGN.md` (white QR tile, alert colours and contrast table, check marks, 16 px rule for controls, logout in the top bar, step indicator, error summary, D-054).
+* **Local database:** migration `0014` (labels only) is not applied to the local development database.
+* **Tests:** assert in the concurrency test of the registration completion that exactly one client is logged in; a cross-account test of the five-minute window (D-055, review finding 5).
+* **Backlog from the security reviews:** a redirect of invalid links to a fixed URL instead of rendering under the token URL (D-055); ASGI deployments need the proxy body limit (D-052); a new admin URL must be wrapped with `admin_site.admin_view()` (the route walk test fails otherwise); the lower `requests` minimum needs a support source (D-048).
+* **Not verifiable locally:** CI (the minimum job with Python 3.12, Django 6.0 and MariaDB 10.11, and the latest job) has not run for the current code (the last passed run is 38273753482 of 2026-10-12; Python 3.12 and Docker are not available on the development machine); real Microsoft Graph delivery and the Entra/Exchange setup; the real address-directory database with SELECT-only grants and a real import; HTTPS, HSTS, cookies and the request body limit on a real host; the supervised services and the scheduler (D-008); a check of the pages on real phones and browsers (WCAG 2.2 AA is not established by automated tests); every step of `docs/DEPLOYMENT.md`.
+* **Owner and operator:** AGOV answer (D-004), imprint and privacy notice content (D-022), the operator of stage and production and the other owner decisions O-1 to O-23 of `docs/DEPLOYMENT.md` (D-053), the proxy and client-IP approach (finding F-1 there), the import account credentials (D-049), and a human review of the security-critical changes (D-019).
 
 Deployment gates: no stage or production instance is deployed before
 

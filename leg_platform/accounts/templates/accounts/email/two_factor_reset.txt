@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-Two-factor authentication of your account at {{ instance_name }} was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in.{% endblocktranslate %}
+Two-factor authentication of your account at {{ instance_name }} was reset. The earlier authenticator app and emergency codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in.{% endblocktranslate %}
 
 {% if contact_url %}{% blocktranslate %}If you did not expect this, contact the operator immediately. You will find contact information here:
 

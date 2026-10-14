@@ -17,9 +17,10 @@ from typing import NamedTuple
 from axes.backends import AxesStandaloneBackend
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.signals import user_login_failed
+from django.contrib.auth.signals import user_logged_in, user_login_failed
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.dispatch import receiver
 from django.shortcuts import redirect
 from django.utils.crypto import constant_time_compare
 from django.utils.translation import gettext
@@ -33,6 +34,14 @@ from leg_platform.accounts.models import User
 PENDING_LIFETIME = timedelta(minutes=5)
 PENDING_SESSION_KEY = "second_factor_pending"
 LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
+
+# Setting up two-factor authentication does not ask for the password again if this session
+# authenticated, by the password or by completing the registration, at most this long ago
+# (owner decision of 2026-10-14, D-055). The time is written by the server when the session logs in
+# and is never taken from the client; removing the second factor, new emergency codes, an email
+# address change and deleting the account always ask for the password.
+RECENT_AUTHENTICATION_WINDOW = timedelta(minutes=5)
+AUTHENTICATED_AT_KEY = "authenticated_at"
 
 # Views that an account without a completed second factor may use although it must have one:
 # logging out and setting the second factor up.
@@ -72,6 +81,26 @@ def is_second_factor_complete(user):
     """
     is_verified = getattr(user, "is_verified", None)
     return bool(user.is_authenticated and is_verified is not None and is_verified())
+
+
+@receiver(user_logged_in)
+def remember_authentication(sender, request, user, **kwargs):
+    """Remember when this session logged in (after Django renewed its ID).
+
+    ``user_logged_in`` is sent by ``login()``: after the password (and the second factor, if
+    there is one) and when the registration is completed. A password change or reset, activity
+    and the session cycling of Django do not write this value again.
+    """
+    request.session[AUTHENTICATED_AT_KEY] = time.time()
+
+
+def recently_authenticated(request, max_age=RECENT_AUTHENTICATION_WINDOW):
+    """Whether this session authenticated at most ``max_age`` ago (a server-side timestamp)."""
+    authenticated_at = request.session.get(AUTHENTICATED_AT_KEY)
+    if isinstance(authenticated_at, bool) or not isinstance(authenticated_at, (int, float)):
+        return False
+    age = time.time() - authenticated_at
+    return 0 <= age <= max_age.total_seconds()
 
 
 class SecondFactorMiddleware:

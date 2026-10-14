@@ -34,6 +34,7 @@ from datetime import timedelta
 from urllib.parse import quote, urlencode
 
 import idna
+import phonenumbers
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
@@ -413,7 +414,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         UNVERIFIED = "unverified", _("Unverified")
         ACTIVE = "active", _("Active")
         BLOCKED = "blocked", _("Blocked")
-        DEACTIVATED = "deactivated", _("Deactivated")
+        DEACTIVATED = "deactivated", _("Deleted (retention obligation)")
 
     class Salutation(models.TextChoices):
         MRS = "mrs", _("Mrs")
@@ -582,6 +583,21 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.swiss_postal_code is not None:
             return str(self.swiss_postal_code)
         return self.foreign_postal_code
+
+    @property
+    def phone_number_display(self):
+        """The phone number as a person writes it: national format for a number of the instance's
+        default region (Switzerland), international format for every other number. The stored
+        value stays in the E.164 format (D-034).
+        """
+        number = self.phone_number
+        if not number:
+            return ""
+        if not number.is_valid():
+            return str(number)
+        if phonenumbers.region_code_for_number(number) == settings.PHONENUMBER_DEFAULT_REGION:
+            return number.as_national
+        return number.as_international
 
     def set_password(self, raw_password):
         if raw_password is not None and not raw_password:
@@ -1153,8 +1169,8 @@ class MailJob(models.Model):
         )
         TWO_FACTOR_ENABLED = "two_factor_enabled", "Two-factor authentication set up"
         TWO_FACTOR_DISABLED = "two_factor_disabled", "Two-factor authentication removed"
-        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
-        RECOVERY_CODE_USED = "recovery_code_used", "Recovery code used"
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Emergency codes renewed"
+        RECOVERY_CODE_USED = "recovery_code_used", "Emergency code used"
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", "Many wrong codes"
         TWO_FACTOR_RESET_LINK = "two_factor_reset_link", "Link to reset two-factor authentication"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
@@ -1229,12 +1245,12 @@ class EmailText(models.Model):
             "Notification: two-factor authentication set up"
         )
         TWO_FACTOR_DISABLED = "two_factor_disabled", _(
-            "Notification: two-factor authentication removed"
+            "Notification: two-factor authentication turned off"
         )
         RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _(
-            "Notification: recovery codes renewed"
+            "Notification: emergency codes renewed"
         )
-        RECOVERY_CODE_USED = "recovery_code_used", _("Notification: recovery code used")
+        RECOVERY_CODE_USED = "recovery_code_used", _("Notification: emergency code used")
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", _(
             "Notification: many wrong codes entered"
         )
@@ -1644,8 +1660,8 @@ class SecurityEvent(models.Model):
         EMAIL_CHANGED = "email_changed", _("Email address changed")
         ACCOUNT_BLOCKED = "account_blocked", _("Account blocked")
         ACCOUNT_UNBLOCKED = "account_unblocked", _("Account unblocked")
-        ACCOUNT_DEACTIVATED = "account_deactivated", _("Account deactivated")
-        ACCOUNT_REACTIVATED = "account_reactivated", _("Account reactivated")
+        ACCOUNT_DEACTIVATED = "account_deactivated", _("Account deleted (retention obligation)")
+        ACCOUNT_REACTIVATED = "account_reactivated", _("Account restored")
         ACCOUNT_DELETED = "account_deleted", _("Account deleted")
         TWO_FACTOR_ENABLED = "two_factor_enabled", _("Two-factor authentication set up")
         TWO_FACTOR_DISABLED = "two_factor_disabled", _(
@@ -1657,8 +1673,8 @@ class SecurityEvent(models.Model):
         TWO_FACTOR_RESET_REQUESTED = "two_factor_reset_requested", _(
             "Link for removing two-factor authentication requested"
         )
-        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _("Recovery codes renewed")
-        RECOVERY_CODE_USED = "recovery_code_used", _("Recovery code used")
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _("Emergency codes renewed")
+        RECOVERY_CODE_USED = "recovery_code_used", _("Emergency code used")
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", _("Many wrong codes entered")
         CODE_ATTEMPTS_PAUSED = "code_attempts_paused", _("Code entry paused")
         LOGIN_LOCKOUT = "login_lockout", _("Account locked after failed logins")

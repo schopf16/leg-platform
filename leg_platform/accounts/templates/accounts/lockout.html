@@ -9,7 +9,9 @@
         <p>{% translate "Too many wrong codes were entered for this account. Code entry is paused. The pause ends within 24 hours, or when a new password has been chosen." %}</p>
         <p><a href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a></p>
       {% else %}
-        <p>{% translate "There were too many failed login attempts. Please try again later." %}</p>
+        <p>{% blocktranslate count counter=login_cooloff_minutes %}There were too many failed login attempts. Please wait about {{ counter }} minute and try again.{% plural %}There were too many failed login attempts. Please wait about {{ counter }} minutes and try again.{% endblocktranslate %}</p>
+        <p>{% translate "If you forgot your password, you can choose a new one." %}</p>
+        <p><a class="btn btn-secondary-action w-100" href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a></p>
       {% endif %}
       <a href="{% url 'accounts:login' %}">{% translate "Back to the login page" %}</a>
     </div>

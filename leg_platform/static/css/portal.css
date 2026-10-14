@@ -44,6 +44,20 @@
   --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, var(--portal-surface));
   --portal-surface: light-dark(#ffffff, #1c1917);
   --portal-field-border: light-dark(#78716c, #8a817b);
+  /* Alerts (docs/DESIGN.md, D-054): the text token on a tint, a 4 px border and an icon in the
+     colour of the meaning. Success and warning use the energy colours of section 3.4. The tint of
+     the information alert follows the accent. Contrast ratios: see D-054. */
+  --portal-alert-success-bg: light-dark(#e8f3ec, #1a2b21);
+  --portal-alert-success-accent: light-dark(#2f8f5b, #5dbb86);
+  --portal-alert-warning-bg: light-dark(#fdf3e0, #2e2512);
+  --portal-alert-warning-accent: light-dark(#b7791f, #e8b34a);
+  --portal-alert-info-bg: light-dark(
+    color-mix(in srgb, var(--tblr-primary) 12%, #ffffff),
+    color-mix(in srgb, var(--tblr-primary) 14%, #1c1917)
+  );
+  --portal-alert-info-accent: var(--tblr-primary);
+  --portal-alert-danger-bg: light-dark(#fbecea, #33201e);
+  --portal-alert-danger-accent: light-dark(#b42318, #f0948a);
 }
 
 :root[data-bs-theme="light"] { color-scheme: light; }
@@ -72,8 +86,37 @@
   font-weight: 700;
 }
 
+/* Members: base size 16 px for page titles, labels, controls, hints and error texts, and at least
+   48 px high controls (docs/DESIGN.md, section 2). Tabler's own sizes are 14 px for these. The
+   administration (Django admin) does not use this stylesheet and stays compact. */
+.register-clear .card h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
 .register-clear .form-label {
+  font-size: 1rem;
   font-weight: 600;
+}
+
+.register-clear .form-hint,
+.register-clear .invalid-feedback {
+  font-size: 0.9375rem;
+  margin-top: 0.25rem;
+}
+
+.register-clear .form-control,
+.register-clear .form-select {
+  font-size: 1rem;
+}
+
+.register-clear .btn {
+  --tblr-btn-font-size: 1rem;
+  font-size: 1rem;
+}
+
+.register-clear .form-check-label {
+  font-size: 1rem;
 }
 
 .login-card h2 {
@@ -323,5 +366,235 @@ input:focus-visible, select:focus-visible {
 @media (min-width: 768px) {
   .member-tabs { display: none; }
   .member-top-navigation { display: flex; }
+  /* From 768 px the top bar shows "Profile" and "Log out"; the menu is for small screens. */
+  .member-menu { display: none; }
   .page-body { padding-bottom: 0; }
 }
+.member-top-navigation {
+  align-items: center;
+  gap: 1rem;
+  margin-inline-start: auto;
+}
+.member-top-navigation form { margin: 0; }
+
+/* A button that is shown only by a script stays hidden without it, although .btn sets display. */
+.btn[hidden] { display: none; }
+
+/* A link-style button has exactly the colour of the links (the accent), not a colour that Tabler
+   mixes from it, so that its contrast is the one of the links (docs/DESIGN.md, section 3.6). */
+.register-clear .btn-link,
+.register-clear .btn-link:hover,
+.register-clear .btn-link:focus-visible {
+  --tblr-btn-color: rgb(var(--tblr-link-color-rgb));
+  --tblr-btn-hover-color: rgb(var(--tblr-link-color-rgb));
+  color: rgb(var(--tblr-link-color-rgb));
+}
+.portal-header .btn-link.nav-link,
+.portal-header .btn-link.nav-link:hover,
+.portal-header .btn-link.nav-link:focus-visible {
+  padding-inline: 0;
+  text-decoration: none;
+  /* The same colour as the "Profile" link next to it. */
+  color: var(--tblr-body-color);
+  --tblr-btn-color: var(--tblr-body-color);
+}
+.portal-header .btn-link.nav-link:hover { text-decoration: underline; }
+
+/* Alerts (docs/DESIGN.md, D-054): the text token on a tint, a 4 px border and an icon in the
+   colour of the meaning, so that the meaning never rests on colour alone and the text reaches
+   4.5:1. Tabler's own alert colours (green and orange text on pale tints) do not. The icons are
+   Tabler Icons served by the instance and used as masks: they take the colour of the border, and
+   the images come from the own origin (Content Security Policy, img-src 'self'). */
+.register-clear .alert {
+  --portal-alert-bg: var(--portal-alert-info-bg);
+  --portal-alert-accent: var(--portal-alert-info-accent);
+  --portal-alert-icon: url("../vendor/tabler-icons/info-circle.svg");
+  position: relative;
+  padding: 0.875rem 1rem 0.875rem 3.25rem;
+  color: var(--tblr-body-color);
+  background-color: var(--portal-alert-bg);
+  border: 1px solid color-mix(in srgb, var(--portal-alert-accent) 40%, transparent);
+  border-inline-start: 4px solid var(--portal-alert-accent);
+  border-radius: 6px;
+}
+.register-clear .alert::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.875rem;
+  top: 0.875rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: var(--portal-alert-accent);
+  mask-image: var(--portal-alert-icon);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+.register-clear .alert-success {
+  --portal-alert-bg: var(--portal-alert-success-bg);
+  --portal-alert-accent: var(--portal-alert-success-accent);
+  --portal-alert-icon: url("../vendor/tabler-icons/circle-check.svg");
+}
+.register-clear .alert-warning {
+  --portal-alert-bg: var(--portal-alert-warning-bg);
+  --portal-alert-accent: var(--portal-alert-warning-accent);
+  --portal-alert-icon: url("../vendor/tabler-icons/alert-triangle.svg");
+}
+.register-clear .alert-danger {
+  --portal-alert-bg: var(--portal-alert-danger-bg);
+  --portal-alert-accent: var(--portal-alert-danger-accent);
+  --portal-alert-icon: url("../vendor/tabler-icons/alert-circle.svg");
+  /* The error colour of the register is the text colour of an error (section 3.1). */
+  color: var(--portal-alert-danger-accent);
+}
+.register-clear .alert a { color: inherit; text-decoration: underline; }
+.register-clear .alert > :last-child { margin-bottom: 0; }
+
+.error-summary-title { font-weight: 700; margin-bottom: 0.5rem; }
+.error-summary ul { padding-inline-start: 1.25rem; }
+.error-summary:focus-visible {
+  outline: 3px solid var(--tblr-primary);
+  outline-offset: 3px;
+}
+
+/* Check marks of checkboxes and radio buttons. Tabler draws them with a mask whose image is a
+   data: URL, which the Content Security Policy does not allow (img-src 'self'); the own files
+   replace it. The mark takes the text colour of the accent, so it follows the instance colours
+   in light and dark mode. A url() in a custom property would be resolved relative to Tabler's
+   stylesheet, so the property mask-image is set directly. */
+.register-clear .form-check-input {
+  --tblr-form-check-icon-color: var(--tblr-primary-fg);
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  float: none;
+  border-color: var(--portal-field-border);
+}
+.register-clear .form-check-input[type="checkbox"]::before {
+  mask-image: url("../img/check.svg");
+}
+.register-clear .form-check-input[type="radio"]::before {
+  mask-image: url("../img/radio-dot.svg");
+}
+.register-clear .form-check-input:checked {
+  border-color: var(--tblr-primary);
+}
+.register-clear label.form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding-inline-start: 0;
+  cursor: pointer;
+}
+.register-clear label.form-check .form-check-label {
+  padding-top: 0.125rem;
+}
+
+/* QR code on a white tile with a quiet zone, in light and dark mode: scanners need dark modules
+   on a light background with a light margin of at least four modules. The code is shown at
+   198 px for about 57 modules (a module is about 3.5 px), so the 24 px of the tile plus the two
+   modules of the image make about nine modules. */
+.qr-tile-wrap { text-align: center; margin: 1rem 0 0.5rem; }
+.qr-tile {
+  display: inline-block;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid var(--portal-field-border);
+  border-radius: 8px;
+  line-height: 0;
+}
+.qr-tile img { display: block; max-width: 100%; height: auto; }
+
+/* Groups of fields (docs/DESIGN.md, D-054). */
+.register-clear .form-section {
+  min-width: 0;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  border: 0;
+}
+.register-clear .form-section > legend {
+  float: none;
+  width: auto;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.register-clear .form-section > .form-hint { margin: -0.25rem 0 0.75rem; }
+
+/* Two fields side by side from 576 px: street and house number, postal code and town. The
+   narrow column is as wide as its label "House number (optional)". */
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 1rem; }
+@media (min-width: 576px) {
+  .field-row-street { grid-template-columns: minmax(0, 1fr) 11.5rem; }
+  .field-row-locality { grid-template-columns: 9rem minmax(0, 1fr); }
+}
+
+/* "Show password" under the field. */
+.password-toggle { padding-inline: 0; min-height: 3rem; }
+
+/* Step indicator of a process with several pages (docs/DESIGN.md, section 6). */
+.step-indicator {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.step-indicator li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--tblr-secondary-color);
+  counter-increment: step;
+}
+.step-indicator li::before {
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2px solid var(--portal-field-border);
+  border-radius: 50%;
+  font-weight: 600;
+}
+.step-indicator .is-current { color: var(--tblr-body-color); font-weight: 700; }
+.step-indicator .is-current::before,
+.step-indicator .is-done::before {
+  background: var(--tblr-primary);
+  border-color: var(--tblr-primary);
+  color: var(--tblr-primary-fg);
+}
+
+.register-clear .card-body h2.h3 { font-size: 1.25rem; }
+.setup-instructions li { margin-bottom: 1rem; }
+.info-details summary { cursor: pointer; padding: 0.5rem 0; min-height: 3rem; }
+
+/* The emergency codes: large, in a list, in capital letters (the check ignores the case). */
+.recovery-codes {
+  margin: 1rem 0;
+  padding-inline-start: 3.75rem;
+  font-family: var(--tblr-font-monospace);
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.recovery-codes li { padding: 0.25rem 0; }
+
+/* The tip about two-factor authentication on the profile. */
+.tip-card {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--portal-tint);
+  border: 1px solid var(--tblr-border-color);
+  border-inline-start: 4px solid var(--tblr-primary);
+  border-radius: 6px;
+}
+.tip-card h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.tip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.tip-actions form { margin: 0; }

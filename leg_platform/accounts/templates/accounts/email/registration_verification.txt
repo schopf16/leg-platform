@@ -6,5 +6,7 @@ To confirm your address and choose your password, open this link within {{ lifet
 
 {{ verification_url }}
 
-The link can be used once. If you did not register, you can ignore this email; nothing will happen.{% endblocktranslate %}
+The link can be used once. If you did not register, you can ignore this email; nothing will happen.{% endblocktranslate %}{% if contact_url %}
+
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

@@ -97,6 +97,16 @@ class VerifiedClient(Client):
             complete_second_factor(self, user)
 
 
+def age_authentication(client, seconds=3600):
+    """Make the login of the client's session older, so that the five minutes without the
+    password for setting up two-factor authentication (D-055) are over."""
+    from leg_platform.accounts.second_factor import AUTHENTICATED_AT_KEY
+
+    session = client.session
+    session[AUTHENTICATED_AT_KEY] = time.time() - seconds
+    session.save()
+
+
 def code_for(device):
     """The code that the device accepts now; an earlier use of a code is forgotten first."""
     AuthenticatorDevice.objects.filter(pk=device.pk).update(last_t=-1)

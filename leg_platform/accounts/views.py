@@ -8,7 +8,7 @@ URL or the request (docs/SECURITY.md, section 4).
 from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import transaction
@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy, ngettext
 from django.views import View
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
@@ -46,6 +47,8 @@ from leg_platform.accounts.forms import (
     ProfileForm,
     ReauthenticationForm,
     RegistrationForm,
+    SetupCodeForm,
+    StartSetupForm,
 )
 from leg_platform.accounts.mail_queue import submit_mail_request
 from leg_platform.accounts.models import (
@@ -67,10 +70,21 @@ ENROLMENT_SESSION_KEY = "two_factor_enrolment_device"
 
 
 def no_referrer(view):
-    """Pages reached through a link with a token send no referrer (OWASP Forgot Password Cheat
-    Sheet, "URL Tokens"); the header of the view wins over the project default."""
+    """Pages whose URL contains a token send no referrer (OWASP Forgot Password Cheat Sheet,
+    "URL Tokens"); the header of the view wins over the project default.
+
+    Only for the views that are opened through the link of an email (``TokenPageMixin``). It must
+    not be set on a page that contains a form: for a form POST the browser takes the Referrer
+    Policy of the page that contains the form, and with ``no-referrer`` it sends ``Origin: null``,
+    which Django's CSRF check refuses (Fetch standard, "append a request Origin header"; Django
+    ``CsrfViewMiddleware._origin_verified``). The pages after the redirect have no token in
+    their URL and use the project default ``same-origin`` (docs/DECISIONS.md, D-054).
+    """
 
     def wrapped(request, *args, **kwargs):
+        # Templates of this response leave out forms that post to another URL: with this policy
+        # the browser would send "Origin: null" and the CSRF check would refuse them.
+        request.no_referrer_page = True
         response = view(request, *args, **kwargs)
         response["Referrer-Policy"] = "no-referrer"
         return response
@@ -139,6 +153,10 @@ class SecondFactorLoginView(FormView):
             form.add_error("otp_token", CodeForm.invalid_code_message)
             return self.form_invalid(form)
         second_factor.complete_login(self.request, self.pending.user, device)
+        if totp.is_recovery_code_device(device):
+            # The person has just proved to own the code, so the number of the codes that are left
+            # is theirs to know. Nothing about the check changes.
+            self._tell_about_the_emergency_code(self.pending.user)
         target = self.pending.next_url
         if not url_has_allowed_host_and_scheme(
             target, allowed_hosts={self.request.get_host()}, require_https=self.request.is_secure()
@@ -146,9 +164,29 @@ class SecondFactorLoginView(FormView):
             target = ""
         return redirect(target or settings.LOGIN_REDIRECT_URL)
 
+    def _tell_about_the_emergency_code(self, user):
+        remaining = totp.remaining_recovery_codes(user)
+        if remaining:
+            text = ngettext(
+                "You used an emergency code. %(count)d code is left. You can create new codes in your profile.",
+                "You used an emergency code. %(count)d codes are left. You can create new codes in your profile.",
+                remaining,
+            ) % {"count": remaining}
+        else:
+            text = _(
+                "You used an emergency code. You have no emergency codes left. Create new codes in your profile."
+            )
+        messages.info(self.request, text)
+
 
 class PortalLogoutView(NeverCacheMixin, LogoutView):
     """Logout only by POST with CSRF protection (Django's LogoutView)."""
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        # The message is stored for the next page; the session of the person has ended.
+        messages.info(request, _("You have been logged out."))
+        return response
 
 
 class RegistrationView(NeverCacheMixin, FormView):
@@ -162,9 +200,23 @@ class RegistrationView(NeverCacheMixin, FormView):
 
 
 class EmailSentView(NeverCacheMixin, TemplateView):
-    """The same page for every address (docs/PROJECT.md, "Registration")."""
+    """The same page for every address (docs/PROJECT.md, "Registration").
+
+    One text for the registration and the password reset: it says what a person needs to know
+    whatever happened, and states nothing that depends on whether the address belongs to an
+    account. ``purpose`` and ``lifetime`` are set in the URL configuration.
+    """
 
     template_name = "accounts/email_sent.html"
+    purpose = None
+    lifetime = None
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            purpose=self.purpose,
+            lifetime_hours=int(self.lifetime.total_seconds() // 3600),
+            **kwargs,
+        )
 
 
 class RegistrationVerifyView(TokenPageMixin, View):
@@ -185,12 +237,11 @@ class RegistrationVerifyView(TokenPageMixin, View):
 class RegistrationCompleteView(NeverCacheMixin, FormView):
     template_name = "accounts/registration_complete.html"
     form_class = CompleteRegistrationForm
-    success_url = reverse_lazy("accounts:login")
+    success_url = reverse_lazy("accounts:welcome")
 
     # The responses of this method come before the mixin's dispatch, so it is marked as not
     # cacheable itself. The password fields are masked in error reports.
     @method_decorator(never_cache)
-    @method_decorator(no_referrer)
     @method_decorator(sensitive_post_parameters("password1", "password2"))
     def dispatch(self, request, *args, **kwargs):
         self.token = self.find_token(request)
@@ -248,8 +299,13 @@ class RegistrationCompleteView(NeverCacheMixin, FormView):
             token.delete()
         self.request.session.pop(REGISTRATION_SESSION_KEY, None)
         self._show_address_warning(form.cleaned_data)
-        messages.success(self.request, _("Your account is active. You can now log in."))
-        return redirect(self.get_success_url())
+        # The person has just proved control of the mailbox (single-use link) and chosen the
+        # password, so the session logs in as after a successful login (owner decision of
+        # 2026-10-14, D-055): the session ID is renewed, the session times and the time of the
+        # authentication are written by the login signal, no failed attempt is recorded, and the
+        # account has no privileges. The link was consumed above, so it cannot log in again.
+        login(self.request, user, backend=second_factor.LOGIN_BACKEND)
+        return redirect("accounts:welcome")
 
     def _show_address_warning(self, cleaned_data):
         result = check_address(
@@ -296,7 +352,6 @@ class PasswordResetSetView(NeverCacheMixin, FormView):
     success_url = reverse_lazy("accounts:login")
 
     @method_decorator(never_cache)
-    @method_decorator(no_referrer)
     @method_decorator(sensitive_post_parameters("new_password1", "new_password2"))
     def dispatch(self, request, *args, **kwargs):
         digest = request.session.get(PASSWORD_RESET_SESSION_KEY)
@@ -342,7 +397,6 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
     form_class = ConfirmForm
 
     @method_decorator(never_cache)
-    @method_decorator(no_referrer)
     def dispatch(self, request, *args, **kwargs):
         digest = request.session.get(EMAIL_CHANGE_SESSION_KEY)
         self.token = (
@@ -404,7 +458,6 @@ class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
     success_url = reverse_lazy("accounts:login")
 
     @method_decorator(never_cache)
-    @method_decorator(no_referrer)
     def dispatch(self, request, *args, **kwargs):
         digest = request.session.get(TWO_FACTOR_RESET_SESSION_KEY)
         self.token = second_factor_reset.find_link_by_digest(digest) if digest else None
@@ -423,17 +476,54 @@ class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
         return redirect(self.get_success_url())
 
 
+class WelcomeView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
+    """The page after the registration: one recommended next step, the extra protection.
+
+    Starting the setup is a POST of the button to the setup page; nothing changes here.
+    """
+
+    template_name = "accounts/welcome.html"
+
+    def get(self, request, *args, **kwargs):
+        if second_factor.has_second_factor(request.user):
+            return redirect("accounts:profile")
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(account=self.request.user, **kwargs)
+
+
+TWO_FACTOR_TIP_SESSION_KEY = "two_factor_tip_dismissed"
+
+
 class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
     """The person's own profile, read only; the account is always request.user."""
 
     template_name = "accounts/profile.html"
 
     def get_context_data(self, **kwargs):
+        second_factor_active = second_factor.has_second_factor(self.request.user)
         return super().get_context_data(
             account=self.request.user,
-            second_factor_active=second_factor.has_second_factor(self.request.user),
+            second_factor_active=second_factor_active,
+            # The tip is shown until the person says "not now"; that is remembered in the
+            # session only, nothing is stored in the database (D-054).
+            show_two_factor_tip=(
+                not second_factor_active
+                and not self.request.session.get(TWO_FACTOR_TIP_SESSION_KEY)
+            ),
             **kwargs,
         )
+
+
+class TwoFactorTipDismissView(NeverCacheMixin, LoginRequiredMixin, View):
+    """"Not now" on the tip about two-factor authentication: hides it for this session."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        request.session[TWO_FACTOR_TIP_SESSION_KEY] = True
+        return redirect("accounts:profile")
 
 
 class ProfileEditView(NeverCacheMixin, LoginRequiredMixin, FormView):
@@ -484,21 +574,41 @@ class EmailChangeRequestView(ReauthenticationMixin, FormView):
 class EmailChangeSentView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
     template_name = "accounts/email_change_sent.html"
 
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            lifetime_hours=int(email_change.EMAIL_CHANGE_LIFETIME.total_seconds() // 3600),
+            **kwargs,
+        )
+
 
 class AccountDeleteForm(ReauthenticationForm):
-    confirm = forms.BooleanField(label=_("I understand that this action cannot be undone."))
+    confirm = forms.BooleanField(
+        label=gettext_lazy("I understand that my account will be deleted."),
+        error_messages={
+            "required": gettext_lazy(
+                "Please tick the box to confirm that you want to delete your account."
+            )
+        },
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The confirmation is given again with every attempt: after an error the box is never
+        # shown as ticked, so that a repeated submit is never a confirmation by habit.
+        self.fields["confirm"].widget = forms.CheckboxInput(
+            attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
+        )
 
 
 class AccountDeleteView(ReauthenticationMixin, FormView):
-    """Delete the logged-in account or deactivate it under the retention rule."""
+    """Delete the logged-in account, or keep it deactivated under the retention rule (D-016).
+
+    The page and the message are the same for every account: the person is told that the account
+    is deleted and that logging in is no longer possible (owner decision of 2026-10-14, D-055).
+    """
 
     template_name = "accounts/account_delete.html"
     form_class = AccountDeleteForm
-
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(
-            retention_obligation=self.request.user.retention_obligation, **kwargs
-        )
 
     def form_valid(self, form):
         user = self.request.user
@@ -515,7 +625,7 @@ class AccountDeleteView(ReauthenticationMixin, FormView):
             messages.error(self.request, _("The account could not be deleted."))
             return redirect("accounts:profile")
         logout(self.request)
-        messages.success(self.request, _("Your account was deleted or deactivated."))
+        messages.success(self.request, _("Your account has been deleted."))
         return redirect("accounts:login")
 
 
@@ -588,7 +698,12 @@ class TwoFactorOverviewView(TwoFactorMixin, TemplateView):
 
 
 class TwoFactorSetupView(ReauthenticationMixin, FormView):
-    """Start setting up the authenticator app, after the password was entered again."""
+    """Start setting up the authenticator app.
+
+    A session that authenticated at most five minutes ago starts without the password; every
+    other session enters the password first (D-055). Starting is a POST: opening the page changes
+    nothing.
+    """
 
     template_name = "accounts/two_factor_setup.html"
 
@@ -596,6 +711,29 @@ class TwoFactorSetupView(ReauthenticationMixin, FormView):
         if request.user.is_authenticated and second_factor.has_second_factor(request.user):
             return redirect("accounts:two_factor")
         return super().dispatch(request, *args, **kwargs)
+
+    def recent(self):
+        return second_factor.recently_authenticated(self.request)
+
+    def get_form_class(self):
+        return StartSetupForm if self.recent() else ReauthenticationForm
+
+    def post(self, request, *args, **kwargs):
+        # The button of the welcome page, the profile and the overview sends no password. If the
+        # five minutes are over by then, the password is asked for, without an error message.
+        if not self.recent() and "current_password" not in request.POST:
+            return self.render_to_response(self.get_context_data(form=self.get_form_class()(
+                **{**self.get_form_kwargs(), "data": None, "files": None}
+            )))
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        # An account that must have a second factor is told so, and cannot cancel the setup.
+        return super().get_context_data(
+            required=second_factor.requires_second_factor(self.request.user),
+            recent=self.recent(),
+            **kwargs,
+        )
 
     def form_valid(self, form):
         try:
@@ -611,7 +749,7 @@ class TwoFactorConfirmView(TwoFactorMixin, FormView):
     """Show the secret and ask for a first code, which proves that the app works."""
 
     template_name = "accounts/two_factor_confirm.html"
-    form_class = CodeForm
+    form_class = SetupCodeForm
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
@@ -623,14 +761,18 @@ class TwoFactorConfirmView(TwoFactorMixin, FormView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(secret=totp.secret_for_display(self.device), **kwargs)
+        return super().get_context_data(
+            secret=totp.secret_for_display(self.device),
+            required=second_factor.requires_second_factor(self.request.user),
+            **kwargs,
+        )
 
     def form_valid(self, form):
         result = totp.confirm_enrolment(
             self.request.user, self.device.pk, form.cleaned_data["otp_token"]
         )
         if result is None:
-            form.add_error("otp_token", CodeForm.invalid_code_message)
+            form.add_error("otp_token", form.invalid_code_message)
             return self.form_invalid(form)
         device, codes = result
         # Other sessions of the account ended with the confirmation; this session stays (D-044).
@@ -699,7 +841,7 @@ class TwoFactorDisableView(ReauthenticationMixin, FormView):
             return refused_change(self.request)
         # Other sessions ended with the removal; this session stays (D-044).
         update_session_auth_hash(self.request, self.request.user)
-        messages.success(self.request, _("Two-factor authentication was removed."))
+        messages.success(self.request, _("Two-factor authentication was turned off."))
         return redirect(self.get_success_url())
 
 

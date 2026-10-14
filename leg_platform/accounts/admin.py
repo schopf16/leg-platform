@@ -146,10 +146,11 @@ class UserAdmin(admin.ModelAdmin):
         "first_name",
         "last_name",
         "status",
+        "retention_obligation",
         "is_staff",
         "is_superuser",
     )
-    list_filter = ("status", "is_staff", "is_superuser")
+    list_filter = ("status", "retention_obligation", "is_staff", "is_superuser")
     # The customer number is searched in its stored form without the space; get_queryset()
     # restricts the searched accounts first.
     search_fields = ("email", "first_name", "last_name", "customer_number__number")
@@ -321,16 +322,17 @@ class UserAdmin(admin.ModelAdmin):
                 gettext("The account will be able to log in and reset its password again."),
             ),
             "delete": (
-                gettext("Delete or deactivate account"),
+                gettext("Delete account"),
                 gettext(
                     "The account is deleted if no retention obligation applies. Otherwise it is "
-                    "deactivated and its email address becomes available for a new registration."
+                    "kept as \"Deleted (retention obligation)\" and its email address becomes "
+                    "available for a new registration."
                 ),
             ),
             "reactivate": (
-                gettext("Reactivate account"),
+                gettext("Restore account"),
                 gettext(
-                    "The account will be reactivated if no active, temporarily locked, or blocked "
+                    "The account will be restored if no active, temporarily locked, or blocked "
                     "account uses its email address. Any pending registration at that address "
                     "will be removed."
                 ),
@@ -370,12 +372,14 @@ class UserAdmin(admin.ModelAdmin):
                     elif operation == "reactivate":
                         account.reactivate()
                         event = Event.ACCOUNT_REACTIVATED
-                        message = gettext("Reactivated the account.")
+                        message = gettext("Restored the account.")
                     else:
                         result = account.delete_or_deactivate()
                         if result == "deactivated":
                             event = Event.ACCOUNT_DEACTIVATED
-                            message = gettext("Deactivated the account under the retention rule.")
+                            message = gettext(
+                                "Deleted the account; it is kept under the retention obligation."
+                            )
                         else:
                             event = Event.ACCOUNT_DELETED
                             message = gettext("Deleted the account.")

@@ -6,5 +6,7 @@ To remove it, open this link within {{ lifetime_hours }} hours:
 
 {{ two_factor_reset_url }}
 
-The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged.{% endblocktranslate %}
+The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged.{% endblocktranslate %}{% if contact_url %}
+
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

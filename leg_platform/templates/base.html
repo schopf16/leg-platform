@@ -23,17 +23,26 @@
               <summary>{% translate "Menu" %}</summary>
               <nav aria-label="{% translate 'Account navigation' %}" class="navbar-nav">
               {% if not user.password_change_required %}<a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>{% endif %}
+              {% if not request.no_referrer_page %}
               <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-link nav-link">{% translate "Log out" %}</button>
               </form>
+              {% endif %}
               </nav>
             </details>
           {% endif %}
           <a class="portal-brand" href="{% url 'home' %}">{% include "_brand.html" %}</a>
-          {% if user.is_authenticated and not user.password_change_required %}
+          {% if user.is_authenticated %}
+            {# From 768 px the top bar shows the links and the menu above is hidden (docs/DESIGN.md, section 6). #}
             <nav class="member-top-navigation" aria-label="{% translate 'Main navigation' %}">
-              <a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>
+              {% if not user.password_change_required %}<a class="nav-link" href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a>{% endif %}
+              {% if not request.no_referrer_page %}
+              <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link nav-link">{% translate "Log out" %}</button>
+              </form>
+              {% endif %}
             </nav>
           {% endif %}
         </div>
@@ -57,6 +66,7 @@
       {% endif %}
     </div>
   {% endblock %}
+  <script defer src="{% static 'js/password-toggle.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -296,6 +296,78 @@ class AccountDeletionTests(TestCase):
         with self.assertRaises(AccountIntegrityError):
             self.user._change(retention_obligation=False)
 
+    def test_the_page_says_that_the_account_is_deleted_and_the_button_says_what_it_does(self):
+        response = self.client.get(DELETE_URL)
+
+        self.assertContains(
+            response,
+            "Ihr Konto wird gelöscht. Sie können sich danach nicht mehr anmelden. "
+            "Das kann nicht rückgängig gemacht werden. "
+            "Sie können sich später mit derselben E-Mail-Adresse neu registrieren.",
+        )
+        self.assertContains(response, ">Konto löschen</button>")
+
+    def test_the_page_is_the_same_for_every_account_and_says_nothing_about_retention(self):
+        # Owner decision (D-055): deleting is deleting; a retention obligation is never shown.
+        def visible(account):
+            client = VerifiedClient()
+            client.force_login(account)
+            return re.sub(r'value="[^"]*"', "", client.get(DELETE_URL).content.decode())
+
+        retained = create_active_user("retained.person@example.org")
+        retained.set_retention_obligation()
+
+        plain = visible(self.user)
+
+        self.assertEqual(visible(retained), plain)
+        for word in ("aufbewahr", "Aufbewahr", "geschlossen", "gesetzlich", "retention", "retain", "closed"):
+            self.assertNotIn(word, plain)
+
+    def test_the_checkbox_has_its_label_on_the_right_and_is_never_ticked_again_after_an_error(self):
+        page = self.client.get(DELETE_URL).content.decode()
+        self.assertRegex(
+            page,
+            r'<label class="form-check" for="id_confirm">\s*<input[^>]*type="checkbox"[^>]*>\s*'
+            r'<span class="form-check-label">Ich verstehe, dass mein Konto gelöscht wird\.</span>',
+        )
+
+        # Ticked, but with a wrong password: the page is shown again with the box unticked.
+        wrong = self.delete_account(current_password="wrong")
+
+        self.assertEqual(wrong.status_code, 200)
+        box = re.search(r'<input[^>]*type="checkbox"[^>]*>', wrong.content.decode()).group(0)
+        self.assertNotIn("checked", box)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_a_missing_confirmation_has_a_specific_message(self):
+        response = self.client.post(DELETE_URL, {"current_password": PASSWORD})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Bitte setzen Sie das Häkchen, um zu bestätigen, dass Sie Ihr Konto löschen möchten."
+        )
+        self.assertNotContains(response, "zwingend erforderlich")
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_the_message_is_the_same_for_every_account(self):
+        deleted = self.client.post(DELETE_URL, {"confirm": "on", "current_password": PASSWORD}, follow=True)
+
+        retained_user = create_active_user("retained.person@example.org")
+        retained_user.set_retention_obligation()
+        client = VerifiedClient()
+        client.force_login(retained_user)
+        kept = client.post(DELETE_URL, {"confirm": "on", "current_password": PASSWORD}, follow=True)
+
+        for response in (deleted, kept):
+            self.assertContains(response, "Ihr Konto wurde gelöscht.")
+            for word in ("geschlossen", "aufbewahr", "gesetzlich"):
+                self.assertNotContains(response, word)
+        self.assertEqual(deleted.redirect_chain, kept.redirect_chain)
+        # Behind the same message the retained account stays in the database, deactivated.
+        retained_user.refresh_from_db()
+        self.assertEqual(retained_user.status, User.Status.DEACTIVATED)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+
 
 @tag("mariadb")
 class AdminLifecycleTests(TestCase):
@@ -389,6 +461,24 @@ class AdminLifecycleTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(retained.status, User.Status.DEACTIVATED)
         self.assertEqual(replacement.email, "retained@example.org")
+
+    def test_a_deleted_account_with_a_retention_obligation_is_shown_understandably(self):
+        retained = create_active_user("retained@example.org")
+        retained.set_retention_obligation()
+        retained.delete_or_deactivate()
+        url = reverse("admin:accounts_user_changelist")
+
+        german = self.client.get(url)
+        self.assertContains(german, "Gelöscht (Aufbewahrungspflicht)")
+        self.assertContains(german, "Aufbewahrungspflicht")
+        self.assertNotContains(german, "Deaktiviert")
+        # The stored key is unchanged (D-016); the filters offer the new label.
+        self.assertEqual(User.Status.DEACTIVATED.value, "deactivated")
+        filtered = self.client.get(url, {"status__exact": "deactivated"})
+        self.assertContains(filtered, "retained@example.org")
+        detail = self.client.get(reverse("admin:accounts_user_change", args=(retained.pk,)))
+        self.assertContains(detail, "Konto wiederherstellen")
+        self.assertNotContains(detail, "Konto reaktivieren")
 
 
 @tag("mariadb")

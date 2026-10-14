@@ -128,19 +128,19 @@ DEFINITIONS = {
     ),
     Key.TWO_FACTOR_DISABLED: Definition(
         "accounts/email/two_factor_disabled.txt",
-        lambda: gettext("Two-factor authentication was removed at %(instance_name)s"),
+        lambda: gettext("Two-factor authentication was turned off at %(instance_name)s"),
         (),
         (),
     ),
     Key.RECOVERY_CODES_RENEWED: Definition(
         "accounts/email/recovery_codes_renewed.txt",
-        lambda: gettext("New recovery codes were created at %(instance_name)s"),
+        lambda: gettext("New emergency codes were created at %(instance_name)s"),
         (),
         (),
     ),
     Key.RECOVERY_CODE_USED: Definition(
         "accounts/email/recovery_code_used.txt",
-        lambda: gettext("A recovery code was used at %(instance_name)s"),
+        lambda: gettext("An emergency code was used at %(instance_name)s"),
         (),
         (),
     ),

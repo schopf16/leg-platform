@@ -130,7 +130,10 @@ class RegistrationTests(TestCase):
     def test_the_confirmation_page_does_not_claim_that_a_link_was_sent(self):
         response = self.client.get(reverse("accounts:registration_sent"))
 
-        self.assertContains(response, "Wenn diese Adresse verwendet werden kann")
+        # Conditional and the same for every address (D-054): it says what to expect if the
+        # address can be used, never that an account or a message exists.
+        self.assertContains(response, "Wenn wir die angegebene Adresse verwenden können")
+        self.assertNotContains(response, "Wir haben eine Nachricht an Ihre Adresse")
 
     def test_emails_are_marked_as_automatic_messages(self):
         create_active_user("taken.person@example.org")
@@ -398,7 +401,7 @@ class VerificationTests(TestCase):
 
         response = self.complete()
 
-        self.assertRedirects(response, reverse("accounts:login"))
+        self.assertRedirects(response, reverse("accounts:welcome"))
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.ACTIVE)
         self.assertTrue(self.user.check_password(PASSWORD))
@@ -414,7 +417,7 @@ class VerificationTests(TestCase):
         ) as check:
             response = self.complete()
 
-        self.assertRedirects(response, reverse("accounts:login"))
+        self.assertRedirects(response, reverse("accounts:welcome"))
         check.assert_called_once_with(
             street="Examplestrasse",
             house_number="12a",

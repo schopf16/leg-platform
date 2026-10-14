@@ -3,6 +3,8 @@
 from django.urls import path
 
 from leg_platform.accounts import views
+from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
+from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 
 app_name = "accounts"
 
@@ -15,7 +17,11 @@ urlpatterns = [
     ),
     path("logout/", views.PortalLogoutView.as_view(), name="logout"),
     path("register/", views.RegistrationView.as_view(), name="registration"),
-    path("register/sent/", views.EmailSentView.as_view(), name="registration_sent"),
+    path(
+        "register/sent/",
+        views.EmailSentView.as_view(purpose="registration", lifetime=REGISTRATION_LINK_LIFETIME),
+        name="registration_sent",
+    ),
     path("register/complete/", views.RegistrationCompleteView.as_view(), name="registration_complete"),
     # Only the token alphabet is matched; the view checks the length.
     path(
@@ -24,7 +30,13 @@ urlpatterns = [
         name="registration_verify",
     ),
     path("password-reset/", views.PasswordResetRequestView.as_view(), name="password_reset"),
-    path("password-reset/sent/", views.EmailSentView.as_view(), name="password_reset_sent"),
+    path(
+        "password-reset/sent/",
+        views.EmailSentView.as_view(
+            purpose="password_reset", lifetime=PASSWORD_RESET_LIFETIME
+        ),
+        name="password_reset_sent",
+    ),
     path(
         "password-reset/new-password/",
         views.PasswordResetSetView.as_view(),
@@ -56,6 +68,11 @@ urlpatterns = [
         name="email_change_sent",
     ),
     path(
+        "profile/two-factor-tip/dismiss/",
+        views.TwoFactorTipDismissView.as_view(),
+        name="two_factor_tip_dismiss",
+    ),
+    path(
         "two-factor-reset/verify/<slug:token>/",
         views.TwoFactorResetVerifyView.as_view(),
         name="two_factor_reset_verify",
@@ -66,6 +83,7 @@ urlpatterns = [
         name="two_factor_reset_confirm",
     ),
     path("profile/", views.ProfileView.as_view(), name="profile"),
+    path("welcome/", views.WelcomeView.as_view(), name="welcome"),
     path("profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"),
     path("profile/delete/", views.AccountDeleteView.as_view(), name="account_delete"),
     path("profile/password/", views.PasswordChangeView.as_view(), name="password_change"),

@@ -5,11 +5,7 @@
   <div class="card card-md">
     <div class="card-body">
       <h1 class="h2 mb-3">{% translate "Delete account" %}</h1>
-      {% if retention_obligation %}
-        <p>{% translate "A retention obligation applies to this account. Continuing will deactivate it instead of deleting its retained data. The email address will become available for a new registration." %}</p>
-      {% else %}
-        <p>{% translate "Continuing will permanently delete your account and its data. This action cannot be undone." %}</p>
-      {% endif %}
+      <p>{% translate "Your account will be deleted. You will no longer be able to log in. This cannot be undone. You can register again later with the same email address." %}</p>
       <p>{% translate "Confirm with your current password and, if enabled, a code from your authenticator app." %}</p>
       <form method="post" novalidate>
         {% csrf_token %}

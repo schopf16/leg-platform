@@ -102,7 +102,7 @@ All required fields are collected when the registration is completed, i.e. on th
 * The registration form asks only for the email address and links to the privacy notice (project owner, 2026-10-13). Until the address is verified, only the address is stored.
 * After submission, the response is always the same generic message, e.g. "A link to activate your account has been emailed to the address provided." (OWASP Authentication Cheat Sheet).
 * If the email address does not belong to an active, temporarily locked or blocked account, an unverified account without a customer number is created and a time-limited, single-use verification link is sent. An earlier pending registration with the same address is replaced.
-* Via the verification link, the person enters the profile data (name, postal address, optional phone number) and sets the password. The link is valid for a limited time (proposal: 24 hours) and stays valid after an unsuccessful submission, e.g. a rejected password. Only when the form has been submitted successfully is the account active, and only then is a customer number assigned and shown in the profile; the link is consumed only at that point. Unverified registrations do not use up customer numbers (D-021). Verification therefore never activates a password that the person clicking the link did not choose.
+* Via the verification link, the person enters the profile data (name, postal address, optional phone number) and sets the password. The link is valid for a limited time (proposal: 24 hours) and stays valid after an unsuccessful submission, e.g. a rejected password. Only when the form has been submitted successfully is the account active, and only then is a customer number assigned and shown in the profile; the link is consumed only at that point. Unverified registrations do not use up customer numbers (D-021). Verification therefore never activates a password that the person clicking the link did not choose. When the form has been submitted successfully, the person is logged in (owner decision of 2026-10-14, D-055: they have just proved control of the mailbox and chosen the password) and sees a page that offers the setup of two-factor authentication as the one recommended next step; skipping it leads to the profile, which reminds them in the session.
 * Unverified accounts and their data are deleted automatically when the verification link expires.
 * If the email address already belongs to an active, temporarily locked or blocked account, no account is created. An email to that address points to login and password reset.
 * Registration and the emails it triggers are rate-limited, so that the function cannot be used to flood mailboxes. A new verification email is obtained by registering again; there is no separate function to resend it.
@@ -128,9 +128,9 @@ Users can change their email address themselves (D-016). The email address is on
 | Active | Email address verified, password set | yes | yes | reserved | – |
 | Temporarily locked | Too many failed login attempts | no, until the cool-off period has expired | yes | reserved | Expiry of the cool-off period |
 | Blocked | Decision of a system administrator, e.g. misuse or suspected account takeover | no | no | reserved | A system administrator |
-| Deactivated | Deletion of an account with a retention obligation | no | no | released for new registrations | A system administrator, only if no active, temporarily locked or blocked account uses the email address |
+| Deactivated (shown as "Deleted (retention obligation)", D-055) | Deletion of an account with a retention obligation; the person is told that the account is deleted and that logging in is no longer possible | no | no | released for new registrations | A system administrator ("Restore account"), only if no active, temporarily locked or blocked account uses the email address |
 
-Responses never reveal whether an account is blocked or deactivated.
+Responses never reveal whether an account is blocked or deactivated. The stored key of the state stays `deactivated`; only its display label changed (D-055).
 
 ## Account Lifecycle
 
@@ -140,7 +140,7 @@ The account lifecycle is defined in `docs/DECISIONS.md` (D-016). In short:
 * System administrators can block and unblock accounts, including the accounts of other system administrators.
 * Every account has a retention obligation flag. It is not set at registration. Later functions set it when an account is used for something subject to a retention obligation. Once set, it can never be unset.
 * Deleting an account, by the user or by a system administrator, removes all of its data if no retention obligation is set. Security log entries are kept without personal reference until they expire (D-018).
-* Deleting an account with a retention obligation deactivates it instead. The user cannot reactivate it.
+* Deleting an account with a retention obligation deactivates it instead; the administration shows it as "Deleted (retention obligation)". The user cannot reactivate it. The user is told only that the account is deleted and that logging in is no longer possible (D-055).
 * The same email address can be used for a new registration after deletion or deactivation.
 * A system administrator can reactivate a deactivated account, unless an active, temporarily locked or blocked account with the same email address exists. A pending unverified registration with that address is deleted on reactivation.
 * At least one active, not blocked system administrator always remains: the last one can neither be deleted, deactivated or blocked nor lose superuser status.

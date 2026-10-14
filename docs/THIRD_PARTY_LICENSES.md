@@ -60,9 +60,9 @@ The following third-party assets are part of this repository, below `leg_platfor
 | Source Sans 3 (`fonts/SourceSans3.ttf`) | repository `google/fonts`, `ofl/sourcesans3`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Source" (`fonts/OFL-SourceSans3.txt`) | Text typeface (D-024) |
 | Bricolage Grotesque (`fonts/BricolageGrotesque.ttf`) | repository `google/fonts`, `ofl/bricolagegrotesque`, unmodified | SIL Open Font License 1.1 (`fonts/OFL-BricolageGrotesque.txt`) | Headings in the register "Warm" (D-024) |
 | IBM Plex Mono (`fonts/IBMPlexMono-Regular.ttf`) | repository `google/fonts`, `ofl/ibmplexmono`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Plex" (`fonts/OFL-IBMPlexMono.txt`) | Identifiers such as the customer number (D-024) |
-| Tabler Icons (`tabler-icons/lock.svg`, inlined in `leg_platform/templates/icons/lock.html`) | v3.49.0, repository `tabler/tabler-icons`, `icons/outline/lock.svg` | MIT (`tabler-icons/LICENSE`) | Icons (D-024); further icons are added with the pages that use them |
+| Tabler Icons (`tabler-icons/lock.svg`, inlined in `leg_platform/templates/icons/lock.html`; `tabler-icons/circle-check.svg`, `alert-triangle.svg`, `info-circle.svg`, `alert-circle.svg`, used as CSS masks for the icons of the alerts, D-054) | v3.49.0, repository `tabler/tabler-icons`, `icons/outline/<name>.svg`, unmodified | MIT (`tabler-icons/LICENSE`) | Icons (D-024); further icons are added with the pages that use them |
 
-The fonts are used unmodified, as `docs/DESIGN.md`, section 4, requires (OFL condition 3 forbids a modified version under a Reserved Font Name). The own file `leg_platform/static/img/select-arrow.svg` replaces a `data:` image of Tabler's stylesheet (D-037) and is part of this project's BSD 3-Clause licence.
+The fonts are used unmodified, as `docs/DESIGN.md`, section 4, requires (OFL condition 3 forbids a modified version under a Reserved Font Name). The own files `leg_platform/static/img/select-arrow.svg`, `check.svg` and `radio-dot.svg` replace `data:` images of Tabler's stylesheet (D-037, D-054) and are part of this project's BSD 3-Clause licence.
 
 ## Sources
 

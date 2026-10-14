@@ -1,0 +1,10 @@
+{% extends "error_base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Something went wrong" %}{% endblock %}
+{% block heading %}{% translate "Something went wrong" %}{% endblock %}
+{% block message %}
+  <p>{% translate "We are sorry. Please try again later." %}</p>
+{% endblock %}
+{% block action %}
+  <a class="btn btn-primary w-100" href="/">{% translate "Go to the start page" %}</a>
+{% endblock %}

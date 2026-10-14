@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your account is ready" %}{% endblock %}
+{% block content %}
+  <div class="card card-md">
+    <div class="card-body">
+      <h1 class="h2 mb-3">{% translate "Your account is ready" %}</h1>
+      <dl class="mb-4">
+        <dt>{% translate "Customer number" %}</dt>
+        <dd class="identifier">{{ account.customer_number_display }}</dd>
+      </dl>
+      <h2 class="h3 mb-2">{% translate "Protect your account even better" %}</h2>
+      <p>{% translate "Extra protection keeps your account safe even if someone learns your password." %}</p>
+      <p>{% translate "A free app on your phone shows a code that you enter after your password." %}</p>
+      {% include "accounts/_authenticator_info.html" %}
+      <form method="post" action="{% url 'accounts:two_factor_setup' %}" class="mb-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-lg w-100">{% translate "Set up extra protection now (about 2 minutes)" %}</button>
+      </form>
+      <a class="btn btn-secondary-action w-100" href="{% url 'accounts:profile' %}">{% translate "Later" %}</a>
+    </div>
+  </div>
+{% endblock %}
