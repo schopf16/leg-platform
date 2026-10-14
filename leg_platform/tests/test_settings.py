@@ -13,7 +13,6 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.views.debug import SafeExceptionReporterFilter, get_default_exception_reporter_filter
 
 from leg_platform.debug import ExceptionReporterFilter
-from leg_platform.mail import GraphNotImplementedEmailBackend
 from leg_platform.tests.test_responses import EXPECTED_CSP
 
 
@@ -247,10 +246,3 @@ class ExceptionReporterFilterTests(SimpleTestCase):
                     reporter_filter.cleansed_substitute,
                 )
         self.assertEqual(reporter_filter.cleanse_setting("EMAIL_MODE", "console"), "console")
-
-
-class PlaceholderEmailBackendTests(SimpleTestCase):
-    def test_refuses_to_send(self):
-        message = mail.EmailMessage("Subject", "Body", "from@example.org", ["to@example.org"])
-        with self.assertRaises(NotImplementedError):
-            GraphNotImplementedEmailBackend().send_messages([message])

@@ -34,6 +34,9 @@ from datetime import timedelta
 from urllib.parse import quote, urlencode
 
 import idna
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from django.conf import settings
 from django.contrib.auth import password_validation
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -1194,6 +1197,98 @@ class EmailTextVersion(models.Model):
     class Meta:
         default_permissions = ()
         ordering = ("-created_at", "-id")
+
+
+# Microsoft Graph configuration of the email delivery (D-006). The application authenticates with a
+# certificate (client credentials, no client secret). The public certificate is not secret; the
+# private key is encrypted like the other stored secrets (docs/SECURITY.md, section 7), is never
+# shown again and is only decrypted to request a token.
+
+GRAPH_CERTIFICATE_KEY_PURPOSE = b"LEG-Platform Microsoft Graph certificate key v1"
+GRAPH_MIN_RSA_KEY_BITS = 2048
+
+
+class GraphConfiguration(models.Model):
+    """The Microsoft Graph settings of the email delivery. The table holds exactly one row (id 1)."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    tenant_id = models.UUIDField(_("tenant ID"), null=True, blank=True)
+    client_id = models.UUIDField(_("client ID"), null=True, blank=True)
+    sender_address = models.EmailField(_("sender mailbox"), max_length=254, blank=True)
+    certificate_pem = models.TextField(blank=True, editable=False)
+    encrypted_private_key = models.TextField(blank=True, editable=False)
+    certificate_expires_on = models.DateTimeField(null=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(id=1), name="accounts_graph_configuration_singleton"
+            )
+        ]
+
+    @classmethod
+    def load(cls):
+        configuration, _created = cls.objects.get_or_create(id=1)
+        return configuration
+
+    @property
+    def is_configured(self):
+        return bool(
+            self.tenant_id
+            and self.client_id
+            and self.sender_address
+            and self.certificate_pem
+            and self.encrypted_private_key
+        )
+
+    @sensitive_variables("private_key_pem")
+    def set_certificate(self, private_key_pem, certificate_pem):
+        """Store a certificate and its private key (both PEM, as bytes) after checking them.
+
+        The key must be RSA with at least GRAPH_MIN_RSA_KEY_BITS, belong to the certificate and
+        the certificate must not have expired. Nothing is stored when a check fails.
+        """
+        try:
+            private_key = serialization.load_pem_private_key(private_key_pem, password=None)
+            certificate = x509.load_pem_x509_certificate(certificate_pem)
+        except (TypeError, ValueError):
+            raise ValidationError(
+                _("The certificate or the private key cannot be read (PEM, no password).")
+            ) from None
+        if (
+            not isinstance(private_key, rsa.RSAPrivateKey)
+            or private_key.key_size < GRAPH_MIN_RSA_KEY_BITS
+        ):
+            raise ValidationError(
+                _("The private key must be an RSA key with at least 2048 bits.")
+            )
+        if certificate.public_key().public_numbers() != private_key.public_key().public_numbers():
+            raise ValidationError(_("The private key does not belong to the certificate."))
+        expires_on = certificate.not_valid_after_utc
+        if expires_on <= timezone.now():
+            raise ValidationError(_("The certificate has expired."))
+        self.certificate_pem = certificate_pem.decode("ascii")
+        self.encrypted_private_key = encrypt(private_key_pem, GRAPH_CERTIFICATE_KEY_PURPOSE)
+        self.certificate_expires_on = expires_on
+        self.save()
+
+    @sensitive_variables()
+    def private_key_pem(self):
+        """Return the private key as PEM bytes. A key encrypted with an earlier SECRET_KEY is
+        encrypted again with the current one (D-040, docs/SECURITY.md, section 7).
+
+        Raises ``DecryptionError`` when no key of the instance decrypts it.
+        """
+        pem = decrypt(self.encrypted_private_key, GRAPH_CERTIFICATE_KEY_PURPOSE)
+        if not is_current(self.encrypted_private_key, GRAPH_CERTIFICATE_KEY_PURPOSE):
+            self.encrypted_private_key = reencrypt(
+                self.encrypted_private_key, GRAPH_CERTIFICATE_KEY_PURPOSE
+            )
+            self.save(update_fields=["encrypted_private_key"])
+        return pem
+
 
 # Second factor (D-040). The devices follow the interface of django-otp (``Device``), so that its
 # middleware and device functions work with them, but the secrets are not stored in plain text:

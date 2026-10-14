@@ -316,7 +316,7 @@ class AxesProxyCountTests(SimpleTestCase):
             with self.subTest(app_env=app_env, mode=mode):
                 env = make_env(app_env, EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=TEST_RECIPIENT)
                 backend = email_backend(load_environment(env))
-                self.assertEqual(backend, "leg_platform.mail.GraphNotImplementedEmailBackend")
+                self.assertEqual(backend, "leg_platform.mail.GraphEmailBackend")
 
 
 class SecurityLogRetentionTests(SimpleTestCase):

@@ -528,13 +528,13 @@ def security_settings(config: EnvironmentConfig) -> dict[str, object]:
 def email_backend(config: EnvironmentConfig) -> str:
     """Return the email backend for EMAIL_MODE.
 
-    The Microsoft Graph backend (modes allowlist and graph) is not implemented yet. Until it
-    is, these modes use a placeholder that refuses to send (``leg_platform.mail``); they never
-    fall back to Django's default SMTP backend or to the console.
+    The modes allowlist and graph send through Microsoft Graph (``leg_platform.mail``). That
+    backend fails closed when it is not configured; these modes never fall back to Django's
+    default SMTP backend or to the console.
     """
     if config.email_mode == EMAIL_MODE_CONSOLE:
         return "django.core.mail.backends.console.EmailBackend"
-    return "leg_platform.mail.GraphNotImplementedEmailBackend"
+    return "leg_platform.mail.GraphEmailBackend"
 
 
 def silenced_system_checks(config: EnvironmentConfig) -> list[str]:
