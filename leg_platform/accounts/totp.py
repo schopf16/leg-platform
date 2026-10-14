@@ -237,9 +237,14 @@ def verify_code(user, raw_code):
     """Verify a code of the authenticator app or a recovery code; return the device or None.
 
     The kind of code follows from its length: six digits for the app, eight characters for a
-    recovery code. The device is locked while the code is checked, so that a code cannot be
-    used twice in parallel. Repeated failures are limited by the abuse protection of the login
-    (``second_factor.verify_second_factor``), not by the device (D-040).
+    recovery code.
+
+    Precondition: the caller holds the row lock of the account, as
+    ``second_factor.verify_second_factor()`` does. ``AuthenticatorDevice.verify_token()`` reads
+    ``last_t`` and saves it without a lock of its own, so only the account lock keeps a code of
+    the app from being accepted twice in parallel. A recovery code is single use by one DELETE
+    statement and does not depend on the lock. Repeated failures are limited by the abuse
+    protection of the login (``second_factor.verify_second_factor``), not by the device (D-040).
     """
     code = normalize_code(raw_code)
     with transaction.atomic():

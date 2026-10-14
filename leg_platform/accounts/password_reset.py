@@ -27,22 +27,26 @@ def process_reset_request(address):
     """Handle a reset request in the background worker; return the sending function or None."""
     address = normalize_email_address(address)
     # The normalised unique column, never Django's email__iexact lookup (docs/SECURITY.md,
-    # section 3).
-    user = User._base_manager.filter(
-        normalized_email=address, status=User.Status.ACTIVE
-    ).first()
-    if user is None:
-        return None
-    # Only the newest link is valid: earlier links of the account stop working, as for the
-    # removal of the second factor. A request above the per-address limit never reaches this
-    # function, so links already sent stay valid then (docs/SECURITY.md, section 3).
-    VerificationToken.objects.filter(
-        user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
-    ).delete()
-    raw_token = VerificationToken.objects.issue(
-        user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
-    )
-    email = user.email
+    # section 3). The account row is locked and the status is checked under the lock, so that
+    # parallel requests replace the links one after another and only the last one stays valid.
+    with transaction.atomic():
+        user = (
+            User._base_manager.select_for_update()
+            .filter(normalized_email=address, status=User.Status.ACTIVE)
+            .first()
+        )
+        if user is None:
+            return None
+        # Only the newest link is valid: earlier links of the account stop working, as for the
+        # removal of the second factor. A request above the per-address limit never reaches this
+        # function, so links already sent stay valid then (docs/SECURITY.md, section 3).
+        VerificationToken.objects.filter(
+            user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
+        ).delete()
+        raw_token = VerificationToken.objects.issue(
+            user, VerificationToken.Purpose.PASSWORD_RESET, PASSWORD_RESET_LIFETIME
+        )
+        email = user.email
     return lambda: emails.send_password_reset(email, raw_token, PASSWORD_RESET_LIFETIME)
 
 
@@ -66,6 +70,7 @@ def delete_expired_reset_tokens(now=None):
 def complete_reset(token, form):
     """Save the new password and consume the token; return the account, or None if not valid.
 
+    The token must be a password reset link; a link of another purpose never sets a password.
     The account is locked before its token, as everywhere else. A reset ends all other sessions
     (Django derives the session hash from the password), removes every outstanding reset link
     of the account and the temporary lockout of the account only: the failure counters and
@@ -81,7 +86,11 @@ def complete_reset(token, form):
         )
         locked_token = (
             VerificationToken.objects.select_for_update()
-            .filter(pk=token.pk, expires_at__gt=timezone.now())
+            .filter(
+                pk=token.pk,
+                purpose=VerificationToken.Purpose.PASSWORD_RESET,
+                expires_at__gt=timezone.now(),
+            )
             .first()
         )
         if user is None or locked_token is None:

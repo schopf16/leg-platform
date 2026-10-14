@@ -1,6 +1,7 @@
 """Password reset (docs/SECURITY.md, sections 3 and 11; OWASP Forgot Password Cheat Sheet)."""
 
 import re
+import threading
 from datetime import timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -8,11 +9,21 @@ from urllib.parse import urlsplit
 from axes.models import AccessAttempt
 from django.conf import settings
 from django.core import mail
-from django.test import Client, TestCase, override_settings, tag
+from django.db import connection
+from django.test import (
+    Client,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+    skipUnlessDBFeature,
+    tag,
+)
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts import mail_queue, password_reset, rate_limits
+from leg_platform.accounts.forms import NewPasswordForm
 from leg_platform.accounts.models import LoginIpAttempt, MailJob, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
@@ -473,3 +484,78 @@ class ResetLockoutTests(TestCase):
         response = login(Client(), attacker.email, NEW_PASSWORD, "10.43.0.1")
 
         self.assertEqual(response.status_code, 429)
+
+
+@tag("mariadb")
+class ResetRequestLockTests(TestCase):
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_the_account_row_is_locked_while_the_link_is_replaced(self):
+        create_active_user("locked.request@example.org")
+
+        with CaptureQueriesContext(connection) as context:
+            self.assertIsNotNone(
+                password_reset.process_reset_request("locked.request@example.org")
+            )
+
+        self.assertTrue(
+            any(
+                "FOR UPDATE" in query["sql"] and User._meta.db_table in query["sql"]
+                for query in context.captured_queries
+            )
+        )
+
+    def test_a_link_of_another_purpose_never_sets_the_password(self):
+        user = create_active_user("other.purpose@example.org")
+        for purpose in (
+            VerificationToken.Purpose.REGISTRATION,
+            VerificationToken.Purpose.TWO_FACTOR_RESET,
+        ):
+            with self.subTest(purpose=purpose):
+                raw = VerificationToken.objects.issue(
+                    user, purpose, password_reset.PASSWORD_RESET_LIFETIME
+                )
+                token = VerificationToken.objects.find_valid(raw, purpose)
+                form = NewPasswordForm(
+                    user=user,
+                    data={"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+                )
+                self.assertTrue(form.is_valid())
+
+                self.assertIsNone(password_reset.complete_reset(token, form))
+
+                user.refresh_from_db()
+                self.assertTrue(user.check_password(PASSWORD))
+                self.assertTrue(VerificationToken.objects.filter(pk=token.pk).exists())
+
+
+@tag("mariadb")
+class ResetRequestConcurrencyTests(TransactionTestCase):
+    def test_parallel_requests_leave_exactly_one_valid_link(self):
+        user = create_active_user("parallel.request@example.org")
+        count = 4
+        barrier = threading.Barrier(count)
+        results = []
+
+        def work():
+            try:
+                barrier.wait()
+                results.append(
+                    password_reset.process_reset_request("parallel.request@example.org")
+                )
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work) for _number in range(count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(len(results), count)
+        self.assertTrue(all(result is not None for result in results))
+        self.assertEqual(
+            VerificationToken.objects.filter(
+                user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
+            ).count(),
+            1,
+        )

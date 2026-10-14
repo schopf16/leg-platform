@@ -1180,7 +1180,14 @@ class ParallelUseTests(TransactionTestCase):
         user, device = create_user_with_totp()
         code = code_for(device)
 
-        results = self.run_in_threads(lambda: totp.verify_code(user, code))
+        def verify_under_account_lock():
+            # The precondition of totp.verify_code(): the caller holds the account row lock, as
+            # second_factor.verify_second_factor() does in production.
+            with transaction.atomic():
+                User._base_manager.select_for_update().filter(pk=user.pk).first()
+                return totp.verify_code(user, code)
+
+        results = self.run_in_threads(verify_under_account_lock)
 
         self.assertEqual(sum(result is not None for result in results), 1)
 

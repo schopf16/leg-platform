@@ -1059,9 +1059,32 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   * M-3 of D-040 remains for the initial system administrator and after a reset of the second factor of a staff user or system administrator.
   * Accepted consequence (re-review, Low-1; availability only): the worker deletes the earlier reset links and creates the new one in a transaction that is committed before the email is sent. If sending fails and the job is repeated (up to `MAX_ATTEMPTS`), every attempt replaces the link again, so during an outage of the email delivery the owner can be left without a working link until a new request is delivered.
   * If roles with permissions are later used outside the administration (for authenticated users without `is_staff`), whether such roles need a second factor must be decided again.
-* Open (to be decided by the project owner; recommended by the `security-reviewer` in the re-review): enforce the L-3 rule also centrally in `User._check_privilege_grant()` on the update path, as defence in depth, before any second function that grants rights is added.
+  * A password reset keeps `is_staff`, `is_superuser`, the groups and the direct permissions of the account and removes no privilege: `complete_reset()` changes only the password, the reset links and the temporary lockout of the account (verified by reading the code, 2026-10-14; see D-043).
+* Open (to be decided by the project owner; recommended by the `security-reviewer` in the re-review; decided in D-043, which keeps the rule in the administration only): enforce the L-3 rule also centrally in `User._check_privilege_grant()` on the update path, as defence in depth, before any second function that grants rights is added.
 * Alternatives: enforcing the rule in `User.set_privileges()` (would also cover future callers, but every caller, including the tests, would have to create a second factor first, and the initial administrator path would need an exception); an enrolment link by email or a one-time code from an administrator (D-040, M-3; not taken).
 * Sources: installed sources of Django 6.1.2 and 6.0.9 (`django/contrib/admin/options.py`); https://docs.djangoproject.com/en/6.1/ref/contrib/admin/actions/ ("Disabling all actions for a particular ModelAdmin", checked on 2026-10-13); D-004, D-005, D-012, D-038, D-040, D-041.
+
+## D-043: Rights Rule Stays in the Administration; Locks and Purpose Check for Password Reset
+
+* Date: 2026-10-14
+* Status: Decided (project owner, 2026-10-14: the rule of D-042 for granting rights is not enforced centrally in the account logic; the findings N-1, N-2 and I-1 of the review are fixed). Not yet reviewed again by the `security-reviewer`.
+* Context: the review of commit c0678b5 by the `security-reviewer` (read only) reported M-1 (the rule of D-042, L-3, is enforced only in the administration, not centrally), N-1 (parallel password reset requests could leave more than one valid reset link), N-2 (the docstring of `totp.verify_code()` claimed a device lock that does not exist), I-1 (a reset link of another purpose could set a password) and N-3 (the current password is checked in form validation outside the lock of the password change).
+* Decision:
+  * M-1: the second-factor rule for granting `is_staff` and `is_superuser` (D-042, L-3) stays in the administration (`UserAdminForm._clean_privileges`, `UserAdmin.save_model`). It is not added to `User._check_privilege_grant()` or `User.set_privileges()`; the open point of D-042 is decided this way. Residual risk: code outside the administration that grants `is_staff` or `is_superuser` must implement the same check and carry a test. Every review that adds such code checks this.
+  * N-1: `process_reset_request()` locks the account row (`select_for_update()`) and checks the status under the lock before it replaces the reset links, in one transaction. Parallel requests replace the links one after another, so only the last link stays valid. An unknown address still returns `None` without a lock on any row.
+  * N-2: the docstring of `totp.verify_code()` states its precondition: the caller holds the row lock of the account, as `second_factor.verify_second_factor()` does (D-040). No runtime check was added. The parallel test for codes of the app takes the same lock; the parallel test for recovery codes is unchanged, because a recovery code is single use by one `DELETE` statement.
+  * I-1: `complete_reset()` accepts only tokens of the purpose `PASSWORD_RESET`. A registration or two-factor reset link cannot set a password.
+* Verified facts (by reading the code, 2026-10-14):
+  * `second_factor.verify_second_factor()` is the only production caller of `totp.verify_code()` and takes the account row lock first.
+  * `AuthenticatorDevice.verify_token()` reads and saves `last_t` without a lock of its own; `RecoveryCodeDevice.verify_token()` removes the code with one `DELETE`.
+  * `PasswordChangeView.form_valid()` locks the account row; the current password is checked earlier, in `ChangePasswordForm.clean_current_password()`.
+* Security implications:
+  * N-3, open and not fixed: the current password is checked before the account row is locked, so two parallel password changes of the same account can both pass the check. The check is still a correct password check and failures are still counted (`authenticate()` sends `user_login_failed`, read by the abuse protection); the race concerns only two changes that both have the correct current password. For the project owner's decision whether the check moves under the lock.
+  * The threaded tests of N-1 and of the parallel app code run only with MariaDB (tag `mariadb`); their results are recorded under Tests.
+* Tests (2026-10-14, MariaDB, `manage.py`): `manage.py check` reported no issues; `manage.py makemigrations --check` reported no changes; `leg_platform.accounts.tests.test_password_reset` and `leg_platform.accounts.tests.test_second_factor` ran 177 tests, OK (includes the new tests for N-1, I-1 and the lock of the app code). The full suite has not been run after these changes.
+* Alternatives: enforcing the rule in `User._check_privilege_grant()` as defence in depth (recommended by the `security-reviewer`; not taken by the owner's decision); enforcing it in `User.set_privileges()` (see D-042).
+* Consequences: this decision does not change the Microsoft Graph delivery, which is committed separately (commit 88ee6ae). Its documentation under D-006 is still pending.
+* Sources: D-012, D-040, D-042; Django documentation of `QuerySet.select_for_update()` (https://docs.djangoproject.com/en/6.1/ref/models/querysets/#select-for-update), which requires a transaction; the code of this repository as read on 2026-10-14.
 
 ## Template for New Decisions
 
