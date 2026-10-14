@@ -16,15 +16,16 @@ from django.dispatch import receiver
 from django.shortcuts import redirect
 from django.utils.translation import gettext
 
-from leg_platform.accounts.second_factor import requires_second_factor
+from leg_platform.accounts.second_factor import STAY_WISH_ATTRIBUTE, requires_second_factor
 from leg_platform.log_filters import TOKEN_URL_PATTERN
 
 STARTED_KEY = "session_started"
 LAST_ACTIVITY_KEY = "session_last_activity"
-# "Stay signed in" (D-056). The login view writes the wish of the person into the session before
-# login(); the signal below turns it into a persistent session, but only for an account that is
-# not a staff user or system administrator. ``STAYING_KEY`` marks such a session.
-STAY_REQUESTED_KEY = "stay_signed_in_requested"
+# "Stay signed in" (D-056). The login view puts the wish of the form on the request object, never
+# into the session; the signal below turns it into a persistent session, but only for an account
+# that is not a staff user or system administrator. With a second factor the wish waits in the
+# pending login (``second_factor.begin_pending_login``) and is put on the request again when the
+# code was accepted. ``STAYING_KEY`` marks a persistent session.
 STAYING_KEY = "stay_signed_in"
 # The last activity is written at most once per interval, so that a request does not always
 # write the session; the idle timeout is therefore exact to one interval.
@@ -37,13 +38,18 @@ def start_session(sender, request, user, **kwargs):
     now = time.time()
     request.session[STARTED_KEY] = now
     request.session[LAST_ACTIVITY_KEY] = now
-    requested = request.session.pop(STAY_REQUESTED_KEY, False) is True
-    if requested and not requires_second_factor(user):
-        # A persistent cookie and a server-side session of the same length. The checks of
+    if getattr(request, STAY_WISH_ATTRIBUTE, False) is True and not requires_second_factor(user):
+        # A persistent cookie and a server-side session of the same length. A timedelta makes
+        # Django store an absolute end time: an integer would mean "that many seconds of
+        # inactivity", and every save (the activity is written once a minute) would move the end
+        # (django/contrib/sessions/backends/base.py, set_expiry and get_expiry_age). The checks of
         # ``timeouts_for`` use the same value for the idle and the absolute timeout.
-        request.session.set_expiry(settings.STAY_SIGNED_IN_DURATION.total_seconds())
+        request.session.set_expiry(settings.STAY_SIGNED_IN_DURATION)
         request.session[STAYING_KEY] = True
     else:
+        # Also when Django kept the data of an earlier login of the same session: the expiry
+        # of a persistent session must not carry over to this one.
+        request.session.set_expiry(None)
         request.session.pop(STAYING_KEY, None)
 
 

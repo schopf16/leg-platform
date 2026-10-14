@@ -61,15 +61,18 @@
     document.dispatchEvent(new CustomEvent("leg:language", { detail: dictionary }));
   };
   const applyLanguage = (code, announce) => {
-    currentLanguage = code;
-    languageButton.textContent = code.toUpperCase();
-    const dictionary = texts && texts[code];
+    // A page without a dictionary has German texts only: its button must not show a language
+    // that the text does not have. The choice is still remembered (the login page takes it up).
+    const shown = texts ? code : "de";
+    currentLanguage = shown;
+    languageButton.textContent = shown.toUpperCase();
+    const dictionary = texts && texts[shown];
     languageButton.setAttribute(
       "aria-label",
-      dictionary ? dictionary.langLabel : `${languageButton.dataset.labelPrefix}: ${NAMES[code]}`
+      dictionary ? dictionary.langLabel : `${languageButton.dataset.labelPrefix}: ${NAMES[shown]}`
     );
-    items.forEach((item) => item.setAttribute("aria-current", String(item.dataset.lang === code)));
-    if (announce || code !== "de") translate(code);
+    items.forEach((item) => item.setAttribute("aria-current", String(item.dataset.lang === shown)));
+    if (texts && (announce || shown !== "de")) translate(shown);
     applyTheme(themeButton.dataset.state);
   };
 

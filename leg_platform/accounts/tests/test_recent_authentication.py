@@ -369,14 +369,15 @@ class RegistrationLoginTests(TestCase):
         self.assertContains(page, user.customer_number_display)
         self.assertContains(page, "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)")
         self.assertContains(page, f'<form method="post" action="{SETUP_URL}"')
-        self.assertContains(page, f'href="{PROFILE_URL}">Später</a>')
+        self.assertContains(page, 'href="/">Später</a>')
         self.assertContains(page, "Was ist eine Authenticator-App?")
         self.assertContains(page, "Der zusätzliche Schutz sichert Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt.")
         self.assertNotContains(page, "Melden Sie sich mit Ihrer E-Mail-Adresse")
-        # The button starts the setup in one more step; skipping leads to the profile with the reminder.
+        # The button starts the setup in one more step; skipping leads to the start page, where
+        # the task tile reminds the person (D-057).
         self.assertRedirects(self.client.post(SETUP_URL, {}), CONFIRM_URL, fetch_redirect_response=False)
-        later = self.client.get(PROFILE_URL)
-        self.assertContains(later, "Möchten Sie Ihr Konto zusätzlich schützen?")
+        later = self.client.get("/")
+        self.assertContains(later, "Zwei-Faktor-Anmeldung")
 
     def test_the_welcome_page_needs_a_login_and_skips_accounts_with_a_second_factor(self):
         self.assertRedirects(
@@ -386,4 +387,4 @@ class RegistrationLoginTests(TestCase):
         holder = VerifiedClient()
         holder.force_login(user)
 
-        self.assertRedirects(holder.get(WELCOME_URL), PROFILE_URL, fetch_redirect_response=False)
+        self.assertRedirects(holder.get(WELCOME_URL), "/", fetch_redirect_response=False)

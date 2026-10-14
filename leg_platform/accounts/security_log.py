@@ -43,14 +43,17 @@ MESSAGES = {
     Event.GRAPH_CONFIGURATION_CHANGED: "The Microsoft Graph configuration was changed",
     Event.GRAPH_CERTIFICATE_UPLOADED: "A Microsoft Graph certificate was uploaded",
     Event.GRAPH_TEST_EMAIL_REQUESTED: "A Microsoft Graph test email was requested",
+    Event.PORTAL_SETTINGS_CHANGED: "The portal settings were changed",
 }
 
 
-def record(event, *, account=None, actor=None, long_retention=False):
+def record(event, *, account=None, actor=None, long_retention=False, detail=""):
     """Store the event and log it; call it in the transaction of the change it records.
 
     The log line is written only when the transaction commits, so a rolled-back change leaves
-    neither a stored event nor a log line (D-018).
+    neither a stored event nor a log line (D-018). ``detail`` is added to the log line only; it
+    must never contain personal data (the portal settings give the host names of public
+    addresses, D-056).
     """
     SecurityEvent.objects.record(
         event, account=account, actor=actor, long_retention=long_retention
@@ -63,6 +66,8 @@ def record(event, *, account=None, actor=None, long_retention=False):
         for label, value in (("account", account_id), ("actor", actor_id))
         if value is not None
     ]
+    if detail:
+        references.append(detail)
     if references:
         transaction.on_commit(
             functools.partial(

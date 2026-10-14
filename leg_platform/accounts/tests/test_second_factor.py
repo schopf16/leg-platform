@@ -137,7 +137,7 @@ class SecondFactorLoginTests(TestCase):
 
         response = send_code(self.client, code_for(self.device))
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
         self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
         self.assertEqual(self.client.session[DEVICE_ID_SESSION_KEY], self.device.persistent_id)
         self.assertEqual(self.client.get(reverse("accounts:profile")).status_code, 200)
@@ -209,7 +209,7 @@ class SecondFactorLoginTests(TestCase):
 
         response = send_code(self.client, " ABCD-2345 ")
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
         self.assertEqual(
             self.client.session[DEVICE_ID_SESSION_KEY],
             RecoveryCodeDevice.objects.get().persistent_id,
@@ -246,7 +246,7 @@ class SecondFactorLoginTests(TestCase):
         self.assertNotEqual(after_password, after_code)
 
     def test_an_internal_redirect_target_is_followed_and_an_external_one_ignored(self):
-        for target, expected in (("/profile/", "/profile/"), ("https://attacker.example.net/", "/profile/")):
+        for target, expected in (("/profile/", "/profile/"), ("https://attacker.example.net/", "/")):
             with self.subTest(target=target):
                 client = Client()
                 client.post(
@@ -268,7 +268,7 @@ class SecondFactorLoginTests(TestCase):
 
         response = log_in(self.client, plain.email)
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
         self.assertEqual(self.client.session["_auth_user_id"], str(plain.pk))
 
     def test_the_ip_slot_is_released_after_a_complete_login(self):
@@ -698,7 +698,7 @@ class RecoveryCodesAndRemovalTests(TestCase):
         self.assertFalse(RecoveryCodeDevice.objects.exists())
         client = Client()
         self.assertRedirects(
-            log_in(client, self.user.email, address="10.3.0.2"), reverse("accounts:profile")
+            log_in(client, self.user.email, address="10.3.0.2"), reverse("home")
         )
         self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_DISABLED)
 
@@ -987,7 +987,7 @@ class PasswordChangeTests(TestCase):
         )
         self.assertRedirects(
             log_in(Client(), self.user.email, OTHER_PASSWORD, address="10.4.0.3"),
-            reverse("accounts:profile"),
+            reverse("home"),
         )
 
     def test_the_current_password_check_is_under_the_abuse_protection(self):
@@ -1544,7 +1544,7 @@ class CodeBudgetTests(TestCase):
 
         response = send_code(self.client, code_for(self.device), address="10.8.0.7")
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
 
     def test_the_pause_does_not_affect_other_accounts(self):
         set_budget(self.device, totp.CODE_PAUSE_AT)
@@ -1554,7 +1554,7 @@ class CodeBudgetTests(TestCase):
 
         response = send_code(client, code_for(other_device), address="10.8.0.8")
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
 
     def test_the_normal_lockout_page_has_no_pause_text(self):
         log_in(self.client, self.user.email, address="10.8.0.10")
@@ -1627,7 +1627,7 @@ class PendingLoginBindingTests(TestCase):
 
         response = send_code(self.client, code_for(self.device), address="10.9.0.2")
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(response, reverse("home"))
 
 
 @tag("mariadb")

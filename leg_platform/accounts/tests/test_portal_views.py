@@ -48,7 +48,7 @@ class LoginTests(TestCase):
             with self.subTest(address=address):
                 client = Client()
                 response = login(client, address, address=f"10.0.1.{number}")
-                self.assertRedirects(response, reverse("accounts:profile"))
+                self.assertRedirects(response, reverse("home"))
                 self.assertEqual(client.session["_auth_user_id"], str(self.user.pk))
 
     def test_the_customer_number_is_not_a_login_identifier(self):
@@ -89,7 +89,7 @@ class LoginTests(TestCase):
                     {"username": self.user.email, "password": PASSWORD, "next": target},
                     REMOTE_ADDR="10.0.3.1",
                 )
-                self.assertRedirects(response, reverse("accounts:profile"))
+                self.assertRedirects(response, reverse("home"))
 
     def test_an_internal_redirect_target_is_followed(self):
         response = self.client.post(
@@ -178,12 +178,12 @@ class LogoutAndProfileTests(TestCase):
 
         self.assertRegex(response.content.decode(), r"\b[0-9]{3} [0-9]{3}\b")
 
-    def test_the_root_leads_to_the_login_page_or_the_profile(self):
+    def test_the_root_leads_to_the_login_page_or_shows_the_start_page(self):
         self.assertRedirects(self.client.get("/"), LOGIN_URL, fetch_redirect_response=False)
         self.client.force_login(self.user)
-        self.assertRedirects(
-            self.client.get("/"), reverse("accounts:profile"), fetch_redirect_response=False
-        )
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/home.html")
 
     def test_pages_with_personal_data_or_forms_are_not_cached(self):
         self.client.force_login(self.user)

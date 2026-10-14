@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import urlsplit
 
 from django import forms
 from django.conf import settings
@@ -163,6 +164,7 @@ class UserAdmin(admin.ModelAdmin):
         "retention_obligation",
         "status",
         "is_active",
+        "hidden_tasks_display",
     )
     privilege_fields = ("is_staff", "is_superuser", "groups", "user_permissions")
     fieldsets = (
@@ -205,6 +207,7 @@ class UserAdmin(admin.ModelAdmin):
             },
         ),
         (None, {"fields": ("phone_number",)}),
+        (None, {"fields": ("hidden_tasks_display",)}),
     )
 
     # Not shown (D-036): the eCH-0010 fields title, organisation_name_add_on_1,
@@ -221,6 +224,17 @@ class UserAdmin(admin.ModelAdmin):
     def customer_number_column(self, obj):
         # Read from the row (customer_number_id); no query per account.
         return obj.customer_number_display
+
+    @admin.display(description=_("hidden tasks"))
+    def hidden_tasks_display(self, obj):
+        # Read only, as a help for support: it explains "I do not see the tile" (D-057).
+        from leg_platform.accounts import tasks
+
+        keys = sorted(obj.hidden_tasks.values_list("task_key", flat=True))
+        if not keys:
+            return "-"
+        known = tasks.TASKS_BY_KEY
+        return ", ".join(str(known[key].title) if key in known else key for key in keys)
 
     @admin.display(description=_("postal code"))
     def postal_code(self, obj):
@@ -1273,6 +1287,28 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         if not self.has_view_or_change_permission(request):
             raise PermissionDenied
         return PortalSettings.load()
+
+    @staticmethod
+    def _host(address):
+        return (urlsplit(address).hostname or "-") if address else "-"
+
+    def save_model(self, request, obj, form, change):
+        # Every change of an address is a security event (D-056): the addresses are shown as links
+        # to every visitor. Only the host names of the old and the new address are logged (public
+        # data, no personal data); the full addresses are in the history of the administration.
+        with transaction.atomic():
+            stored = PortalSettings.objects.select_for_update().get(pk=obj.pk)
+            changes = [
+                f"{name} changed, host {self._host(getattr(stored, name))} -> "
+                f"{self._host(getattr(obj, name))}"
+                for name in ("privacy_url", "imprint_url")
+                if getattr(stored, name) != getattr(obj, name)
+            ]
+            super().save_model(request, obj, form, change)
+            if changes:
+                security_log.record(
+                    Event.PORTAL_SETTINGS_CHANGED, actor=request.user, detail="; ".join(changes)
+                )
 
     def changelist_view(self, request, extra_context=None):
         if not self.has_view_or_change_permission(request):

@@ -125,6 +125,19 @@ body {
    small corner radii, lines instead of shadows. */
 .register-clear {
   --tblr-body-font-size: 1rem;
+  /* The design package sets text with a line height of 1.5 (login/VORGABEN.md, reference). */
+  --tblr-body-line-height: 1.5;
+  /* No resting shadows (rule R7): Tabler's own shadows of buttons and fields are switched off;
+     the focus rings are the outline and the ring set below, not these. */
+  --tblr-btn-box-shadow: none;
+  --tblr-shadow-input: none;
+  /* Tabler sets text with the alternate glyphs of Inter; the typeface of the package is Source
+     Sans 3 without them. */
+  font-feature-settings: normal;
+  font-variant-ligatures: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }
 
 .register-clear h1,
@@ -316,7 +329,7 @@ body {
   height: 10px;
   border-radius: 50%;
   background: var(--yellow);
-  box-shadow: 0 0 0 3px var(--warm);
+  box-shadow: 0 0 0 3px var(--panel);
 }
 
 .logo-plate {

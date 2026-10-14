@@ -39,10 +39,10 @@ from leg_platform.accounts.tests.test_second_factor import (
     promote,
     send_code,
 )
-from leg_platform.accounts.views import TWO_FACTOR_TIP_SESSION_KEY
 
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")
+HOME_URL = reverse("home")
 COMPLETE_URL = reverse("accounts:registration_complete")
 PROFILE_EDIT_URL = reverse("accounts:profile_edit")
 SETUP_URL = reverse("accounts:two_factor_setup")
@@ -311,7 +311,7 @@ class InputTypeTests(TestCase):
             LOGIN_URL, {"username": f"  {user.email.upper()} ", "password": PASSWORD}
         )
 
-        self.assertRedirects(response, PROFILE_URL)
+        self.assertRedirects(response, HOME_URL)
 
     def test_the_login_has_the_show_password_button_and_a_specific_message(self):
         html = self.client.get(LOGIN_URL).content.decode()
@@ -356,16 +356,16 @@ class LogoutTests(TestCase):
         self.user = create_active_user("active.person@example.org")
         self.client.force_login(self.user)
 
-    def test_the_top_bar_has_a_logout_button_next_to_the_profile_link(self):
+    def test_the_menu_has_a_logout_button_and_the_profile_entry(self):
         html = self.client.get(PROFILE_URL).content.decode()
 
-        bar = re.search(r'<nav class="member-top-navigation".*?</nav>', html, re.S).group(0)
-        self.assertIn(reverse("accounts:profile"), bar)
-        self.assertRegex(bar, r'<form method="post" action="/logout/"')
-        self.assertIn("csrfmiddlewaretoken", bar)
-        self.assertIn(">Abmelden</button>", bar)
-        # The menu for small screens stays.
-        self.assertIn('<details class="member-menu">', html)
+        menu = re.search(r'<nav class="frame-menu.*?</nav>', html, re.S).group(0)
+        self.assertIn(reverse("accounts:profile"), menu)
+        self.assertRegex(menu, r'<form method="post" action="/logout/"')
+        self.assertIn("csrfmiddlewaretoken", menu)
+        self.assertIn("Abmelden", menu)
+        # The menu for small screens is the same menu in a drawer.
+        self.assertIn('id="frame-drawer"', html)
 
     def test_an_account_that_must_change_its_password_can_still_log_out(self):
         self.user.password_change_required = True
@@ -373,9 +373,9 @@ class LogoutTests(TestCase):
 
         html = self.client.get(reverse("accounts:password_change")).content.decode()
 
-        bar = re.search(r'<nav class="member-top-navigation".*?</nav>', html, re.S).group(0)
-        self.assertIn('action="/logout/"', bar)
-        self.assertNotIn(reverse("accounts:profile"), bar)
+        header = re.search(r'<header class="frame-header.*?</header>', html, re.S).group(0)
+        self.assertIn('action="/logout/"', header)
+        self.assertNotIn(reverse("accounts:profile"), html.split("</header>")[0])
 
     def test_the_logout_still_needs_the_csrf_token_and_says_so_afterwards(self):
         browser = Client(enforce_csrf_checks=True)
@@ -396,53 +396,6 @@ class LogoutTests(TestCase):
         self.assertRedirects(response, LOGIN_URL)
         self.assertContains(response, "Sie wurden abgemeldet.")
         self.assertNotIn("_auth_user_id", browser.session)
-
-
-@tag("mariadb")
-class TwoFactorTipTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("active.person@example.org")
-        self.client.force_login(self.user)
-
-    def test_the_profile_offers_the_extra_protection_until_the_person_says_not_now(self):
-        first = self.client.get(PROFILE_URL)
-
-        self.assertContains(first, "Möchten Sie Ihr Konto zusätzlich schützen?")
-        self.assertContains(first, "Das ist freiwillig und dauert etwa 2 Minuten.")
-        self.assertRegex(first.content.decode(), rf'<form method="post" action="{SETUP_URL}">')
-        self.assertContains(first, "Jetzt einrichten")
-
-        dismissed = self.client.post(reverse("accounts:two_factor_tip_dismiss"))
-
-        self.assertRedirects(dismissed, PROFILE_URL)
-        self.assertNotContains(self.client.get(PROFILE_URL), "Möchten Sie Ihr Konto zusätzlich schützen?")
-
-    def test_the_answer_is_kept_in_the_session_only(self):
-        self.client.post(reverse("accounts:two_factor_tip_dismiss"))
-
-        self.assertTrue(self.client.session[TWO_FACTOR_TIP_SESSION_KEY])
-        # A new session shows the tip again; nothing about the answer is stored with the account.
-        again = Client()
-        again.force_login(self.user)
-        self.assertContains(again.get(PROFILE_URL), "Möchten Sie Ihr Konto zusätzlich schützen?")
-
-    def test_an_account_with_a_second_factor_sees_no_tip(self):
-        user, _device = create_user_with_totp("holder.person@example.org")
-        holder = VerifiedClient()
-        holder.force_login(user)
-
-        self.assertNotContains(holder.get(PROFILE_URL), "Möchten Sie Ihr Konto zusätzlich schützen?")
-
-    def test_dismissing_works_only_by_post_with_a_login_and_a_csrf_token(self):
-        url = reverse("accounts:two_factor_tip_dismiss")
-
-        self.assertEqual(self.client.get(url).status_code, 405)
-        anonymous = Client().post(url)
-        self.assertRedirects(anonymous, f"{LOGIN_URL}?next={url}", fetch_redirect_response=False)
-        browser = Client(enforce_csrf_checks=True)
-        browser.force_login(self.user)
-        with self.assertLogs("django.security.csrf", "WARNING"):
-            self.assertEqual(browser.post(url).status_code, 403)
 
 
 @tag("mariadb")
@@ -617,7 +570,7 @@ class EmergencyCodeLoginTests(TestCase):
     def test_a_login_with_an_emergency_code_says_how_many_codes_are_left(self):
         client, response = self.log_in_with("abcd-2345", "10.8.1.1")
 
-        self.assertRedirects(response, PROFILE_URL, fetch_redirect_response=False)
+        self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
         page = client.get(PROFILE_URL)
         self.assertContains(
             page,
@@ -642,7 +595,7 @@ class EmergencyCodeLoginTests(TestCase):
         log_in(client, self.user.email, address="10.8.3.1")
         response = send_code(client, code_for(self.device), address="10.8.3.1")
 
-        self.assertRedirects(response, PROFILE_URL)
+        self.assertRedirects(response, HOME_URL)
         self.assertNotContains(client.get(PROFILE_URL), "Notfallcode verwendet")
 
     def test_a_wrong_code_says_the_same_as_before_and_shows_no_count(self):

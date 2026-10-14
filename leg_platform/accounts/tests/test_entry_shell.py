@@ -211,3 +211,39 @@ class FlagTests(SimpleTestCase):
             text = (STATIC / "img" / "flags" / f"{name}.svg").read_text(encoding="utf-8")
             for colour in colours:
                 self.assertIn(colour, text)
+
+
+class DesignRefinementTests(SimpleTestCase):
+    """The points of the design acceptance of phase 1 (D-056)."""
+
+    CSS = (STATIC / "css" / "portal.css").read_text(encoding="utf-8")
+    SCRIPT = (STATIC / "js" / "corner-controls.js").read_text(encoding="utf-8")
+
+    def test_the_language_button_shows_german_on_a_page_without_translations(self):
+        # A page without the dictionary must not show a language that its text does not have;
+        # the choice is only remembered (the login page takes it up again).
+        self.assertIn('const shown = texts ? code : "de";', self.SCRIPT)
+        self.assertIn("languageButton.textContent = shown.toUpperCase();", self.SCRIPT)
+        self.assertIn('item.dataset.lang === shown', self.SCRIPT)
+        self.assertIn('write("leg-lang", code);', self.SCRIPT)
+
+    def test_the_benefit_dot_has_a_ring_in_the_panel_colour(self):
+        block = re.search(r"\.entry-benefits li::before \{(.*?)\}", self.CSS, re.S).group(1)
+        self.assertIn("box-shadow: 0 0 0 3px var(--panel);", block)
+
+    def test_tablers_resting_shadows_are_switched_off_and_the_text_settings_are_neutral(self):
+        block = re.search(r"\.register-clear \{(.*?)\n\}", self.CSS, re.S).group(1)
+        for setting in (
+            "--tblr-btn-box-shadow: none;",
+            "--tblr-shadow-input: none;",
+            "--tblr-body-line-height: 1.5;",
+            "font-feature-settings: normal;",
+            "font-variant-ligatures: normal;",
+            "text-rendering: auto;",
+            "-webkit-font-smoothing: auto;",
+        ):
+            with self.subTest(setting=setting):
+                self.assertIn(setting, block)
+        # The cards have no shadow either; the focus ring of a field is the one of the design.
+        self.assertRegex(self.CSS, r"\.register-clear \.card \{[^}]*box-shadow: none;")
+

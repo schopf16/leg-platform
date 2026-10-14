@@ -68,9 +68,9 @@ urlpatterns = [
         name="email_change_sent",
     ),
     path(
-        "profile/two-factor-tip/dismiss/",
-        views.TwoFactorTipDismissView.as_view(),
-        name="two_factor_tip_dismiss",
+        "tasks/<slug:key>/hide/",
+        views.HideTaskView.as_view(),
+        name="task_hide",
     ),
     path(
         "two-factor-reset/verify/<slug:token>/",

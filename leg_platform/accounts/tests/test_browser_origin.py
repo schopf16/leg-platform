@@ -93,7 +93,7 @@ class LoginOriginTests(BrowserOriginMixin, TestCase):
             browser_client(),
             LOGIN_URL,
             {"username": "active.person@example.org", "password": PASSWORD},
-            reverse("accounts:profile"),
+            reverse("home"),
         )
 
 

@@ -33,6 +33,9 @@ from leg_platform.accounts.models import User
 # again at the login page. A proposal awaiting the project owner's confirmation (D-040).
 PENDING_LIFETIME = timedelta(minutes=5)
 PENDING_SESSION_KEY = "second_factor_pending"
+# The attribute of the request object that carries the wish "stay signed in" to the receiver of
+# the session start (``session_timeout.start_session``); never a session value (D-056).
+STAY_WISH_ATTRIBUTE = "_stay_signed_in_wish"
 LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
 
 # Setting up two-factor authentication does not ask for the password again if this session
@@ -144,6 +147,7 @@ class SecondFactorMiddleware:
 class PendingLogin(NamedTuple):
     user: User
     next_url: str
+    stay: bool = False
 
 
 def pending_login(request):
@@ -164,14 +168,15 @@ def pending_login(request):
     ):
         request.session.pop(PENDING_SESSION_KEY, None)
         return None
-    return PendingLogin(user, pending["next"])
+    return PendingLogin(user, pending["next"], pending.get("stay") is True)
 
 
-def begin_pending_login(request, user, next_url):
+def begin_pending_login(request, user, next_url, stay=False):
     """Remember that the password of the account was checked; the code is asked next.
 
     The session ID is renewed, so that a session ID that someone else planted in the browser
-    before the password was entered cannot be used to complete the second step.
+    before the password was entered cannot be used to complete the second step. ``stay`` is the
+    wish "stay signed in" of the login form; it lives and dies with the pending login (D-056).
     """
     request.session.cycle_key()
     request.session[PENDING_SESSION_KEY] = {
@@ -179,6 +184,7 @@ def begin_pending_login(request, user, next_url):
         "started": time.time(),
         "next": next_url,
         "auth_hash": user.get_session_auth_hash(),
+        "stay": bool(stay),
     }
     # The password was right: the IP slot of this attempt is released. The code step reserves
     # its own slot and keeps it if the code is wrong (D-017).
@@ -234,9 +240,14 @@ def verify_password(request, user, password):
     return succeeded
 
 
-def complete_login(request, user, device):
-    """Log the account in after the password and the second factor were verified."""
+def complete_login(request, user, device, stay=False):
+    """Log the account in after the password and the second factor were verified.
+
+    ``stay`` is the wish of the pending login; the receiver of the session start reads it from
+    the request (``session_timeout.STAY_WISH_ATTRIBUTE``) and ignores it for staff users.
+    """
     request.session.pop(PENDING_SESSION_KEY, None)
+    setattr(request, STAY_WISH_ATTRIBUTE, stay is True)
     # django-otp stores the device in the new session after Django's login() renewed its ID.
     user.otp_device = device
     login(request, user, backend=LOGIN_BACKEND)

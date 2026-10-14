@@ -578,6 +578,21 @@ class User(AbstractBaseUser, PermissionsMixin):
         return format_customer_number(self.customer_number_id)
 
     @property
+    def display_name(self):
+        """The name shown in the header and on the start page: first and last name, or the
+        company name for an account that has no personal name."""
+        return f"{self.first_name} {self.last_name}".strip() or self.organisation_name
+
+    @property
+    def street_address_display(self):
+        """The street and the house number (or the post office box) for one line, or ''."""
+        if self.street.strip():
+            return f"{self.street} {self.house_number}".strip()
+        if self.post_office_box_number is not None:
+            return f"{gettext('Post office box')} {self.post_office_box_number}"
+        return ""
+
+    @property
     def postal_code_display(self):
         """The postal code of the address, whichever of the two eCH-0010 fields holds it."""
         if self.swiss_postal_code is not None:
@@ -1457,18 +1472,21 @@ def validate_https_address(value):
     so a ``javascript:`` or ``http://`` address, an address with credentials and an address with
     white space or control characters are refused (docs/SECURITY.md, section 6).
     """
-    parts = urlsplit(value)
+    # Any parsing error (an unclosed bracket such as "https://[::1", a port out of range) is a
+    # refusal, never an exception that reaches the person (D-056).
     try:
+        parts = urlsplit(value)
         parts.port
     except ValueError:
-        parts = None
+        raise ValidationError(
+            _("Enter a complete address that starts with https://."), code="https_required"
+        ) from None
     if (
-        parts is None
-        or parts.scheme != "https"
+        parts.scheme != "https"
         or not parts.hostname
         or parts.username is not None
         or parts.password is not None
-        or any(character.isspace() or ord(character) < 32 for character in value)
+        or any(character.isspace() or ord(character) < 32 or ord(character) == 127 for character in value)
     ):
         raise ValidationError(
             _("Enter a complete address that starts with https://."), code="https_required"
@@ -1523,6 +1541,29 @@ class PortalSettings(models.Model):
         settings_row, _created = cls.objects.get_or_create(id=1)
         return settings_row
 
+
+class HiddenTask(models.Model):
+    """A task tile that a person hid on the start page (D-057).
+
+    Hiding is final: there is no way back and no list of hidden tasks. It is stored on the server,
+    so it applies on every device and after every login. The key is one of the keys in
+    ``leg_platform.accounts.tasks``; the row belongs to the account and is deleted with it.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="hidden_tasks", editable=False
+    )
+    task_key = models.CharField(max_length=32, db_collation=EXACT_COLLATION, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(fields=["user", "task_key"], name="accounts_hidden_task_unique")
+        ]
+
+    def __str__(self):
+        return self.task_key
 
 
 # Second factor (D-040). The devices follow the interface of django-otp (``Device``), so that its
@@ -1776,10 +1817,12 @@ class SecurityEvent(models.Model):
         GRAPH_TEST_EMAIL_REQUESTED = "graph_test_email_requested", _(
             "Microsoft Graph test email requested"
         )
+        PORTAL_SETTINGS_CHANGED = "portal_settings_changed", _("Portal settings changed")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
-    # Changes of the mail delivery are kept long for the same reason (D-006).
+    # Changes of the mail delivery are kept long for the same reason (D-006); so are changes of
+    # the addresses that every visitor is sent to (D-056).
     LONG_RETENTION = frozenset(
         {
             Event.PRIVILEGES_CHANGED,
@@ -1790,6 +1833,7 @@ class SecurityEvent(models.Model):
             Event.EMERGENCY_KEYS_REENCRYPTED,
             Event.GRAPH_CONFIGURATION_CHANGED,
             Event.GRAPH_CERTIFICATE_UPLOADED,
+            Event.PORTAL_SETTINGS_CHANGED,
         }
     )
 

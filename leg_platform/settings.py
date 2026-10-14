@@ -112,7 +112,7 @@ AXES_LOCKOUT_TEMPLATE = "accounts/lockout.html"
 
 # Login and logout (D-025: the login page is the entry point of the application).
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "accounts:profile"
+LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "accounts:login"
 
 # Phone numbers (D-034): numbers without an international prefix are read as Swiss numbers;

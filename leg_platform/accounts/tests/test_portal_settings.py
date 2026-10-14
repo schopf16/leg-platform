@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings, tag
 from django.urls import reverse
 
 from leg_platform.accounts.admin import PortalSettingsAdmin
-from leg_platform.accounts.models import PortalSettings, validate_https_address
+from leg_platform.accounts.models import PortalSettings, SecurityEvent, validate_https_address
 from leg_platform.accounts.portal_settings import legal_links
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 
@@ -43,6 +43,12 @@ class AddressValidationTests(TestCase):
             "https://www.example.org/\nprivacy",
             "https:///privacy",
             "https://www.example.org:99999/",
+            # An unclosed bracket makes urlsplit() itself raise ValueError (security review L4).
+            "https://[::1",
+            "https://[::1/privacy",
+            # DEL and other control characters.
+            "https://www.example.org/pri\x7fvacy",
+            "https://www.example.org/\x00",
         ):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 validate_https_address(value)
@@ -159,6 +165,48 @@ class PortalSettingsAdminTests(TestCase):
             LogEntry.objects.filter(
                 user=self.administrator, object_id="1", action_flag=CHANGE
             ).exists()
+        )
+
+    def test_a_change_of_an_address_is_a_security_event_with_the_hosts_only(self):
+        self.client.force_login(self.administrator)
+        self.client.get(self.url)
+        with self.assertLogs("leg_platform.security", "WARNING") as logs, self.captureOnCommitCallbacks(
+            execute=True
+        ):
+            self.client.post(
+                self.url,
+                {
+                    "privacy_url": "https://old.example.org/secret-path?token=1",
+                    "imprint_url": "",
+                    "_save": "Sichern",
+                },
+            )
+            self.client.post(
+                self.url,
+                {
+                    "privacy_url": "https://new.example.org/other",
+                    "imprint_url": IMPRINT,
+                    "_save": "Sichern",
+                },
+            )
+        events = SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED)
+        self.assertEqual(events.count(), 2)
+        self.assertTrue(all(event.long_retention for event in events))
+        self.assertTrue(all(event.actor_id == self.administrator.pk for event in events))
+        text = "\n".join(logs.output)
+        self.assertIn("privacy_url changed, host - -> old.example.org", text)
+        self.assertIn("privacy_url changed, host old.example.org -> new.example.org", text)
+        self.assertIn("imprint_url changed, host - -> www.example.org", text)
+        # Paths, queries and the whole address are not in the log.
+        self.assertNotIn("secret-path", text)
+        self.assertNotIn("token=1", text)
+
+    def test_saving_without_a_change_records_no_event(self):
+        self.client.force_login(self.administrator)
+        self.client.get(self.url)
+        self.client.post(self.url, {"privacy_url": "", "imprint_url": "", "_save": "Sichern"})
+        self.assertFalse(
+            SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists()
         )
 
     def test_an_address_without_https_is_refused_with_a_german_message(self):

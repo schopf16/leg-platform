@@ -20,9 +20,6 @@ msgstr "Schweizerdeutsch"
 msgid "Menu"
 msgstr "Menü"
 
-msgid "Account navigation"
-msgstr "Kontonavigation"
-
 msgid "Main navigation"
 msgstr "Hauptnavigation"
 
@@ -100,6 +97,87 @@ msgstr "Vorschau des Impressums"
 
 msgid "Open page"
 msgstr "Seite öffnen"
+
+# Frame after the login, start page and tasks (D-057)
+msgid "Open menu"
+msgstr "Menü öffnen"
+
+msgid "Close menu"
+msgstr "Menü schliessen"
+
+msgid "Quick access"
+msgstr "Schnellzugriff"
+
+msgid "My area"
+msgstr "Mein Bereich"
+
+msgid "Coming next"
+msgstr "Demnächst"
+
+msgid "Start"
+msgstr "Start"
+
+msgid "Locations"
+msgstr "Standorte"
+
+msgid "Invoices"
+msgstr "Rechnungen"
+
+msgid "Energy"
+msgstr "Energie"
+
+msgid "Messages"
+msgstr "Mitteilungen"
+
+msgid "later"
+msgstr "später"
+
+msgid "not yet available"
+msgstr "noch nicht verfügbar"
+
+#, python-format
+msgid "Hello, %(name)s"
+msgstr "Guten Tag, %(name)s"
+
+msgid "Open"
+msgstr "Offen"
+
+msgid "Hide"
+msgstr "Ausblenden"
+
+#, python-format
+msgid "Hide task: %(title)s"
+msgstr "Ausblenden: %(title)s"
+
+msgid "No open tasks"
+msgstr "Keine offenen Aufgaben"
+
+msgid "Tasks appear here as soon as there is something to do."
+msgstr "Hier erscheinen Aufgaben, sobald es etwas zu erledigen gibt."
+
+msgid "Add your address"
+msgstr "Adresse ergänzen"
+
+msgid "Your address is still missing."
+msgstr "Ihre Adresse fehlt noch."
+
+msgid "Add address"
+msgstr "Adresse ergänzen"
+
+msgid "Two-factor sign-in"
+msgstr "Zwei-Faktor-Anmeldung"
+
+msgid "Protects your account additionally with a code from an app."
+msgstr "Schützt Ihr Konto zusätzlich mit einem Code aus einer App."
+
+msgid "Set up 2FA"
+msgstr "2FA einrichten"
+
+msgid "hidden tasks"
+msgstr "Ausgeblendete Aufgaben"
+
+msgid "Portal settings changed"
+msgstr "Portal-Einstellungen geändert"
 
 msgid "Address count"
 msgstr "Anzahl Adressen"
@@ -1772,15 +1850,6 @@ msgstr "E-Mail-Adresse erneut ändern"
 msgid "If you forgot your password, you can choose a new one."
 msgstr "Wenn Sie Ihr Passwort vergessen haben, können Sie ein neues wählen."
 
-msgid "Protect your account even better?"
-msgstr "Möchten Sie Ihr Konto zusätzlich schützen?"
-
-msgid "Set up now"
-msgstr "Jetzt einrichten"
-
-msgid "Not now"
-msgstr "Jetzt nicht"
-
 msgid "Extra protection when logging in"
 msgstr "Zusätzlicher Schutz bei der Anmeldung"
 
@@ -1892,9 +1961,6 @@ msgstr "Das ist freiwillig und dauert etwa 2 Minuten. Sie können den Schutz sp�
 
 msgid "On the next page you connect an authenticator app on your phone."
 msgstr "Auf der nächsten Seite verbinden Sie eine Authenticator-App auf Ihrem Smartphone."
-
-msgid "With a code from an app on your phone, nobody can log in with your password alone. This is voluntary and takes about 2 minutes."
-msgstr "Mit einem Code aus einer App auf Ihrem Smartphone kann sich niemand nur mit Ihrem Passwort anmelden. Das ist freiwillig und dauert etwa 2 Minuten."
 
 msgid "Your account will be deleted. You will no longer be able to log in. This cannot be undone. You can register again later with the same email address."
 msgstr "Ihr Konto wird gelöscht. Sie können sich danach nicht mehr anmelden. Das kann nicht rückgängig gemacht werden. Sie können sich später mit derselben E-Mail-Adresse neu registrieren."

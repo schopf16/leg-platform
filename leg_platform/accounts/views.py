@@ -12,7 +12,7 @@ from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -34,6 +34,7 @@ from leg_platform.accounts import (
     second_factor_reset,
     security_log,
     session_timeout,
+    tasks,
     totp,
 )
 from leg_platform.accounts.forms import (
@@ -105,11 +106,45 @@ class TokenPageMixin(NeverCacheMixin):
         return super().dispatch(*args, **kwargs)
 
 
-class HomeView(View):
-    """The root URL leads to the login page or, when logged in, to the profile (D-025)."""
+class HomeView(NeverCacheMixin, TemplateView):
+    """The start page (D-057): a greeting, the open tasks as tiles, or the empty state.
 
-    def get(self, request):
-        return redirect("accounts:profile" if request.user.is_authenticated else "accounts:login")
+    A person without a login is sent to the login page. Everything shown belongs to
+    ``request.user``; nothing is taken from the request.
+    """
+
+    template_name = "accounts/home.html"
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("accounts:login")
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        user = self.request.user
+        return super().get_context_data(
+            account=user,
+            tasks=tasks.open_tasks(user),
+            address_line=user.street_address_display,
+            **kwargs,
+        )
+
+
+class HideTaskView(NeverCacheMixin, LoginRequiredMixin, View):
+    """"Hide" on a task tile: the task is gone for good for this account (D-057).
+
+    POST only, with the CSRF check of Django. The account is always ``request.user``; the key
+    must be one of the known tasks, every other key is a 404.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, key):
+        try:
+            tasks.hide(request.user, key)
+        except KeyError:
+            raise Http404 from None
+        return redirect("home")
 
 
 class PortalLoginView(NeverCacheMixin, LoginView):
@@ -121,15 +156,17 @@ class PortalLoginView(NeverCacheMixin, LoginView):
 
     def form_valid(self, form):
         user = form.get_user()
-        # The wish is written before login() and read by the session signal (D-056); it is
-        # never taken from the client after that.
+        # The wish of the form goes on the request object, not into the session: nothing about
+        # it stays behind if the login is not completed (D-056).
         wish = form.cleaned_data.get("remember_me") is True
         if not second_factor.has_second_factor(user):
-            self.request.session[session_timeout.STAY_REQUESTED_KEY] = wish
+            setattr(self.request, session_timeout.STAY_WISH_ATTRIBUTE, wish)
             return super().form_valid(form)
-        # No login() yet: that follows the second factor (D-017).
-        second_factor.begin_pending_login(self.request, user, self.get_redirect_url())
-        self.request.session[session_timeout.STAY_REQUESTED_KEY] = wish
+        # No login() yet: that follows the second factor (D-017). The wish waits in the pending
+        # login.
+        second_factor.begin_pending_login(
+            self.request, user, self.get_redirect_url(), stay=wish
+        )
         return redirect("accounts:login_second_factor")
 
 
@@ -158,7 +195,7 @@ class SecondFactorLoginView(FormView):
             # lockout is answered by the middleware of the abuse protection instead.
             form.add_error("otp_token", CodeForm.invalid_code_message)
             return self.form_invalid(form)
-        second_factor.complete_login(self.request, self.pending.user, device)
+        second_factor.complete_login(self.request, self.pending.user, device, stay=self.pending.stay)
         if totp.is_recovery_code_device(device):
             # The person has just proved to own the code, so the number of the codes that are left
             # is theirs to know. Nothing about the check changes.
@@ -492,14 +529,11 @@ class WelcomeView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         if second_factor.has_second_factor(request.user):
-            return redirect("accounts:profile")
+            return redirect("home")
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(account=self.request.user, **kwargs)
-
-
-TWO_FACTOR_TIP_SESSION_KEY = "two_factor_tip_dismissed"
 
 
 class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
@@ -508,28 +542,11 @@ class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
     template_name = "accounts/profile.html"
 
     def get_context_data(self, **kwargs):
-        second_factor_active = second_factor.has_second_factor(self.request.user)
         return super().get_context_data(
             account=self.request.user,
-            second_factor_active=second_factor_active,
-            # The tip is shown until the person says "not now"; that is remembered in the
-            # session only, nothing is stored in the database (D-054).
-            show_two_factor_tip=(
-                not second_factor_active
-                and not self.request.session.get(TWO_FACTOR_TIP_SESSION_KEY)
-            ),
+            second_factor_active=second_factor.has_second_factor(self.request.user),
             **kwargs,
         )
-
-
-class TwoFactorTipDismissView(NeverCacheMixin, LoginRequiredMixin, View):
-    """"Not now" on the tip about two-factor authentication: hides it for this session."""
-
-    http_method_names = ["post"]
-
-    def post(self, request):
-        request.session[TWO_FACTOR_TIP_SESSION_KEY] = True
-        return redirect("accounts:profile")
 
 
 class ProfileEditView(NeverCacheMixin, LoginRequiredMixin, FormView):
