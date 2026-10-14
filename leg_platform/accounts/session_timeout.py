@@ -21,6 +21,11 @@ from leg_platform.log_filters import TOKEN_URL_PATTERN
 
 STARTED_KEY = "session_started"
 LAST_ACTIVITY_KEY = "session_last_activity"
+# "Stay signed in" (D-056). The login view writes the wish of the person into the session before
+# login(); the signal below turns it into a persistent session, but only for an account that is
+# not a staff user or system administrator. ``STAYING_KEY`` marks such a session.
+STAY_REQUESTED_KEY = "stay_signed_in_requested"
+STAYING_KEY = "stay_signed_in"
 # The last activity is written at most once per interval, so that a request does not always
 # write the session; the idle timeout is therefore exact to one interval.
 ACTIVITY_WRITE_INTERVAL = 60
@@ -32,15 +37,30 @@ def start_session(sender, request, user, **kwargs):
     now = time.time()
     request.session[STARTED_KEY] = now
     request.session[LAST_ACTIVITY_KEY] = now
+    requested = request.session.pop(STAY_REQUESTED_KEY, False) is True
+    if requested and not requires_second_factor(user):
+        # A persistent cookie and a server-side session of the same length. The checks of
+        # ``timeouts_for`` use the same value for the idle and the absolute timeout.
+        request.session.set_expiry(settings.STAY_SIGNED_IN_DURATION.total_seconds())
+        request.session[STAYING_KEY] = True
+    else:
+        request.session.pop(STAYING_KEY, None)
 
 
-def timeouts_for(user):
-    """Return (idle, absolute) timeouts in seconds; shorter for staff users and administrators."""
+def timeouts_for(user, session=None):
+    """Return (idle, absolute) timeouts in seconds; shorter for staff users and administrators.
+
+    A session that was started with "stay signed in" has the configured duration for both, unless
+    the account is a staff user or administrator (their shorter timeouts always apply).
+    """
     if requires_second_factor(user):
         return (
             settings.SESSION_PRIVILEGED_IDLE_TIMEOUT.total_seconds(),
             settings.SESSION_PRIVILEGED_ABSOLUTE_TIMEOUT.total_seconds(),
         )
+    if session is not None and session.get(STAYING_KEY) is True:
+        duration = settings.STAY_SIGNED_IN_DURATION.total_seconds()
+        return duration, duration
     return (
         settings.SESSION_IDLE_TIMEOUT.total_seconds(),
         settings.SESSION_ABSOLUTE_TIMEOUT.total_seconds(),
@@ -76,7 +96,7 @@ class SessionTimeoutMiddleware:
         last = session.get(LAST_ACTIVITY_KEY)
         if not isinstance(started, (int, float)) or not isinstance(last, (int, float)):
             return True
-        idle, absolute = timeouts_for(request.user)
+        idle, absolute = timeouts_for(request.user, session)
         now = time.time()
         if now - last > idle or now - started > absolute or now < started:
             return True

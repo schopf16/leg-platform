@@ -1,9 +1,8 @@
 from django.core.exceptions import ImproperlyConfigured
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from leg_platform.branding import contrast, instance_static_directory, load_branding
-from leg_platform.presentation import colour_mode
 
 
 class BrandingTests(SimpleTestCase):
@@ -20,8 +19,13 @@ class BrandingTests(SimpleTestCase):
             with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
                 instance_static_directory({"INSTANCE_STATIC_DIRECTORY": value})
 
-    def test_default_colours_reach_required_contrast(self):
+    def test_default_colours_are_the_ones_of_the_design_package_and_reach_required_contrast(self):
         branding = load_branding({})
+        self.assertEqual(
+            (branding.accent_light, branding.text_light, branding.accent_dark, branding.text_dark,
+             branding.highlight),
+            ("#005BA2", "#FFFFFF", "#6AA9E0", "#0B1520", "#DDDD22"),
+        )
         self.assertGreaterEqual(contrast(branding.accent_light, branding.text_light), 4.5)
         self.assertGreaterEqual(contrast(branding.accent_dark, branding.text_dark), 4.5)
         self.assertAlmostEqual(contrast("#FFFFFF", "#000000"), 21)
@@ -34,7 +38,7 @@ class BrandingTests(SimpleTestCase):
         for name, value in (
             ("INSTANCE_ACCENT_LIGHT", "red"),
             ("INSTANCE_ACCENT_LIGHT", "#FFFFFF"),
-            ("INSTANCE_ACCENT_TEXT_LIGHT", "#2F6B4F"),
+            ("INSTANCE_ACCENT_TEXT_LIGHT", "#005BA2"),
             ("INSTANCE_ACCENT_DARK", "#000000"),
             ("INSTANCE_HIGHLIGHT", "#1C1917"),
             ("INSTANCE_HIGHLIGHT", "#ffffff;}body{display:none"),
@@ -58,8 +62,8 @@ class BrandingTests(SimpleTestCase):
 
 
 @override_settings(INSTANCE_BRANDING=load_branding({}))
-class PresentationTests(SimpleTestCase):
-    def test_rendered_theme_logos_and_navigation_are_localized(self):
+class PresentationTests(TestCase):
+    def render_base(self, branding=None):
         from django.contrib.auth.models import AnonymousUser
         from django.template.loader import render_to_string
         from django.test import RequestFactory
@@ -68,67 +72,55 @@ class PresentationTests(SimpleTestCase):
 
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        request.COOKIES["colour_mode"] = "dark"
+        with override_settings(INSTANCE_BRANDING=branding or load_branding({})), override("de-ch"):
+            return render_to_string("base.html", instance(request), request=request)
+
+    def test_rendered_page_starts_light_has_both_logos_and_the_corner_buttons(self):
         branding = load_branding({
             "INSTANCE_LOGO_LIGHT": "instance/logo.svg",
             "INSTANCE_LOGO_DARK": "instance/logo-dark.svg",
         })
-        with override_settings(INSTANCE_BRANDING=branding), override("de-ch"):
-            content = render_to_string("base.html", instance(request), request=request)
-        self.assertIn('data-bs-theme="dark"', content)
+        content = self.render_base(branding)
+        # Light by default, whatever the device prefers; the browser script switches it (D-056).
+        self.assertIn('data-theme="light" data-bs-theme="light"', content)
         self.assertIn('class="portal-logo portal-logo-dark"', content)
         self.assertIn("/static/instance/logo-dark.svg", content)
-        self.assertIn("Darstellung", content)
+        # The two corner buttons are on every page and the old select is gone.
+        self.assertIn('id="lang-btn"', content)
+        self.assertIn('id="theme-btn"', content)
+        self.assertIn("Sprache: Deutsch", content)
+        self.assertIn("Darstellung: hell. Zu dunkel wechseln.", content)
+        self.assertNotIn('name="mode"', content)
         self.assertNotIn("Colour mode", content)
         self.assertNotIn("ß", content)
-        # Only the external script of the instance itself (show password), never an inline one.
+        # Only external scripts of the own origin, never an inline one, and no style attribute.
         self.assertNotRegex(content, r"<script(?![^>]*\ssrc=\"/static/)")
         self.assertNotIn("style=", content)
+
+    def test_the_theme_script_is_loaded_in_the_head_without_defer(self):
+        content = self.render_base()
+        head = content.split("</head>")[0]
+        self.assertRegex(head, r'<script src="/static/js/theme-init\.js"></script>')
+        self.assertIn('<script defer src="/static/js/corner-controls.js"></script>', content)
 
     def test_stylesheet_is_self_hosted_css_with_validated_values(self):
         response = self.client.get(reverse("instance_stylesheet"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/css; charset=utf-8")
-        self.assertContains(response, "--tblr-primary:#2F6B4F")
-        self.assertContains(response, '--tblr-btn-color:var(--tblr-primary-fg)')
+        self.assertContains(response, ":root{--accent:#005BA2;--accent-rgb:0, 91, 162;--on-accent:#FFFFFF;--yellow:#DDDD22;}")
+        self.assertContains(response, ':root[data-theme="dark"]{--accent:#6AA9E0;--accent-rgb:106, 169, 224;--on-accent:#0B1520;}')
+        self.assertNotContains(response, "prefers-color-scheme")
 
-    def test_theme_changes_only_with_post_and_allowlisted_values(self):
-        self.assertEqual(self.client.get(reverse("colour_mode")).status_code, 405)
-        with self.assertLogs("leg_platform.presentation", level="WARNING"):
-            self.assertEqual(
-                self.client.post(reverse("colour_mode"), {"mode": "invalid"}).status_code, 400
-            )
-        for mode in ("auto", "light", "dark"):
-            response = self.client.post(reverse("colour_mode"), {"mode": mode, "next": "/login/"})
-            self.assertEqual(response.status_code, 302)
-            self.assertEqual(response["Location"], "/login/")
-            cookie = response.cookies["colour_mode"]
-            self.assertEqual(cookie.value, mode)
-            self.assertTrue(cookie["httponly"])
-            self.assertEqual(cookie["samesite"], "Lax")
-            self.assertEqual(cookie["domain"], "")
+    def test_the_colour_mode_has_no_server_side_endpoint_and_no_cookie(self):
+        # K3 (D-056): nothing about the colour mode or the language goes to the server.
+        from django.urls import NoReverseMatch
+        with self.assertRaises(NoReverseMatch):
+            reverse("colour_mode")
+        self.assertEqual(self.client.post("/appearance/", {"mode": "dark"}).status_code, 404)
+        response = self.client.get(reverse("accounts:login"))
+        self.assertFalse([name for name in response.cookies if "colour" in name or "theme" in name])
 
-    def test_external_redirect_is_rejected(self):
-        for target in ("https://attacker.invalid/", "//attacker.invalid/", "\\\\attacker.invalid/"):
-            with self.subTest(target=target):
-                response = self.client.post(reverse("colour_mode"), {"mode": "dark", "next": target})
-                self.assertEqual(response["Location"], "/")
-
-    def test_csrf_is_required(self):
-        from django.test import Client
-        response = Client(enforce_csrf_checks=True).post(reverse("colour_mode"), {"mode": "dark"})
-        self.assertEqual(response.status_code, 403)
-
-    def test_unknown_cookie_and_query_parameters_cannot_override_mode(self):
-        from django.test import RequestFactory
-        request = RequestFactory().get("/?theme=dark&theme-primary=red")
-        request.COOKIES["colour_mode"] = "invalid"
-        self.assertEqual(colour_mode(request), "auto")
-
-    @override_settings(COLOUR_MODE_COOKIE_NAME="__Host-colour_mode", SESSION_COOKIE_SECURE=True)
-    def test_secure_host_cookie_outside_local(self):
-        response = self.client.post(reverse("colour_mode"), {"mode": "dark"})
-        cookie = response.cookies["__Host-colour_mode"]
-        self.assertTrue(cookie["secure"])
-        self.assertEqual(cookie["path"], "/")
-        self.assertEqual(cookie["domain"], "")
+    def test_query_parameters_cannot_set_the_theme_or_the_branding(self):
+        response = self.client.get(reverse("accounts:login") + "?theme=dark&theme-primary=red")
+        self.assertContains(response, 'data-theme="light" data-bs-theme="light"')
+        self.assertNotContains(response, "theme-primary")

@@ -33,6 +33,7 @@ from leg_platform.accounts import (
     second_factor,
     second_factor_reset,
     security_log,
+    session_timeout,
     totp,
 )
 from leg_platform.accounts.forms import (
@@ -120,10 +121,15 @@ class PortalLoginView(NeverCacheMixin, LoginView):
 
     def form_valid(self, form):
         user = form.get_user()
+        # The wish is written before login() and read by the session signal (D-056); it is
+        # never taken from the client after that.
+        wish = form.cleaned_data.get("remember_me") is True
         if not second_factor.has_second_factor(user):
+            self.request.session[session_timeout.STAY_REQUESTED_KEY] = wish
             return super().form_valid(form)
         # No login() yet: that follows the second factor (D-017).
         second_factor.begin_pending_login(self.request, user, self.get_redirect_url())
+        self.request.session[session_timeout.STAY_REQUESTED_KEY] = wish
         return redirect("accounts:login_second_factor")
 
 

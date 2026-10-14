@@ -91,7 +91,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 * [ ] Logo, accent colours and the optional highlight colour come from the instance configuration; without instance values, the platform defaults apply.
 * [ ] The colour pairs in `docs/DESIGN.md`, section 3.6, are used as specified; colour values configured for an instance are checked for the required contrast, and the check is documented.
 * [ ] Status is never shown by colour alone.
-* [ ] Light and dark mode work; the default follows the device setting and can be switched; the negative logo is used in dark mode.
+* [ ] Light and dark mode work only through the button in the top right corner (default: light, also when the device prefers dark; no automatic mode, D-056); the choice is kept for the tab only; the negative logo is used in dark mode.
 * [ ] A print stylesheet hides navigation and controls.
 * [ ] Fonts and icons are served by the instance itself; licence texts of the fonts are included.
 * [ ] Keyboard operation and a visible focus indicator work on all phase 1 pages.

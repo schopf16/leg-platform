@@ -48,7 +48,6 @@ INSTANCE_BASE_URL = ENVIRONMENT.instance_base_url
 INSTANCE_PRIVACY_URL = ENVIRONMENT.instance_privacy_url
 INSTANCE_WEBSITE_URL = ENVIRONMENT.instance_website_url
 INSTANCE_BRANDING = load_branding(os.environ)
-COLOUR_MODE_COOKIE_NAME = "colour_mode" if APP_ENV == "local" else "__Host-colour_mode"
 
 # Application definition
 
@@ -245,6 +244,12 @@ SESSION_ABSOLUTE_TIMEOUT = timedelta(hours=8)
 SESSION_PRIVILEGED_IDLE_TIMEOUT = timedelta(minutes=15)
 SESSION_PRIVILEGED_ABSOLUTE_TIMEOUT = timedelta(hours=4)
 SESSION_COOKIE_AGE = int(SESSION_ABSOLUTE_TIMEOUT.total_seconds())
+# "Stay signed in" (D-056, owner decision of 2026-10-14; team lead decision K21): a person who
+# ticks the box at login gets a persistent session that ends after this time. It does not slide
+# (the idle and the absolute timeout are both this long) and it is ignored for staff users and
+# system administrators, whose shorter timeouts above stay in force. The value is subject to
+# the security review.
+STAY_SIGNED_IN_DURATION = timedelta(days=14)
 # No JavaScript reads the CSRF cookie. Django's documentation states that HttpOnly offers
 # little practical protection for this cookie; it is set because docs/SECURITY.md (section 3)
 # requires HttpOnly where possible. Scripts that need the token must read it from the form

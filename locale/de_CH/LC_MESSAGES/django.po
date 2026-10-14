@@ -17,21 +17,6 @@ msgstr ""
 msgid "Swiss German"
 msgstr "Schweizerdeutsch"
 
-msgid "Colour mode"
-msgstr "Darstellung"
-
-msgid "Device setting"
-msgstr "Geräteeinstellung"
-
-msgid "Light"
-msgstr "Hell"
-
-msgid "Dark"
-msgstr "Dunkel"
-
-msgid "Apply"
-msgstr "Übernehmen"
-
 msgid "Menu"
 msgstr "Menü"
 
@@ -41,8 +26,80 @@ msgstr "Kontonavigation"
 msgid "Main navigation"
 msgstr "Hauptnavigation"
 
-msgid "Choose a valid colour mode."
-msgstr "Wählen Sie eine gültige Darstellung."
+# Corner buttons: language menu and light/dark button (D-056)
+msgid "Language"
+msgstr "Sprache"
+
+msgid "Language: German"
+msgstr "Sprache: Deutsch"
+
+msgid "Display: light. Switch to dark."
+msgstr "Darstellung: hell. Zu dunkel wechseln."
+
+msgid "Display: dark. Switch to light."
+msgstr "Darstellung: dunkel. Zu hell wechseln."
+
+# Entry shell: panel texts of the login and of the registration (LEG-Design-Vorgaben)
+msgid "Welcome to the LEG portal"
+msgstr "Willkommen im Portal der LEG"
+
+msgid "Solar power from the neighbourhood"
+msgstr "Solarstrom aus der Nachbarschaft"
+
+msgid "Produced locally, shared together"
+msgstr "Lokal erzeugt, gemeinsam genutzt"
+
+msgid "Stay signed in"
+msgstr "Angemeldet bleiben"
+
+msgid "Legal notice"
+msgstr "Impressum"
+
+msgid "Create account"
+msgstr "Konto erstellen"
+
+msgid "First we confirm your email address. After that you fill in the remaining details."
+msgstr "Zuerst bestätigen wir Ihre E-Mail-Adresse. Danach füllen Sie die restlichen Angaben aus."
+
+msgid "First we confirm your email address. After that you set your password and add your details."
+msgstr "Zuerst bestätigen wir Ihre E-Mail-Adresse. Danach legen Sie Ihr Passwort fest und ergänzen Ihre Angaben."
+
+msgid "One login for all sites"
+msgstr "Eine Anmeldung für alle Standorte"
+
+msgid "Invoices and messages available at any time"
+msgstr "Rechnungen und Mitteilungen jederzeit abrufbar"
+
+# Portal settings in the administration (D-056)
+msgid "portal settings"
+msgstr "Portal-Einstellungen"
+
+msgid "address of the privacy notice"
+msgstr "Adresse der Datenschutzerklärung"
+
+msgid "address of the legal notice"
+msgstr "Adresse des Impressums"
+
+msgid "Linked in the footer, at the registration and when deleting the account. Leave empty to show the text without a link."
+msgstr "Wird in der Fusszeile, bei der Registrierung und beim Löschen des Kontos verlinkt. Leer lassen: Text ohne Link."
+
+msgid "Linked in the footer. Leave empty to show the text without a link."
+msgstr "Wird in der Fusszeile verlinkt. Leer lassen: Text ohne Link."
+
+msgid "Enter a complete address that starts with https://."
+msgstr "Bitte geben Sie eine vollständige Adresse mit https:// ein."
+
+msgid "The texts are maintained on your website. Enter only the addresses here."
+msgstr "Die Texte pflegen Sie auf Ihrer Website. Hier tragen Sie nur die Adressen ein."
+
+msgid "preview of the privacy notice"
+msgstr "Vorschau der Datenschutzerklärung"
+
+msgid "preview of the legal notice"
+msgstr "Vorschau des Impressums"
+
+msgid "Open page"
+msgstr "Seite öffnen"
 
 msgid "Address count"
 msgstr "Anzahl Adressen"
@@ -944,19 +1001,12 @@ msgstr "Abmelden"
 msgid "Privacy notice"
 msgstr "Datenschutz"
 
-msgid "To the website"
-msgstr "Zur Website"
-
 msgid "optional"
 msgstr "freiwillig"
 
 #: leg_platform/accounts/templates/accounts/login.html
 msgid "Log in"
 msgstr "Anmelden"
-
-#, python-format
-msgid "Welcome to %(instance_name)s"
-msgstr "Willkommen bei %(instance_name)s"
 
 msgid "No account yet?"
 msgstr "Noch kein Konto?"

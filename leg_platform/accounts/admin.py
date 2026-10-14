@@ -10,7 +10,7 @@ from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -42,6 +42,7 @@ from leg_platform.accounts.models import (
     EmailTextVersion,
     GraphConfiguration,
     IssuedCustomerNumber,
+    PortalSettings,
     SecurityEvent,
     User,
     customer_numbers_nearly_exhausted,
@@ -1218,11 +1219,88 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
             )
 
 
+class PortalSettingsAdmin(admin.ModelAdmin):
+    """The addresses of the privacy notice and the legal notice (D-056).
+
+    Only system administrators see and change them: the addresses are shown as links to every
+    visitor of the portal. No row can be added or deleted. A change is recorded in the history
+    of the administration.
+    """
+
+    fieldsets = (
+        (
+            None,
+            {
+                "description": _(
+                    "The texts are maintained on your website. Enter only the addresses here."
+                ),
+                "fields": ("privacy_url", "privacy_preview", "imprint_url", "imprint_preview"),
+            },
+        ),
+    )
+    readonly_fields = ("privacy_preview", "imprint_preview")
+    # The own preview link below opens a new tab; the standard "Currently" link of the widget is
+    # not needed.
+    formfield_overrides = {models.URLField: {"widget": forms.URLInput(attrs={"size": 60})}}
+
+    @staticmethod
+    def _preview(address):
+        if not address:
+            return "-"
+        # The address passed the https check when it was saved; format_html escapes it anyway.
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>',
+            address,
+            gettext("Open page"),
+        )
+
+    @admin.display(description=_("preview of the privacy notice"))
+    def privacy_preview(self, obj):
+        return self._preview(obj.privacy_url)
+
+    @admin.display(description=_("preview of the legal notice"))
+    def imprint_preview(self, obj):
+        return self._preview(obj.imprint_url)
+
+    @staticmethod
+    def _change_url():
+        return reverse("admin:accounts_portalsettings_change", args=(1,))
+
+    def get_object(self, request, object_id, from_field=None):
+        if str(object_id) != "1":
+            return None
+        # Checked before load(), because load() creates the row when it does not exist yet.
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
+        return PortalSettings.load()
+
+    def changelist_view(self, request, extra_context=None):
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
+        return HttpResponseRedirect(self._change_url())
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 admin.site.unregister(Group)
 admin.site.register(Group, RestrictedGroupAdmin)
 admin.site.register(User, UserAdmin)
 admin.site.register(EmailText, EmailTextAdmin)
 admin.site.register(SecurityEvent, SecurityEventAdmin)
 admin.site.register(GraphConfiguration, GraphConfigurationAdmin)
+admin.site.register(PortalSettings, PortalSettingsAdmin)
 admin.site.register(AccessAttempt, ReadOnlyAxesAdmin)
 admin.site.register(AccessFailureLog, ReadOnlyAxesFailureAdmin)

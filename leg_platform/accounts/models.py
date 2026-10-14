@@ -31,7 +31,7 @@ import unicodedata
 from base64 import b32encode
 from contextlib import contextmanager
 from datetime import timedelta
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 import idna
 import phonenumbers
@@ -1448,6 +1448,81 @@ class GraphConfiguration(models.Model):
             )
             self.save(update_fields=["encrypted_private_key"])
         return pem
+
+
+def validate_https_address(value):
+    """Accept only a complete https:// address without credentials (D-056).
+
+    The addresses of the privacy notice and the legal notice are shown to every visitor as links,
+    so a ``javascript:`` or ``http://`` address, an address with credentials and an address with
+    white space or control characters are refused (docs/SECURITY.md, section 6).
+    """
+    parts = urlsplit(value)
+    try:
+        parts.port
+    except ValueError:
+        parts = None
+    if (
+        parts is None
+        or parts.scheme != "https"
+        or not parts.hostname
+        or parts.username is not None
+        or parts.password is not None
+        or any(character.isspace() or ord(character) < 32 for character in value)
+    ):
+        raise ValidationError(
+            _("Enter a complete address that starts with https://."), code="https_required"
+        )
+
+
+class PortalSettings(models.Model):
+    """The portal settings that the administrator maintains. The table holds exactly one row (id 1).
+
+    The privacy notice and the legal notice are texts of the owner of the instance, maintained on
+    their own website; the portal only links to them (LEG-Design-Vorgaben/legal/VORGABEN.md,
+    section 8; D-056).
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    privacy_url = models.URLField(
+        _("address of the privacy notice"),
+        max_length=500,
+        blank=True,
+        validators=[validate_https_address],
+        help_text=_(
+            "Linked in the footer, at the registration and when deleting the account. "
+            "Leave empty to show the text without a link."
+        ),
+    )
+    imprint_url = models.URLField(
+        _("address of the legal notice"),
+        max_length=500,
+        blank=True,
+        validators=[validate_https_address],
+        help_text=_(
+            "Linked in the footer. Leave empty to show the text without a link."
+        ),
+    )
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        verbose_name = _("portal settings")
+        verbose_name_plural = _("portal settings")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(id=1), name="accounts_portal_settings_singleton"
+            )
+        ]
+
+    def __str__(self):
+        return str(self._meta.verbose_name)
+
+    @classmethod
+    def load(cls):
+        settings_row, _created = cls.objects.get_or_create(id=1)
+        return settings_row
+
 
 
 # Second factor (D-040). The devices follow the interface of django-otp (``Device``), so that its

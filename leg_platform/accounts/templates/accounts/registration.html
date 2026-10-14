@@ -1,19 +1,15 @@
-{% extends "base.html" %}
+{% extends "entry_base.html" %}
 {% load i18n %}
 {% block title %}{% translate "Register" %}{% endblock %}
-{% block content %}
-  <div class="card card-md">
-    <div class="card-body">
-      <h1 class="h2 mb-3">{% translate "Register" %}</h1>
-      <p>{% translate "Enter your email address. We will send you a link to complete your registration." %}</p>
-      <form method="post" novalidate>
-        {% csrf_token %}
-        {% include "accounts/_form_fields.html" %}
-        <button type="submit" class="btn btn-primary w-100">{% translate "Register" %}</button>
-      </form>
-    </div>
-  </div>
-  <div class="text-center mt-3">
-    {% translate "Already registered?" %} <a href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
-  </div>
+{% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
+{% block form %}
+  <h1>{% translate "Register" %}</h1>
+  <p>{% translate "Enter your email address. We will send you a link to complete your registration." %}</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "accounts/_form_fields.html" %}
+    <button type="submit" class="btn btn-primary">{% translate "Register" %}</button>
+  </form>
+  <p class="entry-divider">{% translate "Already registered?" %}</p>
+  <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
 {% endblock %}

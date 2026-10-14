@@ -24,10 +24,9 @@ deployment; serve static files with a restrictive CSP. Run Django's `collectstat
 the instance's configured static directories before serving the files. A missing file is
 an operator error; the startup path validation does not prove that the file exists.
 
-Colour mode defaults to the device setting. The user can select light, dark or automatic
-mode without JavaScript. The preference cookie contains no account data and can be deleted
-to restore the device setting. Print output hides navigation and interactive controls and
-shows the instance name and date.
+Colour mode and language (D-056): the pages start light and German. The person switches with the two buttons in the top right corner; there is no automatic mode that follows the device setting. The choice is kept only in the `sessionStorage` of the browser tab (no cookie, nothing is sent to the server), so a new tab starts light and German again. The buttons need JavaScript; without it they are hidden. Print output hides navigation, the corner buttons and interactive controls and shows the instance name and date.
+
+The platform defaults of the colours are the values of the design package of the owner (accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22`; D-056); an instance replaces them with the variables above. The addresses of the privacy notice and the legal notice in the footer are maintained by the system administrator in the administration ("Portal-Einstellungen"); the privacy address falls back to `INSTANCE_PRIVACY_URL` while the setting is empty. The footer also shows the host of `INSTANCE_WEBSITE_URL` as a link.
 
 Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, Safari 17.5
 or newer, and Opera 109 or newer. Devices that cannot update to these versions are not

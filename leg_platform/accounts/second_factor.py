@@ -53,14 +53,13 @@ UNRESTRICTED_VIEWS = frozenset(
         "accounts:two_factor_qr",
         # Public endpoints used before authentication; they do not expose account data.
         "instance_stylesheet",
-        "colour_mode",
         "addresses:lookup",
     }
 )
 # The same for an account that must replace its password first (D-005, D-041). The branding
-# stylesheet and the colour mode are presentation only, so that the page is rendered correctly.
+# stylesheet is presentation only, so that the page is rendered correctly.
 PASSWORD_CHANGE_VIEWS = frozenset(
-    {"accounts:logout", "accounts:password_change", "instance_stylesheet", "colour_mode"}
+    {"accounts:logout", "accounts:password_change", "instance_stylesheet"}
 )
 
 

@@ -1,30 +1,27 @@
-{% extends "base.html" %}
+{% extends "entry_base.html" %}
 {% load i18n static %}
 {% block title %}{% translate "Complete your registration" %}{% endblock %}
-{% block content %}
-  <div class="card card-md">
-    <div class="card-body">
-      <h1 class="h2 mb-3">{% translate "Complete your registration" %}</h1>
-      {% include "accounts/_error_summary.html" %}
-      <p>{% translate "Enter your data and choose a password." %}</p>
-      <p>{% translate "Fields marked optional may stay empty. All other fields are required." %}</p>
-      <p>{% translate "Your data is used to identify you and, later, to send invoices by post or email." %}
-        {% if instance_privacy_url %}
-          <a href="{{ instance_privacy_url }}" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>
-        {% endif %}
-      </p>
-      <dl class="mb-3">
-        <dt>{% translate "Email address" %}</dt>
-        <dd>{{ account_email }}</dd>
-      </dl>
-      <form method="post" novalidate>
-        {% csrf_token %}
-        <input type="hidden" name="registration" value="{{ registration_ref }}">
-        {% include "accounts/_profile_fields.html" %}
-        <button type="submit" class="btn btn-primary w-100">{% translate "Activate account" %}</button>
-      </form>
-    </div>
-  </div>
+{% block panel %}{% include "accounts/_panel_register.html" with password_step=True %}{% endblock %}
+{% block form %}
+  <h1>{% translate "Complete your registration" %}</h1>
+  {% include "accounts/_error_summary.html" %}
+  <p>{% translate "Enter your data and choose a password." %}</p>
+  <p>{% translate "Fields marked optional may stay empty. All other fields are required." %}</p>
+  <p>{% translate "Your data is used to identify you and, later, to send invoices by post or email." %}
+    {% if instance_privacy_url %}
+      <a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>
+    {% endif %}
+  </p>
+  <dl class="mb-3">
+    <dt>{% translate "Email address" %}</dt>
+    <dd>{{ account_email }}</dd>
+  </dl>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="registration" value="{{ registration_ref }}">
+    {% include "accounts/_profile_fields.html" %}
+    <button type="submit" class="btn btn-primary">{% translate "Activate account" %}</button>
+  </form>
 {% endblock %}
 {% block scripts %}
   {{ block.super }}

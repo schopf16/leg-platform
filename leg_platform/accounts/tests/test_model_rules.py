@@ -168,6 +168,7 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "accounts.EmailText",
                 "accounts.SecurityEvent",
                 "accounts.GraphConfiguration",
+                "accounts.PortalSettings",
                 "axes.AccessAttempt",
                 "axes.AccessFailureLog",
                 "addresses.ImportRequest",

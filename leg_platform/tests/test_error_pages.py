@@ -17,7 +17,8 @@ SECRET_PATH = "/secret-looking-path-17/"
 def assert_no_inline_code(case, html):
     case.assertNotIn("<style", html.lower())
     case.assertNotRegex(html, r"(?i)\sstyle\s*=")
-    case.assertNotRegex(html.lower(), r"<script")
+    # Scripts only as files of the own origin (the corner buttons, D-056), never inline.
+    case.assertNotRegex(html, r"(?i)<script(?![^>]*\ssrc=\"/static/)")
     case.assertNotRegex(html, r"(?i)\son[a-z]+\s*=")
     case.assertNotIn("javascript:", html.lower())
 

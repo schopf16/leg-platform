@@ -16,6 +16,7 @@ from django.utils.translation import gettext
 
 from leg_platform.accounts import email_texts
 from leg_platform.accounts.models import EmailText
+from leg_platform.accounts.portal_settings import legal_links
 
 Key = EmailText.Key
 
@@ -32,7 +33,7 @@ def _values(specific):
     return {
         "instance_name": settings.INSTANCE_NAME,
         "contact_url": settings.INSTANCE_WEBSITE_URL or "",
-        "privacy_url": settings.INSTANCE_PRIVACY_URL or "",
+        "privacy_url": legal_links().privacy_url or "",
         "login_url": absolute_url(reverse("accounts:login")),
         **specific,
     }

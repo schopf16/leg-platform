@@ -68,6 +68,7 @@ The application reads its configuration only from environment variables (`leg_pl
 | `EMAIL_MODE` | not set; the default `console` applies | Emails are written to the standard output of the process that sends them, which is the mail worker (section 6). Never use `allowlist` or `graph` locally unless the project owner provides a dedicated development registration (D-028). |
 | `DJANGO_ALLOWED_HOSTS` | set per process in the start block (section 5) | `127.0.0.1,localhost`. Django refuses to start `runserver` with debug off and no allowed hosts. Do not set it as a permanent user variable. |
 | `INSTANCE_BASE_URL` | not set; the default `http://127.0.0.1:8000` applies | Base of all links in emails. Only if you use another port, set `http://127.0.0.1:<port>` for the server and the worker (its host must be in `DJANGO_ALLOWED_HOSTS`). |
+| `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, in the start block of section 6 | The local instance presentation of the design package (D-056): the name "LEG-Portal", the website `https://leg-ittigen.ch` (the third item of the footer row), the directory `$HOME\.leg-platform-dev\instance-static` that holds the two logo files unchanged in its sub-folder `instance` (copied from `LEG-Design-Vorgaben\logo\`: `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`; they contain no script and no external reference), and their relative paths `instance/LEG-Ittigen_pos_rgb.svg` and `instance/LEG-Ittigen_neg_sw.svg`. Without them the pages show the instance name as text instead of the logo. These are public values and no secrets. |
 | `DJANGO_DEBUG` | not set (False) | `True` is allowed only with `APP_ENV=local`. Not needed: production-like error handling and the full Content Security Policy are the better basis for a design review. |
 | `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` | optional, per process | Path of the SQLite file of section 10. Default: `$HOME\.leg-platform-local-address-directory.sqlite3`. |
 
@@ -104,7 +105,7 @@ Stage and production use `leg_platform.import_settings` for the same purpose (`d
 
 Registration, password reset and email change **only queue** an email (D-038). The mail worker takes the job, issues the link and sends it. Without the worker, no verification or reset email is ever produced (symptom: the "email sent" page appears and nothing arrives). With `EMAIL_MODE=console`, the email is printed to the **standard output of the worker**, so the worker's output must be captured to a file that you can read.
 
-Start both with one block. It refuses to start if port 8000 is taken (it never kills anything), writes logs and process IDs to `$HOME\.leg-platform-dev\` and sets the variables for both child processes:
+Start both with one block. It refuses to start if port 8000 is taken (it never kills anything), writes logs and process IDs to `$HOME\.leg-platform-dev\` and sets the variables for both child processes. The logo files must exist once in `$HOME\.leg-platform-dev\instance-static\instance\` (one-time copy, no overwrite of other content: `New-Item -ItemType Directory -Force "$HOME\.leg-platform-dev\instance-static\instance"; Copy-Item <path of LEG-Design-Vorgaben>\logo\*.svg "$HOME\.leg-platform-dev\instance-static\instance"`); without them the pages show the name as text:
 
 ```powershell
 $Repo = (Get-Location).Path
@@ -120,6 +121,15 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
 } else {
     $env:DJANGO_ALLOWED_HOSTS = '127.0.0.1,localhost'
     if ($Port -ne 8000) { $env:INSTANCE_BASE_URL = "http://127.0.0.1:$Port" }
+    # Local instance presentation (section 4): name, website and the two logo files of the design package.
+    $env:INSTANCE_NAME = 'LEG-Portal'
+    $env:INSTANCE_WEBSITE_URL = 'https://leg-ittigen.ch'
+    $instanceStatic = Join-Path $State 'instance-static'
+    if (Test-Path "$instanceStatic\instance\LEG-Ittigen_pos_rgb.svg") {
+        $env:INSTANCE_STATIC_DIRECTORY = $instanceStatic
+        $env:INSTANCE_LOGO_LIGHT = 'instance/LEG-Ittigen_pos_rgb.svg'
+        $env:INSTANCE_LOGO_DARK = 'instance/LEG-Ittigen_neg_sw.svg'
+    }
     $python = Join-Path $Repo '.venv\Scripts\python.exe'
 
     $server = Start-Process -FilePath $python -WorkingDirectory $Repo -WindowStyle Hidden -PassThru `

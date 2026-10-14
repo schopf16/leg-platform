@@ -25,54 +25,100 @@
   font-display: swap;
 }
 
+/* Design tokens of the design language (docs/DESIGN.md, section 3; LEG-Design-Vorgaben/login/
+   VORGABEN.md, section 6). The light values are the default. The dark values apply only when
+   the person chooses dark with the button (data-theme="dark" on <html>, set by
+   static/js/theme-init.js); there is no automatic mode and no prefers-color-scheme rule
+   (docs/DECISIONS.md, D-056). instance.css replaces --accent, --accent-rgb, --on-accent and
+   --yellow with the values of the instance. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --bg: #f6f7f8;
+  --panel: #ffffff;
+  --fg: #1b1d20;
+  --muted: #5a6068;
+  --line: #dee2e7;
+  --accent: #005ba2;
+  --accent-rgb: 0, 91, 162;
+  --on-accent: #ffffff;
+  --yellow: #dddd22;
+  --bad: #b42318;
+  --bad-rgb: 180, 35, 24;
+  --ok: #2f8f5b;
+  /* Status "open" and "not set up". Text on --panel: 5.9:1 (light), 8.9:1 (dark). */
+  --warn: #8a5a00;
+  --warm: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --logo-plate: transparent;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111315;
+  --panel: #191c1f;
+  --fg: #e6e9ec;
+  --muted: #9aa2ab;
+  --line: #2a2f35;
+  --accent: #6aa9e0;
+  --accent-rgb: 106, 169, 224;
+  --on-accent: #0b1520;
+  --bad: #f0948a;
+  --bad-rgb: 240, 148, 138;
+  --ok: #5dbb86;
+  --warn: #e8b34a;
+  --logo-plate: color-mix(in srgb, var(--fg) 8%, var(--warm));
+}
+
+:root {
   --tblr-font-sans-serif: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --tblr-font-monospace: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --portal-font-display: "Bricolage Grotesque", "Source Sans 3", system-ui, sans-serif;
-  --tblr-primary: #2f6b4f;
-  --tblr-primary-rgb: 47, 107, 79;
-  --tblr-primary-fg: #ffffff;
-  --tblr-body-bg: light-dark(#f5f5f4, #0c0a09);
-  --tblr-body-color: light-dark(#1c1917, #f5f5f4);
-  --tblr-bg-surface: light-dark(#ffffff, #1c1917);
-  --tblr-secondary-color: light-dark(#57534e, #a8a29e);
-  --tblr-border-color: light-dark(#e7e5e4, #44403c);
-  --tblr-danger: light-dark(#b42318, #f0948a);
-  --tblr-danger-rgb: 180, 35, 24;
-  /* Light tint of the accent for the "Warm" areas (docs/DESIGN.md, section 2). */
-  --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, var(--portal-surface));
-  --portal-surface: light-dark(#ffffff, #1c1917);
-  --portal-field-border: light-dark(#78716c, #8a817b);
+  /* The variables of Tabler follow the tokens. */
+  --tblr-primary: var(--accent);
+  --tblr-primary-rgb: var(--accent-rgb);
+  --tblr-primary-fg: var(--on-accent);
+  --tblr-link-color: var(--accent);
+  --tblr-link-hover-color: var(--accent);
+  --tblr-link-color-rgb: var(--accent-rgb);
+  --tblr-link-hover-color-rgb: var(--accent-rgb);
+  --tblr-focus-ring-color: var(--accent);
+  --tblr-body-bg: var(--bg);
+  --tblr-body-color: var(--fg);
+  --tblr-bg-surface: var(--panel);
+  --tblr-secondary-color: var(--muted);
+  --tblr-border-color: var(--line);
+  --tblr-danger: var(--bad);
+  --tblr-danger-rgb: var(--bad-rgb);
+  /* Light tint of the accent for the "warm" areas. */
+  --portal-tint: var(--warm);
+  --portal-surface: var(--panel);
+  --portal-field-border: var(--muted);
   /* Alerts (docs/DESIGN.md, D-054): the text token on a tint, a 4 px border and an icon in the
-     colour of the meaning. Success and warning use the energy colours of section 3.4. The tint of
-     the information alert follows the accent. Contrast ratios: see D-054. */
-  --portal-alert-success-bg: light-dark(#e8f3ec, #1a2b21);
-  --portal-alert-success-accent: light-dark(#2f8f5b, #5dbb86);
-  --portal-alert-warning-bg: light-dark(#fdf3e0, #2e2512);
-  --portal-alert-warning-accent: light-dark(#b7791f, #e8b34a);
-  --portal-alert-info-bg: light-dark(
-    color-mix(in srgb, var(--tblr-primary) 12%, #ffffff),
-    color-mix(in srgb, var(--tblr-primary) 14%, #1c1917)
-  );
-  --portal-alert-info-accent: var(--tblr-primary);
-  --portal-alert-danger-bg: light-dark(#fbecea, #33201e);
-  --portal-alert-danger-accent: light-dark(#b42318, #f0948a);
+     colour of the meaning. The tint of the information alert follows the accent. */
+  --portal-alert-success-bg: color-mix(in srgb, var(--ok) 12%, var(--panel));
+  --portal-alert-success-accent: var(--ok);
+  --portal-alert-warning-bg: color-mix(in srgb, var(--warn) 12%, var(--panel));
+  --portal-alert-warning-accent: var(--warn);
+  --portal-alert-info-bg: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  --portal-alert-info-accent: var(--accent);
+  --portal-alert-danger-bg: color-mix(in srgb, var(--bad) 10%, var(--panel));
+  --portal-alert-danger-accent: var(--bad);
 }
 
-:root[data-bs-theme="light"] { color-scheme: light; }
-:root[data-bs-theme="dark"] {
-  color-scheme: dark;
-  --tblr-danger-rgb: 240, 148, 138;
+.btn-primary {
+  --tblr-btn-bg: var(--accent);
+  --tblr-btn-border-color: var(--accent);
+  --tblr-btn-color: var(--on-accent);
+  --tblr-btn-hover-bg: var(--accent);
+  --tblr-btn-hover-border-color: var(--accent);
+  --tblr-btn-hover-color: var(--on-accent);
+  --tblr-btn-active-bg: var(--accent);
+  --tblr-btn-active-border-color: var(--accent);
+  --tblr-btn-active-color: var(--on-accent);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-bs-theme="light"]) {
-    --tblr-primary: #74c59a;
-    --tblr-primary-rgb: 116, 197, 154;
-    --tblr-primary-fg: #0c0a09;
-    --tblr-danger-rgb: 240, 148, 138;
-  }
+body {
+  background: var(--bg);
+  color: var(--fg);
 }
 
 /* Register "Clear" (docs/DESIGN.md, section 2): 16 px text, controls at least 48 px high,
@@ -119,15 +165,23 @@
   font-size: 1rem;
 }
 
-.login-card h2 {
-  font-size: 1.5rem;
-}
-
 .register-clear .form-control,
 .register-clear .form-select {
   min-height: 3rem;
-  border-color: var(--portal-field-border);
-  border-radius: 6px;
+  padding: 0.75rem 0.875rem;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background-color: var(--panel);
+  color: var(--fg);
+}
+
+/* A field in focus: border in the accent and a ring of 30 % accent (login/VORGABEN.md, 4). */
+.register-clear .form-control:focus,
+.register-clear .form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  background-color: var(--panel);
+  color: var(--fg);
 }
 
 .register-clear .form-select {
@@ -149,34 +203,30 @@
   margin-inline-end: 0.5rem;
 }
 
+/* Cards and tiles: 12 px radius, a line instead of a shadow. */
 .register-clear .card {
-  border-radius: 6px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
-/* The second action next to a primary one: outlined, same height. */
+/* The second action next to a primary one: transparent, a 1.5 px border in the muted colour. */
 .btn-secondary-action {
-  background: var(--portal-surface);
-  border: 1px solid var(--portal-field-border);
-  color: var(--tblr-body-color);
+  background: transparent;
+  border: 1.5px solid var(--muted);
+  color: var(--fg);
 }
 
-.btn-secondary-action:hover {
-  background: var(--portal-tint);
-  color: var(--tblr-body-color);
-}
-
-/* Register "Warm": a display typeface for headings. */
-.register-warm h1,
-.portal-brand {
-  font-family: var(--portal-font-display);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.btn-secondary-action:hover,
+.btn-secondary-action:focus-visible {
+  background: var(--warm);
+  border-color: var(--muted);
+  color: var(--fg);
 }
 
 .portal-brand {
   font-size: 1.25rem;
-  color: var(--tblr-body-color);
+  font-weight: 700;
+  color: var(--fg);
   text-decoration: none;
 }
 
@@ -192,69 +242,276 @@
   align-items: center;
 }
 
-/* Identifiers such as the customer number are set in the monospace typeface. */
-.identifier {
-  font-family: var(--tblr-font-monospace);
+/* The corner buttons are fixed in the top right corner; until the frame of the signed-in pages
+   has its own place for them (docs/DESIGN.md, section 6), the header leaves room. */
+.portal-header .container-xl {
+  padding-inline-end: 7.5rem;
 }
 
-/* Login page: a short welcome area on the left, the form on the right (docs/DESIGN.md,
-   section 6). On narrow screens the areas are stacked. */
-.login-split {
+/* ---- Entry shell (entry_base.html): login, registration, password reset, lockout ----
+   Desktop: two equal columns. Left the warm panel, right the form on the page background.
+   Phone (760 px and below): the panel shrinks to a top bar with the logo; the text is hidden
+   (LEG-Design-Vorgaben/login/VORGABEN.md, sections 2 to 4a). Spacing from 4, 8, 12, 16, 24,
+   32 and 48 px; no shadows, no gradients. */
+.entry-split {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
 }
 
-.login-welcome {
-  background: var(--portal-tint);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1.5rem;
-  padding: 2rem 1.5rem;
-  border-bottom: 0.5rem solid var(--portal-highlight, transparent);
+.entry-warm {
+  background: var(--warm);
+  padding: 48px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 24px;
+  border-right: 1px solid var(--line);
+  min-width: 0;
 }
 
-.login-welcome h1 {
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.1;
+.entry-warm p {
   margin: 0;
 }
 
-.login-welcome p {
-  color: var(--tblr-secondary-color);
-  font-size: 1.125rem;
-  margin: 0;
-  max-width: 28rem;
+.entry-title {
+  font-family: var(--portal-font-display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  max-width: 14ch;
+  text-wrap: balance;
+  color: var(--fg);
 }
 
-.login-form-area {
+.entry-lead {
+  font-size: 18px;
+  color: var(--muted);
+  max-width: 40ch;
+}
+
+.entry-benefits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  font-size: 16px;
+}
+
+.entry-benefits li {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  gap: 12px;
   align-items: center;
-  padding: 2rem 1.5rem;
-  gap: 1rem;
 }
 
-.login-form-area .login-card {
+/* The yellow dot never carries text or an icon. */
+.entry-benefits li::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px var(--warm);
+}
+
+.logo-plate {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--logo-plate);
+}
+
+.entry-warm .portal-logo {
+  width: 360px;
+  max-width: 100%;
+  max-height: none;
+  height: auto;
+}
+
+/* Only the logo of the colour mode is shown (the plate is the dark-mode background). */
+.entry-warm .portal-logo-light { display: block; }
+:root[data-theme="dark"] .entry-warm .portal-logo-light { display: none; }
+:root[data-theme="dark"] .entry-warm .portal-logo-dark { display: block; }
+
+.entry-warm .logo-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.entry-form {
+  min-width: 0;
+  padding: 48px 56px;
+  display: grid;
+  align-content: center;
+}
+
+.entry-card {
   width: 100%;
-  max-width: 28rem;
+  max-width: 400px;
+  margin-inline: auto;
+  display: grid;
+  gap: 20px;
 }
 
-.login-links {
+.entry-card > * {
+  min-width: 0;
+}
+
+.entry-card h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.entry-card p {
+  margin: 0;
+}
+
+.entry-card .mb-3,
+.entry-card .mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.entry-card form {
+  display: grid;
+  gap: 20px;
+}
+
+.entry-field {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-field .form-label,
+.entry-field-row .form-label {
+  margin: 0;
+}
+
+.entry-field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.entry-field-row a {
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.entry-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.entry-check-input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.entry-card .btn {
   width: 100%;
-  max-width: 28rem;
+  min-height: 48px;
 }
 
-@media (min-width: 768px) {
-  .login-split {
-    grid-template-columns: 1fr 1fr;
+.entry-divider {
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Footer row: three items spread over the width. Underlined only on hover. */
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.legal-links a {
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.legal-links a:hover {
+  text-decoration: underline;
+}
+
+.footer .legal-links {
+  justify-content: center;
+  gap: 8px 24px;
+}
+
+@media (max-width: 760px) {
+  .entry-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
-  .login-welcome {
-    padding: 4rem;
+  .entry-warm {
+    display: flex;
+    align-items: center;
+    min-height: 64px;
+    padding: 12px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
+
+  .entry-title,
+  .entry-lead,
+  .entry-benefits {
+    display: none;
+  }
+
+  .entry-warm .portal-logo {
+    width: auto;
+    height: 40px;
+  }
+
+  /* Room for the corner buttons that sit in the top bar. */
+  .entry-warm .logo-plate {
+    max-width: calc(100% - 112px);
+  }
+
+  .entry-form {
+    padding: 24px 16px;
+    align-content: start;
+  }
+
+  .entry-card {
+    gap: 16px;
+  }
+
+  .entry-card form {
+    gap: 16px;
+  }
+}
+
+/* A message of an entry page (the instance name as text where no logo is set). */
+.entry-card .alert {
+  margin: 0;
 }
 
 /* "No account yet?" between two lines, in text size instead of Tabler's small capitals. */
@@ -272,15 +529,15 @@
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 50%;
-  background: #8a817b;
+  background: var(--muted);
 }
 
 .status-active {
-  background: light-dark(#2f8f5b, #5dbb86);
+  background: var(--ok);
 }
 
 .status-unverified {
-  background: light-dark(#b7791f, #e8b34a);
+  background: var(--warn);
 }
 
 .status-blocked {
@@ -294,11 +551,12 @@
 @media print {
   .portal-header,
   .login-links,
+  .corner,
   footer {
     display: none;
   }
   :root { color-scheme: light; }
-  body, .card, .login-welcome {
+  body, .card, .entry-warm, .entry-split {
     background: #ffffff !important;
     color: #000000 !important;
   }
@@ -312,18 +570,145 @@
 .portal-logo { max-width: min(14rem, 55vw); max-height: 4rem; object-fit: contain; }
 .portal-header .portal-brand { max-width: 55%; overflow-wrap: anywhere; }
 .portal-logo-dark { display: none; }
-:root[data-bs-theme="dark"] .portal-logo-light { display: none; }
-:root[data-bs-theme="dark"] .portal-logo-dark { display: inline-block; }
+:root[data-theme="dark"] .portal-logo-light { display: none; }
+:root[data-theme="dark"] .portal-logo-dark { display: inline-block; }
 
-.colour-mode-form {
-  display: flex;
-  flex-wrap: wrap;
+/* ---- Corner controls (_corner_controls.html): language menu and light/dark button ----
+   The same on every page: fixed in the top right corner, round, 40 px, a 1 px line, the icon in
+   the muted colour; on hover the icon turns to the text colour and the line to the muted colour
+   (login/VORGABEN.md, section 5). Without JavaScript the buttons would do nothing, so they are
+   shown only when theme-init.js has marked the page with the class "js". */
+.corner {
+  display: none;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 16px;
+  z-index: 1030;
+  gap: 8px;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
 }
-.colour-mode-form .form-select { width: auto; }
+
+.js .corner {
+  display: flex;
+}
+
+.corner button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  font: 600 13px/1 var(--tblr-font-sans-serif);
+}
+
+.corner button:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+
+.corner svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-btn .moon { display: none; }
+:root[data-theme="dark"] .theme-btn .sun { display: none; }
+:root[data-theme="dark"] .theme-btn .moon { display: block; }
+
+.lang { position: relative; }
+
+/* An invisible bridge between the button and the menu keeps the menu open while the pointer
+   moves from the one to the other. */
+.lang::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: -8px;
+  right: -8px;
+  height: 12px;
+  display: none;
+}
+
+.lang:hover::after,
+.lang:focus-within::after,
+.lang.open::after {
+  display: block;
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  min-width: 160px;
+  display: none;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* The only shadow of the design: a floating menu (as in the reference of the owner). */
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
+}
+
+.lang:hover .lang-menu,
+.lang:focus-within .lang-menu,
+.lang.open .lang-menu {
+  display: grid;
+  gap: 2px;
+}
+
+/* Escape closes the menu until the pointer or the focus leaves and comes back. */
+.lang.dismissed::after,
+.lang.dismissed .lang-menu {
+  display: none;
+}
+
+.corner .lang-menu button {
+  width: 100%;
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: 400 15px/1.2 var(--tblr-font-sans-serif);
+  text-align: left;
+}
+
+.corner .lang-menu button:hover,
+.corner .lang-menu button:focus-visible {
+  background: var(--warm);
+  border-color: transparent;
+}
+
+.corner .lang-menu button[aria-current="true"] {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.corner .flag {
+  width: 20px;
+  height: 14px;
+  margin-right: 10px;
+  flex: none;
+  display: block;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line);
+}
 .member-menu summary { cursor: pointer; padding: 0.75rem; min-height: 3rem; }
 .member-menu { order: -1; }
 .member-menu nav { gap: 0.5rem; }
@@ -354,14 +739,11 @@
   border-radius: 6px;
 }
 .page-body { padding-bottom: 4rem; }
+/* Focus is always visible: a 2 px outline in the accent with a 2 px offset. */
 a:focus-visible, button:focus-visible, summary:focus-visible,
 input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--tblr-primary);
-  outline-offset: 3px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-bs-theme="light"]) .portal-logo-light { display: none; }
-  :root:not([data-bs-theme="light"]) .portal-logo-dark { display: inline-block; }
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 @media (min-width: 768px) {
   .member-tabs { display: none; }
@@ -532,8 +914,36 @@ input:focus-visible, select:focus-visible {
   .field-row-locality { grid-template-columns: 9rem minmax(0, 1fr); }
 }
 
-/* "Show password" under the field. */
-.password-toggle { padding-inline: 0; min-height: 3rem; }
+/* "Show password": a small eye icon inside the field (team lead decision K20). */
+.password-field { position: relative; }
+.password-field .form-control { padding-inline-end: 3.25rem; }
+.password-toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 4px;
+  width: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.password-toggle[hidden] { display: none; }
+.password-toggle:hover { color: var(--fg); }
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.password-toggle .eye-off { display: none; }
+.password-toggle.is-visible .eye { display: none; }
+.password-toggle.is-visible .eye-off { display: block; }
 
 /* Step indicator of a process with several pages (docs/DESIGN.md, section 6). */
 .step-indicator {

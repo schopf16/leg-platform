@@ -1,0 +1,10 @@
+{% load i18n %}{% comment %}
+The three legal items of the footer row: Datenschutz | Impressum | the host of the website of the
+instance (LEG-Design-Vorgaben/login/VORGABEN.md, section 4; D-056). The addresses of the first two
+are maintained in the portal settings; without an address the item is plain text. External links
+open in a new tab and send no referrer.
+{% endcomment %}<div class="legal-links">
+  {% if instance_privacy_url %}<a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer" data-i18n="privacy">{% translate "Privacy notice" %}</a>{% else %}<span data-i18n="privacy">{% translate "Privacy notice" %}</span>{% endif %}
+  {% if instance_imprint_url %}<a href="{{ instance_imprint_url }}" target="_blank" rel="noopener noreferrer" data-i18n="imprint">{% translate "Legal notice" %}</a>{% else %}<span data-i18n="imprint">{% translate "Legal notice" %}</span>{% endif %}
+  {% if instance_website_url %}<a href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{{ instance_website_host }}</a>{% endif %}
+</div>

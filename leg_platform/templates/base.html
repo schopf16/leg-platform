@@ -1,6 +1,6 @@
 {% load i18n static %}<!doctype html>
 {% get_current_language as LANGUAGE_CODE %}
-<html lang="{{ LANGUAGE_CODE }}" data-bs-theme="{{ colour_mode }}">
+<html lang="{{ LANGUAGE_CODE }}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,11 +8,14 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}{% endblock %} – {{ instance_name }}</title>
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  {# Not deferred: sets the colour mode of this tab before the page is painted (D-056). #}
+  <script src="{% static 'js/theme-init.js' %}"></script>
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/portal.css' %}">
   <link rel="stylesheet" href="{% url 'instance_stylesheet' %}">
 </head>
 <body class="register-clear">
+  {% include "_corner_controls.html" %}
   <div class="print-heading">{{ instance_name }} — {{ print_date|date:"d.m.Y" }}</div>
   {% block body %}
     <div class="page">
@@ -54,9 +57,8 @@
         </div>
       </main>
       <footer class="footer footer-transparent d-print-none">
-        <div class="container-xl text-center">
-          {% include "_colour_mode.html" %}
-          {% include "_footer_links.html" %}
+        <div class="container-xl">
+          {% include "_legal_links.html" %}
         </div>
       </footer>
       {% if user.is_authenticated and not user.password_change_required %}
@@ -66,6 +68,8 @@
       {% endif %}
     </div>
   {% endblock %}
+  {% block scripts_before %}{% endblock %}
+  <script defer src="{% static 'js/corner-controls.js' %}"></script>
   <script defer src="{% static 'js/password-toggle.js' %}"></script>
   {% block scripts %}{% endblock %}
 </body>

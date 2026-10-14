@@ -2,7 +2,8 @@
 
 Security review of 2026-10-14 (findings 1 and 5): a logged-in person who opens an invalid link
 gets a page with ``Referrer-Policy: no-referrer``; a form on it would post ``Origin: null`` and be
-refused by the CSRF check, so such a page has no logout or colour-mode form.
+refused by the CSRF check, so such a page has no logout form. (The colour-mode form of the footer is
+gone since D-056: the colour mode is chosen in the browser and posts nothing.)
 """
 
 from django.test import Client, TestCase, tag
@@ -25,7 +26,7 @@ class InvalidLinkPageFormsTests(TestCase):
         self.client = Client()
         self.client.force_login(create_active_user())
 
-    def test_an_invalid_link_page_sends_no_referrer_and_has_no_logout_or_colour_form(self):
+    def test_an_invalid_link_page_sends_no_referrer_and_has_no_logout_form(self):
         for name in TOKEN_VERIFY_VIEWS:
             with self.subTest(view=name):
                 response = self.client.get(reverse(name, args=[INVALID_TOKEN]))
@@ -33,15 +34,17 @@ class InvalidLinkPageFormsTests(TestCase):
                 self.assertEqual(response["Referrer-Policy"], "no-referrer")
                 html = response.content.decode()
                 self.assertNotIn(reverse("accounts:logout"), html)
-                self.assertNotIn(reverse("colour_mode"), html)
+                # No page posts a colour-mode choice any more.
+                self.assertNotIn("/appearance/", html)
+                self.assertNotIn('name="mode"', html)
 
-    def test_the_normal_pages_keep_the_logout_and_the_colour_mode_forms(self):
+    def test_the_normal_pages_keep_the_logout_form(self):
         response = self.client.get(reverse("accounts:profile"))
 
         self.assertEqual(response["Referrer-Policy"], "same-origin")
         html = response.content.decode()
         self.assertIn(reverse("accounts:logout"), html)
-        self.assertIn(reverse("colour_mode"), html)
+        self.assertNotIn("/appearance/", html)
 
 
 @tag("mariadb")

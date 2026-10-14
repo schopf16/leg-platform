@@ -44,12 +44,14 @@ class Branding:
 
 
 def load_branding(env: Mapping[str, str]) -> Branding:
+    # Defaults of the design package of the project owner (LEG-Design-Vorgaben/login/VORGABEN.md,
+    # section 6; docs/DECISIONS.md, D-056). An instance can replace every value.
     defaults = {
-        "INSTANCE_ACCENT_LIGHT": "#2F6B4F",
+        "INSTANCE_ACCENT_LIGHT": "#005BA2",
         "INSTANCE_ACCENT_TEXT_LIGHT": "#FFFFFF",
-        "INSTANCE_ACCENT_DARK": "#74C59A",
-        "INSTANCE_ACCENT_TEXT_DARK": "#0C0A09",
-        "INSTANCE_HIGHLIGHT": "",
+        "INSTANCE_ACCENT_DARK": "#6AA9E0",
+        "INSTANCE_ACCENT_TEXT_DARK": "#0B1520",
+        "INSTANCE_HIGHLIGHT": "#DDDD22",
     }
     colours = {}
     for name, default in defaults.items():
@@ -57,7 +59,8 @@ def load_branding(env: Mapping[str, str]) -> Branding:
         if value and re.fullmatch(r"#[0-9A-Fa-f]{6}", value) is None:
             raise ImproperlyConfigured(f"{name} must be a six-digit hexadecimal colour.")
         colours[name] = value
-    for suffix, surfaces in (("LIGHT", ("#FFFFFF", "#F5F5F4")), ("DARK", ("#1C1917", "#0C0A09"))):
+    # The surfaces are the tokens --panel and --bg of the design language (docs/DESIGN.md, 3.1).
+    for suffix, surfaces in (("LIGHT", ("#FFFFFF", "#F6F7F8")), ("DARK", ("#191C1F", "#111315"))):
         accent = colours[f"INSTANCE_ACCENT_{suffix}"]
         foreground = colours[f"INSTANCE_ACCENT_TEXT_{suffix}"]
         if any(contrast(accent, surface) < 4.5 for surface in (*surfaces, foreground)):

@@ -135,7 +135,7 @@ Consider at least:
 * the application runs on its own host name, never under a path of another website, so that it does not share an origin with it (D-025); on a subdomain of the website's registrable domain it is still the same site, so the cookie rules in section 3 apply and the installation guide states the residual risk
 * logo files are static files provided by the operator and are embedded as images, never inlined into the HTML; static SVG logo files are checked for scripts and external references before deployment and/or served with a restrictive Content Security Policy (`docs/DESIGN.md`, section 10)
 * instance branding values are validated: colour values match `^#[0-9A-Fa-f]{6}$`, configured URLs (privacy notice, website) are absolute `https://` URLs, logo references point to a file inside the instance's static files with an allowlisted extension (no absolute paths, path traversal or external URLs); values are validated at startup (configuration) or when saved (database), and invalid values are rejected (`docs/DESIGN.md`, section 3.2)
-* the colour mode is rendered by the server; no script evaluates URL parameters for theme or branding settings (`docs/DESIGN.md`, section 7)
+* the colour mode and the language are chosen in the browser and kept in the `sessionStorage` of the tab only (no cookie, nothing sent to the server); the scripts are external files, read only allowlisted values and evaluate no URL parameters for theme or branding settings (`docs/DESIGN.md`, section 7; D-056)
 * secure uploads, if introduced later; this includes any later web upload of logo files
 * rate limiting and abuse protection
 * secure error handling
@@ -297,7 +297,7 @@ Logging, configuration and repository:
 * Secure HTTP headers are set; static assets are served by the instance itself.
 * `Referrer-Policy` is `same-origin` or stricter.
 * No template inlines the content of an SVG logo; logos are embedded with `<img>`.
-* The colour mode mechanism ignores URL parameters and accepts only the allowlisted values (`light`, `dark`, `auto`).
+* The scripts of the colour mode and the language ignore URL parameters and accept only the allowlisted values (`light`, `dark`; `de`, `fr`, `it`, `en`) from the `sessionStorage` of the tab (D-056).
 * Invalid instance branding values (colour values not matching `^#[0-9A-Fa-f]{6}$`, URLs that are not absolute `https://` URLs, logo references outside the instance's static files, with path traversal or with a non-allowlisted extension) are rejected at startup or when saved.
 * Pages reached through verification, password reset, email change and second-factor removal links redirect to a URL without the token before rendering; the rendered page contains no token in its URL.
 * Secrets are not contained in the Git repository.

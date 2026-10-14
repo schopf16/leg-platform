@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.urls import path
 
-from leg_platform.presentation import instance_stylesheet, set_colour_mode
+from leg_platform.presentation import instance_stylesheet
 
 # Marker in an exception message; the 500 response must not contain it.
 INTERNAL_DETAIL = "internal-detail-that-must-not-be-shown"
@@ -27,7 +27,6 @@ def error_view(request):
 
 urlpatterns = [
     path("instance.css", instance_stylesheet, name="instance_stylesheet"),
-    path("appearance/", set_colour_mode, name="colour_mode"),
     path("ok/", ok_view),
     path("error/", error_view),
 ]

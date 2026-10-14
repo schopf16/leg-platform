@@ -162,7 +162,7 @@ class CompletionFormTests(ProfileFieldsMarkupMixin, TestCase):
             )
             self.assertIn('type="password"', element(self.html, field_id))
         self.assertIn("js/password-toggle.js", self.html)
-        self.assertIn(">Passwort anzeigen</button>", self.html)
+        self.assertIn('aria-label="Passwort anzeigen"', self.html)
 
     def test_an_invalid_form_has_an_error_summary_and_specific_messages(self):
         data = completion_data(

@@ -1,35 +1,37 @@
-{% extends "base.html" %}
-{% load i18n %}
+{% extends "entry_base.html" %}
+{% load i18n static %}
 {% block title %}{% translate "Log in" %}{% endblock %}
-{% block body %}
-  <div class="login-split">
-    <section class="login-welcome register-warm">
-      <span class="portal-brand">{% include "_brand.html" %}</span>
-      <h1>{% blocktranslate %}Welcome to {{ instance_name }}{% endblocktranslate %}</h1>
-      <p>{% translate "Here you manage your account and, later, your locations, energy data and invoices." %}</p>
-    </section>
-    <main class="login-form-area">
-      <div class="login-card">
-        {% include "_messages.html" %}
-        <div class="card card-md">
-          <div class="card-body">
-            <h2 class="mb-4">{% translate "Log in" %}</h2>
-            <form method="post" novalidate>
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ next }}">
-              {% include "accounts/_form_fields.html" %}
-              <div class="mb-3 text-end"><a href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a></div>
-              <button type="submit" class="btn btn-primary w-100">{% include "icons/lock.html" %}{% translate "Log in" %}</button>
-            </form>
-            <div class="hr-text hr-text-plain">{% translate "No account yet?" %}</div>
-            <a class="btn btn-secondary-action w-100" href="{% url 'accounts:registration' %}">{% translate "Register as a new user" %}</a>
-          </div>
-        </div>
+{% block scripts_before %}<script src="{% static 'js/login-texts.js' %}"></script>{% endblock %}
+{% block form %}
+  {% for error in form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  {% endfor %}
+  <h1 data-i18n="signIn">{% translate "Log in" %}</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="entry-field">
+      <label class="form-label" for="{{ form.username.id_for_label }}" data-i18n="email">{% translate "Email address" %}</label>
+      {{ form.username }}
+      {% if form.username.errors %}<div class="invalid-feedback d-block" id="{{ form.username.auto_id }}_error">{{ form.username.errors.0 }}</div>{% endif %}
+    </div>
+    <div class="entry-field">
+      <div class="entry-field-row">
+        <label class="form-label" for="{{ form.password.id_for_label }}" data-i18n="password">{% translate "Password" %}</label>
+        <a href="{% url 'accounts:password_reset' %}" data-i18n="forgot">{% translate "Forgot password?" %}</a>
       </div>
-      <nav class="login-links d-print-none">
-        {% include "_colour_mode.html" %}
-        {% include "_footer_links.html" %}
-      </nav>
-    </main>
-  </div>
+      <div class="password-field">
+        {{ form.password }}
+        {% include "accounts/_password_toggle.html" with field=form.password %}
+      </div>
+      {% if form.password.errors %}<div class="invalid-feedback d-block" id="{{ form.password.auto_id }}_error">{{ form.password.errors.0 }}</div>{% endif %}
+    </div>
+    <label class="entry-check" for="{{ form.remember_me.id_for_label }}">
+      {{ form.remember_me }}
+      <span data-i18n="keepSignedIn">{% translate "Stay signed in" %}</span>
+    </label>
+    <button type="submit" class="btn btn-primary" data-i18n="signInButton">{% translate "Log in" %}</button>
+  </form>
+  <p class="entry-divider" data-i18n="noAccount">{% translate "No account yet?" %}</p>
+  <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}" data-i18n="register">{% translate "Register as a new user" %}</a>
 {% endblock %}

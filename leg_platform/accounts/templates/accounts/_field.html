@@ -2,9 +2,9 @@
 One form field: label, widget, hint and error. Context: ``field`` (a bound field), ``optional``
 (the label says that the field may stay empty, docs/DESIGN.md, D-054). The ids of the hint and the
 error are the ones Django puts into ``aria-describedby`` of the widget; the error summary links
-to the widget by its id. A password field gets a button that shows the password: it is hidden
-until the script of the page enables it, so that the field stays a plain password field without
-JavaScript.
+to the widget by its id. A password field gets a button with an eye icon inside the field that shows
+the password: it is hidden until the script of the page enables it, so that the field stays a plain
+password field without JavaScript (team lead decision K20).
 {% endcomment %}<div class="mb-3">
   {% if field.field.widget.input_type == "checkbox" %}
     <label class="form-check" for="{{ field.id_for_label }}">
@@ -13,12 +13,14 @@ JavaScript.
     </label>
   {% else %}
     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="text-secondary fw-normal">({% translate "optional" %})</span>{% endif %}</label>
-    {{ field }}
-  {% endif %}
-  {% if field.field.widget.input_type == "password" %}
-    <button type="button" class="btn btn-link password-toggle d-print-none" data-password-toggle hidden
-            aria-controls="{{ field.id_for_label }}"
-            data-show-label="{% translate 'Show password' %}" data-hide-label="{% translate 'Hide password' %}">{% translate "Show password" %}</button>
+    {% if field.field.widget.input_type == "password" %}
+      <div class="password-field">
+        {{ field }}
+        {% include "accounts/_password_toggle.html" %}
+      </div>
+    {% else %}
+      {{ field }}
+    {% endif %}
   {% endif %}
   {% if field.help_text %}<div class="form-hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
   {% if hint %}<div class="form-hint">{{ hint }}</div>{% endif %}

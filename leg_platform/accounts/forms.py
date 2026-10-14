@@ -259,6 +259,9 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
         "invalid_login": _("The email address or the password is incorrect."),
         "inactive": _("The email address or the password is incorrect."),
     }
+    # Off by default. The login view decides what it means: a persistent session for a user, and
+    # nothing for a staff user or system administrator (D-056).
+    remember_me = forms.BooleanField(required=False, label=_("Stay signed in"))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -276,6 +279,8 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
             "autocomplete": "username",
         }
         username.widget = forms.EmailInput(attrs=attrs)
+        # A native checkbox of 20 px (login/VORGABEN.md, section 4), not Tabler's drawn one.
+        self.fields["remember_me"].widget.attrs["class"] = "entry-check-input"
 
     def confirm_login_allowed(self, user):
         if not user.is_active:

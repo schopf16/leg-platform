@@ -991,7 +991,7 @@ Run after sections 2 to 10 and after every update. Each check has an expected re
 | --- | --- | --- |
 | V10 | `curl -sI http://<HOST>/login/` | `301`, `Location: https://<HOST>/login/` |
 | V11 | `curl -sI https://<HOST>/login/` | `200`; headers `strict-transport-security: max-age=3600` (or the final value), `content-security-policy: default-src 'self'; ...` with `frame-ancestors 'none'`, `x-frame-options: DENY`, `x-content-type-options: nosniff`, `referrer-policy: same-origin` |
-| V12 | `curl -sI https://<HOST>/login/ \| grep -i '^set-cookie'` | the CSRF cookie is `__Host-csrftoken=...; Path=/; Secure; HttpOnly; SameSite=Lax` with **no** `Domain` attribute; the colour-mode cookie (if set) is `__Host-colour_mode`; after a login (browser) the session cookie is `__Host-sessionid` with the same flags |
+| V12 | `curl -sI https://<HOST>/login/ \| grep -i '^set-cookie'` | the CSRF cookie is `__Host-csrftoken=...; Path=/; Secure; HttpOnly; SameSite=Lax` with **no** `Domain` attribute; there is no colour-mode cookie (the choice stays in the `sessionStorage` of the tab, D-056); after a login (browser) the session cookie is `__Host-sessionid` with the same flags |
 | V13 | `curl -s -o /dev/null -w '%{http_code}\n' https://<HOST>/does-not-exist/` | `404` |
 | V14 | `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://<HOST>/admin/` | `302`, the location contains `/admin/login/`; following it leads to `/login/?next=/admin/`: the administration needs the portal login and the second factor (D-052) |
 | V15 | `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<HOST>/login/ -d 'username=x&password=y'` | `403` (CSRF) |

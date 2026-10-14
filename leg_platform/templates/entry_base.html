@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n %}{% comment %}
+The shell of every page without a session: login, registration, password reset, the second
+step of the login, the lockout and the result pages (LEG-Design-Vorgaben/login/VORGABEN.md and
+register/VORGABEN.md; D-056). Two equal columns on a desktop: the warm panel with the logo and
+the texts of the page type on the left, the form on the right. On a phone the panel shrinks to a
+top bar with the logo. Blocks: panel (all texts of the panel; the login texts by default, or the
+partial accounts/_panel_register.html for the registration), panel_title, panel_lead and
+panel_benefits (single texts; empty for a page without them) and form (the content of the right
+column, max. 400 px).
+{% endcomment %}
+{% block body %}
+  <div class="entry-split">
+    <aside class="entry-warm">
+      <span class="logo-plate">{% include "_brand.html" %}</span>
+      {% block panel %}
+        {% block panel_title %}<p class="entry-title" data-i18n="welcome">{% translate "Welcome to the LEG portal" %}</p>{% endblock %}
+        {% block panel_lead %}<p class="entry-lead" data-i18n="welcomeLead">{% translate "Here you manage your account and, later, your locations, energy data and invoices." %}</p>{% endblock %}
+        {% block panel_benefits %}
+          <ul class="entry-benefits">
+            <li data-i18n="benefit1">{% translate "Solar power from the neighbourhood" %}</li>
+            <li data-i18n="benefit2">{% translate "Produced locally, shared together" %}</li>
+          </ul>
+        {% endblock %}
+      {% endblock %}
+    </aside>
+    <main class="entry-form">
+      <div class="entry-card">
+        {% include "_messages.html" %}
+        {% block form %}{% endblock %}
+        {% include "_legal_links.html" %}
+      </div>
+    </main>
+  </div>
+{% endblock %}
