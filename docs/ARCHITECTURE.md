@@ -23,7 +23,7 @@ Established packages are preferred over custom developments. The following candi
 | ------- | --------- | --------------------------- |
 | Login abuse protection | `django-axes` | Tracks failed login attempts; release 8.3.1 (2026-02-11); declares Django 4.2, 5.2, 6.0; requires Python ≥ 3.10. |
 | Two-factor authentication (TOTP) | `django-otp` | TOTP devices compatible with Google Authenticator via the `otpauth` URL scheme; static tokens usable as recovery codes; release 1.7.4 (2026-10-08). How the Django admin is protected with it must still be verified in its documentation. |
-| Encryption of the Microsoft Graph client secret | `cryptography` | Release 50.0.2 (2026-09-30); requires Python ≥ 3.9 (except 3.9.0 and 3.9.1). |
+| Encryption of the Microsoft Graph certificate private key and of the second factor secrets | `cryptography` | Release 50.0.2 (2026-09-30); requires Python ≥ 3.9 (except 3.9.0 and 3.9.1). |
 
 Sources: https://pypi.org/project/django-axes/, https://github.com/jazzband/django-axes, https://pypi.org/project/django-otp/, https://django-otp-official.readthedocs.io/en/stable/overview.html, https://pypi.org/project/cryptography/
 
@@ -139,9 +139,10 @@ Sending is encapsulated behind a central application interface. The concrete Mic
 The Microsoft Graph configuration is kept in the database and maintained in a dedicated section of the Django admin (D-006):
 
 * tenant ID, client ID, sender address
-* client secret, stored encrypted; the encryption key is derived from Django's `SECRET_KEY` with HKDF and a fixed, purpose-specific label, and the secret is encrypted with Fernet (both from `cryptography`), so that operators do not need to manage an additional key; a database backup alone does not reveal the secret
-* keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption, and the secret is then encrypted again with the current key; if no key matches, the admin clearly asks for the secret to be entered again
-* expiry date of the client secret with a warning before expiry
+* authentication with a certificate (client credentials flow with a signed client assertion, D-006), not with a client secret; Microsoft recommends certificates for production (Microsoft Learn, checked 2026-10-14)
+* certificate (public part, with its expiry date) and private key; the private key is stored encrypted, the encryption key is derived from Django's `SECRET_KEY` with HKDF and a fixed, purpose-specific label, and the private key is encrypted with Fernet (both from `cryptography`), so that operators do not need to manage an additional key; a database backup alone does not reveal the private key; the private key is never displayed again
+* keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption, and the private key is then encrypted again with the current key; if no key matches, the admin clearly asks for the certificate and private key to be uploaded again
+* expiry date of the certificate with a warning before expiry
 * test send with understandable feedback
 
 The exact `cryptography` API is verified against the documentation of the installed version before implementation.
@@ -154,7 +155,7 @@ Local development, stage and production have separate settings and credentials. 
 | `allowlist` | allowed | required | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. Locally only with a dedicated development app registration and sender mailbox, separate from stage and production (D-020, `docs/SECURITY.md`, sections 7 and 8); the local recipient addresses are kept only in the developer's user environment variable `EMAIL_ALLOWED_RECIPIENTS`, never in the repository. Without allowed recipients, or with an entry that is not one complete address, the application refuses to start. |
 | `graph` | refused | refused | required | Emails are sent via Microsoft Graph without restriction. |
 
-"Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`. Until the Microsoft Graph backend exists (D-006), `allowlist` and `graph` use a placeholder backend that refuses to send (D-028). Automated tests never send real email: Django's test runner replaces the backend with its in-memory backend, and tests use only addresses under reserved domains (RFC 2606), which a test checks for the whole repository.
+"Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`. `allowlist` and `graph` use the Microsoft Graph backend `leg_platform.mail.GraphEmailBackend` (D-006), which fails closed while no configuration exists (D-028). Automated tests never send real email: Django's test runner replaces the backend with its in-memory backend, and tests use only addresses under reserved domains (RFC 2606), which a test checks for the whole repository.
 
 Links in emails (verification, password reset, email change) are built from the canonical base URL in the instance configuration, not from the request. This also works for emails that are not triggered by a request (e.g. management commands). `ALLOWED_HOSTS` still lists only the host names of the application (not the instance's website; D-025).
 

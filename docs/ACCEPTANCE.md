@@ -61,8 +61,8 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 ## 8. Email
 
 * [ ] The application has a central interface for outgoing email.
-* [ ] The Django admin has a dedicated section for the Microsoft Graph configuration (tenant ID, client ID, sender address, client secret, expiry date).
-* [ ] The admin shows "set" and the expiry date of the client secret and warns before expiry.
+* [ ] The Django admin has a dedicated section for the Microsoft Graph configuration (tenant ID, client ID, sender address, certificate and private key, expiry date of the certificate).
+* [ ] The admin shows the public certificate and its expiry date, never the private key, and warns before the certificate expires.
 * [ ] A test send provides understandable feedback.
 * [ ] The administration lists all emails with editable subject and text and a placeholder cheat sheet; the editor refuses unknown placeholders, a missing personal link, typed web or email addresses and template syntax; the default can be restored; users without the permission cannot read or change the texts (D-039).
 * [ ] The editor offers a preview of the typed text with example links and a test email that goes only to the address of the logged-in account; neither saves anything. Every change of a text is kept as a version that can be restored; a version that is no longer valid is refused (D-039).

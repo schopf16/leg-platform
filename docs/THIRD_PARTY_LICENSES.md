@@ -16,7 +16,7 @@ Licences as declared in the package metadata (`License-Expression`, `License` or
 | django-axes | MIT | Login abuse protection (D-017) |
 | django-ipware | MIT | Trusted-proxy-aware client IP resolution for login abuse protection (D-017) |
 | django-otp | Unlicense | Two-factor authentication (D-004) |
-| cryptography | Apache-2.0 OR BSD-3-Clause | Encryption of the Microsoft Graph client secret, keyed hashes (D-006, D-023) |
+| cryptography | Apache-2.0 OR BSD-3-Clause | Encryption of the Microsoft Graph certificate private key, second factor secrets, keyed hashes (D-006, D-023, D-040) |
 | mysqlclient | GPL-2.0-or-later | Database driver of Django's MySQL backend, used for MariaDB (D-030); see the note on MariaDB Connector/C below |
 | msal | MIT | Microsoft Graph token acquisition (D-026) |
 | segno | BSD-3-Clause (metadata: classifier "BSD License"; the bundled licence text is the 3-clause BSD licence) | QR code for TOTP enrolment |

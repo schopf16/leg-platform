@@ -151,13 +151,13 @@ Sources: https://docs.djangoproject.com/en/6.0/ref/settings/ (`SECURE_REFERRER_P
 * Local secrets in ignored files or environment variables.
 * Server secrets via protected environment variables or a suitable secret store.
 * The TOTP key of the second factor is encrypted in the same way (own HKDF label, Fernet, fallback keys tried and the key encrypted again when used); recovery codes are stored only as keyed digests, also checked against the digests of the fallback keys (D-040). No security value is displayed again.
-* Exception by decision D-006: the Microsoft Graph client secret is maintained in the Django admin and stored encrypted in the database:
+* Exception by decision D-006: the private key of the Microsoft Graph certificate is written in the Django admin and stored encrypted in the database; it is never displayed again:
   * The encryption key is derived from `SECRET_KEY` with HKDF and a fixed, purpose-specific label; encryption uses Fernet. Both come from the established `cryptography` library; no custom cryptographic primitives are developed.
   * Keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption; the secret is then encrypted again with the current key.
 * Never display secrets in plain text again.
 * Keep credentials for local, stage and production separate, and separate per instance.
 * The initial system administrator password is entered interactively and never stored in `.env` or other files (D-005).
-* In case of accidental disclosure, the affected secrets must be revoked or rotated. If `SECRET_KEY` is changed without keeping the old key in `SECRET_KEY_FALLBACKS`, the Microsoft Graph client secret must be entered again.
+* In case of accidental disclosure, the affected secrets must be revoked or rotated. If `SECRET_KEY` is changed without keeping the old key in `SECRET_KEY_FALLBACKS`, the Microsoft Graph certificate and its private key must be uploaded again.
 * No production or stage secrets on development machines. Read deny rules in `.claude/settings.json` additionally keep AI tools away from secret files; they do not apply to scripts that open files themselves and are therefore not a complete protection (D-020).
 
 ## 8. Microsoft Graph
@@ -165,8 +165,8 @@ Sources: https://docs.djangoproject.com/en/6.0/ref/settings/ (`SECURE_REFERRER_P
 * Use only the required permissions.
 * By default, the application permission `Mail.Send` allows sending mail as any user of the Microsoft organisation. The application must therefore be restricted to the sender mailbox with "RBAC for Applications" in Exchange Online, and no organisation-wide `Mail.Send` permission may remain in Microsoft Entra ID.
 * The installation guide explains these steps for operators without in-depth IT knowledge.
-* Choose authentication suitable for the actual Microsoft tenant configuration.
-* The client secret is write-only in the admin, stored encrypted, and only "set" and its expiry date are displayed.
+* Authentication uses a certificate, not a client secret: Microsoft recommends a certificate for production (D-006, Microsoft Learn, checked 2026-10-14).
+* The private key is write-only in the admin and stored encrypted; only the public certificate and its expiry date are displayed.
 * Take expiry and renewal of credentials into account; the admin warns before expiry.
 * The configuration is accessible only to system administrators; every change is logged.
 * The test send never displays secrets.
@@ -276,8 +276,8 @@ Account lifecycle:
 
 Email and Microsoft Graph:
 
-* The Microsoft Graph configuration is accessible only to system administrators; every change is logged; the client secret is never displayed after saving and is stored encrypted.
-* The client secret can still be decrypted with a key from `SECRET_KEY_FALLBACKS`; without a matching key, the admin clearly asks for the secret to be entered again.
+* The Microsoft Graph configuration is accessible only to system administrators; every change is logged; the private key is never displayed after saving and is stored encrypted.
+* The private key can still be decrypted with a key from `SECRET_KEY_FALLBACKS`; without a matching key, the admin clearly asks for the certificate and private key to be uploaded again.
 * Local delivery is restricted to console output or to allowed recipients; stage delivery is restricted to allowed recipients; unrestricted delivery is refused outside production; any mode other than unrestricted Microsoft Graph delivery is refused in production.
 * Automated tests send no real email, and the repository contains email addresses only under reserved domains (RFC 2606).
 * A missing or unknown `APP_ENV` prevents the application from starting.

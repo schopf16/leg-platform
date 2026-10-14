@@ -75,13 +75,14 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 
 ## D-006: Email Delivery via Microsoft Graph
 
-* Date: 2026-10-09 (updated)
-* Status: Decided
+* Date: 2026-10-09 (updated 2026-10-14)
+* Status: Decided; amended on 2026-10-14 (certificate instead of client secret, see the last bullets of "Open")
 * Decision:
   * Outgoing email is sent via Microsoft Graph: email verification, password reset, security notifications and account notifications where needed.
-  * The system administrator maintains the configuration in a dedicated section of the Django admin: tenant ID, client ID, sender address, client secret and its expiry date, plus a test send with understandable feedback.
-  * The client secret is write-only. After saving, only "set" and the expiry date are displayed; the admin warns before expiry.
-  * The client secret is stored encrypted in the database. The key is derived from Django's `SECRET_KEY` with HKDF and a fixed, purpose-specific label; the secret is encrypted with Fernet. Both come from the established `cryptography` library. Keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption, after which the secret is encrypted again with the current key. If no key matches, the admin clearly asks for the secret to be entered again.
+  * The system administrator maintains the configuration in a dedicated section of the Django admin: tenant ID, client ID, sender address, certificate and its private key, plus a test send with understandable feedback. The section is not implemented yet.
+  * The application authenticates with a certificate (client credentials flow with a signed client assertion), not with a client secret.
+  * The private key is write-only and stored encrypted in the database; it is never displayed again. The public certificate and its expiry date are displayed; the admin warns before expiry.
+  * The private key is encrypted with a key derived from Django's `SECRET_KEY` with HKDF and a fixed, purpose-specific label (`LEG-Platform Microsoft Graph certificate key v1`); the key is encrypted with Fernet. Both come from the established `cryptography` library. Keys derived from `SECRET_KEY_FALLBACKS` are tried for decryption, after which the private key is encrypted again with the current key. If no key matches, the admin clearly asks for the certificate and private key to be uploaded again.
   * The configuration is accessible only to system administrators; every change is logged.
   * In Exchange Online, the application is restricted to the sender mailbox with "RBAC for Applications"; no organisation-wide `Mail.Send` permission remains in Microsoft Entra ID. The installation guide explains this step by step.
   * The environment variable `EMAIL_MODE` controls delivery: `console` (default, output only), `allowlist` (only to `EMAIL_ALLOWED_RECIPIENTS`) and `graph` (unrestricted, only allowed with `APP_ENV=production`).
@@ -93,8 +94,13 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
 * Not yet verified: the exact HKDF and Fernet API of the installed `cryptography` version; to be verified before implementation.
 * Rationale: the database password alone does not protect against leaked backups or database exports, access by hosting staff or SQL injection. Deriving the key from `SECRET_KEY` adds this protection without additional effort for operators. HKDF with a purpose-specific label keeps this key separate from Django's other uses of `SECRET_KEY`.
 * Alternatives: plain text storage (rejected: a leaked secret would allow sending mail as any user of the organisation); separate encryption key (rejected for now: additional burden for operators without in-depth IT knowledge); secret only in environment variables (rejected: the project owner wants the configuration in the admin); using `SECRET_KEY` directly as encryption key (rejected: no key separation).
-* Open: whether certificate-based authentication is preferable to a client secret is to be checked in the Microsoft documentation.
-* Sources: https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac, https://docs.djangoproject.com/en/stable/ref/settings/#secret-key, https://pypi.org/project/cryptography/
+* Amendment of 2026-10-14 (decided by the project owner): the application uses a certificate instead of a client secret. Verified in Microsoft Learn (checked 2026-10-14):
+  * "Microsoft recommends that you use a certificate instead of a client secret before moving the application to a production environment." A client secret "should **not be used** in production environments".
+  * The client credentials flow accepts a certificate in place of `client_secret`: the request contains `client_assertion_type` `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a `client_assertion`, a JWT signed with the certificate's private key.
+  * The permission `Mail.Send` and the endpoint `sendMail` are unchanged.
+  * Microsoft recommends, for production, a certificate signed by a well-known certificate authority, and self-signed certificates for testing. The application cannot check this; the installation guide must describe it, and the admin must warn before the certificate expires.
+* Implemented (commit 88ee6ae): `GraphConfiguration` stores the certificate and the encrypted private key; `GraphEmailBackend` requests a token with `msal` (`ConfidentialClientApplication`, client credentials, scope `https://graph.microsoft.com/.default`) and sends with `POST /v1.0/users/{sender}/sendMail`, which returns HTTP 202 when the message is accepted, not when it is delivered. Tests replace msal and the HTTP request with mocks.
+* Sources: https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac, https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials, https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow, https://learn.microsoft.com/en-us/graph/api/user-sendmail, https://docs.djangoproject.com/en/stable/ref/settings/#secret-key, https://pypi.org/project/cryptography/
 
 ## D-007: Security Keeper
 
@@ -491,7 +497,7 @@ Decisions are based on verified facts (see D-011). Technical and legal statement
   | `django-axes` | 8.3.1 | Login abuse protection (D-017). Release 2026-02-11, Python ≥ 3.10, declares Django 4.2, 5.2, 6.0 and Python 3.10 to 3.14. |
   | `django-ipware` | 8.0.0 | Trusted-proxy-aware client IP resolution for login abuse protection (D-017); supports Python 3.10+ and Django 5.2+. Its required `python-ipware` dependency is installed transitively. |
   | `django-otp` | 1.7.4 | TOTP and static recovery tokens (D-004). Release 2026-10-08, Python ≥ 3.8; built-in exponential throttling of failed verifications (not used in the project's own device models, D-040). Offers the extras `qrcode` and `segno`. |
-  | `cryptography` | 50.0.2 | HKDF and Fernet for the Microsoft Graph client secret (D-006) and keyed hashes (D-023). Python ≥ 3.9 (except 3.9.0, 3.9.1). |
+  | `cryptography` | 50.0.2 | HKDF and Fernet for the Microsoft Graph certificate private key (D-006), second factor secrets (D-040) and keyed hashes (D-023). Python ≥ 3.9 (except 3.9.0, 3.9.1). |
   | `segno` (new) | 1.6.6 | QR code for TOTP enrolment in the application views; pure Python, BSD licence, no dependencies on Python ≥ 3.10; one of the two extras offered by `django-otp`. |
   | `msal` (new) | 1.39.0 | Token acquisition for Microsoft Graph with the client credentials flow; Microsoft's own library, MIT licence, Python ≥ 3.9. Depends on `requests`, `PyJWT[crypto]` and `cryptography<51`. |
   | Tabler | 1.6.1 | Latest release (28 September); served by the instance itself (D-024). |

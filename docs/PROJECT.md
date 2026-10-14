@@ -212,10 +212,10 @@ Security notifications state that the person should contact the operator immedia
 The system administrator configures Microsoft Graph in a dedicated section of the Django admin:
 
 * tenant ID, client ID and sender address (the "tenant ID" is the Microsoft Entra term for the Microsoft organisation)
-* client secret: write-only; after saving, only "set" and its expiry date are displayed, with a warning before expiry
+* certificate and private key (D-006): the private key is write-only; after saving, only the public certificate and its expiry date are displayed, with a warning before expiry
 * a test send with understandable feedback
 
-The client secret is stored encrypted. In Microsoft Entra / Exchange Online, the application is restricted to the sender mailbox. The installation guide explains these steps for operators without in-depth IT knowledge.
+The private key is stored encrypted. The application authenticates with the certificate, not with a client secret (D-006). In Microsoft Entra / Exchange Online, the application is restricted to the sender mailbox. The installation guide explains these steps for operators without in-depth IT knowledge.
 
 Configuration and credentials are separated between local, stage and production, and between instances. Local and stage delivery is controlled by default.
 
