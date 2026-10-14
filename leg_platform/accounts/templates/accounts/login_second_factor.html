@@ -4,12 +4,14 @@
 {% block content %}
   <div class="card card-md">
     <div class="card-body">
-      <h1 class="h2 mb-3">{% translate "Log in: second step" %}</h1>
+      <p class="text-secondary mb-1">{% translate "Step 2 of 2" %}</p>
+      <h1 class="h2 mb-3">{% translate "Confirm sign-in" %}</h1>
       <p>{% translate "Enter the code from your authenticator app. If you cannot use the app, enter one of your recovery codes." %}</p>
       <form method="post" novalidate>
         {% csrf_token %}
         {% include "accounts/_form_fields.html" %}
-        <button type="submit" class="btn btn-primary w-100">{% translate "Log in" %}</button>
+        <p class="form-hint mb-3">{% translate "A recovery code has the form xxxx-xxxx. The hyphen can be left out." %}</p>
+        <button type="submit" class="btn btn-primary w-100">{% translate "Confirm sign-in" %}</button>
       </form>
       <p class="mt-3 mb-0"><a href="{% url 'accounts:login' %}">{% translate "Start again" %}</a></p>
     </div>

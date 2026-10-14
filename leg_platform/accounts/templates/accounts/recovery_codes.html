@@ -8,10 +8,15 @@
         <div class="alert alert-success" role="status">{% translate "Two-factor authentication is on." %}</div>
       {% endif %}
       <h1 class="h2 mb-3">{% translate "Your recovery codes" %}</h1>
-      <p>{% translate "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone. They are shown only now." %}</p>
+      <div class="alert alert-warning">{% translate "These codes are shown only now. Save them before you leave this page." %}</div>
+      <p>{% translate "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone." %}</p>
       <ul class="list-unstyled identifier text-center">
         {% for code in codes %}<li>{{ code }}</li>{% endfor %}
       </ul>
+      <label class="form-check mb-3">
+        <input class="form-check-input" type="checkbox">
+        <span class="form-check-label">{% translate "I have stored the recovery codes" %}</span>
+      </label>
       <a class="btn btn-primary w-100" href="{% url 'accounts:two_factor' %}">{% translate "I have saved the codes" %}</a>
     </div>
   </div>

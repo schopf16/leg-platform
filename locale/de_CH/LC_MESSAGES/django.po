@@ -934,8 +934,14 @@ msgstr ""
 "Für Ihr Konto bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt. Die früheren Wiederherstellungscodes sind ungültig geworden."
 
 #: leg_platform/accounts/templates/accounts/login_second_factor.html
-msgid "Log in: second step"
-msgstr "Anmelden: zweiter Schritt"
+msgid "Step 2 of 2"
+msgstr "Schritt 2 von 2"
+
+msgid "Confirm sign-in"
+msgstr "Anmeldung bestätigen"
+
+msgid "A recovery code has the form xxxx-xxxx. The hyphen can be left out."
+msgstr "Ein Wiederherstellungscode hat die Form xxxx-xxxx. Der Bindestrich kann weggelassen werden."
 
 msgid "Enter the code from your authenticator app. If you cannot use the app, enter one of your recovery codes."
 msgstr "Geben Sie den Code aus Ihrer Authenticator-App ein. Wenn Sie die App nicht verwenden können, geben Sie einen Ihrer Wiederherstellungscodes ein."
@@ -972,8 +978,11 @@ msgstr "Zwei-Faktor-Authentifizierung einrichten"
 msgid "You need an authenticator app on your phone, for example Google Authenticator or Microsoft Authenticator. Enter your password to continue."
 msgstr "Sie brauchen eine Authenticator-App auf Ihrem Telefon, zum Beispiel Google Authenticator oder Microsoft Authenticator. Geben Sie Ihr Passwort ein, um fortzufahren."
 
-msgid "Continue"
-msgstr "Weiter"
+msgid "Continue to setup"
+msgstr "Weiter zur Einrichtung"
+
+msgid "Your authenticator app shows a new six-digit code every 30 seconds. You need a current code on the next page."
+msgstr "Ihre Authenticator-App zeigt alle 30 Sekunden einen neuen sechsstelligen Code an. Auf der nächsten Seite brauchen Sie einen aktuellen Code."
 
 msgid "Cancel"
 msgstr "Abbrechen"
@@ -1002,6 +1011,9 @@ msgstr "Danach brauchen Sie für die Anmeldung nur noch Ihr Passwort, und Ihre W
 msgid "Your earlier recovery codes become invalid. Enter your password and a code to confirm."
 msgstr "Ihre früheren Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
 
+msgid "The new codes are shown only once, on the next page."
+msgstr "Die neuen Codes werden nur einmal auf der nächsten Seite angezeigt."
+
 #: leg_platform/accounts/templates/accounts/recovery_codes.html
 msgid "Recovery codes"
 msgstr "Wiederherstellungscodes"
@@ -1012,8 +1024,14 @@ msgstr "Die Zwei-Faktor-Authentifizierung ist eingeschaltet."
 msgid "Your recovery codes"
 msgstr "Ihre Wiederherstellungscodes"
 
-msgid "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone. They are shown only now."
-msgstr "Bewahren Sie diese Codes an einem sicheren Ort auf, zum Beispiel in einem Passwortmanager oder auf Papier. Jeder Code gilt einmal und ersetzt die App, wenn Sie Ihr Telefon verlieren. Sie werden nur jetzt angezeigt."
+msgid "These codes are shown only now. Save them before you leave this page."
+msgstr "Diese Codes werden nur jetzt angezeigt. Speichern Sie sie, bevor Sie diese Seite verlassen."
+
+msgid "Keep these codes in a safe place, for example in a password manager or on paper. Each code works once and replaces the app if you lose your phone."
+msgstr "Bewahren Sie diese Codes an einem sicheren Ort auf, zum Beispiel in einem Passwortmanager oder auf Papier. Jeder Code gilt einmal und ersetzt die App, wenn Sie Ihr Telefon verlieren."
+
+msgid "I have stored the recovery codes"
+msgstr "Ich habe die Wiederherstellungscodes gespeichert"
 
 msgid "I have saved the codes"
 msgstr "Ich habe die Codes gespeichert"

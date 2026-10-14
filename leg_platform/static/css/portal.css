@@ -27,8 +27,11 @@
   font-display: swap;
 }
 
-:root,
-[data-bs-theme="light"] {
+/* Light values are the default. The colour mode follows the device setting: the server renders no
+   data-bs-theme attribute, so Tabler's light-dark() tokens (vendor tabler.min.css, first :root rule)
+   follow the device too. Dark values are below (docs/DESIGN.md, sections 3 and 7). */
+:root {
+  color-scheme: light dark;
   --tblr-font-sans-serif: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --tblr-font-monospace: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --portal-font-display: "Bricolage Grotesque", "Source Sans 3", system-ui, sans-serif;
@@ -43,6 +46,26 @@
   --tblr-danger-rgb: 180, 35, 24;
   /* Light tint of the accent for the "Warm" areas (docs/DESIGN.md, section 2). */
   --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, #ffffff);
+  --portal-surface: #ffffff;
+  --portal-field-border: #78716c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tblr-primary: #74c59a;
+    --tblr-primary-rgb: 116, 197, 154;
+    --tblr-primary-fg: #0c0a09;
+    --tblr-body-bg: #0c0a09;
+    --tblr-body-color: #f5f5f4;
+    --tblr-bg-surface: #1c1917;
+    --tblr-secondary-color: #a8a29e;
+    --tblr-border-color: #44403c;
+    --tblr-danger: #f0948a;
+    --tblr-danger-rgb: 240, 148, 138;
+    --portal-tint: color-mix(in srgb, var(--tblr-primary) 12%, #1c1917);
+    --portal-surface: #1c1917;
+    --portal-field-border: #8a817b;
+  }
 }
 
 /* Register "Clear" (docs/DESIGN.md, section 2): 16 px text, controls at least 48 px high,
@@ -67,7 +90,7 @@
 .register-clear .form-control,
 .register-clear .form-select {
   min-height: 3rem;
-  border-color: #78716c;
+  border-color: var(--portal-field-border);
   border-radius: 6px;
 }
 
@@ -97,8 +120,8 @@
 
 /* The second action next to a primary one: outlined, same height. */
 .btn-secondary-action {
-  background: #ffffff;
-  border: 1px solid #78716c;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-field-border);
   color: var(--tblr-body-color);
 }
 
@@ -122,8 +145,15 @@
 }
 
 .portal-header {
-  background: #ffffff;
+  background: var(--portal-surface);
   border-bottom: 1px solid var(--tblr-border-color);
+}
+
+/* Links and buttons in the header are at least 48 px high (docs/DESIGN.md, section 2). */
+.portal-header .nav-link {
+  min-height: 3rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Identifiers such as the customer number are set in the monospace typeface. */
