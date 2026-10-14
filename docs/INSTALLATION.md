@@ -2,6 +2,8 @@
 
 This guide grows with the project. Installation of stage and production instances is documented once the hosting details are decided (D-008).
 
+Related documents: `docs/STARTUP.md` starts, checks, uses and stops the complete local environment (including the synthetic local address directory); `docs/DEPLOYMENT.md` is the runbook for a VPS (a proposal, D-053); `docs/OPERATIONS.md` describes roles, rules and the CI.
+
 ## Instance Presentation
 
 Branding is configured through the variables documented in `.env.example` (D-051).
@@ -91,6 +93,8 @@ SHA-256 multihash before parsing, bounds the download/archive/rows and publishes
 Existing directory generations are retained; reserve disk capacity for them and for temporary
 downloads and database transaction logs. A hard-killed running job requires investigation;
 confirm no importer remains active before operator recovery. Do not blindly reset its state.
+
+For local development only, `leg_platform.local_directory_settings` adds a throw-away SQLite directory with a few invented addresses (`manage.py seed_local_address_directory`); it refuses to be imported unless `APP_ENV=local`. The steps are in `docs/STARTUP.md`, section 10. Never use it for stage or production.
 
 Run the complete local tests sequentially:
 
@@ -198,7 +202,7 @@ py -3.14 -m venv .venv
 
 Without a running MariaDB server, only the tests that need no database can run: `manage.py test --exclude-tag mariadb`. With Django 6.1, the system checks that `check` and other commands such as `makemigrations` run also access the database ("The check management command now supplies all databases if not specified", Django 6.1 release notes), so these commands need a running MariaDB server.
 
-Local development server (for design reviews and manual tests): `python manage.py runserver --noreload` needs `DJANGO_DEBUG=True` or `DJANGO_ALLOWED_HOSTS` (for example `127.0.0.1,localhost`) in the environment of that process, because Django refuses to start the server with `DEBUG` off and no allowed hosts; both are only allowed with `APP_ENV=local`. Set them for the process only (in PowerShell: `$env:DJANGO_DEBUG = 'True'` in the terminal that starts the server). The server listens on `http://127.0.0.1:8000/`, the value `INSTANCE_BASE_URL` has locally by default. Pages that need an account use the throw-away accounts of `seed_design_accounts` (see "Instance Configuration").
+Local development server (for design reviews and manual tests): `python manage.py runserver --noreload` needs `DJANGO_DEBUG=True` or `DJANGO_ALLOWED_HOSTS` (for example `127.0.0.1,localhost`) in the environment of that process, because Django refuses to start the server with `DEBUG` off and no allowed hosts; both are only allowed with `APP_ENV=local`. Set them for the process only (in PowerShell: `$env:DJANGO_DEBUG = 'True'` in the terminal that starts the server). The server listens on `http://127.0.0.1:8000/`, the value `INSTANCE_BASE_URL` has locally by default. Pages that need an account use the throw-away accounts of `seed_design_accounts` (see "Instance Configuration"). The complete start, check, stop and test procedure for agents is in `docs/STARTUP.md`.
 
 Email: locally, emails are written to the console by default (`EMAIL_MODE=console`). To test delivery via Microsoft Graph locally, use `EMAIL_MODE=allowlist` with a dedicated development app registration and sender mailbox, never the credentials of stage or production, and set the allowed recipient addresses only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). The Microsoft Graph backend is implemented and authenticates with a certificate (D-006); the admin section for its configuration is not implemented yet. Until a configuration exists, every send attempt in this mode fails with an error and no email is sent. Automated tests never send real email.
 

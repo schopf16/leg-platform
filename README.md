@@ -37,6 +37,13 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 
 Read the relevant rules before every larger change.
 
+## Operation Documents
+
+* `docs/STARTUP.md`: start, check, use and stop the complete local environment (Windows, PowerShell), for developers and for the designer and tester agents; test commands and troubleshooting.
+* `docs/DEPLOYMENT.md`: runbook to deploy an instance to a VPS (Infomaniak "VPS Lite"), for an operator or another AI assistant; a proposal that needs the owner's decisions (D-053), not yet run on a server.
+* `docs/INSTALLATION.md`: configuration variables, local setup of MariaDB, Microsoft Graph steps and the address directory.
+* `docs/OPERATIONS.md`: roles, rules, CI and the step list for stage and production.
+
 ## First Phase
 
 * Login page as the entry point; no public home page, information about the LEG is provided by its own website (D-025)

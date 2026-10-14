@@ -19,7 +19,7 @@ Roles:
 * **Stage:** the test system. The owner checks it here first.
 * **Production:** the real system for the users.
 
-Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DECISIONS.md`, D-008). The server details are still open (section 6).
+Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DECISIONS.md`, D-008). The server details are still open (section 6). A proposed step-by-step runbook for the server is in `docs/DEPLOYMENT.md` (D-053); it is not yet run on a server and every owner decision it lists is open. The local environment is described in `docs/STARTUP.md`.
 
 ## 2. Rules that always apply
 
@@ -91,7 +91,7 @@ Status: **NOT YET VERIFIED**. The install guide says that stage and production s
 4. Axes and the IP-attempt retention must be configured and scheduled.
 5. The mail worker and the scheduled tasks must be running as services.
 
-**D2. Prepare the server.** Operating system, web server with HTTPS, reverse proxy, log settings and maintenance: **open** (`docs/DECISIONS.md`, D-008). Do not guess these values.
+**D2. Prepare the server.** Operating system, web server with HTTPS, reverse proxy, log settings and maintenance: **open** (`docs/DECISIONS.md`, D-008). Do not guess these values. A proposed runbook with the owner decisions it needs is `docs/DEPLOYMENT.md` (D-053); it is not yet verified on a server.
 
 **D3. Create the database and the application account.** Use the statement from `docs/INSTALLATION.md` ("Database privileges"):
 
