@@ -725,7 +725,8 @@ class AlertAndMessageMarkupTests(TestCase):
         )
         html = response.content.decode()
 
-        self.assertRegex(html, r'<div role="status">\s*<div class="alert alert-success">')
+        # On the profile the message sits inside the changed card (designer acceptance, D4).
+        self.assertRegex(html, r'<div class="alert alert-success profile-message" role="status"')
 
     def test_a_form_error_alert_keeps_role_alert(self):
         response = self.client.post(LOGIN_URL, {"username": "a@example.org", "password": "x"}, REMOTE_ADDR="10.6.2.1")

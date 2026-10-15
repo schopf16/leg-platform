@@ -65,6 +65,22 @@ The platform itself is neutral. Each instance configures its own branding; these
 
 Without instance values, the platform defaults apply. They are the values of the design package (D-056): accent `#005BA2` (light) and `#6AA9E0` (dark), text on it `#FFFFFF` and `#0B1520`, highlight `#DDDD22` (the token `--yellow`). Without a logo, the instance name is shown as text.
 
+**Where the operator of a deployment changes the branding (WL-24, decision of the designer review: branding stays with the deployment, not in the administration).** The values change rarely, and the checks (contrast, allowed file types) and the logo files belong with the deployment, so they are not editable in the administration. Only the two addresses of the footer (privacy notice, imprint) are maintained there (D-056, "Portal-Einstellungen"). Everything else is set in the environment of the processes, once per instance:
+
+| What | Where | Variable or file |
+| ---- | ----- | ---------------- |
+| Name of the instance (header, titles, mails, administration) | environment | `INSTANCE_NAME` |
+| Website of the instance (third item of the footer row) | environment | `INSTANCE_WEBSITE_URL` (`https://`) |
+| Logos (positive and negative) | static directory of the instance and environment | files in `INSTANCE_STATIC_DIRECTORY`, referenced by `INSTANCE_LOGO_LIGHT` and `INSTANCE_LOGO_DARK` (`.svg` or `.png`, relative paths) |
+| Accent colours and the text on them | environment | `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK` (contrast of 4.5:1 is checked at the start) |
+| Highlight colour | environment | `INSTANCE_HIGHLIGHT` |
+| Privacy notice (fallback) | environment | `INSTANCE_PRIVACY_URL` (used when the portal settings have no address) |
+| Privacy notice and imprint (the address) | administration, "Inhalte" | "Portal-Einstellungen" |
+| Texts of the emails | administration, "Inhalte" | "Mailtexte" (D-039) |
+| Texts of the pages (login, registration, errors) | catalogue | `locale/de_CH/LC_MESSAGES/django.po` (deployment, with the translator) |
+
+The names and the exact steps are in `docs/INSTALLATION.md` and `docs/STARTUP.md`, section 4.
+
 Rules for instance values:
 
 * Text on the accent colour, and the accent colour used as text on the panel and the page background, reach at least 4.5:1 (WCAG 2.2, success criterion 1.4.3). The application checks this at the start against the surfaces `#FFFFFF`, `#F6F7F8` (light) and `#191C1F`, `#111315` (dark).

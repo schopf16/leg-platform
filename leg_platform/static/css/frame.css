@@ -690,10 +690,10 @@
   gap: 16px;
 }
 
-/* The buttons of a card are 40 px high on a desktop, as in the images of the owner (the images
-   win over K5, D-059); on a phone they are 44 px (see the phone rules below). */
+/* The buttons of a card are at least 44 px high on a desktop (K5; the images show 40 px, K5 wins,
+   D-059) and 48 px on a phone (see the phone rules below). */
 .profile-card .btn {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 /* Rows of label and value, separated by lines; the value column starts at 216 px. */
@@ -745,6 +745,33 @@
   margin-left: 8px;
   font-size: 14px;
   color: var(--fg);
+}
+
+/* In the head of a card the status sits at the right end, also when the row wraps (a phone). */
+.profile-card-head .profile-status {
+  margin-left: auto;
+}
+
+/* The message of an action, inside the card under its title (D4). */
+.profile-message {
+  margin: 0;
+}
+
+.profile-message:focus-visible,
+.profile-card h2:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* "Fertig" and its box: no extra container (the images). */
+.profile-done-form {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+
+.profile-card .qr-tile-wrap {
+  text-align: left;
 }
 
 .profile-muted,
@@ -942,8 +969,16 @@
     padding: 16px;
   }
 
-  .recovery-codes {
+  /* One field per row, at least 48 px high (the images). The registration keeps its pairs. */
+  .profile-form .field-pair,
+  .profile-form .field-pair-street,
+  .profile-form .field-pair-locality {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-form .form-control,
+  .profile-form .form-select {
+    min-height: 48px;
   }
 }
 

@@ -13,7 +13,7 @@ Never do any of the following (`AGENTS.md` sections 8 and 9, `CONDUCT.md`, D-020
 * Never use stage or production credentials, hosts or data. This environment must only connect to the local MariaDB on `127.0.0.1` with `APP_ENV=local`. Never use real personal data; use addresses under `example.org`, `example.com`, `example.net`, `.test` or `.invalid` (RFC 2606).
 * Never delete or recreate the seeded design accounts or their credentials file, never run `flush`, never drop the database, and never delete the directory file of section 10, unless the main session or the project owner explicitly orders it (section 12).
 * Never stop a process by name. Stop only by process ID (`Stop-Process -Id <PID>`); `Stop-Process -Name`, `taskkill /IM` and similar are forbidden. Another session may run its own server, worker or test run; do not stop processes that you did not start (section 11).
-* Never run two test runs at the same time against the same MariaDB server (D-046, section 13).
+* Never run two test runs at the same time against the same MariaDB server (D-046, section 13): the runner uses one test database. Before a run check that none is active: `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'manage.py test' -and $_.Name -match 'python' }` must print nothing (the command line of your own shell may match too: look at the process names).
 * Never commit or push; the main session commits.
 * Never "fix" application code during a design review or a test run; report defects to the main session.
 
@@ -23,7 +23,7 @@ Never do any of the following (`AGENTS.md` sections 8 and 9, `CONDUCT.md`, D-020
 | --- | --- | --- |
 | MariaDB 12.3 | Windows service `MySQL` (the name the setup script gives the MariaDB service), `127.0.0.1:3306` only | Created by `scripts/local/setup-dev-windows.ps1`. Databases `leg_platform` (data) and `test_leg_platform` (created and dropped by the test runner). |
 | Python environment | `.venv` in the repository root | `.venv\Scripts\python.exe`. Created as described in `docs/INSTALLATION.md`. |
-| Development server | `http://127.0.0.1:8000/` | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use the host `127.0.0.1`, never `localhost`: the cookies are host-only and the links in emails use `127.0.0.1`. |
+| Development server | `http://127.0.0.1:8000/` (the designer and the acceptance); `http://127.0.0.1:8001/` (the developer's own server) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use the host `127.0.0.1`, never `localhost`: the cookies are host-only and the links in emails use `127.0.0.1`. **Port 8000 belongs to the session that checks the design or accepts the work; the developer starts an own server on port 8001 (`$Port = 8001`, section 6) and never on 8000 while another session uses it.** The server has no reload and caches templates: restart it after a change of a template. |
 | Mail worker | background process | `manage.py process_mail_queue --loop`. Required, see section 6. |
 | Address directory (optional) | SQLite file outside the repository | Synthetic data only, section 10. |
 | Logs and process IDs | `$HOME\.leg-platform-dev\` | Outside the repository. Nothing there is committed. |
@@ -195,6 +195,8 @@ The command line check protects against a reused process ID: only a process whos
 
 ### 9.1 Seeded design accounts
 
+**What a login shows (design package, D-056 to D-059).** After the login the start page `/` opens in the new frame (header with the logo, the name and the two corner buttons; on a desktop the left menu, on a phone the bottom bar and the menu that opens from the left). The seeded user sees two task tiles ("Adresse ergänzen" is not shown for an account with a complete address; "Zwei-Faktor-Anmeldung" while no second factor is set up). "Ausblenden" hides a tile for good on the server (`HiddenTask`); the empty state "Keine offenen Aufgaben" follows. To look at the tiles again after an acceptance, delete the rows of the design user in `accounts_hiddentask` (the administration shows the hidden tasks of an account read-only on its page, and a one-line script with the Django shell does the deletion; never touch other accounts). The profile (`/profile/`) has five cards that open in place. The administration (`/admin/`, only staff users and system administrators with a completed second factor) shows the groups "Benutzer", "Inhalte" and "System". The error pages are rendered for `/does-not-exist/` (404); a 500 and a CSRF page are covered by the tests.
+
 `seed_design_accounts` creates three throw-away accounts, one per access level, with addresses under `example.org`: `design.user@example.org` (authenticated user), `design.staff@example.org` (staff user without any role) and `design.administrator@example.org` (system administrator). It refuses to run unless `APP_ENV=local` (`leg_platform/accounts/management/commands/seed_design_accounts.py`).
 
 * Check whether they already exist: `Test-Path "$HOME\.leg-platform-design-accounts.json"`. If it is `True`, **the accounts exist; use them and never run the creation again** (it would refuse anyway: it never overwrites the file and refuses if a design account exists).
@@ -219,9 +221,9 @@ The command line check protects against a reused process ID: only a process whos
 
 1. Open `http://127.0.0.1:8000/register/`, enter an address such as `test.user1@example.org` and submit. The response is always the same page "email sent".
 2. The worker produces the email within a few seconds (interval 5 seconds). Extract the link from the worker's output with the helper block below this list (the console email is quoted-printable, so a long link may be split over two lines with `=`; the helper decodes it and prints the recipient and the complete link). The last line for the address is the newest link. The helper was checked against emails produced by Django's console backend (offline, without database).
-3. Open the link in the browser. It only stores the token in the session and redirects to `/register/complete/`. Complete the profile and choose a password with **at least 15 characters** (Django validators, `docs/SECURITY.md` section 3). Registration never logs in; go to `/login/`.
-4. Limits (D-038): per address 12 requests per hour and 24 per 24 hours, per client IP 20 per hour (shared by registration and password reset), instance wide 300 per hour. All requests come from `127.0.0.1`; after about 20 registrations or resets in one hour no further email is produced. Clear the counters locally with the snippet in section 14 (row "No email although the worker runs").
-5. Password reset and email change work the same way: the link appears in the worker output. Unverified accounts are deleted by `delete_expired_registrations`, which is part of `run_scheduled_tasks` and not scheduled locally; they stay until then.
+3. Open the link in the browser. It only stores the token in the session and redirects to the password step (`/register/password/`, step 2 of 3: the rules are listed under the field). The next page (`/register/complete/`, step 3 of 3) asks for the name and the address and the privacy box; the button "Konto erstellen" creates the account and logs you in on the start page (D-058). The link stays valid until this last step is done (24 hours). Choose a password with **at least 15 characters** (docs/SECURITY.md section 3).
+4. Limits (D-038): per address 3 requests per 10 minutes, 12 per hour and 24 per 24 hours, per client IP 20 per hour (shared by registration and password reset), instance wide 300 per hour. All requests come from `127.0.0.1`; after about 20 registrations or resets in one hour the page answers "Zu viele Anfragen" (HTTP 429) and nothing is stored. The same browser asking for the same address again within 60 seconds creates no new mail (the page offers "E-Mail erneut senden" after the pause). Clear the counters locally with the snippet in section 14 (row "No email although the worker runs"). A script (curl) must send the form field `form_started` of the page, at least two seconds old, and leave `contact_fax_number` empty; otherwise it gets the normal page without a mail (bot check, D-058).
+5. Password reset and email change work the same way: the link appears in the worker output. A request for a new login address or second address (profile card "E-Mail-Adressen") sends the link to the new address and a notice with a "stop" link to the old one. Unverified accounts are deleted by `delete_expired_registrations`, which is part of `run_scheduled_tasks` and not scheduled locally; they stay until then.
 
 Helper for step 2 (the lines of the here-string start in column 0, as PowerShell requires):
 
@@ -230,7 +232,7 @@ $log = Join-Path $HOME '.leg-platform-dev\worker.out.log'
 $helper = @'
 import email, re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-LINK = re.compile(r"https?://\S+?/(?:register|password-reset|two-factor-reset|email-change)/verify/[A-Za-z0-9_-]+/")
+LINK = re.compile(r"https?://\S+?/(?:register|password-reset|two-factor-reset|email-change)/(?:verify|stop)/[A-Za-z0-9_-]+/")
 for block in re.split(r"(?m)^-{79}$", text):
     start = block.find("Content-Type:")
     if start < 0:

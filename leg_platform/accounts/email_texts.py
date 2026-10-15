@@ -117,6 +117,12 @@ DEFINITIONS = {
         (CONTACT_URL,),
         (),
     ),
+    Key.SECONDARY_EMAIL_CHANGED: Definition(
+        "accounts/email/secondary_email_changed.txt",
+        lambda: gettext("The second email address at %(instance_name)s was changed"),
+        (CONTACT_URL,),
+        (),
+    ),
     Key.PASSWORD_CHANGED: Definition(
         "accounts/email/password_changed.txt",
         lambda: gettext("Your password at %(instance_name)s was changed"),
@@ -143,7 +149,7 @@ DEFINITIONS = {
     ),
     Key.RECOVERY_CODE_USED: Definition(
         "accounts/email/recovery_code_used.txt",
-        lambda: gettext("An recovery code was used at %(instance_name)s"),
+        lambda: gettext("A recovery code was used at %(instance_name)s"),
         (),
         (),
     ),

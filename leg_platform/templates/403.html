@@ -1,11 +1,11 @@
 {% extends "error_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Access denied" %}{% endblock %}
-{% block heading %}{% translate "Access denied" %}{% endblock %}
+{% block title %}{% translate "You have no access here." %}{% endblock %}
+{% block heading %}{% translate "You have no access here." %}{% endblock %}
 {% block message %}
-  <p>{% translate "You do not have permission to open this page." %}</p>
+  <p class="error-text">{% translate "This page is not available to you." %}</p>
 {% endblock %}
 {% block action %}
   {% url 'home' as start_url %}
-  <a class="btn btn-primary w-100" href="{{ start_url|default:'/' }}">{% translate "Go to the start page" %}</a>
+  <a class="btn btn-primary" href="{{ start_url|default:'/' }}">{% translate "Go to the start page" %}</a>
 {% endblock %}

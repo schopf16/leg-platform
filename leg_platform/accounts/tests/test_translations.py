@@ -120,7 +120,6 @@ def account_texts():
                 "Unconfirmed account",
                 "Account with internal number %(number)s",
                 "internal number",
-                "LEG Platform",
                 "Administration",
                 "A system administrator also needs access to the administration.",
                 "Only active accounts can receive access to the administration.",
@@ -273,7 +272,8 @@ class AdminPageTranslationTests(TestCase):
             with self.subTest(page=page_name):
                 self.assertNotIn("Normalisiert", content)
                 self.assertNotIn("Django", content)
-                self.assertIn("LEG-Plattform", content)
+                # The admin shows the name of the instance (WL-23), not a fixed product name.
+                self.assertIn(settings.INSTANCE_NAME, content)
         for text in (
             "Firmenname",
             "Adresszusatz",
@@ -289,7 +289,8 @@ class AdminPageTranslationTests(TestCase):
         if django.VERSION >= (6, 1):
             # Empty choice label introduced in Django 6.1; Django 6.0 renders "---------".
             self.assertIn("- Bitte auswählen -", rendered["user form"])
-        for text in ("Administrator-Status", "Mitarbeiter", "Benutzer", "Select an option"):
+        # "Benutzer" is the name of the navigation group (WL-23), so it is no longer a leftover.
+        for text in ("Administrator-Status", "Mitarbeiter", "Select an option"):
             self.assertNotIn(text, rendered["user form"])
         # eCH-0010 fields that are kept but not shown (D-036).
         for text in (

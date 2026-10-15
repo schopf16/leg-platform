@@ -1,0 +1,7 @@
+{% comment %}
+The messages of one card, inside the card under its title (navigation/VORGABEN.md, 3.3; designer
+acceptance of phase 4, D4). ``items`` are the messages that the views tagged with the card. The
+first one gets the focus after the action (``static/js/profile-focus.js``).
+{% endcomment %}{% for message in items %}
+  <div class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag|default:'info' }}{% endif %} profile-message" role="status" tabindex="-1" data-profile-message>{{ message }}</div>
+{% endfor %}

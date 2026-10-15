@@ -1,11 +1,8 @@
 {% extends "error_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Page not found" %}{% endblock %}
-{% block heading %}{% translate "Page not found" %}{% endblock %}
+{% block title %}{% translate "This page no longer exists." %}{% endblock %}
+{% block heading %}{% translate "This page no longer exists." %}{% endblock %}
 {% block message %}
-  <p>{% translate "The page does not exist or was moved. Check the address or go to the start page." %}</p>
-{% endblock %}
-{% block action %}
   {% url 'home' as start_url %}
-  <a class="btn btn-primary w-100" href="{{ start_url|default:'/' }}">{% translate "Go to the start page" %}</a>
+  <p class="error-text"><a href="{{ start_url|default:'/' }}">{% translate "Back to the start page?" %}</a></p>
 {% endblock %}

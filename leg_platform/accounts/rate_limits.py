@@ -37,6 +37,11 @@ MAIL_GLOBAL_LIMITS = ((300, timedelta(hours=1)),)
 # The information email to the owner of an existing address is static, so repeating it within a
 # day adds nothing; it is checked in the background job, invisible to the requester.
 EXISTING_ACCOUNT_NOTICE_LIMITS = ((1, timedelta(hours=24)),)
+# Requests that store nothing (a hit of the bot check, a repeat within the pause) still write the
+# session of the client; they are counted per client address so that they cannot create sessions
+# without a limit (security review of phase 4, M4). Generous for a person, who needs one or two.
+MAIL_SILENT_LIMITS = ((30, timedelta(hours=1)),)
+SCOPE_MAIL_SILENT = "mail-silent"
 SCOPE_MAIL_ADDRESS = "mail-address"
 SCOPE_MAIL_IP = "mail-ip"
 SCOPE_MAIL_GLOBAL = "mail-global"

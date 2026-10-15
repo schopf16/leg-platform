@@ -5,5 +5,5 @@
 {% block form %}
   <h1>{% translate "Email address changed" %}</h1>
   <p>{% blocktranslate with email=new_email %}Your new email address <strong class="address-text">{{ email }}</strong> is confirmed. From now on you sign in with this address.{% endblocktranslate %}</p>
-  <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
+  {% include "accounts/_result_button.html" %}
 {% endblock %}

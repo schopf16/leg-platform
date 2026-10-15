@@ -90,7 +90,7 @@
       {% endif %}
       <main class="frame-main">
         <div class="frame-content">
-          {% include "_messages.html" %}
+          {% block messages %}{% include "_messages.html" %}{% endblock %}
           <div class="{% block inner_class %}container-tight{% endblock %}">
             {% block content %}{% endblock %}
           </div>

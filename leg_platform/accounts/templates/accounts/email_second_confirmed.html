@@ -8,5 +8,5 @@ was confirmed. Not routed yet. The text is a proposal; the package shows only th
 {% block form %}
   <h1>{% translate "Second address confirmed" %}</h1>
   <p>{% blocktranslate with email=new_email %}Your second email address <strong class="address-text">{{ email }}</strong> is confirmed. It receives information. You do not sign in with it.{% endblocktranslate %}</p>
-  <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
+  {% include "accounts/_result_button.html" %}
 {% endblock %}

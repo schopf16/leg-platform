@@ -29,6 +29,7 @@ from leg_platform.addresses.services import directory_status
 from leg_platform.accounts import (
     email_change,
     password_reset,
+    rate_limits,
     resend,
     second_factor,
     second_factor_reset,
@@ -49,6 +50,7 @@ from leg_platform.accounts.forms import (
     RegistrationPasswordForm,
     password_rules,
 )
+from leg_platform.accounts.login_protection import axes_client_ip
 from leg_platform.accounts.mail_queue import submit_mail_request
 from leg_platform.accounts.normalization import normalize_email_address
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
@@ -261,20 +263,33 @@ class MailRequestView(NeverCacheMixin, FormView):
 
     def form_valid(self, form):
         address = form.cleaned_data["email"]
-        if not form.automated:
-            pending = resend.pending(self.request, self.purpose)
-            within_pause = (
-                pending is not None
-                and pending.wait > 0
-                and normalize_email_address(pending.address) == normalize_email_address(address)
-            )
+        pending = resend.pending(self.request, self.purpose)
+        within_pause = (
+            not form.automated
+            and pending is not None
+            and pending.wait > 0
+            and normalize_email_address(pending.address) == normalize_email_address(address)
+        )
+        if form.automated or within_pause:
+            # Nothing is stored for the mail, but the answer writes the session: the requests of
+            # this kind are counted per client address, and above the limit the person (or the
+            # script) gets the refusal without a session (security review of phase 4, M4).
+            if not rate_limits.consume(
+                rate_limits.SCOPE_MAIL_SILENT,
+                rate_limits.ip_key(axes_client_ip(self.request)),
+                rate_limits.MAIL_SILENT_LIMITS,
+            ):
+                return self.refused(form)
             if within_pause:
                 return super().form_valid(form)
-            if not submit_mail_request(self.request, self.kind, address):
-                form.add_error(None, _("Too many requests, please try again later."))
-                return self.render_to_response(self.get_context_data(form=form), status=429)
+        elif not submit_mail_request(self.request, self.kind, address):
+            return self.refused(form)
         resend.remember(self.request, self.purpose, address)
         return super().form_valid(form)
+
+    def refused(self, form):
+        form.add_error(None, _("Too many requests, please try again later."))
+        return self.render_to_response(self.get_context_data(form=form), status=429)
 
 
 class RegistrationView(MailRequestView):
@@ -708,7 +723,12 @@ class EmailChangeStopVerifyView(TokenPageMixin, View):
         found = VerificationToken.objects.find_valid(
             token, VerificationToken.Purpose.EMAIL_CHANGE_STOP
         )
-        if found is None or found.user.status != User.Status.ACTIVE:
+        # The link only has a meaning while a request is open (security review of phase 4, H1).
+        if (
+            found is None
+            or found.user.status != User.Status.ACTIVE
+            or not email_change.has_open_request(found.user)
+        ):
             return render(request, "accounts/email_change_stop_invalid.html")
         request.session.cycle_key()
         request.session[EMAIL_CHANGE_STOP_SESSION_KEY] = found.digest
@@ -731,13 +751,21 @@ class EmailChangeStopConfirmView(NeverCacheMixin, FormView):
             if digest
             else None
         )
-        if self.token is None or self.token.user.status != User.Status.ACTIVE:
+        if (
+            self.token is None
+            or self.token.user.status != User.Status.ACTIVE
+            or not email_change.has_open_request(self.token.user)
+        ):
             return render(request, "accounts/email_change_stop_invalid.html")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        email_change.stop_all(self.token.user)
+        stopped = email_change.stop_all(self.token.user)
         self.request.session.pop(EMAIL_CHANGE_STOP_SESSION_KEY, None)
+        if stopped is None:
+            # The request ended between the page and the button: nothing was stopped, and no
+            # session ended.
+            return render(self.request, "accounts/email_change_stop_invalid.html")
         return render(self.request, "accounts/email_change_stopped.html")
 
 

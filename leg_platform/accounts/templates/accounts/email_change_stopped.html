@@ -1,12 +1,15 @@
 {% extends "entry_base.html" %}
 {% load i18n %}{% comment %}
-Prepared for the profile (phase 4, the stop link of the notice about an email change): the result
-page after a pending change was stopped. Not routed yet. The text is a proposal of the designer.
+The result page after a pending change was stopped with the link of the notice (D-059). Every
+pending change is cancelled and every session of the account has ended, so the page recommends a
+new password. The texts are a proposal of the designer, completed by the security review.
 {% endcomment %}
 {% block title %}{% translate "Change stopped" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
 {% block form %}
   <h1>{% translate "Change stopped" %}</h1>
-  <p>{% translate "The change of your email address was stopped. Your previous addresses stay valid." %}</p>
-  <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
+  <p>{% translate "The change of your email address was stopped. Your previous addresses stay valid. All sessions of your account were ended." %}</p>
+  <p>{% translate "If you did not request the change, choose a new password now." %}</p>
+  <a class="btn btn-primary" href="{% url 'accounts:password_reset' %}">{% translate "Choose a new password" %}</a>
+  <p class="entry-center"><a href="{% url 'accounts:login' %}">{% translate "To the login" %}</a></p>
 {% endblock %}

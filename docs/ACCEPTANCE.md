@@ -57,7 +57,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 * [ ] All instance-specific values, including the canonical base URL and the link to the privacy notice, are documented as part of the instance configuration.
 * [ ] A second instance can be set up from the same code base using only the documented installation steps and its own configuration.
 * [ ] The installation guide states that the application runs on its own host name (e.g. a subdomain) and not under a path of another website, and states the residual risk of a subdomain of the website's registrable domain compared with a separate registrable domain (D-025).
-* [ ] The installation guide describes the operator's manual checks of instance branding: the accent colour is not a red tone and not confusable with the error or energy colours, and static SVG logo files contain no scripts or external references (`docs/DESIGN.md`, sections 3.2 and 10).
+* [ ] The installation guide describes the operator's manual checks of instance branding: the accent colour is not a red tone and not confusable with the error or energy colours, and static SVG logo files contain no scripts or external references (`docs/DESIGN.md`, sections 3.2 and 10). The table in `docs/DESIGN.md`, section 3.2, states where the operator changes each branding value.
 
 ## 8. Email
 
@@ -95,6 +95,8 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 * [ ] Light and dark mode work only through the button in the top right corner (default: light, also when the device prefers dark; no automatic mode, D-056); the choice is kept for the tab only; the negative logo is used in dark mode.
 * [ ] A print stylesheet hides navigation and controls.
 * [ ] Fonts and icons are served by the instance itself; licence texts of the fonts are included.
+* [ ] The error pages (404, 403, the expired-page page of a failed security check, 500) are in the design of the portal (logo, tokens, friendly short texts of `navigation/VORGABEN.md`, section 8a), show no technical detail and work without a session, a database and a context processor (D-054, D-060).
+* [ ] The start page of the administration shows the groups "Benutzer", "Inhalte" and "System", the hint where texts and footer addresses are maintained, and the name of the instance as the title (D-060).
 * [ ] Keyboard operation and a visible focus indicator work on all phase 1 pages.
 
 ## 13. Language

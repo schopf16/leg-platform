@@ -342,6 +342,88 @@ body {
   color: var(--fg);
 }
 
+/* ---- Error pages (error_base.html; navigation/VORGABEN.md, 8a) ----
+   A centred card on the page background with the logo, a friendly heading, one sentence and one
+   way out. No shadow; the same tokens as every page. */
+.error-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 16px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.error-card {
+  width: 100%;
+  max-width: 480px;
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.error-logo {
+  /* The plate of the dark mode has 8 px of padding; the logo itself lines up with the text. */
+  margin-inline-start: -8px;
+}
+
+.error-logo .portal-logo {
+  display: block;
+  width: auto;
+  height: 40px;
+  max-width: 100%;
+  max-height: 40px;
+}
+
+.error-logo .portal-logo-dark,
+:root[data-theme="dark"] .error-logo .portal-logo-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .error-logo .portal-logo-dark {
+  display: block;
+}
+
+.error-logo .logo-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.error-card h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.error-text {
+  margin: 0;
+  font-size: 16px;
+}
+
+.error-text a {
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .error-card {
+    padding: 24px 16px;
+  }
+
+  .error-card h1 {
+    font-size: 24px;
+  }
+
+  .error-card .btn {
+    width: 100%;
+  }
+}
+
 .entry-form {
   min-width: 0;
   padding: 48px 56px;

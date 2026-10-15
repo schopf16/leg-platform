@@ -198,6 +198,22 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
 
     field_order = PROFILE_FIELD_ORDER
 
+    def save(self, commit=True):
+        """Write only the fields of the form (security review of phase 4, M1).
+
+        The instance was loaded at the start of the request. A save of every column would write
+        back what a parallel request changed in the meantime: the end of all sessions
+        (``session_version``), a new password or the second address.
+        """
+        if not commit:
+            return super().save(commit=False)
+        if self.errors:
+            raise ValueError("The profile could not be saved because the data did not validate.")
+        self.instance.save(
+            update_fields=[*PROFILE_FIELDS, "swiss_postal_code", "foreign_postal_code"]
+        )
+        return self.instance
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial.setdefault("postal_code", self.instance.postal_code_display)
@@ -220,6 +236,8 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
             "numeric" if self._country_code() == SWITZERLAND else "text"
         )
         self.fields["post_office_box_number"].described_by = ("hint",)
+        # The short label of the images (the registration says "Postal code" in full).
+        self.fields["postal_code"].label = _("ZIP code")
 
     def _country_code(self):
         if self.is_bound:
@@ -511,6 +529,8 @@ class SetupCodeForm(CodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["otp_token"].widget.attrs["inputmode"] = "numeric"
+        self.fields["otp_token"].widget.attrs["placeholder"] = "000000"
+        self.fields["otp_token"].label = _("Code from the app")
 
 
 class StartSetupForm(PortalFormMixin, forms.Form):
@@ -537,9 +557,9 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
     )
     # Removed for an account without a second factor. A recovery code is also accepted here.
     otp_token = forms.CharField(
-        label=_("Code"),
+        label=_("Code from the app"),
         max_length=32,
-        widget=forms.TextInput(attrs={"autocomplete": "one-time-code"}),
+        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "placeholder": "000000"}),
         error_messages={"required": _("Enter the code.")},
     )
     password_error = _("The password is not correct. Please try again.")
@@ -670,6 +690,8 @@ class AccountDeleteForm(ReauthenticationForm):
         super().__init__(*args, **kwargs)
         # The confirmation is given again with every attempt: after an error the box is never
         # shown as ticked, so that a repeated submit is never a confirmation by habit.
+        # The error summary names the box by a short word, not by the whole sentence (D11).
+        self.fields["confirm"].summary_label = _("Confirmation")
         self.fields["confirm"].widget = forms.CheckboxInput(
             attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
         )
@@ -686,11 +708,21 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
         error_messages={"required": _("Enter your current password.")},
     )
-    field_order = ("current_password", "new_password1", "new_password2")
+    # Asked for where a second factor is set up, as for the other changes of the account (K12,
+    # security review of phase 4); a recovery code is also accepted. Removed otherwise.
+    otp_token = forms.CharField(
+        label=_("Code from the app"),
+        max_length=32,
+        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "placeholder": "000000"}),
+        error_messages={"required": _("Enter the code.")},
+    )
+    field_order = ("current_password", "otp_token", "new_password1", "new_password2")
 
     def __init__(self, user, *args, request, **kwargs):
         super().__init__(user, *args, **kwargs)
         self.request = request
+        if not second_factor.has_second_factor(user):
+            del self.fields["otp_token"]
         self.fields["new_password1"].widget.attrs.pop("autofocus", None)
         describe_password_fields(self, "new_password1", "new_password2")
 
@@ -702,6 +734,17 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        # The code is checked only after the password was right.
+        if (
+            "otp_token" in self.fields
+            and "current_password" in cleaned_data
+            and "otp_token" in cleaned_data
+            and second_factor.verify_second_factor(
+                self.request, self.user, cleaned_data["otp_token"]
+            )
+            is None
+        ):
+            self.add_error("otp_token", CodeForm.invalid_code_message)
         # An initial password that must be replaced is not replaced by itself (D-005).
         if (
             self.user.password_change_required

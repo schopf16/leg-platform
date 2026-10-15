@@ -183,8 +183,8 @@ class BotCheckTests(TestCase):
             with self.subTest(url=url):
                 html = Client().get(url).content.decode()
                 self.assertIn('class="hp-field" aria-hidden="true"', html)
-                self.assertRegex(html, r'name="company_website"[^>]*tabindex="-1"')
-                self.assertRegex(html, r'name="company_website"[^>]*autocomplete="off"')
+                self.assertRegex(html, r'name="contact_fax_number"[^>]*tabindex="-1"')
+                self.assertRegex(html, r'name="contact_fax_number"[^>]*autocomplete="off"')
                 self.assertIn('name="form_started"', html)
 
     def test_a_filled_hidden_field_gets_the_same_page_and_no_job(self):
@@ -195,7 +195,7 @@ class BotCheckTests(TestCase):
                 MailJob.objects.all().delete()
 
                 caught = post_form(
-                    url, make("a.person@example.org", company_website="https://spam.example"), address="10.72.0.3"
+                    url, make("a.person@example.org", contact_fax_number="https://spam.example"), address="10.72.0.3"
                 )
 
                 self.assertEqual((caught.status_code, caught["Location"]), (normal.status_code, normal["Location"]))
@@ -227,7 +227,7 @@ class BotCheckTests(TestCase):
 
     def test_a_hit_is_never_shown_as_a_refusal(self):
         response = post_form(
-            REGISTRATION_URL, registration_data("a.person@example.org", company_website="x")
+            REGISTRATION_URL, registration_data("a.person@example.org", contact_fax_number="x")
         )
 
         self.assertEqual(response.status_code, 302)
@@ -235,7 +235,7 @@ class BotCheckTests(TestCase):
 
     def test_the_pages_after_a_hit_and_after_a_request_are_the_same(self):
         pages = []
-        for extra in ({}, {"company_website": "x"}):
+        for extra in ({}, {"contact_fax_number": "x"}):
             client = Client()
             response = post_form(
                 REGISTRATION_URL, registration_data("a.person@example.org", **extra), client, "10.72.0.6"

@@ -2,6 +2,16 @@
 {% load i18n static %}
 {% block title %}{% translate "Profile" %}{% endblock %}
 {% block inner_class %}{% endblock %}
+{# The messages are shown inside the cards (D4); only the ones without a card stay here. #}
+{% block messages %}
+  {% if general_messages %}
+    <div role="status">
+      {% for message in general_messages %}
+        <div class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag|default:'info' }}{% endif %}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
 {% block content %}
   <p class="page-label">{% translate "My account" %}</p>
   <h1 class="start-title">{% translate "Profile" %}</h1>
@@ -26,4 +36,5 @@
   {% endif %}
   {% if tf_state == "codes" %}<script defer src="{% static 'js/recovery-codes.js' %}"></script>{% endif %}
   <script defer src="{% static 'js/confirm-gate.js' %}"></script>
+  <script defer src="{% static 'js/profile-focus.js' %}"></script>
 {% endblock %}

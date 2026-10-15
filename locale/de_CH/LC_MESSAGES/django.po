@@ -203,9 +203,6 @@ msgstr "Adressvorschläge sind vorübergehend eingeschränkt. Sie können mit de
 msgid "Address suggestions need JavaScript. You can continue with the address as entered."
 msgstr "Adressvorschläge benötigen JavaScript. Sie können mit der eingegebenen Adresse fortfahren."
 
-msgid "An import is already queued, running or was requested within the last hour."
-msgstr "Ein Import ist bereits vorgemerkt, läuft oder wurde innerhalb der letzten Stunde angefordert."
-
 msgid "Can request an address directory import"
 msgstr "Kann einen Import des Adressverzeichnisses anfordern"
 
@@ -248,23 +245,11 @@ msgstr "Konto sperren"
 msgid "Blocked the account."
 msgstr "Das Konto wurde gesperrt."
 
-msgid "Cancel and return to profile"
-msgstr "Abbrechen und zum Profil zurückkehren"
-
-msgid "Change email address"
-msgstr "E-Mail-Adresse ändern"
-
-msgid "Check the new email address"
-msgstr "Neue E-Mail-Adresse prüfen"
-
 msgid "Confirm email address change"
 msgstr "Änderung der E-Mail-Adresse bestätigen"
 
 msgid "Confirm new email address"
 msgstr "Neue E-Mail-Adresse bestätigen"
-
-msgid "Confirm with your current password and, if enabled, a code from your authenticator app."
-msgstr "Bestätigen Sie mit Ihrem aktuellen Passwort und, falls aktiviert, einem Code aus Ihrer Authenticator-App."
 
 msgid "Confirm your new email address at %(instance_name)s"
 msgstr "Neue E-Mail-Adresse bei %(instance_name)s bestätigen"
@@ -277,9 +262,6 @@ msgstr "Konto löschen"
 
 msgid "Deleted the account."
 msgstr "Das Konto wurde gelöscht."
-
-msgid "Edit profile"
-msgstr "Profil bearbeiten"
 
 msgid "Email address change requested"
 msgstr "Änderung der E-Mail-Adresse angefordert"
@@ -299,35 +281,17 @@ msgstr "Guten Tag\n\nBei %(instance_name)s wurde eine Änderung Ihrer E-Mail-Adr
 msgid "Hello\n\nSomeone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
 msgstr "Guten Tag\n\nBei %(instance_name)s wurde versucht, die E-Mail-Adresse eines Kontos in diese Adresse zu ändern. Es wurde keine Änderung vorgenommen. Falls Sie dies veranlasst haben, melden Sie sich mit der bereits registrierten E-Mail-Adresse an oder kontaktieren Sie den Betreiber."
 
-msgid "Hello\n\nThe email address for your account at %(instance_name)s was changed. All other sessions were ended."
-msgstr "Guten Tag\n\nDie E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Alle anderen Sitzungen wurden beendet."
-
 msgid "Home"
 msgstr "Startseite"
 
 msgid "I confirm this account change."
 msgstr "Ich bestätige diese Kontoänderung."
 
-#, python-format
-msgid "Open the link in the message to confirm the new address. The link is valid for %(counter)s hour. Your current email address remains unchanged until you confirm the new one."
-msgid_plural "Open the link in the message to confirm the new address. The link is valid for %(counter)s hours. Your current email address remains unchanged until you confirm the new one."
-msgstr[0] "Öffnen Sie in der Nachricht den Link, um die neue Adresse zu bestätigen. Der Link ist %(counter)s Stunde gültig. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
-msgstr[1] "Öffnen Sie in der Nachricht den Link, um die neue Adresse zu bestätigen. Der Link ist %(counter)s Stunden gültig. Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen."
-
-msgid "New email address"
-msgstr "Neue E-Mail-Adresse"
-
 msgid "Notification: email address changed"
 msgstr "Benachrichtigung: E-Mail-Adresse geändert"
 
 msgid "Personal link to confirm the new email address."
 msgstr "Persönlicher Link zur Bestätigung der neuen E-Mail-Adresse."
-
-msgid "Save profile"
-msgstr "Profil speichern"
-
-msgid "Send verification link"
-msgstr "Bestätigungslink senden"
 
 msgid "The account change could not be made. It may be the last system administrator or its email address may be in use."
 msgstr "Die Kontoänderung konnte nicht durchgeführt werden. Möglicherweise handelt es sich um den letzten Systemadministrator oder die E-Mail-Adresse ist bereits in Verwendung."
@@ -353,20 +317,8 @@ msgstr "Konto entsperren"
 msgid "Unblocked the account."
 msgstr "Das Konto wurde entsperrt."
 
-msgid "We will keep your current email address until you verify the new one. Enter your password and, if enabled, a code from your authenticator app."
-msgstr "Ihre aktuelle E-Mail-Adresse bleibt bestehen, bis Sie die neue bestätigen. Geben Sie Ihr Passwort und, falls aktiviert, einen Code aus Ihrer Authenticator-App ein."
-
-msgid "Your account has been deleted."
-msgstr "Ihr Konto wurde gelöscht."
-
 msgid "Your email address at %(instance_name)s was changed"
 msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
-
-msgid "Fields marked optional may stay empty. All other fields are required."
-msgstr "Felder mit dem Hinweis «freiwillig» dürfen leer bleiben. Alle anderen Felder müssen ausgefüllt werden."
-
-msgid "Your profile was updated."
-msgstr "Ihr Profil wurde aktualisiert."
 
 msgid "No import requested"
 msgstr "Kein Import angefordert"
@@ -445,10 +397,6 @@ msgstr "Konto"
 msgid "accounts"
 msgstr "Konten"
 
-#: leg_platform/accounts/admin.py
-msgid "LEG Platform"
-msgstr "LEG-Plattform"
-
 msgid "Administration"
 msgstr "Verwaltung"
 
@@ -523,6 +471,14 @@ msgstr "Zugang zur Verwaltung"
 
 msgid "retention obligation"
 msgstr "Aufbewahrungspflicht"
+
+#. Verbose names that Django derives from the field names (privacy_accepted_at/url); the
+#. catalogue test requires a translation for every field of the account.
+msgid "privacy accepted at"
+msgstr "Datenschutzerklärung akzeptiert am"
+
+msgid "privacy accepted url"
+msgstr "Adresse der akzeptierten Datenschutzerklärung"
 
 msgid "salutation"
 msgstr "Anrede"
@@ -1027,13 +983,6 @@ msgstr "Zurück zur Anmeldeseite"
 msgid "Check your email"
 msgstr "Prüfen Sie Ihre E-Mails"
 
-msgid "If we can use the address you entered, we have sent a message to it. It should arrive within a few minutes. Please also look in your spam folder."
-msgstr "Wenn wir die angegebene Adresse verwenden können, haben wir eine Nachricht an diese Adresse gesendet. Sie sollte innerhalb weniger Minuten ankommen. Schauen Sie bitte auch im Spam-Ordner nach."
-
-#: leg_platform/accounts/templates/accounts/registration_invalid.html
-msgid "Link not valid"
-msgstr "Link ungültig"
-
 #: leg_platform/accounts/templates/accounts/profile.html
 msgid "Customer number"
 msgstr "Kundennummer"
@@ -1073,9 +1022,6 @@ msgstr "Der Code ist falsch oder wurde bereits verwendet."
 
 msgid "Current password"
 msgstr "Aktuelles Passwort"
-
-msgid "The password is incorrect."
-msgstr "Das Passwort ist falsch."
 
 #: leg_platform/accounts/views.py
 msgid "Your password was changed."
@@ -1192,7 +1138,7 @@ msgstr ""
 "Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Authentifizierung ausgeschaltet. Alle Wiederherstellungscodes sind ungültig geworden."
 
 #, python-format
-msgid "An recovery code was used at %(instance_name)s"
+msgid "A recovery code was used at %(instance_name)s"
 msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
 
 #: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
@@ -1200,7 +1146,7 @@ msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
 msgid ""
 "Hello\n"
 "\n"
-"An recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
+"A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
 msgstr ""
 "Guten Tag\n"
 "\n"
@@ -1223,34 +1169,14 @@ msgstr "Anmeldung bestätigen"
 msgid "Start again"
 msgstr "Neu beginnen"
 
-#: leg_platform/accounts/templates/accounts/two_factor.html
-msgid "Extra protection is turned on. After your password, you enter the code that your authenticator app shows."
-msgstr "Der zusätzliche Schutz ist eingeschaltet. Nach dem Passwort geben Sie den Code ein, den Ihre Authenticator-App anzeigt."
-
 #, python-format
 msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Sie haben %(counter)s unbenutzten Wiederherstellungscode."
 msgstr[1] "Sie haben %(counter)s unbenutzte Wiederherstellungscodes."
 
-msgid "Create new recovery codes"
-msgstr "Neue Wiederherstellungscodes erstellen"
-
-msgid "Turn off extra protection"
-msgstr "Zusätzlichen Schutz ausschalten"
-
 msgid "Your account must use two-factor authentication. It cannot be turned off."
 msgstr "Ihr Konto muss die Zwei-Faktor-Authentifizierung verwenden. Sie kann nicht ausgeschaltet werden."
-
-msgid "At the moment you log in with your password only. You can add a second step: after your password you enter a six-digit code that an app on your phone shows. This is voluntary. It protects your account even if someone learns your password."
-msgstr "Zurzeit melden Sie sich nur mit Ihrem Passwort an. Sie können einen zweiten Schritt hinzufügen: Nach dem Passwort geben Sie einen sechsstelligen Code ein, den eine App auf Ihrem Smartphone anzeigt. Das ist freiwillig. Es schützt Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt."
-
-msgid "Set up extra protection"
-msgstr "Zusätzlichen Schutz einrichten"
-
-#: leg_platform/accounts/templates/accounts/two_factor_setup.html
-msgid "Enter your password to continue. On the next page you connect an authenticator app on your phone."
-msgstr "Geben Sie Ihr Passwort ein, um fortzufahren. Auf der nächsten Seite verbinden Sie eine Authenticator-App auf Ihrem Smartphone."
 
 msgid "Continue"
 msgstr "Weiter"
@@ -1258,54 +1184,15 @@ msgstr "Weiter"
 msgid "Cancel"
 msgstr "Abbrechen"
 
-#: leg_platform/accounts/templates/accounts/two_factor_confirm.html
-msgid "Open the app and scan this QR code with its camera (look for «+» or «Add account»)."
-msgstr "Öffnen Sie die App und scannen Sie diesen QR-Code mit der Kamera (suchen Sie nach «+» oder «Konto hinzufügen»)."
-
 msgid "QR code for the authenticator app"
 msgstr "QR-Code für die Authenticator-App"
-
-msgid "Cannot scan? Enter this key instead"
-msgstr "Scannen nicht möglich? Geben Sie stattdessen diesen Schlüssel ein"
-
-msgid "Enter the code the app shows now."
-msgstr "Geben Sie den Code ein, den die App jetzt anzeigt."
-
-msgid "Turn on extra protection"
-msgstr "Zusätzlichen Schutz einschalten"
-
-#: leg_platform/accounts/templates/accounts/two_factor_disable.html
-msgid "After this you only need your password to log in, and your recovery codes become invalid. Enter your password and a code to confirm."
-msgstr "Danach brauchen Sie für die Anmeldung nur noch Ihr Passwort, und Ihre Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
-
-#: leg_platform/accounts/templates/accounts/recovery_codes_new.html
-msgid "Your earlier recovery codes become invalid. Enter your password and a code to confirm."
-msgstr "Ihre früheren Wiederherstellungscodes werden ungültig. Geben Sie zur Bestätigung Ihr Passwort und einen Code ein."
-
-msgid "The new codes are shown only once, on the next page."
-msgstr "Die neuen Codes werden nur einmal auf der nächsten Seite angezeigt."
 
 #: leg_platform/accounts/templates/accounts/recovery_codes.html
 msgid "Recovery codes"
 msgstr "Wiederherstellungscodes"
 
-msgid "Extra protection is turned on."
-msgstr "Der zusätzliche Schutz ist eingeschaltet."
-
-msgid "Your recovery codes"
-msgstr "Ihre Wiederherstellungscodes"
-
-msgid "The codes are shown only now. Save them before you leave this page."
-msgstr "Die Codes werden nur jetzt angezeigt. Speichern Sie sie, bevor Sie diese Seite verlassen."
-
-msgid "If you lose your phone or cannot open the app, you can log in with one of these codes instead of the app code. Each code works only once. Write them down or print them now. They are not shown again."
-msgstr "Wenn Sie Ihr Smartphone verlieren oder die App nicht öffnen können, melden Sie sich mit einem dieser Codes an, anstelle des App-Codes. Jeder Code gilt nur einmal. Schreiben Sie die Codes jetzt auf oder drucken Sie sie aus. Sie werden nicht noch einmal angezeigt."
-
 msgid "Copy codes"
 msgstr "Codes kopieren"
-
-msgid "I have saved the codes - continue"
-msgstr "Ich habe die Codes gespeichert – weiter"
 
 #: leg_platform/accounts/session_timeout.py
 msgid "You were logged out for security reasons. Please log in again."
@@ -1484,11 +1371,6 @@ msgstr "Haben Sie das nicht erwartet? Dann schliessen Sie diese Seite. Es änder
 
 msgid "Remove now"
 msgstr "Jetzt entfernen"
-
-#: leg_platform/accounts/templates/accounts/two_factor_reset_invalid.html
-#, python-format
-msgid "This link is not valid or has expired. If you still need to remove two-factor authentication, please contact %(instance_name)s. The removal can be started again there."
-msgstr "Dieser Link ist ungültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Authentifizierung noch entfernen müssen, wenden Sie sich bitte an %(instance_name)s. Dort kann das Entfernen erneut veranlasst werden."
 
 #: leg_platform/accounts/templates/accounts/password_change.html
 msgid "You must choose a new password before you can continue. The current password was only meant for the first login."
@@ -1681,17 +1563,8 @@ msgstr "Passwort anzeigen"
 msgid "Hide password"
 msgstr "Passwort verbergen"
 
-msgid "First name and last name are required, unless you enter a company name below."
-msgstr "Vorname und Nachname sind erforderlich, ausser Sie geben unten einen Firmennamen ein."
-
 msgid "Company"
 msgstr "Firma"
-
-msgid "Only fill in if invoices should be addressed to a company."
-msgstr "Nur ausfüllen, wenn die Rechnung auf eine Firma lauten soll."
-
-msgid "Postal address"
-msgstr "Postadresse"
 
 msgid "Only if you have no street address."
 msgstr "Nur, wenn Sie keine Strasse angeben."
@@ -1705,53 +1578,17 @@ msgstr "Passwort"
 msgid "You have been logged out."
 msgstr "Sie wurden abgemeldet."
 
-msgid "If nothing arrives, check the spelling of the address and try again."
-msgstr "Kommt nichts an, prüfen Sie die Schreibweise der Adresse und versuchen Sie es erneut."
-
-msgid "Change email address again"
-msgstr "E-Mail-Adresse erneut ändern"
-
 msgid "If you forgot your password, you can choose a new one."
 msgstr "Wenn Sie Ihr Passwort vergessen haben, können Sie ein neues wählen."
-
-msgid "Extra protection when logging in"
-msgstr "Zusätzlicher Schutz bei der Anmeldung"
 
 msgid "You have no unused recovery codes left. Create new ones."
 msgstr "Sie haben keine unbenutzten Wiederherstellungscodes mehr. Erstellen Sie neue."
 
-msgid "Turn off"
-msgstr "Ausschalten"
-
-msgid "A free app for your smartphone that shows a new number code every 30 seconds. You can get one from the App Store or Google Play, for example Google Authenticator or Microsoft Authenticator."
-msgstr "Eine kostenlose App für Ihr Smartphone, die alle 30 Sekunden einen neuen Zahlencode anzeigt. Sie finden sie im App Store oder bei Google Play, zum Beispiel «Google Authenticator» oder «Microsoft Authenticator»."
-
-msgid "What is an authenticator app?"
-msgstr "Was ist eine Authenticator-App?"
-
 msgid "Two-factor authentication is mandatory for your role."
 msgstr "Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht."
 
-msgid "Steps of the setup"
-msgstr "Schritte der Einrichtung"
-
-msgid "Connect the app"
-msgstr "App verbinden"
-
-msgid "Save recovery codes"
-msgstr "Wiederherstellungscodes speichern"
-
-msgid "Install an authenticator app if you do not have one yet."
-msgstr "Installieren Sie eine Authenticator-App, falls Sie noch keine haben."
-
-msgid "Scan with the camera inside your authenticator app."
-msgstr "Scannen Sie den Code mit der Kamera in Ihrer Authenticator-App."
-
 msgid "Two-factor authentication was turned off."
 msgstr "Die Zwei-Faktor-Authentifizierung wurde ausgeschaltet."
-
-msgid "Print this page"
-msgstr "Seite drucken"
 
 msgid "The codes were copied."
 msgstr "Die Codes wurden kopiert."
@@ -1774,48 +1611,8 @@ msgstr "Bitte setzen Sie das Häkchen, um zu bestätigen, dass Sie Ihr Konto lö
 msgid "Page not found"
 msgstr "Seite nicht gefunden"
 
-msgid "The page does not exist or was moved. Check the address or go to the start page."
-msgstr "Die Seite gibt es nicht oder sie wurde verschoben. Prüfen Sie die Adresse oder gehen Sie zur Startseite."
-
 msgid "Go to the start page"
 msgstr "Zur Startseite"
-
-msgid "Access denied"
-msgstr "Zugriff verweigert"
-
-msgid "You do not have permission to open this page."
-msgstr "Sie dürfen diese Seite nicht öffnen."
-
-msgid "Your entry could not be processed"
-msgstr "Ihre Eingabe konnte nicht verarbeitet werden"
-
-msgid "The page was open for too long, or your browser blocked a security check. Nothing has been saved. Please go back, reload the page and try again."
-msgstr "Die Seite war zu lange geöffnet, oder Ihr Browser hat eine Sicherheitsprüfung blockiert. Es wurde nichts gespeichert. Gehen Sie bitte zurück, laden Sie die Seite neu und versuchen Sie es noch einmal."
-
-msgid "Something went wrong"
-msgstr "Etwas ist schiefgelaufen"
-
-msgid "We are sorry. Please try again later."
-msgstr "Das tut uns leid. Bitte versuchen Sie es später noch einmal."
-
-#, python-format
-msgid "Step %(step)s of 2"
-msgstr "Schritt %(step)s von 2"
-
-msgid "Set up extra protection now (about 2 minutes)"
-msgstr "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)"
-
-msgid "This is voluntary and takes about 2 minutes. You can turn it off again later."
-msgstr "Das ist freiwillig und dauert etwa 2 Minuten. Sie können den Schutz später wieder ausschalten."
-
-msgid "On the next page you connect an authenticator app on your phone."
-msgstr "Auf der nächsten Seite verbinden Sie eine Authenticator-App auf Ihrem Smartphone."
-
-msgid "Your account will be deleted. You will no longer be able to log in. This cannot be undone. You can register again later with the same email address."
-msgstr "Ihr Konto wird gelöscht. Sie können sich danach nicht mehr anmelden. Das kann nicht rückgängig gemacht werden. Sie können sich später mit derselben E-Mail-Adresse neu registrieren."
-
-msgid "I understand that my account will be deleted."
-msgstr "Ich verstehe, dass mein Konto gelöscht wird."
 
 msgid "Deleted (retention obligation)"
 msgstr "Gelöscht (Aufbewahrungspflicht)"
@@ -1946,14 +1743,32 @@ msgstr "Zur Anmeldung"
 msgid "Link no longer valid"
 msgstr "Link nicht mehr gültig"
 
-msgid "The link has expired or was already used. Your email address was not changed. You can request the change again in your profile."
-msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Ihre E-Mail-Adresse wurde nicht geändert. Sie können die Änderung im Profil erneut anfordern."
-
 msgid "Change stopped"
 msgstr "Änderung gestoppt"
 
-msgid "The change of your email address was stopped. Your previous addresses stay valid."
-msgstr "Die Änderung Ihrer E-Mail-Adresse wurde gestoppt. Ihre bisherigen Adressen bleiben gültig."
+msgid "The change of your email address was stopped. Your previous addresses stay valid. All sessions of your account were ended."
+msgstr "Die Änderung Ihrer E-Mail-Adresse wurde gestoppt. Ihre bisherigen Adressen bleiben gültig. Alle Sitzungen Ihres Kontos wurden beendet."
+
+msgid "If you did not request the change, choose a new password now."
+msgstr "Wenn Sie die Änderung nicht veranlasst haben, wählen Sie jetzt ein neues Passwort."
+
+msgid "Choose a new password"
+msgstr "Neues Passwort wählen"
+
+msgid "Notification: second email address changed"
+msgstr "Hinweis: zweite E-Mail-Adresse geändert"
+
+msgid "The second email address at %(instance_name)s was changed"
+msgstr "Die zweite E-Mail-Adresse bei %(instance_name)s wurde geändert"
+
+msgid ""
+"Hello\n"
+"\n"
+"The second email address for your account at %(instance_name)s was changed."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Die zweite E-Mail-Adresse für Ihr Konto bei %(instance_name)s wurde geändert."
 
 msgid "Second address confirmed"
 msgstr "Zweite Adresse bestätigt"
@@ -2025,12 +1840,6 @@ msgstr "Bestätigt"
 
 msgid "Set password"
 msgstr "Passwort festlegen"
-
-msgid "privacy accepted at"
-msgstr "Datenschutzerklärung akzeptiert am"
-
-msgid "privacy accepted url"
-msgstr "Adresse der akzeptierten Datenschutzerklärung"
 
 # The profile in cards and the second address (D-059)
 msgid "Personal link that stops the requested change of an email address."
@@ -2321,3 +2130,69 @@ msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Fa
 
 msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator of this portal. The removal can be started again there."
 msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die LEG. Dort kann das Entfernen erneut veranlasst werden."
+
+msgid "This page no longer exists."
+msgstr "Diese Seite gibt es nicht mehr."
+
+msgid "Back to the start page?"
+msgstr "Zurück zur Startseite?"
+
+msgid "Oops, something went wrong."
+msgstr "Hoppla, da ist etwas schiefgelaufen."
+
+msgid "Please try again in a moment."
+msgstr "Bitte versuchen Sie es gleich noch einmal."
+
+msgid "You have no access here."
+msgstr "Hier haben Sie keinen Zugriff."
+
+msgid "This page is not available to you."
+msgstr "Diese Seite ist für Sie nicht freigegeben."
+
+msgid "The page has expired."
+msgstr "Die Seite ist abgelaufen."
+
+msgid "Please reload the page and try again. Nothing has been saved."
+msgstr "Bitte laden Sie die Seite neu und versuchen Sie es noch einmal. Es wurde nichts gespeichert."
+
+msgid "Users"
+msgstr "Benutzer"
+
+msgid "Change"
+msgstr "Ändern"
+
+msgid "ZIP code"
+msgstr "PLZ"
+
+msgid "Confirmation"
+msgstr "Bestätigung"
+
+msgid "Cancel request: %(address)s"
+msgstr "Anfrage abbrechen: %(address)s"
+
+msgid "Receives information, not for logging in."
+msgstr "Erhält Informationen, nicht für die Anmeldung."
+
+msgid "To the profile"
+msgstr "Zum Profil"
+
+msgid "Content"
+msgstr "Inhalte"
+
+msgid "System"
+msgstr "System"
+
+msgid "You maintain the texts of the emails and the addresses of the footer under Content."
+msgstr "Texte der E-Mails und Adressen der Fusszeile pflegen Sie unter Inhalte."
+
+msgid "blocked or failed login"
+msgstr "gesperrte oder fehlgeschlagene Anmeldung"
+
+msgid "blocked and failed logins"
+msgstr "Gesperrte und fehlgeschlagene Anmeldungen"
+
+msgid "failed login in the log"
+msgstr "fehlgeschlagene Anmeldung im Protokoll"
+
+msgid "log of failed logins"
+msgstr "Protokoll der fehlgeschlagenen Anmeldungen"

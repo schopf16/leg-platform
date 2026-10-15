@@ -6,6 +6,7 @@ are plain text. Links are built from the canonical base URL of the instance conf
 never from the request (docs/SECURITY.md, section 4). Neither messages nor tokens are logged.
 """
 
+import math
 from datetime import timedelta
 
 from django.conf import settings
@@ -124,7 +125,7 @@ def send_registration_verification(address, raw_token, lifetime: timedelta):
             "verification_url": absolute_url(
                 reverse("accounts:registration_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 
@@ -147,7 +148,7 @@ def send_password_reset(address, raw_token, lifetime: timedelta):
             "reset_url": absolute_url(
                 reverse("accounts:password_reset_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 
@@ -166,7 +167,7 @@ def send_email_change_verification(address, raw_token, lifetime: timedelta):
             "email_change_url": absolute_url(
                 reverse("accounts:email_change_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 
@@ -179,6 +180,12 @@ def send_email_change_existing_account(address):
 def send_email_changed(address):
     """Notify the former address that the account email changed; contains no link."""
     _send(address, Key.EMAIL_CHANGED, {})
+
+
+def send_secondary_email_changed(address):
+    """Tell every address that the second address was added or removed; contains no link and no
+    word about logging in again (the sessions stay)."""
+    _send(address, Key.SECONDARY_EMAIL_CHANGED, {})
 
 
 def send_two_factor_enabled(address):
@@ -215,7 +222,7 @@ def send_two_factor_reset_link(address, raw_token, lifetime: timedelta):
             "two_factor_reset_url": absolute_url(
                 reverse("accounts:two_factor_reset_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 
@@ -234,7 +241,7 @@ def send_secondary_email_verification(address, raw_token, lifetime: timedelta):
             "email_change_url": absolute_url(
                 reverse("accounts:email_change_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 
@@ -249,7 +256,7 @@ def send_email_change_notice(address, raw_token, lifetime: timedelta):
             "stop_url": absolute_url(
                 reverse("accounts:email_change_stop_verify", kwargs={"token": raw_token})
             ),
-            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
         },
     )
 

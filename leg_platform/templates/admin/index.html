@@ -1,0 +1,6 @@
+{% extends "admin/index.html" %}
+{# The start page of the administration: Django's page with one hint above the groups (WL-23). #}
+{% block content %}
+  {% if index_hint %}<p class="help">{{ index_hint }}</p>{% endif %}
+  {{ block.super }}
+{% endblock %}

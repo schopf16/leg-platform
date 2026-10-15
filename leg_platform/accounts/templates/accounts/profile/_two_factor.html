@@ -3,7 +3,7 @@ The card of two-factor authentication with every state in place (navigation/VORG
 3.3, item 3), chosen by the server: ``tf_state`` is view, setup, app (step 1 of 2), codes (step 2
 of 2, or new codes) , codes_new or disable. The recovery codes are shown only in the answer to the
 form that made them; nothing about them is stored (D-059).
-{% endcomment %}<section class="profile-card" id="card-two-factor" aria-labelledby="card-two-factor-title">
+{% endcomment %}<section class="profile-card" id="card-two-factor" aria-labelledby="card-two-factor-title"{% if tf_state != "view" %} data-state="edit"{% endif %}>
   {% if tf_state == "view" or tf_state == "setup" %}
     <div class="profile-card-head">
       <h2 id="card-two-factor-title">{% translate "Two-factor authentication (2FA)" %}</h2>
@@ -14,6 +14,7 @@ form that made them; nothing about them is stored (D-059).
       {% endif %}
     </div>
   {% endif %}
+  {% include "accounts/profile/_card_messages.html" with items=messages_two_factor %}
 
   {% if tf_state == "view" %}
     {% if second_factor_active %}
@@ -29,7 +30,8 @@ form that made them; nothing about them is stored (D-059).
       <p class="profile-text">{% translate "With a code from an app you protect your account additionally. This is voluntary." %}</p>
       <form method="post" action="{% url 'accounts:two_factor_setup' %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary">{% translate "Set up 2FA" %}</button>
+        {# One primary button in view (R1): while another card is open, this one is secondary. #}
+        <div class="profile-actions"><button type="submit" class="btn {% if edit %}btn-secondary-action{% else %}btn-primary{% endif %}">{% translate "Set up 2FA" %}</button></div>
       </form>
     {% endif %}
 
@@ -39,7 +41,7 @@ form that made them; nothing about them is stored (D-059).
     {% if recent %}
       <form method="post" action="{% url 'accounts:two_factor_setup' %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary">{% translate "Set up 2FA" %}</button>
+        <div class="profile-actions"><button type="submit" class="btn btn-primary">{% translate "Set up 2FA" %}</button></div>
       </form>
     {% else %}
       {% with form=setup_form %}
@@ -85,9 +87,9 @@ form that made them; nothing about them is stored (D-059).
               data-done="{% translate 'The codes were copied.' %}" data-failed="{% translate 'The codes could not be copied. Please write them down.' %}">{% translate "Copy codes" %}</button>
     </div>
     <p class="profile-note d-print-none" role="status" data-codes-status></p>
-    <form method="post" action="{% url 'accounts:recovery_codes_done' %}" class="profile-form d-print-none" data-codes-done-form>
+    <form method="post" action="{% url 'accounts:recovery_codes_done' %}" class="profile-done-form d-print-none" data-codes-done-form>
       {% csrf_token %}
-      <label class="entry-check" for="id_saved"><input class="entry-check-input" type="checkbox" name="saved" id="id_saved"><span>{% translate "I saved the codes." %}</span></label>
+      <label class="entry-check" for="id_saved"><input class="entry-check-input" type="checkbox" name="saved" id="id_saved" required><span>{% translate "I saved the codes." %}</span></label>
       <div class="profile-actions"><button type="submit" class="btn btn-primary" data-codes-done data-gate="id_saved">{% translate "Done" %}</button></div>
     </form>
 
@@ -117,7 +119,7 @@ form that made them; nothing about them is stored (D-059).
         {% include "accounts/_field.html" with field=form.current_password %}
         {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
         <div class="profile-actions">
-          <button type="submit" class="btn btn-danger">{% translate "Turn off 2FA" %}</button>
+          <button type="submit" class="btn btn-danger-outline">{% translate "Turn off 2FA" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>
         </div>
       </form>

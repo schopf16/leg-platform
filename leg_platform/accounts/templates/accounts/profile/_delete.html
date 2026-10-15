@@ -2,7 +2,8 @@
 The card "Konto löschen" (navigation/VORGABEN.md, section 3.3, item 4): the red start state, then
 the confirmation with the notice of the legal text (legal/VORGABEN.md, section 7), the password,
 the box and the red button.
-{% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title">
+{% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title"{% if edit == "delete" %} data-state="edit"{% endif %}>
+  {% include "accounts/profile/_card_messages.html" with items=messages_delete %}
   {% if edit == "delete" %}
     <h2 id="card-delete-title">{% translate "Really delete the account?" %}</h2>
     <p class="profile-text">{% translate "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted." %}</p>
@@ -15,7 +16,7 @@ the box and the red button.
         {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
         {% include "accounts/_field.html" with field=form.confirm %}
         <div class="profile-actions">
-          <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
+          <button type="submit" class="btn btn-danger-outline" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
         </div>
       </form>

@@ -2,11 +2,12 @@
 The card "Persönliche Angaben" (navigation/VORGABEN.md, section 3.3): name and address; the form
 opens in the card. The further fields of the profile (salutation, company, address addition, post
 office box, country, phone) are under "Weitere Angaben (optional)" (K15).
-{% endcomment %}<section class="profile-card" id="card-personal" aria-labelledby="card-personal-title">
+{% endcomment %}<section class="profile-card" id="card-personal" aria-labelledby="card-personal-title"{% if edit == "personal" %} data-state="edit"{% endif %}>
   <div class="profile-card-head has-action">
     <h2 id="card-personal-title">{% translate "Personal details" %}</h2>
     {% if edit != "personal" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=personal#card-personal">{% translate "Edit" %}</a>{% endif %}
   </div>
+  {% include "accounts/profile/_card_messages.html" with items=messages_personal %}
   {% if edit == "personal" %}
     {% with form=personal_form %}
       <form method="post" action="{% url 'accounts:profile_edit' %}" class="profile-form" novalidate>

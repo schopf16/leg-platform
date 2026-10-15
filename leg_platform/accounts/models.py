@@ -947,6 +947,16 @@ class User(AbstractBaseUser, PermissionsMixin):
             # The second address and the requests for new addresses are no longer needed, also
             # for an account that is kept under the retention obligation (D-059).
             PendingEmailChange.objects.using(using).filter(user=account).delete()
+            # The links of a change in progress hold the proposed address; they go as well
+            # (security review of phase 4, M2).
+            VerificationToken.objects.using(using).filter(
+                user=account,
+                purpose__in=(
+                    VerificationToken.Purpose.EMAIL_CHANGE,
+                    VerificationToken.Purpose.SECONDARY_EMAIL,
+                    VerificationToken.Purpose.EMAIL_CHANGE_STOP,
+                ),
+            ).delete()
             if account.secondary_email:
                 account.secondary_email = ""
                 account.save(using=using, update_fields=["secondary_email"])
@@ -1285,12 +1295,14 @@ class MailJob(models.Model):
         SECONDARY_EMAIL_REQUEST = "secondary_email_request", "Second email address request"
         EMAIL_CHANGE_NOTICE = "email_change_notice", "Email address change requested"
         ACCOUNT_DELETED = "account_deleted", "Account deleted"
+        SECONDARY_EMAIL_CHANGED = "secondary_email_changed", "Second email address changed"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
     NOTIFICATION_KINDS = (
         Kind.PASSWORD_CHANGED,
         Kind.EMAIL_CHANGED,
+        Kind.SECONDARY_EMAIL_CHANGED,
         Kind.TWO_FACTOR_ENABLED,
         Kind.TWO_FACTOR_DISABLED,
         Kind.RECOVERY_CODES_RENEWED,
@@ -1354,6 +1366,9 @@ class EmailText(models.Model):
             "Email address change: the new address already has an account"
         )
         EMAIL_CHANGED = "email_changed", _("Notification: email address changed")
+        SECONDARY_EMAIL_CHANGED = "secondary_email_changed", _(
+            "Notification: second email address changed"
+        )
         TWO_FACTOR_ENABLED = "two_factor_enabled", _(
             "Notification: two-factor authentication set up"
         )

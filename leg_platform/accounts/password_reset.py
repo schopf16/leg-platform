@@ -56,20 +56,33 @@ def process_password_changed(address):
 
 
 def delete_expired_reset_tokens(now=None):
-    """Delete reset and email change links that expired.
+    """Delete reset, second factor, email change and stop links that expired, and the requests
+    for new addresses that expired.
 
-    Email change links are included so that the proposed address they hold (``target_email``)
-    does not stay in the database after the link expired (D-016, data minimisation).
+    The links of an email change hold the proposed address (``target_email``) and the requests
+    hold it too: neither stays in the database after it expired (D-016, data minimisation;
+    security review of phase 4, M2). The stop links of an account without an open request go too
+    (their meaning ended with the request).
     """
+    from leg_platform.accounts.models import PendingEmailChange
+
+    now = now or timezone.now()
     count, _ = VerificationToken.objects.filter(
         purpose__in=(
             VerificationToken.Purpose.PASSWORD_RESET,
             VerificationToken.Purpose.TWO_FACTOR_RESET,
             VerificationToken.Purpose.EMAIL_CHANGE,
+            VerificationToken.Purpose.SECONDARY_EMAIL,
+            VerificationToken.Purpose.EMAIL_CHANGE_STOP,
         ),
-        expires_at__lte=now or timezone.now(),
+        expires_at__lte=now,
     ).delete()
-    return count
+    expired, _ = PendingEmailChange.objects.filter(expires_at__lte=now).delete()
+    open_accounts = PendingEmailChange.objects.values("user_id")
+    idle_stops, _ = VerificationToken.objects.filter(
+        purpose=VerificationToken.Purpose.EMAIL_CHANGE_STOP
+    ).exclude(user_id__in=open_accounts).delete()
+    return count + expired + idle_stops
 
 
 def complete_reset(token, form):

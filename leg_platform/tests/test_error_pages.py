@@ -38,7 +38,8 @@ class ErrorPageTests(SimpleTestCase):
         self.assertNotIn("'unsafe-inline'", policy)
         # The page is styled by the stylesheets of the portal, served by the instance itself.
         self.assertIn("css/portal.css", html)
-        self.assertIn('class="btn btn-primary', html)
+        self.assertIn('class="error-card"', html)
+        self.assertIn('class="logo-plate error-logo"', html)
         # No detail of the request, the exception or the configuration.
         for detail in ("Traceback", "DEBUG", "CSRF", "Origin", settings.SECRET_KEY, STRONG_KEY,
                        TEST_DB_PASSWORD, SECRET_PATH):
@@ -51,9 +52,8 @@ class ErrorPageTests(SimpleTestCase):
         html = self.check_common(response, 404)
 
         self.assertTemplateUsed(response, "404.html")
-        self.assertIn("Seite nicht gefunden", html)
-        self.assertIn("Zur Startseite", html)
-        self.assertIn('href="/"', html)
+        self.assertIn("Diese Seite gibt es nicht mehr.", html)
+        self.assertIn('<a href="/">Zurück zur Startseite?</a>', html)
         self.assertNotIn("The requested resource", html)
 
     def test_csrf_failure_is_swiss_german_and_leads_to_the_login_page(self):
@@ -64,7 +64,7 @@ class ErrorPageTests(SimpleTestCase):
 
         html = self.check_common(response, 403)
         self.assertTemplateUsed(response, "403_csrf.html")
-        self.assertIn("Ihre Eingabe konnte nicht verarbeitet werden", html)
+        self.assertIn("Die Seite ist abgelaufen.", html)
         self.assertIn("Es wurde nichts gespeichert", html)
         self.assertIn('href="/login/"', html)
         self.assertIn("Zurück zur Anmeldeseite", html)
@@ -76,7 +76,7 @@ class ErrorPageTests(SimpleTestCase):
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("Zugriff verweigert", html)
+        self.assertIn("Hier haben Sie keinen Zugriff.", html)
         self.assertNotIn("detail-of-the-exception", html)
         self.assertNotIn(SHARP_S, html)
 
@@ -93,8 +93,8 @@ class ErrorPageTests(SimpleTestCase):
         with translation.override("en"):
             html = page_not_found(RequestFactory().get("/x/"), Http404()).content.decode()
 
-        self.assertIn("Page not found", html)
-        self.assertNotIn("Seite nicht gefunden", html)
+        self.assertIn("This page no longer exists.", html)
+        self.assertNotIn("Diese Seite gibt es nicht mehr", html)
 
     @override_settings(
         ROOT_URLCONF="leg_platform.tests.urls", DEBUG=False
@@ -106,12 +106,30 @@ class ErrorPageTests(SimpleTestCase):
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 500)
-        self.assertIn("Etwas ist schiefgelaufen", html)
-        self.assertIn("Das tut uns leid", html)
+        self.assertIn("Hoppla, da ist etwas schiefgelaufen.", html)
+        self.assertIn("Bitte versuchen Sie es gleich noch einmal.", html)
         self.assertIn("Zur Startseite", html)
         self.assertIn("css/portal.css", html)
         self.assertNotIn(SHARP_S, html)
         assert_no_inline_code(self, html)
+
+    @override_settings(INSTANCE_NAME="LEG-Portal")
+    def test_the_name_and_the_logo_of_the_instance_come_from_the_settings_without_a_request(self):
+        html = server_error(RequestFactory().get("/error/")).content.decode()
+
+        self.assertIn("LEG-Portal", html)
+        self.assertIn("<title>Hoppla, da ist etwas schiefgelaufen. – LEG-Portal</title>", html)
+
+    def test_the_logo_files_of_the_instance_are_shown_when_they_are_configured(self):
+        from types import SimpleNamespace
+
+        branding = SimpleNamespace(logo_light="instance/light.svg", logo_dark="instance/dark.svg")
+        with override_settings(INSTANCE_BRANDING=branding):
+            html = page_not_found(RequestFactory().get("/x/"), Http404()).content.decode()
+
+        self.assertIn("instance/light.svg", html)
+        self.assertIn("instance/dark.svg", html)
+        self.assertIn("portal-logo-dark", html)
 
     @override_settings(ROOT_URLCONF="leg_platform.tests.urls", DEBUG=False)
     def test_server_error_through_the_middleware_has_the_policy_and_no_detail(self):

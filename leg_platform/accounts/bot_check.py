@@ -20,7 +20,7 @@ SALT = "leg-platform.mail-request-form"
 MINIMUM_SECONDS = 2
 # A form that was open for longer than this is treated as a hit (the signature has expired).
 MAXIMUM_SECONDS = 3 * 24 * 3600
-HONEYPOT_FIELD = "company_website"
+HONEYPOT_FIELD = "contact_fax_number"
 STAMP_FIELD = "form_started"
 
 

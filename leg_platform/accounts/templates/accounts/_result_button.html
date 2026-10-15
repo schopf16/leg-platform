@@ -1,0 +1,1 @@
+{% load i18n %}{# The way out of a result page: a person who is logged in goes to the profile, anybody else to the login. #}{% if user.is_authenticated %}<a class="btn btn-primary" href="{% url 'accounts:profile' %}">{% translate "To the profile" %}</a>{% else %}<a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>{% endif %}

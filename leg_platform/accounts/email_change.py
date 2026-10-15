@@ -35,14 +35,32 @@ KIND_OF_PURPOSE = {purpose: kind for kind, purpose in PURPOSE_OF_KIND.items()}
 CONFIRMATION_PURPOSES = tuple(PURPOSE_OF_KIND.values())
 
 
+def _drop_stop_tokens_if_idle(user):
+    """Delete the stop links of the account when no request is open any more (security review of
+    phase 4, H1): a link of a notice only has a meaning while the change it reports is pending."""
+    if not has_open_request(user):
+        VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
+
+
+def has_open_request(user):
+    """Whether the account has a request for a new address that has not expired."""
+    return PendingEmailChange.objects.filter(user=user, expires_at__gt=timezone.now()).exists()
+
+
 def pending_changes(user):
     """The open requests of the account by kind; expired ones are removed (D-059)."""
-    PendingEmailChange.objects.filter(user=user, expires_at__lte=timezone.now()).delete()
+    expired, _ = PendingEmailChange.objects.filter(user=user, expires_at__lte=timezone.now()).delete()
+    if expired:
+        _drop_stop_tokens_if_idle(user)
     return {row.kind: row for row in PendingEmailChange.objects.filter(user=user)}
 
 
 def _remaining(pending):
     return max(pending.expires_at - timezone.now(), timedelta(seconds=1))
+
+
+class RequestRefused(Exception):
+    """The limit of the client address or of the instance is used up (D-038): nothing was stored."""
 
 
 def request_changes(request, user, *, login=None, secondary=None, remove_secondary=False):
@@ -52,6 +70,11 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
     caller has asked for the password and, where set up, the code. A removed second address is
     removed at once (nothing needs confirming). Every request counts against the limits of the
     mail requests (D-038), and the old addresses get the notice with the stop link.
+
+    The notice is queued before the links, so that it is sent first (security review of phase 4):
+    nobody can confirm before the old address was told. If a limit refuses one of the requests,
+    ``RequestRefused`` is raised and everything of this call is rolled back (the earlier request
+    stays as it was, and no job is left without its row).
     """
     from leg_platform.accounts.mail_queue import enqueue_for_account, submit_mail_request
 
@@ -59,13 +82,13 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
     with transaction.atomic():
         locked = User._base_manager.select_for_update().get(pk=user.pk)
         expires_at = timezone.now() + EMAIL_CHANGE_LIFETIME
+        submissions = []
         if login:
             PendingEmailChange.objects.update_or_create(
                 user=locked, kind=Kind.LOGIN, defaults={"address": login, "expires_at": expires_at}
             )
             VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE).delete()
-            submit_mail_request(request, MailJob.Kind.EMAIL_CHANGE_REQUEST, login, account=locked)
-            requested = True
+            submissions.append((MailJob.Kind.EMAIL_CHANGE_REQUEST, login))
         if secondary:
             PendingEmailChange.objects.update_or_create(
                 user=locked,
@@ -73,21 +96,24 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
                 defaults={"address": secondary, "expires_at": expires_at},
             )
             VerificationToken.objects.filter(user=locked, purpose=Purpose.SECONDARY_EMAIL).delete()
-            submit_mail_request(
-                request, MailJob.Kind.SECONDARY_EMAIL_REQUEST, secondary, account=locked
-            )
-            requested = True
+            submissions.append((MailJob.Kind.SECONDARY_EMAIL_REQUEST, secondary))
         if remove_secondary and locked.secondary_email:
             recipients = locked.notification_addresses()
             locked.set_secondary_email("")
             PendingEmailChange.objects.filter(user=locked, kind=Kind.SECONDARY).delete()
             VerificationToken.objects.filter(user=locked, purpose=Purpose.SECONDARY_EMAIL).delete()
-            enqueue_for_account(MailJob.Kind.EMAIL_CHANGED, locked, addresses=recipients)
+            enqueue_for_account(MailJob.Kind.SECONDARY_EMAIL_CHANGED, locked, addresses=recipients)
             security_log.record(SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=locked)
-        if requested:
+        if submissions:
+            # An older notice must not stop or report a newer request: its links end here.
+            VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
             # The notice goes to the addresses that are valid now, with the link that stops it.
             enqueue_for_account(MailJob.Kind.EMAIL_CHANGE_NOTICE, locked)
+            for kind, address in submissions:
+                if not submit_mail_request(request, kind, address, account=locked):
+                    raise RequestRefused
             security_log.record(SecurityEvent.Event.EMAIL_CHANGE_REQUESTED, account=locked)
+            requested = True
     return requested
 
 
@@ -218,7 +244,8 @@ def confirm_change(token):
                 return None
             locked_token.delete()
             pending.delete()
-            enqueue_for_account(MailJob.Kind.EMAIL_CHANGED, user, addresses=recipients)
+            _drop_stop_tokens_if_idle(user)
+            enqueue_for_account(MailJob.Kind.SECONDARY_EMAIL_CHANGED, user, addresses=recipients)
             security_log.record(SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=user)
             return user
         duplicate = (
@@ -246,6 +273,7 @@ def confirm_change(token):
             return None
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE).delete()
         pending.delete()
+        _drop_stop_tokens_if_idle(user)
         user.end_all_sessions()
         # The old login address and the second address are told (D-059).
         enqueue_for_account(MailJob.Kind.EMAIL_CHANGED, user, addresses=recipients)
@@ -260,6 +288,7 @@ def cancel(user, kind):
         deleted, _ = PendingEmailChange.objects.filter(user=locked, kind=kind).delete()
         VerificationToken.objects.filter(user=locked, purpose=PURPOSE_OF_KIND[kind]).delete()
         if deleted:
+            _drop_stop_tokens_if_idle(locked)
             security_log.record(SecurityEvent.Event.EMAIL_CHANGE_CANCELLED, account=locked)
     return bool(deleted)
 
@@ -267,11 +296,17 @@ def cancel(user, kind):
 def stop_all(user):
     """The link of the notice stops every pending change of the account (D-059).
 
-    The links of the confirmations and the other stop links end with it, and the sessions of the
-    account end: whoever asked for the change was not the owner, or the owner wants to be sure.
+    Returns the account, or None when no request is open: then the link has no meaning any more
+    (the change was confirmed, cancelled or has expired) and nothing happens, in particular no
+    session ends (security review of phase 4, H1). The links of the confirmations and the other
+    stop links end with the stop, and the sessions of the account end: whoever asked for the
+    change was not the owner, or the owner wants to be sure.
     """
     with transaction.atomic():
         locked = User._base_manager.select_for_update().get(pk=user.pk)
+        if not has_open_request(locked):
+            VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
+            return None
         PendingEmailChange.objects.filter(user=locked).delete()
         VerificationToken.objects.filter(
             user=locked,

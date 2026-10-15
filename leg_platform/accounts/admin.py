@@ -58,11 +58,16 @@ Event = SecurityEvent.Event
 # Versions of an email text that are kept per email (D-039).
 MAX_EMAIL_TEXT_VERSIONS = 100
 
-# Plain, instance-neutral titles instead of Django's defaults, which name Django (D-036).
-# Instance-specific names follow with the instance configuration (README, "Current Status").
-admin.site.site_header = _("LEG Platform")
-admin.site.site_title = _("LEG Platform")
+# Plain, instance-neutral titles instead of Django's defaults, which name Django (D-036). The
+# header and the title of the site are the name of the instance (``PortalAdminSite.each_context``).
 admin.site.index_title = _("Administration")
+
+# The names of the pages of the lockout protection are plain words instead of the product name
+# (WL-23); the models are those of django-axes, only their names are set here.
+AccessAttempt._meta.verbose_name = _("blocked or failed login")
+AccessAttempt._meta.verbose_name_plural = _("blocked and failed logins")
+AccessFailureLog._meta.verbose_name = _("failed login in the log")
+AccessFailureLog._meta.verbose_name_plural = _("log of failed logins")
 
 
 # Rights in the administration are granted only to an account that already uses two-factor

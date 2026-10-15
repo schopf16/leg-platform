@@ -1,14 +1,15 @@
-{% load i18n static %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
-{# Layout of the error pages. It does not extend base.html: an error page must not need the #}
-{# session, the database or a context processor. The 500 page is rendered without a request, so #}
-{# every value from the context is optional and the links fall back to fixed paths. Django passes #}
-{# no technical detail to these templates that is used here, and none must be shown (D-054). #}
+{% load i18n static instance_branding %}{% get_current_language as LANGUAGE_CODE %}{% instance_branding as brand %}<!doctype html>
+{# Layout of the error pages (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 8a). It does not #}
+{# extend base.html: an error page must not need the session, the database or a context #}
+{# processor. The 500 page is rendered without a request, so the name and the logos come from #}
+{# the settings through a tag, and the links fall back to fixed paths. Django passes no technical #}
+{# detail to these templates that is used here, and none must be shown (D-054). #}
 <html lang="{{ LANGUAGE_CODE }}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>{% block title %}{% endblock %}{% if instance_name %} – {{ instance_name }}{% endif %}</title>
+  <title>{% block title %}{% endblock %} – {{ brand.name }}</title>
   <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
   <script src="{% static 'js/theme-init.js' %}"></script>
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
@@ -17,19 +18,21 @@
 </head>
 <body class="register-clear">
   {% include "_corner_controls.html" %}
-  <div class="page">
-    <main class="page-body">
-      <div class="container-tight py-4">
-        <div class="card card-md">
-          <div class="card-body">
-            <h1 class="h2 mb-3">{% block heading %}{% endblock %}</h1>
-            {% block message %}{% endblock %}
-            {% block action %}{% endblock %}
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
+  <main class="error-page">
+    <div class="error-card">
+      <span class="logo-plate error-logo">
+        {% if brand.logo_light %}
+          <img class="portal-logo portal-logo-light" src="{% static brand.logo_light %}" alt="{{ brand.name }}">
+          <img class="portal-logo portal-logo-dark" src="{% static brand.logo_dark %}" alt="{{ brand.name }}">
+        {% else %}
+          <span class="logo-name">{{ brand.name }}</span>
+        {% endif %}
+      </span>
+      <h1>{% block heading %}{% endblock %}</h1>
+      {% block message %}{% endblock %}
+      {% block action %}{% endblock %}
+    </div>
+  </main>
   <script defer src="{% static 'js/corner-controls.js' %}"></script>
 </body>
 </html>

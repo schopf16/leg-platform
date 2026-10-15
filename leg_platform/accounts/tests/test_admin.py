@@ -9,7 +9,7 @@ from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
-from django.test import RequestFactory, TestCase, tag
+from django.test import RequestFactory, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
@@ -360,18 +360,54 @@ class AdminPresentationTests(TestCase):
         self.member = create_active_user("member@example.org")
         self.pending = User.objects.create_user("pending@example.org")
 
-    def test_site_titles_do_not_name_django(self):
+    def test_site_titles_do_not_name_django_and_are_the_name_of_the_instance(self):
         with translation.override("en"):
-            self.assertEqual(str(admin.site.site_header), "LEG Platform")
             self.assertEqual(str(admin.site.index_title), "Administration")
         with translation.override("de-ch"):
-            self.assertEqual(str(admin.site.site_header), "LEG-Plattform")
-            self.assertEqual(str(admin.site.site_title), "LEG-Plattform")
             self.assertEqual(str(admin.site.index_title), "Verwaltung")
             self.client.force_login(self.administrator)
-            content = self.client.get(reverse("admin:index")).content.decode()
+            with override_settings(INSTANCE_NAME="LEG-Portal"):
+                content = self.client.get(reverse("admin:index")).content.decode()
         self.assertNotIn("Django", content)
         self.assertIn("Verwaltung", content)
+        # One name for the portal and its administration (WL-23).
+        self.assertIn("<title>Verwaltung | LEG-Portal</title>", content)
+        self.assertIn("LEG-Portal", content)
+        self.assertNotIn("LEG-Plattform", content)
+
+    def test_the_start_page_has_three_groups_and_the_hint(self):
+        self.client.force_login(self.administrator)
+
+        with translation.override("de-ch"):
+            content = self.client.get(reverse("admin:index")).content.decode()
+
+        groups = re.findall(r'<a href="[^"]*" class="section">([^<]+)</a>', content)
+        self.assertEqual(groups, ["Benutzer", "Inhalte", "System"])
+        self.assertIn("Texte der E-Mails und Adressen der Fusszeile pflegen Sie unter Inhalte.", content)
+        for name in ("Mailtexte", "Portal-Einstellungen", "Gesperrte und fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
+            self.assertIn(name, content)
+        # No product name of a package as a heading.
+        self.assertNotIn(">Axes<", content)
+
+    def test_the_groups_follow_the_rights_of_the_account(self):
+        staff = create_active_user("staff@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        self.client.force_login(staff)
+
+        with translation.override("de-ch"):
+            content = self.client.get(reverse("admin:index")).content.decode()
+
+        # A staff user without rights sees no group at all, and never the system group.
+        self.assertNotIn("Sicherheitsprotokoll", content)
+        self.assertNotIn("Gesperrte und fehlgeschlagene Anmeldungen", content)
+        self.assertNotIn(">System<", content)
+
+    def test_the_page_of_one_app_keeps_the_list_of_that_app(self):
+        self.client.force_login(self.administrator)
+
+        response = self.client.get(reverse("admin:app_list", args=["accounts"]))
+
+        self.assertEqual(response.status_code, 200)
 
     def test_admin_pages_need_no_inline_code(self):
         # The pages must work under the Content Security Policy: no inline scripts or styles,

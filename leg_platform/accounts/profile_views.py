@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
-from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django_otp import login as otp_login
 
 from leg_platform.addresses.services import check_address
@@ -95,6 +95,7 @@ def two_factor_state(user, edit, step, session):
     return "setup"
 
 
+@sensitive_variables("codes")
 def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enrolled=False, status=200):
     """The profile page with one card in an edit state (or none); ``forms`` holds bound forms."""
     user = request.user
@@ -106,7 +107,21 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     only_two_factor = (
         second_factor.requires_second_factor(user) and not second_factor.is_second_factor_complete(user)
     )
+    # The messages of the views go into the card that they belong to (the tag "card-<name>"); the
+    # rest, and those of a card that is not shown, stay at the top of the page.
+    shown = {"two_factor"} if only_two_factor else set(CARD_ANCHORS)
+    card_messages = {card: [] for card in CARD_ANCHORS}
+    general_messages = []
+    for message in messages.get_messages(request):
+        tags = message.extra_tags or ""
+        card = tags[len("card-"):] if tags.startswith("card-") else None
+        if card in shown:
+            card_messages[card].append(message)
+        else:
+            general_messages.append(message)
     context = {
+        "general_messages": general_messages,
+        **{f"messages_{card}": items for card, items in card_messages.items()},
         "account": user,
         "edit": edit,
         "second_factor_active": second_factor.has_second_factor(user),
@@ -190,8 +205,8 @@ class ProfileEditView(ProfileCardView):
             country=form.cleaned_data.get("country", "CH"),
         )
         if result["warning"]:
-            messages.warning(request, result["warning"])
-        messages.success(request, _("Saved."))
+            messages.warning(request, result["warning"], extra_tags="card-personal")
+        messages.success(request, _("Saved."), extra_tags="card-personal")
         return back_to("personal")
 
 
@@ -202,31 +217,49 @@ class EmailChangeRequestView(ProfileCardView):
     def get(self, request):
         return render_profile(request, edit="email")
 
+    def refused(self, request):
+        """The answer when the limit of the client address or of the instance is used up (D-038).
+        Nothing was stored. The person is logged in, so telling it hints at no account."""
+        messages.error(request, _("Too many requests, please try again later."), extra_tags="card-email")
+        return render_profile(request, edit="email", status=429)
+
+    def kinds_asked(self, request):
+        """The kinds of request that the posted values ask for, judged before the password and the
+        code are checked: a refusal must not use up a code of the authenticator app."""
+        user = request.user
+        kinds = []
+        if request.POST.get("email", "").strip().lower() not in ("", user.email):
+            kinds.append(MailJob.Kind.EMAIL_CHANGE_REQUEST)
+        second = request.POST.get("secondary_email", "").strip().lower()
+        if second and second != user.secondary_email:
+            kinds.append(MailJob.Kind.SECONDARY_EMAIL_REQUEST)
+        return kinds
+
     def post(self, request):
+        if any(requests_refused(request, kind) for kind in self.kinds_asked(request)):
+            return self.refused(request)
         form = EmailChangeForm(request.POST, request=request)
         if not form.is_valid():
             return render_profile(request, edit="email", forms={"email": form}, status=200)
-        if (form.login_change or form.secondary_change) and requests_refused(
-            request, MailJob.Kind.EMAIL_CHANGE_REQUEST
-        ):
-            # The limit of the client address or of the instance (D-038); nothing is stored. The
-            # person is logged in, so telling it is no hint about any account.
-            form.add_error(None, _("Too many requests, please try again later."))
-            return render_profile(request, edit="email", forms={"email": form}, status=429)
-        email_change.request_changes(
-            request,
-            request.user,
-            login=form.login_change,
-            secondary=form.secondary_change,
-            remove_secondary=form.remove_secondary,
-        )
+        try:
+            email_change.request_changes(
+                request,
+                request.user,
+                login=form.login_change,
+                secondary=form.secondary_change,
+                remove_secondary=form.remove_secondary,
+            )
+        except email_change.RequestRefused:
+            # A limit was reached between the check and the request: everything was rolled back.
+            return self.refused(request)
         if form.login_change or form.secondary_change:
             messages.success(
                 request,
                 _("We sent a confirmation link to the new address. It is valid for 24 hours."),
+                extra_tags="card-email",
             )
         else:
-            messages.success(request, _("Saved."))
+            messages.success(request, _("Saved."), extra_tags="card-email")
         return back_to("email")
 
 
@@ -239,7 +272,7 @@ class EmailChangeCancelView(ProfileCardView):
         if kind not in PendingEmailChange.Kind.values:
             raise Http404
         email_change.cancel(request.user, kind)
-        messages.success(request, _("The request was cancelled."))
+        messages.success(request, _("The request was cancelled."), extra_tags="card-email")
         return back_to("email")
 
 
@@ -295,7 +328,7 @@ class PasswordChangeView(ProfileCardView):
         # Renews the session ID and keeps this session; Django derives the session hash from
         # the password, so every other session of the account ends (docs/SECURITY.md).
         update_session_auth_hash(request, user)
-        messages.success(request, _("Your password was changed."))
+        messages.success(request, _("Your password was changed."), extra_tags="card-password")
         return redirect("accounts:profile") if self.required() else back_to("password")
 
     def invalid(self, form):
@@ -369,6 +402,7 @@ class TwoFactorConfirmView(ProfileCardView):
     def get(self, request):
         return render_profile(request, edit="two_factor", step="app")
 
+    @sensitive_variables("result", "codes")
     def post(self, request):
         form = SetupCodeForm(request.POST)
         if form.is_valid():
@@ -417,6 +451,7 @@ class RecoveryCodesView(ProfileCardView):
     def get(self, request):
         return render_profile(request, edit="two_factor", step="codes_new")
 
+    @sensitive_variables("codes")
     def post(self, request):
         form = ReauthenticationForm(request.POST, request=request)
         if not form.is_valid():
@@ -440,7 +475,7 @@ class RecoveryCodesDoneView(ProfileCardView):
 
     def post(self, request):
         if request.POST.get("saved") == "on":
-            messages.success(request, _("The recovery codes are saved."))
+            messages.success(request, _("The recovery codes are saved."), extra_tags="card-two_factor")
         else:
             messages.warning(
                 request,
@@ -448,6 +483,7 @@ class RecoveryCodesDoneView(ProfileCardView):
                     "Please confirm that you saved the codes. They are not shown again; if you "
                     "did not save them, create new codes."
                 ),
+                extra_tags="card-two_factor",
             )
         return back_to("two_factor")
 
@@ -479,7 +515,7 @@ class TwoFactorDisableView(ProfileCardView):
             return refused_change(request)
         # Other sessions ended with the removal; this session stays (D-044).
         update_session_auth_hash(request, request.user)
-        messages.success(request, _("Two-factor authentication was turned off."))
+        messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
         return back_to("two_factor")
 
 
@@ -512,7 +548,7 @@ class AccountDeleteView(ProfileCardView):
                 # Every address of the account is told (D-059); the jobs hold no account key.
                 enqueue_for_account(MailJob.Kind.ACCOUNT_DELETED, user, addresses=addresses)
         except AccountIntegrityError:
-            messages.error(request, _("The account could not be deleted."))
+            messages.error(request, _("The account could not be deleted."), extra_tags="card-delete")
             return back_to("delete")
         logout(request)
         return render(request, "accounts/account_deleted.html")
@@ -520,5 +556,5 @@ class AccountDeleteView(ProfileCardView):
 
 def refused_change(request):
     """A change that the rules refused, e.g. after a parallel request changed the account."""
-    messages.error(request, _("The change could not be made."))
+    messages.error(request, _("The change could not be made."), extra_tags="card-two_factor")
     return redirect("accounts:two_factor")

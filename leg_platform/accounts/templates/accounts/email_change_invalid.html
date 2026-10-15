@@ -6,5 +6,5 @@
   <h1>{% translate "Link no longer valid" %}</h1>
   {# Neutral: the page can be a reload after the confirmation (security review of phase 3, A3). #}
   <p>{% translate "This link can no longer be used. If you have just confirmed the change, log in with the new address." %}</p>
-  <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
+  {% include "accounts/_result_button.html" %}
 {% endblock %}
