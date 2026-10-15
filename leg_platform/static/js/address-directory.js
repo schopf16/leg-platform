@@ -1,11 +1,15 @@
-/* Suggestions and notice of the address directory (D-054, D-065). Local-only: the requests go to
-   the own origin, nothing is inserted as HTML, and only a deliberate choice changes the fields.
+/* Suggestions and notice of the address directory (D-054, D-065, D-066). Local-only: the requests go
+   to the own origin, nothing is inserted as HTML, and only a deliberate choice changes the fields.
+   The script is loaded only on pages where an address can be edited (registration details, profile
+   edit form), never in a read-only view.
 
    Two places, each where the person looks when the feedback appears:
    - the panel with suggestions, directly under the street input (the "suggest" request);
-   - the notice, after the postal code and town (the "check" request): shown only when the address
-     is complete and not found, or when the service says something. It never takes the focus and
+   - the notice, after the postal code and town (the "check" request): shown only when the
+     directory is available and does not know the complete address. It never takes the focus and
      never blocks saving; the form is never intercepted.
+   Nothing is shown when the directory cannot answer (missing, unreachable, old, limited, invalid
+   or failed answer): the person cannot do anything about it (D-066).
    The suggest and the check requests have their own stale-response protection. The panel is not
    cleared while the person types: it is replaced or hidden when the answer arrives. The check never
    runs on change or blur: a notice that appears then shifts the Save button between mouse-down and
@@ -38,10 +42,15 @@
     const fields = {};
     ["street", "house_number", "postal_code", "locality", "country"].forEach((name) => {
       const key = name.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase()) + "Id";
-      fields[name] = document.getElementById(widget.dataset[key]);
+      fields[name] = document.getElementById(widget.dataset[key] || "");
     });
+    // A form without a country field (the registration, where the country is Switzerland) names
+    // the fixed country in data-country-value. Without a field and without that value the widget
+    // does nothing; the server answers only for "CH" in any case.
+    const fixedCountry = widget.dataset.countryValue || "";
+    if (!fields.country && !fixedCountry) return;
     if (!form || !panel || !title || !note || !list || !more || !announce) return;
-    if (Object.values(fields).some((field) => !field)) return;
+    if (Object.entries(fields).some(([name, field]) => !field && name !== "country")) return;
     const endpoint = new URL(widget.dataset.endpoint, location.href);
     if (endpoint.origin !== location.origin) return;
     const addressFields = [fields.street, fields.house_number, fields.postal_code, fields.locality];
@@ -53,7 +62,8 @@
       check: {version: 0, controller: null},
     };
 
-    const isSwiss = () => fields.country.value === "CH";
+    const country = () => (fields.country ? fields.country.value : fixedCountry);
+    const isSwiss = () => country() === "CH";
     const street = () => fields.street.value.trim();
     const postalCode = () => fields.postal_code.value.trim();
 
@@ -114,7 +124,7 @@
       if (channel.controller) channel.controller.abort();
       channel.controller = new AbortController();
       const body = new URLSearchParams({mode});
-      Object.entries(fields).forEach(([name, field]) => body.set(name, field.value));
+      Object.entries(fields).forEach(([name, field]) => body.set(name, name === "country" ? country() : field.value));
       try {
         const token = form.querySelector("[name=csrfmiddlewaretoken]");
         if (!token) throw new Error("Missing CSRF token");
@@ -168,22 +178,17 @@
     const complete = () => isSwiss() && street() !== "" && /^[0-9]{4}$/.test(postalCode()) &&
       fields.locality.value.trim() !== "";
 
-    // ``atLoad``: the form was just opened. Then an address that is not found also fills the panel,
-    // so that the "Check address" link after saving lands on a ready list.
+    // ``atLoad``: the form was just opened (the person clicked "Edit"). Then an address that is not
+    // found also fills the panel, so that the suggestions are ready next to the notice. Only the
+    // not-found notice is ever shown: when the directory cannot answer, nothing is shown (D-066).
     const check = async (atLoad) => {
       if (!complete()) return;
       const answer = await send("check");
-      if (!answer) return;
+      if (!answer || !answer.ok) return;
       const data = answer.data;
-      if (!answer.ok) {
-        showNotice("info", (data && data.warning) || text.unavailable);
-        return;
-      }
-      if (data.status === "available" && data.match === false) {
+      if (data && data.status === "available" && data.match === false && data.warning) {
         showNotice("warning", data.warning);
         if (atLoad) suggest();
-      } else if (data.warning) {
-        showNotice("info", data.warning);
       }
     };
 
@@ -242,7 +247,9 @@
         else suggestTimer = setTimeout(suggest, SUGGEST_DELAY);
       }
     };
-    Object.entries(fields).forEach(([name, field]) => field.addEventListener("input", onInput(name)));
+    Object.entries(fields).forEach(([name, field]) => {
+      if (field) field.addEventListener("input", onInput(name));
+    });
 
     // A press on the list must not move the focus out of the street field.
     panel.addEventListener("mousedown", (event) => event.preventDefault());

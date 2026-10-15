@@ -27,7 +27,6 @@ from django.views import View
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django_otp import login as otp_login
 
-from leg_platform.addresses.services import check_address
 from leg_platform.accounts import email_change, second_factor, security_log, totp
 from leg_platform.accounts import password_reset
 from leg_platform.accounts.forms import (
@@ -67,9 +66,6 @@ CARD_ANCHORS = {
 # The steps of the card of two-factor authentication that a person can open by address; the codes
 # are only ever the answer to a form (they are stored nowhere).
 TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "lost_phone")
-# Tag of the one-time message "the saved address was not found" (D-065). The profile shows it in the
-# Address row, not in the header of the card.
-ADDRESS_WARNING_TAG = "address-warning"
 
 
 def card_url(card, step=None):
@@ -115,25 +111,19 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         second_factor.requires_second_factor(user) and not second_factor.is_second_factor_complete(user)
     )
     # The messages of the views go into the card that they belong to (the tag "card-<name>"); the
-    # rest, and those of a card that is not shown, stay at the top of the page. The message with the
-    # tag ADDRESS_WARNING_TAG (the saved address was not found in the directory) is not part of the
-    # card header: it is shown in the Address row of the card (D-065).
+    # rest, and those of a card that is not shown, stay at the top of the page.
     shown = {"two_factor"} if only_two_factor else set(CARD_ANCHORS)
     card_messages = {card: [] for card in CARD_ANCHORS}
     general_messages = []
-    address_warning = None
     for message in messages.get_messages(request):
         tags = (message.extra_tags or "").split()
         card = next((tag[len("card-"):] for tag in tags if tag.startswith("card-")), None)
-        if card == "personal" and ADDRESS_WARNING_TAG in tags and "personal" in shown:
-            address_warning = message
-        elif card in shown:
+        if card in shown:
             card_messages[card].append(message)
         else:
             general_messages.append(message)
     context = {
         "general_messages": general_messages,
-        "address_warning": address_warning,
         **{f"messages_{card}": items for card, items in card_messages.items()},
         "account": user,
         "edit": edit,
@@ -218,26 +208,7 @@ class ProfileEditView(ProfileCardView):
         if not form.is_valid():
             return render_profile(request, edit="personal", forms={"personal": form}, status=200)
         form.save()
-        result = check_address(
-            street=form.cleaned_data.get("street", ""),
-            house_number=form.cleaned_data.get("house_number", ""),
-            postal_code=form.cleaned_data.get("postal_code", ""),
-            locality=form.cleaned_data.get("town", ""),
-            country=form.cleaned_data.get("country", "CH"),
-        )
-        # Only a data problem is shown after saving, once: an address that the available directory
-        # does not know. A directory that is unavailable, old or limited is not the person's
-        # problem (D-065).
-        not_found = result.get("match") is False and result.get("status") == "available" and result.get("warning")
-        if not_found:
-            messages.warning(
-                request, result["warning"], extra_tags=f"card-personal {ADDRESS_WARNING_TAG}"
-            )
-            messages.success(
-                request, _("Saved. Please check your address below."), extra_tags="card-personal"
-            )
-        else:
-            messages.success(request, _("Saved."), extra_tags="card-personal")
+        messages.success(request, _("Saved."), extra_tags="card-personal")
         return back_to("personal")
 
 

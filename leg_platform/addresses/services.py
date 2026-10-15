@@ -8,11 +8,9 @@ import unicodedata
 from django.db import DatabaseError
 from django.utils.connection import ConnectionDoesNotExist
 from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy
 
 from .models import Address, Directory, READ_ALIAS
 
-ATTRIBUTION = gettext_lazy("Federal Office of Topography swisstopo")
 FIELDS = ("street", "house_number", "postal_code", "locality")
 LIMITS = {"street": 255, "house_number": 32, "postal_code": 4, "locality": 255, "country": 2}
 RESULT_LIMIT = 10
@@ -64,10 +62,14 @@ def clean_input(values):
 
 
 def directory_status():
+    """The state of the directory, for the operator page of the administration.
+
+    The ``warning`` is a text for the operator. It is never given to the people who type an address
+    (D-066): ``lookup`` leaves it out of its answer.
+    """
     result = {
         "status": "unavailable", "data_date": None, "stale": False,
-        "warning": _("The address directory is unavailable. You can continue with the address as entered."),
-        "attribution": ATTRIBUTION,
+        "warning": _("The address directory is unavailable."),
     }
     try:
         directory = Directory.objects.using(READ_ALIAS).filter(pk=1).first()
@@ -81,8 +83,7 @@ def directory_status():
         status="available",
         data_date=directory.data_date.isoformat() if directory.data_date else None,
         stale=directory.is_stale,
-        warning=_("The address directory is more than 92 days old. You can continue with the address as entered.")
-        if directory.is_stale else "",
+        warning=_("The address directory is more than 92 days old.") if directory.is_stale else "",
     )
     return result, directory
 
@@ -154,17 +155,26 @@ def approximate_matches(query, values):
 
 
 def lookup(values, *, mode="suggest"):
+    """The JSON answer of the lookup endpoint.
+
+    The ``warning`` is empty except for one case: the directory is available and not old, the mode is
+    "check" and it does not know the complete address (D-066). A directory that is missing,
+    unreachable, old or failing is not the problem of the person who types, so nothing is said about
+    it (it is logged, and shown to the operator in the administration only).
+    """
     values = clean_input(values)
     if mode not in {"suggest", "check"}:
         raise ValueError("Invalid lookup mode.")
     if values["country"] != "CH" or not values["street"]:
         return {
             "status": "not_checked", "data_date": None, "stale": False,
-            "warning": "", "attribution": ATTRIBUTION, "results": [], "match": None,
-            "kind": "prefix",
+            "warning": "", "results": [], "match": None, "kind": "prefix",
         }
-    result, directory = directory_status()
-    result.update(results=[], match=None, kind="prefix")
+    status, directory = directory_status()
+    result = {
+        "status": status["status"], "data_date": status["data_date"], "stale": status["stale"],
+        "warning": "", "results": [], "match": None, "kind": "prefix",
+    }
     if directory is None:
         return result
     try:
@@ -177,7 +187,8 @@ def lookup(values, *, mode="suggest"):
                     street__iexact=values["street"], house_number__iexact=values["house_number"],
                     postal_code=values["postal_code"], locality__iexact=values["locality"],
                 ).exists()
-            if not result["match"]:
+            if not result["match"] and not directory.is_stale:
+                # A directory that is more than 92 days old may lack a new address: no notice then.
                 result["warning"] = _(
                     "This address was not found in the official directory. Please check street, "
                     "house number, postal code and town. You can still save it as entered."
@@ -198,28 +209,5 @@ def lookup(values, *, mode="suggest"):
                     result["results"], result["kind"] = rows, kind
     except (DatabaseError, ConnectionDoesNotExist):
         logger.warning("Address directory lookup is unavailable.")
-        result.update(
-            status="unavailable", results=[], match=None, kind="prefix",
-            warning=_("The address directory is unavailable. You can continue with the address as entered."),
-        )
+        result.update(status="unavailable", results=[], match=None, kind="prefix", warning="")
     return result
-
-
-def check_address(*, street="", house_number="", postal_code="", locality="", country="CH"):
-    """Form integration: return a warning dict, not a ValidationError.
-
-    Call only after the host form's normal validation. Do not alter cleaned_data
-    or add_error(); display the returned warning even if the profile is saved.
-    """
-    try:
-        return lookup({
-            "street": street, "house_number": house_number,
-            "postal_code": str(postal_code or ""), "locality": locality,
-            "country": str(country),
-        }, mode="check")
-    except ValueError:
-        return {
-            "status": "not_checked", "match": None, "results": [], "kind": "prefix",
-            "data_date": None, "stale": False, "attribution": ATTRIBUTION,
-            "warning": _("The address could not be checked. You can continue with the address as entered."),
-        }

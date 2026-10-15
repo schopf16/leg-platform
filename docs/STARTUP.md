@@ -258,7 +258,7 @@ Replace the example key with the one on the page. This is RFC 6238 with SHA-1, s
 
 ## 10. Synthetic address directory (optional)
 
-The registration and profile forms check addresses against a local copy of the official directory (D-033). Locally there is no MariaDB directory; without a directory the forms show the non-blocking warning "The address directory is unavailable" (and no suggestions). To test suggestions, use a throw-away SQLite file with a few invented addresses:
+The registration (step "Your details") and the profile edit form offer address suggestions from a local copy of the official directory (D-033, D-066). Locally there is no MariaDB directory; without a directory the forms show no suggestions and say nothing about it (the failure is only logged; the operator page "Address directory" of the administration shows the status). To test suggestions, use a throw-away SQLite file with a few invented addresses:
 
 * `leg_platform/local_directory_settings.py` adds the two SQLite aliases `addresses` and `address_import` to the normal settings. It **refuses to be imported unless `APP_ENV=local`**, refuses a file inside the repository or a relative path, and changes no security setting. The file is `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` or, by default, `$HOME\.leg-platform-local-address-directory.sqlite3`.
 * `manage.py seed_local_address_directory` loads eight invented addresses (streets "Example Street", "Sample Avenue", "Test Lane", "Throwaway Road", postal codes 9997 to 9999). It refuses outside `APP_ENV=local`, refuses if either alias is not SQLite, and refuses to replace a directory whose checksum is not its synthetic marker (so a file that holds a real import is never overwritten).

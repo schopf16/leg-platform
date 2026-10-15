@@ -439,10 +439,11 @@ class SessionHardeningTests(TestCase):
         # The summary names the box by a short word (the checkbox has a long sentence as label).
         self.assertIn("Datenschutzerklärung:", html)
 
-    def test_an_address_directory_note_appears_only_on_the_details_step(self):
+    def test_no_address_directory_note_appears_on_any_step(self):
+        # D-066: nothing is said about an unavailable directory, on no page of the registration.
         self.open_link()
-        unavailable = ({"status": "unavailable"}, None)
-        with patch("leg_platform.accounts.views.directory_status", return_value=unavailable):
+        unavailable = ({"status": "unavailable", "warning": "Operator text."}, None)
+        with patch("leg_platform.addresses.services.directory_status", return_value=unavailable):
             password = self.client.get(PASSWORD_URL)
             self.set_password()
             details = self.client.get(COMPLETE_URL)
@@ -450,10 +451,10 @@ class SessionHardeningTests(TestCase):
             start = self.client.get(HOME_URL)
 
         text = "Ihre Adresse konnte nicht geprüft werden und wird so gespeichert, wie Sie sie eingegeben haben."
-        self.assertContains(details, text)
-        self.assertNotContains(password, text)
-        self.assertNotContains(start, text)
-        self.assertNotContains(start, "Adressverzeichnis")
+        for page in (password, details, start):
+            self.assertNotContains(page, text)
+            self.assertNotContains(page, "Adressverzeichnis")
+            self.assertNotContains(page, "Operator text.")
 
 
 def input_tag(html, field_id):

@@ -103,7 +103,11 @@ class CompletionFormTests(TestCase):
         # The fields that only the profile has are not asked at the registration (K15).
         for field_id in ("id_salutation", "id_organisation_name", "id_address_line_1", "id_phone_number"):
             self.assertNotIn(f'id="{field_id}"', self.html)
-        self.assertNotIn("data-address-directory", self.html)
+        # The address suggestions are offered here too (D-066): once, under the street input.
+        self.assertEqual(self.html.count("data-address-directory"), 1)
+        self.assertLess(self.html.index(' id="id_street"'), self.html.index("data-address-directory"))
+        self.assertLess(self.html.index("data-address-directory"), self.html.index(' id="id_house_number"'))
+        self.assertLess(self.html.index(' id="id_town"'), self.html.index("data-address-notice"))
 
     def test_the_password_step_has_the_username_the_rules_and_buttons_that_show_the_password(self):
         html = self.password_page.content.decode()

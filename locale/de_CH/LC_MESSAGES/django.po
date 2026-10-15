@@ -182,9 +182,6 @@ msgstr "Portal-Einstellungen geändert"
 msgid "Address count"
 msgstr "Anzahl Adressen"
 
-msgid "Federal Office of Topography swisstopo"
-msgstr "Bundesamt für Landestopografie swisstopo"
-
 msgid "Address directory"
 msgstr "Adressverzeichnis"
 
@@ -212,9 +209,6 @@ msgstr "In %(postal_code)s wurde keine Strasse gefunden, die mit «%(street)s» 
 msgid "More addresses match. Keep typing to narrow the list."
 msgstr "Es passen weitere Adressen. Geben Sie mehr ein, um die Liste einzugrenzen."
 
-msgid "Suggestions from the official address directory (swisstopo)."
-msgstr "Vorschläge aus dem amtlichen Adressverzeichnis (swisstopo)."
-
 #, python-format
 msgid "%(count)s address suggestion available. Press the down arrow key to choose one."
 msgid_plural "%(count)s address suggestions available. Press the down arrow key to choose one."
@@ -230,18 +224,6 @@ msgstr[1] "Keine genaue Übereinstimmung. %(count)s ähnliche Adressen verfügba
 #, python-format
 msgid "Address filled in: %(address)s."
 msgstr "Adresse eingetragen: %(address)s."
-
-msgid "Check address"
-msgstr "Adresse prüfen"
-
-msgid "Saved. Please check your address below."
-msgstr "Gespeichert. Bitte prüfen Sie Ihre Adresse weiter unten."
-
-msgid "Address suggestions are temporarily limited. You can continue with the address as entered."
-msgstr "Adressvorschläge sind vorübergehend eingeschränkt. Sie können mit der eingegebenen Adresse fortfahren."
-
-msgid "Address suggestions need JavaScript. You can continue with the address as entered."
-msgstr "Adressvorschläge benötigen JavaScript. Sie können mit der eingegebenen Adresse fortfahren."
 
 msgid "Can request an address directory import"
 msgstr "Kann einen Import des Adressverzeichnisses anfordern"
@@ -378,17 +360,14 @@ msgstr "Läuft"
 msgid "Started at"
 msgstr "Gestartet am"
 
-msgid "The address could not be checked. You can continue with the address as entered."
-msgstr "Die Adresse konnte nicht geprüft werden. Sie können mit der eingegebenen Adresse fortfahren."
-
 msgid "The address directory import has been queued."
 msgstr "Der Import des Adressverzeichnisses wurde vorgemerkt."
 
-msgid "The address directory is more than 92 days old. You can continue with the address as entered."
-msgstr "Das Adressverzeichnis ist mehr als 92 Tage alt. Sie können mit der eingegebenen Adresse fortfahren."
+msgid "The address directory is more than 92 days old."
+msgstr "Das Adressverzeichnis ist mehr als 92 Tage alt."
 
-msgid "The address directory is unavailable. You can continue with the address as entered."
-msgstr "Das Adressverzeichnis ist nicht verfügbar. Sie können mit der eingegebenen Adresse fortfahren."
+msgid "The address directory is unavailable."
+msgstr "Das Adressverzeichnis ist nicht verfügbar."
 
 msgid "The import runs in a separate background worker. Addresses already entered are not changed."
 msgstr "Der Import läuft in einem separaten Hintergrundprozess. Bereits eingegebene Adressen werden nicht verändert."
@@ -2138,9 +2117,6 @@ msgstr "Datenschutzerklärung"
 
 msgid "Too many requests, please try again later."
 msgstr "Zu viele Anfragen, bitte versuchen Sie es später erneut."
-
-msgid "Your address could not be checked and is saved as you entered it."
-msgstr "Ihre Adresse konnte nicht geprüft werden und wird so gespeichert, wie Sie sie eingegeben haben."
 
 msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator: you find the contact details on <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. The removal can be started again there."
 msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die LEG: Die Kontaktangaben finden Sie auf <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. Dort kann das Entfernen erneut veranlasst werden."

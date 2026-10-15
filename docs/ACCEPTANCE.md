@@ -30,6 +30,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 
 * [ ] Users can view their own profile as five cards that change in place (personal details, email addresses, password, two-factor authentication, delete account) and work without a script (D-059).
 * [ ] Users can change permitted profile data of their own; name and postal address are required, the further details (salutation, company, address addition, post office box, phone number) are optional.
+* [ ] While an address is edited (registration step 3 and the profile edit form), suggestions and "Did you mean ..." are offered for Swiss addresses and the not-found notice appears for a complete address that the directory does not know; nothing about the directory is shown in the overview, after saving, or when the directory cannot answer; the user interface names no source of the directory (D-066). Verified so far only with a stub and a synthetic directory (`docs/DECISIONS.md`, D-066); not accepted on a real system.
 * [ ] Users can change their email address as described in `docs/PROJECT.md`, "Changing the Email Address", and can add a second address that receives every notification but never serves for the login or the reset (D-059). A pending request shows its deadline and can be cancelled; the notice to the old address has a link that stops the change without a login.
 * [ ] Every change of the second factor, the password or an address is mailed to every address of the account.
 * [ ] System administrators can block and unblock accounts.

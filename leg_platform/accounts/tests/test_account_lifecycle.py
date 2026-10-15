@@ -80,26 +80,23 @@ class ProfileEditingTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, "Anna")
 
-    def test_address_matching_is_advisory_and_uses_the_saved_form_values(self):
-        with patch(
-            "leg_platform.accounts.profile_views.check_address",
-            return_value={"warning": "Address could not be confirmed.", "match": False, "status": "available"},
-        ) as check:
+    def test_saving_the_address_is_not_checked_against_the_directory_and_stores_the_form_values(self):
+        # D-066: a lookup is made only while the address is edited (by the script of the form),
+        # never when it is saved or shown.
+        with patch("leg_platform.addresses.services.lookup") as lookup, \
+                patch("leg_platform.addresses.services.directory_status") as status, \
+                patch("leg_platform.addresses.views.lookup") as view_lookup, \
+                patch("leg_platform.addresses.views.allow_request") as view_limit:
             response = self.client.post(PROFILE_EDIT_URL, {**PROFILE, "street": "Changed street"})
 
         self.assertEqual(response.status_code, 302)
-        check.assert_called_once_with(
-            street="Changed street",
-            house_number="12a",
-            postal_code="3000",
-            locality="Bern",
-            country="CH",
-        )
+        lookup.assert_not_called()
+        status.assert_not_called()
+        view_lookup.assert_not_called()
+        view_limit.assert_not_called()
         self.user.refresh_from_db()
         self.assertEqual(self.user.street, "Changed street")
-        self.assertTrue(
-            any("Address could not be confirmed." in str(message) for message in get_messages(response.wsgi_request))
-        )
+        self.assertEqual([str(message) for message in get_messages(response.wsgi_request)], ["Gespeichert."])
 
     def test_profile_form_contains_the_address_widget_and_local_script(self):
         response = self.client.get(PROFILE_EDIT_URL)

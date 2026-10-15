@@ -3,7 +3,6 @@
 {% block content %}
 <section aria-labelledby="directory-heading">
   <h2 id="directory-heading">{% translate "Address directory" %}</h2>
-  <p>{{ directory_status.attribution }}</p>
   {% if directory %}
     <dl>
       <dt>{% translate "Data date" %}</dt><dd>{{ directory.data_date|date:"DATE_FORMAT" }}</dd>

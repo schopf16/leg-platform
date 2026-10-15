@@ -214,7 +214,7 @@ Status: **not built.** Step A (research) is done. The owner decided the licence,
 | --- | --- | --- |
 | Use of the data | Planned. Addresses are checked only against the local copy. The stored profile address stays exactly as entered. No address is sent to an external service. | Decided (D-049, item 4) |
 | Terms of use and licence | **Decided 2026-10-14 (owner):** free use; the source must be named. Basis: the owner's copy of the swisstopo terms and the general opendata.swiss rule "Open use. Must provide the source." The STAC record says "proprietary"; this is recorded as a difference (D-049). | Owner (D-049) |
-| Attribution text | **Decided 2026-10-14 (owner):** "Bundesamt für Landestopografie swisstopo". It is shown wherever register-based checks are shown. | Owner (D-049) |
+| Attribution text | **Decided 2026-10-14 (owner):** "Bundesamt für Landestopografie swisstopo". **Changed 2026-10-15 (owner, D-066):** the software shows no attribution in the user interface; the text belongs to the privacy notice and the imprint of each instance (owner content, D-022). Whether that place satisfies the terms of use is an open owner question (D-066). | Owner (D-049, D-066) |
 | Update rule | **Decided 2026-10-14 (owner): option C** (D-050). An import can be started by a user with a dedicated permission from the admin area; it runs as a background job. The operator's own import command stays available. The server needs an outbound HTTPS connection to `data.geo.admin.ch`. Security conditions apply (D-050); the security reviewer must review them. | Owner (D-050) |
 | Reminder for old data | **Decided 2026-10-14 (owner):** a warning after 92 days, which matches "once per quarter or manually". | Owner (D-050) |
 | Import account and database alias | **OPEN.** The names are not decided. The import needs its own account and its own read-only database alias. | Owner and operator (D-049, step B) |
@@ -241,7 +241,7 @@ There are no ready-made groups or roles (`AGENTS.md`, section 6; D-012). A syste
 Each item must be decided or answered before the step that depends on it.
 
 1. **Licence and terms of the address register:** decided 2026-10-14 (section 5). Closed.
-2. **Attribution:** decided 2026-10-14 (section 5). Closed.
+2. **Attribution:** decided 2026-10-14 (section 5); changed 2026-10-15 (D-066): not shown in the user interface, to be placed in the privacy notice and the imprint; the question whether this satisfies the terms of use is open with the owner.
 3. **Update option and 92-day reminder:** decided 2026-10-14, option C (section 5). Closed. The security review of option C is open.
 4. **Import account, its name and its database alias:** open (D-049, step B). Owner and operator decide the names; the password is entered only on the server.
 5. **Import schedule per server:** open (D-049, item 5).

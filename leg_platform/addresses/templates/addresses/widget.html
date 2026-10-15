@@ -5,11 +5,10 @@ input. The fields stay authoritative: nothing here changes a field except a deli
 The texts are read by ``static/js/address-directory.js`` from the data attributes; ``%(name)s``
 placeholders are replaced there by plain string replacement and the result is set as text.
 The notice about the address as a whole is ``addresses/widget_notice.html`` (after the postal code
-and town). Without JavaScript both stay empty and only the noscript text is shown.
+and town). Without JavaScript both stay empty and nothing is said about it (D-066).
 {% endcomment %}{% blocktranslate asvar title_one count counter=1 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar title_many count counter=2 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar note_approximate with street='%(street)s' postal_code='%(postal_code)s' %}No street starting with “{{ street }}” was found in {{ postal_code }}. Choose an address to fill in the fields.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_one count counter=1 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_many count counter=2 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_one count counter=1 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_many count counter=2 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_text with address='%(address)s' %}Address filled in: {{ address }}.{% endblocktranslate %}<div class="address-assist" data-address-directory
      data-endpoint="{% url 'addresses:lookup' %}"
      data-notice-id="{{ address_notice_id|default:'address-notice' }}"
-     data-unavailable="{% translate 'The address directory is unavailable. You can continue with the address as entered.' %}"
      data-title-prefix="{% translate 'Matching addresses' %}"
      data-title-approximate-one="{{ title_one }}"
      data-title-approximate-many="{{ title_many }}"
@@ -25,7 +24,7 @@ and town). Without JavaScript both stay empty and only the noscript text is show
      data-house-number-id="{{ address_house_number_id|default:'id_house_number' }}"
      data-postal-code-id="{{ address_postal_code_id|default:'id_postal_code' }}"
      data-locality-id="{{ address_locality_id|default:'id_town' }}"
-     data-country-id="{{ address_country_id|default:'id_country' }}">
+     {% if address_country_value %}data-country-value="{{ address_country_value }}"{% else %}data-country-id="{{ address_country_id|default:'id_country' }}"{% endif %}>
   <div class="address-suggest" data-address-suggest hidden>
     <div class="address-suggest-head">
       <p class="address-suggest-title" id="address-suggest-title" data-address-title></p>
@@ -34,7 +33,5 @@ and town). Without JavaScript both stay empty and only the noscript text is show
     <ul class="address-suggest-list" data-address-results aria-labelledby="address-suggest-title"></ul>
     <p class="address-more" data-address-more hidden></p>
   </div>
-  <p class="form-hint">{% translate "Suggestions from the official address directory (swisstopo)." %}</p>
   <p class="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-address-announce></p>
-  <noscript><p class="form-hint">{% translate "Address suggestions need JavaScript. You can continue with the address as entered." %}</p></noscript>
 </div>

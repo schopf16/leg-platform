@@ -8,6 +8,7 @@ forms with the CSRF token of the page and the ``Origin`` header of the page, as 
 """
 
 import re
+from urllib.parse import urlencode
 
 from django.core import mail
 from django.test import Client, TestCase, tag
@@ -123,6 +124,33 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         self.assertEqual(opened.status_code, 302)
         self.assertEqual(opened["Referrer-Policy"], "no-referrer")
         self.assert_the_page_does_not_send_no_referrer(self.client, self.password_url)
+
+    def test_the_address_lookup_of_the_details_step_is_accepted_with_the_origin_of_a_browser(self):
+        # D-066: the script posts the lookup from the details step with the token of the page in
+        # the header and, in a browser, the origin of the page; "null" would come from a page with
+        # the policy "no-referrer" (D-054, R-01) and is refused.
+        self.client.get(self.link)
+        reference = VerificationToken.objects.get().pk
+        submit_like_a_browser(self.client, self.password_url, password_data(registration=reference))
+        page = self.client.get(self.url)
+        self.assertEqual(page.status_code, 200)
+        token = form_token(page)
+        lookup_url = reverse("addresses:lookup")
+        body = urlencode({"street": "", "mode": "suggest", "country": "CH"})
+
+        def post_lookup(origin):
+            return self.client.post(
+                lookup_url, body, content_type="application/x-www-form-urlencoded",
+                HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN=origin,
+            )
+
+        with self.assertLogs("django.security.csrf", "WARNING") as logs:
+            refused = post_lookup("null")
+        self.assertEqual(refused.status_code, 403)
+        self.assertIn("Origin checking failed - null", logs.output[0])
+        accepted = post_lookup(PAGE_ORIGIN)
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.json()["status"], "not_checked")
 
     def test_the_forms_are_accepted_with_the_origin_of_a_browser(self):
         self.client.get(self.link)

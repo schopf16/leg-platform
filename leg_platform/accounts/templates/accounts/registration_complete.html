@@ -19,13 +19,15 @@
       {% include "accounts/_field.html" with field=form.last_name %}
     </div>
     <div class="field-pair field-pair-street">
-      {% include "accounts/_field.html" with field=form.street %}
+      {# Address suggestions (D-066): the country of a registration is Switzerland (the form fixes it). #}
+      {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" address_country_value="CH" %}
       {% include "accounts/_field.html" with field=form.house_number %}
     </div>
     <div class="field-pair field-pair-locality">
       {% include "accounts/_field.html" with field=form.postal_code %}
       {% include "accounts/_field.html" with field=form.town %}
     </div>
+    {% include "addresses/widget_notice.html" %}
     <div class="entry-field">
       <label class="entry-check" for="{{ form.privacy.id_for_label }}">
         {{ form.privacy }}
@@ -33,11 +35,11 @@
       </label>
       {% if form.privacy.errors %}<div class="invalid-feedback d-block" id="{{ form.privacy.auto_id }}_error">{{ form.privacy.errors.0 }}</div>{% endif %}
     </div>
-    {% if address_unchecked %}<p class="entry-hint">{% translate "Your address could not be checked and is saved as you entered it." %}</p>{% endif %}
     <button type="submit" class="btn btn-primary">{% translate "Create account" %}</button>
   </form>
 {% endblock %}
 {% block scripts %}
   {{ block.super }}
+  <script defer src="{% static 'js/address-directory.js' %}"></script>
   <script defer src="{% static 'js/submit-once.js' %}"></script>
 {% endblock %}

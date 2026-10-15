@@ -30,7 +30,7 @@
 {% endblock %}
 {% block scripts %}
   {{ block.super }}
-  {% if edit == "personal" %}
+  {% if edit == "personal" and not only_two_factor %}
     <script defer src="{% static 'js/address-directory.js' %}"></script>
     <script defer src="{% static 'js/postal-code-input.js' %}"></script>
   {% endif %}

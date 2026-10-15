@@ -25,7 +25,6 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, TemplateView
 
-from leg_platform.addresses.services import directory_status
 from leg_platform.accounts import (
     email_change,
     password_reset,
@@ -528,10 +527,7 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
         return kwargs
 
     def get_context_data(self, **kwargs):
-        # A note only where an address directory is set up but cannot be reached: the address is
-        # then stored as entered (nothing is said where there is no directory, or on a later page).
-        unavailable = directory_status()[0]["status"] == "unavailable"
-        return super().get_context_data(progress_step=3, address_unchecked=unavailable, **kwargs)
+        return super().get_context_data(progress_step=3, **kwargs)
 
     def form_valid(self, form):
         password_hash = self.held_password_hash()

@@ -21,12 +21,15 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.digests import keyed_digest
+from leg_platform.accounts.models import RateLimitBucket, RateLimitEvent
+from leg_platform.accounts.rate_limits import RATE_LIMIT_PURPOSE
 from leg_platform.addresses import importer
 from leg_platform.addresses.jobs import process_one, request_import
 from leg_platform.addresses.limits import allow_request
 from leg_platform.addresses.models import Address, Directory, ImportRequest
 from leg_platform.addresses.router import AddressRouter
-from leg_platform.addresses.services import approximate_matches, check_address, clean_input, directory_status, lookup
+from leg_platform.addresses.services import approximate_matches, clean_input, directory_status, lookup
 
 HEADER = "STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_NAME;COM_NAME\n"
 SYNTHETIC_CSV = HEADER + "Example Street;12a;9999 Example Town;Discarded synthetic building;Discarded municipality\n"
@@ -230,7 +233,9 @@ class RateLimitAdapterTests(SimpleTestCase):
         login = types.ModuleType("leg_platform.accounts.login_protection")
         login.axes_client_ip = self.client_ip
         rate = types.ModuleType("leg_platform.accounts.rate_limits")
+        self.exhausted = MagicMock(return_value=False)
         rate.consume_all = self.consume
+        rate.exhausted = self.exhausted
         rate.ip_key = self.ip_key
         self.modules = patch.dict(sys.modules, {
             "leg_platform.accounts.login_protection": login,
@@ -260,6 +265,14 @@ class RateLimitAdapterTests(SimpleTestCase):
             self.consume.return_value = results
             self.assertFalse(allow_request(object()))
 
+    def test_read_only_precheck_refuses_before_anything_is_counted(self):
+        self.exhausted.return_value = True
+        self.assertFalse(allow_request(object()))
+        self.consume.assert_not_called()
+        checks = self.exhausted.call_args.args[0]
+        self.assertEqual(checks[0][0], "address-lookup-ip")
+        self.assertEqual(checks[1][0], "address-lookup-global")
+
     def test_untrusted_ip_and_counter_failure_refuse(self):
         self.client_ip.return_value = None
         self.assertFalse(allow_request(object()))
@@ -273,6 +286,49 @@ class RateLimitAdapterTests(SimpleTestCase):
                 self.assertEqual(logs.output, [
                     "WARNING:leg_platform.addresses.limits:Address request limit check failed; request refused."
                 ])
+
+    def test_failing_read_only_precheck_fails_closed_without_counting(self):
+        for error in (DatabaseError("private database detail"), ValueError("private invalid value")):
+            with self.subTest(error=type(error).__name__):
+                self.exhausted.side_effect = error
+                with self.assertLogs("leg_platform.addresses.limits", level="WARNING") as logs:
+                    self.assertFalse(allow_request(object()))
+                    self.assertFalse(allow_request(object(), admin=True))
+                self.consume.assert_not_called()
+                self.assertEqual(logs.output, [
+                    "WARNING:leg_platform.addresses.limits:Address request limit check failed; request refused."
+                ] * 2)
+
+
+@override_settings(AXES_IPWARE_PROXY_COUNT=0)
+class RateLimitDatabaseTests(TransactionTestCase):
+    """The real counters: a refused request changes nothing (security review of D-066, N-2)."""
+
+    def snapshot(self):
+        return (
+            sorted(RateLimitBucket.objects.values_list("digest", "last_seen_at")),
+            sorted(RateLimitEvent.objects.values_list("bucket_id", "occurred_at")),
+        )
+
+    def test_limits_apply_and_a_refused_request_writes_nothing(self):
+        for admin, limit, global_scope in ((False, 60, "address-lookup-global"), (True, 5, "address-import-global")):
+            with self.subTest(admin=admin):
+                RateLimitBucket.objects.all().delete()
+                request = RequestFactory().post("/", REMOTE_ADDR="192.0.2.7")
+                for _number in range(limit):
+                    self.assertTrue(allow_request(request, admin=admin))
+                self.assertEqual(RateLimitEvent.objects.count(), 2 * limit)
+                before = self.snapshot()
+                self.assertEqual(len(before[0]), 2)
+                global_digest = keyed_digest(f"{global_scope}\ninstance", RATE_LIMIT_PURPOSE)
+                self.assertEqual(RateLimitEvent.objects.filter(bucket_id=global_digest).count(), limit)
+                self.assertFalse(allow_request(request, admin=admin))
+                # No bucket, no event, no last-use time changed, so the global bucket is untouched.
+                self.assertEqual(self.snapshot(), before)
+                self.assertEqual(RateLimitEvent.objects.filter(bucket_id=global_digest).count(), limit)
+                # Another client address is not affected by the used-up one.
+                other = RequestFactory().post("/", REMOTE_ADDR="192.0.2.8")
+                self.assertTrue(allow_request(other, admin=admin))
 
 
 @override_settings(LANGUAGE_CODE="en", ROOT_URLCONF="leg_platform.addresses.tests.urls")
@@ -337,9 +393,10 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertEqual(Address.objects.using("addresses").count(), 1)
 
     def test_exact_advisory_match_and_unknown_address(self):
-        self.assertTrue(check_address(street="previous street", house_number="1", postal_code=9999, locality="example town")["match"])
-        result = check_address(street="Unknown", postal_code=9999, locality="Example Town")
+        self.assertTrue(lookup({"street": "previous street", "house_number": "1", "postal_code": "9999", "locality": "example town"}, mode="check")["match"])
+        result = lookup({"street": "Unknown", "postal_code": "9999", "locality": "Example Town"}, mode="check")
         self.assertFalse(result["match"])
+        self.assertEqual(result["status"], "available")
         self.assertIn("save it as entered", result["warning"])
         self.assertEqual(result["kind"], "prefix")
 
@@ -349,8 +406,10 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertEqual(len(result["results"]), 1)
 
     def test_foreign_po_box_and_invalid_inputs_are_not_blocking(self):
-        for values in ({"country": "DE"}, {"street": ""}, {"street": "x" * 256}):
-            self.assertEqual(check_address(**values)["status"], "not_checked")
+        for values in ({"country": "DE"}, {"street": ""}):
+            self.assertEqual(lookup(values, mode="check")["status"], "not_checked")
+        with self.assertRaises(ValueError):
+            lookup({"street": "x" * 256}, mode="check")
 
     def test_foreign_and_nonstreet_addresses_skip_directory_and_warning(self):
         with patch("leg_platform.addresses.services.directory_status") as query:
@@ -358,7 +417,7 @@ class DirectoryDatabaseTests(TransactionTestCase):
                 {"country": "DE", "street": "Foreign Street"},
                 {"country": "CH", "street": ""},
             ):
-                result = check_address(**values)
+                result = lookup(values, mode="check")
                 self.assertEqual(result["status"], "not_checked")
                 self.assertEqual(result["warning"], "")
                 self.assertIsNone(result["match"])
@@ -371,31 +430,48 @@ class DirectoryDatabaseTests(TransactionTestCase):
             directory.save(using="address_import")
             result, _directory = directory_status()
             self.assertEqual(result["stale"], stale)
+            # The operator page keeps its status text; the people who type never get it.
             self.assertEqual(bool(result["warning"]), stale)
+            answer = lookup({"street": "Unknown", "postal_code": "9999", "locality": "Example Town"}, mode="check")
+            self.assertEqual(answer["stale"], stale)
+            self.assertEqual(answer["warning"] == "", stale)
 
-    def test_missing_directory_is_explicit_nonblocking_warning(self):
+    def test_missing_directory_gives_no_warning_in_the_answer(self):
         Directory.objects.using("address_import").all().delete()
-        result = lookup({"street": "Example"})
-        self.assertEqual(result["status"], "missing")
-        self.assertIn("continue", result["warning"])
+        for mode in ("suggest", "check"):
+            with self.subTest(mode=mode):
+                result = lookup({"street": "Example", "postal_code": "9999", "locality": "Example Town"}, mode=mode)
+                self.assertEqual(result["status"], "missing")
+                self.assertEqual(result["warning"], "")
+                self.assertEqual(result["results"], [])
+                self.assertIsNone(result["match"])
+        # The operator page still gets its text.
+        self.assertTrue(directory_status()[0]["warning"])
 
-    def test_database_error_is_explicit_nonblocking_warning(self):
+    def test_database_error_gives_no_warning_in_the_answer_and_is_logged(self):
         with patch("leg_platform.addresses.services.Directory.objects.using", side_effect=DatabaseError("private detail")):
             with self.assertLogs("leg_platform.addresses.services", level="WARNING") as logs:
-                result = check_address(street="Example")
+                result = lookup({"street": "Example"}, mode="check")
         self.assertEqual(result["status"], "unavailable")
         self.assertIsNone(result["match"])
+        self.assertEqual(result["warning"], "")
         self.assertEqual(logs.output, [
             "WARNING:leg_platform.addresses.services:Address directory status is unavailable."
         ])
 
-    def test_entry_query_failure_is_nonblocking(self):
+    def test_entry_query_failure_gives_no_warning_and_is_logged(self):
         with patch("leg_platform.addresses.services.Address.objects.using", side_effect=DatabaseError("private detail")):
             with self.assertLogs("leg_platform.addresses.services", level="WARNING") as logs:
-                self.assertEqual(lookup({"street": "Example"})["status"], "unavailable")
+                result = lookup({"street": "Example"})
+                check = lookup({"street": "Example", "postal_code": "9999", "locality": "Town"}, mode="check")
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["warning"], "")
+        self.assertEqual(check["status"], "unavailable")
+        self.assertEqual(check["warning"], "")
+        self.assertIsNone(check["match"])
         self.assertEqual(logs.output, [
             "WARNING:leg_platform.addresses.services:Address directory lookup is unavailable."
-        ])
+        ] * 2)
 
     def add_addresses(self, *rows):
         """Synthetic directory rows: (street, house number, postal code, locality)."""
@@ -639,7 +715,7 @@ class DirectoryDatabaseTests(TransactionTestCase):
                 self.assertEqual(result["status"], "unavailable")
                 self.assertEqual(result["results"], [])
                 self.assertEqual(result["kind"], "prefix")
-                self.assertIn("continue", result["warning"])
+                self.assertEqual(result["warning"], "")
                 self.assertEqual(logs.output, [
                     "WARNING:leg_platform.addresses.services:Address directory lookup is unavailable."
                 ])
@@ -818,7 +894,7 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertEqual(data["results"], [{
             "street": "Bahnhofstrasse", "house_number": "5", "postal_code": "9999", "locality": "Example Town",
         }])
-        self.assertEqual(set(data), {"status", "data_date", "stale", "warning", "attribution", "results", "match", "kind"})
+        self.assertEqual(set(data), {"status", "data_date", "stale", "warning", "results", "match", "kind"})
         self.assertIn("no-store", response["Cache-Control"])
         self.assertIn("private", response["Cache-Control"])
 
@@ -879,6 +955,61 @@ class DirectoryDatabaseTests(TransactionTestCase):
                 content_type="application/x-www-form-urlencoded",
             ).status_code, {400, 413})
 
+    def post_lookup(self, values, *, allowed=True, **extra):
+        with patch("leg_platform.addresses.views.allow_request", return_value=allowed):
+            return self.client.post(
+                "/addresses/lookup/", urlencode(values), content_type="application/x-www-form-urlencoded", **extra
+            )
+
+    def test_endpoint_shows_no_warning_for_any_state_in_which_the_directory_cannot_answer(self):
+        # D-066: the person cannot do anything about it, so no text is sent for these states (they
+        # are logged on the server). The answers keep their status and HTTP code.
+        values = {"street": "Previous Street", "house_number": "1", "postal_code": "9999",
+                  "locality": "Example Town", "mode": "check"}
+        stale = Directory.objects.using("address_import").get(pk=1)
+        stale.data_date = timezone.localdate() - timedelta(days=200)
+        stale.save(using="address_import")
+        for name, answer in (
+            ("stale, found", self.post_lookup(values)),
+            ("stale, not found", self.post_lookup({**values, "street": "Unknown"})),
+        ):
+            with self.subTest(name):
+                self.assertEqual(answer.status_code, 200)
+                self.assertEqual(answer.json()["status"], "available")
+                self.assertTrue(answer.json()["stale"])
+                self.assertEqual(answer.json()["warning"], "")
+        Directory.objects.using("address_import").all().delete()
+        missing = self.post_lookup(values)
+        self.assertEqual((missing.status_code, missing.json()["status"], missing.json()["warning"]), (200, "missing", ""))
+        with patch("leg_platform.addresses.services.Directory.objects.using", side_effect=DatabaseError("private detail")):
+            with self.assertLogs("leg_platform.addresses.services", level="WARNING"):
+                unreachable = self.post_lookup(values)
+        self.assertEqual(
+            (unreachable.status_code, unreachable.json()["status"], unreachable.json()["warning"]), (200, "unavailable", "")
+        )
+        limited = self.post_lookup(values, allowed=False)
+        self.assertEqual((limited.status_code, limited.json()["status"], limited.json()["warning"]), (429, "rate_limited", ""))
+        invalid = self.post_lookup({**values, "mode": "delete"})
+        self.assertEqual((invalid.status_code, invalid.json()["status"], invalid.json()["warning"]), (400, "invalid", ""))
+        multipart = self.client.post("/addresses/lookup/", values)
+        self.assertEqual((multipart.status_code, multipart.json()["warning"]), (400, ""))
+        for answer in (missing, unreachable, limited, invalid, multipart):
+            self.assertNotIn("swisstopo", answer.content.decode())
+            self.assertNotIn("attribution", answer.json())
+
+    def test_endpoint_has_a_warning_only_for_an_available_directory_that_does_not_know_the_address(self):
+        values = {"street": "Previous Street", "house_number": "1", "postal_code": "9999",
+                  "locality": "Example Town", "mode": "check"}
+
+        found = self.post_lookup(values).json()
+        unknown = self.post_lookup({**values, "street": "Unknown"}).json()
+        suggest = self.post_lookup({**values, "street": "Unknown", "mode": "suggest"}).json()
+
+        self.assertEqual((found["status"], found["match"], found["warning"]), ("available", True, ""))
+        self.assertEqual((unknown["status"], unknown["match"]), ("available", False))
+        self.assertIn("not found in the official directory", unknown["warning"])
+        self.assertEqual(suggest["warning"], "")
+
     def _staff_client(self, with_permission):
         if get_user_model()._meta.app_label == "accounts":
             from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
@@ -908,7 +1039,7 @@ class DirectoryDatabaseTests(TransactionTestCase):
         url = reverse("admin:addresses_importrequest_changelist")
         with patch("leg_platform.addresses.importer.import_directory") as download:
             response = client.get(url)
-            self.assertContains(response, "Federal Office of Topography swisstopo")
+            self.assertNotContains(response, "swisstopo")
             self.assertContains(response, "Data date")
             with patch("leg_platform.addresses.admin.allow_request", return_value=True):
                 self.assertEqual(client.post(url).status_code, 302)

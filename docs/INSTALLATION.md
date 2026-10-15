@@ -37,9 +37,12 @@ supported. Responsive checks do not establish full WCAG 2.2 AA conformity.
 ## Local Address Directory
 
 The application never sends profile addresses to an external service. Suggestions query
-only a local copy of the official directory, attributed to the
-Federal Office of Topography swisstopo in the Swiss German translation (D-049). A missing, stale or unavailable
-directory gives an explicit advisory warning and never blocks registration or saving.
+only a local copy of the official directory. The user interface shows no source and no warning
+about the directory (D-066); the swisstopo source reference (D-049, for example "Bundesamt für
+Landestopografie swisstopo") belongs to the privacy notice and the imprint of the instance, which
+the operator provides (D-022). A missing, stale or unavailable directory is logged on the server
+and shown on the operator page "Address directory" of the administration only; it never blocks
+registration or saving, and the people who type an address are told nothing.
 Foreign addresses and post office boxes are not checked against building addresses.
 
 The operator creates a separate MariaDB database with

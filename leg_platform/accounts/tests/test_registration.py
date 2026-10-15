@@ -5,11 +5,14 @@ in-memory backend, so the messages are read from ``mail.outbox``.
 
 import io
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from threading import Barrier
 from unittest.mock import patch
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -553,31 +556,97 @@ class VerificationTests(TestCase):
             ["first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy"],
         )
 
-    def test_an_unreachable_address_directory_gives_a_note_on_the_details_step_only(self):
+    def test_an_unreachable_address_directory_gives_no_note_on_any_step(self):
+        # D-066: the person cannot do anything about an unavailable directory, so nothing is said.
         self.open_link()
-        self.set_password()
-        unavailable = ({"status": "unavailable"}, None)
-        with patch("leg_platform.accounts.views.directory_status", return_value=unavailable):
+        unavailable = ({"status": "unavailable", "warning": "Operator text."}, None)
+        with patch("leg_platform.addresses.services.directory_status", return_value=unavailable):
+            password = self.client.get(self.password_url)
+            self.set_password()
             page = self.client.get(self.complete_url)
-            self.assertContains(
-                page,
-                "Ihre Adresse konnte nicht geprüft werden und wird so gespeichert, wie Sie sie eingegeben haben.",
-            )
-        response = self.complete()
+            response = self.complete()
 
+        for html in (password, page):
+            self.assertNotContains(html, "konnte nicht geprüft werden")
+            self.assertNotContains(html, "Adressverzeichnis")
+            self.assertNotContains(html, "Operator text.")
         # The registration is not blocked, and the start page carries no message about it.
         self.assertRedirects(response, reverse("home"))
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.ACTIVE)
         self.assertEqual([str(message) for message in get_messages(response.wsgi_request)], [])
 
-    def test_no_note_where_no_directory_is_imported(self):
+    def test_the_address_lookup_of_the_details_step_stays_protected_and_unchanged(self):
+        # D-066: the suggestions are also offered to a person who is not logged in yet. The request
+        # is a same-origin POST with the CSRF token of the form; nothing about the endpoint is
+        # relaxed (CSRF, rate limit, POST only, no storing, no account data).
+        self.open_link()
+        self.set_password()
+        page = self.client.get(self.complete_url)
+        html = page.content.decode()
+        # The page that holds the form is not "no-referrer" (D-054, R-01): a browser would send
+        # "Origin: null" for the POST and the CSRF check would refuse it.
+        self.assertNotEqual(page.get("Referrer-Policy"), "no-referrer")
+        self.assertEqual(page.get("Referrer-Policy"), "same-origin")
+        token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html).group(1)
+        url = reverse("addresses:lookup")
+        self.assertIn(f'data-endpoint="{url}"', html)
+        values = {"street": "", "mode": "suggest", "country": "CH"}
+
+        protected = Client(enforce_csrf_checks=True)
+        protected.cookies[settings.CSRF_COOKIE_NAME] = self.client.cookies[settings.CSRF_COOKIE_NAME].value
+        refused = protected.post(url, values)
+        no_token = protected.post(url, urlencode(values), content_type="application/x-www-form-urlencoded")
+        foreign_origin = protected.post(
+            url, urlencode(values), content_type="application/x-www-form-urlencoded",
+            HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN="https://evil.example.net",
+        )
+        answered = protected.post(
+            url, urlencode(values), content_type="application/x-www-form-urlencoded", HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual((refused.status_code, no_token.status_code, foreign_origin.status_code), (403, 403, 403))
+        self.assertEqual(answered.status_code, 200)
+        self.assertIn("no-store", answered["Cache-Control"])
+        self.assertEqual(answered.json()["warning"], "")
+        self.assertEqual(protected.get(url).status_code, 405)
+
+    def test_the_address_lookup_of_the_details_step_is_rate_limited_for_an_anonymous_client(self):
+        url = reverse("addresses:lookup")
+        values = urlencode({"street": "", "mode": "suggest", "country": "CH"})
+        statuses = [
+            Client().post(url, values, content_type="application/x-www-form-urlencoded", REMOTE_ADDR="10.9.9.9").status_code
+            for _ in range(61)
+        ]
+
+        self.assertEqual(statuses[:60], [200] * 60)
+        self.assertEqual(statuses[60], 429)
+
+    def test_the_details_step_offers_the_address_suggestions_for_switzerland(self):
         self.open_link()
         self.set_password()
 
         page = self.client.get(self.complete_url)
 
-        self.assertNotContains(page, "konnte nicht geprüft werden")
+        html = page.content.decode()
+        self.assertContains(page, "js/address-directory.js")
+        self.assertEqual(html.count("data-address-directory"), 1)
+        # No country field on this page: the widget names the fixed country, and the field ids are
+        # the ones of the registration form.
+        self.assertNotIn('id="id_country"', html)
+        self.assertIn('data-country-value="CH"', html)
+        self.assertNotIn("data-country-id", html)
+        for name, field_id in (("street", "id_street"), ("house-number", "id_house_number"),
+                               ("postal-code", "id_postal_code"), ("locality", "id_town")):
+            self.assertIn(f'data-{name}-id="{field_id}"', html)
+            self.assertIn(f' id="{field_id}"', html)
+        self.assertContains(page, 'data-address-notice role="status"></div>')
+        for text in ("swisstopo", "Landestopografie", "Official address directory", "amtliches Adressverzeichnis",
+                     "Amtliches Adressverzeichnis", "Adressvorschläge benötigen JavaScript", "<noscript"):
+            self.assertNotContains(page, text)
+        # The other steps have no address: no widget, no script.
+        password = self.client.get(self.password_url)
+        self.assertNotContains(password, "data-address-directory")
+        self.assertNotContains(password, "js/address-directory.js")
 
     def test_the_registration_link_stays_valid_until_the_last_step_is_completed(self):
         # Mail scanners open links; the back button and a lost session must not need a new mail.
