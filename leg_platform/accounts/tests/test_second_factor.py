@@ -664,12 +664,13 @@ class RecoveryCodesAndRemovalTests(TestCase):
     def data(self, **overrides):
         return {"current_password": PASSWORD, "otp_token": code_for(self.device), **overrides}
 
-    def test_new_recovery_codes_need_the_password_and_a_code(self):
+    def test_new_recovery_codes_need_the_code_and_nothing_else_is_a_proof(self):
         url = reverse("accounts:recovery_codes")
         for name, data in (
-            ("wrong password", self.data(current_password="wrong password for this account")),
-            ("wrong code", self.data(otp_token="000000")),
-            ("no code", {"current_password": PASSWORD}),
+            ("wrong code", {"otp_token": "000000"}),
+            ("the password alone", {"current_password": PASSWORD}),
+            ("the password in the code field", {"otp_token": PASSWORD}),
+            ("nothing", {}),
         ):
             with self.subTest(name=name):
                 self.assertEqual(self.client.post(url, data).status_code, 200)
@@ -720,12 +721,12 @@ class RecoveryCodesAndRemovalTests(TestCase):
             fetch_redirect_response=False,
         )
 
-    def test_turning_it_off_needs_the_password_and_a_code(self):
+    def test_turning_it_off_needs_the_code_and_nothing_else_is_a_proof(self):
         url = reverse("accounts:two_factor_disable")
         for data in (
-            self.data(current_password="wrong password for this account"),
-            self.data(otp_token="000000"),
+            {"otp_token": "000000"},
             {"current_password": PASSWORD},
+            {"otp_token": PASSWORD},
             {},
         ):
             self.client.post(url, data)
@@ -765,21 +766,27 @@ class RecoveryCodesAndRemovalTests(TestCase):
                 )
 
     def test_the_password_check_of_the_forms_is_under_the_abuse_protection(self):
+        # An account without a second factor gives the password (D-062); guessing it is stopped.
+        plain = create_active_user("plain.guess@example.org")
+        client = Client()
+        client.force_login(plain)
         for _attempt in range(LOGIN_FAILURE_LIMIT):
-            response = self.client.post(
-                reverse("accounts:two_factor_disable"),
-                self.data(current_password="wrong password for this account"),
+            response = client.post(
+                reverse("accounts:account_delete"),
+                {"current_password": "wrong password for this account", "confirm": "on"},
                 REMOTE_ADDR="10.3.0.3",
             )
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(
-            self.client.post(
-                reverse("accounts:two_factor_disable"), self.data(), REMOTE_ADDR="10.3.0.3"
+            client.post(
+                reverse("accounts:account_delete"),
+                {"current_password": PASSWORD, "confirm": "on"},
+                REMOTE_ADDR="10.3.0.3",
             ).status_code,
             429,
         )
-        self.assertTrue(AuthenticatorDevice.objects.exists())
+        self.assertTrue(User.objects.filter(pk=plain.pk).exists())
 
     def test_the_code_check_of_the_forms_is_under_the_abuse_protection(self):
         for _attempt in range(LOGIN_FAILURE_LIMIT):
@@ -793,15 +800,16 @@ class RecoveryCodesAndRemovalTests(TestCase):
         self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
 
     def test_the_data_of_a_failed_check_is_not_stored_by_the_abuse_protection(self):
+        # The sentinel has the shape of a code, so that the check is reached and recorded.
         self.client.post(
             reverse("accounts:two_factor_disable"),
-            {"current_password": "password-sentinel-1", "otp_token": SECRET_SENTINEL},
+            {"current_password": "password-sentinel-1", "otp_token": "654321"},
         )
 
         self.assertTrue(AccessAttempt.objects.exists())
         for attempt in AccessAttempt.objects.all():
             self.assertNotIn("password-sentinel-1", attempt.post_data)
-            self.assertNotIn(SECRET_SENTINEL, attempt.post_data)
+            self.assertNotIn("654321", attempt.post_data)
 
     def test_a_successful_check_releases_its_ip_slots(self):
         self.client.post(reverse("accounts:recovery_codes"), self.data())

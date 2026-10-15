@@ -13,6 +13,7 @@ password field without JavaScript (team lead decision K20).
     </label>
   {% else %}
     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="text-secondary fw-normal">({% translate "optional" %})</span>{% endif %}</label>
+    {% if field.field.lead %}<p class="profile-text" id="{{ field.auto_id }}_lead">{{ field.field.lead }}</p>{% endif %}
     {% if field.field.widget.input_type == "password" %}
       <div class="password-field">
         {{ field }}
@@ -27,4 +28,5 @@ password field without JavaScript (team lead decision K20).
   {% endif %}
   {% if field.help_text %}<div class="form-hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
   {% if hint %}<div class="form-hint" id="{{ field.auto_id }}_hint">{{ hint }}</div>{% endif %}
+  {% if field.field.closing_note %}<div class="form-hint" id="{{ field.auto_id }}_note">{{ field.field.closing_note }}</div>{% endif %}
 </div>

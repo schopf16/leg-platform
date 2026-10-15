@@ -2298,6 +2298,22 @@ msgstr "ausstehende E-Mail-Änderung"
 msgid "pending email changes"
 msgstr "ausstehende E-Mail-Änderungen"
 
+# One proof per confirmation (D-062).
+msgid "Enter the code from your app or a recovery code."
+msgstr "Geben Sie den Code aus Ihrer App oder einen Wiederherstellungscode ein."
+
+msgid "That is not a code. Enter the 6 digits from your app or a recovery code such as abcd-efgh."
+msgstr "Das ist kein Code. Geben Sie die 6 Ziffern aus Ihrer App oder einen Wiederherstellungscode wie abcd-efgh ein."
+
+msgid "For this confirmation you need the 6-digit code from your app. Your password is not needed here."
+msgstr "Zur Bestätigung brauchen Sie den 6-stelligen Code aus Ihrer App. Ihr Passwort wird hier nicht benötigt."
+
+msgid "Is the app not at hand? Enter a recovery code instead, for example abcd-efgh. Each code works only once."
+msgstr "Haben Sie die App nicht zur Hand? Geben Sie stattdessen einen Wiederherstellungscode ein, zum Beispiel abcd-efgh. Jeder Code gilt nur einmal."
+
+msgid "Your account was changed in the meantime. Please try again."
+msgstr "Ihr Konto wurde inzwischen geändert. Bitte versuchen Sie es erneut."
+
 msgid "Default text restored."
 msgstr "Standardtext wiederhergestellt."
 

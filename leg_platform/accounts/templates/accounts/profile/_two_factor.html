@@ -48,7 +48,7 @@ form that made them; nothing about them is stored (D-059).
         <form method="post" action="{% url 'accounts:two_factor_setup' %}" class="profile-form" novalidate>
           {% csrf_token %}
           {% include "accounts/_error_summary.html" %}
-          {% include "accounts/_field.html" with field=form.current_password %}
+          {% include "accounts/profile/_proof_fields.html" %}
           <div class="profile-actions">
             <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
             {% if not second_factor_required %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>{% endif %}
@@ -100,8 +100,7 @@ form that made them; nothing about them is stored (D-059).
       <form method="post" action="{% url 'accounts:recovery_codes' %}" class="profile-form" novalidate>
         {% csrf_token %}
         {% include "accounts/_error_summary.html" %}
-        {% include "accounts/_field.html" with field=form.current_password %}
-        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        {% include "accounts/profile/_proof_fields.html" %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-primary">{% translate "Create new codes" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>
@@ -116,8 +115,7 @@ form that made them; nothing about them is stored (D-059).
       <form method="post" action="{% url 'accounts:two_factor_disable' %}" class="profile-form" novalidate>
         {% csrf_token %}
         {% include "accounts/_error_summary.html" %}
-        {% include "accounts/_field.html" with field=form.current_password %}
-        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        {% include "accounts/profile/_proof_fields.html" %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-danger-outline">{% translate "Turn off 2FA" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>

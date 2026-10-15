@@ -20,6 +20,7 @@ from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.crypto import constant_time_compare
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
@@ -299,18 +300,29 @@ class PasswordChangeView(ProfileCardView):
         )
 
     def post(self, request):
+        # The state of the account at the start of the request: with the code as the proof the
+        # password is not typed, so a change of the account in between is found by this value
+        # (D-040, D-062).
+        started_with = request.user.get_session_auth_hash()
         form = self.form(request.POST)
         if not form.is_valid():
             return self.invalid(form)
+        changed_meanwhile = False
         with transaction.atomic():
-            # The row is locked and read again, so that the current password is checked and the
-            # new password is written to the current state of the account. The form checked the
-            # current password before the lock; a parallel change of the password in between
-            # must not be overwritten by a request that gave the old password (D-040).
+            # The row is locked and read again, so that the new password is written to the
+            # current state of the account. With the password as the proof it is checked again
+            # here: a parallel change of the password in between must not be overwritten by a
+            # request that gave the old password (D-040). With the code as the proof the code was
+            # used up by the form and cannot be checked a second time; the session hash (derived
+            # from the password) is compared with the one of the start instead.
             user = User._base_manager.select_for_update().get(pk=request.user.pk)
-            verified = second_factor.verify_password(
-                request, user, form.cleaned_data["current_password"]
-            )
+            if form.proof == "code":
+                verified = constant_time_compare(user.get_session_auth_hash(), started_with)
+                changed_meanwhile = not verified
+            else:
+                verified = second_factor.verify_password(
+                    request, user, form.cleaned_data["current_password"]
+                )
             if verified:
                 form.user = user
                 # An initial password that had to be replaced is replaced (D-005).
@@ -326,7 +338,12 @@ class PasswordChangeView(ProfileCardView):
                 password_reset.notify_password_changed(user)
                 security_log.record(SecurityEvent.Event.PASSWORD_CHANGED, account=user)
         if not verified:
-            form.add_error("current_password", ReauthenticationForm.password_error)
+            if changed_meanwhile:
+                form.add_error(
+                    None, _("Your account was changed in the meantime. Please try again.")
+                )
+            else:
+                form.add_error("current_password", ReauthenticationForm.password_error)
             return self.invalid(form)
         # Renews the session ID and keeps this session; Django derives the session hash from
         # the password, so every other session of the account ends (docs/SECURITY.md).

@@ -5,6 +5,8 @@ The forms accept only the fields they define, so that any other submitted value
 is ignored (docs/SECURITY.md, section 3).
 """
 
+import re
+
 from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, SetPasswordMixin
@@ -13,7 +15,7 @@ from django.forms.boundfield import BoundField
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.accounts import second_factor
+from leg_platform.accounts import second_factor, totp
 from leg_platform.accounts.bot_check import BotCheckMixin
 from leg_platform.accounts.models import (
     EMAIL_MAX_LENGTH,
@@ -130,10 +132,15 @@ class PortalBoundField(BoundField):
             return None
         ids = []
         if self.auto_id and not self.is_hidden:
+            # A lead text above the control comes first, as it is read first (``lead``).
+            ids += [f"{self.auto_id}_{suffix}" for suffix in getattr(self.field, "described_first", ())]
+            error_first = getattr(self.field, "error_before_hint", False)
+            if error_first and self.errors:
+                ids.append(f"{self.auto_id}_error")
             if self.help_text:
                 ids.append(f"{self.auto_id}_helptext")
             ids += [f"{self.auto_id}_{suffix}" for suffix in getattr(self.field, "described_by", ())]
-            if self.errors:
+            if self.errors and not error_first:
                 ids.append(f"{self.auto_id}_error")
         return " ".join(ids)
 
@@ -542,11 +549,99 @@ class StartSetupForm(PortalFormMixin, forms.Form):
         super().__init__(*args, **kwargs)
 
 
-class ReauthenticationForm(PortalFormMixin, forms.Form):
-    """Asks the logged-in person for the password and, if set up, the second factor again.
+class ProofCodeInput(forms.TextInput):
+    """The field for the code of a confirmation: it never writes a value back into the page.
+
+    A code is used once, so repeating it helps nobody, and a password that was typed into the
+    field by habit must not appear in the page again (design package, one proof, 2.4).
+    """
+
+    def format_value(self, value):
+        return None
+
+
+# What a code can look like after ``totp.normalize_code``: six characters (the app) or eight
+# (a recovery code: base32 letters and digits). Anything else is no code and is refused before
+# the abuse protection counts it (docs/SECURITY.md, section 3, "one proof").
+CODE_SHAPE = re.compile(r"^(?:[a-z0-9]{6}|[a-z0-9]{8})$")
+
+
+class OneProofMixin:
+    """One proof per confirmation: the code of the second factor if one is set up, otherwise the
+    password, never both (owner decision of 2026-10-15, "2FA gewinnt"; D-062).
+
+    The form removes the field that it does not need: ``current_password`` when the account has a
+    second factor (``proof == "code"``), ``otp_token`` otherwise (``proof == "password"``). The
+    code is checked after every other field is valid, so that a recovery code is not used up by a
+    form that fails anyway, and only if it has the shape of a code.
+    """
+
+    proof = "password"
+    code_required_message = _("Enter the code from your app or a recovery code.")
+    code_shape_message = _(
+        "That is not a code. Enter the 6 digits from your app or a recovery code such as abcd-efgh."
+    )
+    code_lead = _(
+        "For this confirmation you need the 6-digit code from your app. Your password is not "
+        "needed here."
+    )
+    code_hint = _(
+        "Is the app not at hand? Enter a recovery code instead, for example abcd-efgh. Each code "
+        "works only once."
+    )
+
+    def use_one_proof(self, user, *, autofocus=True):
+        field = self.fields["otp_token"]
+        if not second_factor.has_second_factor(user):
+            self.proof = "password"
+            del self.fields["otp_token"]
+            return
+        self.proof = "code"
+        del self.fields["current_password"]
+        field.widget = ProofCodeInput(
+            attrs={
+                "autocomplete": "one-time-code",
+                "autocapitalize": "none",
+                "autocorrect": "off",
+                "spellcheck": "false",
+                "maxlength": "12",
+                "placeholder": "000000",
+                "class": "form-control",
+            }
+        )
+        if autofocus:
+            field.widget.attrs["autofocus"] = True
+        field.error_messages["required"] = self.code_required_message
+        field.help_text = self.code_hint
+        field.lead = self.code_lead
+        field.described_first = ("lead",)
+        field.error_before_hint = True
+
+    def clean_otp_token(self):
+        value = self.cleaned_data["otp_token"]
+        if not CODE_SHAPE.match(totp.normalize_code(value)):
+            raise ValidationError(self.code_shape_message, code="code_shape")
+        return value
+
+    def check_code(self, cleaned_data):
+        """Check the code (used up if it is a recovery code); only when nothing else is wrong.
+
+        When the budget of wrong codes is used up, ``verify_second_factor`` marks the request as
+        locked out and the lockout page of the abuse protection answers (with its own text about
+        the pause); the form only adds the common error.
+        """
+        if self.proof != "code" or self.errors or "otp_token" not in cleaned_data:
+            return
+        if second_factor.verify_second_factor(self.request, self.user, cleaned_data["otp_token"]) is None:
+            self.add_error("otp_token", CodeForm.invalid_code_message)
+
+
+class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
+    """Asks the logged-in person for one proof: the code of the second factor if one is set up,
+    otherwise the password (D-062).
 
     For changes that a hijacked session must not be able to make (docs/SECURITY.md, section 3).
-    Both checks run under the abuse protection of the login, so that the form cannot be used to
+    The check runs under the abuse protection of the login, so that the form cannot be used to
     guess the password or a code.
     """
 
@@ -556,12 +651,13 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
         error_messages={"required": _("Enter your current password.")},
     )
-    # Removed for an account without a second factor. A recovery code is also accepted here.
+    # Instead of the password where a second factor is set up. A recovery code is also accepted.
     otp_token = forms.CharField(
         label=_("Code from the app"),
-        max_length=32,
-        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "placeholder": "000000"}),
-        error_messages={"required": _("Enter the code.")},
+        # Generous on purpose: a password pasted by habit gets the message "that is not a code",
+        # not Django's message about the length (the shape check refuses it, D-062).
+        max_length=256,
+        widget=forms.TextInput(),
     )
     password_error = _("The password is not correct. Please try again.")
 
@@ -569,8 +665,7 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         super().__init__(*args, **kwargs)
         self.request = request
         self.user = request.user
-        if not second_factor.has_second_factor(self.user):
-            del self.fields["otp_token"]
+        self.use_one_proof(self.user)
 
     def check_changes(self, cleaned_data):
         """Hook for the forms that ask for more than the proof: add errors here. The code is
@@ -578,19 +673,17 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        password = cleaned_data.get("current_password")
-        if password is None:
-            return cleaned_data
-        if not second_factor.verify_password(self.request, self.user, password):
-            self.add_error("current_password", self.password_error)
+        if self.proof == "password":
+            password = cleaned_data.get("current_password")
+            if password is None:
+                return cleaned_data
+            if not second_factor.verify_password(self.request, self.user, password):
+                self.add_error("current_password", self.password_error)
+                return cleaned_data
+            self.check_changes(cleaned_data)
             return cleaned_data
         self.check_changes(cleaned_data)
-        # The code is checked only after the password was right and the rest is valid.
-        if "otp_token" in self.fields and not self.errors:
-            if second_factor.verify_second_factor(
-                self.request, self.user, cleaned_data["otp_token"]
-            ) is None:
-                self.add_error("otp_token", CodeForm.invalid_code_message)
+        self.check_code(cleaned_data)
         return cleaned_data
 
 
@@ -625,14 +718,21 @@ class EmailChangeForm(ReauthenticationForm):
     )
     field_order = ("email", "secondary_email", "current_password", "otp_token")
 
+    link_note = _(
+        "You confirm new addresses with a link. The confirmation is valid for 24 hours. "
+        "Otherwise the current address stays valid."
+    )
+
     def __init__(self, *args, request, **kwargs):
         super().__init__(*args, request=request, **kwargs)
         self.initial.setdefault("email", request.user.email)
         self.initial.setdefault("secondary_email", request.user.secondary_email)
-        self.fields["current_password"].help_text = _(
-            "You confirm new addresses with a link. The confirmation is valid for 24 hours. "
-            "Otherwise the current address stays valid."
-        )
+        # The proof is the third field here, so it takes no autofocus. The note about the link
+        # stands below the proof, whichever it is (one proof, 2.4).
+        proof_field = self.fields["otp_token" if self.proof == "code" else "current_password"]
+        proof_field.widget.attrs.pop("autofocus", None)
+        proof_field.closing_note = self.link_note
+        proof_field.described_by = (*getattr(proof_field, "described_by", ()), "note")
         # The login address and the new one(s) as the form found them; filled by ``clean``.
         self.login_change = None
         self.secondary_change = None
@@ -701,8 +801,10 @@ class AccountDeleteForm(ReauthenticationForm):
         )
 
 
-class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
-    """Change the password of the logged-in account; asks for the current password first."""
+class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):
+    """Change the password of the logged-in account; asks for one proof first: the code of the
+    second factor if one is set up, otherwise the current password (D-062). The new password and
+    its repetition are asked for in both cases."""
 
     different_password_message = _("Choose a password that is different from the current one.")
 
@@ -712,21 +814,19 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
         error_messages={"required": _("Enter your current password.")},
     )
-    # Asked for where a second factor is set up, as for the other changes of the account (K12,
-    # security review of phase 4); a recovery code is also accepted. Removed otherwise.
+    # Instead of the current password where a second factor is set up; a recovery code is also
+    # accepted.
     otp_token = forms.CharField(
         label=_("Code from the app"),
-        max_length=32,
-        widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "placeholder": "000000"}),
-        error_messages={"required": _("Enter the code.")},
+        max_length=256,
+        widget=forms.TextInput(),
     )
     field_order = ("current_password", "otp_token", "new_password1", "new_password2")
 
     def __init__(self, user, *args, request, **kwargs):
         super().__init__(user, *args, **kwargs)
         self.request = request
-        if not second_factor.has_second_factor(user):
-            del self.fields["otp_token"]
+        self.use_one_proof(user)
         self.fields["new_password1"].widget.attrs.pop("autofocus", None)
         describe_password_fields(self, "new_password1", "new_password2")
 
@@ -738,26 +838,14 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # An initial password that must be replaced is not replaced by itself (D-005).
-        if (
-            self.user.password_change_required
-            and "current_password" in cleaned_data
-            and "new_password2" in cleaned_data
-            and cleaned_data["new_password2"] == cleaned_data["current_password"]
-        ):
+        # The new password is not the one that is set now. With the code as the proof the current
+        # password is not typed, so it is compared with the stored one (D-005, D-062).
+        new = cleaned_data.get("new_password2")
+        if new and "new_password1" in cleaned_data and self.user.check_password(new):
             self.add_error("new_password1", self.different_password_message)
-        # The code is checked, and so used up, only after the password was right and every other
-        # field is valid: a recovery code must not be lost to a form that fails anyway (security
-        # review, final, R2).
-        if (
-            "otp_token" in self.fields
-            and not self.errors
-            and second_factor.verify_second_factor(
-                self.request, self.user, cleaned_data["otp_token"]
-            )
-            is None
-        ):
-            self.add_error("otp_token", CodeForm.invalid_code_message)
+        # The code is checked, and so used up, only after every other field is valid: a recovery
+        # code must not be lost to a form that fails anyway (security review, final, R2).
+        self.check_code(cleaned_data)
         return cleaned_data
 
 

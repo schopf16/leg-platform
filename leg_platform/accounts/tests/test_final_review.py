@@ -401,22 +401,23 @@ class CodeIsUsedUpLastTests(TestCase):
         )
         self.assertEqual(right.status_code, 302)
 
-    def test_a_wrong_password_never_reaches_the_code(self):
+    def test_a_password_in_the_code_field_never_reaches_the_check(self):
+        # A password typed by habit has no shape of a code: refused before the check, so it is not
+        # counted and a recovery code stays valid (D-062).
         response = self.client.post(
             PASSWORD_URL,
             {
-                "current_password": "wrong password here",
-                "otp_token": self.code,
+                "otp_token": PASSWORD,
                 "new_password1": OTHER_PASSWORD,
                 "new_password2": OTHER_PASSWORD,
             },
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Das ist kein Code.")
         right = self.client.post(
             PASSWORD_URL,
             {
-                "current_password": PASSWORD,
                 "otp_token": self.code,
                 "new_password1": OTHER_PASSWORD,
                 "new_password2": OTHER_PASSWORD,

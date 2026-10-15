@@ -437,7 +437,7 @@ class PasswordCardCodeTests(TestCase):
         response = self.client.post(self.url, self.data())
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Geben Sie den Code ein.")
+        self.assertContains(response, "Geben Sie den Code aus Ihrer App oder einen Wiederherstellungscode ein.")
         self.assertTrue(User.objects.get(pk=self.user.pk).check_password(PASSWORD))
 
     def test_a_wrong_code_keeps_the_password(self):

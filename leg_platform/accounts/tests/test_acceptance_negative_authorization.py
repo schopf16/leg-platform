@@ -641,7 +641,7 @@ class ReauthenticationTests(TestCase):
             return not second_factor.has_second_factor(user)
         return not User.objects.filter(pk=user.pk).exists()
 
-    def test_a_missing_or_wrong_password_or_code_changes_nothing_and_the_right_ones_do(self):
+    def test_a_missing_or_wrong_code_changes_nothing_and_the_right_one_alone_does(self):
         for name, (url_name, extra) in self.ACTIONS.items():
             user, device, client, address = self.account(name)
             digests = stored_digests(user)
@@ -649,11 +649,11 @@ class ReauthenticationTests(TestCase):
             other_code = recovery_codes_of(f"someone.else.{name}@example.org")[0]
             url = reverse(url_name)
             attempts = {
-                "wrong password, right code": {"current_password": OTHER_PASSWORD, "otp_token": code_for(device)},
+                "wrong code": {"otp_token": "000000"},
                 "right password, wrong code": {"current_password": PASSWORD, "otp_token": "000000"},
-                "right password, no code": {"current_password": PASSWORD},
-                "no password, right code": {"otp_token": code_for(device)},
-                "right password, code of nobody": {"current_password": PASSWORD, "otp_token": other_code},
+                "right password alone": {"current_password": PASSWORD},
+                "password in the code field": {"otp_token": PASSWORD},
+                "code of nobody": {"otp_token": other_code},
                 "nothing": {},
             }
             for label, data in attempts.items():
@@ -662,10 +662,11 @@ class ReauthenticationTests(TestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertFalse(self.effect(name, user, digests))
                     self.assertEqual(MailJob.objects.count(), jobs)
-            with self.subTest(action=name, attempt="right password and right code"):
+            # One proof (D-062): with a second factor the code alone is the proof.
+            with self.subTest(action=name, attempt="the right code alone"):
                 client.post(
                     url,
-                    {**extra, "current_password": PASSWORD, "otp_token": code_for(device)},
+                    {**extra, "otp_token": code_for(device)},
                     REMOTE_ADDR=address,
                 )
                 self.assertTrue(self.effect(name, user, digests))

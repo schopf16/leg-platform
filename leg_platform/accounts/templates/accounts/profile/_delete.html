@@ -12,8 +12,7 @@ the box and the red button.
       <form method="post" action="{% url 'accounts:account_delete' %}" class="profile-form profile-form-inset" novalidate>
         {% csrf_token %}
         {% include "accounts/_error_summary.html" %}
-        {% include "accounts/_field.html" with field=form.current_password %}
-        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        {% include "accounts/profile/_proof_fields.html" %}
         {% include "accounts/_field.html" with field=form.confirm %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-danger-outline" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>

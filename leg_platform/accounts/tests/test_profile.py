@@ -743,22 +743,20 @@ class TwoFactorActionTests(TestCase):
         self.user.set_secondary_email(SECOND)
         self.client.force_login(self.user)
 
-    def test_new_codes_need_the_password_and_the_code(self):
+    def test_new_codes_need_the_code_and_the_password_alone_is_no_proof(self):
         url = reverse("accounts:recovery_codes")
 
-        wrong_password = self.client.post(
-            url, {"current_password": OTHER_PASSWORD, "otp_token": code_for(self.device)}
-        )
-        no_code = self.client.post(url, {"current_password": PASSWORD})
+        wrong_code = self.client.post(url, {"otp_token": "000000"})
+        password_only = self.client.post(url, {"current_password": PASSWORD})
 
-        for response in (wrong_password, no_code):
+        for response in (wrong_code, password_only):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(codes_in(response), [])
 
     def test_new_codes_replace_the_old_ones_and_are_shown_once(self):
         response = self.client.post(
             reverse("accounts:recovery_codes"),
-            {"current_password": PASSWORD, "otp_token": code_for(self.device)},
+            {"otp_token": code_for(self.device)},
         )
         run_mail_queue()
 

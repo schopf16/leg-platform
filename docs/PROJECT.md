@@ -111,7 +111,7 @@ All required fields are collected when the registration is completed, i.e. on th
 
 Users can change their email address themselves (D-016). The email address is only changed once the new address has been verified:
 
-* The change requires re-authentication with the current password and, if set up, the second factor.
+* The change requires re-authentication with one proof: the code of the second factor if one is set up, otherwise the current password (D-062).
 * A time-limited, single-use verification link is sent to the new address.
 * Until the new address is verified, the account continues to use the old address unchanged.
 * Only after successful verification is the old address replaced; the account continues under the new address.

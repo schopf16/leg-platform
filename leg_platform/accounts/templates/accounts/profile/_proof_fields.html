@@ -1,0 +1,4 @@
+{% comment %}
+The proof field of a confirmation: the code of the second factor if one is set up, otherwise the
+current password, never both (D-062). The form removes the field that it does not need.
+{% endcomment %}{% if form.current_password %}{% include "accounts/_field.html" with field=form.current_password %}{% endif %}{% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
