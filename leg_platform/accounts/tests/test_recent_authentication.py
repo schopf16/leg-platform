@@ -384,3 +384,155 @@ class RegistrationLoginTests(TestCase):
         # The button starts the setup in one more step; the old welcome page is gone (D-058).
         self.assertRedirects(self.client.post(SETUP_URL, {}), CONFIRM_URL, fetch_redirect_response=False)
         self.assertEqual(Client().get("/welcome/").status_code, 404)
+
+
+# A time and a marker that no login writes: they show whether a session carried something of an
+# earlier login over to a later one.
+def mark_session_of_other_account(client):
+    """Put a time that is still inside the window and a marker into the session of the client."""
+    session = client.session
+    session[AUTHENTICATED_AT_KEY] = time.time() - 100
+    session["marker_of_the_first_account"] = "kept?"
+    session.save()
+    return session[AUTHENTICATED_AT_KEY]
+
+
+@tag("mariadb")
+class CrossAccountWindowTests(TestCase):
+    """The window of five minutes belongs to one login of one account (D-055, review finding 5):
+    a login of account A never grants it for account B."""
+
+    def setUp(self):
+        self.first = create_active_user("first.person@example.org")
+        self.second = create_active_user("second.person@example.org")
+
+    def start_setup(self, client):
+        return client.post(SETUP_URL, {})
+
+    def test_a_fresh_login_of_one_account_gives_the_other_account_no_window(self):
+        first_browser, second_browser = Client(), Client()
+        log_in(first_browser, self.first.email, address="10.21.0.1")
+        log_in(second_browser, self.second.email, address="10.21.0.2")
+        age_authentication(second_browser, seconds=301)
+        self.assertLess(time.time() - first_browser.session[AUTHENTICATED_AT_KEY], 30)
+
+        # The password is asked for, and nothing starts, in the browser of the second account.
+        late = self.start_setup(second_browser)
+        self.assertEqual(late.status_code, 200)
+        self.assertContains(late, 'name="current_password"')
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.second).exists())
+        # The fresh browser of the first account starts for its own account only.
+        self.assertRedirects(self.start_setup(first_browser), CONFIRM_URL, fetch_redirect_response=False)
+        self.assertEqual(AuthenticatorDevice.objects.get().user_id, self.first.pk)
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.second).exists())
+
+    def test_the_window_of_the_other_account_does_not_help_a_session_with_an_old_login(self):
+        first_browser, second_browser = Client(), Client()
+        log_in(first_browser, self.first.email, address="10.21.0.3")
+        log_in(second_browser, self.second.email, address="10.21.0.4")
+        age_authentication(first_browser, seconds=301)
+
+        # The second account's fresh login does not make the first account's old one recent.
+        self.assertContains(self.start_setup(first_browser), 'name="current_password"')
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.first).exists())
+
+    def test_switching_the_account_in_the_same_browser_drops_the_session_of_the_first_account(self):
+        client = Client()
+        log_in(client, self.first.email, address="10.21.0.5")
+        mark = mark_session_of_other_account(client)
+        self.assertTrue(recently_authenticated(FakeRequest(client.session)))
+
+        # Django's login() ends the session of another account (flush) before it starts the new
+        # one: nothing of the first session stays, the time is written again for the second login.
+        before = time.time()
+        log_in(client, self.second.email, address="10.21.0.6")
+
+        self.assertEqual(client.session["_auth_user_id"], str(self.second.pk))
+        self.assertNotIn("marker_of_the_first_account", client.session)
+        self.assertNotEqual(client.session[AUTHENTICATED_AT_KEY], mark)
+        self.assertGreaterEqual(client.session[AUTHENTICATED_AT_KEY], before)
+        # The window then belongs to the second account's own login, and a started setup is its own.
+        self.assertRedirects(self.start_setup(client), CONFIRM_URL, fetch_redirect_response=False)
+        self.assertEqual(AuthenticatorDevice.objects.get().user_id, self.second.pk)
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.first).exists())
+
+    def test_a_password_step_for_another_account_neither_starts_nor_extends_a_window(self):
+        holder, device = create_user_with_totp("holder.person@example.org")
+        client = Client()
+        log_in(client, self.first.email, address="10.21.0.7")
+        mark = mark_session_of_other_account(client)
+
+        # Someone types the password of an account with a second factor in the same browser.
+        response = log_in(client, holder.email, address="10.21.0.8")
+        self.assertRedirects(response, CODE_URL, fetch_redirect_response=False)
+        # The code page is closed to a browser that is logged in, so the code is not even checked.
+        coded = send_code(client, code_for(device), address="10.21.0.8")
+        self.assertRedirects(coded, HOME_URL, fetch_redirect_response=False)
+
+        self.assertEqual(client.session["_auth_user_id"], str(self.first.pk))
+        self.assertEqual(client.session[AUTHENTICATED_AT_KEY], mark)
+        self.assertEqual(AuthenticatorDevice.objects.filter(user=holder).count(), 1)
+        # The window that is left is the first account's own: it starts nothing for the holder.
+        self.assertRedirects(self.start_setup(client), CONFIRM_URL, fetch_redirect_response=False)
+        self.assertEqual(AuthenticatorDevice.objects.get(user=self.first).confirmed, False)
+        self.assertTrue(AuthenticatorDevice.objects.get(user=holder).confirmed)
+
+    def test_after_a_logout_the_next_account_in_the_same_browser_starts_without_a_window(self):
+        holder, _device = create_user_with_totp("holder.person@example.org")
+        client = Client()
+        log_in(client, self.first.email, address="10.21.0.9")
+        self.assertIn(AUTHENTICATED_AT_KEY, client.session)
+        client.post(reverse("accounts:logout"))
+
+        response = log_in(client, holder.email, address="10.21.0.10")
+
+        self.assertRedirects(response, CODE_URL)
+        self.assertNotIn(AUTHENTICATED_AT_KEY, client.session)
+        self.assertNotIn("_auth_user_id", client.session)
+        self.assertFalse(recently_authenticated(FakeRequest(client.session)))
+
+    def test_a_started_setup_of_one_account_cannot_be_finished_by_the_other_account(self):
+        first_browser, second_browser = Client(), Client()
+        log_in(first_browser, self.first.email, address="10.21.0.11")
+        log_in(second_browser, self.second.email, address="10.21.0.12")
+        self.start_setup(first_browser)
+        device = AuthenticatorDevice.objects.get(user=self.first)
+
+        # The second account has no started setup of its own: the page sends it to the start,
+        # and the code of the first account's device confirms nothing.
+        self.assertRedirects(second_browser.get(CONFIRM_URL), SETUP_URL, fetch_redirect_response=False)
+        self.assertRedirects(
+            second_browser.post(CONFIRM_URL, {"otp_token": code_for(device)}), SETUP_URL, fetch_redirect_response=False
+        )
+        device.refresh_from_db()
+        self.assertFalse(device.confirmed)
+
+
+@tag("mariadb")
+class RegistrationInABrowserOfAnotherAccountTests(TestCase):
+    """Completing a registration logs the new account in; the session of an account that was
+    logged in in the same browser ends and its window does not pass on (D-055, A1 and A3)."""
+
+    databases = ADDRESS_DATABASES
+
+    def test_the_completion_starts_a_new_session_and_a_new_time(self):
+        first = create_active_user("first.person@example.org")
+        register(Client(), "new.person@example.org")
+        token = VerificationToken.objects.get()
+        browser = Client()
+        log_in(browser, first.email, address="10.22.0.1")
+        mark = mark_session_of_other_account(browser)
+
+        browser.get(verification_path(mail.outbox[0]))
+        browser.post(PASSWORD_URL, password_data(registration=token.pk))
+        before = time.time()
+        response = browser.post(COMPLETE_URL, completion_data(registration=token.pk))
+
+        self.assertRedirects(response, HOME_URL)
+        new = User.objects.get(normalized_email="new.person@example.org")
+        self.assertEqual(browser.session["_auth_user_id"], str(new.pk))
+        self.assertNotIn("marker_of_the_first_account", browser.session)
+        self.assertNotEqual(browser.session[AUTHENTICATED_AT_KEY], mark)
+        self.assertGreaterEqual(browser.session[AUTHENTICATED_AT_KEY], before)
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=first).exists())
+

@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from leg_platform.accounts import mail_queue, registration
 from leg_platform.accounts.models import MailJob, PortalSettings, User, VerificationToken
+from leg_platform.accounts.second_factor import AUTHENTICATED_AT_KEY
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
@@ -847,6 +848,15 @@ class ConcurrentCompletionTests(TransactionTestCase):
         user = User.objects.get()
         self.assertEqual(user.status, User.Status.ACTIVE)
         self.assertEqual(VerificationToken.objects.count(), 0)
+        # Exactly one of the two browsers is logged in, as the account (D-055, A1): the one that
+        # created it. The other one holds no login and no remembered time of a login.
+        logged_in = [client for client in clients if "_auth_user_id" in client.session]
+        self.assertEqual(len(logged_in), 1)
+        self.assertEqual(logged_in[0].session["_auth_user_id"], str(user.pk))
+        loser = next(client for client in clients if client is not logged_in[0])
+        self.assertNotIn("_auth_user_id", loser.session)
+        self.assertNotIn(AUTHENTICATED_AT_KEY, loser.session)
+        self.assertEqual(loser.get(reverse("accounts:profile")).status_code, 302)
 
     def test_a_replacement_and_a_completion_at_the_same_time_leave_one_consistent_state(self):
         register(Client())

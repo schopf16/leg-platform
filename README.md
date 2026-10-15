@@ -95,8 +95,7 @@ Phases 1 to 5 of the design package (D-056 to D-060) are implemented: the login 
 Open work:
 
 * **Address suggestions** (designer review R-04, R-05, R-21, `docs/DECISIONS.md` D-054): the suggestion list stands far from the street field; only prefix matching works, so a typing error finds no suggestion; the warning after saving is far from the fields. A fuzzy fallback on a public endpoint needs a security check.
-* **Tests:** assert in the concurrency test of the registration completion that exactly one client is logged in; a cross-account test of the five-minute window (D-055, review finding 5).
-* **Mails:** greeting by name in security notifications (R-13, needs a new placeholder, D-039); the registration and the notices are plain text (no button; the link is on a line of its own).
+* **Mails:** greeting by name in security notifications (R-13, needs a new placeholder, D-039; not started in code, design notes in D-063; the concurrency test of the registration completion and the cross-account test of the five-minute window are done, D-063); the registration and the notices are plain text (no button; the link is on a line of its own).
 * **Translations:** the French, Italian and English texts of the login page are drafts that native speakers must review (D-056); every other page is German only.
 * **Messages (Mitteilungen), locations, invoices and energy** are menu entries marked "später"; they are not built (WL-27, `docs/PROJECT.md`).
 * **Proof of work for the mail forms** (ALTCHA) is only a recommendation (D-058); it needs the approval of the designer and the study of the manufacturer's documentation.
