@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from leg_platform.accounts import views
+from leg_platform.accounts import profile_views, views
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
@@ -86,14 +86,14 @@ urlpatterns = [
         name="email_change_confirm",
     ),
     path(
-        "email-change/request/",
-        views.EmailChangeRequestView.as_view(),
-        name="email_change_request",
+        "email-change/stop/<slug:token>/",
+        views.EmailChangeStopVerifyView.as_view(),
+        name="email_change_stop_verify",
     ),
     path(
-        "email-change/sent/",
-        views.EmailChangeSentView.as_view(),
-        name="email_change_sent",
+        "email-change/stop/",
+        views.EmailChangeStopConfirmView.as_view(),
+        name="email_change_stop_confirm",
     ),
     path(
         "tasks/<slug:key>/hide/",
@@ -110,26 +110,49 @@ urlpatterns = [
         views.TwoFactorResetConfirmView.as_view(),
         name="two_factor_reset_confirm",
     ),
-    path("profile/", views.ProfileView.as_view(), name="profile"),
-    path("profile/edit/", views.ProfileEditView.as_view(), name="profile_edit"),
-    path("profile/delete/", views.AccountDeleteView.as_view(), name="account_delete"),
-    path("profile/password/", views.PasswordChangeView.as_view(), name="password_change"),
-    path("profile/two-factor/", views.TwoFactorOverviewView.as_view(), name="two_factor"),
-    path("profile/two-factor/setup/", views.TwoFactorSetupView.as_view(), name="two_factor_setup"),
+    path("profile/", profile_views.ProfileView.as_view(), name="profile"),
+    path("profile/edit/", profile_views.ProfileEditView.as_view(), name="profile_edit"),
+    path(
+        "profile/email/",
+        profile_views.EmailChangeRequestView.as_view(),
+        name="email_change_request",
+    ),
+    path(
+        "profile/email/cancel/<slug:kind>/",
+        profile_views.EmailChangeCancelView.as_view(),
+        name="email_change_cancel",
+    ),
+    path("profile/delete/", profile_views.AccountDeleteView.as_view(), name="account_delete"),
+    path("profile/password/", profile_views.PasswordChangeView.as_view(), name="password_change"),
+    path("profile/two-factor/", profile_views.TwoFactorOverviewView.as_view(), name="two_factor"),
+    path(
+        "profile/two-factor/setup/",
+        profile_views.TwoFactorSetupView.as_view(),
+        name="two_factor_setup",
+    ),
     path(
         "profile/two-factor/setup/confirm/",
-        views.TwoFactorConfirmView.as_view(),
+        profile_views.TwoFactorConfirmView.as_view(),
         name="two_factor_confirm",
     ),
-    path("profile/two-factor/setup/qr.svg", views.TwoFactorQrView.as_view(), name="two_factor_qr"),
+    path(
+        "profile/two-factor/setup/qr.svg",
+        profile_views.TwoFactorQrView.as_view(),
+        name="two_factor_qr",
+    ),
     path(
         "profile/two-factor/recovery-codes/",
-        views.RecoveryCodesView.as_view(),
+        profile_views.RecoveryCodesView.as_view(),
         name="recovery_codes",
     ),
     path(
+        "profile/two-factor/recovery-codes/done/",
+        profile_views.RecoveryCodesDoneView.as_view(),
+        name="recovery_codes_done",
+    ),
+    path(
         "profile/two-factor/disable/",
-        views.TwoFactorDisableView.as_view(),
+        profile_views.TwoFactorDisableView.as_view(),
         name="two_factor_disable",
     ),
 ]

@@ -1,12 +1,17 @@
 {% extends "entry_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Confirm email address change" %}{% endblock %}
+{% block title %}{% if secondary %}{% translate "Confirm second email address" %}{% else %}{% translate "Confirm email address change" %}{% endif %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Confirm email address change" %}</h1>
-  <p>{% blocktranslate with email=new_email %}Confirm that <strong class="address-text">{{ email }}</strong> should become the email address for your account.{% endblocktranslate %}</p>
+  {% if secondary %}
+    <h1>{% translate "Confirm second email address" %}</h1>
+    <p>{% blocktranslate with email=new_email %}Confirm that <strong class="address-text">{{ email }}</strong> should be the second email address of your account. It receives information. You do not log in with it.{% endblocktranslate %}</p>
+  {% else %}
+    <h1>{% translate "Confirm email address change" %}</h1>
+    <p>{% blocktranslate with email=new_email %}Confirm that <strong class="address-text">{{ email }}</strong> should become the email address for your account.{% endblocktranslate %}</p>
+  {% endif %}
   <form method="post">
     {% csrf_token %}
-    <button type="submit" class="btn btn-primary">{% translate "Confirm new email address" %}</button>
+    <button type="submit" class="btn btn-primary">{% if secondary %}{% translate "Confirm second address" %}{% else %}{% translate "Confirm new email address" %}{% endif %}</button>
   </form>
 {% endblock %}

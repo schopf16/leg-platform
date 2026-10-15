@@ -1,41 +1,29 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Profile" %}{% endblock %}
+{% block inner_class %}{% endblock %}
 {% block content %}
-  <div class="card card-md">
-    <div class="card-body">
-      <h1 class="h2 mb-3">{% translate "Profile" %}</h1>
-      <dl class="row">
-        <dt class="col-sm-5">{% translate "Customer number" %}</dt>
-        <dd class="col-sm-7 identifier">{{ account.customer_number_display }}</dd>
-        <dt class="col-sm-5">{% translate "Status" %}</dt>
-        <dd class="col-sm-7"><span class="status-dot status-{{ account.status }}" aria-hidden="true"></span> {{ account.get_status_display }}</dd>
-        <dt class="col-sm-5">{% translate "Email address" %}</dt>
-        <dd class="col-sm-7">{{ account.email }}</dd>
-        <dt class="col-sm-5">{% translate "Name" %}</dt>
-        <dd class="col-sm-7">{% if account.organisation_name %}{{ account.organisation_name }}<br>{% endif %}{{ account.first_name }} {{ account.last_name }}</dd>
-        <dt class="col-sm-5">{% translate "Address" %}</dt>
-        <dd class="col-sm-7">
-          {% if account.address_line_1 %}{{ account.address_line_1 }}<br>{% endif %}
-          {% if account.street %}{{ account.street }} {{ account.house_number }}<br>{% endif %}
-          {% if account.post_office_box_number %}{% translate "Post office box" %} {{ account.post_office_box_number }}<br>{% endif %}
-          {{ account.postal_code_display }} {{ account.town }}<br>
-          {{ account.country.name }}
-        </dd>
-        {% if account.phone_number %}
-          <dt class="col-sm-5">{% translate "Phone number" %}</dt>
-          <dd class="col-sm-7">{{ account.phone_number_display }}</dd>
-        {% endif %}
-        <dt class="col-sm-5">{% translate "Two-factor authentication" %}</dt>
-        <dd class="col-sm-7">{% if second_factor_active %}{% translate "On" %}{% else %}{% translate "Off" %}{% endif %}</dd>
-      </dl>
-      <div class="d-grid gap-2 d-print-none">
-        <a class="btn btn-secondary-action" href="{% url 'accounts:profile_edit' %}">{% translate "Edit profile" %}</a>
-        <a class="btn btn-secondary-action" href="{% url 'accounts:email_change_request' %}">{% translate "Change email address" %}</a>
-        <a class="btn btn-secondary-action" href="{% url 'accounts:password_change' %}">{% translate "Change password" %}</a>
-        <a class="btn btn-secondary-action" href="{% url 'accounts:two_factor' %}">{% translate "Two-factor authentication" %}</a>
-        <a class="btn btn-outline-danger" href="{% url 'accounts:account_delete' %}">{% translate "Delete account" %}</a>
-      </div>
-    </div>
+  <p class="page-label">{% translate "My account" %}</p>
+  <h1 class="start-title">{% translate "Profile" %}</h1>
+  <p class="start-sub">{% translate "Your details and security settings." %}</p>
+  <div class="profile-cards">
+    {% if not only_two_factor %}
+      {% include "accounts/profile/_personal.html" %}
+      {% include "accounts/profile/_email.html" %}
+      {% include "accounts/profile/_password.html" %}
+    {% endif %}
+    {% include "accounts/profile/_two_factor.html" %}
+    {% if not only_two_factor %}
+      {% include "accounts/profile/_delete.html" %}
+    {% endif %}
   </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {% if edit == "personal" %}
+    <script defer src="{% static 'js/address-directory.js' %}"></script>
+    <script defer src="{% static 'js/postal-code-input.js' %}"></script>
+  {% endif %}
+  {% if tf_state == "codes" %}<script defer src="{% static 'js/recovery-codes.js' %}"></script>{% endif %}
+  <script defer src="{% static 'js/confirm-gate.js' %}"></script>
 {% endblock %}

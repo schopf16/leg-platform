@@ -10,10 +10,10 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 ## 2. Login Page, Registration and Login
 
 * [ ] The login page is the entry point of the application; it offers login, password reset and registration and links to the instance's privacy notice and website. All other pages accessible without login link to the privacy notice as well (D-022, D-025).
-* [ ] The application has no public home page; the root URL leads to the login page or, for logged-in users, to their profile, subject to the central second-factor check (staff users and system administrators without a completed second factor are led to its setup).
+* [ ] The application has no public home page; the root URL leads to the login page or, for logged-in users, to the start page with the greeting and the task tiles (D-057), subject to the central second-factor check (staff users and system administrators without a completed second factor are led to its setup).
 * [ ] A person can register with the email address only; the privacy notice is linked.
-* [ ] Via the link sent, the email address is verified, the required profile data is entered and the password is set; the account is then active.
-* [ ] A customer number is assigned when the registration is completed, i.e. when the password form is submitted successfully via the verification link (not at registration and not when the link is merely opened; D-021), and displayed in the profile in two blocks of three digits.
+* [ ] Via the link sent, the email address is verified, the password is set (step 2 of 3) and the required profile data is entered (step 3 of 3); the account is then active (D-058).
+* [ ] A customer number is assigned when the registration is completed, i.e. when the last step "Konto erstellen" is submitted successfully (not at registration and not when the link is merely opened; D-021, D-058), and displayed on the start page in two blocks of three digits.
 * [ ] Login works with the email address; the customer number is not a login identifier (D-021).
 * [ ] Logout works.
 * [ ] Password change and password reset work.
@@ -28,9 +28,10 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 
 ## 4. Profile and Account Lifecycle
 
-* [ ] Users can view their own profile.
-* [ ] Users can change permitted profile data of their own; name, postal address and email address are required, the phone number is optional.
-* [ ] Users can change their email address as described in `docs/PROJECT.md`, "Changing the Email Address".
+* [ ] Users can view their own profile as five cards that change in place (personal details, email addresses, password, two-factor authentication, delete account) and work without a script (D-059).
+* [ ] Users can change permitted profile data of their own; name and postal address are required, the further details (salutation, company, address addition, post office box, phone number) are optional.
+* [ ] Users can change their email address as described in `docs/PROJECT.md`, "Changing the Email Address", and can add a second address that receives every notification but never serves for the login or the reset (D-059). A pending request shows its deadline and can be cancelled; the notice to the old address has a link that stops the change without a login.
+* [ ] Every change of the second factor, the password or an address is mailed to every address of the account.
 * [ ] System administrators can block and unblock accounts.
 * [ ] Users can delete their own account; system administrators can delete accounts. Deletion follows the retention obligation rule (D-016).
 * [ ] The same email address can be used for a new registration after deletion or deactivation.

@@ -23,7 +23,7 @@ from django_otp import devices_for_user
 
 from leg_platform.accounts import security_log
 from leg_platform.accounts.encryption import DecryptionError
-from leg_platform.accounts.mail_queue import enqueue
+from leg_platform.accounts.mail_queue import enqueue_for_account
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     MailJob,
@@ -126,7 +126,7 @@ def record_failed_code(user):
         update_fields=["failed_codes", "failed_codes_since", "code_budget_relieved"]
     )
     if device.failed_codes == CODE_NOTICE_AT:
-        enqueue(MailJob.Kind.CODE_ATTEMPTS_WARNING, user.email)
+        enqueue_for_account(MailJob.Kind.CODE_ATTEMPTS_WARNING, user)
         security_log.record(Event.CODE_ATTEMPTS_WARNING, account=user)
     elif device.failed_codes == CODE_PAUSE_AT:
         security_log.record(Event.CODE_ATTEMPTS_PAUSED, account=user)
@@ -183,7 +183,7 @@ def confirm_enrolment(user, device_id, code):
         codes = _replace_recovery_codes(user)
         # Other sessions end; the view keeps the session that made the change (D-044).
         user.end_all_sessions()
-        enqueue(MailJob.Kind.TWO_FACTOR_ENABLED, user.email)
+        enqueue_for_account(MailJob.Kind.TWO_FACTOR_ENABLED, user)
         security_log.record(Event.TWO_FACTOR_ENABLED, account=user)
     return device, codes
 
@@ -214,7 +214,7 @@ def renew_recovery_codes(user):
         codes = _replace_recovery_codes(user)
         # Other sessions end; the view keeps the session that made the change (D-044).
         user.end_all_sessions()
-        enqueue(MailJob.Kind.RECOVERY_CODES_RENEWED, user.email)
+        enqueue_for_account(MailJob.Kind.RECOVERY_CODES_RENEWED, user)
         security_log.record(Event.RECOVERY_CODES_RENEWED, account=user)
     return codes
 
@@ -235,7 +235,7 @@ def disable(user):
             device.delete()
         # Other sessions end; the view keeps the session that made the change (D-044).
         user.end_all_sessions()
-        enqueue(MailJob.Kind.TWO_FACTOR_DISABLED, user.email)
+        enqueue_for_account(MailJob.Kind.TWO_FACTOR_DISABLED, user)
         security_log.record(Event.TWO_FACTOR_DISABLED, account=user)
 
 
@@ -265,7 +265,7 @@ def verify_code(user, raw_code):
             if fits and device.verify_token(code):
                 if is_recovery_code_device(device):
                     # In the same transaction as the use of the code.
-                    enqueue(MailJob.Kind.RECOVERY_CODE_USED, user.email)
+                    enqueue_for_account(MailJob.Kind.RECOVERY_CODE_USED, user)
                     security_log.record(Event.RECOVERY_CODE_USED, account=user)
                 break
         else:

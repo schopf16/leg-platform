@@ -24,8 +24,11 @@ from leg_platform.accounts.models import RateLimitBucket
 
 RATE_LIMIT_PURPOSE = b"LEG-Platform rate limit v1"
 
-# (number of requests, window): a request is allowed only if every window has room.
-MAIL_ADDRESS_LIMITS = ((12, timedelta(hours=1)), (24, timedelta(hours=24)))
+# (number of requests, window): a request is allowed only if every window has room. The short
+# window (D-058, security review of phase 3) stops a burst to one address that the hourly budget
+# alone would allow; a person at the device needs at most a few tries in ten minutes (the page
+# offers "send again" only after a pause of 60 seconds).
+MAIL_ADDRESS_LIMITS = ((12, timedelta(hours=1)), (24, timedelta(hours=24)), (3, timedelta(minutes=10)))
 MAIL_IP_LIMITS = ((20, timedelta(hours=1)),)
 # An instance-wide cap on requests that send email, so that many distinct victims cannot be
 # mail-bombed from many client addresses and the sender's reputation is protected. Generous for
@@ -57,6 +60,26 @@ def ip_key(address):
     if isinstance(parsed, IPv6Address):
         return str(IPv6Network((parsed, 64), strict=False))
     return str(parsed)
+
+
+def exhausted(checks):
+    """Whether any of the keys has no room left, read only (security review of phase 3, A1).
+
+    ``checks`` is a list of ``(scope, value, limits)``. Nothing is written and no bucket is made:
+    a key that was never used has room, so a client that is refused costs the database no row. A
+    key that is being counted at the same moment may still pass here and be refused by
+    ``consume_all`` afterwards; this check only keeps a flood from making rows.
+    """
+    now = timezone.now()
+    for scope, value, limits in checks:
+        digest = keyed_digest(f"{scope}\n{value}", RATE_LIMIT_PURPOSE)
+        bucket = RateLimitBucket.objects.filter(digest=digest).first()
+        if bucket is None:
+            continue
+        for count, window in limits:
+            if bucket.events.filter(occurred_at__gt=now - window).count() >= count:
+                return True
+    return False
 
 
 def consume(scope, value, limits):

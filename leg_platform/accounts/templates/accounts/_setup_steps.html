@@ -1,9 +1,0 @@
-{% load i18n %}{% comment %}
-Step indicator of the setup of two-factor authentication (docs/DESIGN.md, section 6, D-055): two
-steps. Context: ``current`` (1 or 2). The current step carries aria-current; "Step n of 2" comes
-first in the text order.
-{% endcomment %}<p class="text-secondary mb-1">{% blocktranslate with step=current %}Step {{ step }} of 2{% endblocktranslate %}</p>
-<ol class="step-indicator" aria-label="{% translate 'Steps of the setup' %}">
-  <li{% if current == 1 %} aria-current="step" class="is-current"{% elif current > 1 %} class="is-done"{% endif %}>{% translate "Connect the app" %}</li>
-  <li{% if current == 2 %} aria-current="step" class="is-current"{% endif %}>{% translate "Save emergency codes" %}</li>
-</ol>

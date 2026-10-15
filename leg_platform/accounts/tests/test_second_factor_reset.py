@@ -162,13 +162,13 @@ class AdministrationResetTests(TestCase):
         second = link_in(mail.outbox[1])
         self.assertNotEqual(first, second)
         owner = Client()
-        self.assertContains(owner.get(first, follow=True), "ungültig")
+        self.assertContains(owner.get(first, follow=True), "Link nicht mehr gültig")
         confirm = owner.get(second)["Location"]
         owner.post(confirm)
         self.assertFalse(has_second_factor(self.user))
         # The consumed link cannot be used again, not even from the remembered session.
-        self.assertContains(Client().get(second, follow=True), "ungültig")
-        self.assertContains(owner.post(confirm), "ungültig")
+        self.assertContains(Client().get(second, follow=True), "Link nicht mehr gültig")
+        self.assertContains(owner.post(confirm), "Link nicht mehr gültig")
 
     def test_an_expired_link_is_not_valid(self):
         self.client.force_login(self.administrator)
@@ -176,7 +176,7 @@ class AdministrationResetTests(TestCase):
         run_mail_queue()
         path = link_in(mail.outbox[0])
         VerificationToken.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
-        self.assertContains(Client().get(path, follow=True), "ungültig")
+        self.assertContains(Client().get(path, follow=True), "Link nicht mehr gültig")
         self.assertTrue(has_second_factor(self.user))
 
     def test_a_link_stops_working_when_the_account_becomes_a_staff_user(self):
@@ -185,7 +185,7 @@ class AdministrationResetTests(TestCase):
         run_mail_queue()
         path = link_in(mail.outbox[0])
         self.user.set_privileges(is_staff=True, is_superuser=False)
-        self.assertContains(Client().get(path, follow=True), "ungültig")
+        self.assertContains(Client().get(path, follow=True), "Link nicht mehr gültig")
         self.assertTrue(has_second_factor(self.user))
 
     def test_a_link_is_not_sent_if_the_account_has_no_factor_or_is_privileged(self):

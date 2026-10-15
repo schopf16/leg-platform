@@ -425,6 +425,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Account
 
     email = models.EmailField(_("email address"), max_length=EMAIL_MAX_LENGTH)
+    # The second address (D-059): it receives information and notifications and is never a login
+    # name, never unique and never used for a password reset. It is stored only once it has been
+    # confirmed with a link; a requested address waits in ``PendingEmailChange``. Changed only
+    # through ``set_secondary_email``.
+    secondary_email = models.EmailField(
+        _("second email address"), max_length=EMAIL_MAX_LENGTH, blank=True, editable=False
+    )
     # The unique message is intended for the later email change in the account's own profile
     # (the admin cannot change email addresses). Public registration must NOT show it: it must
     # answer duplicates generically, or it would reveal which addresses have an account
@@ -937,6 +944,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         using = self._state.db or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
             account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
+            # The second address and the requests for new addresses are no longer needed, also
+            # for an account that is kept under the retention obligation (D-059).
+            PendingEmailChange.objects.using(using).filter(user=account).delete()
+            if account.secondary_email:
+                account.secondary_email = ""
+                account.save(using=using, update_fields=["secondary_email"])
             if account.retention_obligation:
                 account._change(status=self.Status.DEACTIVATED)
                 account.end_all_sessions()
@@ -997,6 +1010,31 @@ class User(AbstractBaseUser, PermissionsMixin):
         email = str(email).strip() if email is not None else email
         validate_account_email(email)
         self._change(email=email)
+
+    def notification_addresses(self):
+        """The addresses that receive the notifications of the account: the login address and the
+        confirmed second address, without repetition (D-059)."""
+        addresses = [self.email]
+        if self.secondary_email and self.secondary_email not in addresses:
+            addresses.append(self.secondary_email)
+        return addresses
+
+    def set_secondary_email(self, address):
+        """Store the confirmed second address, or remove it with an empty value (D-059).
+
+        The address must differ from the login address; it need not be unique (it is no login
+        name). The caller has checked that the person confirmed it.
+        """
+        address = normalize_email_address(address) if address else ""
+        if address:
+            validate_account_email(address)
+            if address == self.email:
+                raise AccountIntegrityError("The second address differs from the login address.")
+        using = self._state.db or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            self._locked_row(using)
+            self.secondary_email = address
+            self.save(using=using, update_fields=["secondary_email"])
 
     def assign_customer_number(self):
         """Issue the customer number when the registration is completed (D-021).
@@ -1139,6 +1177,11 @@ class VerificationToken(models.Model):
         PASSWORD_RESET = "password_reset", "Password reset"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
         EMAIL_CHANGE = "email_change", "Email address change"
+        # Confirms a requested second address (D-059).
+        SECONDARY_EMAIL = "secondary_email", "Second email address"
+        # The link in the notice about a requested change: it stops every pending change of the
+        # account without a login (D-059).
+        EMAIL_CHANGE_STOP = "email_change_stop", "Stop an email address change"
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="verification_tokens", editable=False
@@ -1154,6 +1197,38 @@ class VerificationToken(models.Model):
     )
 
     objects = VerificationTokenManager()
+
+
+class PendingEmailChange(models.Model):
+    """A requested address that nobody has confirmed yet (D-059).
+
+    The profile shows it as "Ausstehend" with its deadline, and the person can cancel it. The row
+    is made by the request itself, for every target address, so that the profile and the response
+    do not depend on whether the address can be used (docs/SECURITY.md, section 3: no account
+    enumeration); the link to confirm it is made and sent by the worker only where it can work.
+    At most one request per kind and account; a new request replaces the old one. It ends when the
+    link is confirmed, when the person or the link of the notice cancels it, or at its deadline.
+    """
+
+    class Kind(models.TextChoices):
+        LOGIN = "login", "Login address"
+        SECONDARY = "secondary", "Second address"
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="pending_email_changes", editable=False
+    )
+    kind = models.CharField(max_length=9, choices=Kind, editable=False)
+    address = models.EmailField(max_length=EMAIL_MAX_LENGTH, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("user", "kind"), name="accounts_pending_email_unique")
+        ]
+
+    def __str__(self):
+        return f"{self.kind} change of account {self.user_id}"
 
 
 class RateLimitBucket(models.Model):
@@ -1200,11 +1275,16 @@ class MailJob(models.Model):
         )
         TWO_FACTOR_ENABLED = "two_factor_enabled", "Two-factor authentication set up"
         TWO_FACTOR_DISABLED = "two_factor_disabled", "Two-factor authentication removed"
-        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Emergency codes renewed"
-        RECOVERY_CODE_USED = "recovery_code_used", "Emergency code used"
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", "Recovery codes renewed"
+        RECOVERY_CODE_USED = "recovery_code_used", "Recovery code used"
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", "Many wrong codes"
         TWO_FACTOR_RESET_LINK = "two_factor_reset_link", "Link to reset two-factor authentication"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
+        # D-059: a requested second address, the notice with the stop link about a requested
+        # change, and the notice about the deletion of the account (to every address).
+        SECONDARY_EMAIL_REQUEST = "secondary_email_request", "Second email address request"
+        EMAIL_CHANGE_NOTICE = "email_change_notice", "Email address change requested"
+        ACCOUNT_DELETED = "account_deleted", "Account deleted"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1218,6 +1298,8 @@ class MailJob(models.Model):
         Kind.CODE_ATTEMPTS_WARNING,
         Kind.TWO_FACTOR_RESET_LINK,
         Kind.TWO_FACTOR_RESET,
+        Kind.EMAIL_CHANGE_NOTICE,
+        Kind.ACCOUNT_DELETED,
     )
 
     kind = models.CharField(max_length=32, choices=Kind, editable=False)
@@ -1279,9 +1361,9 @@ class EmailText(models.Model):
             "Notification: two-factor authentication turned off"
         )
         RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _(
-            "Notification: emergency codes renewed"
+            "Notification: recovery codes renewed"
         )
-        RECOVERY_CODE_USED = "recovery_code_used", _("Notification: emergency code used")
+        RECOVERY_CODE_USED = "recovery_code_used", _("Notification: recovery code used")
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", _(
             "Notification: many wrong codes entered"
         )
@@ -1291,6 +1373,13 @@ class EmailText(models.Model):
         TWO_FACTOR_RESET = "two_factor_reset", _(
             "Notification: two-factor authentication reset"
         )
+        SECONDARY_EMAIL_VERIFICATION = "secondary_email_verification", _(
+            "Second email address: link to confirm the address"
+        )
+        EMAIL_CHANGE_NOTICE = "email_change_notice", _(
+            "Notification: email address change requested (with the link to stop it)"
+        )
+        ACCOUNT_DELETED = "account_deleted", _("Notification: account deleted")
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False
@@ -1805,8 +1894,8 @@ class SecurityEvent(models.Model):
         TWO_FACTOR_RESET_REQUESTED = "two_factor_reset_requested", _(
             "Link for removing two-factor authentication requested"
         )
-        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _("Emergency codes renewed")
-        RECOVERY_CODE_USED = "recovery_code_used", _("Emergency code used")
+        RECOVERY_CODES_RENEWED = "recovery_codes_renewed", _("Recovery codes renewed")
+        RECOVERY_CODE_USED = "recovery_code_used", _("Recovery code used")
         CODE_ATTEMPTS_WARNING = "code_attempts_warning", _("Many wrong codes entered")
         CODE_ATTEMPTS_PAUSED = "code_attempts_paused", _("Code entry paused")
         LOGIN_LOCKOUT = "login_lockout", _("Account locked after failed logins")
@@ -1834,6 +1923,14 @@ class SecurityEvent(models.Model):
             "Microsoft Graph test email requested"
         )
         PORTAL_SETTINGS_CHANGED = "portal_settings_changed", _("Portal settings changed")
+        EMAIL_CHANGE_CANCELLED = "email_change_cancelled", _(
+            "Requested email address change cancelled by the account"
+        )
+        EMAIL_CHANGE_STOPPED = "email_change_stopped", _(
+            "Requested email address change stopped with the link of the notice"
+        )
+        SECONDARY_EMAIL_CHANGED = "secondary_email_changed", _("Second email address changed")
+        REGISTRATION_COMPLETED = "registration_completed", _("Registration completed")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.

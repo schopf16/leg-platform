@@ -23,7 +23,8 @@ PROFILE_VIEWS = frozenset(
         "accounts:recovery_codes",
         "accounts:two_factor_disable",
         "accounts:email_change_request",
-        "accounts:email_change_sent",
+        "accounts:email_change_cancel",
+        "accounts:recovery_codes_done",
     }
 )
 

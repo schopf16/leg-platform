@@ -176,10 +176,11 @@ class EmailChangeOriginTests(BrowserOriginMixin, TestCase):
         member.force_login(self.user)
         member.post(
             reverse("accounts:email_change_request"),
-            {"email": "new.address@example.org", "current_password": PASSWORD},
+            {"email": "new.address@example.org", "secondary_email": "", "current_password": PASSWORD},
         )
         run_mail_queue()
-        match = re.search(r"https?://[^/]+(/email-change/verify/[^/\s]+/)", mail.outbox[-1].body)
+        message = next(m for m in mail.outbox if m.to == ["new.address@example.org"])
+        match = re.search(r"https?://[^/]+(/email-change/verify/[^/\s]+/)", message.body)
         self.link = match.group(1)
         self.url = reverse("accounts:email_change_confirm")
         self.client = browser_client()

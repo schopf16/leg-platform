@@ -1,0 +1,63 @@
+{% load i18n %}{% comment %}
+The card "E-Mail-Adressen" (navigation/VORGABEN.md, section 3.3, item 2): the login address and
+the second address, each with its status; a requested address is "Ausstehend" with its deadline
+and "Anfrage abbrechen". The form asks for both addresses and the current password (D-059).
+{% endcomment %}<section class="profile-card" id="card-email" aria-labelledby="card-email-title">
+  <div class="profile-card-head has-action">
+    <h2 id="card-email-title">{% translate "Email addresses" %}</h2>
+    {% if edit != "email" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=email#card-email">{% translate "Edit" %}</a>{% endif %}
+  </div>
+  {% if edit == "email" %}
+    {% with form=email_form %}
+      <form method="post" action="{% url 'accounts:email_change_request' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.email %}
+        {% include "accounts/_field.html" with field=form.secondary_email %}
+        {% include "accounts/_field.html" with field=form.current_password %}
+        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-email">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+  {% else %}
+    <dl class="profile-rows">
+      <div class="profile-row profile-row-status">
+        <dt>{% translate "Login (username)" %}</dt>
+        {% if pending.login %}
+          <dd>
+            {{ pending.login.address }}
+            <span class="profile-status"><span class="status-dot status-unverified" aria-hidden="true"></span>{% translate "Pending" %}</span>
+          </dd>
+          <dd class="profile-row-action">
+            <form method="post" action="{% url 'accounts:email_change_cancel' 'login' %}">{% csrf_token %}<button type="submit" class="btn btn-secondary-action">{% translate "Cancel request" %}</button></form>
+          </dd>
+          <dd class="profile-note">{% blocktranslate with deadline=pending.login.expires_at|date:"j. F Y, H:i" old=account.email %}Please confirm by {{ deadline }}. Until then {{ old }} stays valid.{% endblocktranslate %}</dd>
+        {% else %}
+          <dd>{{ account.email }}</dd>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Confirmed" %}</span></dd>
+        {% endif %}
+      </div>
+      <div class="profile-row profile-row-status">
+        <dt>{% translate "Second address" %}</dt>
+        {% if pending.secondary %}
+          <dd>
+            {{ pending.secondary.address }}
+            <span class="profile-status"><span class="status-dot status-unverified" aria-hidden="true"></span>{% translate "Pending" %}</span>
+          </dd>
+          <dd class="profile-row-action">
+            <form method="post" action="{% url 'accounts:email_change_cancel' 'secondary' %}">{% csrf_token %}<button type="submit" class="btn btn-secondary-action">{% translate "Cancel request" %}</button></form>
+          </dd>
+          <dd class="profile-note">{% if account.secondary_email %}{% blocktranslate with deadline=pending.secondary.expires_at|date:"j. F Y, H:i" old=account.secondary_email %}Please confirm by {{ deadline }}. Until then {{ old }} stays valid.{% endblocktranslate %}{% else %}{% blocktranslate with deadline=pending.secondary.expires_at|date:"j. F Y, H:i" %}Please confirm by {{ deadline }}. Until then no second address is used.{% endblocktranslate %}{% endif %}</dd>
+        {% elif account.secondary_email %}
+          <dd>{{ account.secondary_email }}</dd>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Confirmed" %}</span></dd>
+        {% else %}
+          <dd><span class="profile-muted">{% translate "not set" %}</span></dd>
+        {% endif %}
+      </div>
+    </dl>
+  {% endif %}
+</section>

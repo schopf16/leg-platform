@@ -44,6 +44,10 @@ MESSAGES = {
     Event.GRAPH_CERTIFICATE_UPLOADED: "A Microsoft Graph certificate was uploaded",
     Event.GRAPH_TEST_EMAIL_REQUESTED: "A Microsoft Graph test email was requested",
     Event.PORTAL_SETTINGS_CHANGED: "The portal settings were changed",
+    Event.EMAIL_CHANGE_CANCELLED: "A requested email address change was cancelled by the account",
+    Event.EMAIL_CHANGE_STOPPED: "A requested email address change was stopped with the notice link",
+    Event.SECONDARY_EMAIL_CHANGED: "The second email address was changed",
+    Event.REGISTRATION_COMPLETED: "A registration was completed",
 }
 
 

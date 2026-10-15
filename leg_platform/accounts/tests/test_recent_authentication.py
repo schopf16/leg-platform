@@ -109,7 +109,7 @@ class RecentAuthenticationTests(TestCase):
 
         page = client.get(SETUP_URL)
         self.assertNotContains(page, 'name="current_password"')
-        self.assertContains(page, "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)")
+        self.assertContains(page, "2FA einrichten")
         # Opening the page changes nothing.
         self.assertFalse(AuthenticatorDevice.objects.exists())
 
@@ -148,8 +148,8 @@ class RecentAuthenticationTests(TestCase):
 
         page = client.get(SETUP_URL)
         self.assertContains(page, 'name="current_password"')
-        self.assertContains(page, "Geben Sie Ihr Passwort ein, um fortzufahren.")
-        # The button of the welcome page sends no password: the prompt comes without an error.
+        self.assertNotContains(page, "invalid-feedback")
+        # The button of the card sends no password: the prompt comes without an error.
         prompt = client.post(SETUP_URL, {})
         self.assertEqual(prompt.status_code, 200)
         self.assertContains(prompt, 'name="current_password"')
@@ -157,7 +157,7 @@ class RecentAuthenticationTests(TestCase):
         self.assertFalse(AuthenticatorDevice.objects.exists())
         # A wrong password is refused, the right one starts the setup.
         wrong = client.post(SETUP_URL, {"current_password": "wrong password for this account"}, REMOTE_ADDR="10.20.0.3")
-        self.assertContains(wrong, "Das Passwort ist falsch.")
+        self.assertContains(wrong, "Das Passwort stimmt nicht. Bitte versuchen Sie es erneut.")
         self.assertFalse(AuthenticatorDevice.objects.exists())
         right = client.post(SETUP_URL, {"current_password": PASSWORD}, REMOTE_ADDR="10.20.0.3")
         self.assertRedirects(right, CONFIRM_URL, fetch_redirect_response=False)
@@ -322,9 +322,10 @@ class RegistrationLoginTests(TestCase):
         number = user.customer_number_id
         self.assertRegex(number, r"\A[0-9]{6}\Z")
         self.assertNotEqual(self.client.get("/admin/").status_code, 200)
-        # A second submission with the used link changes nothing.
+        # A second submission with the used link changes nothing; the person is logged in, so
+        # the answer is the start page (B3).
         again = self.complete()
-        self.assertRedirects(again, INVALID_URL, fetch_redirect_response=False)
+        self.assertRedirects(again, HOME_URL, fetch_redirect_response=False)
         user.refresh_from_db()
         self.assertEqual(user.customer_number_id, number)
 

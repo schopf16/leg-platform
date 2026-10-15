@@ -9,7 +9,7 @@ from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts import emails
+from leg_platform.accounts import emails, totp
 from leg_platform.accounts.login_protection import LOGIN_COOLOFF, LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
@@ -27,7 +27,7 @@ from leg_platform.accounts.tests.helpers import (
     completion_data,
     create_active_user,
     password_data,
-    registration_data,
+    reset_request_data,
     run_mail_queue,
     verification_path,
 )
@@ -63,69 +63,6 @@ def label_of(html, field_id):
     match = re.search(rf'<label[^>]*\bfor="{field_id}"[^>]*>(.*?)</label>', html, re.S)
     assert match, f"No label for {field_id}."
     return " ".join(match.group(1).split())
-
-
-class ProfileFieldsMarkupMixin:
-    """The markup that the completion of the registration and the profile form share."""
-
-    optional_fields = (
-        "id_salutation",
-        "id_organisation_name",
-        "id_address_line_1",
-        "id_house_number",
-        "id_post_office_box_number",
-        "id_phone_number",
-    )
-    required_fields = ("id_first_name", "id_last_name", "id_street", "id_postal_code", "id_town")
-
-    def check_markup(self, html):
-        self.assertIn(
-            "Felder mit dem Hinweis «freiwillig» dürfen leer bleiben. "
-            "Alle anderen Felder müssen ausgefüllt werden.",
-            html,
-        )
-        for field_id in self.optional_fields:
-            with self.subTest(optional=field_id):
-                self.assertIn("(freiwillig)", label_of(html, field_id))
-        for field_id in self.required_fields:
-            with self.subTest(required=field_id):
-                self.assertNotIn("(freiwillig)", label_of(html, field_id))
-        # The HTML attribute is set where a field is always required. The names and the street
-        # are required only under a condition, which the text states, so they carry none.
-        for field_id in ("id_town", "id_postal_code", "id_country"):
-            with self.subTest(html_required=field_id):
-                self.assertRegex(element(html, field_id), r"\brequired\b")
-        for field_id in ("id_first_name", "id_last_name", "id_street", "id_organisation_name"):
-            with self.subTest(not_html_required=field_id):
-                self.assertNotRegex(element(html, field_id), r"\brequired\b")
-        self.assertIn("Vorname und Nachname sind erforderlich, ausser Sie geben unten einen Firmennamen ein.", html)
-        for legend in ("Name", "Firma", "Postadresse", "Telefon"):
-            self.assertRegex(html, rf"<legend>{legend}</legend>")
-        # Street and house number, and postal code and town, side by side from 576 px.
-        self.assertRegex(html, r'field-row-street">\s*<div>\s*<div class="mb-3">\s*<label[^>]*for="id_street"')
-        self.assertRegex(html, r'</div>\s*<div>\s*<div class="mb-3">\s*<label[^>]*for="id_house_number"')
-        self.assertRegex(html, r'field-row-locality">\s*<div>\s*<div class="mb-3">\s*<label[^>]*for="id_postal_code"')
-        self.assertRegex(html, r'</div>\s*<div>\s*<div class="mb-3">\s*<label[^>]*for="id_town"')
-        # The mount point of the address suggestions: after the street and the house number and
-        # before the postal code and the town; the post office box after the country.
-        order = [
-            html.index('id="id_street"'),
-            html.index('id="id_house_number"'),
-            html.index("data-address-directory"),
-            html.index('id="id_postal_code"'),
-            html.index('id="id_town"'),
-            html.index('id="id_country"'),
-            html.index('id="id_post_office_box_number"'),
-            html.index('id="id_phone_number"'),
-        ]
-        self.assertEqual(order, sorted(order))
-        self.assertIn("Nur, wenn Sie keine Strasse angeben.", html)
-        box = element(html, "id_post_office_box_number")
-        self.assertIn('type="text"', box)
-        self.assertIn('inputmode="numeric"', box)
-        self.assertIn('inputmode="numeric"', element(html, "id_postal_code"))
-        self.assertIn("js/postal-code-input.js", html)
-        self.assertIn("js/address-directory.js", html)
 
 
 @tag("mariadb")
@@ -257,18 +194,53 @@ class CompletionFormTests(TestCase):
 
 
 @tag("mariadb")
-class ProfileFormTests(ProfileFieldsMarkupMixin, TestCase):
+class ProfileFormTests(TestCase):
     databases = ADDRESS_DATABASES
 
     def setUp(self):
         self.user = create_active_user(phone_number="+41311234567")
         self.client.force_login(self.user)
 
-    def test_optional_fields_are_marked_and_the_rule_and_the_groups_are_stated(self):
+    def test_the_card_marks_optional_fields_and_keeps_the_pairs_and_the_directory(self):
         html = self.client.get(PROFILE_EDIT_URL).content.decode()
 
-        self.check_markup(html)
-        # The profile form has no password fields.
+        for field_id in (
+            "id_salutation",
+            "id_organisation_name",
+            "id_address_line_1",
+            "id_post_office_box_number",
+            "id_phone_number",
+        ):
+            with self.subTest(optional=field_id):
+                self.assertIn("(freiwillig)", label_of(html, field_id))
+        for field_id in ("id_first_name", "id_last_name", "id_street", "id_postal_code", "id_town"):
+            with self.subTest(required=field_id):
+                self.assertNotIn("(freiwillig)", label_of(html, field_id))
+        for field_id in ("id_town", "id_postal_code", "id_country"):
+            with self.subTest(html_required=field_id):
+                self.assertRegex(element(html, field_id), r"\brequired\b")
+        # The further details are in their own group (K15); the pairs sit side by side.
+        self.assertIn("Weitere Angaben (optional)", html)
+        self.assertIn("field-pair field-pair-street", html)
+        self.assertIn("field-pair field-pair-locality", html)
+        order = [
+            html.index('id="id_street"'),
+            html.index('id="id_house_number"'),
+            html.index("data-address-directory"),
+            html.index('id="id_postal_code"'),
+            html.index('id="id_town"'),
+            html.index('id="id_post_office_box_number"'),
+            html.index('id="id_phone_number"'),
+        ]
+        self.assertEqual(order, sorted(order))
+        self.assertIn("Nur, wenn Sie keine Strasse angeben.", html)
+        box = element(html, "id_post_office_box_number")
+        self.assertIn('type="text"', box)
+        self.assertIn('inputmode="numeric"', box)
+        self.assertIn('inputmode="numeric"', element(html, "id_postal_code"))
+        self.assertIn("js/postal-code-input.js", html)
+        self.assertIn("js/address-directory.js", html)
+        # The card has no password fields.
         self.assertNotIn("id_password1", html)
 
     def test_the_phone_number_is_shown_as_a_person_writes_it(self):
@@ -364,7 +336,7 @@ class InputTypeTests(TestCase):
 
     def test_only_the_setup_code_field_asks_for_a_numeric_keyboard(self):
         user, device = create_user_with_totp()
-        # The second step of the login accepts the codes of the app and the emergency codes.
+        # The second step of the login accepts the codes of the app and the recovery codes.
         stepper = Client()
         log_in(stepper, user.email)
         step = element(stepper.get(CODE_URL).content.decode(), "id_otp_token")
@@ -439,51 +411,46 @@ class LogoutTests(TestCase):
 
 @tag("mariadb")
 class TwoFactorPageTests(TestCase):
-    def test_the_overview_without_a_second_factor_explains_it_in_plain_words(self):
-        user = create_active_user()
-        self.client.force_login(user)
+    """The card of two-factor authentication in the profile (D-059): wording and structure."""
 
-        response = self.client.get(reverse("accounts:two_factor"))
+    def test_the_card_without_a_second_factor_explains_it_in_plain_words(self):
+        self.client.force_login(create_active_user())
 
-        self.assertContains(response, "Zusätzlicher Schutz bei der Anmeldung")
-        self.assertContains(response, "Zurzeit melden Sie sich nur mit Ihrem Passwort an.")
-        self.assertContains(response, "Das ist freiwillig.")
-        self.assertContains(response, "<details")
-        self.assertContains(response, "Was ist eine Authenticator-App?")
-        self.assertContains(response, "App Store oder bei Google Play")
-        self.assertContains(response, "Zusätzlichen Schutz einrichten")
+        response = self.client.get(PROFILE_URL)
 
-    def test_the_overview_with_a_second_factor_counts_the_emergency_codes_and_turns_off_in_red(self):
+        self.assertContains(response, "Zwei-Faktor-Anmeldung (2FA)")
+        self.assertContains(response, "Nicht eingerichtet")
+        self.assertContains(
+            response, "Mit einem Code aus einer App schützen Sie Ihr Konto zusätzlich. Das ist freiwillig."
+        )
+        self.assertContains(response, "2FA einrichten")
+
+    def test_the_card_with_a_second_factor_counts_the_recovery_codes_and_turns_off_in_red(self):
         user, _device = create_user_with_totp()
         client = VerifiedClient()
         client.force_login(user)
         complete_second_factor(client, user)
 
-        response = client.get(reverse("accounts:two_factor"))
+        response = client.get(PROFILE_URL)
         html = response.content.decode()
 
-        self.assertContains(response, "Sie haben 3 unbenutzte Notfallcodes.")
-        self.assertContains(response, "Neue Notfallcodes erstellen")
-        self.assertRegex(
-            html, r'class="btn btn-outline-danger" href="/profile/two-factor/disable/">Zusätzlichen Schutz ausschalten'
-        )
+        self.assertContains(response, "Sie haben 3 unbenutzte Wiederherstellungscodes.")
+        self.assertContains(response, "Neue Codes erzeugen")
+        self.assertRegex(html, r'class="btn btn-danger-outline" href="[^"]*step=disable[^"]*">2FA deaktivieren')
         RecoveryCode.objects.filter(device__user=user).exclude(pk=RecoveryCode.objects.first().pk).delete()
-        self.assertContains(client.get(reverse("accounts:two_factor")), "Sie haben 1 unbenutzten Notfallcode.")
+        self.assertContains(client.get(PROFILE_URL), "Sie haben 1 unbenutzten Wiederherstellungscode.")
         RecoveryCode.objects.all().delete()
         self.assertContains(
-            client.get(reverse("accounts:two_factor")),
-            "Sie haben keine unbenutzten Notfallcodes mehr. Erstellen Sie neue.",
+            client.get(PROFILE_URL),
+            "Sie haben keine unbenutzten Wiederherstellungscodes mehr. Erstellen Sie neue.",
         )
-        self.assertNotContains(client.get(reverse("accounts:two_factor")), "0 unbenutzte")
+        self.assertNotContains(client.get(PROFILE_URL), "0 unbenutzte")
 
-    def test_the_wording_is_turned_off_everywhere_and_the_button_is_red(self):
+    def test_the_wording_is_turned_off_everywhere(self):
         user, device = create_user_with_totp()
         client = VerifiedClient()
         client.force_login(user)
         complete_second_factor(client, user)
-        page = client.get(reverse("accounts:two_factor_disable")).content.decode()
-        self.assertIn("Zusätzlichen Schutz ausschalten", page)
-        self.assertRegex(page, r'<button type="submit" class="btn btn-outline-danger w-100">Ausschalten</button>')
 
         response = client.post(
             reverse("accounts:two_factor_disable"),
@@ -495,7 +462,7 @@ class TwoFactorPageTests(TestCase):
         self.assertContains(response, "Die Zwei-Faktor-Authentifizierung wurde ausgeschaltet.")
         self.assertNotContains(response, "wurde entfernt")
 
-    def test_the_setup_pages_have_a_step_indicator_one_list_and_the_manual_key_in_a_details_element(self):
+    def test_the_setup_has_two_steps_one_form_each_and_the_manual_key_as_text(self):
         user = create_active_user("enrolling.person@example.org")
         client = Client()
         client.force_login(user)
@@ -503,29 +470,18 @@ class TwoFactorPageTests(TestCase):
         first = client.get(SETUP_URL).content.decode()
         # The session logged in just now: the button starts the setup without a password (D-055).
         self.assertNotIn('name="current_password"', first)
-        self.assertIn("Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)", first)
-        self.assertIn("Das ist freiwillig und dauert etwa 2 Minuten.", first)
-        self.assertIn(">Abbrechen</a>", first)
+        self.assertIn("2FA einrichten", first)
         self.assertNotIn("Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht.", first)
 
         client.post(SETUP_URL, {})
         second = client.get(CONFIRM_URL).content.decode()
-        secret = AuthenticatorDevice.objects.get(user=user)
+        device = AuthenticatorDevice.objects.get(user=user)
 
-        # Two steps in all: the app (QR code and code on one page), then the emergency codes.
         self.assertIn("Schritt 1 von 2", second)
-        self.assertRegex(second, r'<li aria-current="step" class="is-current">App verbinden</li>')
-        # One ordered list with the three steps; the QR code is on a tile of its own.
-        self.assertEqual(second.count('<ol class="setup-instructions">'), 1)
-        self.assertIn("Installieren Sie eine Authenticator-App, falls Sie noch keine haben.", second)
-        self.assertIn("Geben Sie den Code ein, den die App jetzt anzeigt.", second)
-        self.assertIn('<div class="qr-tile">', second)
-        self.assertIn("Scannen Sie den Code mit der Kamera in Ihrer Authenticator-App.", second)
-        self.assertRegex(second, r"<details[^>]*>\s*<summary>Scannen nicht möglich\?")
-        self.assertIn("Geben Sie stattdessen diesen Schlüssel ein", second)
-        from leg_platform.accounts import totp
-
-        self.assertIn(totp.secret_for_display(secret), second)
+        self.assertIn("Scannen Sie diesen Code mit Ihrer Authenticator-App.", second)
+        self.assertIn("Kein Scannen möglich? Geben Sie diesen Schlüssel in der App ein:", second)
+        self.assertIn(totp.secret_for_display(device), second)
+        self.assertEqual(second.count('name="otp_token"'), 1)
 
     def test_the_wrong_code_message_explains_the_rotation_of_the_codes(self):
         user = create_active_user("enrolling.person@example.org")
@@ -547,12 +503,11 @@ class TwoFactorPageTests(TestCase):
         setup = client.get(SETUP_URL).content.decode()
         self.assertIn("Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht.", setup)
         self.assertNotIn("Abbrechen", setup)
-        self.assertNotIn("Das ist freiwillig", setup)
         client.post(SETUP_URL, {"current_password": PASSWORD}, REMOTE_ADDR="10.9.5.1")
         confirm = client.get(CONFIRM_URL).content.decode()
         self.assertNotIn("Abbrechen", confirm)
 
-    def test_the_emergency_codes_page_has_one_button_a_list_and_print_and_copy_without_script(self):
+    def test_the_recovery_codes_have_a_list_a_copy_button_without_script_and_one_done_button(self):
         user = create_active_user("enrolling.person@example.org")
         client = Client()
         client.force_login(user)
@@ -563,26 +518,24 @@ class TwoFactorPageTests(TestCase):
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Schritt 2 von 2", html)
-        self.assertIn("Der zusätzliche Schutz ist eingeschaltet.", html)
-        self.assertIn("Ihre Notfallcodes", html)
-        self.assertNotIn('type="checkbox"', html)
-        self.assertEqual(html.count("Ich habe die Codes gespeichert – weiter"), 1)
-        self.assertRegex(html, r'<ol class="recovery-codes" id="emergency-codes">')
+        self.assertIn("Wiederherstellungscodes", html)
+        self.assertEqual(html.count('type="checkbox"'), 1)
+        self.assertEqual(html.count(">Fertig</button>"), 1)
+        self.assertRegex(html, r'<ol class="recovery-codes" id="recovery-codes-list">')
         self.assertEqual(len(re.findall(r"<li>[a-z2-7]{4}-[a-z2-7]{4}</li>", html)), 10)
-        self.assertRegex(html, r'data-codes-print hidden>Seite drucken</button>')
-        self.assertRegex(html, r'data-codes-copy hidden aria-controls="emergency-codes"')
+        # The copy button is hidden until the script shows it; the page works without a script.
+        self.assertRegex(html, r'data-codes-copy hidden aria-controls="recovery-codes-list"')
         self.assertIn("js/recovery-codes.js", html)
-        self.assertNotIn("Wiederherstellungscode", html)
+        self.assertNotIn("Notfallcode", html)
         self.assertIn("no-store", response["Cache-Control"])
 
-    def test_no_page_calls_the_emergency_codes_recovery_codes_any_more(self):
-        user, device = create_user_with_totp()
+    def test_no_page_of_the_profile_says_notfallcode(self):
+        user, _device = create_user_with_totp()
         client = VerifiedClient()
         client.force_login(user)
         complete_second_factor(client, user)
         pages = [
-            client.get(reverse("accounts:two_factor")),
+            client.get(PROFILE_URL),
             client.get(reverse("accounts:recovery_codes")),
             client.get(reverse("accounts:two_factor_disable")),
         ]
@@ -590,17 +543,15 @@ class TwoFactorPageTests(TestCase):
         log_in(stepper, user.email, address="10.9.3.1")
         pages.append(stepper.get(CODE_URL))
 
-        # The sign-in page of the code asks for a "Wiederherstellungscode" since the package of the
-        # project owner names it so (D-058); the pages of the profile follow in phase 4.
-        for response in pages[:-1]:
-            self.assertNotContains(response, "Wiederherstellungscode")
-            self.assertNotContains(response, "ecovery code")
+        for response in pages:
+            self.assertNotContains(response, "Notfallcode")
+            self.assertNotContains(response, "mergency code")
+        self.assertContains(pages[0], "Wiederherstellungscodes")
         self.assertContains(pages[-1], "Wiederherstellungscode")
-        self.assertNotContains(pages[-1], "ecovery code")
 
 
 @tag("mariadb")
-class EmergencyCodeLoginTests(TestCase):
+class RecoveryCodeLoginTests(TestCase):
     def setUp(self):
         self.user, self.device = create_user_with_totp()
 
@@ -609,18 +560,18 @@ class EmergencyCodeLoginTests(TestCase):
         log_in(client, self.user.email, address=address)
         return client, send_code(client, code, address=address)
 
-    def test_a_login_with_an_emergency_code_says_how_many_codes_are_left(self):
+    def test_a_login_with_a_recovery_code_says_how_many_codes_are_left(self):
         client, response = self.log_in_with("abcd-2345", "10.8.1.1")
 
         self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
         page = client.get(PROFILE_URL)
         self.assertContains(
             page,
-            "Sie haben einen Notfallcode verwendet. Es sind noch 2 Codes übrig. "
+            "Sie haben einen Wiederherstellungscode verwendet. Es sind noch 2 Codes übrig. "
             "Neue Codes können Sie in Ihrem Profil erstellen.",
         )
         # The message is shown once.
-        self.assertNotContains(client.get(PROFILE_URL), "Sie haben einen Notfallcode verwendet")
+        self.assertNotContains(client.get(PROFILE_URL), "Sie haben einen Wiederherstellungscode verwendet")
 
     def test_the_wording_follows_the_number_of_codes_that_are_left(self):
         self.log_in_with("abcd2345", "10.8.2.1")
@@ -629,16 +580,16 @@ class EmergencyCodeLoginTests(TestCase):
 
         self.assertContains(one.get(PROFILE_URL), "Es ist noch 1 Code übrig.")
         self.assertContains(
-            zero.get(PROFILE_URL), "Sie haben keine Notfallcodes mehr. Erstellen Sie in Ihrem Profil neue Codes."
+            zero.get(PROFILE_URL), "Sie haben keine Wiederherstellungscodes mehr. Erstellen Sie in Ihrem Profil neue Codes."
         )
 
-    def test_a_login_with_the_code_of_the_app_says_nothing_about_emergency_codes(self):
+    def test_a_login_with_the_code_of_the_app_says_nothing_about_recovery_codes(self):
         client = Client()
         log_in(client, self.user.email, address="10.8.3.1")
         response = send_code(client, code_for(self.device), address="10.8.3.1")
 
         self.assertRedirects(response, HOME_URL)
-        self.assertNotContains(client.get(PROFILE_URL), "Notfallcode verwendet")
+        self.assertNotContains(client.get(PROFILE_URL), "Wiederherstellungscode verwendet")
 
     def test_a_wrong_code_says_the_same_as_before_and_shows_no_count(self):
         client = Client()
@@ -673,7 +624,7 @@ class SentAndInvalidPageTests(TestCase):
 
     def test_the_password_reset_page_is_the_same_pattern_without_the_step_bar(self):
         client = Client()
-        client.post(reverse("accounts:password_reset"), {"email": "someone@example.org"}, REMOTE_ADDR="10.7.9.1")
+        client.post(reverse("accounts:password_reset"), reset_request_data("someone@example.org"), REMOTE_ADDR="10.7.9.1")
 
         response = client.get(reverse("accounts:password_reset_sent"))
 
@@ -690,7 +641,7 @@ class SentAndInvalidPageTests(TestCase):
         pages = []
         for address in ("known.person@example.org", "unknown.person@example.org"):
             client = Client()
-            client.post(reverse("accounts:password_reset"), {"email": address}, REMOTE_ADDR="10.7.1.1")
+            client.post(reverse("accounts:password_reset"), reset_request_data(address), REMOTE_ADDR="10.7.1.1")
             content = client.get(reverse("accounts:password_reset_sent")).content
             content = re.sub(rb'name="csrfmiddlewaretoken" value="[^"]+"', b"", content)
             # The page names the address that the person entered; everything else is equal.
@@ -698,17 +649,23 @@ class SentAndInvalidPageTests(TestCase):
 
         self.assertEqual(pages[0], pages[1])
 
-    def test_the_email_change_page_says_the_same(self):
+    def test_the_email_change_card_says_what_happens_next(self):
         user = create_active_user()
         client = VerifiedClient()
         client.force_login(user)
 
-        response = client.get(reverse("accounts:email_change_sent"))
+        response = client.post(
+            reverse("accounts:email_change_request"),
+            {"email": "new.address@example.org", "secondary_email": "", "current_password": PASSWORD},
+            REMOTE_ADDR="10.7.2.1",
+            follow=True,
+        )
 
-        self.assertContains(response, "Spam-Ordner")
-        self.assertContains(response, "Der Link ist 24 Stunden gültig.")
-        self.assertContains(response, "Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen.")
-        self.assertContains(response, "E-Mail-Adresse erneut ändern")
+        self.assertContains(
+            response, "Wir haben einen Bestätigungslink an die neue Adresse gesendet. Er ist 24 Stunden gültig."
+        )
+        self.assertContains(response, "Ausstehend")
+        self.assertContains(response, "new.address@example.org")
 
     def test_invalid_link_pages_ask_for_the_address_again_and_have_a_login_button(self):
         registration = self.client.get(reverse("accounts:registration_verify", args=["x"]), follow=True)
@@ -746,7 +703,12 @@ class SentAndInvalidPageTests(TestCase):
         )
         self.assertContains(response, f'href="{reverse("accounts:password_reset")}"', status_code=429)
         self.assertNotContains(response, "person@example.org", status_code=429)
-
+        # The page is rendered in the entry layout like the login: two columns, the panel, the
+        # corner buttons and the footer row (designer, phase 3).
+        html = response.content.decode()
+        for marker in ('class="entry-split"', 'class="entry-warm"', 'class="corner', 'class="alert alert-danger"'):
+            self.assertIn(marker, html)
+        self.assertEqual(html.count("<h1"), 1)
 
 @tag("mariadb")
 class AlertAndMessageMarkupTests(TestCase):
@@ -778,7 +740,7 @@ class EmailWebsiteLineAndWordingTests(TestCase):
     def send_all_link_mails(self):
         register(Client(), "new.person@example.org")
         user = create_active_user("active.person@example.org")
-        Client().post(reverse("accounts:password_reset"), {"email": user.email}, REMOTE_ADDR="10.5.1.1")
+        Client().post(reverse("accounts:password_reset"), reset_request_data(user.email), REMOTE_ADDR="10.5.1.1")
         run_mail_queue()
         return [message for message in mail.outbox]
 
@@ -796,7 +758,7 @@ class EmailWebsiteLineAndWordingTests(TestCase):
             with self.subTest(subject=message.subject):
                 self.assertNotIn("Fragen oder Probleme", message.body)
 
-    def test_the_emails_about_the_second_factor_say_emergency_code(self):
+    def test_the_emails_about_the_second_factor_say_recovery_code(self):
         emails.send_recovery_code_used("a@example.org")
         emails.send_recovery_codes_renewed("a@example.org")
         emails.send_two_factor_enabled("a@example.org")
@@ -804,16 +766,16 @@ class EmailWebsiteLineAndWordingTests(TestCase):
 
         text = "\n".join(m.subject + "\n" + m.body for m in mail.outbox)
 
-        self.assertIn("Notfallcode", text)
+        self.assertIn("Wiederherstellungscode", text)
         self.assertIn("ausgeschaltet", text)
-        self.assertNotIn("Wiederherstellungscode", text)
+        self.assertNotIn("Notfallcode", text)
         self.assertNotIn(SHARP_S, text)
 
-    def test_the_labels_of_the_editable_texts_and_the_security_log_say_emergency_code(self):
+    def test_the_labels_of_the_editable_texts_and_the_security_log_say_recovery_code(self):
         with translation.override("de-ch"):
             labels = [str(label) for _value, label in EmailText._meta.get_field("key").flatchoices]
             labels += [str(label) for _value, label in SecurityEvent._meta.get_field("event").flatchoices]
 
-        self.assertIn("Hinweis: Notfallcode verwendet", labels)
-        self.assertIn("Notfallcodes erneuert", labels)
-        self.assertFalse([label for label in labels if "Wiederherstellung" in label])
+        self.assertIn("Hinweis: Wiederherstellungscode verwendet", labels)
+        self.assertIn("Wiederherstellungscodes erneuert", labels)
+        self.assertFalse([label for label in labels if "Notfallcode" in label])

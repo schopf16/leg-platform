@@ -29,7 +29,9 @@ from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
     create_active_user,
+    hour_and_day_limits,
     registration_data,
+    reset_request_data,
     run_mail_queue,
     verification_path,
 )
@@ -43,7 +45,9 @@ INVALID_URL = reverse("accounts:password_reset_invalid")
 
 
 def request_reset(address, client=None, remote_addr="10.40.0.1"):
-    response = (client or Client()).post(REQUEST_URL, {"email": address}, REMOTE_ADDR=remote_addr)
+    response = (client or Client()).post(
+        REQUEST_URL, reset_request_data(address), REMOTE_ADDR=remote_addr
+    )
     run_mail_queue()
     return response
 
@@ -63,6 +67,7 @@ def login(client, address, password, remote_addr):
 
 
 @tag("mariadb")
+@hour_and_day_limits
 class ResetRequestTests(TestCase):
     def setUp(self):
         self.user = create_active_user("active.person@example.org")
@@ -133,7 +138,9 @@ class ResetRequestTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_the_request_needs_a_csrf_token(self):
-        response = Client(enforce_csrf_checks=True).post(REQUEST_URL, {"email": self.user.email})
+        response = Client(enforce_csrf_checks=True).post(
+            REQUEST_URL, reset_request_data(self.user.email)
+        )
 
         self.assertEqual(response.status_code, 403)
 

@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-Two-factor authentication was set up for your account at {{ instance_name }}. From now on you need a code from your authenticator app, or an emergency code, to log in.{% endblocktranslate %}
+Two-factor authentication was set up for your account at {{ instance_name }}. From now on you need a code from your authenticator app, or an recovery code, to log in.{% endblocktranslate %}
 
 {% if contact_url %}{% blocktranslate %}If you did not do this, contact the operator immediately. You will find contact information here:
 

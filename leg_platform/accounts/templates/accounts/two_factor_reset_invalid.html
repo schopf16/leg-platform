@@ -1,9 +1,13 @@
 {% extends "entry_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Link not valid" %}{% endblock %}
+{% block title %}{% translate "Link no longer valid" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Link not valid" %}</h1>
-  <p>{% blocktranslate %}This link is not valid or has expired. If you still need to remove two-factor authentication, please contact {{ instance_name }}. The removal can be started again there.{% endblocktranslate %}</p>
+  <h1>{% translate "Link no longer valid" %}</h1>
+  {% if instance_website_url %}
+    <p>{% blocktranslate with url=instance_website_url host=instance_website_host %}This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator: you find the contact details on <a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ host }}</a>. The removal can be started again there.{% endblocktranslate %}</p>
+  {% else %}
+    <p>{% translate "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator of this portal. The removal can be started again there." %}</p>
+  {% endif %}
   <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
 {% endblock %}

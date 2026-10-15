@@ -237,7 +237,9 @@ class RegistrationTests(TestCase):
     def test_a_new_registration_replaces_the_pending_one(self):
         register(self.client)
         first = User.objects.get()
-        register(self.client, "NEW.person@example.org ")
+        # Another browser: this one has no pause to wait for (the same browser within the pause
+        # creates no new job, D-058).
+        register(Client(), "NEW.person@example.org ")
 
         users = User.objects.all()
         self.assertEqual(users.count(), 1)
@@ -550,41 +552,60 @@ class VerificationTests(TestCase):
             ["first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy"],
         )
 
-    def test_address_matching_warning_does_not_block_registration(self):
+    def test_an_unreachable_address_directory_gives_a_note_on_the_details_step_only(self):
         self.open_link()
-        with patch(
-            "leg_platform.accounts.views.check_address",
-            return_value={"warning": "Address could not be confirmed."},
-        ) as check:
-            response = self.complete()
+        self.set_password()
+        unavailable = ({"status": "unavailable"}, None)
+        with patch("leg_platform.accounts.views.directory_status", return_value=unavailable):
+            page = self.client.get(self.complete_url)
+            self.assertContains(
+                page,
+                "Ihre Adresse konnte nicht geprüft werden und wird so gespeichert, wie Sie sie eingegeben haben.",
+            )
+        response = self.complete()
 
+        # The registration is not blocked, and the start page carries no message about it.
         self.assertRedirects(response, reverse("home"))
-        check.assert_called_once_with(
-            street="Examplestrasse",
-            house_number="12a",
-            postal_code="3000",
-            locality="Bern",
-            country="CH",
-        )
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.ACTIVE)
-        self.assertTrue(
-            any(
-                "Address could not be confirmed." in str(message)
-                for message in get_messages(response.wsgi_request)
-            )
-        )
+        self.assertEqual([str(message) for message in get_messages(response.wsgi_request)], [])
 
-    def test_the_link_can_be_used_only_once(self):
+    def test_no_note_where_no_directory_is_imported(self):
         self.open_link()
+        self.set_password()
+
+        page = self.client.get(self.complete_url)
+
+        self.assertNotContains(page, "konnte nicht geprüft werden")
+
+    def test_the_registration_link_stays_valid_until_the_last_step_is_completed(self):
+        # Mail scanners open links; the back button and a lost session must not need a new mail.
+        self.open_link()
+        self.set_password()
+
+        again = self.open_link()
+
+        self.assertRedirects(again, self.password_url, fetch_redirect_response=False)
+        self.set_password()
+        self.assertEqual(self.client.get(self.complete_url).status_code, 200)
+
+    def test_the_link_cannot_be_used_after_the_account_was_created(self):
+        self.open_link()
+        self.set_password()
         self.complete()
 
         again = self.open_link()
         direct = self.client.get(self.complete_url)
         password = self.client.get(self.password_url)
 
-        for response in (again, direct, password):
-            self.assertInvalidRedirect(response)
+        # The link is dead (the page "Link nicht mehr gültig"). The steps lead a person who is
+        # logged in to the start page, not to an error page (B3).
+        self.assertInvalidRedirect(again)
+        for response in (direct, password):
+            self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
+        anonymous = Client()
+        self.assertInvalidRedirect(anonymous.get(self.password_url))
+        self.assertInvalidRedirect(Client().get(self.path))
 
     def test_the_steps_are_not_available_without_the_link_in_the_same_session(self):
         for client in (Client(), self.client):

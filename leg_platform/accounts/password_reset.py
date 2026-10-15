@@ -129,6 +129,6 @@ def _end_account_lockout(user):
 
 def notify_password_changed(user):
     """Queue the notification that the password was changed (no link, docs/SECURITY.md)."""
-    from leg_platform.accounts.mail_queue import enqueue
+    from leg_platform.accounts.mail_queue import enqueue_for_account
 
-    enqueue(MailJob.Kind.PASSWORD_CHANGED, user.email)
+    enqueue_for_account(MailJob.Kind.PASSWORD_CHANGED, user)

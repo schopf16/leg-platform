@@ -33,6 +33,14 @@ def remember(request, purpose, address):
     }
 
 
+def forget(request, purpose):
+    """Remove the pending request of this browser from the session (D-058; review B2): after the
+    registration or the reset is finished, and when a link was refused."""
+    if purpose not in _PURPOSES:
+        raise ValueError(purpose)
+    request.session.pop(_KEY % purpose, None)
+
+
 def pending(request, purpose):
     """Return the pending request of this browser, or None. Values of the session are checked."""
     if purpose not in _PURPOSES:

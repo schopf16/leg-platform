@@ -1,0 +1,53 @@
+{% load i18n %}{% comment %}
+The card "Persönliche Angaben" (navigation/VORGABEN.md, section 3.3): name and address; the form
+opens in the card. The further fields of the profile (salutation, company, address addition, post
+office box, country, phone) are under "Weitere Angaben (optional)" (K15).
+{% endcomment %}<section class="profile-card" id="card-personal" aria-labelledby="card-personal-title">
+  <div class="profile-card-head has-action">
+    <h2 id="card-personal-title">{% translate "Personal details" %}</h2>
+    {% if edit != "personal" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=personal#card-personal">{% translate "Edit" %}</a>{% endif %}
+  </div>
+  {% if edit == "personal" %}
+    {% with form=personal_form %}
+      <form method="post" action="{% url 'accounts:profile_edit' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        <div class="field-pair">
+          {% include "accounts/_field.html" with field=form.first_name %}
+          {% include "accounts/_field.html" with field=form.last_name %}
+        </div>
+        <div class="field-pair field-pair-street">
+          {% include "accounts/_field.html" with field=form.street %}
+          {% include "accounts/_field.html" with field=form.house_number %}
+        </div>
+        {% include "addresses/widget.html" %}
+        <div class="field-pair field-pair-locality">
+          {% include "accounts/_field.html" with field=form.postal_code %}
+          {% include "accounts/_field.html" with field=form.town %}
+        </div>
+        <details class="more-details"{% if form.is_bound %} open{% endif %}>
+          <summary>{% translate "Further details (optional)" %}</summary>
+          <div class="more-fields">
+            {% include "accounts/_field.html" with field=form.salutation optional=True %}
+            {% include "accounts/_field.html" with field=form.organisation_name optional=True %}
+            {% include "accounts/_field.html" with field=form.address_line_1 optional=True %}
+            {% include "accounts/_field.html" with field=form.post_office_box_number optional=True hint=_("Only if you have no street address.") %}
+            {% include "accounts/_field.html" with field=form.country %}
+            {% include "accounts/_field.html" with field=form.phone_number optional=True %}
+          </div>
+        </details>
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-personal">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+  {% else %}
+    <dl class="profile-rows">
+      <div class="profile-row"><dt>{% translate "Name" %}</dt><dd>{{ account.display_name }}</dd></div>
+      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}</dd></div>
+      {% if account.organisation_name and account.first_name %}<div class="profile-row"><dt>{% translate "Company" %}</dt><dd>{{ account.organisation_name }}</dd></div>{% endif %}
+      {% if account.phone_number %}<div class="profile-row"><dt>{% translate "Phone" %}</dt><dd>{{ account.phone_number_display }}</dd></div>{% endif %}
+    </dl>
+  {% endif %}
+</section>

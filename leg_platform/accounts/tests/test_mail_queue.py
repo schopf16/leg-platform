@@ -26,11 +26,13 @@ from leg_platform.accounts.models import (
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     create_active_user,
+    hour_and_day_limits,
     registration_data,
+    reset_request_data,
     run_mail_queue,
 )
 
-ADDRESS_LIMITS = rate_limits.MAIL_ADDRESS_LIMITS
+ADDRESS_LIMITS = rate_limits.MAIL_ADDRESS_LIMITS[:2]
 HOURLY, DAILY = ADDRESS_LIMITS[0][0], ADDRESS_LIMITS[1][0]
 
 
@@ -44,7 +46,7 @@ def post_registration(address, remote_addr="10.20.0.1"):
 
 def post_reset(address, remote_addr="10.20.0.1"):
     return Client().post(
-        reverse("accounts:password_reset"), {"email": address}, REMOTE_ADDR=remote_addr
+        reverse("accounts:password_reset"), reset_request_data(address), REMOTE_ADDR=remote_addr
     )
 
 
@@ -148,6 +150,7 @@ class ConcurrentRateLimitTests(TransactionTestCase):
 
 
 @tag("mariadb")
+@hour_and_day_limits
 class MailRequestTests(TestCase):
     def test_the_request_only_stores_a_job_and_sends_nothing(self):
         response = post_registration("new.person@example.org")
@@ -244,34 +247,46 @@ class MailRequestTests(TestCase):
         self.assertEqual(token.user_id, User.objects.get().pk)
 
     def test_one_client_address_is_limited_across_different_email_addresses(self):
-        for number in range(rate_limits.MAIL_IP_LIMITS[0][0] + 1):
+        limit = rate_limits.MAIL_IP_LIMITS[0][0]
+        for number in range(limit):
             post_registration(f"person{number}@example.org", remote_addr="10.30.0.5")
 
-        suppressed = list(MailJob.objects.order_by("pk").values_list("suppressed", flat=True))
-        self.assertEqual(suppressed.count(True), 1)
-        self.assertTrue(suppressed[-1])
+        refused = post_registration("one.more@example.org", remote_addr="10.30.0.5")
+
+        # Over the limit of the client address: the visible refusal, and nothing is stored.
+        self.assertEqual(refused.status_code, 429)
+        self.assertContains(refused, "Zu viele Anfragen, bitte versuchen Sie es später erneut.", status_code=429)
+        self.assertEqual(MailJob.objects.count(), limit)
+        self.assertFalse(MailJob.objects.filter(suppressed=True).exists())
+        self.assertFalse(User.objects.filter(email="one.more@example.org").exists())
         post_registration("other@example.org", remote_addr="10.30.0.6")
         self.assertFalse(MailJob.objects.order_by("pk").last().suppressed)
 
     def test_an_unknown_client_address_shares_one_strict_bucket(self):
+        limit = rate_limits.MAIL_IP_LIMITS[0][0]
         with patch("leg_platform.accounts.mail_queue.axes_client_ip", return_value=None):
-            for number in range(rate_limits.MAIL_IP_LIMITS[0][0] + 1):
+            for number in range(limit):
                 post_registration(f"person{number}@example.org")
+            refused = post_registration("one.more@example.org")
 
-        self.assertTrue(MailJob.objects.order_by("pk").last().suppressed)
+        self.assertEqual(refused.status_code, 429)
+        self.assertEqual(MailJob.objects.count(), limit)
 
     def test_a_refused_client_address_does_not_use_up_the_budget_of_a_victims_address(self):
         limit = rate_limits.MAIL_IP_LIMITS[0][0]
         for number in range(limit):
             post_registration(f"filler{number}@example.org", remote_addr="10.31.0.5")
 
-        for _ in range(5):
-            post_registration("victim.person@example.org", remote_addr="10.31.0.5")
+        refused = [
+            post_registration("victim.person@example.org", remote_addr="10.31.0.5") for _ in range(5)
+        ]
 
-        # The attacker's address is over its limit, so nothing was counted for the victim.
-        self.assertTrue(
-            MailJob.objects.filter(address="", suppressed=True).count() >= 5
-        )
+        # The attacker's address is over its limit, so nothing was counted or stored for the victim.
+        self.assertEqual({response.status_code for response in refused}, {429})
+        self.assertEqual(MailJob.objects.count(), limit)
+        self.assertFalse(RateLimitEvent.objects.filter(bucket__digest=rate_limits.keyed_digest(
+            "mail-address\nvictim.person@example.org", rate_limits.RATE_LIMIT_PURPOSE
+        )).exists())
         post_registration("victim.person@example.org", remote_addr="10.31.0.6")
         self.assertFalse(MailJob.objects.order_by("pk").last().suppressed)
         self.assertEqual(
@@ -292,21 +307,29 @@ class MailRequestTests(TestCase):
 
     def test_the_instance_wide_cap_refuses_and_is_logged(self):
         with patch.object(rate_limits, "MAIL_GLOBAL_LIMITS", ((2, timedelta(hours=1)),)):
-            with patch.object(mail_queue.rate_limits, "MAIL_GLOBAL_LIMITS", ((2, timedelta(hours=1)),)):
+            with patch.object(mail_queue, "_last_rejection_log", float("-inf")):
                 with self.assertLogs("leg_platform.accounts.mail_queue", "WARNING") as logs:
-                    for number in range(3):
+                    responses = [
                         post_registration(f"person{number}@example.org", remote_addr=f"10.32.0.{number}")
+                        for number in range(4)
+                    ]
 
-        suppressed = list(MailJob.objects.order_by("pk").values_list("suppressed", flat=True))
-        self.assertEqual(suppressed, [False, False, True])
-        self.assertIn("instance-wide limit", "\n".join(logs.output))
+        self.assertEqual([response.status_code for response in responses], [302, 302, 429, 429])
+        self.assertEqual(MailJob.objects.count(), 2)
+        self.assertFalse(MailJob.objects.filter(suppressed=True).exists())
+        # The log is limited to one line a minute: two refusals, one line.
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("limit is used up", logs.output[0])
 
     def test_ipv6_addresses_of_one_prefix_share_the_budget(self):
         limit = rate_limits.MAIL_IP_LIMITS[0][0]
-        for number in range(limit + 1):
+        for number in range(limit):
             post_registration(f"person{number}@example.org", remote_addr=f"2001:db8:1:2::{number + 1:x}")
 
-        self.assertTrue(MailJob.objects.order_by("pk").last().suppressed)
+        refused = post_registration("one.more@example.org", remote_addr="2001:db8:1:2::ffff")
+
+        self.assertEqual(refused.status_code, 429)
+        self.assertEqual(MailJob.objects.count(), limit)
         post_registration("other@example.org", remote_addr="2001:db8:1:3::1")
         self.assertFalse(MailJob.objects.order_by("pk").last().suppressed)
 
@@ -331,6 +354,7 @@ class MailRequestTests(TestCase):
 
 
 @tag("mariadb")
+@hour_and_day_limits
 class MailWorkerTests(TestCase):
     def test_a_failing_job_is_repeated_later_and_then_given_up(self):
         post_registration("new.person@example.org")
@@ -415,7 +439,13 @@ class MailWorkerTests(TestCase):
             post_reset("reset.person@example.org", remote_addr="10.33.0.9")
 
         suppressed = list(MailJob.objects.order_by("pk").values_list("suppressed", flat=True))
-        self.assertEqual(suppressed, [False, False, True, False])
+        self.assertEqual(suppressed, [False, False, False])
+        # The reset is a kind of its own: the registration cap did not refuse it (the third
+        # registration was refused and stored nothing).
+        self.assertEqual(
+            list(MailJob.objects.order_by("pk").values_list("kind", flat=True)),
+            [MailJob.Kind.REGISTRATION, MailJob.Kind.REGISTRATION, MailJob.Kind.PASSWORD_RESET],
+        )
 
     def test_the_worker_command_processes_the_queue(self):
         post_registration("new.person@example.org")

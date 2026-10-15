@@ -647,6 +647,306 @@
   }
 }
 
+/* ---- Profile (D-059): cards that change in place ---- */
+.page-label {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.profile-cards {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.profile-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.profile-card h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.profile-card-danger {
+  border-color: var(--bad);
+}
+
+.profile-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* The buttons of a card are 40 px high on a desktop, as in the images of the owner (the images
+   win over K5, D-059); on a phone they are 44 px (see the phone rules below). */
+.profile-card .btn {
+  min-height: 40px;
+}
+
+/* Rows of label and value, separated by lines; the value column starts at 216 px. */
+.profile-rows {
+  margin: 0;
+  display: grid;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-row:first-child {
+  border-top: 0;
+}
+
+.profile-row dt {
+  font-weight: 600;
+}
+
+.profile-row dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-row-action,
+.profile-row-end {
+  justify-self: end;
+}
+
+.profile-row-action form {
+  margin: 0;
+}
+
+.profile-row .profile-note {
+  grid-column: 1 / -1;
+}
+
+.profile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.profile-muted,
+.profile-note,
+.profile-step {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.profile-note,
+.profile-text,
+.profile-step {
+  margin: 0;
+}
+
+.profile-text {
+  color: var(--muted);
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.profile-actions form {
+  margin: 0;
+}
+
+/* A form inside a card: the fields in a box of the page colour (the images of the owner). */
+.profile-form {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  margin: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.profile-form .mb-3,
+.profile-form .more-fields .mb-3 {
+  display: grid;
+  gap: 8px;
+  margin: 0 !important;
+}
+
+.profile-form .form-label,
+.profile-form .form-hint {
+  margin: 0;
+}
+
+.profile-form .form-label {
+  font-weight: 600;
+}
+
+.profile-form .form-hint {
+  font-size: 13px;
+}
+
+.profile-form .form-control,
+.profile-form .form-select {
+  min-height: 48px;
+  border-radius: 8px;
+}
+
+.profile-form .error-summary {
+  margin: 0;
+}
+
+.more-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.more-fields {
+  display: grid;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.profile-notice {
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.btn-danger-outline {
+  color: var(--bad);
+  border: 1.5px solid var(--bad);
+  background: transparent;
+}
+
+.btn-danger-outline:hover,
+.btn-danger-outline:focus-visible {
+  color: var(--bad);
+  background: var(--portal-alert-danger-bg);
+  border-color: var(--bad);
+}
+
+.profile-card .btn-danger {
+  --tblr-btn-bg: var(--bad);
+  --tblr-btn-border-color: var(--bad);
+  --tblr-btn-hover-bg: var(--bad);
+  --tblr-btn-hover-border-color: var(--bad);
+  --tblr-btn-active-bg: var(--bad);
+  --tblr-btn-active-border-color: var(--bad);
+  --tblr-btn-color: var(--on-accent);
+  --tblr-btn-hover-color: var(--on-accent);
+  --tblr-btn-active-color: var(--on-accent);
+}
+
+.recovery-codes {
+  list-style: none;
+  margin: 0;
+  padding: 16px 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--tblr-font-monospace);
+  font-size: 16px;
+}
+
+.mono-key {
+  font-family: var(--tblr-font-monospace);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .profile-cards {
+    margin-top: 24px;
+    gap: 16px;
+  }
+
+  .profile-card {
+    padding: 16px;
+  }
+
+  .profile-card-head {
+    flex-wrap: wrap;
+  }
+
+  /* On a phone the button of a card is below its rows, as wide as the card (the images). */
+  .profile-card-head.has-action {
+    display: contents;
+  }
+
+  .profile-card-head.has-action > .btn {
+    order: 2;
+    width: 100%;
+  }
+
+  .profile-row dt {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .profile-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-row-action {
+    justify-self: stretch;
+  }
+
+  .profile-row-end {
+    justify-self: start;
+  }
+
+  .profile-card .btn,
+  .profile-actions > * {
+    min-height: 48px;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+  }
+
+  .profile-actions .btn,
+  .profile-actions form,
+  .profile-actions form .btn,
+  .profile-row-action .btn {
+    width: 100%;
+  }
+
+  .profile-form {
+    padding: 16px;
+  }
+
+  .recovery-codes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Print: no header, menu or bar. */
 @media print {
   .frame-header,

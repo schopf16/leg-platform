@@ -1,0 +1,126 @@
+{% load i18n %}{% comment %}
+The card of two-factor authentication with every state in place (navigation/VORGABEN.md, section
+3.3, item 3), chosen by the server: ``tf_state`` is view, setup, app (step 1 of 2), codes (step 2
+of 2, or new codes) , codes_new or disable. The recovery codes are shown only in the answer to the
+form that made them; nothing about them is stored (D-059).
+{% endcomment %}<section class="profile-card" id="card-two-factor" aria-labelledby="card-two-factor-title">
+  {% if tf_state == "view" or tf_state == "setup" %}
+    <div class="profile-card-head">
+      <h2 id="card-two-factor-title">{% translate "Two-factor authentication (2FA)" %}</h2>
+      {% if second_factor_active %}
+        <span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Active" %}</span>
+      {% else %}
+        <span class="profile-status"><span class="status-dot status-unverified" aria-hidden="true"></span>{% translate "Not set up" %}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if tf_state == "view" %}
+    {% if second_factor_active %}
+      <p class="profile-text">{% translate "You need a code from your app at every login, in addition to your password." %}</p>
+      <div class="profile-actions">
+        <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=codes_new#card-two-factor">{% translate "Create new codes" %}</a>
+        {% if not second_factor_required %}<a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=disable#card-two-factor">{% translate "Turn off 2FA" %}</a>{% endif %}
+      </div>
+      <p class="profile-note">{% translate "New codes replace the old ones. The old codes no longer work afterwards." %}
+        {% if remaining_codes %}{% blocktranslate count counter=remaining_codes %}You have {{ counter }} unused recovery code.{% plural %}You have {{ counter }} unused recovery codes.{% endblocktranslate %}{% else %}{% translate "You have no unused recovery codes left. Create new ones." %}{% endif %}</p>
+      {% if second_factor_required %}<p class="profile-note">{% translate "Your account must use two-factor authentication. It cannot be turned off." %}</p>{% endif %}
+    {% else %}
+      <p class="profile-text">{% translate "With a code from an app you protect your account additionally. This is voluntary." %}</p>
+      <form method="post" action="{% url 'accounts:two_factor_setup' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% translate "Set up 2FA" %}</button>
+      </form>
+    {% endif %}
+
+  {% elif tf_state == "setup" %}
+    {% if second_factor_required %}<p class="profile-text">{% translate "Two-factor authentication is mandatory for your role." %}</p>{% endif %}
+    <p class="profile-text">{% translate "With a code from an app you protect your account additionally." %}</p>
+    {% if recent %}
+      <form method="post" action="{% url 'accounts:two_factor_setup' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">{% translate "Set up 2FA" %}</button>
+      </form>
+    {% else %}
+      {% with form=setup_form %}
+        <form method="post" action="{% url 'accounts:two_factor_setup' %}" class="profile-form" novalidate>
+          {% csrf_token %}
+          {% include "accounts/_error_summary.html" %}
+          {% include "accounts/_field.html" with field=form.current_password %}
+          <div class="profile-actions">
+            <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+            {% if not second_factor_required %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>{% endif %}
+          </div>
+        </form>
+      {% endwith %}
+    {% endif %}
+
+  {% elif tf_state == "app" %}
+    <h2 id="card-two-factor-title">{% translate "Set up the app" %}</h2>
+    <p class="profile-step">{% translate "Step 1 of 2" %}</p>
+    <p class="profile-text">{% translate "Scan this code with your authenticator app." %}</p>
+    <div class="qr-tile-wrap"><div class="qr-tile"><img src="{% url 'accounts:two_factor_qr' %}" alt="{% translate 'QR code for the authenticator app' %}" width="160" height="160"></div></div>
+    <p class="profile-note">{% translate "Cannot scan? Enter this key in the app:" %} <span class="mono-key">{{ secret }}</span></p>
+    {% with form=code_form %}
+      <form method="post" action="{% url 'accounts:two_factor_confirm' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.otp_token %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+          {% if not second_factor_required %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>{% endif %}
+        </div>
+      </form>
+    {% endwith %}
+
+  {% elif tf_state == "codes" %}
+    <h2 id="card-two-factor-title">{% translate "Recovery codes" %}</h2>
+    {% if enrolled %}<p class="profile-step">{% translate "Step 2 of 2" %}</p>{% endif %}
+    <p class="profile-text">{% translate "You need these codes if you have no access to the app. Each code works only once. They are shown only now." %}</p>
+    <ol class="recovery-codes" id="recovery-codes-list">
+      {% for code in codes %}<li>{{ code }}</li>{% endfor %}
+    </ol>
+    <div class="profile-actions d-print-none">
+      <button type="button" class="btn btn-secondary-action" data-codes-copy hidden aria-controls="recovery-codes-list"
+              data-done="{% translate 'The codes were copied.' %}" data-failed="{% translate 'The codes could not be copied. Please write them down.' %}">{% translate "Copy codes" %}</button>
+    </div>
+    <p class="profile-note d-print-none" role="status" data-codes-status></p>
+    <form method="post" action="{% url 'accounts:recovery_codes_done' %}" class="profile-form d-print-none" data-codes-done-form>
+      {% csrf_token %}
+      <label class="entry-check" for="id_saved"><input class="entry-check-input" type="checkbox" name="saved" id="id_saved"><span>{% translate "I saved the codes." %}</span></label>
+      <div class="profile-actions"><button type="submit" class="btn btn-primary" data-codes-done data-gate="id_saved">{% translate "Done" %}</button></div>
+    </form>
+
+  {% elif tf_state == "codes_new" %}
+    <h2 id="card-two-factor-title">{% translate "Create new codes" %}</h2>
+    <p class="profile-text">{% translate "The previous codes no longer work afterwards." %}</p>
+    {% with form=action_form %}
+      <form method="post" action="{% url 'accounts:recovery_codes' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.current_password %}
+        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Create new codes" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+
+  {% elif tf_state == "disable" %}
+    <h2 id="card-two-factor-title">{% translate "Turn off 2FA" %}</h2>
+    <p class="profile-text">{% translate "Afterwards only your password protects the account. You can set up 2FA again at any time." %}</p>
+    {% with form=action_form %}
+      <form method="post" action="{% url 'accounts:two_factor_disable' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.current_password %}
+        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-danger">{% translate "Turn off 2FA" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+  {% endif %}
+</section>

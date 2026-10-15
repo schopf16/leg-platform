@@ -1,4 +1,4 @@
-/* Print and copy for the page of the emergency codes. Both buttons are rendered hidden by the
+/* Print and copy for the page of the recovery codes. Both buttons are rendered hidden by the
    server and shown here only if the browser can do it, so that without this script the page
    stays complete (the person can still select the codes and use the print function of the
    browser). The codes are only read from the page: they are not stored, logged or sent anywhere

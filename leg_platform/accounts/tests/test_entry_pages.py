@@ -287,7 +287,8 @@ class ResultPagesTests(TestCase):
         page = self.client.get(reverse("accounts:email_change_verify", args=["x" * 43]))
 
         self.assertContains(page, "Link nicht mehr gültig")
-        self.assertContains(page, "Der Link ist abgelaufen oder wurde schon verwendet. Ihre E-Mail-Adresse wurde nicht geändert. Sie können die Änderung im Profil erneut anfordern.")
+        self.assertContains(page, "Dieser Link kann nicht mehr verwendet werden. Falls Sie die Änderung soeben bestätigt haben, melden Sie sich mit der neuen Adresse an.")
+        self.assertNotContains(page, "wurde nicht geändert")
         self.assertContains(page, f'href="{reverse("accounts:login")}">Zur Anmeldung</a>')
         self.assertContains(page, "Mein Konto")
         self.assertContains(page, "Ihre Angaben im LEG-Portal.")
@@ -313,11 +314,23 @@ class ResultPagesTests(TestCase):
         self.assertIn("Änderung gestoppt", stopped)
         self.assertIn("Die Änderung Ihrer E-Mail-Adresse wurde gestoppt. Ihre bisherigen Adressen bleiben gültig.", stopped)
 
+    @override_settings(INSTANCE_WEBSITE_URL="https://www.example.org/")
     def test_the_removal_of_the_second_factor_pages_use_the_entry_shell(self):
         page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]))
 
         self.assertContains(page, 'class="entry-split"')
-        self.assertContains(page, "Link ungültig")
+        self.assertContains(page, "Link nicht mehr gültig")
+        self.assertNotContains(page, "Link ungültig")
+        # A real way to the operator: the website of the instance, not the name of the portal.
+        self.assertContains(page, 'href="https://www.example.org/"')
+        self.assertContains(page, "wenden Sie sich an die LEG")
+        self.assertNotContains(page, "wenden Sie sich an LEG-Portal")
+
+    @override_settings(INSTANCE_WEBSITE_URL="")
+    def test_the_invalid_removal_link_without_a_website_still_names_the_operator(self):
+        page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]))
+
+        self.assertContains(page, "wenden Sie sich an die LEG")
 
 
 @tag("mariadb")

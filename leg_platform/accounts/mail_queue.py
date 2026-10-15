@@ -21,6 +21,7 @@ at least once. After ``MAX_ATTEMPTS`` the job is given up.
 """
 
 import logging
+import time
 from datetime import timedelta
 
 from django.db import DatabaseError, transaction
@@ -64,6 +65,7 @@ HANDLERS = {
     MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
     MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
     MailJob.Kind.TWO_FACTOR_RESET: _notification(emails.send_two_factor_reset),
+    MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted),
 }
 
 # Handlers of jobs about an account get the account key and the address of the request (D-044).
@@ -75,13 +77,50 @@ DONE = "done"
 FAILED = "failed"
 
 
+_REJECTION_LOG_INTERVAL = 60.0
+_last_rejection_log = float("-inf")
+
+
+def _log_rejection():
+    """Log that requests are refused, at most once a minute (a flood must not flood the log)."""
+    global _last_rejection_log
+    now = time.monotonic()
+    if now - _last_rejection_log >= _REJECTION_LOG_INTERVAL:
+        _last_rejection_log = now
+        logger.warning("Requests that send email are refused: the client or instance limit is used up.")
+
+
+def requests_refused(request, kind):
+    """Whether the client IP address or the instance has used up its limit for this kind of request.
+
+    Read only and before anything is stored (security review of phase 3, A1). Only these two
+    limits are ever shown to the person (HTTP 429): they do not depend on an account, so no answer
+    tells whether an address has an account; the limit of an address stays silent (D-038).
+    """
+    client_ip = axes_client_ip(request)
+    refused = rate_limits.exhausted(
+        [
+            (rate_limits.SCOPE_MAIL_IP, rate_limits.ip_key(client_ip), rate_limits.MAIL_IP_LIMITS),
+            (rate_limits.SCOPE_MAIL_GLOBAL, str(kind), rate_limits.MAIL_GLOBAL_LIMITS),
+        ]
+    )
+    if refused:
+        _log_rejection()
+    return refused
+
+
 def submit_mail_request(request, kind, email, *, account=None):
     """Count a request for an email and store the job; the same work for every address.
 
-    The request is counted at the address, the client IP address and the whole instance only if
-    all three limits have room, so that a client that is refused cannot use up the budget of
-    someone else's address. A refused request is stored as a suppressed job without the address.
+    Returns False without storing anything if the limit of the client IP address or of the
+    instance is used up: the caller shows the refusal. Otherwise the request is counted at the
+    address, the client IP address and the whole instance only if all three limits have room, so
+    that a client that is refused cannot use up the budget of someone else's address. A request
+    above the limit of the address is stored as a suppressed job without the address, so that the
+    answer and its time stay the same (D-038).
     """
+    if requests_refused(request, kind):
+        return False
     address = normalize_email_address(email)
     client_ip = axes_client_ip(request)
     if not client_ip:
@@ -104,6 +143,7 @@ def submit_mail_request(request, kind, email, *, account=None):
         suppressed=suppressed,
         next_attempt_at=timezone.now(),
     )
+    return True
 
 
 def enqueue(kind, address, account=None):
@@ -111,6 +151,19 @@ def enqueue(kind, address, account=None):
     MailJob.objects.create(
         kind=kind, address=address, account=account, next_attempt_at=timezone.now()
     )
+
+
+def enqueue_for_account(kind, user, addresses=None):
+    """Queue the same notification for every address of the account (D-059).
+
+    The login address and the confirmed second address by default, or the addresses that the
+    caller names (e.g. the addresses before a change). One job per address: a failing delivery to
+    one address does not hold back the other. A notice about a requested change keeps the account
+    key, because the worker makes a personal link for it.
+    """
+    with_account = user if kind == MailJob.Kind.EMAIL_CHANGE_NOTICE else None
+    for address in addresses if addresses is not None else user.notification_addresses():
+        enqueue(kind, address, account=with_account)
 
 
 def process_pending(limit=50):
@@ -171,6 +224,14 @@ def _process_next():
                 from leg_platform.accounts import email_change
 
                 send = email_change.process_request(account_id, address)
+            elif kind == MailJob.Kind.SECONDARY_EMAIL_REQUEST:
+                from leg_platform.accounts import email_change
+
+                send = email_change.process_secondary_request(account_id, address)
+            elif kind == MailJob.Kind.EMAIL_CHANGE_NOTICE:
+                from leg_platform.accounts import email_change
+
+                send = email_change.process_notice(account_id, address)
             elif kind in ACCOUNT_HANDLERS:
                 send = ACCOUNT_HANDLERS[kind](account_id, address)
             else:

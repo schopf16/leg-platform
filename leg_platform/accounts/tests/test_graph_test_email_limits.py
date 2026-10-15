@@ -15,11 +15,16 @@ from leg_platform.accounts.models import (
     SecurityEvent,
 )
 from leg_platform.accounts.rate_limits import MAIL_ADDRESS_LIMITS
-from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import (
+    VerifiedClient,
+    create_active_user,
+    hour_and_day_limits,
+)
 from leg_platform.environment import EMAIL_MODE_CONSOLE, EMAIL_MODE_GRAPH
 
 
 @tag("mariadb")
+@hour_and_day_limits
 class GraphTestEmailLimitTests(TestCase):
     client_class = VerifiedClient
 

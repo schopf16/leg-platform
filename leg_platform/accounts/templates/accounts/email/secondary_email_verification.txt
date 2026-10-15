@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+Someone asked at {{ instance_name }} to add this address as the second email address of an account. The second address only receives information; it is not used to log in. To confirm it, open this link:
+
+{{ email_change_url }}
+
+The link expires in {{ lifetime_hours }} hours. The address is not used until you confirm it. If you did not expect this, you can ignore this email; nothing will happen.{% endblocktranslate %}{% if contact_url %}
+
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% endautoescape %}

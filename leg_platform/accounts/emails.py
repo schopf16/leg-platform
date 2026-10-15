@@ -75,6 +75,10 @@ def _sample_values(key):
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:email_change_verify", kwargs={"token": EXAMPLE_TOKEN})
             )
+        elif placeholder is email_texts.STOP_URL:
+            specific[placeholder.name] = absolute_url(
+                reverse("accounts:email_change_stop_verify", kwargs={"token": EXAMPLE_TOKEN})
+            )
         elif placeholder is email_texts.TWO_FACTOR_RESET_URL:
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:two_factor_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
@@ -219,3 +223,37 @@ def send_two_factor_reset_link(address, raw_token, lifetime: timedelta):
 def send_two_factor_reset(address):
     """Tell the owner that the second factor was reset; contains no link."""
     _send(address, Key.TWO_FACTOR_RESET, {})
+
+
+def send_secondary_email_verification(address, raw_token, lifetime: timedelta):
+    """Send the single-use link that confirms a requested second address (D-059)."""
+    _send(
+        address,
+        Key.SECONDARY_EMAIL_VERIFICATION,
+        {
+            "email_change_url": absolute_url(
+                reverse("accounts:email_change_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_email_change_notice(address, raw_token, lifetime: timedelta):
+    """Tell an address of the account that a change was requested, with the link that stops it
+    without a login (D-059)."""
+    _send(
+        address,
+        Key.EMAIL_CHANGE_NOTICE,
+        {
+            "stop_url": absolute_url(
+                reverse("accounts:email_change_stop_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_hours": str(int(lifetime.total_seconds() // 3600)),
+        },
+    )
+
+
+def send_account_deleted(address):
+    """Tell an address of the account that the account was deleted; contains no link (D-059)."""
+    _send(address, Key.ACCOUNT_DELETED, {})

@@ -1,19 +1,18 @@
 {% extends "entry_base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Your details" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_register.html" with password_step=True %}{% endblock %}
 {% block form %}
   {% include "accounts/_progress.html" %}
   <h1>{% translate "Your details" %}</h1>
   {% include "accounts/_error_summary.html" %}
-  <form method="post" novalidate>
+  <form method="post" novalidate data-submit-once>
     {% csrf_token %}
     <input type="hidden" name="registration" value="{{ registration_ref }}">
-    {# The address as text with its status; no password field on this page (K7, register/VORGABEN.md). #}
+    {# The address as plain text with its status beside it; no password field on this page (K7). #}
     <div class="entry-field">
       <span class="form-label">{% translate "Email address" %}</span>
-      <p class="plain-box"><span class="plain-value">{{ account_email }}</span></p>
-      <p class="plain-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Confirmed" %}</p>
+      <p class="plain-line"><span class="plain-value">{{ account_email }}</span><span class="plain-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Confirmed" %}</span></p>
     </div>
     <div class="field-pair">
       {% include "accounts/_field.html" with field=form.first_name %}
@@ -34,6 +33,11 @@
       </label>
       {% if form.privacy.errors %}<div class="invalid-feedback d-block" id="{{ form.privacy.auto_id }}_error">{{ form.privacy.errors.0 }}</div>{% endif %}
     </div>
+    {% if address_unchecked %}<p class="entry-hint">{% translate "Your address could not be checked and is saved as you entered it." %}</p>{% endif %}
     <button type="submit" class="btn btn-primary">{% translate "Create account" %}</button>
   </form>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/submit-once.js' %}"></script>
 {% endblock %}

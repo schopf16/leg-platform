@@ -9,10 +9,12 @@ from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, SetPasswordMixin
 from django.core.exceptions import ValidationError
+from django.forms.boundfield import BoundField
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import second_factor
+from leg_platform.accounts.bot_check import BotCheckMixin
 from leg_platform.accounts.models import (
     EMAIL_MAX_LENGTH,
     SWISS_POSTAL_CODE_MESSAGE,
@@ -21,6 +23,8 @@ from leg_platform.accounts.models import (
     parse_swiss_postal_code,
     validate_account_email,
 )
+
+from leg_platform.accounts.normalization import normalize_email_address
 
 # Fields of the profile a person enters (docs/PROJECT.md, "Profile Data and Purpose"). The two
 # postal code fields of the model are replaced by one form field (D-036).
@@ -96,8 +100,7 @@ def password_hint():
         return ""
     return gettext(
         "Choose at least %(min_length)d characters. A sentence of several words is easy to "
-        "remember and hard to guess, for example «My cat drinks milk every morning». Please do "
-        "not use this exact example."
+        "remember and hard to guess."
     ) % {"min_length": minimum}
 
 
@@ -115,8 +118,30 @@ AUTOCOMPLETE = {
 }
 
 
+class PortalBoundField(BoundField):
+    """A bound field whose ``aria-describedby`` names every text that belongs to the field: the
+    help text, the hint or the list of rules that the template shows next to it (the field says
+    which in ``described_by``, as suffixes of its id), and the error (security review, design
+    review of phase 3: the order is the one a person reads)."""
+
+    @property
+    def aria_describedby(self):
+        if self.field.widget.attrs.get("aria-describedby"):
+            return None
+        ids = []
+        if self.auto_id and not self.is_hidden:
+            if self.help_text:
+                ids.append(f"{self.auto_id}_helptext")
+            ids += [f"{self.auto_id}_{suffix}" for suffix in getattr(self.field, "described_by", ())]
+            if self.errors:
+                ids.append(f"{self.auto_id}_error")
+        return " ".join(ids)
+
+
 class PortalFormMixin:
     """Give the widgets of a form the control classes of Tabler (docs/DESIGN.md, section 9)."""
+
+    bound_field_class = PortalBoundField
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -194,6 +219,7 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
         self.fields["postal_code"].widget.attrs["inputmode"] = (
             "numeric" if self._country_code() == SWITZERLAND else "text"
         )
+        self.fields["post_office_box_number"].described_by = ("hint",)
 
     def _country_code(self):
         if self.is_bound:
@@ -221,6 +247,8 @@ class EmailAddressForm(PortalFormMixin, forms.Form):
             attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
         ),
     )
+    # The hint under the field (the time the link is valid) is read with it.
+    email.described_by = ("hint",)
 
     def clean_email(self):
         email = self.cleaned_data["email"]
@@ -231,19 +259,32 @@ class EmailAddressForm(PortalFormMixin, forms.Form):
         return email
 
 
-class RegistrationForm(EmailAddressForm):
+class RegistrationForm(BotCheckMixin, EmailAddressForm):
     """Registration asks only for the email address; the profile follows after the link."""
 
 
-class PasswordResetRequestForm(EmailAddressForm):
+class PasswordResetRequestForm(BotCheckMixin, EmailAddressForm):
     pass
 
 
 def describe_password_fields(form, first, second):
     """Advice at the first password field and a specific message when a field is empty."""
     form.fields[first].help_text = password_hint()
+    form.fields[first].described_by = ("rules",)
     form.fields[first].error_messages["required"] = _("Enter a password.")
     form.fields[second].error_messages["required"] = _("Enter the password again.")
+
+
+def pin_username(form, address):
+    """Make the field "username" of a bound form the address that belongs to the page.
+
+    The field is shown as text and is only there for the password manager; whatever the request
+    carries, the form is bound to the address of the page, so that a re-rendered form never shows
+    or offers another one (security review of phase 3, A4).
+    """
+    if form.is_bound:
+        form.data = form.data.copy()
+        form.data[form.add_prefix("username")] = address
 
 
 class NewPasswordForm(PortalFormMixin, SetPasswordForm):
@@ -271,6 +312,7 @@ class NewPasswordForm(PortalFormMixin, SetPasswordForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        pin_username(self, self.user.email)
         self.initial["username"] = self.user.email
         self.fields["username"].widget.attrs["class"] = "plain-value"
         describe_password_fields(self, "new_password1", "new_password2")
@@ -311,6 +353,7 @@ class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        pin_username(self, user.email)
         self.initial["username"] = user.email
         self.fields["username"].widget.attrs["class"] = "plain-value"
         describe_password_fields(self, "password1", "password2")
@@ -380,6 +423,16 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
         # A house number has no standard autocomplete value, so that no password manager fills it.
         self.fields["house_number"].widget.attrs["autocomplete"] = "off"
         self.fields["privacy"].widget.attrs["class"] = "entry-check-input"
+        # The error summary names the box by a short word, not by the whole sentence.
+        self.fields["privacy"].summary_label = _("Privacy policy")
+
+    def _post_clean(self):
+        super()._post_clean()
+        # One clear message per field (design review of phase 3): the rules of the model for the
+        # name and the address (company name, post office box) repeat what the fields say and
+        # name things that this form does not ask for, so only the first message of a field stays.
+        for errors in self._errors.values():
+            del errors.data[1:]
 
     def clean(self):
         cleaned_data = super().clean()
@@ -489,7 +542,7 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "one-time-code"}),
         error_messages={"required": _("Enter the code.")},
     )
-    password_error = _("The password is incorrect.")
+    password_error = _("The password is not correct. Please try again.")
 
     def __init__(self, *args, request, **kwargs):
         super().__init__(*args, **kwargs)
@@ -516,25 +569,110 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
 
 
 class EmailChangeForm(ReauthenticationForm):
-    """Propose a new address and prove control of the current credentials."""
+    """The card "E-Mail-Adressen" of the profile: the login address and the second address, with
+    the current password and, where set up, the code (D-059).
+
+    Either address may change, or both; the second one may be emptied to remove it. A new address
+    is not stored: it is requested and confirmed with a link. The form tells nothing about
+    whether an address can be used (no account enumeration).
+    """
 
     email = forms.EmailField(
-        label=_("New email address"),
+        label=_("Email address for login (username)"),
         max_length=EMAIL_MAX_LENGTH,
         error_messages={"required": _("Enter the new email address.")},
         widget=forms.EmailInput(
             attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
         ),
     )
-    field_order = ("email", "current_password", "otp_token")
+    secondary_email = forms.EmailField(
+        label=_("Second email address"),
+        required=False,
+        max_length=EMAIL_MAX_LENGTH,
+        help_text=_(
+            "The second address receives information. You do not log in with it. Leave the field "
+            "empty if you do not want one."
+        ),
+        widget=forms.EmailInput(
+            attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
+        ),
+    )
+    field_order = ("email", "secondary_email", "current_password", "otp_token")
+
+    def __init__(self, *args, request, **kwargs):
+        super().__init__(*args, request=request, **kwargs)
+        self.initial.setdefault("email", request.user.email)
+        self.initial.setdefault("secondary_email", request.user.secondary_email)
+        self.fields["current_password"].help_text = _(
+            "You confirm new addresses with a link. The confirmation is valid for 24 hours. "
+            "Otherwise the current address stays valid."
+        )
+        # The login address and the new one(s) as the form found them; filled by ``clean``.
+        self.login_change = None
+        self.secondary_change = None
+        self.remove_secondary = False
+
+    @staticmethod
+    def _normalised(value, message):
+        try:
+            validate_account_email(value)
+        except ValueError:
+            raise ValidationError(message, code="invalid") from None
+        return normalize_email_address(value)
 
     def clean_email(self):
-        email = self.cleaned_data["email"]
-        try:
-            validate_account_email(email)
-        except ValueError:
-            raise ValidationError(_("Enter a valid email address."), code="invalid") from None
-        return email
+        return self._normalised(self.cleaned_data["email"], _("Enter a valid email address."))
+
+    def clean_secondary_email(self):
+        value = self.cleaned_data.get("secondary_email")
+        if not value:
+            return ""
+        return self._normalised(value, _("Enter a valid email address."))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        user = self.user
+        login = cleaned_data["email"]
+        secondary = cleaned_data.get("secondary_email", "")
+        if login != user.email:
+            self.login_change = login
+        if secondary != user.secondary_email:
+            if secondary:
+                self.secondary_change = secondary
+            else:
+                self.remove_secondary = True
+        # The second address is never the login address (the current one, or the new one).
+        if secondary and secondary == (self.login_change or user.email):
+            self.add_error(
+                "secondary_email",
+                _("The second address must differ from the address for login."),
+            )
+        elif not (self.login_change or self.secondary_change or self.remove_secondary):
+            raise ValidationError(_("Nothing was changed."), code="unchanged")
+        return cleaned_data
+
+
+class AccountDeleteForm(ReauthenticationForm):
+    """The confirmation of the deletion: the password (and code), and the box (D-059)."""
+
+    confirm = forms.BooleanField(
+        label=_(
+            "I know that my account and my details will be deleted and that this cannot be undone."
+        ),
+        error_messages={
+            "required": _("Please tick the box to confirm that you want to delete your account.")
+        },
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The confirmation is given again with every attempt: after an error the box is never
+        # shown as ticked, so that a repeated submit is never a confirmation by habit.
+        self.fields["confirm"].widget = forms.CheckboxInput(
+            attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
+        )
 
 
 class ChangePasswordForm(PortalFormMixin, SetPasswordForm):

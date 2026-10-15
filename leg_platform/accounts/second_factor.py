@@ -41,7 +41,7 @@ LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
 # Setting up two-factor authentication does not ask for the password again if this session
 # authenticated, by the password or by completing the registration, at most this long ago
 # (owner decision of 2026-10-14, D-055). The time is written by the server when the session logs in
-# and is never taken from the client; removing the second factor, new emergency codes, an email
+# and is never taken from the client; removing the second factor, new recovery codes, an email
 # address change and deleting the account always ask for the password.
 RECENT_AUTHENTICATION_WINDOW = timedelta(minutes=5)
 AUTHENTICATED_AT_KEY = "authenticated_at"

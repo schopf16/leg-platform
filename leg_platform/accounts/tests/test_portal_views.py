@@ -166,16 +166,19 @@ class LogoutAndProfileTests(TestCase):
         response = self.client.get(reverse("accounts:profile"), {"id": self.other.pk})
         content = response.content.decode()
 
-        self.assertContains(response, self.user.customer_number_display)
         self.assertContains(response, "active.person@example.org")
         self.assertNotContains(response, self.other.customer_number_display)
         self.assertNotContains(response, "other.person@example.org")
         self.assertNotIn("Berta", content)
+        # The customer number is on the start page (D-057), again only the own one.
+        start = self.client.get(reverse("home"), {"id": self.other.pk})
+        self.assertContains(start, self.user.customer_number_display)
+        self.assertNotContains(start, self.other.customer_number_display)
 
     def test_the_customer_number_is_shown_in_two_blocks(self):
         self.client.force_login(self.user)
 
-        response = self.client.get(reverse("accounts:profile"))
+        response = self.client.get(reverse("home"))
 
         self.assertRegex(response.content.decode(), r"\b[0-9]{3} [0-9]{3}\b")
 
@@ -196,6 +199,9 @@ class LogoutAndProfileTests(TestCase):
 @tag("mariadb")
 class PageSecurityAndLanguageTests(TestCase):
     """All pages follow the Content Security Policy and the language rules (D-010, D-028)."""
+
+    # The details step of the registration reads the status of the address directory (D-058).
+    databases = {"default", "addresses", "address_import"}
 
     def pages(self):
         user = create_active_user("active.person@example.org")

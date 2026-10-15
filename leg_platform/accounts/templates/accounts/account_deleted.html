@@ -1,0 +1,9 @@
+{% extends "entry_base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your account was deleted" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
+{% block form %}
+  <h1>{% translate "Your account was deleted" %}</h1>
+  <p>{% translate "Your details are removed. You are logged out. If you want to take part again, you can register anew at any time." %}</p>
+  <a class="btn btn-secondary-action" href="{% url 'home' %}">{% translate "To the start page" %}</a>
+{% endblock %}

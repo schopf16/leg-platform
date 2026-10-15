@@ -557,7 +557,7 @@ class EnrolmentTests(TestCase):
             self.assertNotIn(text, logs.output[0])
         overview = self.client.get(reverse("accounts:two_factor"))
         self.assertNotContains(overview, totp.format_recovery_code(codes[0]))
-        self.assertContains(overview, "Sie haben 10 unbenutzte Notfallcodes.")
+        self.assertContains(overview, "Sie haben 10 unbenutzte Wiederherstellungscodes.")
 
     def test_the_session_id_changes_when_the_second_factor_is_turned_on(self):
         self.start()
@@ -693,7 +693,11 @@ class RecoveryCodesAndRemovalTests(TestCase):
     def test_the_second_factor_can_be_turned_off_by_a_user(self):
         response = self.client.post(reverse("accounts:two_factor_disable"), self.data())
 
-        self.assertRedirects(response, reverse("accounts:two_factor"))
+        self.assertRedirects(
+            response,
+            f"{reverse('accounts:profile')}#card-two-factor",
+            fetch_redirect_response=False,
+        )
         self.assertFalse(AuthenticatorDevice.objects.exists())
         self.assertFalse(RecoveryCodeDevice.objects.exists())
         client = Client()
@@ -916,7 +920,9 @@ class PasswordChangeTests(TestCase):
     def test_the_password_is_changed(self):
         response = self.post()
 
-        self.assertRedirects(response, reverse("accounts:profile"))
+        self.assertRedirects(
+            response, f"{reverse('accounts:profile')}#card-password", fetch_redirect_response=False
+        )
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(OTHER_PASSWORD))
         self.assertFalse(self.user.check_password(PASSWORD))
@@ -1021,9 +1027,10 @@ class PasswordChangeTests(TestCase):
     def test_the_profile_links_to_the_pages(self):
         response = self.client.get(reverse("accounts:profile"))
 
-        self.assertContains(response, self.url)
-        self.assertContains(response, reverse("accounts:two_factor"))
-        self.assertTrue(re.search(r"Zwei-Faktor-Authentifizierung", response.content.decode()))
+        # The cards open in place: the links lead to the state of the card (D-059).
+        self.assertContains(response, "?edit=password#card-password")
+        self.assertContains(response, "2FA einrichten")
+        self.assertContains(response, "Zwei-Faktor-Anmeldung (2FA)")
 
 
 @tag("mariadb")

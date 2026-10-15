@@ -5,9 +5,10 @@
 {% block form %}
   {% include "accounts/_progress.html" with progress_step=1 %}
   <h1>{% translate "Confirm email address" %}</h1>
+  {% include "accounts/_error_summary.html" %}
   <form method="post" novalidate>
     {% csrf_token %}
-    {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+    {% include "accounts/_bot_check.html" %}
     {% blocktranslate count counter=lifetime_hours asvar link_hint %}We send you a link. It is valid for {{ counter }} hour.{% plural %}We send you a link. It is valid for {{ counter }} hours.{% endblocktranslate %}
     {% include "accounts/_field.html" with field=form.email hint=link_hint %}
     <button type="submit" class="btn btn-primary">{% translate "Send link" %}</button>

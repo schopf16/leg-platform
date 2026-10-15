@@ -1,0 +1,13 @@
+{% extends "entry_base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Stop the change" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
+{% block form %}
+  <h1>{% translate "Stop the change" %}</h1>
+  <p>{% translate "A change of an email address of your account was requested. If you did not request it, stop it here. Your current addresses stay valid, and all sessions of your account end." %}</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary">{% translate "Stop the change now" %}</button>
+  </form>
+  <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "Cancel" %}</a>
+{% endblock %}

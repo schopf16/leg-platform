@@ -4,9 +4,7 @@ Please confirm your email address with this link. The link is valid for {{ lifet
 
 Continue registration:
 
-{{ verification_url }}
-
-The link can be used once. If you did not register, you can ignore this email; nothing will happen.{% endblocktranslate %}{% if contact_url %}
+{{ verification_url }}{% endblocktranslate %}{% if contact_url %}
 
 {% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

@@ -97,7 +97,9 @@ def remove_second_factor(user, event, *, actor=None):
         user=user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
     ).delete()
     user.end_all_sessions()
-    _enqueue(MailJob.Kind.TWO_FACTOR_RESET, user.email)
+    from leg_platform.accounts.mail_queue import enqueue_for_account
+
+    enqueue_for_account(MailJob.Kind.TWO_FACTOR_RESET, user)
     security_log.record(event, account=user, actor=actor, long_retention=_privileged(user))
 
 

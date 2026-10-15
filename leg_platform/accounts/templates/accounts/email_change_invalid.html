@@ -4,6 +4,7 @@
 {% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
 {% block form %}
   <h1>{% translate "Link no longer valid" %}</h1>
-  <p>{% translate "The link has expired or was already used. Your email address was not changed. You can request the change again in your profile." %}</p>
+  {# Neutral: the page can be a reload after the confirmation (security review of phase 3, A3). #}
+  <p>{% translate "This link can no longer be used. If you have just confirmed the change, log in with the new address." %}</p>
   <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
 {% endblock %}

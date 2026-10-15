@@ -2,6 +2,7 @@
 
 import re
 import time
+from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from django.conf import settings
@@ -10,6 +11,7 @@ from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 
+from leg_platform.accounts import bot_check, rate_limits
 from leg_platform.accounts.models import AuthenticatorDevice, User
 
 PASSWORD = "copper kettle hums beside quiet orchard"
@@ -31,9 +33,25 @@ PROFILE = {
 }
 
 
+def hour_and_day_limits(test_class):
+    """Run the tests of a class with the windows of one hour and one day only.
+
+    The tests that send a dozen requests for one address in a row test the hourly and the daily
+    window; the burst window (3 per 10 minutes, ``test_burst_limit.py``) would refuse them earlier.
+    """
+    return patch.object(rate_limits, "MAIL_ADDRESS_LIMITS", rate_limits.MAIL_ADDRESS_LIMITS[:2])(
+        test_class
+    )
+
+
 def registration_data(email="new.person@example.org", **overrides):
-    """The registration form: only the email address; anything else is ignored."""
-    return {"email": email, **overrides}
+    """The registration form: only the email address and the stamp of the bot check."""
+    return {"email": email, "form_started": bot_check.new_stamp(), **overrides}
+
+
+def reset_request_data(email, **overrides):
+    """The form that asks for a link to reset the password, with the stamp of the bot check."""
+    return {"email": email, "form_started": bot_check.new_stamp(), **overrides}
 
 
 def password_data(password=PASSWORD, registration=None, **overrides):

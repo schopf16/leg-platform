@@ -63,6 +63,9 @@ TWO_FACTOR_RESET_URL = Placeholder(
 LIFETIME_HOURS = Placeholder(
     "lifetime_hours", _("Number of hours for which the personal link can be used.")
 )
+STOP_URL = Placeholder(
+    "stop_url", _("Personal link that stops the requested change of an email address.")
+)
 
 COMMON_PLACEHOLDERS = (INSTANCE_NAME, CONTACT_URL, PRIVACY_URL, LOGIN_URL)
 # Only the name of the portal is available in the subject.
@@ -134,13 +137,13 @@ DEFINITIONS = {
     ),
     Key.RECOVERY_CODES_RENEWED: Definition(
         "accounts/email/recovery_codes_renewed.txt",
-        lambda: gettext("New emergency codes were created at %(instance_name)s"),
+        lambda: gettext("New recovery codes were created at %(instance_name)s"),
         (),
         (),
     ),
     Key.RECOVERY_CODE_USED: Definition(
         "accounts/email/recovery_code_used.txt",
-        lambda: gettext("An emergency code was used at %(instance_name)s"),
+        lambda: gettext("An recovery code was used at %(instance_name)s"),
         (),
         (),
     ),
@@ -159,6 +162,24 @@ DEFINITIONS = {
     Key.TWO_FACTOR_RESET: Definition(
         "accounts/email/two_factor_reset.txt",
         lambda: gettext("Two-factor authentication was reset at %(instance_name)s"),
+        (),
+        (),
+    ),
+    Key.SECONDARY_EMAIL_VERIFICATION: Definition(
+        "accounts/email/secondary_email_verification.txt",
+        lambda: gettext("Confirm your second email address at %(instance_name)s"),
+        (EMAIL_CHANGE_URL, LIFETIME_HOURS),
+        (EMAIL_CHANGE_URL,),
+    ),
+    Key.EMAIL_CHANGE_NOTICE: Definition(
+        "accounts/email/email_change_notice.txt",
+        lambda: gettext("An email address change was requested at %(instance_name)s"),
+        (STOP_URL, LIFETIME_HOURS),
+        (STOP_URL,),
+    ),
+    Key.ACCOUNT_DELETED: Definition(
+        "accounts/email/account_deleted.txt",
+        lambda: gettext("Your account at %(instance_name)s was deleted"),
         (),
         (),
     ),

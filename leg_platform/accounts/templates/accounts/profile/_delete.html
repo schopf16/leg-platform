@@ -1,0 +1,28 @@
+{% load i18n %}{% comment %}
+The card "Konto löschen" (navigation/VORGABEN.md, section 3.3, item 4): the red start state, then
+the confirmation with the notice of the legal text (legal/VORGABEN.md, section 7), the password,
+the box and the red button.
+{% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title">
+  {% if edit == "delete" %}
+    <h2 id="card-delete-title">{% translate "Really delete the account?" %}</h2>
+    <p class="profile-text">{% translate "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted." %}</p>
+    <div class="profile-notice">{% if privacy_url %}{% blocktranslate with url=privacy_url %}Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the <a href="{{ url }}" target="_blank" rel="noopener noreferrer">privacy notice</a>.{% endblocktranslate %}{% else %}{% translate "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the privacy notice." %}{% endif %}</div>
+    {% with form=delete_form %}
+      <form method="post" action="{% url 'accounts:account_delete' %}" class="profile-form profile-form-inset" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.current_password %}
+        {% if form.otp_token %}{% include "accounts/_field.html" with field=form.otp_token %}{% endif %}
+        {% include "accounts/_field.html" with field=form.confirm %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+  {% else %}
+    <h2 id="card-delete-title">{% translate "Delete account" %}</h2>
+    <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
+    <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></div>
+  {% endif %}
+</section>
