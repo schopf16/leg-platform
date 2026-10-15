@@ -116,9 +116,27 @@ form that made them; nothing about them is stored (D-059).
         {% csrf_token %}
         {% include "accounts/_error_summary.html" %}
         {% include "accounts/profile/_proof_fields.html" %}
+        <p class="profile-text"><a href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=lost_phone#card-two-factor">{% translate "Phone lost?" %}</a></p>
         <div class="profile-actions">
           <button type="submit" class="btn btn-danger-outline">{% translate "Turn off 2FA" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+
+  {% elif tf_state == "lost_phone" %}
+    <h2 id="card-two-factor-title">{% translate "Phone lost?" %}</h2>
+    <p class="profile-text">{% translate "If you cannot use your authenticator app, you can turn off 2FA with your password and one of your recovery codes. Afterwards only your password protects the account. You can set up 2FA again at any time." %}</p>
+    <p class="profile-text">{% translate "You have neither the app nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of 2FA, and you confirm it with a link that is sent to your email address." %}</p>
+    {% with form=action_form %}
+      <form method="post" action="{% url 'accounts:two_factor_lost_phone' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.current_password %}
+        {% include "accounts/_field.html" with field=form.otp_token %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-danger-outline">{% translate "Turn off 2FA" %}</button>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=disable#card-two-factor">{% translate "Back" %}</a>
         </div>
       </form>
     {% endwith %}

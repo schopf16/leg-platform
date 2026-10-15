@@ -28,13 +28,13 @@ from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
     VerifiedClient,
+    code_for,
     create_active_user,
     run_mail_queue,
 )
 from leg_platform.accounts.tests.test_password_reset import NEW_PASSWORD, SET_URL, request_reset, reset_path
 from leg_platform.accounts.tests.test_profile import NEW, SECOND
 from leg_platform.accounts.tests.test_second_factor import (
-    RECOVERY_CODES,
     create_user_with_totp,
 )
 from leg_platform.accounts.tests.test_second_factor_reset import (
@@ -303,7 +303,7 @@ class CodeIsUsedUpLastTests(TestCase):
     def setUp(self):
         self.user, self.device = create_user_with_totp()
         self.client.force_login(self.user)
-        self.code = RECOVERY_CODES[0]
+        self.code = code_for(self.device)
 
     def test_the_password_card_with_another_mistake_keeps_the_code(self):
         wrong = self.client.post(
@@ -371,8 +371,8 @@ class CodeIsUsedUpLastTests(TestCase):
 
         # Not silent: the card is shown again with the message about the code.
         self.assertEqual(second.status_code, 200)
-        self.assertContains(second, "Der Code ist falsch, abgelaufen oder wurde schon verwendet.")
-        self.assertContains(second, "Warten Sie auf den nächsten")
+        self.assertContains(second, "Der 2FA-Authentifizierungscode ist falsch oder abgelaufen.")
+        self.assertContains(second, "Warten Sie auf den nächsten Code in Ihrer App")
 
     def test_a_weak_new_password_keeps_the_recovery_code(self):
         # The policy of the password (length, common passwords) runs before the code is checked.
@@ -414,7 +414,7 @@ class CodeIsUsedUpLastTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Das ist kein Code.")
+        self.assertContains(response, "Das ist kein 2FA-Authentifizierungscode.")
         right = self.client.post(
             PASSWORD_URL,
             {

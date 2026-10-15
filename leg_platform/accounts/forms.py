@@ -10,6 +10,7 @@ import re
 from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth.forms import AuthenticationForm, SetPasswordForm, SetPasswordMixin
+from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ValidationError
 from django.forms.boundfield import BoundField
 from django.utils.translation import gettext
@@ -550,44 +551,47 @@ class StartSetupForm(PortalFormMixin, forms.Form):
 
 
 class ProofCodeInput(forms.TextInput):
-    """The field for the code of a confirmation: it never writes a value back into the page.
+    """The field for the code of a confirmation: a plain text field that never writes a value
+    back into the page.
 
     A code is used once, so repeating it helps nobody, and a password that was typed into the
-    field by habit must not appear in the page again (design package, one proof, 2.4).
+    field by habit must not appear in the page again (design package, one proof, 2.4). The value
+    is visible text, with no special keyboard, length or pattern in the browser (owner, block 8).
     """
 
     def format_value(self, value):
         return None
 
 
-# What a code can look like after ``totp.normalize_code``: six characters (the app) or eight
-# (a recovery code: base32 letters and digits). Anything else is no code and is refused before
-# the abuse protection counts it (docs/SECURITY.md, section 3, "one proof").
-CODE_SHAPE = re.compile(r"^(?:[a-z0-9]{6}|[a-z0-9]{8})$")
+# What the app code can look like after ``totp.normalize_code``: six digits. A recovery code does
+# not count in a confirmation of the profile (D-062, block 8). Anything else is no code and is
+# refused before the abuse protection counts it (docs/SECURITY.md, section 3, "one proof").
+CODE_SHAPE = re.compile(r"^[0-9]{6}$")
+# A recovery code of the "phone lost" way: eight letters and digits of the base32 alphabet.
+RECOVERY_CODE_SHAPE = re.compile(r"^[a-z2-7]{8}$")
 
 
 class OneProofMixin:
-    """One proof per confirmation: the code of the second factor if one is set up, otherwise the
-    password, never both (owner decision of 2026-10-15, "2FA gewinnt"; D-062).
+    """One proof per confirmation: the 6-digit code of the authenticator app if a second factor
+    is set up, otherwise the password, never both (owner decision of 2026-10-15, "2FA wins";
+    D-062). A recovery code is no proof here (block 8): it counts at the login and in the way
+    "phone lost" of the card "turn off 2FA" only.
 
     The form removes the field that it does not need: ``current_password`` when the account has a
     second factor (``proof == "code"``), ``otp_token`` otherwise (``proof == "password"``). The
-    code is checked after every other field is valid, so that a recovery code is not used up by a
-    form that fails anyway, and only if it has the shape of a code.
+    code is checked after every other field is valid, and only if it has the shape of an app code.
     """
 
     proof = "password"
-    code_required_message = _("Enter the code from your app or a recovery code.")
-    code_shape_message = _(
-        "That is not a code. Enter the 6 digits from your app or a recovery code such as abcd-efgh."
+    code_label = _("2FA authentication code")
+    code_required_message = _("Enter the 2FA authentication code.")
+    code_shape_message = _("That is not a 2FA authentication code. It has 6 digits.")
+    code_wrong_message = _(
+        "The 2FA authentication code is wrong or has expired. Wait for the next code in your app "
+        "and try again."
     )
     code_lead = _(
-        "For this confirmation you need the 6-digit code from your app. Your password is not "
-        "needed here."
-    )
-    code_hint = _(
-        "Is the app not at hand? Enter a recovery code instead, for example abcd-efgh. Each code "
-        "works only once."
+        "Enter the 6-digit code from your authenticator app. Your password is not needed here."
     )
 
     def use_one_proof(self, user, *, autofocus=True):
@@ -595,27 +599,28 @@ class OneProofMixin:
         if not second_factor.has_second_factor(user):
             self.proof = "password"
             del self.fields["otp_token"]
+            # The error stands before a hint or a note in the page, so it is read first as well.
+            self.fields["current_password"].error_before_hint = True
             return
         self.proof = "code"
         del self.fields["current_password"]
         field.widget = ProofCodeInput(
-            attrs={
-                "autocomplete": "one-time-code",
-                "autocapitalize": "none",
-                "autocorrect": "off",
-                "spellcheck": "false",
-                "maxlength": "12",
-                "placeholder": "000000",
-                "class": "form-control",
-            }
+            attrs={"autocomplete": "one-time-code", "placeholder": "000000", "class": "form-control"}
         )
         if autofocus:
             field.widget.attrs["autofocus"] = True
+        field.label = self.code_label
         field.error_messages["required"] = self.code_required_message
-        field.help_text = self.code_hint
         field.lead = self.code_lead
         field.described_first = ("lead",)
         field.error_before_hint = True
+
+    def proof_changed(self):
+        """Whether the second factor was set up or removed since the form was built. The form
+        then fails closed: it asked for the other proof, so nothing is accepted."""
+        return second_factor.has_second_factor(self.user) != (self.proof == "code")
+
+    changed_message = _("Your account was changed in the meantime. Please try again.")
 
     def clean_otp_token(self):
         value = self.cleaned_data["otp_token"]
@@ -624,16 +629,23 @@ class OneProofMixin:
         return value
 
     def check_code(self, cleaned_data):
-        """Check the code (used up if it is a recovery code); only when nothing else is wrong.
+        """Check the app code; only when nothing else is wrong. A recovery code is not accepted
+        here and is never used up (the shape check refuses it, and the check is told to accept
+        the app only).
 
         When the budget of wrong codes is used up, ``verify_second_factor`` marks the request as
         locked out and the lockout page of the abuse protection answers (with its own text about
-        the pause); the form only adds the common error.
+        the pause); the form only adds the error.
         """
         if self.proof != "code" or self.errors or "otp_token" not in cleaned_data:
             return
-        if second_factor.verify_second_factor(self.request, self.user, cleaned_data["otp_token"]) is None:
-            self.add_error("otp_token", CodeForm.invalid_code_message)
+        if (
+            second_factor.verify_second_factor(
+                self.request, self.user, cleaned_data["otp_token"], recovery=False
+            )
+            is None
+        ):
+            self.add_error("otp_token", self.code_wrong_message)
 
 
 class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
@@ -673,6 +685,9 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        if self.proof_changed():
+            self.add_error(None, self.changed_message)
+            return cleaned_data
         if self.proof == "password":
             password = cleaned_data.get("current_password")
             if password is None:
@@ -684,6 +699,68 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
             return cleaned_data
         self.check_changes(cleaned_data)
         self.check_code(cleaned_data)
+        return cleaned_data
+
+
+class LostPhoneForm(PortalFormMixin, forms.Form):
+    """The way "phone lost" of the card "turn off 2FA": the password **and** a recovery code
+    (owner decision of 2026-10-15, D-062, block 8). It is the only place where a recovery code is a
+    proof besides the login.
+
+    The order is: the format and the required fields, then the password (under the abuse
+    protection of the login), then the code (used up only if everything before was right). A wrong
+    password and a wrong code give the same answer, so the form tells which of the two failed to
+    nobody who has only one of them.
+    """
+
+    current_password = forms.CharField(
+        label=_("Current password"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
+        error_messages={"required": _("Enter your current password.")},
+    )
+    otp_token = forms.CharField(
+        label=_("Recovery code"),
+        max_length=256,
+        widget=ProofCodeInput(attrs={"autocomplete": "off", "placeholder": "abcd-efgh"}),
+        help_text=_("One of your recovery codes, for example abcd-efgh. Each code works only once."),
+        error_messages={"required": _("Enter a recovery code.")},
+    )
+    shape_message = _("That is not a recovery code. It has 8 letters and digits, for example abcd-efgh.")
+    wrong_message = _("The password or the recovery code is wrong. Check both and try again.")
+    changed_message = OneProofMixin.changed_message
+
+    def __init__(self, *args, request, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.request = request
+        self.user = request.user
+        self.fields["otp_token"].error_before_hint = True
+        # A plain text field: the server limit is not announced to the browser (owner, block 8).
+        self.fields["otp_token"].widget.attrs.pop("maxlength", None)
+
+    def clean_otp_token(self):
+        value = self.cleaned_data["otp_token"]
+        if not RECOVERY_CODE_SHAPE.match(totp.normalize_code(value)):
+            raise ValidationError(self.shape_message, code="code_shape")
+        return value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+        if not second_factor.has_second_factor(self.user):
+            self.add_error(None, self.changed_message)
+            return cleaned_data
+        if not second_factor.verify_password(self.request, self.user, cleaned_data["current_password"]):
+            self.add_error(None, self.wrong_message)
+            return cleaned_data
+        if (
+            second_factor.verify_second_factor(
+                self.request, self.user, cleaned_data["otp_token"], app=False
+            )
+            is None
+        ):
+            self.add_error(None, self.wrong_message)
         return cleaned_data
 
 
@@ -838,14 +915,32 @@ class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # The new password is not the one that is set now. With the code as the proof the current
-        # password is not typed, so it is compared with the stored one (D-005, D-062).
-        new = cleaned_data.get("new_password2")
-        if new and "new_password1" in cleaned_data and self.user.check_password(new):
-            self.add_error("new_password1", self.different_password_message)
+        if self.proof_changed():
+            self.add_error(None, self.changed_message)
+            return cleaned_data
         # The code is checked, and so used up, only after every other field is valid: a recovery
         # code must not be lost to a form that fails anyway (security review, final, R2).
         self.check_code(cleaned_data)
+        # "The new password is not the one that is set now" (D-005, D-062) is compared only after
+        # the proof was given: with the password as the proof, ``clean_current_password`` has
+        # verified it under the abuse protection (so the field is in ``cleaned_data``); with the
+        # code, ``check_code`` has accepted it (and used it up, also when the answer is then
+        # "choose another password"). Without a proof the answer is the same whatever the new
+        # password is, so the form cannot be used to guess the password (security review, H-1).
+        # The comparison has no side effect: no setter, so no rehash (L-1).
+        proven = (
+            "current_password" in cleaned_data
+            if self.proof == "password"
+            else "otp_token" in cleaned_data and not self.errors
+        )
+        new = cleaned_data.get("new_password2")
+        if (
+            proven
+            and new
+            and "new_password1" in cleaned_data
+            and check_password(new, self.user.password)
+        ):
+            self.add_error("new_password1", self.different_password_message)
         return cleaned_data
 
 

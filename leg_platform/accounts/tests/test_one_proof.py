@@ -36,11 +36,10 @@ DELETE_URL = reverse("accounts:account_delete")
 CODES_URL = reverse("accounts:recovery_codes")
 DISABLE_URL = reverse("accounts:two_factor_disable")
 NEW = "new.address.proof@example.org"
-LEAD = "Zur Bestätigung brauchen Sie den 6-stelligen Code aus Ihrer App. Ihr Passwort wird hier nicht benötigt."
-HINT = "Haben Sie die App nicht zur Hand? Geben Sie stattdessen einen Wiederherstellungscode ein"
-MISSING = "Geben Sie den Code aus Ihrer App oder einen Wiederherstellungscode ein."
-SHAPE = "Das ist kein Code."
-WRONG = "Der Code ist falsch, abgelaufen oder wurde schon verwendet."
+LEAD = "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein. Ihr Passwort wird hier nicht benötigt."
+MISSING = "Geben Sie den 2FA-Authentifizierungscode ein."
+SHAPE = "Das ist kein 2FA-Authentifizierungscode. Er besteht aus 6 Ziffern."
+WRONG = "Der 2FA-Authentifizierungscode ist falsch oder abgelaufen."
 PAUSED = "pausiert"
 
 PAGES = {
@@ -94,9 +93,12 @@ class FieldsOfTheStatesTests(TestCase):
                 self.assertIn('name="otp_token"', html)
                 self.assertNotIn('name="current_password"', html)
                 self.assertNotIn("Aktuelles Passwort", html)
-                self.assertIn("Code aus der App", html)
+                self.assertIn("2FA-Authentifizierungscode", html)
+                self.assertNotIn(">Code aus der App<", html)
                 self.assertIn(LEAD, html)
-                self.assertIn(HINT, html)
+                # No word about recovery codes in the normal forms (block 8).
+                self.assertNotIn("Wiederherstellungscode ein", html)
+                self.assertNotIn("abcd-efgh", html)
                 # The lead stands between the label and the field.
                 label = html.index('for="id_otp_token"')
                 lead = html.index(LEAD)
@@ -104,20 +106,20 @@ class FieldsOfTheStatesTests(TestCase):
                 self.assertLess(label, lead)
                 self.assertLess(lead, field)
 
-    def test_the_attributes_of_the_code_field(self):
+    def test_the_code_field_is_a_plain_text_field(self):
         _user, _device, client = account_a("attrs.a@example.org")
 
         for name, url in PAGES.items():
             tag_ = input_tag(client.get(url).content.decode(), "otp_token")
             with self.subTest(form=name):
                 self.assertIn('autocomplete="one-time-code"', tag_)
-                self.assertIn('maxlength="12"', tag_)
-                self.assertIn('placeholder="000000"', tag_)
-                self.assertIn('autocapitalize="none"', tag_)
-                self.assertIn('spellcheck="false"', tag_)
                 self.assertIn('type="text"', tag_)
-                # Recovery codes have letters: no numeric keyboard.
-                self.assertNotIn("inputmode", tag_)
+                # Like every other text field (owner, block 8): no special keyboard, length or
+                # pattern in the browser, no special style class.
+                for attribute in ("inputmode", "maxlength", "pattern", "autocapitalize", "spellcheck"):
+                    self.assertNotIn(attribute, tag_)
+                self.assertIn('class="form-control', tag_)
+                self.assertNotIn("value=", tag_)
                 # Focus where it is the first field only; in the e-mail form it is the third.
                 self.assertEqual("autofocus" in tag_, name != "email")
 
@@ -205,27 +207,28 @@ class CodeAsTheOnlyProofTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(PendingEmailChange.objects.filter(user=self.user).exists())
 
-    def test_the_description_order_is_lead_error_hint_note(self):
+    def test_the_description_order_is_lead_error_note(self):
         html = self.email(otp_token="123456").content.decode()
 
         self.assertIn(
-            'aria-describedby="id_otp_token_lead id_otp_token_error id_otp_token_helptext id_otp_token_note"',
+            'aria-describedby="id_otp_token_lead id_otp_token_error id_otp_token_note"',
             input_tag(html, "otp_token"),
         )
-        for suffix in ("lead", "error", "helptext", "note"):
+        for suffix in ("lead", "error", "note"):
             self.assertIn(f'id="id_otp_token_{suffix}"', html)
+        self.assertNotIn("id_otp_token_helptext", html)
         self.assertIn("Neue Adressen bestätigen Sie mit einem Link.", html)
 
     def test_the_error_summary_names_the_field(self):
         html = self.email(otp_token="123456").content.decode()
 
-        self.assertRegex(html, r"Code aus der App[^<]*:")
+        self.assertRegex(html, r"2FA-Authentifizierungscode: Der 2FA-Authentifizierungscode ist falsch")
 
     def test_the_delete_form_has_the_same_field_and_no_note_about_a_link(self):
         html = self.client.post(DELETE_URL, {"otp_token": "123456", "confirm": "on"}).content.decode()
 
         self.assertIn(
-            'aria-describedby="id_otp_token_lead id_otp_token_error id_otp_token_helptext"',
+            'aria-describedby="id_otp_token_lead id_otp_token_error"',
             input_tag(html, "otp_token"),
         )
         self.assertNotIn("Neue Adressen bestätigen Sie mit einem Link.", html)
@@ -253,13 +256,17 @@ class ShapeAndBudgetTests(TestCase):
         self.assertEqual(self.post(code_for(self.device)).status_code, 302)
 
     def test_what_has_no_shape_of_a_code_is_refused_before_the_check(self):
-        for value in ("12345", "1234567", "abcdefghi", "abcd-efg", "12 34 5", "!#%&/(", "é" * 6, "a" * 31):
+        # Six digits only (block 8): a recovery code, six letters or anything else is no app code.
+        for value in (
+            "12345", "1234567", "abcdefghi", "abcd-efg", "12 34 5", "!#%&/(", "é" * 6, "a" * 31,
+            "abcd2345", "abcdef", "12345a", "١٢٣٤٥٦",
+        ):
             with self.subTest(value=value):
                 self.assertContains(self.post(value), SHAPE)
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
 
     def test_the_shapes_of_a_code_reach_the_check_and_a_wrong_one_counts(self):
-        for value in ("000001", "abcd-2345", "ABCD 2345", "12 34 56"):
+        for value in ("000001", "12 34 56", "123-456", "000 002"):
             with self.subTest(value=value):
                 self.assertContains(self.post(value), WRONG)
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 4)
@@ -285,34 +292,57 @@ class ShapeAndBudgetTests(TestCase):
 
 @tag("mariadb")
 class RecoveryCodeTests(TestCase):
+    """A recovery code is no proof in the confirmations of the profile (block 8): it is refused
+    and never used up. It counts at the login and in the way "phone lost" only."""
+
     def setUp(self):
         self.user, self.device, self.client = account_a("active.person@example.org")
         self.code = RECOVERY_CODES[0]
 
-    def test_a_recovery_code_is_the_proof_and_is_used_up_once(self):
+    def test_no_confirmation_accepts_a_recovery_code_and_none_uses_it_up(self):
+        before = totp.remaining_recovery_codes(self.user)
+        posts = {
+            "email": (EMAIL_URL, {"email": NEW, "secondary_email": ""}),
+            "password": (PASSWORD_URL, {"new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD}),
+            "delete": (DELETE_URL, {"confirm": "on"}),
+            "new codes": (CODES_URL, {}),
+            "turn off": (DISABLE_URL, {}),
+        }
+
+        for name, (url, data) in posts.items():
+            with self.subTest(form=name):
+                response = self.client.post(url, {**data, "otp_token": self.code}, REMOTE_ADDR="10.90.3.1")
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, SHAPE)
+
+        self.assertEqual(totp.remaining_recovery_codes(self.user), before)
+        self.assertFalse(PendingEmailChange.objects.filter(user=self.user).exists())
+        self.assertTrue(User.objects.get(pk=self.user.pk).check_password(PASSWORD))
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        # Nothing reached the check, so nothing was counted either.
+        self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
+
+    def test_the_verification_itself_refuses_a_recovery_code_when_it_is_told_to(self):
+        # Also if a recovery code got past the shape check, the check accepts the app only.
         before = totp.remaining_recovery_codes(self.user)
 
-        first = self.client.post(EMAIL_URL, {"email": NEW, "secondary_email": "", "otp_token": self.code}, REMOTE_ADDR="10.90.3.1")
-        second = self.client.post(EMAIL_URL, {"email": NEW, "secondary_email": "", "otp_token": self.code}, REMOTE_ADDR="10.90.3.1")
+        self.assertIsNone(totp.verify_code(self.user, self.code, recovery=False))
 
-        self.assertEqual(first.status_code, 302)
-        self.assertEqual(second.status_code, 200)
-        self.assertContains(second, WRONG)
-        self.assertEqual(totp.remaining_recovery_codes(self.user), before - 1)
+        self.assertEqual(totp.remaining_recovery_codes(self.user), before)
+        self.assertIsNotNone(totp.verify_code(self.user, self.code))
 
-    def test_a_failing_form_does_not_use_up_the_recovery_code(self):
+    def test_a_failing_form_does_not_use_up_the_app_code(self):
+        code = code_for(self.device)
         failing = self.client.post(
-            EMAIL_URL, {"email": "not an address", "secondary_email": "", "otp_token": self.code}, REMOTE_ADDR="10.90.3.2"
+            EMAIL_URL, {"email": "not an address", "secondary_email": "", "otp_token": code}, REMOTE_ADDR="10.90.3.2"
         )
-        before = totp.remaining_recovery_codes(self.user)
 
         right = self.client.post(
-            EMAIL_URL, {"email": NEW, "secondary_email": "", "otp_token": self.code}, REMOTE_ADDR="10.90.3.2"
+            EMAIL_URL, {"email": NEW, "secondary_email": "", "otp_token": code}, REMOTE_ADDR="10.90.3.2"
         )
 
         self.assertEqual(failing.status_code, 200)
         self.assertEqual(right.status_code, 302)
-        self.assertEqual(totp.remaining_recovery_codes(self.user), before - 1)
 
 
 @tag("mariadb")
@@ -347,20 +377,24 @@ class PasswordCardTests(TestCase):
                 user.refresh_from_db()
                 self.assertTrue(user.check_password(PASSWORD))
 
-    def test_the_new_password_may_not_be_the_stored_one_and_the_code_stays_valid(self):
-        user, _device, client = account_a("active.person@example.org")
-        code = RECOVERY_CODES[1]
+    def test_the_new_password_may_not_be_the_stored_one_after_a_valid_proof(self):
+        user, device, client = account_a("same.password.a@example.org")
+        code = code_for(device)
 
         same = client.post(
             PASSWORD_URL,
             {"otp_token": code, "new_password1": PASSWORD, "new_password2": PASSWORD},
             REMOTE_ADDR="10.90.4.2",
         )
-        right = self.post(client, otp_token=code)
+        again = self.post(client, otp_token=code)
 
         self.assertEqual(same.status_code, 200)
         self.assertContains(same, "Wählen Sie ein Passwort, das sich vom aktuellen unterscheidet.")
-        self.assertEqual(right.status_code, 302)
+        # The code of the first request was a valid proof and is used up (D-062, security review H-1).
+        self.assertEqual(again.status_code, 200)
+        self.assertContains(again, WRONG)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password(PASSWORD))
 
     def test_a_change_of_the_account_in_between_stops_the_change_with_the_code(self):
         user, device, client = account_a("pw.race.a@example.org")
@@ -448,14 +482,17 @@ class OtherConfirmationsTests(TestCase):
 
         self.assertFalse(User.objects.filter(pk=user.pk).exists())
 
-    def test_turning_off_the_second_factor_and_new_codes_with_the_code(self):
+    def test_new_codes_with_the_code(self):
         user, device, client = account_a("actions.a@example.org")
+
         codes = client.post(CODES_URL, {"otp_token": code_for(device)}, REMOTE_ADDR="10.90.5.3")
+
         self.assertEqual(len(codes_in(codes)), totp.RECOVERY_CODE_COUNT)
 
-        # The code of this period is used up; a recovery code (the new ones) turns it off.
-        new_code = codes_in(codes)[0]
-        off = client.post(DISABLE_URL, {"otp_token": new_code}, REMOTE_ADDR="10.90.5.3")
+    def test_turning_off_the_second_factor_with_the_code(self):
+        user, device, client = account_a("actions.a2@example.org")
+
+        off = client.post(DISABLE_URL, {"otp_token": code_for(device)}, REMOTE_ADDR="10.90.5.4")
 
         self.assertEqual(off.status_code, 302)
         self.assertFalse(second_factor.has_second_factor(user))
@@ -464,10 +501,11 @@ class OtherConfirmationsTests(TestCase):
 class TextsAndStyleTests(SimpleTestCase):
     def test_the_texts_are_german_without_the_sharp_s(self):
         expected = {
+            "code_label": "2FA-Authentifizierungscode",
             "code_lead": LEAD,
-            "code_hint": "Haben Sie die App nicht zur Hand? Geben Sie stattdessen einen Wiederherstellungscode ein, zum Beispiel abcd-efgh. Jeder Code gilt nur einmal.",
             "code_required_message": MISSING,
-            "code_shape_message": "Das ist kein Code. Geben Sie die 6 Ziffern aus Ihrer App oder einen Wiederherstellungscode wie abcd-efgh ein.",
+            "code_shape_message": SHAPE,
+            "code_wrong_message": "Der 2FA-Authentifizierungscode ist falsch oder abgelaufen. Warten Sie auf den nächsten Code in Ihrer App und versuchen Sie es erneut.",
         }
         with translation.override("de-ch"):
             for name, text in expected.items():

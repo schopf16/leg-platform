@@ -72,7 +72,7 @@ class CardLayoutTests(TestCase):
         self.assertIn('class="btn btn-danger-outline" data-gate="id_confirm">Konto endgültig löschen</button>', delete)
         self.assertNotIn("btn btn-danger\"", disable + delete)
 
-    def test_the_code_field_says_code_aus_der_app_and_has_a_placeholder(self):
+    def test_the_code_field_says_2fa_authentication_code_and_has_a_placeholder(self):
         user, _device = create_user_with_totp("coded.person@example.org")
         client = Client()
         client.force_login(user)
@@ -80,7 +80,7 @@ class CardLayoutTests(TestCase):
         for query in ("?edit=email", "?edit=password", "?edit=delete", "?edit=two_factor&step=disable"):
             html = client.get(f"{PROFILE_URL}{query}").content.decode()
             with self.subTest(query=query):
-                self.assertRegex(html, r'<label[^>]*for="id_otp_token"[^>]*>Code aus der App</label>')
+                self.assertRegex(html, r'<label[^>]*for="id_otp_token"[^>]*>2FA-Authentifizierungscode</label>')
                 self.assertRegex(html, r'<input[^>]*name="otp_token"[^>]*placeholder="000000"')
 
     def test_the_error_of_a_field_is_directly_under_it_before_the_hint(self):

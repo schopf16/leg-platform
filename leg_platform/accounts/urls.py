@@ -155,4 +155,9 @@ urlpatterns = [
         profile_views.TwoFactorDisableView.as_view(),
         name="two_factor_disable",
     ),
+    path(
+        "profile/two-factor/lost-phone/",
+        profile_views.TwoFactorLostPhoneView.as_view(),
+        name="two_factor_lost_phone",
+    ),
 ]

@@ -34,6 +34,7 @@ from leg_platform.accounts.forms import (
     AccountDeleteForm,
     ChangePasswordForm,
     EmailChangeForm,
+    LostPhoneForm,
     ProfileForm,
     ReauthenticationForm,
     SetupCodeForm,
@@ -65,7 +66,7 @@ CARD_ANCHORS = {
 }
 # The steps of the card of two-factor authentication that a person can open by address; the codes
 # are only ever the answer to a form (they are stored nowhere).
-TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable")
+TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "lost_phone")
 
 
 def card_url(card, step=None):
@@ -90,6 +91,8 @@ def two_factor_state(user, edit, step, session):
             return "codes_new"
         if step == "disable" and not second_factor.requires_second_factor(user):
             return "disable"
+        if step == "lost_phone" and not second_factor.requires_second_factor(user):
+            return "lost_phone"
         return "view"
     if step == "app" and totp.unconfirmed_totp_device(user, session.get(ENROLMENT_SESSION_KEY)):
         return "app"
@@ -160,6 +163,8 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
             )
         elif state in ("codes_new", "disable"):
             context["action_form"] = forms.get("action") or ReauthenticationForm(request=request)
+        elif state == "lost_phone":
+            context["action_form"] = forms.get("action") or LostPhoneForm(request=request)
     else:
         context["tf_state"] = "view"
     if context["second_factor_active"]:
@@ -534,6 +539,34 @@ class TwoFactorDisableView(ProfileCardView):
         except totp.SecondFactorError:
             return refused_change(request)
         # Other sessions ended with the removal; this session stays (D-044).
+        update_session_auth_hash(request, request.user)
+        messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
+        return back_to("two_factor")
+
+
+class TwoFactorLostPhoneView(TwoFactorDisableView):
+    """The way "phone lost" of turning off 2FA: the password and a recovery code (D-062).
+
+    The same rules as turning off: not for staff users and administrators, and only with a second
+    factor. The recovery code is used up by the check. Everything after the check is the same as
+    in ``TwoFactorDisableView``: the second factor is removed, the other sessions end, every
+    address is told, the event is logged.
+    """
+
+    def get(self, request):
+        return render_profile(request, edit="two_factor", step="lost_phone")
+
+    @sensitive_variables("form")
+    def post(self, request):
+        form = LostPhoneForm(request.POST, request=request)
+        if not form.is_valid():
+            return render_profile(
+                request, edit="two_factor", step="lost_phone", forms={"action": form}
+            )
+        try:
+            totp.disable(request.user, via_recovery_code=True)
+        except totp.SecondFactorError:
+            return refused_change(request)
         update_session_auth_hash(request, request.user)
         messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
         return back_to("two_factor")

@@ -44,7 +44,6 @@ from leg_platform.accounts.forms import (
     LoginForm,
     NewPasswordForm,
     PasswordResetRequestForm,
-    ReauthenticationForm,
     RegistrationDetailsForm,
     RegistrationForm,
     RegistrationPasswordForm,
@@ -775,15 +774,6 @@ class TwoFactorMixin(NeverCacheMixin, LoginRequiredMixin):
     @method_decorator(sensitive_post_parameters("current_password", "otp_token"))
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
-
-
-class ReauthenticationMixin(TwoFactorMixin):
-    """A form view whose form asks for the password and the second factor again."""
-
-    form_class = ReauthenticationForm
-
-    def get_form_kwargs(self):
-        return {**super().get_form_kwargs(), "request": self.request}
 
 
 class TwoFactorResetVerifyView(TokenPageMixin, View):

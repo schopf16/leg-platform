@@ -191,13 +191,14 @@ def begin_pending_login(request, user, next_url, stay=False):
     settle_client_ip_attempt(request, succeeded=True)
 
 
-def verify_second_factor(request, user, code):
+def verify_second_factor(request, user, code, *, app=True, recovery=True):
     """Check the code under the abuse protection; return the device that accepted it, or None.
 
     Every code attempt counts like a login attempt: it is refused while the account or the IP
     address is locked out, and a wrong code is a failed attempt of the account and the IP
     address (D-017). The Axes backend is used for the lockout check only, as
-    ``django.contrib.auth.authenticate()`` does with every backend.
+    ``django.contrib.auth.authenticate()`` does with every backend. ``app`` and ``recovery`` say
+    which kinds of code are accepted (``totp.verify_code``).
     """
     credentials = {"username": user.email}
     # One attempt at a time per account: the lockout check, the verification and the record of
@@ -216,7 +217,7 @@ def verify_second_factor(request, user, code):
             request.second_factor_paused = True
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
             return None
-        device = totp.verify_code(user, code)
+        device = totp.verify_code(user, code, app=app, recovery=recovery)
         if device is None:
             totp.record_failed_code(user)
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)

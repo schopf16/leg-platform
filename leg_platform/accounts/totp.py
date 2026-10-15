@@ -219,11 +219,13 @@ def renew_recovery_codes(user):
     return codes
 
 
-def disable(user):
+def disable(user, *, via_recovery_code=False):
     """Remove the second factor of the account; staff users and administrators keep theirs.
 
     The reset of the second factor of another account is a function of the system
-    administrators, with its own rules (docs/SECURITY.md, section 3).
+    administrators, with its own rules (docs/SECURITY.md, section 3). ``via_recovery_code`` is
+    the "phone lost" way (D-062): the log line says so; the used recovery code was logged by
+    ``verify_code`` in the same transaction as its use.
     """
     from leg_platform.accounts.second_factor import requires_second_factor
 
@@ -236,14 +238,20 @@ def disable(user):
         # Other sessions end; the view keeps the session that made the change (D-044).
         user.end_all_sessions()
         enqueue_for_account(MailJob.Kind.TWO_FACTOR_DISABLED, user)
-        security_log.record(Event.TWO_FACTOR_DISABLED, account=user)
+        security_log.record(
+            Event.TWO_FACTOR_DISABLED,
+            account=user,
+            detail="phone lost, recovery code" if via_recovery_code else "",
+        )
 
 
-def verify_code(user, raw_code):
+def verify_code(user, raw_code, *, app=True, recovery=True):
     """Verify a code of the authenticator app or a recovery code; return the device or None.
 
     The kind of code follows from its length: six digits for the app, eight characters for a
-    recovery code.
+    recovery code. ``app`` and ``recovery`` say which kinds this check accepts: the
+    confirmations of the profile accept the app only, the "phone lost" way only a recovery code
+    (D-062); the login accepts both.
 
     Precondition: the caller holds the row lock of the account, as
     ``second_factor.verify_second_factor()`` does. ``AuthenticatorDevice.verify_token()`` reads
@@ -259,9 +267,9 @@ def verify_code(user, raw_code):
             return None
         for device in devices_for_user(user, confirmed=True, for_verify=True):
             if isinstance(device, AuthenticatorDevice):
-                fits = code.isascii() and code.isdigit() and len(code) == device.DIGITS
+                fits = app and code.isascii() and code.isdigit() and len(code) == device.DIGITS
             else:
-                fits = len(code) == RECOVERY_CODE_LENGTH
+                fits = recovery and len(code) == RECOVERY_CODE_LENGTH
             if fits and device.verify_token(code):
                 if is_recovery_code_device(device):
                     # In the same transaction as the use of the code.

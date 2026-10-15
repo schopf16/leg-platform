@@ -2298,18 +2298,48 @@ msgstr "ausstehende E-Mail-Änderung"
 msgid "pending email changes"
 msgstr "ausstehende E-Mail-Änderungen"
 
-# One proof per confirmation (D-062).
-msgid "Enter the code from your app or a recovery code."
-msgstr "Geben Sie den Code aus Ihrer App oder einen Wiederherstellungscode ein."
+# One proof per confirmation (D-062, block 8).
+msgid "2FA authentication code"
+msgstr "2FA-Authentifizierungscode"
 
-msgid "That is not a code. Enter the 6 digits from your app or a recovery code such as abcd-efgh."
-msgstr "Das ist kein Code. Geben Sie die 6 Ziffern aus Ihrer App oder einen Wiederherstellungscode wie abcd-efgh ein."
+msgid "Enter the 2FA authentication code."
+msgstr "Geben Sie den 2FA-Authentifizierungscode ein."
 
-msgid "For this confirmation you need the 6-digit code from your app. Your password is not needed here."
-msgstr "Zur Bestätigung brauchen Sie den 6-stelligen Code aus Ihrer App. Ihr Passwort wird hier nicht benötigt."
+msgid "That is not a 2FA authentication code. It has 6 digits."
+msgstr "Das ist kein 2FA-Authentifizierungscode. Er besteht aus 6 Ziffern."
 
-msgid "Is the app not at hand? Enter a recovery code instead, for example abcd-efgh. Each code works only once."
-msgstr "Haben Sie die App nicht zur Hand? Geben Sie stattdessen einen Wiederherstellungscode ein, zum Beispiel abcd-efgh. Jeder Code gilt nur einmal."
+msgid "The 2FA authentication code is wrong or has expired. Wait for the next code in your app and try again."
+msgstr "Der 2FA-Authentifizierungscode ist falsch oder abgelaufen. Warten Sie auf den nächsten Code in Ihrer App und versuchen Sie es erneut."
+
+msgid "Enter the 6-digit code from your authenticator app. Your password is not needed here."
+msgstr "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein. Ihr Passwort wird hier nicht benötigt."
+
+msgid "Recovery code"
+msgstr "Wiederherstellungscode"
+
+msgid "One of your recovery codes, for example abcd-efgh. Each code works only once."
+msgstr "Einer Ihrer Wiederherstellungscodes, zum Beispiel abcd-efgh. Jeder Code gilt nur einmal."
+
+msgid "Enter a recovery code."
+msgstr "Geben Sie einen Wiederherstellungscode ein."
+
+msgid "That is not a recovery code. It has 8 letters and digits, for example abcd-efgh."
+msgstr "Das ist kein Wiederherstellungscode. Er besteht aus 8 Buchstaben und Ziffern, zum Beispiel abcd-efgh."
+
+msgid "The password or the recovery code is wrong. Check both and try again."
+msgstr "Das Passwort oder der Wiederherstellungscode ist falsch. Prüfen Sie beide Angaben und versuchen Sie es erneut."
+
+msgid "Phone lost?"
+msgstr "Handy verloren?"
+
+msgid "If you cannot use your authenticator app, you can turn off 2FA with your password and one of your recovery codes. Afterwards only your password protects the account. You can set up 2FA again at any time."
+msgstr "Wenn Sie Ihre Authenticator-App nicht nutzen können, schalten Sie 2FA mit Ihrem Passwort und einem Ihrer Wiederherstellungscodes aus. Danach schützt nur noch Ihr Passwort das Konto. Sie können 2FA jederzeit wieder einrichten."
+
+msgid "You have neither the app nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of 2FA, and you confirm it with a link that is sent to your email address."
+msgstr "Sie haben weder die App noch einen Wiederherstellungscode? Dann wenden Sie sich an den Betrieb des Portals. Ein Administrator kann das Entfernen von 2FA starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-Adresse gesendet wird."
+
+msgid "Back"
+msgstr "Zurück"
 
 msgid "Your account was changed in the meantime. Please try again."
 msgstr "Ihr Konto wurde inzwischen geändert. Bitte versuchen Sie es erneut."

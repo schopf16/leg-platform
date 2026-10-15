@@ -229,9 +229,7 @@ class RecentAuthenticationTests(TestCase):
                 response = client.post(reverse(f"accounts:{name}"), {}, REMOTE_ADDR="10.20.0.5")
 
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(
-                    response, "Geben Sie den Code aus Ihrer App oder einen Wiederherstellungscode ein."
-                )
+                self.assertContains(response, "Geben Sie den 2FA-Authentifizierungscode ein.")
                 self.assertNotContains(response, 'name="current_password"')
         self.assertTrue(AuthenticatorDevice.objects.get(user=user).confirmed)
 
