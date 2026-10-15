@@ -32,6 +32,26 @@ def permission_label(permission):
     return str(permission)
 
 
+def assignable_permissions_filter():
+    """The rights that a group may hold (design package, final spot check, 1): exactly the ones that
+    the help names. The portal settings, Microsoft Graph, the security log and the other pages of
+    the system stay with the system administrators; no right is offered for them."""
+    from django.db.models import Q
+
+    from leg_platform.accounts.models import EmailText, User
+
+    # Joined by the names of the model, not looked up: the form is built without a query.
+    condition = Q(pk__in=[])
+    for model in (User, EmailText):
+        codenames = [f"{action}_{model._meta.model_name}" for action in ("view", "change")]
+        condition |= Q(
+            content_type__app_label=model._meta.app_label,
+            content_type__model=model._meta.model_name,
+            codename__in=codenames,
+        )
+    return condition
+
+
 class PermissionLabelsMixin:
     """For a ModelAdmin: shows the rights of a many-to-many field with their readable names."""
 

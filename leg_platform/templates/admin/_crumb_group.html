@@ -1,0 +1,4 @@
+{% load i18n %}{% comment %}
+The second step of the breadcrumb: the group of the start page that the model belongs to ("Inhalte"),
+as on the dashboard; the name of the app where no group is known (design package, final spot check, 3).
+{% endcomment %}{% if portal_group %}<li><a href="{{ portal_group.url }}">{{ portal_group.name }}</a></li>{% else %}<li><a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a></li>{% endif %}

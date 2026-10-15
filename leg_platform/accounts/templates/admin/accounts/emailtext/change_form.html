@@ -1,6 +1,13 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
+{% block form_top %}
+{{ block.super }}
+{# One line about the two links of this page (design package, final spot check, 9). The change #}
+{# history names the acting accounts and is for system administrators only (D-039). #}
+<p class="help">{% translate "Earlier versions show the wording of earlier texts." %}{% if request.user.is_superuser %} {% translate "The change history shows who changed what and when." %}{% endif %}</p>
+{% endblock %}
+
 {% block submit_buttons_bottom %}
 {{ block.super }}
 {% if has_change_permission %}

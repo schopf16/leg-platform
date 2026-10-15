@@ -2,13 +2,33 @@
    The look of the administration stays that of Django; this file only sets widths and the small
    boxes of the portal's own pages. No inline style is used anywhere (Content Security Policy). */
 
-/* The subject of an email and the addresses of the portal settings use the width of the page. */
+/* The subject and the text of an email and the addresses of the portal settings use the width of
+   the page. */
 .field-subject input[type="text"],
+.field-body textarea,
 .field-privacy_url input,
 .field-imprint_url input {
   box-sizing: border-box;
   width: 100%;
   max-width: 60em;
+}
+
+/* Help texts are at least 14 px (Django's own size is 13 px). */
+.help,
+p.help,
+form p.help,
+div.help,
+form div.help,
+div.help li,
+form .aligned p.help,
+form .aligned div.help,
+form .aligned .help,
+form .aligned .helptext,
+fieldset .description,
+.module .description,
+.helptext,
+.portal-hint {
+  font-size: 0.875rem;
 }
 
 /* The box "First steps" and the help about the rights. */
@@ -34,16 +54,16 @@
   list-style: none;
 }
 
+/* A fixed column for the status, so that the links below each other start at the same place. */
 .portal-steps li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18em minmax(0, 1fr);
   align-items: baseline;
   gap: 12px;
   padding: 4px 0;
 }
 
 .portal-state {
-  flex: none;
-  min-width: 12em;
   font-weight: 600;
 }
 

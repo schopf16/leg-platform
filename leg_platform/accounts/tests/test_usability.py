@@ -597,7 +597,7 @@ class RecoveryCodeLoginTests(TestCase):
 
         response = send_code(client, "wrong-code", address="10.8.4.1")
 
-        self.assertContains(response, "Der Code ist falsch oder wurde bereits verwendet.")
+        self.assertContains(response, "Der Code ist falsch, abgelaufen oder wurde schon verwendet.")
         self.assertNotContains(response, "übrig")
         self.assertEqual(len(RECOVERY_CODES), 3)
 

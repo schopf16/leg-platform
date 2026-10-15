@@ -1,0 +1,38 @@
+# German texts of the JavaScript of the Django administration that the installed Django version
+# does not translate yet (the widget that chooses the rights of a group). Source texts are the
+# ones of Django. The character "sharp s" is never used (AGENTS.md, section 2).
+msgid ""
+msgstr ""
+"Project-Id-Version: LEG-Platform\n"
+"PO-Revision-Date: 2026-10-15 06:00+0200\n"
+"Last-Translator: LEG-Platform contributors\n"
+"Language-Team: Swiss German\n"
+"Language: de_CH\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, javascript-format
+msgid "Choose %s by selecting them and then select the \"Choose\" arrow button."
+msgstr "Markieren Sie die gewünschten Einträge (%s) und klicken Sie dann auf den Pfeil «Wählen»."
+
+#, javascript-format
+msgid "Remove %s by selecting them and then select the \"Remove\" arrow button."
+msgstr "Markieren Sie die Einträge (%s), die Sie entfernen möchten, und klicken Sie dann auf den Pfeil «Entfernen»."
+
+#, javascript-format
+msgid "Choose all %s"
+msgstr "Alle auswählen (%s)"
+
+#, javascript-format
+msgid "Choose selected %s"
+msgstr "Markierte auswählen (%s)"
+
+#, javascript-format
+msgid "Remove selected %s"
+msgstr "Markierte entfernen (%s)"
+
+#, javascript-format
+msgid "Remove all %s"
+msgstr "Alle entfernen (%s)"

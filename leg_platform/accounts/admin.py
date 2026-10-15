@@ -8,11 +8,11 @@ from django.contrib import admin, messages
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -33,7 +33,11 @@ from leg_platform.accounts import (
     security_log,
 )
 from leg_platform.accounts.forms import clean_postal_code, postal_code_field
-from leg_platform.accounts.permission_names import PermissionLabelsMixin, rights_help
+from leg_platform.accounts.permission_names import (
+    PermissionLabelsMixin,
+    assignable_permissions_filter,
+    rights_help,
+)
 from leg_platform.accounts.models import (
     AccountIntegrityError,
     CERTIFICATE_EXPIRED,
@@ -623,6 +627,20 @@ class RestrictedGroupAdmin(PermissionLabelsMixin, DjangoGroupAdmin):
     change_form_template = "admin/auth/group/change_form.html"
     change_list_template = "admin/auth/group/change_list.html"
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        field = form.base_fields.get("permissions")
+        if field is not None:
+            # Only the documented rights; a right that the group already holds stays in the
+            # list, so that saving never removes it silently.
+            condition = assignable_permissions_filter()
+            if obj is not None and obj.pk:
+                condition |= Q(group=obj)
+            field.queryset = (
+                Permission.objects.filter(condition).select_related("content_type").distinct()
+            )
+        return form
+
     def changelist_view(self, request, extra_context=None):
         return super().changelist_view(request, {"rights_help": rights_help(), **(extra_context or {})})
 
@@ -821,6 +839,9 @@ class EmailTextAdmin(admin.ModelAdmin):
     def log_change(self, request, obj, message):
         if self._is_test_action(request):
             return None
+        if request.POST.get("reset_to_default") and not (obj.subject or obj.body):
+            # The history says what happened in plain words (design package, final spot check, 7).
+            message = gettext("Default text restored.")
         return super().log_change(request, obj, message)
 
     def response_change(self, request, obj):
@@ -931,7 +952,11 @@ class EmailTextAdmin(admin.ModelAdmin):
             obj.save()
             self._record_version(request, obj, previous)
             # Not self.log_change(): that one logs nothing when a preview field was posted.
-            super().log_change(request, obj, gettext("Restored an earlier version."))
+            super().log_change(
+                request,
+                obj,
+                gettext("Restored an earlier version.") if version_id else gettext("Default text restored."),
+            )
         self.message_user(request, _("The version was restored."), messages.SUCCESS)
         return HttpResponseRedirect(versions_url)
 
@@ -1011,8 +1036,6 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
         "username",
         "path_info",
         "failures_since_start",
-        "user_agent",
-        "http_accept",
         "attempt_time",
     )
     search_fields = ("username", "path_info")
@@ -1023,6 +1046,7 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
 
         minutes = int(LOGIN_COOLOFF.total_seconds() // 60)
         return super().changelist_view(request, {"lockout_minutes": minutes, **(extra_context or {})})
+
     def has_module_permission(self, request):
         return request.user.is_superuser
 
@@ -1045,8 +1069,6 @@ class ReadOnlyAxesFailureAdmin(ReadOnlyAxesAdmin):
         "username",
         "path_info",
         "locked_out",
-        "user_agent",
-        "http_accept",
         "attempt_time",
     )
 
@@ -1365,11 +1387,16 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         return field
 
     def response_change(self, request, obj):
-        if any(name in request.POST for name in ("_continue", "_addanother", "_saveasnew")):
-            return super().response_change(request, obj)
-        self.message_user(
-            request, _("Saved. The addresses now appear in the footer."), messages.SUCCESS
-        )
+        # One message for every way of saving ("Save" and "Save and continue editing"), instead
+        # of the general sentence of Django (design package, final spot check, 6).
+        if obj.privacy_url or obj.imprint_url:
+            message = _("Saved. The addresses now appear in the footer.")
+        else:
+            message = _(
+                "The addresses were removed. The footer shows the privacy notice and the legal "
+                "notice without a link."
+            )
+        self.message_user(request, message, messages.SUCCESS)
         return HttpResponseRedirect(self._change_url())
 
     @staticmethod

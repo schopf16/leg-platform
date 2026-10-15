@@ -371,7 +371,35 @@ class CodeIsUsedUpLastTests(TestCase):
 
         # Not silent: the card is shown again with the message about the code.
         self.assertEqual(second.status_code, 200)
-        self.assertContains(second, "Der Code ist falsch oder wurde bereits verwendet.")
+        self.assertContains(second, "Der Code ist falsch, abgelaufen oder wurde schon verwendet.")
+        self.assertContains(second, "Warten Sie auf den nächsten")
+
+    def test_a_weak_new_password_keeps_the_recovery_code(self):
+        # The policy of the password (length, common passwords) runs before the code is checked.
+        for weak in ("short", "password1234"):
+            with self.subTest(password=weak):
+                response = self.client.post(
+                    PASSWORD_URL,
+                    {
+                        "current_password": PASSWORD,
+                        "otp_token": self.code,
+                        "new_password1": weak,
+                        "new_password2": weak,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(User.objects.get(pk=self.user.pk).check_password(PASSWORD))
+
+        right = self.client.post(
+            PASSWORD_URL,
+            {
+                "current_password": PASSWORD,
+                "otp_token": self.code,
+                "new_password1": OTHER_PASSWORD,
+                "new_password2": OTHER_PASSWORD,
+            },
+        )
+        self.assertEqual(right.status_code, 302)
 
     def test_a_wrong_password_never_reaches_the_code(self):
         response = self.client.post(

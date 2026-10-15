@@ -310,8 +310,8 @@ class WordsOfTheAdministrationTests(TestCase):
             reverse("admin:accounts_user_change", args=(self.other.pk,))
         ).content.decode()
 
-        self.assertIn('<a href="/admin/accounts/">Benutzer</a>', page)
-        self.assertNotIn('<a href="/admin/accounts/">Konten</a>', page)
+        self.assertIn('<li><a href="/admin/">Benutzer</a></li>', page)
+        self.assertNotIn('<a href="/admin/accounts/">', page)
         self.assertIn("Änderungsverlauf", page)
         self.assertNotIn("Geschichte", page)
 

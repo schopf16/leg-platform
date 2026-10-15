@@ -1000,9 +1000,6 @@ msgstr "Zurück zum Profil"
 msgid "Code"
 msgstr "Code"
 
-msgid "The code is incorrect or has already been used."
-msgstr "Der Code ist falsch oder wurde bereits verwendet."
-
 msgid "Current password"
 msgstr "Aktuelles Passwort"
 
@@ -2291,6 +2288,30 @@ msgstr "Wenn sich eine Person nicht anmelden kann, weil ein Administrator das Ko
 
 msgid "First steps"
 msgstr "Erste Schritte"
+
+msgid "certificate expired"
+msgstr "Zertifikat abgelaufen"
+
+msgid "pending email change"
+msgstr "ausstehende E-Mail-Änderung"
+
+msgid "pending email changes"
+msgstr "ausstehende E-Mail-Änderungen"
+
+msgid "Default text restored."
+msgstr "Standardtext wiederhergestellt."
+
+msgid "The addresses were removed. The footer shows the privacy notice and the legal notice without a link."
+msgstr "Die Adressen wurden entfernt. Die Fusszeile zeigt Datenschutz und Impressum ohne Link."
+
+msgid "Earlier versions show the wording of earlier texts."
+msgstr "Frühere Fassungen zeigen den Wortlaut früherer Texte."
+
+msgid "The change history shows who changed what and when."
+msgstr "Der Änderungsverlauf zeigt, wer wann was geändert hat."
+
+msgid "The name, the logo and the website address of the footer are set by the operator when the portal is installed."
+msgstr "Name, Logo und Website-Adresse der Fusszeile legt der Betrieb bei der Installation fest."
 
 # Terms of Django's administration that are replaced by the words of the portal (P2-7, P2-4, P2-8).
 msgid "View site"

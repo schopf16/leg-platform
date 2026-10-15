@@ -270,7 +270,7 @@ class SecondStepOfTheLoginTests(TestCase):
 
         page = self.client.post(CODE_URL, {"otp_token": "000000"}, REMOTE_ADDR="10.30.0.2")
 
-        self.assertContains(page, "Der Code ist falsch oder wurde bereits verwendet.")
+        self.assertContains(page, "Der Code ist falsch, abgelaufen oder wurde schon verwendet.")
 
     def test_the_right_code_logs_in_and_leads_to_the_start_page(self):
         user, device = create_user_with_totp("holder.person@example.org")

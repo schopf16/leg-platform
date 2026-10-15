@@ -4,6 +4,7 @@
 {% block breadcrumbs %}
 <ol class="breadcrumbs">
   <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  {% include "admin/_crumb_group.html" %}
   <li><a href="{{ change_url }}">{{ opts.verbose_name|capfirst }}</a></li>
   <li aria-current="page">{% translate "Send test email" %}</li>
 </ol>

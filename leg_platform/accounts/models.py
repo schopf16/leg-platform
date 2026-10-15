@@ -1246,6 +1246,10 @@ class PendingEmailChange(models.Model):
     expires_at = models.DateTimeField(db_index=True)
 
     class Meta:
+        # A name for the rights of this model in the lists of the administration (they are only
+        # shown there as "<name>: <action>").
+        verbose_name = _("pending email change")
+        verbose_name_plural = _("pending email changes")
         constraints = [
             models.UniqueConstraint(fields=("user", "kind"), name="accounts_pending_email_unique")
         ]

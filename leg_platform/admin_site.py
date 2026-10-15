@@ -36,12 +36,31 @@ INDEX_HINT = _("You maintain the texts of the emails and the addresses of the fo
 
 
 class PortalAdminSite(AdminSite):
+    def group_of(self, object_name):
+        """The group of the start page that a model belongs to: (key, name)."""
+        for key, name, object_names in ADMIN_GROUPS:
+            if object_name in object_names:
+                return key, name
+        return "system", dict((k, n) for k, n, _o in ADMIN_GROUPS)["system"]
+
     def each_context(self, request):
         context = super().each_context(request)
         # One name for the portal and its administration: the name of the instance (D-013).
         context["site_header"] = settings.INSTANCE_NAME
         context["site_title"] = settings.INSTANCE_NAME
+        # The pages of a model show the group of the start page in the breadcrumb ("Inhalte >
+        # Mailtexte"), not the name of the app (design package, final spot check, 3).
+        context["portal_group"] = self._group_of_request(request)
         return context
+
+    def _group_of_request(self, request):
+        match = getattr(request, "resolver_match", None)
+        url_name = getattr(match, "url_name", None) or ""
+        for model in self._registry:
+            if url_name.startswith(f"{model._meta.app_label}_{model._meta.model_name}_"):
+                _key, name = self.group_of(model._meta.object_name)
+                return {"name": name, "url": reverse("admin:index", current_app=self.name)}
+        return None
 
     def index(self, request, extra_context=None):
         # The hint names the group "Content": only an account that sees that group gets it. An
@@ -61,7 +80,12 @@ class PortalAdminSite(AdminSite):
         when the account may open its page. Each item: label, state (True, False or None for a
         plain fact), status text and the link.
         """
-        from leg_platform.accounts.models import EmailText, GraphConfiguration, PortalSettings
+        from leg_platform.accounts.models import (
+            CERTIFICATE_EXPIRED,
+            EmailText,
+            GraphConfiguration,
+            PortalSettings,
+        )
 
         def may_open(model):
             model_admin = self._registry.get(model)
@@ -93,12 +117,17 @@ class PortalAdminSite(AdminSite):
             )
         if may_open(GraphConfiguration):
             row = GraphConfiguration.objects.filter(pk=1).first()
-            ready = bool(row and row.is_configured)
+            expired = bool(row and row.certificate_pem and row.certificate_status() == CERTIFICATE_EXPIRED)
+            ready = bool(row and row.is_configured) and not expired
+            if expired:
+                status = _("certificate expired")
+            else:
+                status = _("ready") if ready else _("not ready")
             steps.append(
                 {
                     "label": _("Sending of emails (Microsoft Graph)"),
                     "ok": ready,
-                    "status": _("ready") if ready else _("not ready"),
+                    "status": status,
                     "url": reverse(
                         "admin:accounts_graphconfiguration_changelist", current_app=self.name
                     ),

@@ -510,7 +510,13 @@ class CodeForm(PortalFormMixin, forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "autofocus": True}),
         error_messages={"required": _("Enter the code.")},
     )
-    invalid_code_message = _("The code is incorrect or has already been used.")
+    # One text for every place that asks for a code, at the login and in the profile (design
+    # package, final spot check, 5): it says what to do. It does not tell whether the code was
+    # wrong, expired or used, so it reveals nothing about the account.
+    invalid_code_message = _(
+        "The code is wrong, expired or was already used. The app shows a new code every 30 "
+        "seconds: wait for the next one and try again."
+    )
 
 
 class SetupCodeForm(CodeForm):
@@ -520,11 +526,6 @@ class SetupCodeForm(CodeForm):
     numeric keyboard. Spaces and hyphens that a person copies along are still accepted by the
     check (``totp.normalize_code``), so the field has no ``maxlength`` of six.
     """
-
-    invalid_code_message = _(
-        "The code is wrong, expired or was already used. The app shows a new code every 30 "
-        "seconds: wait for the next one and try again."
-    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
