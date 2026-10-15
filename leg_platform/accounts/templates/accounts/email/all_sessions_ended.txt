@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+Several wrong codes or passwords were entered in the confirmations of your account at {{ instance_name }} within a short time. For your safety all sessions of your account were ended, on every device.
+
+If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with "Forgot password" on the login page.{% endblocktranslate %}
+
+{% if contact_url %}{% blocktranslate %}If you need help, contact the operator. You will find contact information here:
+
+{{ contact_url }}{% endblocktranslate %}{% else %}{% translate "If you need help, contact the operator of this portal." %}{% endif %}
+{% endautoescape %}

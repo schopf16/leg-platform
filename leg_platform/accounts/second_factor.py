@@ -10,14 +10,15 @@ and remembered in the session as a pending login; Django's ``login()`` is called
 second factor has been verified as well.
 """
 
+import secrets
 import time
 from datetime import timedelta
 from typing import NamedTuple
 
 from axes.backends import AxesStandaloneBackend
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.signals import user_logged_in, user_login_failed
+from django.contrib.auth import login, logout
+from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.dispatch import receiver
@@ -27,10 +28,17 @@ from django.utils.crypto import constant_time_compare
 from django.utils.translation import gettext, gettext_lazy
 
 from leg_platform.accounts import security_log, totp
-from leg_platform.accounts.digests import keyed_digest
+from leg_platform.accounts.backends import EmailModelBackend
+from leg_platform.accounts.digests import keyed_digests_with_fallbacks
 from leg_platform.accounts.login_protection import settle_client_ip_attempt
 from leg_platform.accounts.mail_queue import enqueue_for_account
-from leg_platform.accounts.models import MailJob, SecurityEvent, SessionCodeFailure, User
+from leg_platform.accounts.models import (
+    ConfirmationFailure,
+    MailJob,
+    SecurityEvent,
+    SessionCodeFailure,
+    User,
+)
 
 # The password step and the code step must follow each other closely; a longer pause starts
 # again at the login page. A proposal awaiting the project owner's confirmation (D-040).
@@ -49,17 +57,27 @@ LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
 RECENT_AUTHENTICATION_WINDOW = timedelta(minutes=5)
 AUTHENTICATED_AT_KEY = "authenticated_at"
 
-# The confirmations in the profile ask for the code of the app only (D-062). A wrong code is
-# counted for the session, not for the account; the session ends with this many wrong codes.
+# The confirmations in the profile ask for the code of the app, or for the password where there is
+# no second factor (D-062). A wrong entry there is counted for the session and for the account, and
+# never as a failed login (so it can neither burn the budget of the codes nor lock the login):
+# the session ends with this many wrong entries, all sessions of the account with
+# ``ACCOUNT_FAILURE_LIMIT`` in ``ACCOUNT_FAILURE_WINDOW``.
 SESSION_CODE_LIMIT = 5
+ACCOUNT_FAILURE_LIMIT = 15
+ACCOUNT_FAILURE_WINDOW = timedelta(hours=24)
 SESSION_CODE_FAILURE_PURPOSE = b"LEG-Platform session code failures v1"
-# Counts of sessions that ended without a success or a logout stay this long, then they are removed.
+# The count per session hangs on a random identifier that the server writes into the session once
+# and that stays when Django renews the key of the session (``cycle_key``): a session that renews
+# its key, for example by posting the login form, keeps its count (security review, block 10, M-1).
+SESSION_COUNTER_KEY = "confirmation_counter_id"
+# Counts of sessions that ended without a success or a logout are removed by the clean-up after
+# this time (``cleanup_confirmation_failures``).
 SESSION_CODE_FAILURE_RETENTION = timedelta(days=30)
 # The attribute of the request that says "end this session": set by the check, read by the view.
 SESSION_ENDED_ATTRIBUTE = "_session_ended_wrong_codes"
 SESSION_ENDED_MESSAGE = gettext_lazy(
-    "For your safety you were logged out: wrong codes were entered several times. Please log "
-    "in again."
+    "For your safety you were logged out: wrong codes or passwords were entered several times. "
+    "Please log in again."
 )
 
 # Views that an account without a completed second factor may use although it must have one:
@@ -110,6 +128,19 @@ def remember_authentication(sender, request, user, **kwargs):
     and the session cycling of Django do not write this value again.
     """
     request.session[AUTHENTICATED_AT_KEY] = time.time()
+    # The identifier of the count of wrong entries in the confirmations of this session; kept if
+    # the session already has one. A completed login proved the password and the code.
+    request.session.setdefault(SESSION_COUNTER_KEY, secrets.token_urlsafe(32))
+    forget_confirmation_failures(request, user)
+
+
+@receiver(user_logged_out)
+def forget_confirmation_failures_at_logout(sender, request, user, **kwargs):
+    """A normal logout ends the count of this session; the end by wrong entries keeps it (it
+    refuses a request of the session that was already running)."""
+    if request is None or user is None or getattr(request, SESSION_ENDED_ATTRIBUTE, False):
+        return
+    forget_confirmation_failures(request, user)
 
 
 def recently_authenticated(request, max_age=RECENT_AUTHENTICATION_WINDOW):
@@ -217,16 +248,16 @@ def verify_second_factor(request, user, code, *, app=True, recovery=True, per_se
     which kinds of code are accepted (``totp.verify_code``).
 
     ``per_session`` is for the confirmations in the profile (D-062): a wrong code is counted for
-    this session only, not against the budget of the account and not as a failed login, so that
-    whoever only holds a session cannot pause the login of the account. The limit ends the
-    session (``SESSION_CODE_LIMIT``); the request is marked and the view answers with the logout.
-    An existing pause or lockout still refuses the code.
+    this session and for the account's cap (``record_confirmation_failure``), not against the
+    budget of the account and not as a failed login, so that whoever only holds a session cannot
+    pause or lock the login of the account. The limit ends the session; the request is marked and
+    the view answers with the logout. An existing pause or lockout still refuses the code.
     """
     credentials = {"username": user.email}
     # One attempt at a time per account: the lockout check, the verification and the record of
     # a failure form one step, so that parallel requests cannot exceed the limit (D-040).
     with transaction.atomic():
-        User._base_manager.select_for_update().filter(pk=user.pk).first()
+        locked = User._base_manager.select_for_update().filter(pk=user.pk).first()
         try:
             AxesStandaloneBackend().authenticate(request, username=user.email)
         except PermissionDenied:
@@ -239,10 +270,7 @@ def verify_second_factor(request, user, code, *, app=True, recovery=True, per_se
             request.second_factor_paused = True
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
             return None
-        if per_session and session_code_limit_reached(request, user):
-            # The session was out of tries already (a parallel request used the last one):
-            # nothing is checked, nothing is counted.
-            setattr(request, SESSION_ENDED_ATTRIBUTE, True)
+        if per_session and confirmation_refused(request, user, locked):
             settle_client_ip_attempt(request, succeeded=True)
             return None
         device = totp.verify_code(user, code, app=app, recovery=recovery)
@@ -251,48 +279,152 @@ def verify_second_factor(request, user, code, *, app=True, recovery=True, per_se
                 totp.record_failed_code(user)
                 user_login_failed.send(sender=__name__, credentials=credentials, request=request)
                 return None
-            # Not a failed login and not a failure of the account: only this session counts.
-            record_session_code_failure(request, user)
+            # Not a failed login and not a failure of the budget: the session and the cap count.
+            record_confirmation_failure(request, user)
             settle_client_ip_attempt(request, succeeded=True)
             return None
         if per_session:
-            reset_session_code_failures(request, user)
+            reset_confirmation_failures(request, user)
     settle_client_ip_attempt(request, succeeded=True)
     return device
 
 
-def _session_digest(request):
-    """The keyed digest of the key of this session, or None if the session has no key."""
-    key = request.session.session_key
-    return keyed_digest(key, SESSION_CODE_FAILURE_PURPOSE) if key else None
+def verify_password(request, user, password, *, reset_on_success=True):
+    """Check the password of the logged-in account in a confirmation of the profile.
+
+    A wrong password is counted for the session and for the account's cap
+    (``record_confirmation_failure``), **not** as a failed login: it does not reach Axes or the IP
+    counter, so whoever only holds a session cannot lock the login of the account (security
+    review, block 10, M-2). A lockout that the failed logins caused still refuses the check. The
+    login itself does not use this function and stays under Axes (D-017). The account row is
+    locked while the password is verified and a failure is recorded, so that parallel requests
+    cannot exceed the limit (D-040). ``reset_on_success=False`` is for a form where the password is
+    not the last proof (a second proof follows and decides the reset).
+    """
+    credentials = {"username": user.email}
+    with transaction.atomic():
+        locked = User._base_manager.select_for_update().filter(pk=user.pk).first()
+        try:
+            AxesStandaloneBackend().authenticate(request, username=user.email)
+        except PermissionDenied:
+            user_login_failed.send(sender=__name__, credentials=credentials, request=request)
+            return False
+        if confirmation_refused(request, user, locked):
+            settle_client_ip_attempt(request, succeeded=True)
+            return False
+        checked = EmailModelBackend().authenticate(
+            request, username=user.email, password=password
+        )
+        succeeded = checked is not None and checked.pk == user.pk
+        if not succeeded:
+            record_confirmation_failure(request, user)
+        elif reset_on_success:
+            reset_confirmation_failures(request, user)
+    settle_client_ip_attempt(request, succeeded=True)
+    return succeeded
 
 
-def session_code_limit_reached(request, user):
-    """Whether this session used up its wrong codes; call it under the lock of the account."""
-    digest = _session_digest(request)
-    if digest is None:
-        return True
-    return SessionCodeFailure.objects.filter(
-        account=user, session_digest=digest, failures__gte=SESSION_CODE_LIMIT
-    ).exists()
+def _counter_identifier(request):
+    """The identifier that the count of this session hangs on, or None.
+
+    Chosen by the server, written into the session once (at the login, or here at the first use
+    with the current key of the session, which is the same for parallel requests) and kept when
+    Django renews the key of the session. The browser cannot choose it: the session data is on
+    the server.
+    """
+    session = getattr(request, "session", None)
+    if session is None:
+        # No session: nothing to count on, the confirmation is refused (fail closed).
+        return None
+    identifier = session.get(SESSION_COUNTER_KEY)
+    if isinstance(identifier, str) and identifier:
+        return identifier
+    key = session.session_key
+    if key:
+        session[SESSION_COUNTER_KEY] = key
+    return key or None
 
 
-def record_session_code_failure(request, user):
-    """Count a wrong code of the confirmations for this session; at the limit, mark the request
-    so that the session ends, and write the event and the notice once. Call it under the lock of
-    the account, in the transaction of the check."""
-    digest = _session_digest(request)
+def _session_digests(request):
+    """The keyed digests of the identifier under the current key and the fallback keys of
+    ``SECRET_KEY_FALLBACKS`` (current first), or an empty list."""
+    identifier = _counter_identifier(request)
+    if identifier is None:
+        return []
+    return keyed_digests_with_fallbacks(identifier, SESSION_CODE_FAILURE_PURPOSE)
+
+
+def _counter_row(request, user):
+    """The row of this session and its current digest (None, None without an identifier).
+
+    A row found under the digest of a fallback key is moved to the current key. Call it under the
+    lock of the account.
+    """
+    digests = _session_digests(request)
+    if not digests:
+        return None, None
+    rows = list(SessionCodeFailure.objects.filter(account=user, session_digest__in=digests))
+    if not rows:
+        return None, digests[0]
+    row = max(rows, key=lambda candidate: candidate.failures)
+    for other in rows:
+        if other.pk != row.pk:
+            other.delete()
+    if row.session_digest != digests[0]:
+        row.session_digest = digests[0]
+        row.save(update_fields=["session_digest"])
+    return row, digests[0]
+
+
+def confirmation_refused(request, user, locked):
+    """Whether a confirmation is refused unseen, and the session ends: it is out of tries (a
+    parallel request used the last one) or it is no longer valid (the sessions of the account
+    ended or the password changed after this request started, so a flood of requests that were
+    already running cannot go on). Call it under the lock of the account (``locked``)."""
+    refused = (
+        locked is None
+        or not constant_time_compare(locked.get_session_auth_hash(), user.get_session_auth_hash())
+    )
+    if not refused:
+        row, digest = _counter_row(request, user)
+        refused = digest is None or (row is not None and row.failures >= SESSION_CODE_LIMIT)
+    if refused:
+        setattr(request, SESSION_ENDED_ATTRIBUTE, True)
+    return refused
+
+
+def record_confirmation_failure(request, user):
+    """Count a wrong code or password of a confirmation, for the session and for the account.
+
+    At ``SESSION_CODE_LIMIT`` wrong entries this session ends (one event and one notice); at
+    ``ACCOUNT_FAILURE_LIMIT`` in ``ACCOUNT_FAILURE_WINDOW`` over all sessions, all sessions of the
+    account end (one event and one notice) and the count starts again. Neither pauses the login.
+    The request is marked so that the view logs this session out. Call it under the lock of the
+    account, in the transaction of the check.
+    """
+    row, digest = _counter_row(request, user)
     if digest is None:
         setattr(request, SESSION_ENDED_ATTRIBUTE, True)
         return
     now = timezone.now()
-    # Rows of sessions that no longer exist would stay; they are removed with the account or here.
-    SessionCodeFailure.objects.filter(updated_at__lt=now - SESSION_CODE_FAILURE_RETENTION).delete()
-    row, _created = SessionCodeFailure.objects.get_or_create(account=user, session_digest=digest)
+    if row is None:
+        row = SessionCodeFailure(account=user, session_digest=digest)
     row.failures += 1
     row.updated_at = now
-    row.save(update_fields=["failures", "updated_at"])
-    if row.failures >= SESSION_CODE_LIMIT:
+    row.save()
+    ConfirmationFailure.objects.filter(
+        account=user, occurred_at__lt=now - ACCOUNT_FAILURE_WINDOW
+    ).delete()
+    ConfirmationFailure.objects.create(account=user, occurred_at=now)
+    if ConfirmationFailure.objects.filter(account=user).count() >= ACCOUNT_FAILURE_LIMIT:
+        ConfirmationFailure.objects.filter(account=user).delete()
+        # Every session ends, also the ones that are running a request (they find the session
+        # hash changed, ``confirmation_refused``). The login is not paused.
+        user.end_all_sessions()
+        security_log.record(SecurityEvent.Event.ALL_SESSIONS_ENDED, account=user)
+        enqueue_for_account(MailJob.Kind.ALL_SESSIONS_ENDED, user)
+        setattr(request, SESSION_ENDED_ATTRIBUTE, True)
+    elif row.failures >= SESSION_CODE_LIMIT:
         setattr(request, SESSION_ENDED_ATTRIBUTE, True)
         # Exactly once: later requests of this session are refused before they are counted.
         if row.failures == SESSION_CODE_LIMIT:
@@ -300,32 +432,22 @@ def record_session_code_failure(request, user):
             enqueue_for_account(MailJob.Kind.SESSION_ENDED_WRONG_CODES, user)
 
 
-def reset_session_code_failures(request, user):
-    """A correct code: the count of this session starts again."""
-    digest = _session_digest(request)
-    if digest is not None:
-        SessionCodeFailure.objects.filter(account=user, session_digest=digest).delete()
+def reset_confirmation_failures(request, user):
+    """A correct proof: the count of this session starts again (the cap of the account does not)."""
+    forget_confirmation_failures(request, user)
+
+
+def forget_confirmation_failures(request, user):
+    """Delete the count of this session (all digests that it can have)."""
+    digests = _session_digests(request)
+    if digests:
+        SessionCodeFailure.objects.filter(account=user, session_digest__in=digests).delete()
 
 
 def end_session_for_wrong_codes(request):
     """End this session only (the others stay) and tell the person at the next page of the login."""
     logout(request)
     messages.warning(request, SESSION_ENDED_MESSAGE)
-
-
-def verify_password(request, user, password):
-    """Check the password of the logged-in account under the abuse protection (D-017).
-
-    The account row is locked while the lockout is checked, the password is verified and a
-    failure is recorded, so that parallel requests cannot exceed the limit (D-040).
-    """
-    with transaction.atomic():
-        User._base_manager.select_for_update().filter(pk=user.pk).first()
-        checked = authenticate(request, username=user.email, password=password)
-    succeeded = checked is not None and checked.pk == user.pk
-    # A failure was already settled by the failed-login signal.
-    settle_client_ip_attempt(request, succeeded=succeeded)
-    return succeeded
 
 
 def complete_login(request, user, device, stay=False):

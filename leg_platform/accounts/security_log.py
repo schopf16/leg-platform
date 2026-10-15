@@ -49,6 +49,7 @@ MESSAGES = {
     Event.SECONDARY_EMAIL_CHANGED: "The second email address was changed",
     Event.REGISTRATION_COMPLETED: "A registration was completed",
     Event.SESSION_ENDED_WRONG_CODES: "A session was ended after wrong codes in a confirmation",
+    Event.ALL_SESSIONS_ENDED: "All sessions of an account were ended after wrong entries in confirmations",
     Event.TWO_FACTOR_REMOVED_PHONE_LOST: (
         "Two-factor authentication was removed with a recovery code (phone lost)"
     ),

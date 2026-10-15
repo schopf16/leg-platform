@@ -130,7 +130,7 @@ python manage.py migrate
 
 **D9. Start the mail worker as a supervised service.** Run `python manage.py process_mail_queue --loop`. Restart it after a failure. Without it, no email is sent. The supervisor tool is open.
 
-**D10. Schedule the cleanup tasks.** Run `python manage.py run_scheduled_tasks` regularly. The planned interval is every 15 minutes (`docs/INSTALLATION.md`). The scheduler is open (D-008). The command bundles these cleanups: expired registrations, mail requests, login IP attempts, the security log and sessions.
+**D10. Schedule the cleanup tasks.** Run `python manage.py run_scheduled_tasks` regularly. The planned interval is every 15 minutes (`docs/INSTALLATION.md`). The scheduler is open (D-008). The command bundles these cleanups: expired registrations, mail requests, login IP attempts, the security log, the counts of wrong entries in the confirmations and sessions.
 
 **D11. Set the email mode for stage.** On stage, `EMAIL_MODE` is `allowlist`. Only the addresses in `EMAIL_ALLOWED_RECIPIENTS` receive email. The Microsoft Graph sender steps are in `docs/INSTALLATION.md`. **NOT YET VERIFIED** on a server.
 
@@ -225,7 +225,7 @@ The start page of the administration ("Verwaltung") has the box "Erste Schritte"
 | What | Who changes it | Where |
 | --- | --- | --- |
 | Address of the privacy notice, address of the legal notice (footer, registration, deleting the account) | System administrator | Administration, group "Inhalte", "Portal-Einstellungen" (https only; empty means the text without a link) |
-| Texts of the emails (subject and text of each of the 19 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
+| Texts of the emails (subject and text of each of the 20 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
 | Microsoft Graph (sender, certificate), security log, blocked logins, groups | System administrator only | Administration, group "System" and "Benutzer" |
 | Name of the instance, website, logos, colours, base URL, email mode | Operator, with environment variables and the instance static directory | `docs/INSTALLATION.md`, `docs/DESIGN.md` section 3.2 |
 | **Texts of the login and registration pages** (title, lead sentence, the benefit points, the labels) | **Operator only, through the translation files** (`locale/<language>/LC_MESSAGES/django.po`, compiled with `msgfmt`, then deploy). They are not editable in the administration. | Source texts in the templates under `leg_platform/templates` and `leg_platform/accounts/templates` |

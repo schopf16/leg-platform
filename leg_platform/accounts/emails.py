@@ -193,6 +193,11 @@ def send_session_ended_wrong_codes(address):
     _send(address, Key.SESSION_ENDED_WRONG_CODES, {})
 
 
+def send_all_sessions_ended(address):
+    """Tell every address that all sessions were ended after wrong entries; contains no link."""
+    _send(address, Key.ALL_SESSIONS_ENDED, {})
+
+
 def send_two_factor_enabled(address):
     """Tell the owner that two-factor authentication was set up; contains no link."""
     _send(address, Key.TWO_FACTOR_ENABLED, {})

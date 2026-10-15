@@ -758,7 +758,11 @@ class LostPhoneForm(PortalFormMixin, forms.Form):
         if not second_factor.has_second_factor(self.user):
             self.add_error(None, self.changed_message)
             return cleaned_data
-        if not second_factor.verify_password(self.request, self.user, cleaned_data["current_password"]):
+        # The password is not the last proof here: a right password must not start the count of
+        # the session again, or the recovery code could be guessed without a limit.
+        if not second_factor.verify_password(
+            self.request, self.user, cleaned_data["current_password"], reset_on_success=False
+        ):
             self.add_error(None, self.wrong_message)
             return cleaned_data
         if (

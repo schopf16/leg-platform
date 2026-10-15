@@ -65,7 +65,9 @@ FORMS = {
 
 
 def digest_of(client):
-    return keyed_digest(client.session.session_key, second_factor.SESSION_CODE_FAILURE_PURPOSE)
+    """The digest under which the count of the session of the client is kept."""
+    identifier = client.session[second_factor.SESSION_COUNTER_KEY]
+    return keyed_digest(identifier, second_factor.SESSION_CODE_FAILURE_PURPOSE)
 
 
 class Base(TestCase):
@@ -87,8 +89,11 @@ class TheSessionEndsTests(Base):
     def test_five_wrong_codes_end_the_session_in_every_confirmation(self):
         for name, (path, data) in FORMS.items():
             with self.subTest(form=name):
+                # An account of its own for each form: the cap of the account (15 over all
+                # sessions) is not the subject here.
+                user, _device = create_user_with_totp(f"{name}.session.limit@example.org")
                 client = Client()
-                client.force_login(self.user)
+                client.force_login(user)
                 for _attempt in range(LIMIT - 1):
                     self.assertEqual(self.wrong(name, client).status_code, 200)
 
@@ -146,10 +151,12 @@ class TheSessionEndsTests(Base):
 @tag("mariadb")
 class TheAccountIsNotAffectedTests(Base):
     def test_the_budget_of_the_account_and_the_abuse_protection_stay_untouched(self):
+        # Twelve real wrong codes in three sessions (under the limit of a session and under the cap
+        # of the account): the budget of the account, which also pauses the login, is untouched.
         for _session in range(3):
             client = Client()
             client.force_login(self.user)
-            for number in range(LIMIT):
+            for number in range(LIMIT - 1):
                 self.wrong("disable", client, f"{number + 100:06d}")
 
         self.assertEqual(self.budget(), 0)
@@ -227,15 +234,55 @@ class ThePerSessionCounterTests(Base):
         self.assertFalse(SessionCodeFailure.objects.exists())
         self.assertEqual(self.client.get(PROFILE).status_code, 200)
 
-    def test_a_wrong_password_in_state_b_is_no_wrong_code(self):
+    def test_a_wrong_password_in_state_b_counts_for_the_session_like_a_wrong_code(self):
         user = create_active_user("state.b.limit@example.org")
         client = Client()
         client.force_login(user)
 
-        for _attempt in range(LOGIN_FAILURE_LIMIT - 1):
-            client.post(DELETE_URL, {"current_password": "a wrong password for the test", "confirm": "on"})
+        for attempt in range(LOGIN_FAILURE_LIMIT - 1):
+            response = client.post(
+                DELETE_URL,
+                {"current_password": "a wrong password for the test", "confirm": "on"},
+                REMOTE_ADDR="10.93.3.5",
+            )
+            self.assertEqual(response.status_code, 200)
 
-        self.assertFalse(SessionCodeFailure.objects.exists())
+        self.assertEqual(SessionCodeFailure.objects.get(account=user).failures, LIMIT - 1)
+        # Not a failed login: neither Axes nor the IP counter know about it (block 10, M-2).
+        self.assertEqual(AccessAttempt.objects.count(), 0)
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
+        # The fifth ends the session.
+        last = client.post(
+            DELETE_URL,
+            {"current_password": "a wrong password for the test", "confirm": "on"},
+            REMOTE_ADDR="10.93.3.5",
+        )
+        self.assertRedirects(last, LOGIN, fetch_redirect_response=False)
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+        # The owner logs in at once.
+        stepper = Client()
+        response = log_in(stepper, user.email, address="10.93.3.6")
+        self.assertRedirects(response, reverse("home"))
+
+    def test_a_right_password_in_state_b_starts_the_count_again(self):
+        user = create_active_user("state.b.reset@example.org")
+        client = Client()
+        client.force_login(user)
+        for _attempt in range(LIMIT - 1):
+            client.post(
+                PASSWORD_URL,
+                {"current_password": "a wrong password for the test", "new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD},
+                REMOTE_ADDR="10.93.3.7",
+            )
+
+        done = client.post(
+            PASSWORD_URL,
+            {"current_password": PASSWORD, "new_password1": OTHER_PASSWORD, "new_password2": OTHER_PASSWORD},
+            REMOTE_ADDR="10.93.3.7",
+        )
+
+        self.assertEqual(done.status_code, 302)
+        self.assertFalse(SessionCodeFailure.objects.filter(account=user).exists())
 
     def test_the_count_is_not_in_the_session_and_cannot_be_set_by_the_browser(self):
         for _attempt in range(3):
@@ -259,16 +306,43 @@ class ThePerSessionCounterTests(Base):
         self.assertEqual(SessionCodeFailure.objects.get().failures, 4)
         self.assertRedirects(self.wrong("email"), LOGIN, fetch_redirect_response=False)
 
-    def test_the_rows_of_old_sessions_are_removed(self):
+    def test_the_cleanup_removes_the_old_rows_and_keeps_the_current_ones(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from leg_platform.accounts.models import ConfirmationFailure
+
         old = SessionCodeFailure.objects.create(
             account=self.user, session_digest="x" * 64, failures=2,
             updated_at=timezone.now() - second_factor.SESSION_CODE_FAILURE_RETENTION * 2,
         )
-
+        old_entry = ConfirmationFailure.objects.create(
+            account=self.user, occurred_at=timezone.now() - second_factor.ACCOUNT_FAILURE_WINDOW * 2
+        )
         self.wrong()
 
+        call_command("cleanup_confirmation_failures", stdout=StringIO())
+
         self.assertFalse(SessionCodeFailure.objects.filter(pk=old.pk).exists())
+        self.assertFalse(ConfirmationFailure.objects.filter(pk=old_entry.pk).exists())
         self.assertEqual(SessionCodeFailure.objects.count(), 1)
+        self.assertEqual(ConfirmationFailure.objects.count(), 1)
+
+    def test_a_normal_logout_deletes_the_count_and_the_end_by_wrong_codes_keeps_it(self):
+        for _attempt in range(3):
+            self.wrong()
+        self.assertEqual(SessionCodeFailure.objects.count(), 1)
+
+        self.client.post(reverse("accounts:logout"))
+
+        self.assertFalse(SessionCodeFailure.objects.exists())
+        other = Client()
+        other.force_login(self.user)
+        for _attempt in range(LIMIT):
+            self.wrong("disable", other)
+        # The row of the ended session stays: it refuses a request that was already running.
+        self.assertEqual(SessionCodeFailure.objects.get().failures, LIMIT)
 
     def test_the_rows_go_with_the_account(self):
         self.wrong()

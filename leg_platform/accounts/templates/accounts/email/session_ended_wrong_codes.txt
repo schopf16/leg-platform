@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-Unusual entries were made in a session of your account at {{ instance_name }}: several wrong codes were entered where a code from your authenticator app is asked. For your safety the session was ended.
+Unusual entries were made in a session of your account at {{ instance_name }}: several wrong codes or passwords were entered where a confirmation asks for them. For your safety the session was ended.
 
 If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with "Forgot password" on the login page.{% endblocktranslate %}
 

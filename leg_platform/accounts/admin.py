@@ -96,7 +96,7 @@ EMAIL_TEXT_PROCESSES = (
             _Key.TWO_FACTOR_RESET,
         ),
     ),
-    (_("Account"), (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES)),
+    (_("Account"), (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES, _Key.ALL_SESSIONS_ENDED)),
 )
 
 # Plain, instance-neutral titles instead of Django's defaults, which name Django (D-036). The

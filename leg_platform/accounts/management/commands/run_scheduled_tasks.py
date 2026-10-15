@@ -15,6 +15,7 @@ TASKS = (
     "cleanup_mail_requests",
     "cleanup_login_ip_attempts",
     "cleanup_security_log",
+    "cleanup_confirmation_failures",
     # Django's own command: removes the expired sessions of the database session store.
     "clearsessions",
 )

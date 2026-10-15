@@ -1177,6 +1177,24 @@ class SessionCodeFailure(models.Model):
         indexes = [models.Index(fields=("updated_at",), name="accounts_scf_updated")]
 
 
+class ConfirmationFailure(models.Model):
+    """One wrong code or password in a confirmation of the profile, for the cap of the account.
+
+    The count per session (``SessionCodeFailure``) ends one session; this one counts across all
+    sessions of the account and ends all of them (D-062, block 10). It never pauses the login. A
+    row holds only the account and the time, and is removed by the cap, by the clean-up and with
+    the account.
+    """
+
+    account = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="confirmation_failures", editable=False
+    )
+    occurred_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        indexes = [models.Index(fields=("account", "occurred_at"), name="accounts_cf_account_time")]
+
+
 # 256 bits from the operating system's random generator (Python "secrets"); the URL-safe text
 # has 43 characters.
 VERIFICATION_TOKEN_BYTES = 32
@@ -1344,6 +1362,7 @@ class MailJob(models.Model):
         SECONDARY_EMAIL_CHANGED = "secondary_email_changed", "Second email address changed"
         # D-062, block 9: the session of a confirmation was ended after wrong codes.
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", "Session ended after wrong codes"
+        ALL_SESSIONS_ENDED = "all_sessions_ended", "All sessions ended after wrong entries"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1352,6 +1371,7 @@ class MailJob(models.Model):
         Kind.EMAIL_CHANGED,
         Kind.SECONDARY_EMAIL_CHANGED,
         Kind.SESSION_ENDED_WRONG_CODES,
+        Kind.ALL_SESSIONS_ENDED,
         Kind.TWO_FACTOR_ENABLED,
         Kind.TWO_FACTOR_DISABLED,
         Kind.RECOVERY_CODES_RENEWED,
@@ -1446,6 +1466,9 @@ class EmailText(models.Model):
         ACCOUNT_DELETED = "account_deleted", _("Notification: account deleted")
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", _(
             "Notification: session ended after wrong codes"
+        )
+        ALL_SESSIONS_ENDED = "all_sessions_ended", _(
+            "Notification: all sessions ended after wrong entries"
         )
 
     key = models.CharField(
@@ -2003,6 +2026,7 @@ class SecurityEvent(models.Model):
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", _(
             "Session ended after wrong codes"
         )
+        ALL_SESSIONS_ENDED = "all_sessions_ended", _("All sessions ended after wrong entries")
         TWO_FACTOR_REMOVED_PHONE_LOST = "two_factor_removed_phone_lost", _(
             "Two-factor authentication removed with a recovery code (phone lost)"
         )

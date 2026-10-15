@@ -34,12 +34,14 @@ from leg_platform.accounts import encryption, second_factor, totp
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
+    ConfirmationFailure,
     LoginIpAttempt,
     LoginIpBucket,
     MailJob,
     RateLimitEvent,
     RecoveryCode,
     RecoveryCodeDevice,
+    SecurityEvent,
     SessionCodeFailure,
     User,
     VerificationToken,
@@ -592,13 +594,17 @@ class EnrolmentTests(TestCase):
         with self.assertRaises(totp.SecondFactorError):
             totp.start_enrolment(self.user)
 
-    def test_the_setup_password_check_is_under_the_abuse_protection(self):
-        for _attempt in range(LOGIN_FAILURE_LIMIT):
+    def test_the_setup_password_check_ends_the_session_after_five_wrong_passwords(self):
+        # A wrong password in a confirmation counts for the session, not as a failed login (D-062,
+        # block 10): the fifth ends the session, and Axes and the IP counter stay untouched.
+        for _attempt in range(second_factor.SESSION_CODE_LIMIT):
             response = self.start("wrong password for this account")
 
-        self.assertEqual(response.status_code, 429)
-        self.assertEqual(self.start().status_code, 429)
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        self.assertEqual(self.start().status_code, 302)
         self.assertFalse(AuthenticatorDevice.objects.exists())
+        self.assertFalse(AccessAttempt.objects.exists())
+        self.assertFalse(LoginIpAttempt.objects.exists())
 
     def test_the_pages_need_a_login(self):
         anonymous = Client()
@@ -766,28 +772,30 @@ class RecoveryCodesAndRemovalTests(TestCase):
                     fetch_redirect_response=False,
                 )
 
-    def test_the_password_check_of_the_forms_is_under_the_abuse_protection(self):
-        # An account without a second factor gives the password (D-062); guessing it is stopped.
+    def test_the_password_check_of_the_forms_ends_the_session_after_five_wrong_passwords(self):
+        # An account without a second factor gives the password (D-062); a wrong one counts for the
+        # session, not as a failed login (block 10): guessing is limited to five tries per session.
         plain = create_active_user("plain.guess@example.org")
         client = Client()
         client.force_login(plain)
-        for _attempt in range(LOGIN_FAILURE_LIMIT):
+        for _attempt in range(second_factor.SESSION_CODE_LIMIT):
             response = client.post(
                 reverse("accounts:account_delete"),
                 {"current_password": "wrong password for this account", "confirm": "on"},
                 REMOTE_ADDR="10.3.0.3",
             )
 
-        self.assertEqual(response.status_code, 429)
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
         self.assertEqual(
             client.post(
                 reverse("accounts:account_delete"),
                 {"current_password": PASSWORD, "confirm": "on"},
                 REMOTE_ADDR="10.3.0.3",
             ).status_code,
-            429,
+            302,
         )
         self.assertTrue(User.objects.filter(pk=plain.pk).exists())
+        self.assertFalse(AccessAttempt.objects.exists())
 
     def test_the_code_check_of_the_forms_still_refuses_during_a_lockout(self):
         # The lockout of the login (failed logins of the account) refuses the check of a code in
@@ -1006,21 +1014,36 @@ class PasswordChangeTests(TestCase):
             reverse("home"),
         )
 
-    def test_the_current_password_check_is_under_the_abuse_protection(self):
-        for _attempt in range(LOGIN_FAILURE_LIMIT):
+    def test_the_current_password_check_ends_the_session_after_five_wrong_passwords(self):
+        for _attempt in range(second_factor.SESSION_CODE_LIMIT):
             response = self.post(current_password="wrong password for this account")
 
-        self.assertEqual(response.status_code, 429)
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        self.assertEqual(self.post().status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(PASSWORD))
+        self.assertFalse(AccessAttempt.objects.exists())
+
+    def test_the_current_password_check_still_refuses_during_a_lockout(self):
+        # The failed logins of the account lock it (Axes); that lockout refuses the check, even
+        # with the right password.
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            log_in(Client(), self.user.email, "wrong password for this account", address="10.4.0.9")
+
         self.assertEqual(self.post().status_code, 429)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
 
     def test_passwords_are_not_stored_by_the_abuse_protection(self):
+        # A wrong password of the profile is not a failed login and leaves no record at all; the
+        # record of a failed login holds no password either.
         self.post(
             current_password="current-sentinel-1",
             new_password1="new-sentinel-2",
             new_password2="new-sentinel-3",
         )
+        self.assertFalse(AccessAttempt.objects.exists())
+        log_in(Client(), self.user.email, "current-sentinel-1", address="10.4.0.8")
 
         self.assertTrue(AccessAttempt.objects.exists())
         for attempt in AccessAttempt.objects.all():
@@ -1272,7 +1295,9 @@ class ParallelUseTests(TransactionTestCase):
         self.assertEqual(send_code(client, code_for(device), address).status_code, 429)
         self.assertNotIn("_auth_user_id", client.session)
 
-    def test_parallel_wrong_passwords_of_the_password_forms_cannot_exceed_the_limit(self):
+    def test_parallel_wrong_passwords_of_the_password_forms_stay_under_the_cap(self):
+        # Wrong passwords in the confirmations are no failed logins (block 10); parallel requests
+        # of many sessions are bounded by the cap of the account: exactly one end of all sessions.
         user = create_active_user()
         clients = []
         for number in range(8):
@@ -1292,13 +1317,19 @@ class ParallelUseTests(TransactionTestCase):
                     REMOTE_ADDR=address,
                 ).status_code
                 for client, address in clients
+                for _twice in range(2)
             ]
         )
 
-        failures = sum(AccessAttempt.objects.values_list("failures_since_start", flat=True))
-        self.assertLessEqual(failures, LOGIN_FAILURE_LIMIT)
         self.assertNotIn(500, results)
-        self.assertIn(429, results)
+        self.assertEqual(AccessAttempt.objects.count(), 0)
+        self.assertEqual(
+            SecurityEvent.objects.filter(event=SecurityEvent.Event.ALL_SESSIONS_ENDED).count(), 1
+        )
+        self.assertLess(
+            ConfirmationFailure.objects.filter(account=user).count(),
+            second_factor.ACCOUNT_FAILURE_LIMIT,
+        )
 
 
 class EncryptionTests(SimpleTestCase):

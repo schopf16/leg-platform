@@ -5,17 +5,19 @@ import re
 import threading
 from unittest import mock
 
+from axes.models import AccessAttempt
 from django.core import mail
 from django.db import connection
 from django.test import Client, TestCase, TransactionTestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts import profile_views, totp
+from leg_platform.accounts import profile_views, second_factor, totp
 from leg_platform.accounts.forms import LostPhoneForm
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
+    LoginIpAttempt,
     MailJob,
     RecoveryCodeDevice,
     SecurityEvent,
@@ -201,17 +203,43 @@ class LostPhoneRefusalTests(TestCase):
     def test_the_wrong_codes_count_for_the_session_not_for_the_account(self):
         self.lost(current_password=PASSWORD, otp_token="abcd2346")
         self.lost(current_password=PASSWORD, otp_token="abcd2347")
-        self.lost(current_password="a wrong password for the check", otp_token="abcd2348")
+        self.lost(current_password="a wrong password for the check", otp_token="abcd2342")
         self.lost(current_password=PASSWORD, otp_token="shape error")
 
-        # Two wrong codes of this session; the wrong password and the shape error did not count.
+        # Two wrong codes and one wrong password of this session; the shape error did not count.
         # The budget of the account (which pauses the login) is untouched (D-062, block 9).
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
-        self.assertEqual(SessionCodeFailure.objects.get(account=self.user).failures, 2)
+        self.assertEqual(SessionCodeFailure.objects.get(account=self.user).failures, 3)
 
-    def test_guessing_the_password_here_is_stopped_by_the_lockout(self):
+    def test_guessing_the_password_here_ends_the_session_and_locks_nothing(self):
         for number in range(LOGIN_FAILURE_LIMIT):
-            self.lost(current_password=f"a wrong password for the check {number}", otp_token=RECOVERY_CODES[0])
+            response = self.lost(
+                current_password=f"a wrong password for the check {number}", otp_token=RECOVERY_CODES[0]
+            )
+
+        # The fifth wrong password ends the session; it is not a failed login (block 10, M-2).
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(remaining(self.user), 3)
+        self.assertFalse(AccessAttempt.objects.exists())
+        self.assertFalse(LoginIpAttempt.objects.exists())
+
+    def test_a_right_password_does_not_start_the_count_again_for_the_code(self):
+        # Password right, code wrong, five times: the right password in between must not reset
+        # the count, or the code could be guessed without a limit.
+        for number in range(second_factor.SESSION_CODE_LIMIT):
+            response = self.lost(current_password=PASSWORD, otp_token=f"abcd234{'67'[number % 2]}")
+
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+
+    def test_a_lockout_of_the_failed_logins_still_refuses_the_check(self):
+        for _attempt in range(LOGIN_FAILURE_LIMIT):
+            Client().post(
+                reverse("accounts:login"),
+                {"username": self.user.email, "password": "a wrong password for the lockout"},
+                REMOTE_ADDR="10.92.2.9",
+            )
 
         response = self.lost(current_password=PASSWORD, otp_token=RECOVERY_CODES[0])
 

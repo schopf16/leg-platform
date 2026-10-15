@@ -242,12 +242,13 @@ class AbuseProtectionTests(TestCase):
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
 
     def test_wrong_codes_never_pause_the_code_entry_of_the_account(self):
-        # Fifteen real wrong codes, in sessions that end after five (D-062, block 9): the budget of
-        # the account, which also pauses the login, is untouched and no notice about it is sent.
+        # Twelve real wrong codes in three sessions (under the limit of a session and under the cap
+        # of the account, D-062, block 10): the budget of the account, which also pauses the login,
+        # is untouched and no notice about it is sent.
         for _session in range(3):
             client = Client()
             client.force_login(self.user)
-            for number in range(second_factor.SESSION_CODE_LIMIT):
+            for number in range(second_factor.SESSION_CODE_LIMIT - 1):
                 client.post(DISABLE_URL, {"otp_token": f"{number + 100:06d}"}, REMOTE_ADDR="10.91.2.1")
 
         device = AuthenticatorDevice.objects.get(pk=self.device.pk)

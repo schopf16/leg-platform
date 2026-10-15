@@ -195,6 +195,12 @@ DEFINITIONS = {
         (CONTACT_URL,),
         (),
     ),
+    Key.ALL_SESSIONS_ENDED: Definition(
+        "accounts/email/all_sessions_ended.txt",
+        lambda: gettext("All sessions at %(instance_name)s were ended"),
+        (CONTACT_URL,),
+        (),
+    ),
 }
 
 MAX_BODY_LENGTH = 5000
