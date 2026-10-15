@@ -381,7 +381,7 @@ class AdminPresentationTests(TestCase):
         with translation.override("de-ch"):
             content = self.client.get(reverse("admin:index")).content.decode()
 
-        groups = re.findall(r'<a href="[^"]*" class="section">([^<]+)</a>', content)
+        groups = re.findall(r'<a href="[^"]*" class="section"[^>]*>([^<]+)</a>', content)
         self.assertEqual(groups, ["Benutzer", "Inhalte", "System"])
         self.assertIn("Texte der E-Mails und Adressen der Fusszeile pflegen Sie unter Inhalte.", content)
         for name in ("Mailtexte", "Portal-Einstellungen", "Gesperrte und fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
