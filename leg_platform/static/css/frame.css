@@ -742,6 +742,15 @@
   grid-column: 1 / -1;
 }
 
+/* The one-time notice after saving: below the address, over the whole width of the row (D-065). */
+.profile-row .profile-row-alert {
+  grid-column: 1 / -1;
+}
+
+.profile-row .alert {
+  margin: 0;
+}
+
 .profile-status {
   display: inline-flex;
   align-items: center;

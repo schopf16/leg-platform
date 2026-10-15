@@ -1,6 +1,8 @@
 {% load i18n %}{% comment %}
 One form field: label, widget, hint and error. Context: ``field`` (a bound field), ``optional``
-(the label says that the field may stay empty, docs/DESIGN.md, D-054). The ids of the hint and the
+(the label says that the field may stay empty, docs/DESIGN.md, D-054) and ``after`` (the name of a
+template that is included at the end of the field, inside its wrapper: the address suggestions
+under the street input, D-065). The ids of the hint and the
 error are the ones Django puts into ``aria-describedby`` of the widget; the error summary links
 to the widget by its id. A password field gets a button with an eye icon inside the field that shows
 the password: it is hidden until the script of the page enables it, so that the field stays a plain
@@ -29,4 +31,5 @@ password field without JavaScript (team lead decision K20).
   {% if field.help_text %}<div class="form-hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
   {% if hint %}<div class="form-hint" id="{{ field.auto_id }}_hint">{{ hint }}</div>{% endif %}
   {% if field.field.closing_note %}<div class="form-hint" id="{{ field.auto_id }}_note">{{ field.field.closing_note }}</div>{% endif %}
+  {% if after %}{% include after %}{% endif %}
 </div>

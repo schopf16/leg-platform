@@ -83,7 +83,7 @@ class ProfileEditingTests(TestCase):
     def test_address_matching_is_advisory_and_uses_the_saved_form_values(self):
         with patch(
             "leg_platform.accounts.profile_views.check_address",
-            return_value={"warning": "Address could not be confirmed."},
+            return_value={"warning": "Address could not be confirmed.", "match": False, "status": "available"},
         ) as check:
             response = self.client.post(PROFILE_EDIT_URL, {**PROFILE, "street": "Changed street"})
 

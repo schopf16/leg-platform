@@ -194,8 +194,48 @@ msgstr "Import des Adressverzeichnisses"
 msgid "Address directory imports"
 msgstr "Importe des Adressverzeichnisses"
 
-msgid "Address suggestions"
-msgstr "Adressvorschläge"
+msgid "Matching addresses"
+msgstr "Passende Adressen"
+
+msgid "Did you mean this address?"
+msgid_plural "Did you mean one of these addresses?"
+msgstr[0] "Meinten Sie diese Adresse?"
+msgstr[1] "Meinten Sie eine dieser Adressen?"
+
+msgid "Choose an address to fill in the fields."
+msgstr "Wählen Sie eine Adresse aus, um die Felder auszufüllen."
+
+#, python-format
+msgid "No street starting with “%(street)s” was found in %(postal_code)s. Choose an address to fill in the fields."
+msgstr "In %(postal_code)s wurde keine Strasse gefunden, die mit «%(street)s» beginnt. Wählen Sie eine Adresse aus, um die Felder auszufüllen."
+
+msgid "More addresses match. Keep typing to narrow the list."
+msgstr "Es passen weitere Adressen. Geben Sie mehr ein, um die Liste einzugrenzen."
+
+msgid "Suggestions from the official address directory (swisstopo)."
+msgstr "Vorschläge aus dem amtlichen Adressverzeichnis (swisstopo)."
+
+#, python-format
+msgid "%(count)s address suggestion available. Press the down arrow key to choose one."
+msgid_plural "%(count)s address suggestions available. Press the down arrow key to choose one."
+msgstr[0] "%(count)s Adressvorschlag verfügbar. Mit der Pfeiltaste nach unten wählen Sie einen aus."
+msgstr[1] "%(count)s Adressvorschläge verfügbar. Mit der Pfeiltaste nach unten wählen Sie einen aus."
+
+#, python-format
+msgid "No exact match. %(count)s similar address available. Press the down arrow key to choose it."
+msgid_plural "No exact match. %(count)s similar addresses available. Press the down arrow key to choose one."
+msgstr[0] "Keine genaue Übereinstimmung. %(count)s ähnliche Adresse verfügbar. Mit der Pfeiltaste nach unten wählen Sie sie aus."
+msgstr[1] "Keine genaue Übereinstimmung. %(count)s ähnliche Adressen verfügbar. Mit der Pfeiltaste nach unten wählen Sie eine aus."
+
+#, python-format
+msgid "Address filled in: %(address)s."
+msgstr "Adresse eingetragen: %(address)s."
+
+msgid "Check address"
+msgstr "Adresse prüfen"
+
+msgid "Saved. Please check your address below."
+msgstr "Gespeichert. Bitte prüfen Sie Ihre Adresse weiter unten."
 
 msgid "Address suggestions are temporarily limited. You can continue with the address as entered."
 msgstr "Adressvorschläge sind vorübergehend eingeschränkt. Sie können mit der eingegebenen Adresse fortfahren."
@@ -323,9 +363,6 @@ msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
 msgid "No import requested"
 msgstr "Kein Import angefordert"
 
-msgid "Official address directory"
-msgstr "Amtliches Adressverzeichnis"
-
 msgid "Queued"
 msgstr "Vorgemerkt"
 
@@ -356,8 +393,8 @@ msgstr "Das Adressverzeichnis ist nicht verfügbar. Sie können mit der eingegeb
 msgid "The import runs in a separate background worker. Addresses already entered are not changed."
 msgstr "Der Import läuft in einem separaten Hintergrundprozess. Bereits eingegebene Adressen werden nicht verändert."
 
-msgid "This address was not found in the official directory. Please check it. You can continue with the address as entered."
-msgstr "Diese Adresse wurde im amtlichen Verzeichnis nicht gefunden. Bitte prüfen Sie sie. Sie können mit der eingegebenen Adresse fortfahren."
+msgid "This address was not found in the official directory. Please check street, house number, postal code and town. You can still save it as entered."
+msgstr "Diese Adresse wurde im amtlichen Verzeichnis nicht gefunden. Bitte prüfen Sie Strasse, Hausnummer, PLZ und Ort. Sie können sie trotzdem so speichern, wie Sie sie eingegeben haben."
 
 msgid "Too many import requests. Please try again later."
 msgstr "Zu viele Importanfragen. Bitte versuchen Sie es später erneut."

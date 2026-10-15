@@ -1021,6 +1021,14 @@ The importer fetches the catalogue entry and the archive of the official buildin
   Expected after success: state `succeeded`, a `row_count` of the order of 3.3 million, the count equal to it, a recent `data_date`. On failure the state is `failed`, the failure is logged without data, and the next **automatic** attempt waits 90 days (manual attempts can be repeated, D-052). The page warns users when the data date is older than 92 days (D-050). Without a directory the forms only show a non-blocking notice.
 * Every 90 days the importer makes one more automatic attempt (it keeps running as a service). Check the journal after each: `journalctl -u leg-platform-addresses --since "7 days ago" | grep -i import`.
 * A hard-killed import requires investigation, not a blind reset (section 8.4).
+* **Open operator step: query plan of the approximate address search (D-065, UNVERIFIED).** The tests run on SQLite; nobody has checked on MariaDB with the real directory that the candidate query uses the index `addr_generation_postal_street` and returns quickly, or how the column collation treats accents in `street = '…'`. After the first import, as the owner of the SELECT-only account or an administrator, run (replace `<GENERATION>` with the value of `SELECT generation FROM leg_platform_addresses.addresses_directory`, which MariaDB stores as 32 hexadecimal characters without hyphens, and use a postal code that exists, ideally the largest one):
+
+  ```bash
+  sudo mariadb leg_platform_addresses -e "EXPLAIN SELECT DISTINCT street FROM addresses_address WHERE generation='<GENERATION>' AND postal_code='3000' ORDER BY street LIMIT 1001"
+  sudo mariadb leg_platform_addresses -e "EXPLAIN SELECT DISTINCT street, house_number, postal_code, locality FROM addresses_address WHERE generation='<GENERATION>' AND postal_code='3000' AND street='Bahnhofstrasse' AND house_number LIKE '1%' ORDER BY street, house_number, postal_code, locality LIMIT 10"
+  ```
+
+  Expected: `key` is `addr_generation_postal_street` (a range or ref access, no full scan, no `Using filesort` on a large row count). Then time the first statement for the postal code with the most addresses, and check with a street name that has an accent (for example `Rue de l'Église`) typed without the accent that `street = '…'` still behaves as intended for the collation. Report the plan and the time to the owner; run this before the go-live: if the plan is a scan, the release is blocked and the result goes to the owner (the code has no switch for the approximate path; it is active whenever the prefix search finds nothing and a four-digit postal code is entered). A statement time limit (`max_statement_time`) for the SELECT-only account is a possible defence in depth that was not decided.
 
 ## 11. Verification checklist
 

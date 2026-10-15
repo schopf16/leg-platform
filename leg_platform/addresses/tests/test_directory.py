@@ -17,6 +17,7 @@ from django.core.management.base import CommandError
 from django.middleware.csrf import get_token
 from django.db import DatabaseError, connections
 from django.test import Client, RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -25,7 +26,7 @@ from leg_platform.addresses.jobs import process_one, request_import
 from leg_platform.addresses.limits import allow_request
 from leg_platform.addresses.models import Address, Directory, ImportRequest
 from leg_platform.addresses.router import AddressRouter
-from leg_platform.addresses.services import check_address, clean_input, directory_status, lookup
+from leg_platform.addresses.services import approximate_matches, check_address, clean_input, directory_status, lookup
 
 HEADER = "STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_NAME;COM_NAME\n"
 SYNTHETIC_CSV = HEADER + "Example Street;12a;9999 Example Town;Discarded synthetic building;Discarded municipality\n"
@@ -339,7 +340,8 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertTrue(check_address(street="previous street", house_number="1", postal_code=9999, locality="example town")["match"])
         result = check_address(street="Unknown", postal_code=9999, locality="Example Town")
         self.assertFalse(result["match"])
-        self.assertIn("continue", result["warning"])
+        self.assertIn("save it as entered", result["warning"])
+        self.assertEqual(result["kind"], "prefix")
 
     def test_directory_lookup_never_queries_accounts(self):
         with self.assertNumQueries(0, using="default"):
@@ -394,6 +396,254 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertEqual(logs.output, [
             "WARNING:leg_platform.addresses.services:Address directory lookup is unavailable."
         ])
+
+    def add_addresses(self, *rows):
+        """Synthetic directory rows: (street, house number, postal code, locality)."""
+        Address.objects.using("address_import").bulk_create([
+            Address(generation=self.generation, street=street, house_number=number,
+                    postal_code=postal_code, locality=locality)
+            for street, number, postal_code, locality in rows
+        ])
+
+    def test_every_answer_has_a_kind_and_a_prefix_match_is_not_approximate(self):
+        self.assertEqual(lookup({"street": "Previous"})["kind"], "prefix")
+        self.assertEqual(lookup({"street": "Previous"}, mode="check")["kind"], "prefix")
+        self.assertEqual(lookup({"street": ""})["kind"], "prefix")
+        self.assertEqual(lookup({"street": "Foreign", "country": "DE"})["kind"], "prefix")
+        # A typing error with a complete postal code: the prefix search finds nothing, the
+        # approximate one finds the street. A prefix match stays a prefix match.
+        self.add_addresses(("Previous Road", "2", "9999", "Example Town"))
+        result = lookup({"street": "Previous", "postal_code": "9999"})
+        self.assertEqual(result["kind"], "prefix")
+        self.assertEqual(len(result["results"]), 2)
+
+    def test_approximate_matching_finds_a_typing_error_within_the_postal_code(self):
+        self.add_addresses(
+            ("Bahnhofstrasse", "5", "9999", "Example Town"),
+            ("Bahnhofstrasse", "7", "9999", "Example Town"),
+            ("Bahnhofstrasse", "5", "8888", "Other Town"),
+        )
+        for typed in ("Bahnhofstrase", "bahnohfstrasse", "BAHNHOFSTRASSEN"):
+            with self.subTest(typed=typed):
+                result = lookup({"street": typed, "postal_code": "9999"})
+                self.assertEqual(result["kind"], "approximate")
+                self.assertEqual(result["status"], "available")
+                self.assertEqual(
+                    [(row["street"], row["house_number"], row["postal_code"]) for row in result["results"]],
+                    [("Bahnhofstrasse", "5", "9999"), ("Bahnhofstrasse", "7", "9999")],
+                )
+                self.assertEqual(set(result["results"][0]), {"street", "house_number", "postal_code", "locality"})
+
+    def test_approximate_matching_needs_a_postal_code_of_exactly_four_digits(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        for postal_code in ("", "9", "99", "999"):
+            with self.subTest(postal_code=postal_code):
+                result = lookup({"street": "Bahnhofstrase", "postal_code": postal_code})
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["kind"], "prefix")
+        # Another postal code does not find the street, and a street of another postal code is not
+        # offered.
+        self.assertEqual(lookup({"street": "Bahnhofstrase", "postal_code": "8888"})["results"], [])
+        self.assertEqual(len(lookup({"street": "Bahnhofstrase", "postal_code": "9999"})["results"]), 1)
+
+    def test_approximate_matching_makes_no_query_without_a_complete_postal_code(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        with patch("leg_platform.addresses.services.approximate_matches") as approximate:
+            lookup({"street": "Bahnhofstrase", "postal_code": "999"})
+            lookup({"street": "Bahnhofstrase"})
+            lookup({"street": "Bahnhofstrase", "postal_code": "9999"}, mode="check")
+            approximate.assert_not_called()
+            lookup({"street": "Previous", "postal_code": "9999"})
+            approximate.assert_not_called()
+
+    def test_approximate_matching_keeps_the_house_number_filter_and_ignores_the_town(self):
+        self.add_addresses(
+            ("Bahnhofstrasse", "5", "9999", "Example Town"),
+            ("Bahnhofstrasse", "7", "9999", "Example Town"),
+        )
+        values = {"street": "Bahnhofstrase", "postal_code": "9999"}
+        self.assertEqual([row["house_number"] for row in lookup({**values, "house_number": "7"})["results"]], ["7"])
+        self.assertEqual(lookup({**values, "house_number": "9"})["results"], [])
+        # The postal code fixes the town; a wrong town text does not hide the street.
+        result = lookup({**values, "locality": "Wrong Town"})
+        self.assertEqual(len(result["results"]), 2)
+        # An exact street with a wrong town is a prefix match within the postal code, not a guess.
+        result = lookup({"street": "Bahnhofstrasse", "postal_code": "9999", "locality": "Wrong Town"})
+        self.assertEqual(result["kind"], "prefix")
+        self.assertEqual(len(result["results"]), 2)
+
+    def test_approximate_matching_is_case_and_accent_insensitive(self):
+        self.add_addresses(("Rue de l'Église", "1", "9999", "Example Town"))
+        for typed in ("RUE DE L'EGLISE", "rue de l'eglis", "rue de l'églsie"):
+            with self.subTest(typed=typed):
+                result = lookup({"street": typed, "postal_code": "9999"})
+                self.assertEqual([row["street"] for row in result["results"]], ["Rue de l'Église"])
+
+    def test_approximate_matching_rejects_unrelated_streets_and_bad_lengths(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        for typed in ("Gartenweg", "Zz", "Bahnhofstrasse" + "x" * 60):
+            with self.subTest(typed=typed):
+                result = lookup({"street": typed, "postal_code": "9999"})
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["kind"], "prefix")
+
+    def test_approximate_matching_sorts_by_similarity_and_is_capped(self):
+        self.add_addresses(
+            ("Schulstrasse", "1", "9999", "Example Town"),
+            ("Schlossstrasse", "1", "9999", "Example Town"),
+        )
+        result = lookup({"street": "Schulstrase", "postal_code": "9999"})
+        self.assertEqual([row["street"] for row in result["results"]], ["Schulstrasse", "Schlossstrasse"])
+        self.add_addresses(*[("Schulstrasse", str(number), "9999", "Example Town") for number in range(2, 30)])
+        self.assertEqual(len(lookup({"street": "Schulstrase", "postal_code": "9999"})["results"]), 10)
+
+    def test_approximate_candidates_are_bounded_and_nothing_is_returned_above_the_bound(self):
+        self.add_addresses(*[(f"Streetname{letter}", "1", "9999", "Example Town") for letter in "ABCD"])
+        # A typing error, so that only the approximate path finds the four streets.
+        values = {"street": "Strietname", "postal_code": "9999"}
+        # The postal code has the four new streets and the street of setUp: five streets.
+        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 5):
+            self.assertEqual(len(lookup(values)["results"]), 4)
+        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 4):
+            with CaptureQueriesContext(connections["addresses"]) as queries:
+                result = lookup(values)
+            self.assertEqual(result["results"], [])
+            self.assertEqual(result["kind"], "prefix")
+        # The candidate query reads at most one more street than the limit; no query searches inside
+        # the text of the street (LIKE '%x%'), and no query reads the whole directory.
+        statements = [query["sql"] for query in queries]
+        self.assertTrue(any("LIMIT 5" in statement for statement in statements), statements)
+        self.assertFalse(any("LIKE '%" in statement for statement in statements), statements)
+
+    def test_approximate_matching_reads_through_the_postal_code_not_the_whole_directory(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        with CaptureQueriesContext(connections["addresses"]) as queries:
+            lookup({"street": "Bahnhofstrase", "postal_code": "9999"})
+        statements = [query["sql"] for query in queries]
+        # Directory, prefix search, candidate streets and one address query: bounded, and every
+        # directory query is restricted to the generation and, for the candidates, the postal code.
+        self.assertLessEqual(len(statements), 4 + 10)
+        candidates = [statement for statement in statements if "DISTINCT" in statement and '"street" FROM' in statement]
+        self.assertEqual(len(candidates), 1)
+        self.assertIn('"postal_code" = \'9999\'', candidates[0])
+        self.assertNotIn("LIKE '%", candidates[0])
+
+    def test_the_candidate_query_ignores_the_house_number_and_each_street_query_filters_it(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"), ("Bahnhofstrasse", "7", "9999", "Example Town"))
+        with CaptureQueriesContext(connections["addresses"]) as queries:
+            result = lookup({"street": "Bahnhofstrase", "postal_code": "9999", "house_number": "7"})
+        self.assertEqual([row["house_number"] for row in result["results"]], ["7"])
+        statements = [query["sql"] for query in queries]
+        candidates = [s for s in statements if "DISTINCT" in s and '"street" FROM' in s]
+        self.assertEqual(len(candidates), 1)
+        self.assertNotIn("house_number", candidates[0])
+        per_street = [s for s in statements if "= 'Bahnhofstrasse'" in s]
+        self.assertEqual(len(per_street), 1)
+        self.assertIn("LIKE '7%'", per_street[0])
+        self.assertIn('"postal_code" = \'9999\'', per_street[0])
+
+    def test_a_typed_street_that_folds_to_less_than_three_characters_finds_nothing(self):
+        self.add_addresses(("Abc Street", "1", "9999", "Example Town"), ("\u00c1bc Street", "1", "9999", "Example Town"))
+        for typed in ("\u0301" * 3, "a\u0301\u0301", "\u0301" * 64, "e\u0301\u0301" + "\u0301" * 3):
+            with self.subTest(typed=typed):
+                result = lookup({"street": typed, "postal_code": "9999"})
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["kind"], "prefix")
+                self.assertEqual(result["status"], "available")
+        # The folded text is not labelled a prefix match by the helper either.
+        query = Address.objects.using("addresses").filter(generation=self.generation)
+        for typed in ("\u0301" * 3, "a\u0301\u0301"):
+            self.assertEqual(
+                approximate_matches(query, {"street": typed, "postal_code": "9999", "house_number": ""}),
+                ([], "approximate"),
+            )
+
+    def test_the_length_bounds_are_three_and_sixty_four_characters(self):
+        # The accent makes the prefix search miss (the typed text has none), so that only the
+        # approximate path can find the street.
+        long_name = "a" * 63
+        too_long = "b" * 64
+        self.add_addresses(
+            ("\u00c9ge Street", "1", "9999", "Example Town"),
+            ("\u00c9" + long_name, "1", "9999", "Example Town"),
+            ("\u00c9" + too_long, "1", "9999", "Example Town"),
+        )
+        found = lambda typed: [row["street"] for row in lookup({"street": typed, "postal_code": "9999"})["results"]]
+        self.assertEqual(found("Ege"), ["\u00c9ge Street"])
+        self.assertEqual(found("Eg"), [])
+        self.assertEqual(found("E" + long_name), ["\u00c9" + long_name])
+        self.assertEqual(found("E" + too_long), [])
+
+    def test_a_street_that_differs_only_by_accents_is_a_prefix_result(self):
+        self.add_addresses(("Rue de l'\u00c9glise", "1", "9999", "Example Town"))
+        # The prefix search of the directory does not equate the accents (SQLite), the approximate
+        # path does; it is labelled a prefix match, because the street starts with the typed text.
+        for typed in ("rue de l'eglise", "RUE DE L'EGL"):
+            with self.subTest(typed=typed):
+                result = lookup({"street": typed, "postal_code": "9999"})
+                self.assertEqual(result["kind"], "prefix")
+                self.assertEqual([row["street"] for row in result["results"]], ["Rue de l'\u00c9glise"])
+
+    def test_a_candidate_with_a_very_long_folded_text_is_not_compared(self):
+        self.add_addresses(("\u00c9gerstrasse-xxxxxxx", "1", "9999", "Example Town"))  # 19 characters
+        values = {"street": "Egerstra", "postal_code": "9999"}
+        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 10):  # candidates up to 20
+            self.assertEqual(len(lookup(values)["results"]), 1)
+        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 9):  # candidates up to 18
+            self.assertEqual(lookup(values)["results"], [])
+
+    def test_the_number_of_full_comparisons_is_capped_and_nothing_is_returned_above_the_cap(self):
+        self.add_addresses(*[(f"Schulstrass{letter}", "1", "9999", "Example Town") for letter in "aeo"])
+        values = {"street": "Schulstrase", "postal_code": "9999"}
+        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 3):
+            self.assertEqual(len(lookup(values)["results"]), 3)
+        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 2):
+            result = lookup(values)
+        self.assertEqual(result["results"], [])
+        self.assertEqual(result["status"], "available")
+        self.assertEqual(result["kind"], "prefix")
+
+    def test_the_time_budget_is_enforced_and_nothing_is_returned_when_it_is_used_up(self):
+        self.add_addresses(("Schulstrasse", "1", "9999", "Example Town"))
+        values = {"street": "Schulstrase", "postal_code": "9999"}
+        self.assertEqual(len(lookup(values)["results"]), 1)
+        # A negative budget is used up at the first candidate, with any clock resolution.
+        with patch("leg_platform.addresses.services.APPROXIMATE_TIME_BUDGET", -1):
+            result = lookup(values)
+        self.assertEqual(result["results"], [])
+        self.assertEqual(result["status"], "available")
+
+    def test_a_failing_candidate_or_street_query_after_a_successful_prefix_query_fails_closed(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        values = {"street": "Bahnhofstrase", "postal_code": "9999"}
+
+        def failing_from(number):
+            seen = []
+
+            def wrapper(execute, sql, params, many, context):
+                if "addresses_address" in sql:
+                    seen.append(sql)
+                    if len(seen) >= number:
+                        raise DatabaseError("private detail")
+                return execute(sql, params, many, context)
+
+            return wrapper
+
+        # Address queries in order: 1 prefix search (succeeds, no result), 2 candidate streets,
+        # 3 the street's addresses.
+        for number in (2, 3):
+            with self.subTest(failing_address_query=number):
+                with connections["addresses"].execute_wrapper(failing_from(number)):
+                    with self.assertLogs("leg_platform.addresses.services", level="WARNING") as logs:
+                        result = lookup(values)
+                self.assertEqual(result["status"], "unavailable")
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["kind"], "prefix")
+                self.assertIn("continue", result["warning"])
+                self.assertEqual(logs.output, [
+                    "WARNING:leg_platform.addresses.services:Address directory lookup is unavailable."
+                ])
+                self.assertNotIn("private detail", str(result))
 
     def test_results_are_bounded_deduplicated_and_filtered(self):
         for number in range(20):
@@ -554,6 +804,23 @@ class DirectoryDatabaseTests(TransactionTestCase):
         self.assertEqual(response.json()["results"][0]["street"], "Previous Street")
         self.assertIn("no-store", response["Cache-Control"])
         self.assertEqual(self.client.get("/addresses/lookup/").status_code, 405)
+
+    def test_public_endpoint_returns_kind_and_only_directory_data_for_an_approximate_match(self):
+        self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        with patch("leg_platform.addresses.views.allow_request", return_value=True):
+            response = self.client.post(
+                "/addresses/lookup/", urlencode({"street": "Bahnhofstrase", "postal_code": "9999"}),
+                content_type="application/x-www-form-urlencoded",
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["kind"], "approximate")
+        self.assertEqual(data["results"], [{
+            "street": "Bahnhofstrasse", "house_number": "5", "postal_code": "9999", "locality": "Example Town",
+        }])
+        self.assertEqual(set(data), {"status", "data_date", "stale", "warning", "attribution", "results", "match", "kind"})
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertIn("private", response["Cache-Control"])
 
     def test_endpoint_csrf_required_even_anonymous(self):
         client = Client(enforce_csrf_checks=True)

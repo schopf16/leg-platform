@@ -1,0 +1,8 @@
+{% comment %}
+The notice of the address directory about the address as a whole (D-065): include it directly after
+the postal code and town row. The element is always in the page and has no content (no white space
+inside), so that a screen reader announces what the script puts into it. The script (static/js/
+address-directory.js) shows at most one paragraph with the class alert-warning (the address was
+not found) or alert-info (the service says something). It never takes the focus and never blocks
+saving. Without JavaScript it stays empty.
+{% endcomment %}<div class="address-notice" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice role="status"></div>

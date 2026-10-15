@@ -223,14 +223,18 @@ class ProfileFormTests(TestCase):
         self.assertIn("Weitere Angaben (optional)", html)
         self.assertIn("field-pair field-pair-street", html)
         self.assertIn("field-pair field-pair-locality", html)
+        # The suggestions sit directly under the street input, before the house number; the notice
+        # follows the postal code and town (D-065). A leading space: the widget also carries
+        # data-...-id="id_..." attributes.
         order = [
-            html.index('id="id_street"'),
-            html.index('id="id_house_number"'),
+            html.index(' id="id_street"'),
             html.index("data-address-directory"),
-            html.index('id="id_postal_code"'),
-            html.index('id="id_town"'),
-            html.index('id="id_post_office_box_number"'),
-            html.index('id="id_phone_number"'),
+            html.index(' id="id_house_number"'),
+            html.index(' id="id_postal_code"'),
+            html.index(' id="id_town"'),
+            html.index("data-address-notice"),
+            html.index(' id="id_post_office_box_number"'),
+            html.index(' id="id_phone_number"'),
         ]
         self.assertEqual(order, sorted(order))
         self.assertIn("Nur, wenn Sie keine Strasse angeben.", html)
