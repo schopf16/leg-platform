@@ -2338,8 +2338,34 @@ msgstr "Wenn Sie Ihre Authenticator-App nicht nutzen können, schalten Sie 2FA m
 msgid "You have neither the app nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of 2FA, and you confirm it with a link that is sent to your email address."
 msgstr "Sie haben weder die App noch einen Wiederherstellungscode? Dann wenden Sie sich an den Betrieb des Portals. Ein Administrator kann das Entfernen von 2FA starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-Adresse gesendet wird."
 
-msgid "Back"
-msgstr "Zurück"
+msgid "For your safety you were logged out: wrong codes were entered several times. Please log in again."
+msgstr "Aus Sicherheitsgründen wurden Sie abgemeldet: Es wurde mehrmals ein falscher Code eingegeben. Bitte melden Sie sich erneut an."
+
+msgid "A session at %(instance_name)s was ended"
+msgstr "Eine Sitzung bei %(instance_name)s wurde beendet"
+
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"Unusual entries were made in a session of your account at %(instance_name)s: several wrong codes were entered where a code from your authenticator app is asked. For your safety the session was ended.\n"
+"\n"
+"If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with \"Forgot password\" on the login page."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"In einer Sitzung Ihres Kontos bei %(instance_name)s wurden ungewöhnliche Eingaben gemacht: Es wurden mehrmals falsche Codes eingegeben, wo ein Code aus Ihrer Authenticator-App verlangt wird. Zu Ihrer Sicherheit wurde die Sitzung beendet.\n"
+"\n"
+"Wenn Sie das waren, können Sie sich wieder anmelden. Wenn Sie es nicht waren, hat möglicherweise jemand Zugriff auf ein Gerät, auf dem Sie angemeldet sind: Wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
+
+msgid "Notification: session ended after wrong codes"
+msgstr "Benachrichtigung: Sitzung nach falschen Codes beendet"
+
+msgid "Session ended after wrong codes"
+msgstr "Sitzung nach falschen Codes beendet"
+
+msgid "Two-factor authentication removed with a recovery code (phone lost)"
+msgstr "Zwei-Faktor-Anmeldung (2FA) mit einem Wiederherstellungscode entfernt (Handy verloren)"
 
 msgid "Your account was changed in the meantime. Please try again."
 msgstr "Ihr Konto wurde inzwischen geändert. Bitte versuchen Sie es erneut."

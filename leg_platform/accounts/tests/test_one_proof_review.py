@@ -9,7 +9,7 @@ from axes.models import AccessAttempt
 from django.test import Client, RequestFactory, TestCase, tag
 from django.urls import reverse
 
-from leg_platform.accounts import totp
+from leg_platform.accounts import second_factor, totp
 from leg_platform.accounts.forms import ChangePasswordForm, ReauthenticationForm
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
@@ -241,23 +241,20 @@ class AbuseProtectionTests(TestCase):
         self.assertEqual(AccessAttempt.objects.count(), 0)
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
 
-    def test_fifteen_real_wrong_codes_pause_the_code_entry(self):
-        for number in range(totp.CODE_PAUSE_AT):
-            response = self.post(f"{number + 100:06d}")
-            self.assertEqual(response.status_code, 200)
-            # The lockout of the abuse protection (5 failures in 15 minutes) is not the subject
-            # here: its records are removed as if the time had passed. The budget of the account
-            # lives on the device and stays.
-            AccessAttempt.objects.all().delete()
-            LoginIpAttempt.objects.all().delete()
+    def test_wrong_codes_never_pause_the_code_entry_of_the_account(self):
+        # Fifteen real wrong codes, in sessions that end after five (D-062, block 9): the budget of
+        # the account, which also pauses the login, is untouched and no notice about it is sent.
+        for _session in range(3):
+            client = Client()
+            client.force_login(self.user)
+            for number in range(second_factor.SESSION_CODE_LIMIT):
+                client.post(DISABLE_URL, {"otp_token": f"{number + 100:06d}"}, REMOTE_ADDR="10.91.2.1")
 
         device = AuthenticatorDevice.objects.get(pk=self.device.pk)
-        self.assertEqual(device.failed_codes, totp.CODE_PAUSE_AT)
-        self.assertTrue(totp.code_attempts_paused(self.user))
-        # The owner was told once at the notice.
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.CODE_ATTEMPTS_WARNING).count(), 1)
-
-        paused = self.post(code_for(self.device))
-
-        self.assertContains(paused, "pausiert", status_code=429)
-        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(device.failed_codes, 0)
+        self.assertFalse(totp.code_attempts_paused(self.user))
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.CODE_ATTEMPTS_WARNING).exists())
+        # No failed login of the abuse protection either: the owner can log in right away.
+        self.assertEqual(AccessAttempt.objects.count(), 0)
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
+        self.assertEqual(self.post(code_for(self.device)).status_code, 302)

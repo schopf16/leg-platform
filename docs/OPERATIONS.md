@@ -225,7 +225,7 @@ The start page of the administration ("Verwaltung") has the box "Erste Schritte"
 | What | Who changes it | Where |
 | --- | --- | --- |
 | Address of the privacy notice, address of the legal notice (footer, registration, deleting the account) | System administrator | Administration, group "Inhalte", "Portal-Einstellungen" (https only; empty means the text without a link) |
-| Texts of the emails (subject and text of each of the 18 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
+| Texts of the emails (subject and text of each of the 19 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
 | Microsoft Graph (sender, certificate), security log, blocked logins, groups | System administrator only | Administration, group "System" and "Benutzer" |
 | Name of the instance, website, logos, colours, base URL, email mode | Operator, with environment variables and the instance static directory | `docs/INSTALLATION.md`, `docs/DESIGN.md` section 3.2 |
 | **Texts of the login and registration pages** (title, lead sentence, the benefit points, the labels) | **Operator only, through the translation files** (`locale/<language>/LC_MESSAGES/django.po`, compiled with `msgfmt`, then deploy). They are not editable in the administration. | Source texts in the templates under `leg_platform/templates` and `leg_platform/accounts/templates` |

@@ -188,6 +188,11 @@ def send_secondary_email_changed(address):
     _send(address, Key.SECONDARY_EMAIL_CHANGED, {})
 
 
+def send_session_ended_wrong_codes(address):
+    """Tell every address that a session was ended after wrong codes; contains no link."""
+    _send(address, Key.SESSION_ENDED_WRONG_CODES, {})
+
+
 def send_two_factor_enabled(address):
     """Tell the owner that two-factor authentication was set up; contains no link."""
     _send(address, Key.TWO_FACTOR_ENABLED, {})

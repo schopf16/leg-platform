@@ -2,18 +2,24 @@
 only confirmation besides the login where a recovery code counts."""
 
 import re
+import threading
+from unittest import mock
 
 from django.core import mail
-from django.test import Client, TestCase, tag
+from django.db import connection
+from django.test import Client, TestCase, TransactionTestCase, tag
 from django.urls import reverse
+from django.utils import timezone
 
-from leg_platform.accounts import totp
+from leg_platform.accounts import profile_views, totp
+from leg_platform.accounts.forms import LostPhoneForm
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     MailJob,
     RecoveryCodeDevice,
     SecurityEvent,
+    SessionCodeFailure,
     User,
 )
 from leg_platform.accounts.tests.helpers import PASSWORD, code_for, create_active_user, run_mail_queue
@@ -71,10 +77,15 @@ class LostPhoneSuccessTests(TestCase):
         # Every other session ended; this one stays.
         self.assertEqual(self.client.get(PROFILE).status_code, 200)
         self.assertEqual(other_session.get(PROFILE).status_code, 302)
-        # The events: the use of the recovery code and the removal, the removal with its way.
+        # The events: the use of the recovery code and the removal with its own event, kept for
+        # the long period (L-2); the plain removal event is not written for this way.
         events = set(SecurityEvent.objects.filter(account_id=self.user.pk).values_list("event", flat=True))
         self.assertIn(SecurityEvent.Event.RECOVERY_CODE_USED, events)
-        self.assertIn(SecurityEvent.Event.TWO_FACTOR_DISABLED, events)
+        self.assertIn(SecurityEvent.Event.TWO_FACTOR_REMOVED_PHONE_LOST, events)
+        self.assertNotIn(SecurityEvent.Event.TWO_FACTOR_DISABLED, events)
+        self.assertTrue(
+            SecurityEvent.objects.get(event=SecurityEvent.Event.TWO_FACTOR_REMOVED_PHONE_LOST).long_retention
+        )
         self.assertTrue(any("phone lost" in line for line in logs.output))
         self.assertFalse(any(RECOVERY_CODES[0] in line or PASSWORD in line for line in logs.output))
 
@@ -187,14 +198,16 @@ class LostPhoneRefusalTests(TestCase):
         self.assertContains(response, GENERIC)
         self.assertTrue(AuthenticatorDevice.objects.filter(user=user).exists())
 
-    def test_the_budget_of_wrong_codes_counts_wrong_codes_only(self):
+    def test_the_wrong_codes_count_for_the_session_not_for_the_account(self):
         self.lost(current_password=PASSWORD, otp_token="abcd2346")
         self.lost(current_password=PASSWORD, otp_token="abcd2347")
         self.lost(current_password="a wrong password for the check", otp_token="abcd2348")
         self.lost(current_password=PASSWORD, otp_token="shape error")
 
-        # Two wrong codes; the wrong password and the shape error did not count.
-        self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 2)
+        # Two wrong codes of this session; the wrong password and the shape error did not count.
+        # The budget of the account (which pauses the login) is untouched (D-062, block 9).
+        self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
+        self.assertEqual(SessionCodeFailure.objects.get(account=self.user).failures, 2)
 
     def test_guessing_the_password_here_is_stopped_by_the_lockout(self):
         for number in range(LOGIN_FAILURE_LIMIT):
@@ -334,3 +347,153 @@ class LostPhonePageTests(TestCase):
                 # Hidden by default: a password field, with the button that the script enables.
                 self.assertEqual(html.count("data-password-toggle"), len(fields))
                 self.assertIn("password-toggle.js", html)
+
+    def test_the_way_back_is_called_cancel_like_everywhere_else(self):
+        html = self.client.get(LOST_PAGE).content.decode()
+
+        self.assertRegex(html, r'step=disable#card-two-factor">Abbrechen</a>')
+        self.assertNotIn("Zurück", html)
+
+
+@tag("mariadb")
+class LostPhoneOneStepTests(TestCase):
+    """L-1 (security review, block 9): the check of the code and the removal are one step."""
+
+    def setUp(self):
+        self.user, self.device = create_user_with_totp()
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def lost(self, **data):
+        return self.client.post(LOST_URL, data or {"current_password": PASSWORD, "otp_token": RECOVERY_CODES[0]}, REMOTE_ADDR="10.94.1.1")
+
+    def assert_given_back(self):
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(remaining(self.user), 3)
+        self.assertFalse(MailJob.objects.exists())
+        self.assertFalse(SecurityEvent.objects.filter(account_id=self.user.pk).exists())
+
+    def test_a_refused_removal_gives_the_code_back(self):
+        with mock.patch.object(totp, "disable", side_effect=totp.SecondFactorError("refused")):
+            response = self.lost()
+
+        self.assertRedirects(response, reverse("accounts:two_factor"), fetch_redirect_response=False)
+        self.assert_given_back()
+        # The code works afterwards.
+        self.assertEqual(self.lost().status_code, 302)
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.user).exists())
+
+    def test_a_promotion_to_staff_between_the_start_and_the_check_keeps_code_and_second_factor(self):
+        real = profile_views.LostPhoneForm
+
+        def promote_while_building(*args, **kwargs):
+            # After the checks of the dispatch, before the lock of the account.
+            promote(self.user)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(profile_views, "LostPhoneForm", side_effect=promote_while_building):
+            response = self.lost()
+
+        self.assertRedirects(response, reverse("accounts:two_factor"), fetch_redirect_response=False)
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(remaining(self.user), 3)
+        self.assertFalse(MailJob.objects.exists())
+        self.assertFalse(
+            SecurityEvent.objects.filter(
+                account_id=self.user.pk,
+                event__in=(
+                    SecurityEvent.Event.RECOVERY_CODE_USED,
+                    SecurityEvent.Event.TWO_FACTOR_REMOVED_PHONE_LOST,
+                ),
+            ).exists()
+        )
+
+    def test_the_second_factor_removed_between_the_start_and_the_check_is_refused_unseen(self):
+        real = profile_views.LostPhoneForm
+
+        def remove_while_building(*args, **kwargs):
+            for device in totp.devices_for_user(self.user, confirmed=None):
+                device.delete()
+            return real(*args, **kwargs)
+
+        with mock.patch.object(profile_views, "LostPhoneForm", side_effect=remove_while_building):
+            response = self.lost()
+
+        self.assertRedirects(response, reverse("accounts:two_factor"), fetch_redirect_response=False)
+        self.assertFalse(MailJob.objects.exists())
+        self.assertFalse(SessionCodeFailure.objects.exists())
+
+    def test_a_paused_budget_with_the_right_password_and_the_right_code_removes_nothing(self):
+        AuthenticatorDevice.objects.filter(pk=self.device.pk).update(
+            failed_codes=totp.CODE_PAUSE_AT, failed_codes_since=timezone.now()
+        )
+
+        response = self.lost()
+
+        self.assertContains(response, "pausiert", status_code=429)
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(remaining(self.user), 3)
+        self.assertFalse(SecurityEvent.objects.filter(account_id=self.user.pk).exists())
+
+
+@tag("mariadb")
+class LostPhoneFormStateTests(TestCase):
+    def test_the_form_fails_closed_when_the_second_factor_went_between_building_and_checking(self):
+        from django.test import RequestFactory
+
+        user, _device = create_user_with_totp()
+        request = RequestFactory().post("/")
+        request.user = user
+        form = LostPhoneForm(
+            {"current_password": PASSWORD, "otp_token": RECOVERY_CODES[0]}, request=request
+        )
+        for device in totp.devices_for_user(user, confirmed=None):
+            device.delete()
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Ihr Konto wurde inzwischen geändert", " ".join(form.non_field_errors()))
+        self.assertFalse(SessionCodeFailure.objects.exists())
+
+
+@tag("mariadb")
+class LostPhoneParallelTests(TransactionTestCase):
+    """Two posts with the same password and code: exactly one wins, the loser changes nothing."""
+
+    def test_exactly_one_of_two_parallel_posts_with_the_same_code_wins(self):
+        user, _device = create_user_with_totp()
+        clients = []
+        for _number in range(2):
+            client = Client()
+            client.force_login(user)
+            clients.append(client)
+        barrier = threading.Barrier(len(clients))
+        results = []
+
+        def work(client):
+            try:
+                barrier.wait()
+                response = client.post(
+                    LOST_URL,
+                    {"current_password": PASSWORD, "otp_token": RECOVERY_CODES[0]},
+                    REMOTE_ADDR="10.94.2.1",
+                )
+                results.append(response["Location"])
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work, args=(client,)) for client in clients]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        won = [location for location in results if location == f"{PROFILE}#card-two-factor"]
+        refused = [location for location in results if location == reverse("accounts:two_factor")]
+        self.assertEqual((len(won), len(refused)), (1, 1))
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=user).exists())
+        self.assertEqual(
+            SecurityEvent.objects.filter(event=SecurityEvent.Event.TWO_FACTOR_REMOVED_PHONE_LOST).count(), 1
+        )
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.RECOVERY_CODE_USED).count(), 1)
+        # The loser counted nothing, neither for the session nor as a failed login.
+        self.assertFalse(SessionCodeFailure.objects.exists())

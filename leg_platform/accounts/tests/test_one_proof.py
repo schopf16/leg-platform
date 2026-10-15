@@ -15,7 +15,12 @@ from unittest import mock
 
 from leg_platform.accounts import second_factor, totp
 from leg_platform.accounts.forms import ChangePasswordForm, OneProofMixin, ReauthenticationForm
-from leg_platform.accounts.models import AuthenticatorDevice, PendingEmailChange, User
+from leg_platform.accounts.models import (
+    AuthenticatorDevice,
+    PendingEmailChange,
+    SessionCodeFailure,
+    User,
+)
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
@@ -265,11 +270,13 @@ class ShapeAndBudgetTests(TestCase):
                 self.assertContains(self.post(value), SHAPE)
         self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
 
-    def test_the_shapes_of_a_code_reach_the_check_and_a_wrong_one_counts(self):
+    def test_the_shapes_of_a_code_reach_the_check_and_a_wrong_one_counts_for_the_session(self):
         for value in ("000001", "12 34 56", "123-456", "000 002"):
             with self.subTest(value=value):
                 self.assertContains(self.post(value), WRONG)
-        self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 4)
+        # Not against the budget of the account, which would also pause the login (D-062, block 9).
+        self.assertEqual(AuthenticatorDevice.objects.get(pk=self.device.pk).failed_codes, 0)
+        self.assertEqual(SessionCodeFailure.objects.get(account=self.user).failures, 4)
 
     def test_a_used_up_budget_pauses_with_the_lockout_page_and_changes_nothing(self):
         AuthenticatorDevice.objects.filter(pk=self.device.pk).update(
@@ -283,11 +290,14 @@ class ShapeAndBudgetTests(TestCase):
         self.assertContains(response, "pausiert", status_code=429)
         self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user).exists())
 
-    def test_the_budget_of_the_code_check_still_stops_guessing(self):
-        for _attempt in range(10):
-            self.post("000002")
+    def test_the_limit_of_the_session_stops_guessing(self):
+        for _attempt in range(second_factor.SESSION_CODE_LIMIT):
+            last = self.post("000002")
+        # The fifth wrong code ends the session (D-062, block 9); the account is not paused.
+        self.assertRedirects(last, reverse("accounts:login"), fetch_redirect_response=False)
         device = AuthenticatorDevice.objects.get(pk=self.device.pk)
-        self.assertGreaterEqual(device.failed_codes, 1)
+        self.assertEqual(device.failed_codes, 0)
+        self.assertFalse(totp.code_attempts_paused(self.user))
 
 
 @tag("mariadb")

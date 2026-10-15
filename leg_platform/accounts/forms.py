@@ -530,14 +530,15 @@ class CodeForm(PortalFormMixin, forms.Form):
 class SetupCodeForm(CodeForm):
     """The first code of the authenticator app when it is set up.
 
-    Only the six digits of the app are valid here, never a recovery code, so the field asks for a
-    numeric keyboard. Spaces and hyphens that a person copies along are still accepted by the
-    check (``totp.normalize_code``), so the field has no ``maxlength`` of six.
+    Only the six digits of the app are valid here, never a recovery code. The field is a plain
+    text field like every other field (owner, block 9): no numeric keyboard, no ``maxlength`` and
+    no pattern in the browser. Spaces and hyphens that a person copies along are accepted by the
+    check (``totp.normalize_code``); the server limit of ``max_length`` is not announced.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["otp_token"].widget.attrs["inputmode"] = "numeric"
+        self.fields["otp_token"].widget.attrs.pop("maxlength", None)
         self.fields["otp_token"].widget.attrs["placeholder"] = "000000"
         self.fields["otp_token"].label = _("Code from the app")
 
@@ -635,13 +636,18 @@ class OneProofMixin:
 
         When the budget of wrong codes is used up, ``verify_second_factor`` marks the request as
         locked out and the lockout page of the abuse protection answers (with its own text about
-        the pause); the form only adds the error.
+        the pause); the form only adds the error. A wrong code is counted for the session, not for
+        the account (``per_session``); the fifth ends the session (D-062, block 9).
         """
         if self.proof != "code" or self.errors or "otp_token" not in cleaned_data:
             return
         if (
             second_factor.verify_second_factor(
-                self.request, self.user, cleaned_data["otp_token"], recovery=False
+                self.request,
+                self.user,
+                cleaned_data["otp_token"],
+                recovery=False,
+                per_session=True,
             )
             is None
         ):
@@ -663,7 +669,8 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
         error_messages={"required": _("Enter your current password.")},
     )
-    # Instead of the password where a second factor is set up. A recovery code is also accepted.
+    # Instead of the password where a second factor is set up. Only the code of the app counts
+    # here, not a recovery code (D-062, block 8); the shape check refuses anything else.
     otp_token = forms.CharField(
         label=_("Code from the app"),
         # Generous on purpose: a password pasted by habit gets the message "that is not a code",
@@ -756,7 +763,11 @@ class LostPhoneForm(PortalFormMixin, forms.Form):
             return cleaned_data
         if (
             second_factor.verify_second_factor(
-                self.request, self.user, cleaned_data["otp_token"], app=False
+                self.request,
+                self.user,
+                cleaned_data["otp_token"],
+                app=False,
+                per_session=True,
             )
             is None
         ):

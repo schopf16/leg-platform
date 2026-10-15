@@ -224,8 +224,10 @@ def disable(user, *, via_recovery_code=False):
 
     The reset of the second factor of another account is a function of the system
     administrators, with its own rules (docs/SECURITY.md, section 3). ``via_recovery_code`` is
-    the "phone lost" way (D-062): the log line says so; the used recovery code was logged by
-    ``verify_code`` in the same transaction as its use.
+    the "phone lost" way (D-062): it has an event of its own, kept for the long period, because it
+    is the only way in which a person weakens their own second factor without the app; the used
+    recovery code was logged by ``verify_code``. The caller of that way runs the check of the code
+    and this function in one transaction, so that a refusal here gives the code back.
     """
     from leg_platform.accounts.second_factor import requires_second_factor
 
@@ -238,11 +240,12 @@ def disable(user, *, via_recovery_code=False):
         # Other sessions end; the view keeps the session that made the change (D-044).
         user.end_all_sessions()
         enqueue_for_account(MailJob.Kind.TWO_FACTOR_DISABLED, user)
-        security_log.record(
-            Event.TWO_FACTOR_DISABLED,
-            account=user,
-            detail="phone lost, recovery code" if via_recovery_code else "",
-        )
+        if via_recovery_code:
+            security_log.record(
+                Event.TWO_FACTOR_REMOVED_PHONE_LOST, account=user, long_retention=True
+            )
+        else:
+            security_log.record(Event.TWO_FACTOR_DISABLED, account=user)
 
 
 def verify_code(user, raw_code, *, app=True, recovery=True):

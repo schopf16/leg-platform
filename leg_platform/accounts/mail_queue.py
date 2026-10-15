@@ -60,6 +60,7 @@ HANDLERS = {
     MailJob.Kind.PASSWORD_CHANGED: password_reset.process_password_changed,
     MailJob.Kind.EMAIL_CHANGED: _notification(emails.send_email_changed),
     MailJob.Kind.SECONDARY_EMAIL_CHANGED: _notification(emails.send_secondary_email_changed),
+    MailJob.Kind.SESSION_ENDED_WRONG_CODES: _notification(emails.send_session_ended_wrong_codes),
     MailJob.Kind.TWO_FACTOR_ENABLED: _notification(emails.send_two_factor_enabled),
     MailJob.Kind.TWO_FACTOR_DISABLED: _notification(emails.send_two_factor_disabled),
     MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),

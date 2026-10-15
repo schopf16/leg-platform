@@ -189,6 +189,12 @@ DEFINITIONS = {
         (),
         (),
     ),
+    Key.SESSION_ENDED_WRONG_CODES: Definition(
+        "accounts/email/session_ended_wrong_codes.txt",
+        lambda: gettext("A session at %(instance_name)s was ended"),
+        (CONTACT_URL,),
+        (),
+    ),
 }
 
 MAX_BODY_LENGTH = 5000

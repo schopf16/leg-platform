@@ -136,7 +136,7 @@ form that made them; nothing about them is stored (D-059).
         {% include "accounts/_field.html" with field=form.otp_token %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-danger-outline">{% translate "Turn off 2FA" %}</button>
-          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=disable#card-two-factor">{% translate "Back" %}</a>
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=disable#card-two-factor">{% translate "Cancel" %}</a>
         </div>
       </form>
     {% endwith %}

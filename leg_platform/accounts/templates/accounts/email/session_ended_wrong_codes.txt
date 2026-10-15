@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+Unusual entries were made in a session of your account at {{ instance_name }}: several wrong codes were entered where a code from your authenticator app is asked. For your safety the session was ended.
+
+If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with "Forgot password" on the login page.{% endblocktranslate %}
+
+{% if contact_url %}{% blocktranslate %}If you need help, contact the operator. You will find contact information here:
+
+{{ contact_url }}{% endblocktranslate %}{% else %}{% translate "If you need help, contact the operator of this portal." %}{% endif %}
+{% endautoescape %}

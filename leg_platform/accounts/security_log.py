@@ -48,6 +48,10 @@ MESSAGES = {
     Event.EMAIL_CHANGE_STOPPED: "A requested email address change was stopped with the notice link",
     Event.SECONDARY_EMAIL_CHANGED: "The second email address was changed",
     Event.REGISTRATION_COMPLETED: "A registration was completed",
+    Event.SESSION_ENDED_WRONG_CODES: "A session was ended after wrong codes in a confirmation",
+    Event.TWO_FACTOR_REMOVED_PHONE_LOST: (
+        "Two-factor authentication was removed with a recovery code (phone lost)"
+    ),
 }
 
 

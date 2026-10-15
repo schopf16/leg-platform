@@ -61,7 +61,7 @@ class FirstStepsTests(TestCase):
             self.assertIn(label, page)
         self.assertEqual(page.count("noch nicht gesetzt"), 2)
         self.assertIn("nicht bereit", page)
-        self.assertIn("18 Texte, davon 0 angepasst", page)
+        self.assertIn(f"{len(EmailText.Key.values)} Texte, davon 0 angepasst", page)
         self.assertIn(reverse("admin:accounts_portalsettings_change", args=(1,)), page)
         self.assertIn(reverse("admin:accounts_emailtext_changelist"), page)
 
@@ -76,7 +76,7 @@ class FirstStepsTests(TestCase):
         page = client.get(INDEX_URL).content.decode()
 
         self.assertEqual(page.count("noch nicht gesetzt"), 1)
-        self.assertIn("18 Texte, davon 1 angepasst", page)
+        self.assertIn(f"{len(EmailText.Key.values)} Texte, davon 1 angepasst", page)
 
     def test_a_ready_delivery_is_shown_as_ready_and_no_secret_is_shown(self):
         client, _administrator = administrator_client()
@@ -151,7 +151,7 @@ class EmailTextListTests(TestCase):
 
         cells = status_cells(page)
         self.assertEqual(cells.count("Angepasst"), 1)
-        self.assertEqual(cells.count("Standardtext"), 17)
+        self.assertEqual(cells.count("Standardtext"), len(EmailText.Key.values) - 1)
         self.assertNotIn("icon-no", page)
         self.assertNotIn("icon-yes", page)
 
@@ -170,8 +170,8 @@ class EmailTextListTests(TestCase):
 
         self.assertEqual(status_cells(with_text).count("Angepasst"), 1)
         self.assertNotIn("Angepasst", status_cells(after_reset))
-        self.assertEqual(status_cells(after_reset).count("Standardtext"), 18)
-        self.assertEqual(len(re.findall(r'<td class="field-last_changed">-</td>', after_reset)), 18)
+        self.assertEqual(status_cells(after_reset).count("Standardtext"), len(EmailText.Key.values))
+        self.assertEqual(len(re.findall(r'<td class="field-last_changed">-</td>', after_reset)), len(EmailText.Key.values))
 
     def test_the_list_has_no_table_of_placeholders_and_the_edit_page_keeps_them(self):
         page = self.client.get(self.url).content.decode()

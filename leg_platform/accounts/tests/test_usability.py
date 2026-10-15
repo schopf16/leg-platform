@@ -334,7 +334,7 @@ class InputTypeTests(TestCase):
         self.assertContains(failed, "Geben Sie Ihr Passwort ein.")
         self.assertNotContains(failed, "zwingend erforderlich")
 
-    def test_only_the_setup_code_field_asks_for_a_numeric_keyboard(self):
+    def test_no_code_field_asks_for_a_numeric_keyboard_or_a_length(self):
         user, device = create_user_with_totp()
         # The second step of the login accepts the codes of the app and the recovery codes.
         stepper = Client()
@@ -348,17 +348,17 @@ class InputTypeTests(TestCase):
         complete_second_factor(member, user)
         again = element(member.get(reverse("accounts:two_factor_disable")).content.decode(), "id_otp_token")
         self.assertNotIn("inputmode", again)
-        # Only the first code of the setup is always six digits.
+        # The first code of the setup is a plain text field too (owner, block 9): a pasted
+        # "123 456" is accepted by the check, and the browser neither limits nor restricts it.
         enrolling = create_active_user("enrolling.person@example.org")
         client = Client()
         client.force_login(enrolling)
         client.post(SETUP_URL, {"current_password": PASSWORD}, REMOTE_ADDR="10.9.8.1")
         field = element(client.get(CONFIRM_URL).content.decode(), "id_otp_token")
-        self.assertIn('inputmode="numeric"', field)
+        for attribute in ("inputmode", "maxlength", "pattern"):
+            self.assertNotIn(attribute, field)
         self.assertIn('autocomplete="one-time-code"', field)
-        # A pasted "123 456" is still accepted by the check, so the field is not limited to six
-        # characters (the limit of 32 characters is the one of every code field).
-        self.assertNotIn('maxlength="6"', field)
+        self.assertIn('placeholder="000000"', field)
 
 
 @tag("mariadb")

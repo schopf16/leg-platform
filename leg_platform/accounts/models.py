@@ -1148,6 +1148,35 @@ class LoginIpAttempt(models.Model):
         indexes = [models.Index(fields=("bucket", "attempted_at"), name="accounts_lia_bucket_time")]
 
 
+class SessionCodeFailure(models.Model):
+    """The wrong app codes entered in the confirmations of one session of an account (D-062).
+
+    A confirmation in the profile (address, password, new recovery codes, turning off 2FA,
+    deleting the account) asks only for the code of the authenticator app. A wrong code there is
+    not counted against the budget of the account, which also pauses the login: whoever only holds
+    a session must not be able to burn it. It is counted for the session instead; the limit ends
+    the session. The row is server side and found by a keyed digest of the session key, never by
+    anything the browser sends; it lives in the database, not in the session, because parallel
+    requests of one session each work on their own copy of the session and would each count from
+    the same value. It is changed only under the lock of the account row.
+    """
+
+    account = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="session_code_failures", editable=False
+    )
+    session_digest = models.CharField(max_length=64, db_collation=EXACT_COLLATION, editable=False)
+    failures = models.PositiveSmallIntegerField(default=0, editable=False)
+    updated_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("account", "session_digest"), name="accounts_scf_account_session"
+            )
+        ]
+        indexes = [models.Index(fields=("updated_at",), name="accounts_scf_updated")]
+
+
 # 256 bits from the operating system's random generator (Python "secrets"); the URL-safe text
 # has 43 characters.
 VERIFICATION_TOKEN_BYTES = 32
@@ -1313,6 +1342,8 @@ class MailJob(models.Model):
         EMAIL_CHANGE_NOTICE = "email_change_notice", "Email address change requested"
         ACCOUNT_DELETED = "account_deleted", "Account deleted"
         SECONDARY_EMAIL_CHANGED = "secondary_email_changed", "Second email address changed"
+        # D-062, block 9: the session of a confirmation was ended after wrong codes.
+        SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", "Session ended after wrong codes"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1320,6 +1351,7 @@ class MailJob(models.Model):
         Kind.PASSWORD_CHANGED,
         Kind.EMAIL_CHANGED,
         Kind.SECONDARY_EMAIL_CHANGED,
+        Kind.SESSION_ENDED_WRONG_CODES,
         Kind.TWO_FACTOR_ENABLED,
         Kind.TWO_FACTOR_DISABLED,
         Kind.RECOVERY_CODES_RENEWED,
@@ -1412,6 +1444,9 @@ class EmailText(models.Model):
             "Notification: email address change requested (with the link to stop it)"
         )
         ACCOUNT_DELETED = "account_deleted", _("Notification: account deleted")
+        SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", _(
+            "Notification: session ended after wrong codes"
+        )
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False
@@ -1963,6 +1998,14 @@ class SecurityEvent(models.Model):
         )
         SECONDARY_EMAIL_CHANGED = "secondary_email_changed", _("Second email address changed")
         REGISTRATION_COMPLETED = "registration_completed", _("Registration completed")
+        # D-062, block 9: a session was ended after wrong codes in the confirmations of the
+        # profile, and the removal of the second factor with a recovery code (phone lost).
+        SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", _(
+            "Session ended after wrong codes"
+        )
+        TWO_FACTOR_REMOVED_PHONE_LOST = "two_factor_removed_phone_lost", _(
+            "Two-factor authentication removed with a recovery code (phone lost)"
+        )
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
@@ -1979,6 +2022,7 @@ class SecurityEvent(models.Model):
             Event.GRAPH_CONFIGURATION_CHANGED,
             Event.GRAPH_CERTIFICATE_UPLOADED,
             Event.PORTAL_SETTINGS_CHANGED,
+            Event.TWO_FACTOR_REMOVED_PHONE_LOST,
         }
     )
 

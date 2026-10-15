@@ -40,6 +40,7 @@ from leg_platform.accounts.models import (
     RateLimitEvent,
     RecoveryCode,
     RecoveryCodeDevice,
+    SessionCodeFailure,
     User,
     VerificationToken,
     recovery_code_digest,
@@ -788,23 +789,24 @@ class RecoveryCodesAndRemovalTests(TestCase):
         )
         self.assertTrue(User.objects.filter(pk=plain.pk).exists())
 
-    def test_the_code_check_of_the_forms_is_under_the_abuse_protection(self):
+    def test_the_code_check_of_the_forms_still_refuses_during_a_lockout(self):
+        # The lockout of the login (failed logins of the account) refuses the check of a code in
+        # the profile, even a correct one; the wrong codes of the profile themselves no longer count
+        # as failed logins (D-062, block 9).
         for _attempt in range(LOGIN_FAILURE_LIMIT):
-            response = self.client.post(
-                reverse("accounts:recovery_codes"),
-                self.data(otp_token="000000"),
-                REMOTE_ADDR="10.3.0.4",
-            )
+            log_in(Client(), self.user.email, "wrong password for this account", address="10.3.0.4")
+
+        response = self.client.post(
+            reverse("accounts:recovery_codes"), self.data(), REMOTE_ADDR="10.3.0.4"
+        )
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(stored_digests(), RECOVERY_DIGESTS)
 
     def test_the_data_of_a_failed_check_is_not_stored_by_the_abuse_protection(self):
-        # The sentinel has the shape of a code, so that the check is reached and recorded.
-        self.client.post(
-            reverse("accounts:two_factor_disable"),
-            {"current_password": "password-sentinel-1", "otp_token": "654321"},
-        )
+        # A wrong password at the login is recorded by the abuse protection; what it records
+        # holds no password (the wrong codes of the profile are no failed logins any more).
+        log_in(Client(), self.user.email, "password-sentinel-1", address="10.3.0.5")
 
         self.assertTrue(AccessAttempt.objects.exists())
         for attempt in AccessAttempt.objects.all():
@@ -1517,7 +1519,7 @@ class CodeBudgetTests(TestCase):
         self.assertIn("_auth_user_id", self.client.session)
         self.assertEqual(budget_of(self.device), 3)
 
-    def test_the_forms_that_ask_for_a_code_count_against_the_same_budget(self):
+    def test_the_forms_that_ask_for_a_code_count_for_the_session_not_for_the_budget(self):
         self.client.force_login(self.user)
         complete_second_factor(self.client, self.user)
 
@@ -1527,7 +1529,9 @@ class CodeBudgetTests(TestCase):
             REMOTE_ADDR="10.8.0.4",
         )
 
-        self.assertEqual(budget_of(self.device), 1)
+        # Not against the budget of the account, which also pauses the login (D-062, block 9).
+        self.assertEqual(budget_of(self.device), 0)
+        self.assertEqual(SessionCodeFailure.objects.get(account=self.user).failures, 1)
 
     def test_attempts_that_the_lockout_refuses_do_not_count(self):
         log_in(self.client, self.user.email, address="10.8.0.5")

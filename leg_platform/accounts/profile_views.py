@@ -180,7 +180,13 @@ class ProfileCardView(NeverCacheMixin, LoginRequiredMixin, View):
         sensitive_post_parameters("current_password", "new_password1", "new_password2", "otp_token")
     )
     def dispatch(self, request, *args, **kwargs):
-        return super().dispatch(request, *args, **kwargs)
+        response = super().dispatch(request, *args, **kwargs)
+        if getattr(request, second_factor.SESSION_ENDED_ATTRIBUTE, False):
+            # The check of a code ended this session (D-062, block 9): whatever the view answered,
+            # the person is logged out and told so at the login page.
+            second_factor.end_session_for_wrong_codes(request)
+            return redirect("accounts:login")
+        return response
 
 
 class ProfileView(ProfileCardView):
@@ -558,15 +564,26 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
 
     @sensitive_variables("form")
     def post(self, request):
+        """The check of the password and the code and the removal are ONE transaction under the
+        lock of the account (security review, block 9, L-1): the state is checked again before the
+        code is used up, and a refusal of the removal gives the code back. A parallel post with the
+        same code finds the second factor gone and uses up nothing. A wrong answer is committed
+        (the count of the session, D-062), a refusal is rolled back."""
         form = LostPhoneForm(request.POST, request=request)
-        if not form.is_valid():
+        try:
+            with transaction.atomic():
+                locked = User._base_manager.select_for_update().get(pk=request.user.pk)
+                if second_factor.requires_second_factor(locked) or not second_factor.has_second_factor(locked):
+                    raise totp.SecondFactorError("Not possible for this account.")
+                valid = form.is_valid()
+                if valid:
+                    totp.disable(request.user, via_recovery_code=True)
+        except totp.SecondFactorError:
+            return refused_change(request)
+        if not valid:
             return render_profile(
                 request, edit="two_factor", step="lost_phone", forms={"action": form}
             )
-        try:
-            totp.disable(request.user, via_recovery_code=True)
-        except totp.SecondFactorError:
-            return refused_change(request)
         update_session_auth_hash(request, request.user)
         messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
         return back_to("two_factor")
