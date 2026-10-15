@@ -19,6 +19,7 @@ from leg_platform.accounts.tests.helpers import (
     VerifiedClient,
     completion_data,
     create_active_user,
+    password_data,
     registration_data,
     run_mail_queue,
     verification_path,
@@ -74,6 +75,10 @@ class BrowserOriginMixin:
         self.assertTemplateUsed(refused, "403_csrf.html")
         # The origin of the page itself is what a browser sends for the project default.
         accepted = submit_like_a_browser(client, url, data)
+        if success_location is None:
+            # The page itself is the result (no redirect), e.g. "Email address changed".
+            self.assertEqual(accepted.status_code, 200, accepted.content.decode()[:2000])
+            return accepted
         self.assertEqual(accepted.status_code, 302, accepted.content.decode()[:2000])
         self.assertEqual(accepted["Location"], success_location)
 
@@ -109,21 +114,26 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         )
         run_mail_queue()
         self.link = verification_path(mail.outbox[-1])
+        self.password_url = reverse("accounts:registration_password")
         self.url = reverse("accounts:registration_complete")
 
-    def test_the_link_sends_no_referrer_and_the_form_page_does_not(self):
+    def test_the_link_sends_no_referrer_and_the_form_pages_do_not(self):
         opened = self.client.get(self.link)
 
         self.assertEqual(opened.status_code, 302)
         self.assertEqual(opened["Referrer-Policy"], "no-referrer")
-        self.assert_the_page_does_not_send_no_referrer(self.client, self.url)
+        self.assert_the_page_does_not_send_no_referrer(self.client, self.password_url)
 
-    def test_the_form_is_accepted_with_the_origin_of_a_browser(self):
+    def test_the_forms_are_accepted_with_the_origin_of_a_browser(self):
         self.client.get(self.link)
-        data = completion_data(registration=VerificationToken.objects.get().pk)
+        reference = VerificationToken.objects.get().pk
 
         self.assert_the_form_works_like_in_a_browser(
-            self.client, self.url, data, reverse("accounts:welcome")
+            self.client, self.password_url, password_data(registration=reference), self.url
+        )
+        self.assert_the_page_does_not_send_no_referrer(self.client, self.url)
+        self.assert_the_form_works_like_in_a_browser(
+            self.client, self.url, completion_data(registration=reference), reverse("home")
         )
 
         self.assertEqual(User.objects.get().status, User.Status.ACTIVE)
@@ -183,10 +193,10 @@ class EmailChangeOriginTests(BrowserOriginMixin, TestCase):
     def test_the_form_is_accepted_with_the_origin_of_a_browser(self):
         self.client.get(self.link)
 
-        self.assert_the_form_works_like_in_a_browser(
-            self.client, self.url, {}, reverse("accounts:login")
-        )
+        accepted = self.assert_the_form_works_like_in_a_browser(self.client, self.url, {}, None)
 
+        self.assertContains(accepted, "E-Mail-Adresse geändert")
+        self.assertContains(accepted, "new.address@example.org")
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "new.address@example.org")
 

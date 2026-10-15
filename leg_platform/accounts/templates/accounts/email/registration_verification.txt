@@ -1,8 +1,8 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-You or someone else entered this email address to register at {{ instance_name }}.
+Please confirm your email address with this link. The link is valid for {{ lifetime_hours }} hours.
 
-To confirm your address and choose your password, open this link within {{ lifetime_hours }} hours:
+Continue registration:
 
 {{ verification_url }}
 

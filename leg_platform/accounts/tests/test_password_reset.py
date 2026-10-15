@@ -39,6 +39,7 @@ SET_URL = reverse("accounts:password_reset_set")
 LOGIN_URL = reverse("accounts:login")
 NEW_PASSWORD = "silver lantern rests under quiet rain"
 INVALID_PAGE = "accounts/password_reset_invalid.html"
+INVALID_URL = reverse("accounts:password_reset_invalid")
 
 
 def request_reset(address, client=None, remote_addr="10.40.0.1"):
@@ -245,15 +246,15 @@ class ResetFlowTests(TestCase):
         self.open_link()
         self.set_password()
 
-        self.assertTemplateUsed(self.open_link(), INVALID_PAGE)
-        self.assertTemplateUsed(self.client.get(SET_URL), INVALID_PAGE)
+        self.assertRedirects(self.open_link(), INVALID_URL, fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(SET_URL), INVALID_URL, fetch_redirect_response=False)
 
     def test_a_new_request_makes_the_earlier_link_invalid_and_the_new_link_works(self):
         request_reset(self.user.email)
         second = reset_path(mail.outbox[-1])
         self.assertNotEqual(second, self.path)
 
-        self.assertTemplateUsed(Client().get(self.path), INVALID_PAGE)
+        self.assertRedirects(Client().get(self.path), INVALID_URL, fetch_redirect_response=False)
         self.assertEqual(VerificationToken.objects.filter(purpose="password_reset").count(), 1)
         self.assertRedirects(self.client.get(second), SET_URL, fetch_redirect_response=False)
         self.assertRedirects(self.set_password(), LOGIN_URL)
@@ -266,7 +267,7 @@ class ResetFlowTests(TestCase):
 
         response = self.set_password()
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertRedirects(response, INVALID_URL, fetch_redirect_response=False)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
 
@@ -292,15 +293,18 @@ class ResetFlowTests(TestCase):
 
         self.set_password()
 
-        self.assertTemplateUsed(
-            Client().get(reverse("accounts:password_reset_verify", args=(stale,))), INVALID_PAGE
+        self.assertRedirects(
+            Client().get(reverse("accounts:password_reset_verify", args=(stale,))),
+            INVALID_URL,
+            fetch_redirect_response=False,
         )
         self.assertEqual(VerificationToken.objects.count(), 0)
 
     def test_an_expired_link_is_invalid(self):
         VerificationToken.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
 
-        self.assertTemplateUsed(self.open_link(), INVALID_PAGE)
+        self.assertRedirects(self.open_link(), INVALID_URL, fetch_redirect_response=False)
+        self.assertTemplateUsed(self.client.get(INVALID_URL), INVALID_PAGE)
 
     def test_a_link_that_expires_before_the_form_is_sent_changes_nothing(self):
         self.open_link()
@@ -308,17 +312,17 @@ class ResetFlowTests(TestCase):
 
         response = self.set_password()
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertRedirects(response, INVALID_URL, fetch_redirect_response=False)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
 
     def test_the_form_is_not_available_without_the_link_in_the_same_session(self):
         for client in (Client(), self.client):
-            self.assertTemplateUsed(client.get(SET_URL), INVALID_PAGE)
+            self.assertRedirects(client.get(SET_URL), INVALID_URL, fetch_redirect_response=False)
         response = Client().post(
             SET_URL, {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD}
         )
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertRedirects(response, INVALID_URL, fetch_redirect_response=False)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(PASSWORD))
 
@@ -328,8 +332,8 @@ class ResetFlowTests(TestCase):
 
         response = self.set_password()
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
-        self.assertTemplateUsed(self.open_link(), INVALID_PAGE)
+        self.assertRedirects(response, INVALID_URL, fetch_redirect_response=False)
+        self.assertRedirects(self.open_link(), INVALID_URL, fetch_redirect_response=False)
 
     def test_the_password_policy_applies(self):
         weak = {
@@ -370,9 +374,15 @@ class ResetFlowTests(TestCase):
         run_mail_queue()
         registration_path = verification_path(mail.outbox[-1])
 
-        self.assertTemplateUsed(client.get(self.path.replace("password-reset", "register")), "accounts/registration_invalid.html")
-        self.assertTemplateUsed(
-            client.get(registration_path.replace("register", "password-reset")), INVALID_PAGE
+        self.assertRedirects(
+            client.get(self.path.replace("password-reset", "register")),
+            reverse("accounts:registration_invalid"),
+            fetch_redirect_response=False,
+        )
+        self.assertRedirects(
+            client.get(registration_path.replace("register", "password-reset")),
+            INVALID_URL,
+            fetch_redirect_response=False,
         )
 
     def test_the_token_pages_send_no_referrer_and_are_not_cached(self):
@@ -485,8 +495,8 @@ class ResetFlowTests(TestCase):
         for response in pages:
             html = response.content.decode()
             self.assertNotIn("\u00df", html)
-        self.assertContains(pages[0], "Passwort vergessen")
-        self.assertContains(pages[4], "Neues Passwort")
+        self.assertContains(pages[0], "Passwort zurücksetzen")
+        self.assertContains(pages[4], "Passwort festlegen")
         for message in mail.outbox:
             self.assertNotIn("\u00df", message.subject + message.body)
             self.assertIn("Guten Tag", message.body)

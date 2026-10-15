@@ -49,6 +49,34 @@ def postal_code_field():
     return forms.CharField(label=_("postal code"), max_length=15, required=False)
 
 
+def password_rules():
+    """The password rules as short lines for a list (docs/SECURITY.md, section 3; D-058).
+
+    They state the rules that the configured validators check and nothing else: the policy has
+    no composition rules (no upper-case, digit or special character is required), a long
+    sentence is advised. The minimum length is the one of the configured validator, so the text
+    cannot differ from the rule.
+    """
+    minimum = next(
+        (
+            validator.min_length
+            for validator in password_validation.get_default_password_validators()
+            if isinstance(validator, password_validation.MinimumLengthValidator)
+        ),
+        None,
+    )
+    rules = []
+    if minimum is not None:
+        rules.append(gettext("At least %(min_length)d characters.") % {"min_length": minimum})
+    rules += [
+        gettext("A sentence of several words is easy to remember and hard to guess."),
+        gettext("All characters are allowed; upper-case letters, digits and special characters are not required."),
+        gettext("No known or easily guessed passwords, no number-only passwords."),
+        gettext("Not similar to your email address."),
+    ]
+    return rules
+
+
 def password_hint():
     """The advice at the password field (docs/SECURITY.md, section 3: passphrases are advised).
 
@@ -219,26 +247,80 @@ def describe_password_fields(form, first, second):
 
 
 class NewPasswordForm(PortalFormMixin, SetPasswordForm):
-    """The new password after a reset link (same password policy as everywhere, twice)."""
+    """The new password after a reset link (same password policy as everywhere, twice).
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        describe_password_fields(self, "new_password1", "new_password2")
-
-
-class CompleteRegistrationForm(SetPasswordMixin, ProfileForm):
-    """Checking the profile and choosing the password after the address was verified.
-
-    The email address is shown by the view and cannot be changed here.
+    The address is shown as text and is a real field marked as the user name, as on the password
+    step of the registration, so that a password manager updates the saved login. The submitted
+    value is never used.
     """
 
-    password1, password2 = SetPasswordMixin.create_password_fields()
-
-    field_order = (*PROFILE_FIELD_ORDER, "password1", "password2")
+    username = forms.CharField(
+        label=_("Email address (username)"),
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "readonly": True,
+                "tabindex": "-1",
+                "autocomplete": "username",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
+    )
+    field_order = ("username", "new_password1", "new_password2")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.initial["username"] = self.user.email
+        self.fields["username"].widget.attrs["class"] = "plain-value"
+        describe_password_fields(self, "new_password1", "new_password2")
+        self.fields["new_password1"].help_text = ""
+        self.fields["new_password1"].label = _("Password")
+        self.fields["new_password2"].label = _("Repeat password")
+        self.fields["new_password2"].help_text = ""
+
+    def clean_username(self):
+        return self.user.email
+
+
+class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
+    """Step 2 of the registration: the password (D-058).
+
+    The address is shown as plain text but is a real field marked as the user name in the same
+    form as the two password fields, so that a password manager saves both together. The
+    submitted value is never used: the user name is the address that was verified.
+    """
+
+    username = forms.CharField(
+        label=_("Email address (username)"),
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "readonly": True,
+                "tabindex": "-1",
+                "autocomplete": "username",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
+    )
+    password1, password2 = SetPasswordMixin.create_password_fields()
+
+    field_order = ("username", "password1", "password2")
+
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.initial["username"] = user.email
+        self.fields["username"].widget.attrs["class"] = "plain-value"
         describe_password_fields(self, "password1", "password2")
+        self.fields["password1"].help_text = ""
+        self.fields["password1"].label = _("Password")
+        self.fields["password2"].label = _("Repeat password")
+        self.fields["password2"].help_text = ""
+
+    def clean_username(self):
+        return self.user.email
 
     def clean(self):
         cleaned_data = super().clean()
@@ -247,9 +329,64 @@ class CompleteRegistrationForm(SetPasswordMixin, ProfileForm):
 
     def _post_clean(self):
         super()._post_clean()
-        # After the instance holds the submitted names, so that the similarity validator
-        # compares the password with them.
-        self.validate_password_for_user(self.instance, "password1")
+        # Only the address is known at this step; the names follow on the next page.
+        self.validate_password_for_user(self.user, "password1")
+
+
+class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
+    """Step 3 of the registration: name, address and the consent to the privacy notice (D-058).
+
+    Only the fields of the design package (team lead decision K15). The country is Switzerland;
+    the other fields of the profile (salutation, company, address addition, post office box,
+    phone number) stay in the model and are entered in the profile later.
+    """
+
+    postal_code = postal_code_field()
+    privacy = forms.BooleanField(
+        required=True,
+        label=_("I have read the privacy notice and accept it."),
+        error_messages={"required": _("Please confirm that you accept the privacy notice.")},
+    )
+
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "street", "house_number", "town")
+
+    field_order = (
+        "first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, label, message in (
+            ("first_name", _("First name"), _("Enter your first name.")),
+            ("last_name", _("Last name"), _("Enter your last name.")),
+            ("street", _("Street"), _("Enter your street.")),
+            ("town", _("Town"), _("Enter a town.")),
+        ):
+            self.fields[name].required = True
+            self.fields[name].label = label
+            self.fields[name].error_messages["required"] = message
+        # Not every address has a house number, so the field may stay empty (the package marks
+        # it neither as required nor as optional).
+        self.fields["house_number"].label = _("House number")
+        self.fields["house_number"].required = False
+        self.fields["postal_code"].label = _("Postal code")
+        self.fields["postal_code"].required = True
+        self.fields["postal_code"].error_messages["required"] = _("Enter a postal code.")
+        self.fields["postal_code"].widget.attrs.update(
+            {"inputmode": "numeric", "autocomplete": "postal-code", "maxlength": "4"}
+        )
+        # A house number has no standard autocomplete value, so that no password manager fills it.
+        self.fields["house_number"].widget.attrs["autocomplete"] = "off"
+        self.fields["privacy"].widget.attrs["class"] = "entry-check-input"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # The country of a registration is Switzerland (K15); the model default is the same.
+        cleaned_data["country"] = SWITZERLAND
+        clean_postal_code(self, cleaned_data)
+        return cleaned_data
 
 
 class LoginForm(PortalFormMixin, AuthenticationForm):

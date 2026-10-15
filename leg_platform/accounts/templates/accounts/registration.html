@@ -1,15 +1,17 @@
 {% extends "entry_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Register" %}{% endblock %}
+{% block title %}{% translate "Confirm email address" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Register" %}</h1>
-  <p>{% translate "Enter your email address. We will send you a link to complete your registration." %}</p>
+  {% include "accounts/_progress.html" with progress_step=1 %}
+  <h1>{% translate "Confirm email address" %}</h1>
   <form method="post" novalidate>
     {% csrf_token %}
-    {% include "accounts/_form_fields.html" %}
-    <button type="submit" class="btn btn-primary">{% translate "Register" %}</button>
+    {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+    {% blocktranslate count counter=lifetime_hours asvar link_hint %}We send you a link. It is valid for {{ counter }} hour.{% plural %}We send you a link. It is valid for {{ counter }} hours.{% endblocktranslate %}
+    {% include "accounts/_field.html" with field=form.email hint=link_hint %}
+    <button type="submit" class="btn btn-primary">{% translate "Send link" %}</button>
   </form>
-  <p class="entry-divider">{% translate "Already registered?" %}</p>
-  <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
+  <p class="entry-divider">{% translate "Already have an account?" %}</p>
+  <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
 {% endblock %}

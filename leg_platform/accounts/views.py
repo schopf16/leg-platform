@@ -9,12 +9,13 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -30,6 +31,7 @@ from leg_platform.addresses.services import check_address
 from leg_platform.accounts import (
     email_change,
     password_reset,
+    resend,
     second_factor,
     second_factor_reset,
     security_log,
@@ -40,7 +42,6 @@ from leg_platform.accounts import (
 from leg_platform.accounts.forms import (
     ChangePasswordForm,
     CodeForm,
-    CompleteRegistrationForm,
     ConfirmForm,
     EmailChangeForm,
     LoginForm,
@@ -48,11 +49,17 @@ from leg_platform.accounts.forms import (
     PasswordResetRequestForm,
     ProfileForm,
     ReauthenticationForm,
+    RegistrationDetailsForm,
     RegistrationForm,
+    RegistrationPasswordForm,
     SetupCodeForm,
     StartSetupForm,
+    password_rules,
 )
 from leg_platform.accounts.mail_queue import submit_mail_request
+from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
+from leg_platform.accounts.portal_settings import legal_links
+from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 from leg_platform.accounts.models import (
     AccountIntegrityError,
     MailJob,
@@ -65,6 +72,9 @@ from leg_platform.accounts.models import (
 # the token itself is not in the URL of the page that is shown (docs/SECURITY.md, section 6;
 # the approach of Django's password reset view).
 REGISTRATION_SESSION_KEY = "registration_token_digest"
+# The password chosen on the second step, as a hash and bound to the verification link, until the
+# last step creates the account (D-058). Never the password itself.
+REGISTRATION_PASSWORD_SESSION_KEY = "registration_password_hash"
 PASSWORD_RESET_SESSION_KEY = "password_reset_token_digest"
 TWO_FACTOR_RESET_SESSION_KEY = "two_factor_reset_token_digest"
 EMAIL_CHANGE_SESSION_KEY = "email_change_token_digest"
@@ -139,11 +149,15 @@ class HideTaskView(NeverCacheMixin, LoginRequiredMixin, View):
 
     http_method_names = ["post"]
 
+    def handle_no_permission(self):
+        # Without a login the person goes to the login page, without "?next": a POST target is
+        # no page to return to (security review of phase 2, N-1).
+        return redirect(settings.LOGIN_URL)
+
     def post(self, request, key):
-        try:
-            tasks.hide(request.user, key)
-        except KeyError:
-            raise Http404 from None
+        if key not in tasks.TASKS_BY_KEY:
+            raise Http404
+        tasks.hide(request.user, key)
         return redirect("home")
 
 
@@ -233,21 +247,43 @@ class PortalLogoutView(NeverCacheMixin, LogoutView):
 
 
 class RegistrationView(NeverCacheMixin, FormView):
+    """Step 1 of the registration: the address (D-058)."""
+
     template_name = "accounts/registration.html"
     form_class = RegistrationForm
     success_url = reverse_lazy("accounts:registration_sent")
 
     def form_valid(self, form):
         submit_mail_request(self.request, MailJob.Kind.REGISTRATION, form.cleaned_data["email"])
+        resend.remember(self.request, resend.REGISTRATION, form.cleaned_data["email"])
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            lifetime_hours=int(REGISTRATION_LINK_LIFETIME.total_seconds() // 3600), **kwargs
+        )
+
+
+class RegistrationInvalidView(NeverCacheMixin, FormView):
+    """"Link no longer valid": asks for the address again, with a form that posts to step 1.
+
+    A page of its own, not the response of the link: the response of a link with a token has
+    ``Referrer-Policy: no-referrer``, and a form on such a page would be refused by the CSRF
+    check (D-054). The link redirects here, so the token is not in this URL.
+    """
+
+    template_name = "accounts/registration_invalid.html"
+    form_class = RegistrationForm
 
 
 class EmailSentView(NeverCacheMixin, TemplateView):
     """The same page for every address (docs/PROJECT.md, "Registration").
 
-    One text for the registration and the password reset: it says what a person needs to know
+    One page for the registration and the password reset: it says what a person needs to know
     whatever happened, and states nothing that depends on whether the address belongs to an
-    account. ``purpose`` and ``lifetime`` are set in the URL configuration.
+    account. It shows the address that this browser entered and offers "send again" after a
+    pause (``leg_platform.accounts.resend``). ``purpose`` and ``lifetime`` are set in the URL
+    configuration.
     """
 
     template_name = "accounts/email_sent.html"
@@ -255,46 +291,78 @@ class EmailSentView(NeverCacheMixin, TemplateView):
     lifetime = None
 
     def get_context_data(self, **kwargs):
+        state = resend.pending(self.request, self.purpose)
+        registration = self.purpose == resend.REGISTRATION
         return super().get_context_data(
             purpose=self.purpose,
             lifetime_hours=int(self.lifetime.total_seconds() // 3600),
+            address=state.address if state else "",
+            wait_seconds=state.wait if state else 0,
+            cooldown_seconds=resend.RESEND_COOLDOWN_SECONDS,
+            resend_url=reverse("accounts:registration_resend" if registration else "accounts:password_reset_resend"),
+            other_address_url=reverse("accounts:registration" if registration else "accounts:password_reset"),
+            progress_step=1 if registration else 0,
             **kwargs,
         )
+
+
+class ResendView(NeverCacheMixin, View):
+    """"Send the email again": only after the pause, and only to the address of this browser.
+
+    Nothing is sent before the pause is over (the server decides, not the countdown of the page);
+    the limits of every request apply as well (D-038).
+    """
+
+    http_method_names = ["post"]
+    purpose = None
+    kind = None
+    start_url = None
+    sent_url = None
+
+    def post(self, request):
+        state = resend.pending(request, self.purpose)
+        if state is None:
+            return redirect(self.start_url)
+        if state.wait > 0:
+            return redirect(self.sent_url)
+        submit_mail_request(request, self.kind, state.address)
+        resend.remember(request, self.purpose, state.address)
+        return redirect(self.sent_url)
 
 
 class RegistrationVerifyView(TokenPageMixin, View):
     """Opening the link changes nothing; it only remembers the token and leaves the URL.
 
     Mail scanners and link previews open links without any person acting; the registration is
-    completed only when the form is submitted.
+    completed only when the last form is submitted.
     """
 
     def get(self, request, token):
         found = VerificationToken.objects.find_valid(token, VerificationToken.Purpose.REGISTRATION)
         if found is None or found.user.status != User.Status.UNVERIFIED:
-            return render(request, "accounts/registration_invalid.html")
+            return redirect("accounts:registration_invalid")
         request.session[REGISTRATION_SESSION_KEY] = found.digest
-        return redirect("accounts:registration_complete")
+        # A new link starts the steps again: a password held for an earlier link is dropped.
+        request.session.pop(REGISTRATION_PASSWORD_SESSION_KEY, None)
+        return redirect("accounts:registration_password")
 
 
-class RegistrationCompleteView(NeverCacheMixin, FormView):
-    template_name = "accounts/registration_complete.html"
-    form_class = CompleteRegistrationForm
-    success_url = reverse_lazy("accounts:welcome")
+class RegistrationStepMixin(NeverCacheMixin):
+    """Steps 2 and 3: they belong to the verified link that is in the session.
 
-    # The responses of this method come before the mixin's dispatch, so it is marked as not
-    # cacheable itself. The password fields are masked in error reports.
+    The form belongs to the registration it was rendered for. Opening another link in the same
+    browser replaces the token in the session; a form rendered for the earlier link must then not
+    be saved into the account of the later one.
+    """
+
     @method_decorator(never_cache)
     @method_decorator(sensitive_post_parameters("password1", "password2"))
     def dispatch(self, request, *args, **kwargs):
         self.token = self.find_token(request)
         if self.token is None:
-            return render(request, "accounts/registration_invalid.html")
-        # The form belongs to the registration it was rendered for. Opening another link in the
-        # same browser replaces the token in the session; a form rendered for the earlier link
-        # must then not be saved into the account of the later one.
+            return redirect("accounts:registration_invalid")
         if request.method == "POST" and request.POST.get("registration") != str(self.token.pk):
-            return render(request, "accounts/registration_invalid.html")
+            return redirect("accounts:registration_invalid")
         return super().dispatch(request, *args, **kwargs)
 
     @staticmethod
@@ -309,18 +377,76 @@ class RegistrationCompleteView(NeverCacheMixin, FormView):
             return None
         return found
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["instance"] = self.token.user
-        return kwargs
-
     def get_context_data(self, **kwargs):
         # The address is shown but cannot be changed here: it is the one that was verified.
         return super().get_context_data(
             account_email=self.token.user.email, registration_ref=self.token.pk, **kwargs
         )
 
+
+class RegistrationPasswordView(RegistrationStepMixin, FormView):
+    """Step 2 of the registration: the password (D-058).
+
+    The password is checked here and kept as a hash in the session, bound to the verification
+    link, until the last step creates the account. The account is not activated before.
+    """
+
+    template_name = "accounts/registration_password.html"
+    form_class = RegistrationPasswordForm
+    success_url = reverse_lazy("accounts:registration_complete")
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "user": self.token.user}
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(progress_step=2, password_rules=password_rules(), **kwargs)
+
     def form_valid(self, form):
+        self.request.session[REGISTRATION_PASSWORD_SESSION_KEY] = {
+            "digest": self.token.digest,
+            "hash": make_password(form.cleaned_data["password1"]),
+        }
+        return super().form_valid(form)
+
+
+class RegistrationCompleteView(RegistrationStepMixin, FormView):
+    """Step 3 of the registration: name, address and consent; "Create account" (D-058)."""
+
+    template_name = "accounts/registration_complete.html"
+    form_class = RegistrationDetailsForm
+    success_url = reverse_lazy("home")
+
+    def get(self, request, *args, **kwargs):
+        if self.held_password_hash() is None:
+            return redirect("accounts:registration_password")
+        return super().get(request, *args, **kwargs)
+
+    def held_password_hash(self):
+        """The hash of the password of step 2 for this link, or None."""
+        held = self.request.session.get(REGISTRATION_PASSWORD_SESSION_KEY)
+        if (
+            isinstance(held, dict)
+            and isinstance(held.get("hash"), str)
+            and held.get("digest") == self.token.digest
+        ):
+            return held["hash"]
+        return None
+
+    def post(self, request, *args, **kwargs):
+        if self.held_password_hash() is None:
+            return redirect("accounts:registration_password")
+        return super().post(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["instance"] = self.token.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(progress_step=3, **kwargs)
+
+    def form_valid(self, form):
+        password_hash = self.held_password_hash()
         with transaction.atomic():
             # The account is locked before its token, as when a pending registration is replaced,
             # so that the two cannot deadlock. The token is consumed only now, by the successful
@@ -336,11 +462,15 @@ class RegistrationCompleteView(NeverCacheMixin, FormView):
                 .first()
             )
             if user is None or token is None:
-                return render(self.request, "accounts/registration_invalid.html")
+                return redirect("accounts:registration_invalid")
+            # The consent: the time and the address of the privacy notice that was shown.
+            form.instance.privacy_accepted_at = timezone.now()
+            form.instance.privacy_accepted_url = legal_links(self.request).privacy_url
             user = form.save()
-            user.complete_registration(form.cleaned_data["password1"])
+            user.complete_registration(password_hash=password_hash)
             token.delete()
         self.request.session.pop(REGISTRATION_SESSION_KEY, None)
+        self.request.session.pop(REGISTRATION_PASSWORD_SESSION_KEY, None)
         self._show_address_warning(form.cleaned_data)
         # The person has just proved control of the mailbox (single-use link) and chosen the
         # password, so the session logs in as after a successful login (owner decision of
@@ -348,7 +478,7 @@ class RegistrationCompleteView(NeverCacheMixin, FormView):
         # authentication are written by the login signal, no failed attempt is recorded, and the
         # account has no privileges. The link was consumed above, so it cannot log in again.
         login(self.request, user, backend=second_factor.LOGIN_BACKEND)
-        return redirect("accounts:welcome")
+        return redirect(self.get_success_url())
 
     def _show_address_warning(self, cleaned_data):
         result = check_address(
@@ -373,7 +503,21 @@ class PasswordResetRequestView(NeverCacheMixin, FormView):
         submit_mail_request(
             self.request, MailJob.Kind.PASSWORD_RESET, form.cleaned_data["email"]
         )
+        resend.remember(self.request, resend.PASSWORD_RESET, form.cleaned_data["email"])
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            lifetime_hours=int(PASSWORD_RESET_LIFETIME.total_seconds() // 3600), **kwargs
+        )
+
+
+class PasswordResetInvalidView(NeverCacheMixin, FormView):
+    """"Link no longer valid": asks for the address again (a page of its own, see
+    ``RegistrationInvalidView``)."""
+
+    template_name = "accounts/password_reset_invalid.html"
+    form_class = PasswordResetRequestForm
 
 
 class PasswordResetVerifyView(TokenPageMixin, View):
@@ -384,7 +528,7 @@ class PasswordResetVerifyView(TokenPageMixin, View):
             token, VerificationToken.Purpose.PASSWORD_RESET
         )
         if found is None or found.user.status != User.Status.ACTIVE:
-            return render(request, "accounts/password_reset_invalid.html")
+            return redirect("accounts:password_reset_invalid")
         request.session[PASSWORD_RESET_SESSION_KEY] = found.digest
         return redirect("accounts:password_reset_set")
 
@@ -406,7 +550,7 @@ class PasswordResetSetView(NeverCacheMixin, FormView):
             else None
         )
         if self.token is None or self.token.user.status != User.Status.ACTIVE:
-            return render(request, "accounts/password_reset_invalid.html")
+            return redirect("accounts:password_reset_invalid")
         return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
@@ -414,10 +558,13 @@ class PasswordResetSetView(NeverCacheMixin, FormView):
         kwargs["user"] = self.token.user
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(password_rules=password_rules(), **kwargs)
+
     def form_valid(self, form):
         user = password_reset.complete_reset(self.token, form)
         if user is None:
-            return render(self.request, "accounts/password_reset_invalid.html")
+            return redirect("accounts:password_reset_invalid")
         password_reset.notify_password_changed(user)
         self.request.session.pop(PASSWORD_RESET_SESSION_KEY, None)
         messages.success(self.request, _("Your password was changed. You can now log in."))
@@ -461,8 +608,12 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
         self.request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
         if user is None:
             return render(self.request, "accounts/email_change_invalid.html")
-        messages.success(self.request, _("Your email address was changed. Please log in again."))
-        return redirect("accounts:login")
+        # The result page (WL-18): every session of the account has ended, so the person logs in.
+        return render(
+            self.request,
+            "accounts/email_change_done.html",
+            {"new_email": user.email},
+        )
 
 
 class TwoFactorMixin(NeverCacheMixin, LoginRequiredMixin):
@@ -517,23 +668,6 @@ class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
             _("Two-factor authentication was removed. You can now log in with your password."),
         )
         return redirect(self.get_success_url())
-
-
-class WelcomeView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
-    """The page after the registration: one recommended next step, the extra protection.
-
-    Starting the setup is a POST of the button to the setup page; nothing changes here.
-    """
-
-    template_name = "accounts/welcome.html"
-
-    def get(self, request, *args, **kwargs):
-        if second_factor.has_second_factor(request.user):
-            return redirect("home")
-        return super().get(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(account=self.request.user, **kwargs)
 
 
 class ProfileView(NeverCacheMixin, LoginRequiredMixin, TemplateView):

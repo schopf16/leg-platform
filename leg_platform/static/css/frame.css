@@ -33,8 +33,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Room on the right for the corner buttons (2 x 40 px, a gap of 8 px, 16 px from the edge). */
-  padding: 0 120px 0 24px;
+  /* Room on the right for the corner buttons: 24 px from the edge, two buttons of 40 px with a
+     gap of 12 px, and 20 px between the name and the first button (the images of the owner). */
+  padding: 0 136px 0 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
@@ -118,6 +119,15 @@
   border-color: var(--muted);
 }
 
+/* On a desktop the corner buttons of a page with the frame sit 24 px from the right edge with a gap
+   of 12 px (navigation/bilder). The entry pages and the phone keep the values of portal.css. */
+@media (min-width: 761px) {
+  body:has(.frame) .corner {
+    right: 24px;
+    gap: 12px;
+  }
+}
+
 /* ---- Menu: the entries of the desktop menu and of the phone menu ---- */
 .frame-menu {
   position: fixed;
@@ -128,7 +138,7 @@
   width: 232px;
   display: flex;
   flex-direction: column;
-  padding: 24px 12px 16px;
+  padding: 32px 12px 24px;
   overflow-y: auto;
   background: var(--panel);
   border-right: 1px solid var(--line);
@@ -139,16 +149,25 @@
   margin-top: 0;
 }
 
+/* The phone menu starts a little lower than the first label of the desktop menu. */
+.frame-drawer-nav > .frame-group:first-child {
+  margin-top: 12px;
+}
+
 .frame-group {
-  margin: 16px 0 4px;
+  margin: 12px 0;
   padding: 0 12px;
   font-size: 12px;
+  line-height: 1.2;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
+/* The rhythm of the entries: 44 px high (48 px on the phone) and 4 px between them. The 3 px bar of
+   the current page is the left border; the icon starts 24 px from the edge of the menu and the text
+   56 px (12 + 3 + 9 px of padding). */
 .frame-item {
   position: relative;
   display: flex;
@@ -156,7 +175,8 @@
   gap: 12px;
   width: 100%;
   min-height: 44px;
-  padding: 8px 12px;
+  margin-bottom: 4px;
+  padding: 8px 12px 8px 9px;
   border: 0;
   border-left: 3px solid transparent;
   border-radius: 8px;
@@ -209,13 +229,16 @@
 }
 
 .frame-menu-foot form {
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .frame-legal {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 12px;
+  min-height: 28px;
+  margin-top: 6px;
   padding: 0 12px;
   font-size: 13px;
   color: var(--muted);
@@ -380,6 +403,11 @@
     cursor: default;
   }
 
+  /* The link over the overlay (closes the menu without a script) adds no second shade. */
+  a.frame-overlay {
+    background: transparent;
+  }
+
   .frame-drawer-panel {
     position: absolute;
     top: 0;
@@ -400,8 +428,15 @@
     align-items: center;
     justify-content: space-between;
     min-height: 56px;
-    padding: 0 0 0 12px;
+    /* The logo plate and the close button are 16 px from the edges of the menu (panel 12 + 4). */
+    padding: 0 4px;
     margin-bottom: 8px;
+  }
+
+  /* The legal row of the phone menu is indented further and spread (handy-menue-*.png). */
+  .frame-drawer-nav .frame-legal {
+    gap: 4px 36px;
+    padding: 0 24px;
   }
 
   .frame-drawer-nav {
@@ -425,8 +460,11 @@
   text-wrap: balance;
 }
 
+/* Start page: title, then the customer number and address (4 px lower than before), then the tiles
+   or the empty state at y = 231 px in the image: 16 px more than the 48 px of the scale (the image
+   wins over the spacing scale, D-057). */
 .start-sub {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   font-size: 16px;
   color: var(--muted);
 }
@@ -435,7 +473,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
-  margin-top: 48px;
+  margin-top: 64px;
 }
 
 /* Two tiles side by side, never narrower than 280 px; a third one goes to the next row. */
@@ -522,12 +560,20 @@
   color: var(--fg);
 }
 
+/* The empty state: a panel as wide as the content (1 px line, 12 px radius, no shadow), the icon
+   and the texts centred in it (app/bilder/kacheln-alles-erledigt-*.png: about 912 x 359 px). */
 .empty-state {
-  margin-top: 48px;
+  margin-top: 64px;
+  min-height: 360px;
+  padding: 48px 24px;
   display: grid;
+  align-content: center;
   justify-items: center;
   gap: 12px;
   text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 
 .empty-state-icon {
@@ -588,6 +634,12 @@
 
   .task-hide {
     min-height: 48px;
+  }
+
+  .empty-state {
+    margin-top: 24px;
+    min-height: 0;
+    padding: 32px 16px;
   }
 
   .empty-state h2 {

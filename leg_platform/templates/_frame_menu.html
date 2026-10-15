@@ -10,7 +10,7 @@ the permissions are checked by the administration itself.
 <a class="frame-item{% if view == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if view == 'home' %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg><span>{% translate "Start" %}</span>
 </a>
-<a class="frame-item{% if view != 'home' %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if view != 'home' %} aria-current="page"{% endif %}>
+<a class="frame-item{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span>{% translate "Profile" %}</span>
 </a>
 {% if user.is_staff %}

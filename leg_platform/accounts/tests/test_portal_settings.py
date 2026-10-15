@@ -49,6 +49,13 @@ class AddressValidationTests(TestCase):
             # DEL and other control characters.
             "https://www.example.org/pri\x7fvacy",
             "https://www.example.org/\x00",
+            # Format and separator characters: a zero-width space, a bidirectional override, the
+            # line and paragraph separators (security review of phase 2, E-2), and a no-break space.
+            "https://www.example.org/\u200bprivacy",
+            "https://www.example.org/\u202eprivacy",
+            "https://www.example.org/\u2028",
+            "https://www.example.org/\u2029",
+            "https://www.example.org/\u00a0privacy",
         ):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 validate_https_address(value)
@@ -85,6 +92,24 @@ class LegalLinksTests(TestCase):
     @override_settings(INSTANCE_PRIVACY_URL="")
     def test_without_any_address_there_is_no_link(self):
         self.assertEqual(tuple(legal_links()), ("", ""))
+
+    @override_settings(INSTANCE_PRIVACY_URL="")
+    def test_a_stored_address_that_is_not_a_clean_https_address_gives_no_link(self):
+        # Written past the form (a direct write to the database): checked again before output
+        # (security review of phase 2, E-1).
+        for value in ("javascript:alert(1)", "http://www.example.org/", "https://example.org/\u200b"):
+            with self.subTest(value=value):
+                PortalSettings.objects.update_or_create(
+                    id=1, defaults={"privacy_url": value, "imprint_url": value}
+                )
+                with self.assertLogs("leg_platform.accounts.portal_settings", level="WARNING"):
+                    links = legal_links()
+                self.assertEqual(tuple(links), ("", ""))
+
+    @override_settings(INSTANCE_PRIVACY_URL="javascript:alert(1)")
+    def test_an_unclean_fallback_address_gives_no_link(self):
+        with self.assertLogs("leg_platform.accounts.portal_settings", level="WARNING"):
+            self.assertEqual(tuple(legal_links()), ("", ""))
 
     def test_the_database_is_read_once_per_request(self):
         PortalSettings.objects.create(id=1, privacy_url=PRIVACY)

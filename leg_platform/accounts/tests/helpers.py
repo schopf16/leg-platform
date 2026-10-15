@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.test import Client
+from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 
@@ -35,12 +36,44 @@ def registration_data(email="new.person@example.org", **overrides):
     return {"email": email, **overrides}
 
 
-def completion_data(password=PASSWORD, registration=None, **overrides):
-    """The form of the completion page; registration is the token reference the page contains."""
-    data = {**PROFILE, "password1": password, "password2": password, **overrides}
+def password_data(password=PASSWORD, registration=None, **overrides):
+    """The password step of the registration (D-058); registration is the token reference."""
+    data = {
+        "username": "ignored@example.org",
+        "password1": password,
+        "password2": password,
+        **overrides,
+    }
     if registration is not None:
         data["registration"] = str(registration)
     return data
+
+
+def completion_data(registration=None, **overrides):
+    """The details step of the registration: no password, the privacy box ticked."""
+    data = {**PROFILE, "privacy": "on", **overrides}
+    if registration is not None:
+        data["registration"] = str(registration)
+    return data
+
+
+def finish_registration(client, path, password=PASSWORD, details=None, **overrides):
+    """Open the link at ``path`` and go through the password and the details step.
+
+    Returns the response of the last step. Extra keywords replace fields of the details form.
+    """
+    client.get(path)
+    page = client.get(reverse("accounts:registration_password"))
+    match = re.search(r'name="registration" value="(\d+)"', page.content.decode())
+    assert match, "The password step shows no registration reference."
+    reference = match.group(1)
+    client.post(
+        reverse("accounts:registration_password"), password_data(password, registration=reference)
+    )
+    return client.post(
+        reverse("accounts:registration_complete"),
+        completion_data(registration=reference, **{**(details or {}), **overrides}),
+    )
 
 
 def create_active_user(email="active.person@example.org", **profile):

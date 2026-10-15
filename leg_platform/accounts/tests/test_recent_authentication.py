@@ -24,6 +24,7 @@ from leg_platform.accounts.tests.helpers import (
     code_for,
     completion_data,
     create_active_user,
+    password_data,
     verification_path,
 )
 from leg_platform.accounts.tests.test_registration import register
@@ -38,9 +39,11 @@ from leg_platform.accounts.views import REGISTRATION_SESSION_KEY
 
 SETUP_URL = reverse("accounts:two_factor_setup")
 CONFIRM_URL = reverse("accounts:two_factor_confirm")
-WELCOME_URL = reverse("accounts:welcome")
+HOME_URL = reverse("home")
 PROFILE_URL = reverse("accounts:profile")
 COMPLETE_URL = reverse("accounts:registration_complete")
+PASSWORD_URL = reverse("accounts:registration_password")
+INVALID_URL = reverse("accounts:registration_invalid")
 ADDRESS_DATABASES = {"default", "addresses", "address_import"}
 
 
@@ -288,16 +291,22 @@ class RegistrationLoginTests(TestCase):
         self.client.get(self.path)
 
     def complete(self, client=None, **overrides):
-        return (client or self.client).post(
-            COMPLETE_URL, completion_data(registration=self.token.pk, **overrides)
+        client = client or self.client
+        password_fields = {k: v for k, v in overrides.items() if k.startswith("password")}
+        details = {k: v for k, v in overrides.items() if k not in password_fields}
+        response = client.post(
+            PASSWORD_URL, password_data(registration=self.token.pk, **password_fields)
         )
+        if response.status_code != 302 or response["Location"] != COMPLETE_URL:
+            return response
+        return client.post(COMPLETE_URL, completion_data(registration=self.token.pk, **details))
 
-    def test_the_completion_logs_the_person_in_and_leads_to_the_welcome_page(self):
+    def test_the_completion_logs_the_person_in_and_leads_to_the_start_page(self):
         before = self.client.session.session_key
 
         response = self.complete()
 
-        self.assertRedirects(response, WELCOME_URL)
+        self.assertRedirects(response, HOME_URL)
         user = User.objects.get()
         self.assertEqual(self.client.session["_auth_user_id"], str(user.pk))
         self.assertNotEqual(self.client.session.session_key, before)
@@ -315,7 +324,7 @@ class RegistrationLoginTests(TestCase):
         self.assertNotEqual(self.client.get("/admin/").status_code, 200)
         # A second submission with the used link changes nothing.
         again = self.complete()
-        self.assertTemplateUsed(again, "accounts/registration_invalid.html")
+        self.assertRedirects(again, INVALID_URL, fetch_redirect_response=False)
         user.refresh_from_db()
         self.assertEqual(user.customer_number_id, number)
 
@@ -336,9 +345,9 @@ class RegistrationLoginTests(TestCase):
         other = Client()
         opened = other.get(self.path)
 
-        self.assertTemplateUsed(opened, "accounts/registration_invalid.html")
+        self.assertRedirects(opened, INVALID_URL, fetch_redirect_response=False)
         posted = self.complete(other)
-        self.assertTemplateUsed(posted, "accounts/registration_invalid.html")
+        self.assertRedirects(posted, INVALID_URL, fetch_redirect_response=False)
         self.assertNotIn("_auth_user_id", other.session)
 
     def test_a_replaced_link_cannot_log_anyone_in(self):
@@ -348,7 +357,7 @@ class RegistrationLoginTests(TestCase):
 
         response = self.complete()
 
-        self.assertTemplateUsed(response, "accounts/registration_invalid.html")
+        self.assertRedirects(response, INVALID_URL, fetch_redirect_response=False)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertFalse(User.objects.get().has_usable_password())
 
@@ -359,32 +368,17 @@ class RegistrationLoginTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertIn(REGISTRATION_SESSION_KEY, self.client.session)
 
-    def test_the_welcome_page_offers_one_next_step(self):
+    def test_the_start_page_after_the_registration_offers_the_setup_as_a_task(self):
         self.complete()
         user = User.objects.get()
 
-        page = self.client.get(WELCOME_URL)
+        page = self.client.get(HOME_URL)
 
-        self.assertContains(page, "Ihr Konto ist bereit")
+        self.assertContains(page, "Guten Tag, Anna Example")
         self.assertContains(page, user.customer_number_display)
-        self.assertContains(page, "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)")
+        self.assertContains(page, "Zwei-Faktor-Anmeldung")
         self.assertContains(page, f'<form method="post" action="{SETUP_URL}"')
-        self.assertContains(page, 'href="/">Später</a>')
-        self.assertContains(page, "Was ist eine Authenticator-App?")
-        self.assertContains(page, "Der zusätzliche Schutz sichert Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt.")
         self.assertNotContains(page, "Melden Sie sich mit Ihrer E-Mail-Adresse")
-        # The button starts the setup in one more step; skipping leads to the start page, where
-        # the task tile reminds the person (D-057).
+        # The button starts the setup in one more step; the old welcome page is gone (D-058).
         self.assertRedirects(self.client.post(SETUP_URL, {}), CONFIRM_URL, fetch_redirect_response=False)
-        later = self.client.get("/")
-        self.assertContains(later, "Zwei-Faktor-Anmeldung")
-
-    def test_the_welcome_page_needs_a_login_and_skips_accounts_with_a_second_factor(self):
-        self.assertRedirects(
-            Client().get(WELCOME_URL), f"{reverse('accounts:login')}?next={WELCOME_URL}", fetch_redirect_response=False
-        )
-        user, _device = create_user_with_totp("holder.person@example.org")
-        holder = VerifiedClient()
-        holder.force_login(user)
-
-        self.assertRedirects(holder.get(WELCOME_URL), "/", fetch_redirect_response=False)
+        self.assertEqual(Client().get("/welcome/").status_code, 404)

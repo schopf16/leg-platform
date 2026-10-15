@@ -1,30 +1,39 @@
 {% extends "entry_base.html" %}
-{% load i18n static %}
-{% block title %}{% translate "Complete your registration" %}{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Your details" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_register.html" with password_step=True %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Complete your registration" %}</h1>
+  {% include "accounts/_progress.html" %}
+  <h1>{% translate "Your details" %}</h1>
   {% include "accounts/_error_summary.html" %}
-  <p>{% translate "Enter your data and choose a password." %}</p>
-  <p>{% translate "Fields marked optional may stay empty. All other fields are required." %}</p>
-  <p>{% translate "Your data is used to identify you and, later, to send invoices by post or email." %}
-    {% if instance_privacy_url %}
-      <a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>
-    {% endif %}
-  </p>
-  <dl class="mb-3">
-    <dt>{% translate "Email address" %}</dt>
-    <dd>{{ account_email }}</dd>
-  </dl>
   <form method="post" novalidate>
     {% csrf_token %}
     <input type="hidden" name="registration" value="{{ registration_ref }}">
-    {% include "accounts/_profile_fields.html" %}
-    <button type="submit" class="btn btn-primary">{% translate "Activate account" %}</button>
+    {# The address as text with its status; no password field on this page (K7, register/VORGABEN.md). #}
+    <div class="entry-field">
+      <span class="form-label">{% translate "Email address" %}</span>
+      <p class="plain-box"><span class="plain-value">{{ account_email }}</span></p>
+      <p class="plain-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Confirmed" %}</p>
+    </div>
+    <div class="field-pair">
+      {% include "accounts/_field.html" with field=form.first_name %}
+      {% include "accounts/_field.html" with field=form.last_name %}
+    </div>
+    <div class="field-pair field-pair-street">
+      {% include "accounts/_field.html" with field=form.street %}
+      {% include "accounts/_field.html" with field=form.house_number %}
+    </div>
+    <div class="field-pair field-pair-locality">
+      {% include "accounts/_field.html" with field=form.postal_code %}
+      {% include "accounts/_field.html" with field=form.town %}
+    </div>
+    <div class="entry-field">
+      <label class="entry-check" for="{{ form.privacy.id_for_label }}">
+        {{ form.privacy }}
+        <span>{% if instance_privacy_url %}{% blocktranslate with url=instance_privacy_url %}I have read the <a href="{{ url }}" target="_blank" rel="noopener noreferrer">privacy notice</a> and accept it.{% endblocktranslate %}{% else %}{% translate "I have read the privacy notice and accept it." %}{% endif %}</span>
+      </label>
+      {% if form.privacy.errors %}<div class="invalid-feedback d-block" id="{{ form.privacy.auto_id }}_error">{{ form.privacy.errors.0 }}</div>{% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary">{% translate "Create account" %}</button>
   </form>
-{% endblock %}
-{% block scripts %}
-  {{ block.super }}
-  <script defer src="{% static 'js/address-directory.js' %}"></script>
-  <script defer src="{% static 'js/postal-code-input.js' %}"></script>
 {% endblock %}

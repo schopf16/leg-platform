@@ -171,7 +171,7 @@ class RenderTests(TestCase):
         with translation.override("de-ch"):
             subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
-        self.assertEqual(subject, "Bestätigen Sie Ihre Registrierung bei Portal")
+        self.assertEqual(subject, "Ihre Registrierung beim Portal")
         self.assertIn(self.VALUES["verification_url"], body)
         self.assertIn("24 Stunden", body)
 
@@ -193,7 +193,7 @@ class RenderTests(TestCase):
         with translation.override("de-ch"):
             subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
-        self.assertEqual(subject, "Bestätigen Sie Ihre Registrierung bei Portal")
+        self.assertEqual(subject, "Ihre Registrierung beim Portal")
         self.assertTrue(body.startswith("Guten Tag\n\nHier:"))
 
     def test_values_are_not_searched_for_further_placeholders(self):

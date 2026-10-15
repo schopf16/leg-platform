@@ -20,8 +20,8 @@ from leg_platform.accounts.second_factor import PENDING_SESSION_KEY
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     code_for,
-    completion_data,
     create_active_user,
+    finish_registration,
     verification_path,
 )
 from leg_platform.accounts.tests.test_registration import register
@@ -248,12 +248,7 @@ class AbandonedSecondStepTests(TestCase):
         # The code step is never completed; the same browser completes a registration.
         register(self.client)
         link = verification_path(mail.outbox[0])
-        self.client.get(link)
-        token = VerificationToken.objects.get()
-        response = self.client.post(
-            reverse("accounts:registration_complete"),
-            completion_data(registration=token.pk),
-        )
+        response = finish_registration(self.client, link)
         self.assertEqual(response.status_code, 302)
         session = self.client.session
         self.assertIn("_auth_user_id", session)

@@ -49,11 +49,11 @@ class InvalidLinkPageFormsTests(TestCase):
 
 @tag("mariadb")
 class SetupPagesAreNotCachedTests(TestCase):
-    def test_the_welcome_and_two_factor_pages_are_not_stored(self):
+    def test_the_start_and_two_factor_pages_are_not_stored(self):
         client = Client()
         client.force_login(create_active_user())
 
-        for name in ("accounts:welcome", "accounts:two_factor", "accounts:two_factor_setup"):
+        for name in ("home", "accounts:two_factor", "accounts:two_factor_setup"):
             with self.subTest(view=name):
                 response = client.get(reverse(name))
 

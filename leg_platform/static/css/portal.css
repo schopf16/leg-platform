@@ -236,6 +236,16 @@ body {
   color: var(--fg);
 }
 
+/* While it waits ("send again" within the pause) the button keeps the look of the image; the note
+   below it says why nothing happens, and the button is really disabled. */
+.btn-secondary-action:disabled {
+  background: transparent;
+  border-color: var(--muted);
+  color: var(--fg);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .portal-brand {
   font-size: 1.25rem;
   font-weight: 700;
@@ -448,6 +458,145 @@ body {
   text-align: center;
   font-size: 14px;
   color: var(--muted);
+}
+
+/* A field of the shared field partial inside an entry card: label, control, hint and error
+   in the rhythm of the shell. */
+.entry-card .mb-3 {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-card .form-label,
+.entry-card .form-hint {
+  margin: 0;
+}
+
+.entry-card .form-hint {
+  font-size: 13px;
+}
+
+/* A hint or a note below a heading or a button, in the muted colour. */
+.entry-hint {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.entry-card .entry-center {
+  text-align: center;
+}
+
+/* The link below its divider ("Wrong address?"): close to it and in semibold. */
+.entry-card .entry-divider + .entry-center {
+  margin-top: -12px;
+}
+
+.entry-card .entry-center a {
+  font-weight: 600;
+}
+
+.address-text {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Registration: step bar (4 px) and step label. The share filled is a class, because the
+   Content Security Policy allows no style attribute. */
+.step-progress {
+  display: grid;
+  gap: 20px;
+}
+
+.step-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.step-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.step-fill-1 { width: 33.333%; }
+.step-fill-2 { width: 66.667%; }
+.step-fill-3 { width: 100%; }
+
+.entry-card .step-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The rules of the password as a list under the first password field. */
+.password-rules {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  color: var(--muted);
+  display: grid;
+  gap: 2px;
+}
+
+/* A value that is shown as text: the address of the account on the password step (a real field,
+   so that the password manager finds the user name) and on the details step. */
+.entry-card input.plain-value,
+.entry-card input.plain-value:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+  padding: 0;
+  min-height: 0;
+  height: auto;
+  font-size: 16px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+/* The address of the details step: in a box like a field (registration/bilder/4b-angaben-*.png),
+   with its status below. */
+.plain-box {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--portal-field-border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.plain-value {
+  overflow-wrap: anywhere;
+}
+
+.plain-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Two fields side by side, on the phone as well (register/VORGABEN.md, details step). */
+.field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.field-pair-street { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); }
+.field-pair-locality { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+
+.resend-form {
+  display: grid;
+  gap: 8px;
+}
+
+.resend-form .entry-hint {
+  text-align: left;
 }
 
 /* Footer row: three items spread over the width. Underlined only on hover. */

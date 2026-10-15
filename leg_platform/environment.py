@@ -337,16 +337,29 @@ def parse_instance_name(env: Mapping[str, str]) -> str:
     return value
 
 
+def has_unsafe_url_character(value: str) -> bool:
+    """Whether a text from the configuration or the administration has a character that has no
+    place in an address that is printed into a page or a header: white space, control and format
+    characters (such as a zero-width space or a bidirectional override) and line or paragraph
+    separators (Unicode categories Cc, Cf, Zl, Zp; security review of phase 2, E-2)."""
+    return any(
+        character.isspace() or unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp")
+        for character in value
+    )
+
+
 def _parse_url(name: str, value: str, allowed_schemes: tuple[str, ...]) -> SplitResult:
-    parts = urlsplit(value)
     try:
+        parts = urlsplit(value)
         port = parts.port
     except ValueError:
-        port = -1
+        # An unclosed bracket or a port that is no number: a configuration error with a message,
+        # not an unexplained ValueError.
+        raise ImproperlyConfigured(f"{name} is not a valid URL.") from None
     if (
         parts.scheme not in allowed_schemes
         or not parts.hostname
-        or any(character.isspace() for character in value)
+        or has_unsafe_url_character(value)
         or (port is not None and not PORT_MIN <= port <= PORT_MAX)
         or parts.username
         or parts.password

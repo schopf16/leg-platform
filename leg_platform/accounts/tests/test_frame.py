@@ -12,9 +12,10 @@ from django.urls import reverse
 from leg_platform.accounts import tasks
 from leg_platform.accounts.models import HiddenTask, PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user
-from leg_platform.accounts.tests.test_second_factor import create_user_with_totp
+from leg_platform.accounts.tests.test_second_factor import create_user_with_totp, log_in, promote
 
 STATIC = Path(settings.BASE_DIR) / "leg_platform" / "static"
+SETUP_URL = reverse("accounts:two_factor_setup")
 HOME_URL = reverse("home")
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")
@@ -181,11 +182,11 @@ class FrameTests(TestCase):
             self.assertNotIn(absent, html)
         self.assertNotIn("Profil", part(html, "<body", "</header>"))
 
-    def test_a_person_without_a_login_gets_the_bare_frame_with_the_legal_links(self):
-        # A token page that is not part of the entry shell yet (phase 3).
+    def test_a_person_without_a_login_gets_the_entry_shell_not_the_frame(self):
+        # The pages of a link of an email are entry pages since phase 3 (D-058).
         response = Client().get(reverse("accounts:email_change_verify", args=["x" * 43]))
         html = response.content.decode()
-        self.assertIn('class="frame frame-bare"', html)
+        self.assertIn('class="entry-split"', html)
         self.assertNotIn('class="frame-menu', html)
         self.assertNotIn('id="menu-btn"', html)
         self.assertNotIn("/logout/", html)
@@ -242,6 +243,34 @@ class FrameStyleTests(SimpleTestCase):
         self.assertIn("button.focus()", text)
         self.assertIn("inert", text)
 
+    def test_the_measures_of_the_images_of_the_owner(self):
+        """Designer review of phase 2: the images win (D-057)."""
+        # Desktop menu: 32 px at the top, 24 px at the bottom, 44 px entries with 4 px between them.
+        self.assertRegex(self.CSS, r"\.frame-menu \{[^}]*padding: 32px 12px 24px")
+        self.assertRegex(self.CSS, r"\.frame-item \{[^}]*margin-bottom: 4px")
+        # Icon at 24 px and text at 56 px: 12 (menu) + 3 (bar) + 9 (padding), then a gap of 12.
+        self.assertRegex(self.CSS, r"\.frame-item \{[^}]*padding: 8px 12px 8px 9px")
+        self.assertRegex(self.CSS, r"\.frame-item \{[^}]*border-left: 3px solid transparent")
+        # Header: 16 px at the left, room for the buttons (24 + 40 + 12 + 40 + 20 px of the name).
+        self.assertRegex(self.CSS, r"\.frame-header \{[^}]*padding: 0 136px 0 16px")
+        self.assertRegex(self.CSS, r"body:has\(\.frame\) \.corner \{[^}]*right: 24px;[^}]*gap: 12px")
+        # Start page: the subtitle 4 px lower, the tiles at y = 231 px.
+        self.assertRegex(self.CSS, r"\.start-sub \{[^}]*margin: 8px 0 0")
+        self.assertRegex(self.CSS, r"\.task-grid \{[^}]*margin-top: 64px")
+        # Empty state: a panel with a line and 12 px radius, no shadow.
+        empty = re.search(r"\.empty-state \{(.*?)\}", self.CSS, re.S).group(1)
+        for declaration in ("border: 1px solid var(--line)", "border-radius: 12px", "background: var(--panel)", "min-height: 360px"):
+            self.assertIn(declaration, empty)
+        # Phone menu: the close button and the logo plate 16 px from the edges.
+        self.assertRegex(self.CSS, r"\.frame-drawer-head \{[^}]*padding: 0 4px")
+        # The tile padding stays 24 px (R3); the image shows 20 px (deviation noted in D-057).
+        self.assertRegex(self.CSS, r"\.task-tile \{[^}]*padding: 24px")
+
+    def test_the_menu_script_focuses_the_close_button_when_it_opens(self):
+        text = (STATIC / "js" / "frame-menu.js").read_text(encoding="utf-8")
+        self.assertIn('".frame-drawer-head [data-menu-close]"', text)
+        self.assertIn("closeButton.focus()", text)
+
 
 @tag("mariadb")
 class StartPageTests(TestCase):
@@ -296,7 +325,7 @@ class StartPageTests(TestCase):
         html = self.client.get(HOME_URL).content.decode()
         tile = part(html, '<article class="task-tile"', "</article>")
         self.assertIn('<span class="status-dot status-open" aria-hidden="true"></span>Offen', tile)
-        # The setup is started by a POST, as on the welcome page.
+        # The setup is started by a POST.
         self.assertRegex(tile, r'<form method="post" action="/profile/two-factor/setup/">')
         self.assertRegex(tile, r'<form method="post" action="/tasks/two_factor/hide/">')
         self.assertIn(">Ausblenden</button>", tile)
@@ -347,12 +376,11 @@ class StartPageTests(TestCase):
         self.assertNotIn("<button", empty)
         self.assertNotIn("task-tile", empty)
 
-    def test_the_welcome_page_leads_to_the_start_page(self):
-        response = self.client.get(reverse("accounts:welcome"))
-        self.assertContains(response, 'href="/"')
-        user, _device = create_user_with_totp("has.factor@example.org")
-        holder, _u = login(user)
-        self.assertRedirects(holder.get(reverse("accounts:welcome")), HOME_URL, fetch_redirect_response=False)
+    def test_the_welcome_page_is_gone(self):
+        # The registration leads to the start page (D-058); the old page has no address any more.
+        self.assertEqual(self.client.get("/welcome/").status_code, 404)
+        with self.assertRaises(Exception):
+            reverse("accounts:welcome")
 
     def test_the_old_tip_on_the_profile_is_gone(self):
         html = self.client.get(PROFILE_URL).content.decode()
@@ -383,8 +411,10 @@ class HideTaskTests(TestCase):
         html = self.client.get(HOME_URL).content.decode()
         self.assertNotIn("anzeigen", html)
         self.assertNotIn("Wiederherstellen", html)
-        for method in ("get", "put", "delete"):
-            self.assertEqual(getattr(self.client, method)(self.url).status_code, 405)
+        for method in ("get", "put", "delete", "head", "options", "patch"):
+            with self.subTest(method=method):
+                self.assertEqual(getattr(self.client, method)(self.url).status_code, 405)
+        self.assertEqual(HiddenTask.objects.count(), 1)
 
     def test_hiding_twice_is_harmless(self):
         self.client.post(self.url)
@@ -398,8 +428,11 @@ class HideTaskTests(TestCase):
         self.assertFalse(HiddenTask.objects.exists())
 
     def test_it_needs_a_login_and_a_csrf_token(self):
+        # Without a login the person goes to the login page, without "?next": a POST target is no
+        # page to return to (security review of phase 2, N-1).
         anonymous = Client().post(self.url)
-        self.assertRedirects(anonymous, f"{LOGIN_URL}?next={self.url}", fetch_redirect_response=False)
+        self.assertRedirects(anonymous, LOGIN_URL, fetch_redirect_response=False)
+        self.assertNotIn("next=", anonymous["Location"])
         browser = Client(enforce_csrf_checks=True)
         browser.force_login(self.user)
         with self.assertLogs("django.security.csrf", "WARNING"):
@@ -445,3 +478,106 @@ class HideTaskTests(TestCase):
         self.assertNotContains(response, 'name="hidden_tasks_display"')
         # Not a model of the administration of its own.
         self.assertNotIn(HiddenTask, admin_site._registry)
+
+
+@tag("mariadb")
+class ReviewFollowUpTests(TestCase):
+    """Security review of phase 2 (N-2, N-4, E-3, E-4): the restricted frame, the negative tests
+    of the pages and the task button, the no-script menu and the active entry of the menu."""
+
+    def forced_password_change(self):
+        user = create_active_user("forced.person@example.org")
+        user.password_change_required = True
+        user.save()
+        client = VerifiedClient()
+        client.force_login(user)
+        return client, user
+
+    def test_an_account_that_must_change_its_password_reaches_nothing_else_and_hides_nothing(self):
+        client, user = self.forced_password_change()
+        target = reverse("accounts:password_change")
+
+        for response in (
+            client.get(HOME_URL),
+            client.post(reverse("accounts:task_hide", args=["two_factor"])),
+            client.get("/admin/"),
+            client.get(PROFILE_URL),
+        ):
+            self.assertRedirects(response, target, fetch_redirect_response=False)
+        self.assertFalse(HiddenTask.objects.filter(user=user).exists())
+
+    def test_staff_without_a_second_factor_is_sent_to_the_setup_and_hides_nothing(self):
+        staff = promote(create_active_user("staff.person@example.org"))
+        client = Client()
+        log_in(client, staff.email, address="10.7.5.1")
+
+        response = client.post(reverse("accounts:task_hide", args=["two_factor"]))
+
+        self.assertRedirects(response, SETUP_URL, fetch_redirect_response=False)
+        self.assertFalse(HiddenTask.objects.exists())
+
+    def test_an_account_with_a_mandatory_but_incomplete_second_factor_gets_the_slim_frame(self):
+        staff = promote(create_active_user("staff.person@example.org"))
+        client = Client()
+        log_in(client, staff.email, address="10.7.5.2")
+
+        html = client.get(SETUP_URL).content.decode()
+
+        self.assertIn('class="frame frame-bare"', html)
+        header = part(html, '<header class="frame-header', "</header>")
+        self.assertIn('action="/logout/"', header)
+        for absent in ('class="frame-menu', 'id="frame-drawer"', 'class="frame-bottombar', 'id="menu-btn"'):
+            self.assertNotIn(absent, html)
+
+    def test_a_staff_account_with_a_complete_second_factor_gets_the_full_frame(self):
+        user, _device = create_user_with_totp("staff.complete@example.org")
+        promote(user)
+        client = VerifiedClient()
+        client.force_login(user)
+
+        html = client.get(HOME_URL).content.decode()
+
+        self.assertIn('class="frame-menu', html)
+        self.assertNotIn("frame-bare", html)
+
+    def test_every_page_of_the_frame_is_not_stored(self):
+        user, _device = create_user_with_totp("stored.person@example.org")
+        client, _user = login(user)
+        for name in ("home", "accounts:profile", "accounts:password_change", "accounts:two_factor"):
+            with self.subTest(page=name):
+                response = client.get(reverse(name))
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("no-store", response["Cache-Control"])
+
+    def test_the_menu_entry_profile_is_active_on_the_profile_pages_only(self):
+        client, _user = login()
+
+        def menu(url):
+            html = client.get(url).content.decode()
+            return part(html, '<nav class="frame-menu', "</nav>")
+
+        for name in ("accounts:profile", "accounts:profile_edit", "accounts:password_change", "accounts:two_factor"):
+            with self.subTest(page=name):
+                nav = menu(reverse(name))
+                self.assertIn('class="frame-item is-active" href="/profile/" aria-current="page"', nav)
+                self.assertEqual(nav.count('aria-current="page"'), 1)
+        home = menu(HOME_URL)
+        self.assertNotIn('class="frame-item is-active" href="/profile/"', home)
+        self.assertEqual(home.count('aria-current="page"'), 1)
+
+    def test_the_menu_can_be_closed_without_a_script(self):
+        client, _user = login()
+
+        html = client.get(HOME_URL).content.decode()
+
+        drawer = part(html, 'id="frame-drawer"', "</nav>")
+        self.assertRegex(drawer, r'<a class="frame-overlay" href="#" data-menu-close tabindex="-1" aria-hidden="true">')
+        self.assertIn('<a class="visually-hidden-focusable frame-close-link" href="#" data-menu-close>Menü schliessen</a>', html)
+        # The buttons stay.
+        self.assertIn('<button type="button" class="frame-overlay" data-menu-close', html)
+
+    def test_an_unknown_key_is_checked_before_anything_is_written(self):
+        user = create_active_user("keys@example.org")
+        with self.assertRaises(ValueError):
+            tasks.hide(user, "unknown")
+        self.assertFalse(HiddenTask.objects.exists())

@@ -26,6 +26,7 @@ from leg_platform.accounts.tests.helpers import (
     complete_second_factor,
     completion_data,
     create_active_user,
+    password_data,
     registration_data,
     run_mail_queue,
     verification_path,
@@ -128,7 +129,9 @@ class ProfileFieldsMarkupMixin:
 
 
 @tag("mariadb")
-class CompletionFormTests(ProfileFieldsMarkupMixin, TestCase):
+class CompletionFormTests(TestCase):
+    """The password step and the details step of the registration (D-058)."""
+
     # Completing the registration reads the address directory (advisory check, D-033).
     databases = ADDRESS_DATABASES
 
@@ -136,38 +139,72 @@ class CompletionFormTests(ProfileFieldsMarkupMixin, TestCase):
         register(self.client)
         self.client.get(verification_path(mail.outbox[0]))
         self.token = VerificationToken.objects.get()
+        self.password_url = reverse("accounts:registration_password")
+        self.password_page = self.client.get(self.password_url)
+        self.client.post(self.password_url, password_data(registration=self.token.pk))
         self.page = self.client.get(COMPLETE_URL)
         self.html = self.page.content.decode()
 
-    def test_optional_fields_are_marked_and_the_rule_and_the_groups_are_stated(self):
-        self.check_markup(self.html)
+    def test_the_details_step_has_the_fields_of_the_package_side_by_side(self):
+        for label, field_id in (
+            ("Vorname", "id_first_name"),
+            ("Nachname", "id_last_name"),
+            ("Strasse", "id_street"),
+            ("Hausnummer", "id_house_number"),
+            ("PLZ", "id_postal_code"),
+            ("Ort", "id_town"),
+        ):
+            with self.subTest(field=field_id):
+                self.assertEqual(label_of(self.html, field_id), label)
+        # Pairs, also on a phone: the first two fields, the street and the house number, the
+        # postal code and the town.
+        self.assertEqual(self.html.count('class="field-pair'), 3)
+        self.assertIn("field-pair-street", self.html)
+        self.assertIn("field-pair-locality", self.html)
+        self.assertIn('inputmode="numeric"', element(self.html, "id_postal_code"))
+        self.assertIn('autocomplete="off"', element(self.html, "id_house_number"))
+        # The fields that only the profile has are not asked at the registration (K15).
+        for field_id in ("id_salutation", "id_organisation_name", "id_address_line_1", "id_phone_number"):
+            self.assertNotIn(f'id="{field_id}"', self.html)
+        self.assertNotIn("data-address-directory", self.html)
 
-    def test_the_password_field_has_the_advice_and_a_button_that_shows_it(self):
-        minimum = next(
-            v.min_length
-            for v in password_validation.get_default_password_validators()
-            if isinstance(v, password_validation.MinimumLengthValidator)
-        )
-        self.assertIn(f"Wählen Sie mindestens {minimum} Zeichen.", self.html)
-        self.assertIn("Meine Katze trinkt jeden Morgen Milch", self.html)
-        # Django's list of the validator rules is not shown.
+    def test_the_password_step_has_the_username_the_rules_and_buttons_that_show_the_password(self):
+        html = self.password_page.content.decode()
+
+        self.assertRegex(element(html, "id_username"), r'autocomplete="username"')
+        self.assertIn("E-Mail-Adresse (Benutzername)", html)
+        self.assertRegex(element(html, "id_username"), r"\breadonly\b")
+        # The rules are a list of the policy; Django's list of the validators is not shown.
+        self.assertIn("Mindestens 15 Zeichen.", html)
         with translation.override("de-ch"):
             for text in password_validation.password_validators_help_texts():
-                self.assertNotIn(text, self.html)
+                self.assertNotIn(text, html)
         # The buttons are hidden until the script shows them, so the fields work without it.
         for field_id in ("id_password1", "id_password2"):
             self.assertRegex(
-                self.html,
+                html,
                 rf'<button type="button"[^>]*data-password-toggle hidden[^>]*aria-controls="{field_id}"',
             )
-            self.assertIn('type="password"', element(self.html, field_id))
-        self.assertIn("js/password-toggle.js", self.html)
-        self.assertIn('aria-label="Passwort anzeigen"', self.html)
+            self.assertIn('type="password"', element(html, field_id))
+        self.assertIn("js/password-toggle.js", html)
+        self.assertIn('aria-label="Passwort anzeigen"', html)
+
+    def test_an_invalid_password_step_has_an_error_summary_and_specific_messages(self):
+        data = password_data("", registration=self.token.pk, password2="")
+        self.client.get(self.password_url)
+
+        response = self.client.post(self.password_url, data)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        for field_id in ("id_password1", "id_password2"):
+            self.assertIn(f'href="#{field_id}"', html)
+        for text in ("Geben Sie ein Passwort ein.", "Geben Sie das Passwort noch einmal ein."):
+            self.assertIn(text, html)
+        self.assertNotIn("Dieses Feld ist zwingend erforderlich", html)
 
     def test_an_invalid_form_has_an_error_summary_and_specific_messages(self):
-        data = completion_data(
-            registration=self.token.pk, town="", postal_code="", password1="", password2=""
-        )
+        data = completion_data(registration=self.token.pk, town="", postal_code="")
 
         response = self.client.post(COMPLETE_URL, data)
         html = response.content.decode()
@@ -175,14 +212,9 @@ class CompletionFormTests(ProfileFieldsMarkupMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertRegex(html, r'<div class="alert alert-danger error-summary" role="alert" tabindex="-1" autofocus>')
         self.assertIn("Bitte prüfen Sie Ihre Angaben", html)
-        for field_id in ("id_town", "id_postal_code", "id_password1", "id_password2"):
+        for field_id in ("id_town", "id_postal_code"):
             self.assertIn(f'href="#{field_id}"', html)
-        for text in (
-            "Geben Sie einen Ort ein.",
-            "Geben Sie eine Postleitzahl ein.",
-            "Geben Sie ein Passwort ein.",
-            "Geben Sie das Passwort noch einmal ein.",
-        ):
+        for text in ("Geben Sie einen Ort ein.", "Geben Sie eine Postleitzahl ein."):
             self.assertIn(text, html)
         self.assertNotIn("Dieses Feld ist zwingend erforderlich", html)
         # The error is tied to its field for assistive technology.
@@ -190,25 +222,34 @@ class CompletionFormTests(ProfileFieldsMarkupMixin, TestCase):
         self.assertIn('id="id_town_error"', html)
         self.assertIn('aria-invalid="true"', element(html, "id_town"))
 
-    def test_the_names_are_required_unless_there_is_a_company_name(self):
-        data = completion_data(registration=self.token.pk, first_name="", last_name="")
+    def test_the_names_and_the_street_are_required(self):
+        data = completion_data(
+            registration=self.token.pk, first_name="", last_name="", street=""
+        )
 
         html = self.client.post(COMPLETE_URL, data).content.decode()
 
-        self.assertIn("Geben Sie einen Vornamen oder einen Firmennamen ein.", html)
-        company = completion_data(
-            registration=self.token.pk, first_name="", last_name="", organisation_name="Example AG"
-        )
-        self.assertEqual(self.client.post(COMPLETE_URL, company).status_code, 302)
+        for text in (
+            "Geben Sie Ihren Vornamen ein.",
+            "Geben Sie Ihren Nachnamen ein.",
+            "Geben Sie Ihre Strasse ein.",
+        ):
+            self.assertIn(text, html)
+        self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
 
-    def test_the_completion_leads_to_the_welcome_page_without_the_old_login_message(self):
+    def test_the_house_number_may_stay_empty(self):
+        data = completion_data(registration=self.token.pk, house_number="")
+
+        self.assertEqual(self.client.post(COMPLETE_URL, data).status_code, 302)
+
+    def test_the_completion_leads_to_the_start_page_without_the_old_login_message(self):
         response = self.client.post(COMPLETE_URL, completion_data(registration=self.token.pk), follow=True)
 
         # The person is logged in by the completion (D-055): no "log in now" message.
-        self.assertEqual(response.redirect_chain[-1][0], reverse("accounts:welcome"))
+        self.assertEqual(response.redirect_chain[-1][0], reverse("home"))
         self.assertNotContains(response, "Melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an.")
         self.assertNotContains(response, "Ihr Konto ist aktiv.")
-        self.assertContains(response, "Ihr Konto ist bereit")
+        self.assertContains(response, "Guten Tag, Anna Example")
 
     def test_the_page_has_no_inline_code_and_no_data_image(self):
         self.assertNotRegex(self.html, r"(?i)\sstyle\s*=")
@@ -238,7 +279,6 @@ class ProfileFormTests(ProfileFieldsMarkupMixin, TestCase):
 
     def test_the_phone_number_is_stored_in_the_international_format(self):
         data = {**completion_data(), "phone_number": "031 123 45 67"}
-        data.pop("password1"), data.pop("password2")
 
         response = self.client.post(PROFILE_EDIT_URL, data)
 
@@ -248,7 +288,6 @@ class ProfileFormTests(ProfileFieldsMarkupMixin, TestCase):
 
     def test_an_invalid_form_has_an_error_summary_with_links_to_the_fields(self):
         data = completion_data(town="", street="", post_office_box_number="")
-        data.pop("password1"), data.pop("password2")
 
         html = self.client.post(PROFILE_EDIT_URL, data).content.decode()
 
@@ -551,10 +590,13 @@ class TwoFactorPageTests(TestCase):
         log_in(stepper, user.email, address="10.9.3.1")
         pages.append(stepper.get(CODE_URL))
 
-        for response in pages:
+        # The sign-in page of the code asks for a "Wiederherstellungscode" since the package of the
+        # project owner names it so (D-058); the pages of the profile follow in phase 4.
+        for response in pages[:-1]:
             self.assertNotContains(response, "Wiederherstellungscode")
             self.assertNotContains(response, "ecovery code")
-        self.assertContains(pages[-1], "Notfallcodes")
+        self.assertContains(pages[-1], "Wiederherstellungscode")
+        self.assertNotContains(pages[-1], "ecovery code")
 
 
 @tag("mariadb")
@@ -611,28 +653,36 @@ class EmergencyCodeLoginTests(TestCase):
 
 @tag("mariadb")
 class SentAndInvalidPageTests(TestCase):
-    def test_the_registration_page_says_what_to_expect_without_naming_the_address(self):
+    def test_the_registration_page_names_the_address_of_this_browser_and_offers_a_new_mail(self):
         register(self.client, "someone.else@example.org")
 
         response = self.client.get(reverse("accounts:registration_sent"))
 
+        self.assertContains(response, "Prüfen Sie Ihre E-Mails")
+        self.assertContains(response, "someone.else@example.org")
+        self.assertContains(response, "Keine E-Mail erhalten? Ein Blick in den Spam-Ordner lohnt sich.")
+        self.assertContains(response, "E-Mail erneut senden")
+        self.assertContains(response, "Erneut senden ist nach")
+        self.assertContains(response, "Falsche Adresse?")
         self.assertContains(
-            response,
-            "Wenn wir die angegebene Adresse verwenden können, haben wir eine Nachricht an diese Adresse gesendet.",
+            response, f'href="{reverse("accounts:registration")}">Andere E-Mail-Adresse verwenden'
         )
-        self.assertContains(response, "Sie sollte innerhalb weniger Minuten ankommen.")
-        self.assertContains(response, "Spam-Ordner")
-        self.assertContains(response, "Der Link ist 24 Stunden gültig.")
-        self.assertContains(response, "Kommt nichts an, prüfen Sie die Schreibweise der Adresse")
-        self.assertContains(response, f'href="{reverse("accounts:registration")}">Erneut registrieren')
-        self.assertNotContains(response, "someone.else@example.org")
-        self.assertNotContains(response, " ihr ")
+        self.assertContains(response, "Schritt 1 von 3")
+        # The page does not say whether the address has an account.
+        self.assertNotContains(response, "besteht bereits")
 
-    def test_the_password_reset_page_offers_a_new_link(self):
-        response = self.client.get(reverse("accounts:password_reset_sent"))
+    def test_the_password_reset_page_is_the_same_pattern_without_the_step_bar(self):
+        client = Client()
+        client.post(reverse("accounts:password_reset"), {"email": "someone@example.org"}, REMOTE_ADDR="10.7.9.1")
 
-        self.assertContains(response, "Der Link ist 24 Stunden gültig.")
-        self.assertContains(response, f'href="{reverse("accounts:password_reset")}">Neuen Link anfordern')
+        response = client.get(reverse("accounts:password_reset_sent"))
+
+        self.assertContains(response, "Prüfen Sie Ihre E-Mails")
+        self.assertContains(response, "someone@example.org")
+        self.assertContains(
+            response, f'href="{reverse("accounts:password_reset")}">Andere E-Mail-Adresse verwenden'
+        )
+        self.assertNotContains(response, "Schritt 1 von 3")
         self.assertNotContains(response, "Erneut registrieren")
 
     def test_the_pages_for_an_unknown_and_a_known_address_are_identical(self):
@@ -642,7 +692,9 @@ class SentAndInvalidPageTests(TestCase):
             client = Client()
             client.post(reverse("accounts:password_reset"), {"email": address}, REMOTE_ADDR="10.7.1.1")
             content = client.get(reverse("accounts:password_reset_sent")).content
-            pages.append(re.sub(rb'name="csrfmiddlewaretoken" value="[^"]+"', b"", content))
+            content = re.sub(rb'name="csrfmiddlewaretoken" value="[^"]+"', b"", content)
+            # The page names the address that the person entered; everything else is equal.
+            pages.append(content.replace(address.encode(), b"ADDRESS"))
 
         self.assertEqual(pages[0], pages[1])
 
@@ -658,16 +710,22 @@ class SentAndInvalidPageTests(TestCase):
         self.assertContains(response, "Ihre aktuelle E-Mail-Adresse bleibt unverändert, bis Sie die neue bestätigen.")
         self.assertContains(response, "E-Mail-Adresse erneut ändern")
 
-    def test_invalid_link_pages_have_two_buttons(self):
-        registration = self.client.get(reverse("accounts:registration_verify", args=["x"]))
-        reset = self.client.get(reverse("accounts:password_reset_verify", args=["x"]))
+    def test_invalid_link_pages_ask_for_the_address_again_and_have_a_login_button(self):
+        registration = self.client.get(reverse("accounts:registration_verify", args=["x"]), follow=True)
+        reset = self.client.get(reverse("accounts:password_reset_verify", args=["x"]), follow=True)
 
-        for response in (registration, reset):
-            self.assertContains(response, "Dieser Link ist ungültig, abgelaufen oder wurde schon verwendet.")
-            self.assertContains(response, f'<a class="btn btn-primary" href="{LOGIN_URL}">Anmelden</a>')
-        self.assertContains(registration, "Wenn Sie die Registrierung schon abgeschlossen haben, melden Sie sich bitte an.")
-        self.assertContains(registration, f'href="{reverse("accounts:registration")}">Erneut registrieren')
-        self.assertContains(reset, f'href="{reverse("accounts:password_reset")}">Neuen Link anfordern')
+        for response, target in (
+            (registration, "accounts:registration"),
+            (reset, "accounts:password_reset"),
+        ):
+            self.assertContains(response, "Link nicht mehr gültig")
+            self.assertContains(
+                response, "Der Link ist abgelaufen oder wurde schon verwendet. Fordern Sie einen neuen Link an."
+            )
+            self.assertContains(response, "Neuen Link senden")
+            self.assertContains(response, f'<form method="post" action="{reverse(target)}"')
+            self.assertContains(response, f'href="{LOGIN_URL}">Zur Anmeldung</a>')
+            self.assertNotContains(response, "Dieser Link ist ungültig")
 
     def test_the_lockout_page_names_the_real_duration_and_links_to_the_password_reset(self):
         for attempt in range(LOGIN_FAILURE_LIMIT):
@@ -681,6 +739,7 @@ class SentAndInvalidPageTests(TestCase):
 
         minutes = int(LOGIN_COOLOFF.total_seconds() // 60)
         self.assertEqual(response.status_code, 429)
+        self.assertContains(response, "Anmeldung vorübergehend gesperrt", status_code=429)
         self.assertContains(response, f"Bitte warten Sie etwa {minutes} Minuten", status_code=429)
         self.assertContains(
             response, "Wenn Sie Ihr Passwort vergessen haben, können Sie ein neues wählen.", status_code=429

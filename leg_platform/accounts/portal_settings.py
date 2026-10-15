@@ -10,6 +10,7 @@ import logging
 from typing import NamedTuple
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import Error as DatabaseError
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,22 @@ _REQUEST_ATTRIBUTE = "_portal_legal_links"
 class LegalLinks(NamedTuple):
     privacy_url: str
     imprint_url: str
+
+
+def _safe_link(value):
+    """The address again checked before it is printed as a link: only a clean https:// address
+    (the value of the database was written by the administrator, the rule of the form can have
+    been bypassed by a direct write, security review of phase 2, E-1). Otherwise no link."""
+    from leg_platform.accounts.models import validate_https_address
+
+    if not value:
+        return ""
+    try:
+        validate_https_address(value)
+    except ValidationError:
+        logger.warning("An address of the portal settings is not a clean https address.")
+        return ""
+    return value
 
 
 def legal_links(request=None):
@@ -45,7 +62,7 @@ def legal_links(request=None):
         row = None
     if row:
         privacy_url, imprint_url = row["privacy_url"], row["imprint_url"]
-    links = LegalLinks(privacy_url or settings.INSTANCE_PRIVACY_URL, imprint_url)
+    links = LegalLinks(_safe_link(privacy_url) or _safe_link(settings.INSTANCE_PRIVACY_URL), _safe_link(imprint_url))
     if request is not None:
         try:
             setattr(request, _REQUEST_ATTRIBUTE, links)

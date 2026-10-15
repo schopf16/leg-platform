@@ -80,7 +80,7 @@ class Definition:
 DEFINITIONS = {
     Key.REGISTRATION_VERIFICATION: Definition(
         "accounts/email/registration_verification.txt",
-        lambda: gettext("Confirm your registration at %(instance_name)s"),
+        lambda: gettext("Your registration at %(instance_name)s"),
         (VERIFICATION_URL, LIFETIME_HOURS),
         (VERIFICATION_URL,),
     ),

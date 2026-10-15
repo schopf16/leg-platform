@@ -73,6 +73,7 @@ def open_tasks(user):
 
 
 def hide(user, key):
-    """Hide the task of this account for good; an unknown key raises ``KeyError``."""
-    TASKS_BY_KEY[key]
+    """Hide the task of this account for good; an unknown key raises ``ValueError``."""
+    if key not in TASKS_BY_KEY:
+        raise ValueError("Unknown task key.")
     HiddenTask.objects.get_or_create(user=user, task_key=key)

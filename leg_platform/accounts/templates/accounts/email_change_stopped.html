@@ -1,0 +1,12 @@
+{% extends "entry_base.html" %}
+{% load i18n %}{% comment %}
+Prepared for the profile (phase 4, the stop link of the notice about an email change): the result
+page after a pending change was stopped. Not routed yet. The text is a proposal of the designer.
+{% endcomment %}
+{% block title %}{% translate "Change stopped" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
+{% block form %}
+  <h1>{% translate "Change stopped" %}</h1>
+  <p>{% translate "The change of your email address was stopped. Your previous addresses stay valid." %}</p>
+  <a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
+{% endblock %}

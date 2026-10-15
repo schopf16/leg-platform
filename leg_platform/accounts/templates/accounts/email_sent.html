@@ -1,16 +1,26 @@
 {% extends "entry_base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Check your email" %}{% endblock %}
 {% block panel %}{% if purpose == "registration" %}{% include "accounts/_panel_register.html" %}{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block form %}
+  {% if purpose == "registration" %}{% include "accounts/_progress.html" %}{% endif %}
   <h1>{% translate "Check your email" %}</h1>
-  <p>{% translate "If we can use the address you entered, we have sent a message to it. It should arrive within a few minutes. Please also look in your spam folder." %}</p>
-  <p>{% blocktranslate count counter=lifetime_hours %}Open the link in the message to continue. The link is valid for {{ counter }} hour.{% plural %}Open the link in the message to continue. The link is valid for {{ counter }} hours.{% endblocktranslate %}</p>
-  <p>{% translate "If nothing arrives, check the spelling of the address and try again." %}</p>
-  {% if purpose == "registration" %}
-    <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}">{% translate "Register again" %}</a>
+  {# The same text for a new address and for an address with an account (docs/PROJECT.md, "Registration"). #}
+  {% if address %}
+    <p>{% blocktranslate with address=address %}We have sent an email to <strong class="address-text">{{ address }}</strong>. Please check your mailbox.{% endblocktranslate %}</p>
   {% else %}
-    <a class="btn btn-secondary-action" href="{% url 'accounts:password_reset' %}">{% translate "Request a new link" %}</a>
+    <p>{% translate "We have sent an email. Please check your mailbox." %}</p>
   {% endif %}
-  <p><a href="{% url 'accounts:login' %}">{% translate "Back to the login page" %}</a></p>
+  <p class="entry-hint">{% translate "No email received? It is worth looking in the spam folder." %}</p>
+  <form method="post" action="{{ resend_url }}" class="resend-form" data-resend data-cooldown="{{ wait_seconds }}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary-action" data-resend-button{% if wait_seconds %} disabled{% endif %}>{% translate "Send email again" %}</button>
+    <p class="entry-hint" data-resend-note{% if not wait_seconds %} hidden{% endif %}>{% blocktranslate with seconds=wait_seconds %}Sending again is possible after <span data-resend-seconds>{{ seconds }}</span> seconds.{% endblocktranslate %}</p>
+  </form>
+  <p class="entry-divider">{% translate "Wrong address?" %}</p>
+  <p class="entry-center"><a href="{{ other_address_url }}">{% translate "Use another email address" %}</a></p>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/resend-cooldown.js' %}"></script>
 {% endblock %}

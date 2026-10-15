@@ -26,7 +26,11 @@
     button.setAttribute("aria-expanded", "true");
     behind.forEach((element) => { element.inert = true; });
     const items = focusable();
-    if (items.length) items[0].focus();
+    // The focus goes to the close button, the first thing a keyboard user may want (designer review
+    // of phase 2); without it, to the first entry.
+    const closeButton = panel.querySelector(".frame-drawer-head [data-menu-close]");
+    if (closeButton) closeButton.focus();
+    else if (items.length) items[0].focus();
   };
 
   const close = () => {
@@ -48,7 +52,11 @@
     open();
   });
   drawer.querySelectorAll("[data-menu-close]").forEach((element) => {
-    element.addEventListener("click", close);
+    element.addEventListener("click", (event) => {
+      // The links to "#" are the way to close the menu without this script.
+      event.preventDefault();
+      close();
+    });
   });
   drawer.addEventListener("keydown", (event) => {
     if (!isOpen) return;

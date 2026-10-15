@@ -82,18 +82,20 @@ class EntryShellTests(TestCase):
         self.assertNotIn("Konto erstellen", html)
 
     def test_an_invalid_registration_link_uses_the_shell_and_the_registration_panel(self):
-        response = self.client.get(reverse("accounts:registration_verify", args=["x" * 43]))
-        html = response.content.decode()
+        link = reverse("accounts:registration_verify", args=["x" * 43])
+        response = self.client.get(link)
+        # The link only redirects (and sends no referrer); the page after it is a page of its own.
+        self.assertEqual(response["Referrer-Policy"], "no-referrer")
+        html = self.client.get(link, follow=True).content.decode()
         self.assertIn('class="entry-split"', html)
         self.assertIn("Konto erstellen", html)
-        self.assertEqual(response["Referrer-Policy"], "no-referrer")
 
     def test_the_lockout_page_uses_the_shell(self):
         request = RequestFactory().get("/")
         with translation.override("de-ch"):
             html = render_to_string("accounts/lockout.html", {"login_cooloff_minutes": 15}, request=request)
         self.assertIn('class="entry-split"', html)
-        self.assertIn("Zu viele Versuche", html)
+        self.assertIn("Anmeldung vorübergehend gesperrt", html)
 
     def test_the_shell_is_not_used_by_the_pages_after_the_login(self):
         user = create_active_user()

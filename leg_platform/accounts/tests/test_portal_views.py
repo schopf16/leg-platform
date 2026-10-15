@@ -14,6 +14,7 @@ from leg_platform.accounts.tests.helpers import (
     code_for,
     completion_data,
     create_active_user,
+    password_data,
     registration_data,
     run_mail_queue,
     verification_path,
@@ -210,26 +211,31 @@ class PageSecurityAndLanguageTests(TestCase):
         member = Client()
         member.force_login(user)
         complete_url = reverse("accounts:registration_complete")
+        password_url = reverse("accounts:registration_password")
 
         def complete(password="1234567890123456", **overrides):
-            data = completion_data(password, registration=reference, **overrides)
-            return pending.post(complete_url, data)
+            password_fields = {k: v for k, v in overrides.items() if k.startswith("password")}
+            details = {k: v for k, v in overrides.items() if k not in password_fields}
+            response = pending.post(
+                password_url, password_data(password, registration=reference, **password_fields)
+            )
+            if response.status_code != 302:
+                return response
+            return pending.post(complete_url, completion_data(registration=reference, **details))
 
         pages = {
             "registration invalid address": anonymous.post(
                 reverse("accounts:registration"), {"email": "not-an-email"}
             ),
             "complete invalid values": complete(
+                PASSWORD,
                 first_name="x" * 40,
-                phone_number="123",
-                country="XX",
-                salutation="invalid",
                 postal_code="ABC",
-                post_office_box_number="1" * 12,
+                house_number="1" * 40,
             ),
-            "complete foreign address": complete(country="DE", postal_code=""),
+            "complete foreign address": complete(PASSWORD, country="DE", postal_code=""),
             "complete different passwords": complete(
-                password2="paper lantern rests under silver rain", first_name=""
+                PASSWORD, password2="paper lantern rests under silver rain", first_name=""
             ),
         }
         for name, password in (
@@ -249,13 +255,18 @@ class PageSecurityAndLanguageTests(TestCase):
             ),
             "password reset sent": anonymous.get(reverse("accounts:password_reset_sent")),
             "password reset invalid link": anonymous.get(
-                reverse("accounts:password_reset_verify", args=["x"])
+                reverse("accounts:password_reset_verify", args=["x"]), follow=True
             ),
+            "password reset expired": anonymous.get(reverse("accounts:password_reset_invalid")),
             "login failed": login(Client(), "unknown.person@example.org", "wrong", address="10.0.5.1"),
             "registration": anonymous.get(reverse("accounts:registration")),
             "registration sent": anonymous.get(reverse("accounts:registration_sent")),
+            "registration password": pending.get(password_url),
             "complete": pending.get(complete_url),
-            "link invalid": anonymous.get(reverse("accounts:registration_verify", args=["x"])),
+            "link invalid": anonymous.get(
+                reverse("accounts:registration_verify", args=["x"]), follow=True
+            ),
+            "link expired": anonymous.get(reverse("accounts:registration_invalid")),
             "profile": member.get(reverse("accounts:profile")),
             "lockout": self.lockout_response(),
         }
@@ -277,7 +288,7 @@ class PageSecurityAndLanguageTests(TestCase):
         fresh.force_login(create_active_user("fresh.person@example.org"))
         pages = {
             "two-factor setup without password": fresh.get(reverse("accounts:two_factor_setup")),
-            "welcome": fresh.get(reverse("accounts:welcome")),
+            "start": fresh.get(reverse("home")),
         }
         age_authentication(member)
         pages |= {

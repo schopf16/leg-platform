@@ -263,9 +263,6 @@ msgstr "Änderung der E-Mail-Adresse bestätigen"
 msgid "Confirm new email address"
 msgstr "Neue E-Mail-Adresse bestätigen"
 
-msgid "Confirm that %(email)s should become the email address for your account."
-msgstr "Bestätigen Sie, dass %(email)s als E-Mail-Adresse für Ihr Konto verwendet werden soll."
-
 msgid "Confirm with your current password and, if enabled, a code from your authenticator app."
 msgstr "Bestätigen Sie mit Ihrem aktuellen Passwort und, falls aktiviert, einem Code aus Ihrer Authenticator-App."
 
@@ -295,9 +292,6 @@ msgstr "Änderung der E-Mail-Adresse: Die neue Adresse hat bereits ein Konto"
 
 msgid "Email address changed"
 msgstr "E-Mail-Adresse geändert"
-
-msgid "Email change link is invalid"
-msgstr "Der Link zur Änderung der E-Mail-Adresse ist ungültig"
 
 msgid "Hello\n\nSomeone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n\n%(email_change_url)s\n\nThe link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
 msgstr "Guten Tag\n\nBei %(instance_name)s wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Öffnen Sie diesen Link, um die neue Adresse zu bestätigen:\n\n%(email_change_url)s\n\nDer Link ist %(lifetime_hours)s Stunden gültig. Die neue Adresse wird erst nach Ihrer Bestätigung verwendet."
@@ -353,9 +347,6 @@ msgstr "Das Konto kann sich nicht anmelden und sein Passwort nicht zurücksetzen
 msgid "The test email limit has been reached. Try again later."
 msgstr "Das Limit für Test-E-Mails wurde erreicht. Versuchen Sie es später erneut."
 
-msgid "This link is invalid, expired, or has already been used. Your email address has not been changed."
-msgstr "Dieser Link ist ungültig, abgelaufen oder wurde bereits verwendet. Ihre E-Mail-Adresse wurde nicht geändert."
-
 msgid "Unblock account"
 msgstr "Konto entsperren"
 
@@ -370,9 +361,6 @@ msgstr "Ihr Konto wurde gelöscht."
 
 msgid "Your email address at %(instance_name)s was changed"
 msgstr "Ihre E-Mail-Adresse bei %(instance_name)s wurde geändert"
-
-msgid "Your email address was changed. Please log in again."
-msgstr "Ihre E-Mail-Adresse wurde geändert. Bitte melden Sie sich erneut an."
 
 msgid "Fields marked optional may stay empty. All other fields are required."
 msgstr "Felder mit dem Hinweis «freiwillig» dürfen leer bleiben. Alle anderen Felder müssen ausgefüllt werden."
@@ -907,60 +895,9 @@ msgstr "Seitennavigation %(name)s"
 msgid "United Kingdom of Great Britain and Northern Ireland"
 msgstr "Vereinigtes Königreich Grossbritannien und Nordirland"
 
-#: leg_platform/accounts/emails.py
-#, python-format
-msgid "Confirm your registration at %(instance_name)s"
-msgstr "Bestätigen Sie Ihre Registrierung bei %(instance_name)s"
-
 #, python-format
 msgid "Your account at %(instance_name)s"
-msgstr "Ihr Konto bei %(instance_name)s"
-
-#: leg_platform/accounts/templates/accounts/email/registration_verification.txt
-#, python-format
-msgid ""
-"Hello\n"
-"\n"
-"You or someone else entered this email address to register at %(instance_name)s.\n"
-"\n"
-"To confirm your address and choose your password, open this link within %(lifetime_hours)s hours:\n"
-"\n"
-"%(verification_url)s\n"
-"\n"
-"The link can be used once. If you did not register, you can ignore this email; nothing will happen."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Sie oder jemand anderes hat diese E-Mail-Adresse für die Registrierung bei %(instance_name)s eingegeben.\n"
-"\n"
-"Um Ihre Adresse zu bestätigen und Ihr Passwort zu wählen, öffnen Sie innerhalb von %(lifetime_hours)s Stunden diesen Link:\n"
-"\n"
-"%(verification_url)s\n"
-"\n"
-"Der Link kann nur einmal verwendet werden. Wenn Sie sich nicht registriert haben, können Sie diese E-Mail ignorieren; es passiert nichts."
-
-#: leg_platform/accounts/templates/accounts/email/registration_existing_account.txt
-#, python-format
-msgid ""
-"Hello\n"
-"\n"
-"Someone entered this email address to register at %(instance_name)s. There is already an account for this address, so no new account was created.\n"
-"\n"
-"You can log in here:\n"
-"\n"
-"%(login_url)s\n"
-"\n"
-"If you do not know the password, you can request a new one on the login page."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Jemand hat diese E-Mail-Adresse für die Registrierung bei %(instance_name)s verwendet. Für diese Adresse besteht bereits ein Konto, deshalb wurde kein neues Konto angelegt.\n"
-"\n"
-"Sie können sich hier anmelden:\n"
-"\n"
-"%(login_url)s\n"
-"\n"
-"Wenn Sie das Passwort nicht kennen, können Sie auf der Anmeldeseite ein neues anfordern."
+msgstr "Ihr Konto beim %(instance_name)s"
 
 #, python-format
 msgid ""
@@ -971,9 +908,6 @@ msgstr ""
 "Wenn das nicht weiterhilft, finden Sie hier Kontaktangaben:\n"
 "\n"
 "%(contact_url)s"
-
-msgid "If you did not try to register, you can ignore this email."
-msgstr "Wenn Sie nicht versucht haben, sich zu registrieren, können Sie diese E-Mail ignorieren."
 
 #: leg_platform/accounts/templates/accounts/email/password_reset.txt
 #, python-format
@@ -1034,19 +968,8 @@ msgstr "Ihr Passwort bei %(instance_name)s wurde geändert"
 msgid "Forgot password?"
 msgstr "Passwort vergessen?"
 
-#: leg_platform/accounts/templates/accounts/password_reset.html
-msgid "Forgot password"
-msgstr "Passwort vergessen"
-
-msgid "Enter your email address. If an account exists for it, we will send you a link to choose a new password."
-msgstr "Geben Sie Ihre E-Mail-Adresse ein. Wenn dazu ein Konto besteht, senden wir Ihnen einen Link, mit dem Sie ein neues Passwort wählen."
-
 msgid "Send link"
 msgstr "Link senden"
-
-#: leg_platform/accounts/templates/accounts/password_reset_set.html
-msgid "Choose a new password"
-msgstr "Neues Passwort wählen"
 
 #, python-format
 msgid "Choose at least %(min_length)d characters. A sentence of several words is easy to remember and hard to guess, for example «My cat drinks milk every morning». Please do not use this exact example."
@@ -1054,10 +977,6 @@ msgstr "Wählen Sie mindestens %(min_length)d Zeichen. Ein Satz aus mehreren Wö
 
 msgid "Save password"
 msgstr "Passwort speichern"
-
-#: leg_platform/accounts/templates/accounts/password_reset_invalid.html
-msgid "This link is invalid, expired or was already used. If you have already chosen a new password, please log in."
-msgstr "Dieser Link ist ungültig, abgelaufen oder wurde schon verwendet. Wenn Sie schon ein neues Passwort gewählt haben, melden Sie sich bitte an."
 
 #: leg_platform/accounts/views.py
 msgid "Your password was changed. You can now log in."
@@ -1089,18 +1008,11 @@ msgstr "Anmelden"
 msgid "No account yet?"
 msgstr "Noch kein Konto?"
 
-msgid "Register"
-msgstr "Registrieren"
-
 msgid "Register as a new user"
 msgstr "Neu registrieren"
 
 msgid "Here you manage your account and, later, your locations, energy data and invoices."
 msgstr "Hier verwalten Sie Ihr Konto und später Ihre Standorte, Energiedaten und Rechnungen."
-
-#: leg_platform/accounts/templates/accounts/lockout.html
-msgid "Too many attempts"
-msgstr "Zu viele Versuche"
 
 #, python-format
 msgid "There were too many failed login attempts. Please wait about %(counter)s minute and try again."
@@ -1110,16 +1022,6 @@ msgstr[1] "Es gab zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie etw
 
 msgid "Back to the login page"
 msgstr "Zurück zur Anmeldeseite"
-
-#: leg_platform/accounts/templates/accounts/registration.html
-msgid "Enter your email address. We will send you a link to complete your registration."
-msgstr "Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link, mit dem Sie die Registrierung abschliessen."
-
-msgid "Your data is used to identify you and, later, to send invoices by post or email."
-msgstr "Ihre Angaben dienen zu Ihrer Identifikation und später dazu, Rechnungen per Post oder E-Mail zu senden."
-
-msgid "Already registered?"
-msgstr "Bereits registriert?"
 
 #: leg_platform/accounts/templates/accounts/registration_sent.html
 msgid "Check your email"
@@ -1131,19 +1033,6 @@ msgstr "Wenn wir die angegebene Adresse verwenden können, haben wir eine Nachri
 #: leg_platform/accounts/templates/accounts/registration_invalid.html
 msgid "Link not valid"
 msgstr "Link ungültig"
-
-msgid "This link is invalid, expired or was already used. If you have already finished the registration, please log in."
-msgstr "Dieser Link ist ungültig, abgelaufen oder wurde schon verwendet. Wenn Sie die Registrierung schon abgeschlossen haben, melden Sie sich bitte an."
-
-#: leg_platform/accounts/templates/accounts/registration_complete.html
-msgid "Complete your registration"
-msgstr "Registrierung abschliessen"
-
-msgid "Enter your data and choose a password."
-msgstr "Geben Sie Ihre Angaben ein und wählen Sie ein Passwort."
-
-msgid "Activate account"
-msgstr "Konto aktivieren"
 
 #: leg_platform/accounts/templates/accounts/profile.html
 msgid "Customer number"
@@ -1328,18 +1217,8 @@ msgstr ""
 "\n"
 "Für Ihr Konto bei %(instance_name)s wurden neue Notfallcodes erstellt. Die früheren Notfallcodes sind ungültig geworden."
 
-#: leg_platform/accounts/templates/accounts/login_second_factor.html
-msgid "Step 2 of 2"
-msgstr "Schritt 2 von 2"
-
 msgid "Confirm sign-in"
 msgstr "Anmeldung bestätigen"
-
-msgid "An emergency code has the form xxxx-xxxx. The hyphen can be left out."
-msgstr "Ein Notfallcode hat die Form xxxx-xxxx. Der Bindestrich kann weggelassen werden."
-
-msgid "Enter the code from your authenticator app. If you cannot use the app, enter one of your emergency codes."
-msgstr "Geben Sie den Code aus Ihrer Authenticator-App ein. Wenn Sie die App nicht verwenden können, geben Sie einen Ihrer Notfallcodes ein."
 
 msgid "Start again"
 msgstr "Neu beginnen"
@@ -1611,9 +1490,6 @@ msgstr "Jetzt entfernen"
 msgid "This link is not valid or has expired. If you still need to remove two-factor authentication, please contact %(instance_name)s. The removal can be started again there."
 msgstr "Dieser Link ist ungültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Authentifizierung noch entfernen müssen, wenden Sie sich bitte an %(instance_name)s. Dort kann das Entfernen erneut veranlasst werden."
 
-msgid "Back to the login"
-msgstr "Zurück zur Anmeldung"
-
 #: leg_platform/accounts/templates/accounts/password_change.html
 msgid "You must choose a new password before you can continue. The current password was only meant for the first login."
 msgstr "Sie müssen ein neues Passwort wählen, bevor Sie weitermachen können. Das aktuelle Passwort war nur für die erste Anmeldung gedacht."
@@ -1829,20 +1705,8 @@ msgstr "Passwort"
 msgid "You have been logged out."
 msgstr "Sie wurden abgemeldet."
 
-#, python-format
-msgid "Open the link in the message to continue. The link is valid for %(counter)s hour."
-msgid_plural "Open the link in the message to continue. The link is valid for %(counter)s hours."
-msgstr[0] "Öffnen Sie in der Nachricht den Link, um fortzufahren. Der Link ist %(counter)s Stunde gültig."
-msgstr[1] "Öffnen Sie in der Nachricht den Link, um fortzufahren. Der Link ist %(counter)s Stunden gültig."
-
 msgid "If nothing arrives, check the spelling of the address and try again."
 msgstr "Kommt nichts an, prüfen Sie die Schreibweise der Adresse und versuchen Sie es erneut."
-
-msgid "Register again"
-msgstr "Erneut registrieren"
-
-msgid "Request a new link"
-msgstr "Neuen Link anfordern"
 
 msgid "Change email address again"
 msgstr "E-Mail-Adresse erneut ändern"
@@ -1938,23 +1802,8 @@ msgstr "Das tut uns leid. Bitte versuchen Sie es später noch einmal."
 msgid "Step %(step)s of 2"
 msgstr "Schritt %(step)s von 2"
 
-msgid "Your account is ready"
-msgstr "Ihr Konto ist bereit"
-
-msgid "Protect your account even better"
-msgstr "Schützen Sie Ihr Konto noch besser"
-
-msgid "Extra protection keeps your account safe even if someone learns your password."
-msgstr "Der zusätzliche Schutz sichert Ihr Konto auch dann, wenn jemand Ihr Passwort erfährt."
-
-msgid "A free app on your phone shows a code that you enter after your password."
-msgstr "Eine kostenlose App auf Ihrem Smartphone zeigt einen Code an, den Sie nach Ihrem Passwort eingeben."
-
 msgid "Set up extra protection now (about 2 minutes)"
 msgstr "Zusätzlichen Schutz jetzt einrichten (etwa 2 Minuten)"
-
-msgid "Later"
-msgstr "Später"
 
 msgid "This is voluntary and takes about 2 minutes. You can turn it off again later."
 msgstr "Das ist freiwillig und dauert etwa 2 Minuten. Sie können den Schutz später wieder ausschalten."
@@ -1989,5 +1838,200 @@ msgstr "Das Konto wurde gelöscht; es wird wegen der Aufbewahrungspflicht aufbew
 msgid "The account is deleted if no retention obligation applies. Otherwise it is kept as \"Deleted (retention obligation)\" and its email address becomes available for a new registration."
 msgstr "Das Konto wird gelöscht, wenn keine Aufbewahrungspflicht besteht. Andernfalls bleibt es als «Gelöscht (Aufbewahrungspflicht)» erhalten, und seine E-Mail-Adresse wird für eine neue Registrierung frei."
 
-msgid "Enter the same password as before, for verification."
-msgstr "Geben Sie zur Bestätigung dasselbe Passwort noch einmal ein."
+# Registration in three steps, result pages and the entry pages (D-058)
+msgid "Your registration at %(instance_name)s"
+msgstr "Ihre Registrierung beim %(instance_name)s"
+
+msgid "At least %(min_length)d characters."
+msgstr "Mindestens %(min_length)d Zeichen."
+
+msgid "A sentence of several words is easy to remember and hard to guess."
+msgstr "Ein Satz aus mehreren Wörtern ist leicht zu merken und schwer zu erraten."
+
+msgid "All characters are allowed; upper-case letters, digits and special characters are not required."
+msgstr "Alle Zeichen sind erlaubt; Grossbuchstaben, Ziffern und Sonderzeichen sind nicht vorgeschrieben."
+
+msgid "No known or easily guessed passwords, no number-only passwords."
+msgstr "Keine bekannten oder leicht zu erratenden Passwörter, keine reinen Zahlenpasswörter."
+
+msgid "Not similar to your email address."
+msgstr "Nicht ähnlich wie Ihre E-Mail-Adresse."
+
+msgid "Email address (username)"
+msgstr "E-Mail-Adresse (Benutzername)"
+
+msgid "Repeat password"
+msgstr "Passwort wiederholen"
+
+msgid "I have read the privacy notice and accept it."
+msgstr "Ich habe die Datenschutzerklärung gelesen und akzeptiere sie."
+
+msgid "I have read the <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">privacy notice</a> and accept it."
+msgstr "Ich habe die <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">Datenschutzerklärung</a> gelesen und akzeptiere sie."
+
+msgid "Please confirm that you accept the privacy notice."
+msgstr "Bitte bestätigen Sie, dass Sie die Datenschutzerklärung akzeptieren."
+
+msgid "Enter your first name."
+msgstr "Geben Sie Ihren Vornamen ein."
+
+msgid "Enter your last name."
+msgstr "Geben Sie Ihren Nachnamen ein."
+
+msgid "Enter your street."
+msgstr "Geben Sie Ihre Strasse ein."
+
+msgid "Postal code"
+msgstr "PLZ"
+
+msgid "My account"
+msgstr "Mein Konto"
+
+msgid "Your details in the LEG portal."
+msgstr "Ihre Angaben im LEG-Portal."
+
+msgid "Password rules"
+msgstr "Passwortregeln"
+
+msgid "Step %(step)s of 3"
+msgstr "Schritt %(step)s von 3"
+
+msgid ""
+"Hello\n"
+"\n"
+"Please confirm your email address with this link. The link is valid for %(lifetime_hours)s hours.\n"
+"\n"
+"Continue registration:\n"
+"\n"
+"%(verification_url)s\n"
+"\n"
+"The link can be used once. If you did not register, you can ignore this email; nothing will happen."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Bitte bestätigen Sie Ihre E-Mail-Adresse mit diesem Link. Der Link ist %(lifetime_hours)s Stunden gültig.\n"
+"\n"
+"Registrierung fortsetzen:\n"
+"\n"
+"%(verification_url)s\n"
+"\n"
+"Der Link kann einmal verwendet werden. Wenn Sie sich nicht registriert haben, können Sie diese E-Mail ignorieren; es passiert nichts."
+
+msgid ""
+"Hello\n"
+"\n"
+"There is already an account for this address. You can log in here. If you did not create an account, you can ignore this email.\n"
+"\n"
+"To the login:\n"
+"\n"
+"%(login_url)s\n"
+"\n"
+"If you do not know the password, you can request a new one on the login page."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für diese Adresse besteht bereits ein Konto. Sie können sich hier anmelden. Falls Sie kein Konto erstellt haben, können Sie diese E-Mail ignorieren.\n"
+"\n"
+"Zur Anmeldung:\n"
+"\n"
+"%(login_url)s\n"
+"\n"
+"Wenn Sie das Passwort nicht kennen, können Sie auf der Anmeldeseite ein neues anfordern."
+
+msgid "Confirm that <strong class=\"address-text\">%(email)s</strong> should become the email address for your account."
+msgstr "Bestätigen Sie, dass <strong class=\"address-text\">%(email)s</strong> die E-Mail-Adresse Ihres Kontos werden soll."
+
+msgid "Your new email address <strong class=\"address-text\">%(email)s</strong> is confirmed. From now on you sign in with this address."
+msgstr "Ihre neue E-Mail-Adresse <strong class=\"address-text\">%(email)s</strong> ist bestätigt. Ab jetzt melden Sie sich mit dieser Adresse an."
+
+msgid "To the login"
+msgstr "Zur Anmeldung"
+
+msgid "Link no longer valid"
+msgstr "Link nicht mehr gültig"
+
+msgid "The link has expired or was already used. Your email address was not changed. You can request the change again in your profile."
+msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Ihre E-Mail-Adresse wurde nicht geändert. Sie können die Änderung im Profil erneut anfordern."
+
+msgid "Change stopped"
+msgstr "Änderung gestoppt"
+
+msgid "The change of your email address was stopped. Your previous addresses stay valid."
+msgstr "Die Änderung Ihrer E-Mail-Adresse wurde gestoppt. Ihre bisherigen Adressen bleiben gültig."
+
+msgid "Second address confirmed"
+msgstr "Zweite Adresse bestätigt"
+
+msgid "Your second email address <strong class=\"address-text\">%(email)s</strong> is confirmed. It receives information. You do not sign in with it."
+msgstr "Ihre zweite E-Mail-Adresse <strong class=\"address-text\">%(email)s</strong> ist bestätigt. Sie erhält Informationen. Für die Anmeldung wird sie nicht verwendet."
+
+msgid "We have sent an email to <strong class=\"address-text\">%(address)s</strong>. Please check your mailbox."
+msgstr "Wir haben eine E-Mail an <strong class=\"address-text\">%(address)s</strong> gesendet. Bitte prüfen Sie Ihr Postfach."
+
+msgid "We have sent an email. Please check your mailbox."
+msgstr "Wir haben eine E-Mail gesendet. Bitte prüfen Sie Ihr Postfach."
+
+msgid "No email received? It is worth looking in the spam folder."
+msgstr "Keine E-Mail erhalten? Ein Blick in den Spam-Ordner lohnt sich."
+
+msgid "Send email again"
+msgstr "E-Mail erneut senden"
+
+msgid "Sending again is possible after <span data-resend-seconds>%(seconds)s</span> seconds."
+msgstr "Erneut senden ist nach <span data-resend-seconds>%(seconds)s</span> Sekunden möglich."
+
+msgid "Wrong address?"
+msgstr "Falsche Adresse?"
+
+msgid "Use another email address"
+msgstr "Andere E-Mail-Adresse verwenden"
+
+msgid "Login temporarily blocked"
+msgstr "Anmeldung vorübergehend gesperrt"
+
+msgid "Code from the app"
+msgstr "Code aus der App"
+
+msgid "Do you not have the app at hand? Enter a recovery code."
+msgstr "Haben Sie die App nicht zur Hand? Geben Sie einen Wiederherstellungscode ein."
+
+msgid "Confirm"
+msgstr "Bestätigen"
+
+msgid "Reset password"
+msgstr "Passwort zurücksetzen"
+
+msgid "We send you a link. It is valid for %(counter)s hour."
+msgid_plural "We send you a link. It is valid for %(counter)s hours."
+msgstr[0] "Wir senden Ihnen einen Link. Er ist %(counter)s Stunde gültig."
+msgstr[1] "Wir senden Ihnen einen Link. Er ist %(counter)s Stunden gültig."
+
+msgid "The link has expired or was already used. Request a new link."
+msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Fordern Sie einen neuen Link an."
+
+msgid "Send new link"
+msgstr "Neuen Link senden"
+
+msgid "You will sign in with this email address and this password."
+msgstr "Mit dieser E-Mail-Adresse und diesem Passwort melden Sie sich künftig an."
+
+msgid "Confirm email address"
+msgstr "E-Mail-Adresse bestätigen"
+
+msgid "Already have an account?"
+msgstr "Schon ein Konto?"
+
+msgid "Your details"
+msgstr "Angaben zu Ihrer Person"
+
+msgid "Confirmed"
+msgstr "Bestätigt"
+
+msgid "Set password"
+msgstr "Passwort festlegen"
+
+msgid "privacy accepted at"
+msgstr "Datenschutzerklärung akzeptiert am"
+
+msgid "privacy accepted url"
+msgstr "Adresse der akzeptierten Datenschutzerklärung"

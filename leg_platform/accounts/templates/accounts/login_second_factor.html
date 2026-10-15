@@ -2,14 +2,17 @@
 {% load i18n %}
 {% block title %}{% translate "Two-factor authentication" %}{% endblock %}
 {% block form %}
-  <p class="entry-divider">{% translate "Step 2 of 2" %}</p>
   <h1>{% translate "Confirm sign-in" %}</h1>
-  <p>{% translate "Enter the code from your authenticator app. If you cannot use the app, enter one of your emergency codes." %}</p>
   <form method="post" novalidate>
     {% csrf_token %}
-    {% include "accounts/_form_fields.html" %}
-    <p class="form-hint">{% translate "An emergency code has the form xxxx-xxxx. The hyphen can be left out." %}</p>
-    <button type="submit" class="btn btn-primary">{% translate "Confirm sign-in" %}</button>
+    {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+    <div class="entry-field">
+      <label class="form-label" for="{{ form.otp_token.id_for_label }}">{% translate "Code from the app" %}</label>
+      {{ form.otp_token }}
+      {% if form.otp_token.errors %}<div class="invalid-feedback d-block" id="{{ form.otp_token.auto_id }}_error">{{ form.otp_token.errors.0 }}</div>{% endif %}
+      <p class="entry-hint">{% translate "Do you not have the app at hand? Enter a recovery code." %}</p>
+    </div>
+    <button type="submit" class="btn btn-primary">{% translate "Confirm" %}</button>
   </form>
-  <p><a href="{% url 'accounts:login' %}">{% translate "Start again" %}</a></p>
+  <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "Start again" %}</a>
 {% endblock %}

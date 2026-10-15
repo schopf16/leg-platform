@@ -25,10 +25,10 @@
     the left. A page without a login (token pages) gets the header with the logo only. An
     account that must replace its password gets the header and "Log out" only.
     {% endcomment %}
-    {% if user.is_authenticated and not user.password_change_required %}{% include "_frame_icons.html" %}{% endif %}
-    <div class="frame{% if not user.is_authenticated or user.password_change_required %} frame-bare{% endif %}">
+    {% if user.is_authenticated and not frame_restricted %}{% include "_frame_icons.html" %}{% endif %}
+    <div class="frame{% if not user.is_authenticated or frame_restricted %} frame-bare{% endif %}">
       <header class="frame-header d-print-none">
-        {% if user.is_authenticated and not user.password_change_required %}
+        {% if user.is_authenticated and not frame_restricted %}
           <a class="frame-round frame-menu-btn" id="menu-btn" href="#frame-drawer" role="button"
              aria-controls="frame-drawer" aria-expanded="false" aria-label="{% translate 'Open menu' %}">
             <svg class="frame-icon" aria-hidden="true"><use href="#i-menu"/></svg>
@@ -37,7 +37,7 @@
         <a class="frame-logo" href="{% url 'home' %}"><span class="logo-plate">{% include "_brand.html" %}</span></a>
         {% if user.is_authenticated %}
           <span class="frame-name">{{ user.display_name }}</span>
-          {% if user.password_change_required and not request.no_referrer_page %}
+          {% if frame_restricted and not request.no_referrer_page %}
             <form method="post" action="{% url 'accounts:logout' %}" class="frame-logout">
               {% csrf_token %}
               <button type="submit" class="btn btn-secondary-action">{% translate "Log out" %}</button>
@@ -45,12 +45,14 @@
           {% endif %}
         {% endif %}
       </header>
-      {% if user.is_authenticated and not user.password_change_required %}
+      {% if user.is_authenticated and not frame_restricted %}
         <nav class="frame-menu d-print-none" aria-label="{% translate 'Main navigation' %}">
           {% include "_frame_menu.html" %}
         </nav>
         <div class="frame-drawer d-print-none" id="frame-drawer">
           <button type="button" class="frame-overlay" data-menu-close tabindex="-1" aria-label="{% translate 'Close menu' %}"></button>
+          {# Without a script the buttons do nothing: a link to "#" over the overlay closes the menu (the anchor of the menu is no longer the target). #}
+          <a class="frame-overlay" href="#" data-menu-close tabindex="-1" aria-hidden="true"></a>
           <div class="frame-drawer-panel" role="dialog" aria-modal="true" aria-label="{% translate 'Menu' %}">
             <div class="frame-drawer-head">
               <a class="frame-drawer-logo" href="{% url 'home' %}"><span class="logo-plate">{% include "_brand.html" %}</span></a>
@@ -61,6 +63,7 @@
             <nav aria-label="{% translate 'Main navigation' %}" class="frame-drawer-nav">
               {% include "_frame_menu.html" %}
             </nav>
+            <a class="visually-hidden-focusable frame-close-link" href="#" data-menu-close>{% translate "Close menu" %}</a>
           </div>
         </div>
         <nav class="frame-bottombar d-print-none" aria-label="{% translate 'Quick access' %}">

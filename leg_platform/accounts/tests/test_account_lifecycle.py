@@ -192,8 +192,12 @@ class EmailChangeTests(TestCase):
             reverse("accounts:email_change_confirm"), {"confirm": "on"}
         )
 
-        self.assertEqual(confirmation.status_code, 302)
-        self.assertEqual(confirmation["Location"], reverse("accounts:login"))
+        # The result page "E-Mail-Adresse geändert" (D-058) is the response itself: the link was
+        # consumed, and every session of the account has ended (the person logs in again).
+        self.assertEqual(confirmation.status_code, 200)
+        self.assertTemplateUsed(confirmation, "accounts/email_change_done.html")
+        self.assertContains(confirmation, "E-Mail-Adresse geändert")
+        self.assertContains(confirmation, "new.address@example.org")
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "new.address@example.org")
         self.assertEqual(self.user.session_version, 1)

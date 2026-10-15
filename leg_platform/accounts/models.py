@@ -66,6 +66,7 @@ from leg_platform.accounts.encryption import (
     reencrypt,
 )
 from leg_platform.accounts.normalization import normalize_email_address
+from leg_platform.environment import has_unsafe_url_character
 
 logger = logging.getLogger(__name__)
 
@@ -527,6 +528,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Contact
 
     phone_number = PhoneNumberField(_("phone number"), blank=True)
+
+    # Consent to the privacy notice, given at the end of the registration (D-058): the time and the
+    # address of the notice that was shown at that time (its version). Written once by the
+    # registration; not editable anywhere.
+    privacy_accepted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    privacy_accepted_url = models.CharField(max_length=500, blank=True, editable=False)
 
     objects = UserManager()
 
@@ -1015,15 +1022,21 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Set the retention obligation flag; it can never be unset (D-016)."""
         self._change(retention_obligation=True)
 
-    def complete_registration(self, raw_password):
+    def complete_registration(self, raw_password=None, *, password_hash=None):
         """Activate an unverified account with the password chosen after verification.
 
         The password, the status and the customer number are written together (D-016, D-021):
         an account is never active without a usable password. The caller validates the
-        password and decides whether the verification link is valid.
+        password and decides whether the verification link is valid. The password is given
+        either as text or, when the registration holds it between two pages, as the hash that
+        was made when it was chosen (D-058); a hash must be one of a known algorithm.
         """
         if self.pk is None:
             raise AccountIntegrityError("Save the account before completing its registration.")
+        if (raw_password is None) == (password_hash is None):
+            raise AccountIntegrityError("Give either the password or its hash.")
+        if password_hash is not None and not self._has_usable_password(password_hash):
+            raise AccountIntegrityError("The password hash is not usable.")
         using = self._state.db or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
             stored = self._locked_row(using)
@@ -1031,7 +1044,10 @@ class User(AbstractBaseUser, PermissionsMixin):
                 raise AccountIntegrityError("Only unverified accounts complete a registration.")
             previous_password = self.password
             previous_status = self.status
-            self.set_password(raw_password)
+            if password_hash is not None:
+                self.password = password_hash
+            else:
+                self.set_password(raw_password)
             self.status = self.Status.ACTIVE
             try:
                 with self._account_change("status"):
@@ -1486,7 +1502,7 @@ def validate_https_address(value):
         or not parts.hostname
         or parts.username is not None
         or parts.password is not None
-        or any(character.isspace() or ord(character) < 32 or ord(character) == 127 for character in value)
+        or has_unsafe_url_character(value)
     ):
         raise ValidationError(
             _("Enter a complete address that starts with https://."), code="https_required"

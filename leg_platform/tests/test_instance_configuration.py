@@ -56,6 +56,11 @@ class InstanceConfigurationTests(SimpleTestCase):
             "portal.example.org",
             "javascript:alert(1)",
             "https://por tal.example.org",
+            # Control and format characters, and an unclosed bracket (review of phase 2, E-1/E-2).
+            "https://portal.example.org\x7f",
+            "https://portal.example.org\u200b",
+            "https://portal.example.org\u2028x",
+            "https://[::1",
         )
         for value in invalid:
             with self.subTest(value=value):

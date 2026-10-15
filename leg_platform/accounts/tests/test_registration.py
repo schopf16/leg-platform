@@ -20,16 +20,21 @@ from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts import mail_queue, registration
-from leg_platform.accounts.models import MailJob, User, VerificationToken
+from leg_platform.accounts.models import MailJob, PortalSettings, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
     completion_data,
     create_active_user,
+    password_data,
     registration_data,
     verification_path,
 )
-from leg_platform.accounts.views import REGISTRATION_SESSION_KEY, RegistrationCompleteView
+from leg_platform.accounts.views import (
+    REGISTRATION_PASSWORD_SESSION_KEY,
+    REGISTRATION_SESSION_KEY,
+    RegistrationCompleteView,
+)
 
 INVALID_PAGE = "accounts/registration_invalid.html"
 
@@ -127,13 +132,19 @@ class RegistrationTests(TestCase):
             with self.subTest(address=address):
                 self.assertEqual(comparable(register(Client(), address)), reference)
 
-    def test_the_confirmation_page_does_not_claim_that_a_link_was_sent(self):
+    def test_the_confirmation_page_is_the_same_for_every_address(self):
+        # The package wins over the earlier conditional wording (D-058): "We have sent an email".
+        # The text never depends on whether the address has an account (D-054).
+        register(self.client, "free.person@example.org")
         response = self.client.get(reverse("accounts:registration_sent"))
 
-        # Conditional and the same for every address (D-054): it says what to expect if the
-        # address can be used, never that an account or a message exists.
-        self.assertContains(response, "Wenn wir die angegebene Adresse verwenden können")
-        self.assertNotContains(response, "Wir haben eine Nachricht an Ihre Adresse")
+        self.assertContains(response, "Prüfen Sie Ihre E-Mails")
+        self.assertContains(response, "free.person@example.org")
+        self.assertContains(response, "Erneut senden ist nach")
+        # Without an address in the session the page names none.
+        bare = Client().get(reverse("accounts:registration_sent"))
+        self.assertContains(bare, "Wir haben eine E-Mail gesendet.")
+        self.assertNotContains(bare, "free.person@example.org")
 
     def test_emails_are_marked_as_automatic_messages(self):
         create_active_user("taken.person@example.org")
@@ -233,11 +244,16 @@ class RegistrationTests(TestCase):
         self.assertNotEqual(users[0].pk, first.pk)
         self.assertEqual(VerificationToken.objects.count(), 1)
         first_link, second_link = (verification_path(message) for message in mail.outbox)
-        self.assertTemplateUsed(self.client.get(first_link), INVALID_PAGE)
+        self.assertRedirects(
+            self.client.get(first_link),
+            reverse("accounts:registration_invalid"),
+            fetch_redirect_response=False,
+        )
+        self.assertTemplateUsed(self.client.get(reverse("accounts:registration_invalid")), INVALID_PAGE)
         self.assertNotIn(REGISTRATION_SESSION_KEY, self.client.session)
         self.assertRedirects(
             self.client.get(second_link),
-            reverse("accounts:registration_complete"),
+            reverse("accounts:registration_password"),
             fetch_redirect_response=False,
         )
 
@@ -365,49 +381,174 @@ class VerificationTests(TestCase):
         self.path = verification_path(mail.outbox[0])
         self.user = User.objects.get()
         self.token = VerificationToken.objects.get()
+        self.password_url = reverse("accounts:registration_password")
         self.complete_url = reverse("accounts:registration_complete")
+        self.invalid_url = reverse("accounts:registration_invalid")
 
     def open_link(self, client=None):
         return (client or self.client).get(self.path)
 
+    def set_password(self, password=PASSWORD, **overrides):
+        data = password_data(password, registration=self.token.pk, **overrides)
+        return self.client.post(self.password_url, data)
+
     def complete(self, password=PASSWORD, **overrides):
-        data = completion_data(password, registration=self.token.pk, **overrides)
+        """The password step and the details step; fields that start with "password" belong to
+        the first. Returns the response of the step that stopped, or of the last one."""
+        password_fields = {k: v for k, v in overrides.items() if k.startswith("password")}
+        details = {k: v for k, v in overrides.items() if k not in password_fields}
+        response = self.set_password(password, **password_fields)
+        if response.status_code != 302 or response["Location"] != self.complete_url:
+            return response
+        data = completion_data(registration=self.token.pk, **details)
         return self.client.post(self.complete_url, data)
+
+    def assertInvalidRedirect(self, response):
+        self.assertRedirects(response, self.invalid_url, fetch_redirect_response=False)
 
     def test_opening_the_link_changes_nothing_and_leaves_the_url(self):
         first = self.open_link()
         second = self.open_link()
 
-        self.assertRedirects(first, self.complete_url, fetch_redirect_response=False)
+        self.assertRedirects(first, self.password_url, fetch_redirect_response=False)
         self.assertEqual(second.status_code, 302)
         self.assertNotIn("/register/verify/", first["Location"])
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.UNVERIFIED)
         self.assertEqual(VerificationToken.objects.count(), 1)
 
-    def test_the_form_shows_the_verified_address_without_the_token(self):
+    def test_the_password_step_shows_the_verified_address_as_username_without_the_token(self):
         self.open_link()
+
+        response = self.client.get(self.password_url)
+
+        self.assertContains(response, "new.person@example.org")
+        self.assertContains(response, 'autocomplete="username"')
+        self.assertContains(response, "Schritt 2 von 3")
+        self.assertNotContains(response, self.path.rsplit("/", 2)[-2])
+
+    def test_the_details_step_shows_the_address_with_its_status_and_no_password_field(self):
+        self.open_link()
+        self.set_password()
 
         response = self.client.get(self.complete_url)
 
         self.assertContains(response, "new.person@example.org")
+        self.assertContains(response, "Bestätigt")
+        self.assertContains(response, "Schritt 3 von 3")
+        self.assertNotContains(response, 'type="password"')
         self.assertNotContains(response, self.path.rsplit("/", 2)[-2])
-        self.assertContains(response, "data-address-directory")
-        self.assertContains(response, "/addresses/lookup/")
-        self.assertContains(response, "js/address-directory.js")
+
+    def test_the_details_step_needs_the_password_step_first(self):
+        self.open_link()
+
+        get = self.client.get(self.complete_url)
+        post = self.client.post(self.complete_url, completion_data(registration=self.token.pk))
+
+        for response in (get, post):
+            self.assertRedirects(response, self.password_url, fetch_redirect_response=False)
+        self.assertFalse(User.objects.get().has_usable_password())
+        self.assertEqual(User.objects.get().status, User.Status.UNVERIFIED)
+
+    def test_the_password_step_does_not_activate_the_account_and_keeps_only_a_hash(self):
+        self.open_link()
+
+        response = self.set_password()
+
+        self.assertRedirects(response, self.complete_url, fetch_redirect_response=False)
+        user = User.objects.get()
+        self.assertEqual(user.status, User.Status.UNVERIFIED)
+        self.assertFalse(user.has_usable_password())
+        self.assertNotIn("_auth_user_id", self.client.session)
+        held = self.client.session[REGISTRATION_PASSWORD_SESSION_KEY]
+        self.assertEqual(held["digest"], self.token.digest)
+        self.assertNotIn(PASSWORD, str(held))
+        self.assertIn("$", held["hash"])
+
+    def test_a_password_held_for_one_link_is_dropped_by_another_link(self):
+        self.open_link()
+        self.set_password()
+        register(Client(), "second.person@example.org")
+
+        self.client.get(verification_path(mail.outbox[-1]))
+
+        self.assertNotIn(REGISTRATION_PASSWORD_SESSION_KEY, self.client.session)
+        self.assertRedirects(
+            self.client.get(self.complete_url), self.password_url, fetch_redirect_response=False
+        )
+
+    def test_a_held_password_does_not_serve_another_link(self):
+        self.open_link()
+        self.set_password()
+        # A forged or stale value of the session for the digest of another link.
+        session = self.client.session
+        session[REGISTRATION_PASSWORD_SESSION_KEY] = {
+            "digest": "0" * 64,
+            "hash": session[REGISTRATION_PASSWORD_SESSION_KEY]["hash"],
+        }
+        session.save()
+
+        response = self.client.get(self.complete_url)
+
+        self.assertRedirects(response, self.password_url, fetch_redirect_response=False)
 
     def test_completing_activates_the_account_and_issues_the_customer_number(self):
         self.open_link()
 
+        before = timezone.now()
         response = self.complete()
 
-        self.assertRedirects(response, reverse("accounts:welcome"))
+        self.assertRedirects(response, reverse("home"))
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.ACTIVE)
         self.assertTrue(self.user.check_password(PASSWORD))
         self.assertRegex(self.user.customer_number_id, r"\A[0-9]{6}\Z")
         self.assertEqual(VerificationToken.objects.count(), 0)
         self.assertNotIn(REGISTRATION_SESSION_KEY, self.client.session)
+        self.assertNotIn(REGISTRATION_PASSWORD_SESSION_KEY, self.client.session)
+        # The consent is stored with its time (D-058); the person is logged in (D-055).
+        self.assertGreaterEqual(self.user.privacy_accepted_at, before)
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
+
+    def test_the_consent_is_stored_with_the_address_that_was_shown(self):
+        PortalSettings.objects.update_or_create(
+            pk=1, defaults={"privacy_url": "https://example.org/privacy"}
+        )
+        self.open_link()
+        self.set_password()
+        self.assertContains(
+            self.client.get(self.complete_url), 'href="https://example.org/privacy"'
+        )
+
+        self.complete()
+
+        self.assertEqual(User.objects.get().privacy_accepted_url, "https://example.org/privacy")
+
+    def test_the_details_step_refuses_a_missing_consent(self):
+        self.open_link()
+        self.set_password()
+        data = completion_data(registration=self.token.pk)
+        del data["privacy"]
+
+        response = self.client.post(self.complete_url, data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors.get("privacy"))
+        user = User.objects.get()
+        self.assertEqual(user.status, User.Status.UNVERIFIED)
+        self.assertIsNone(user.privacy_accepted_at)
+        self.assertEqual(VerificationToken.objects.count(), 1)
+
+    def test_the_details_step_asks_only_for_the_fields_of_the_package(self):
+        self.open_link()
+        self.set_password()
+
+        form = self.client.get(self.complete_url).context["form"]
+
+        self.assertEqual(
+            list(form.fields),
+            ["first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy"],
+        )
 
     def test_address_matching_warning_does_not_block_registration(self):
         self.open_link()
@@ -417,7 +558,7 @@ class VerificationTests(TestCase):
         ) as check:
             response = self.complete()
 
-        self.assertRedirects(response, reverse("accounts:welcome"))
+        self.assertRedirects(response, reverse("home"))
         check.assert_called_once_with(
             street="Examplestrasse",
             house_number="12a",
@@ -440,17 +581,20 @@ class VerificationTests(TestCase):
 
         again = self.open_link()
         direct = self.client.get(self.complete_url)
+        password = self.client.get(self.password_url)
 
-        for response in (again, direct):
-            self.assertTemplateUsed(response, INVALID_PAGE)
+        for response in (again, direct, password):
+            self.assertInvalidRedirect(response)
 
-    def test_the_form_is_not_available_without_the_link_in_the_same_session(self):
+    def test_the_steps_are_not_available_without_the_link_in_the_same_session(self):
         for client in (Client(), self.client):
-            self.assertTemplateUsed(client.get(self.complete_url), INVALID_PAGE)
-        response = Client().post(
-            self.complete_url, completion_data(registration=self.token.pk)
-        )
-        self.assertTemplateUsed(response, INVALID_PAGE)
+            for url in (self.complete_url, self.password_url):
+                self.assertInvalidRedirect(client.get(url))
+        for url, data in (
+            (self.complete_url, completion_data(registration=self.token.pk)),
+            (self.password_url, password_data(registration=self.token.pk)),
+        ):
+            self.assertInvalidRedirect(Client().post(url, data))
         self.assertFalse(User.objects.get().has_usable_password())
 
     def test_a_form_rendered_for_another_registration_is_not_saved(self):
@@ -460,13 +604,14 @@ class VerificationTests(TestCase):
         register(other, "attacker.person@example.org")
         attacker_path = verification_path(mail.outbox[-1])
         self.open_link()
+        self.set_password()
         victim_form = self.client.get(self.complete_url)
         self.assertContains(victim_form, f'name="registration" value="{self.token.pk}"')
 
         self.client.get(attacker_path)
         response = self.complete(first_name="Victim")
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertInvalidRedirect(response)
         attacker = User.objects.get(normalized_email="attacker.person@example.org")
         self.assertEqual(attacker.status, User.Status.UNVERIFIED)
         self.assertEqual(attacker.first_name, "")
@@ -475,9 +620,11 @@ class VerificationTests(TestCase):
     def test_a_form_without_the_registration_reference_is_refused(self):
         self.open_link()
 
-        response = self.client.post(self.complete_url, completion_data())
-
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        for url, data in (
+            (self.password_url, password_data()),
+            (self.complete_url, completion_data()),
+        ):
+            self.assertInvalidRedirect(self.client.post(url, data))
         self.assertFalse(User.objects.get().has_usable_password())
 
     def test_an_expired_link_is_invalid(self):
@@ -485,27 +632,32 @@ class VerificationTests(TestCase):
 
         response = self.open_link()
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertInvalidRedirect(response)
+        self.assertTemplateUsed(self.client.get(self.invalid_url), INVALID_PAGE)
         self.assertNotIn(REGISTRATION_SESSION_KEY, self.client.session)
 
     def test_a_link_that_expires_before_the_form_is_sent_completes_nothing(self):
         self.open_link()
+        self.set_password()
         VerificationToken.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
 
-        response = self.complete()
+        response = self.client.post(self.complete_url, completion_data(registration=self.token.pk))
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertInvalidRedirect(response)
         self.assertFalse(User.objects.get().has_usable_password())
 
     def test_a_token_consumed_by_a_concurrent_submission_completes_nothing(self):
         self.open_link()
+        self.set_password()
         token = VerificationToken.objects.get()
         # Seen as valid at the start of the request, consumed before the form is saved.
         with patch.object(RegistrationCompleteView, "find_token", return_value=token):
             token.delete()
-            response = self.complete()
+            response = self.client.post(
+                self.complete_url, completion_data(registration=self.token.pk)
+            )
 
-        self.assertTemplateUsed(response, INVALID_PAGE)
+        self.assertInvalidRedirect(response)
         self.user.refresh_from_db()
         self.assertEqual(self.user.status, User.Status.UNVERIFIED)
         self.assertFalse(self.user.has_usable_password())
@@ -520,11 +672,21 @@ class VerificationTests(TestCase):
         for name, password in weak.items():
             with self.subTest(name):
                 self.open_link()
-                response = self.complete(password)
+                response = self.set_password(password)
                 self.assertEqual(response.status_code, 200)
                 self.assertTrue(response.context["form"].errors.get("password1"))
                 self.assertFalse(User.objects.get().has_usable_password())
                 self.assertEqual(VerificationToken.objects.count(), 1)
+                self.assertNotIn(REGISTRATION_PASSWORD_SESSION_KEY, self.client.session)
+
+    def test_the_password_step_lists_the_rules_of_the_policy(self):
+        self.open_link()
+
+        response = self.client.get(self.password_url)
+
+        self.assertContains(response, 'class="password-rules"')
+        self.assertContains(response, "Mindestens 15 Zeichen.")
+        self.assertContains(response, "Passwort wiederholen")
 
     def test_different_passwords_are_rejected(self):
         self.open_link()
@@ -545,7 +707,7 @@ class VerificationTests(TestCase):
     def test_the_password_fields_are_masked_in_error_reports(self):
         self.open_link()
 
-        response = self.complete()
+        response = self.set_password()
 
         self.assertEqual(
             response.wsgi_request.sensitive_post_parameters, ("password1", "password2")
@@ -580,7 +742,7 @@ class VerificationTests(TestCase):
         for token in ("x", "A" * 43, "A" * 5000, "-" * 43):
             with self.subTest(length=len(token)):
                 response = self.client.get(reverse("accounts:registration_verify", args=[token]))
-                self.assertTemplateUsed(response, INVALID_PAGE)
+                self.assertInvalidRedirect(response)
 
     def test_a_token_with_other_characters_matches_no_url(self):
         response = self.client.get("/register/verify/abc%20def/")
@@ -597,9 +759,14 @@ class VerificationTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_every_page_of_the_flow_is_not_cached_including_the_invalid_page(self):
-        valid = [self.open_link(), self.client.get(self.complete_url)]
+        opened = self.open_link()
+        valid = [opened, self.client.get(self.password_url)]
+        self.set_password()
+        valid.append(self.client.get(self.complete_url))
         invalid = [
             Client().get(self.complete_url),
+            Client().get(self.password_url),
+            Client().get(self.invalid_url),
             Client().get(reverse("accounts:registration_verify", args=["x"])),
             Client().post(self.complete_url, completion_data()),
         ]
@@ -637,20 +804,25 @@ class ConcurrentCompletionTests(TransactionTestCase):
         clients = [Client(), Client()]
         for client in clients:
             client.get(path)
+            client.post(
+                reverse("accounts:registration_password"), password_data(registration=token.pk)
+            )
         barrier = Barrier(2)
 
         def submit(client):
             try:
                 barrier.wait()
                 data = completion_data(registration=token.pk)
-                return client.post(reverse("accounts:registration_complete"), data).status_code
+                response = client.post(reverse("accounts:registration_complete"), data)
+                return response["Location"]
             finally:
                 connections.close_all()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            statuses = sorted(executor.map(submit, clients))
+            locations = sorted(executor.map(submit, clients))
 
-        self.assertEqual(statuses, [200, 302])
+        # One submission creates the account; the other finds the link used up.
+        self.assertEqual(locations, sorted([reverse("home"), reverse("accounts:registration_invalid")]))
         user = User.objects.get()
         self.assertEqual(user.status, User.Status.ACTIVE)
         self.assertEqual(VerificationToken.objects.count(), 0)
@@ -661,6 +833,9 @@ class ConcurrentCompletionTests(TransactionTestCase):
         token = VerificationToken.objects.get()
         completing = Client()
         completing.get(path)
+        completing.post(
+            reverse("accounts:registration_password"), password_data(registration=token.pk)
+        )
         barrier = Barrier(2)
 
         def complete(_):

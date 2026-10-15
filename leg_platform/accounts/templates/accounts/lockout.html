@@ -1,15 +1,15 @@
 {% extends "entry_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Too many attempts" %}{% endblock %}
+{% block title %}{% translate "Login temporarily blocked" %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Too many attempts" %}</h1>
+  <h1>{% translate "Login temporarily blocked" %}</h1>
   {% if request.second_factor_paused %}
-    <p>{% translate "Too many wrong codes were entered for this account. Code entry is paused. The pause ends within 24 hours, or when a new password has been chosen." %}</p>
-    <p><a href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a></p>
+    <div class="alert alert-danger" role="alert">{% translate "Too many wrong codes were entered for this account. Code entry is paused. The pause ends within 24 hours, or when a new password has been chosen." %}</div>
+    <a class="btn btn-secondary-action" href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a>
   {% else %}
-    <p>{% blocktranslate count counter=login_cooloff_minutes %}There were too many failed login attempts. Please wait about {{ counter }} minute and try again.{% plural %}There were too many failed login attempts. Please wait about {{ counter }} minutes and try again.{% endblocktranslate %}</p>
+    <div class="alert alert-danger" role="alert">{% blocktranslate count counter=login_cooloff_minutes %}There were too many failed login attempts. Please wait about {{ counter }} minute and try again.{% plural %}There were too many failed login attempts. Please wait about {{ counter }} minutes and try again.{% endblocktranslate %}</div>
     <p>{% translate "If you forgot your password, you can choose a new one." %}</p>
     <a class="btn btn-secondary-action" href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a>
   {% endif %}
-  <p><a href="{% url 'accounts:login' %}">{% translate "Back to the login page" %}</a></p>
+  <p class="entry-center"><a href="{% url 'accounts:login' %}">{% translate "To the login" %}</a></p>
 {% endblock %}
