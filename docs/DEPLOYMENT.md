@@ -1,6 +1,6 @@
 # Deploying LEG-Platform to a VPS (Runbook for an Operator or Another AI Assistant)
 
-Status: draft and proposal, 2026-10-14. Nothing in this runbook has been run on a real server. Every statement that could not be verified against an official source or the repository is marked **UNVERIFIED** and must not be run blindly. Every point that only the project owner may decide is marked **DECISION** and listed in section 1. Every point where the executing AI must stop is marked **STOP**.
+Status: revised 2026-10-15 for routine stage and production deployments (D-064). The project owner reports that stage has been set up; its actual configuration and deployment results have not been inspected by the author of this revision. The installation examples below remain unverified on a real server. **UNVERIFIED** means that the executing operator must verify a technical fact, not automatically ask the owner to resolve it. **DECISION** means an owner decision is needed only if it is not already recorded and still applies to the task.
 
 Target: the Ittigen instance on an Infomaniak "VPS Lite" (D-008). The structure also serves other instances (D-013): all instance values come from the configuration, never from this document.
 
@@ -12,7 +12,7 @@ Related documents: `docs/INSTALLATION.md` (variables, Microsoft Graph steps, dat
 
 ### 0.1 What this runbook is
 
-A step-by-step procedure to configure and start the application on a fresh VPS correctly, safely and repeatably, from the exact commit that passed CI. It names the checks that prove each step and the points at which the executing AI stops and asks.
+A procedure for both routine updates of an existing instance and the one-time installation of a fresh VPS, from the exact commit that passed CI. **Start with section 0.5, not with the installation commands.** Sections 2 to 10 describe initial setup; section 12.3 describes updates. Do not repeat initial setup during an update.
 
 ### 0.2 Rules that always apply (`CONDUCT.md`, `AGENTS.md` sections 3 and 8)
 
@@ -28,22 +28,73 @@ A step-by-step procedure to configure and start the application on a fresh VPS c
 
 ### 0.3 STOP and ask the project owner when
 
-* a **DECISION** of section 1 that is needed for the next step is missing, or a verified fact contradicts the assumed one (for example the delivered operating system is not one of the options);
+* an owner decision of section 1 is needed, has not already been recorded and cannot be resolved by inspecting the approved instance configuration; ordinary technical facts are investigated by the operator first;
 * a deployment gate of `README.md` is open and no written owner decision allows the deployment;
 * any command would affect a server, host name or account that is not the one named by the owner;
 * a package source, key fingerprint or checksum does not match what this runbook states;
 * a step fails twice for a reason you cannot explain, or any check of section 11 fails;
-* the importer is `RUNNING` when you are about to stop or restart it (section 8.4);
+* the importer remains `RUNNING` beyond the agreed deployment window or is stalled (section 8.4); while it progresses normally, wait without interrupting it;
 * you find a secret in a place it should not be (a log, a file with the wrong mode, the shell history): report it, do not copy it, and ask the owner for the replacement procedure (`docs/OPERATIONS.md` section 2 rule 12);
-* an action would be needed that this runbook does not describe.
+* a change outside this runbook and the approved instance setup would be needed, particularly a destructive migration, a secret rotation, a change of host or mail recipients, or a weakening of security.
 
 ### 0.4 Conventions
 
-Commands run in a Bash shell as the named operator with `sudo`. Placeholders are in angle brackets (`<HOST>`, `<COMMIT_SHA>`) and are replaced by values the owner gave; never invent them. Use `set +o history` at the start of the session. Each step ends with its check and the expected result. Source lines name the official source for the decision; "checked 2026-10-14" means read on that date by the author of this document.
+Server commands run in a Bash shell as the named operator with `sudo`, with `set -euo pipefail` and tracing disabled. Use `set +o history` at the start of the session. Placeholders such as `<HOST>` and `<COMMIT_SHA>` come from the approved instance record, inspection or the release selection below; never invent them. Each command invocation may use a fresh shell: explicitly set its non-secret working values again. Expected negative probes (for example a refused connection or `grep -c` with no matches) must handle their expected non-zero status explicitly; do not hide unexpected failures with `|| true`. Each step ends with its check and the expected result. Source lines name the official source for the decision; "checked 2026-10-14" means read on that date by the author of this document.
 
-## 1. Owner decisions and inputs required before starting
+### 0.5 Entry point: "Deploy to stage" or "Deploy to production"
 
-Everything in this section must be answered before the step that needs it. The executing AI asks the owner for the open items in one message and records the answers in the hand-over report (section 13), without secrets.
+The owner requests an outcome, not a database or server design consultation. The operator owns the technical execution:
+
+1. **Identify the target.** "Deploy to stage" selects only the recorded stage instance; "deploy to production" selects only the recorded production instance. Never default an unspecified environment to production. If more than one instance matches, ask only which instance. Use existing authorised access from the deployment operator's machine; do not copy stage or production secrets to a development machine.
+2. **Read the instance record** (section 0.6), the last successful hand-over and the release notes. Inspect the named server read-only: OS, service names, unit paths, working directories, management wrapper, current commit, listeners, TLS certificate and backup status. Inspect only non-secret unit metadata; do not dump units or configuration that may contain inline credentials. Do not display secret files or environment values.
+3. **Classify the task.** Existing application, database and services mean **update**, section 12.3. An incomplete installation means investigate and resume only the missing setup steps. A genuinely new server means **initial installation**, sections 1 to 10. Never recreate users, databases, environment files or secrets to make an update fit the examples.
+4. **Select the release.** An explicit requested commit/tag is resolved to its full commit SHA. Otherwise, for stage, resolve the configured release branch (initial convention: the repository's `main`) once to a full SHA and verify CI for that exact SHA. For **every production deployment**, including an explicitly requested commit/tag, verify that the selected full SHA is the same SHA successfully tested and accepted on stage, not a newer branch head. Resolve this comparison yourself; the owner never has to look up or compare hashes. If they do not match, do not deploy that release to production: report that it first needs stage testing and acceptance. Do not choose the newest tag or fall back silently to another revision.
+5. **Verify the gates yourself.** Obtain the CI results for both variants from GitHub Actions, the existing review/acceptance evidence and the server checks. Record links/run IDs and the SHA. Do not ask the owner to read CI, list tables or explain proxy headers. Missing access to evidence is a blocker, not a passed check. The stage deployment request authorises the normal update and its service interruption, but does not waive an open gate. An explicit production deployment request is its per-deployment approval only when the release is unambiguous and the required stage acceptance is recorded. A statement such as "Stage looks good; deploy to production" can give both acceptance and production approval: the operator records it against the verified currently tested stage SHA, without asking the owner to supply a hash. If the statement's target is ambiguous or stage changed since testing, clarify only which tested state the owner accepted.
+6. **Execute and verify.** Follow section 12.3 for an update and section 11 for verification. Report success only when the requested SHA is running and the checks pass. A failure ends in an explicit failed/blocked report, not a successful installation with hidden exceptions.
+
+Do not ask the owner which tables to create, which database alias a migration uses, which SQL privileges to grant, whether to run `collectstatic`, or how to restart a known service. Those are operator tasks with procedures below and in `docs/INSTALLATION.md`. Ask only when an unresolved owner decision or an actual safety boundary is reached.
+
+### 0.6 One-time instance record, reused on every deployment
+
+Keep a **non-secret** instance record on the operator's deployment system, outside the code checkout. A suggested location is `/etc/leg-platform/deployment-stage.md` or `deployment-production.md` on the corresponding server. It is documentation, not a shell script: never `source` or execute it. It must not contain passwords, tokens, private keys, environment-file contents or personal account exports.
+
+Record the following once and update the evidence after each deployment:
+
+| Area | Record (no secrets) | How to establish it |
+| --- | --- | --- |
+| Target and access | Instance identifier, environment, SSH destination/user and application host name | Existing approved hand-over and authorised SSH access; confirm the named server before changing it |
+| Installation | OS, code/venv/static paths, service user, management wrapper and its supported profiles | Server inspection; keep the actual layout if it differs from the examples |
+| Services | Web, mail, importer, cleanup service/timer and backup command/timer names | Existing unit metadata and service status |
+| Configuration | Paths of protected web/import environment files; approved mail mode and recipient-list reference | Existing setup and checks; values and secrets stay in their protected location |
+| Release | Git source, configured stage release branch, running full SHA, CI evidence, accepted stage SHA and acceptance evidence | Git, GitHub Actions and hand-over/owner acceptance |
+| Safety and recovery | Gate evidence or explicit exceptions, approved maintenance policy, backup/restore procedure, off-server target reference, retention and incident contact reference | Existing approved operations record; do not invent missing privacy or risk decisions |
+| Last deployment | Date, old/new full SHA, package inventory location, backup identifier and verification results | Section 13 hand-over |
+
+If this record is missing on an existing stage instance, reconstruct the technical entries by read-only inspection and persist them before the first update. Ask only for information that cannot be discovered safely, such as which server is stage or where authorised access is available. Do not ask the owner to recreate all O-1 to O-23 answers. If the operator cannot access the server, report that the record and live verification remain missing; a documentation change alone does not establish deployability.
+
+### 0.7 First installation versus repeat deployment
+
+| Item | Initial installation | Every later deployment |
+| --- | --- | --- |
+| OS, SSH, firewall, MariaDB, nginx, TLS and service units | Establish and verify the approved setup, sections 2 to 8 | Inspect and preserve it; do not reinstall or reconfigure it without a release requirement |
+| Databases and credentials | Create once using sections 3 and 5; generate secrets only on the target server | Reuse; do not rotate passwords, alter grants or recreate databases |
+| Database structure | Apply the repository migrations with the correct settings/alias, section 6.2 | Review and apply pending migrations automatically unless destructive or outside approved scope |
+| Initial administrator | Human-only hidden password entry, section 9 | Skip; never reset, recreate or promote an account as part of deployment |
+| Graph and branding | Configure once with the authorised people, sections 6.3 and 10.1 | Preserve; verify operation, do not request credentials again |
+| Address directory | Separate database and isolated long-running importer, sections 3.5 and 8.4 | Preserve generations; migrate if needed, do not force a new full import |
+| Backups and checks | Establish recovery procedure and satisfy the gates | Pre-update backup on **stage as well as production**, then section 11 checks |
+
+### 0.8 Questions that remain legitimate
+
+Ask in plain language, naming the consequence and a recommendation, not asking for a technical design. Examples: "The stage server is not recorded; which server should I use?", "This release would permanently remove stored data; do you approve that loss after backup?", or "The required review is missing; deployment is blocked until it is available." Do not ask again for an existing approval.
+
+The owner must not have to read this runbook, look up a command, find a CI run or compare versions to request a deployment. The executing AI performs those tasks and gives a short outcome report. Do not turn an internal documentation correction or a routine operator choice into an owner questionnaire.
+
+First-time human password entry, external Microsoft administration, initial access, privacy/backup policy and production acceptance cannot be replaced by guessed values. Never use a fake privacy link, a self-signed-certificate fallback, a pseudo-terminal password-injection script, relaxed checks or an automatic database restore to avoid a legitimate stop.
+
+## 1. One-time owner decisions and discoverable inputs
+
+This is an **initial-setup checklist**, not a questionnaire to repeat on every deployment. Use recorded decisions and verified server facts first (sections 0.5 and 0.6). Ask one focused question at a time only for an unresolved owner decision needed for the next step. The operator investigates technical choices and supplies a recommendation with evidence rather than asking the owner to choose table names, package commands or proxy parameters. Preserve earlier approvals in the hand-over (section 13).
 
 | No. | DECISION or input | Options and proposal | Needed in |
 | --- | --- | --- | --- |
@@ -54,7 +105,7 @@ Everything in this section must be answered before the step that needs it. The e
 | O-5 | Operating system image | Not verifiable here: Infomaniak lists the distribution families Debian, Ubuntu, FreeBSD, openSUSE, CentOS, Fedora, Arch, AlmaLinux, Rocky and only "official images", without versions (FAQ 1933, checked 2026-10-14). **Proposal if offered:** the newest LTS, Ubuntu 26.04 LTS ("resolute": standard support until May 2031, Python 3.14.3, MariaDB 12.3 repository suite exists). Alternatives: Ubuntu 24.04 LTS ("noble": until June 2029, Python 3.12.3 = the tested minimum, MariaDB 12.3 repository suite exists), Debian 13 ("trixie": full support until 2028-08-09, LTS until 2030-06-30, MariaDB 12.3 repository suite exists; Python 3.13 is not part of the CI matrix). This runbook uses `apt` and `systemd` and works on all three; the executing AI reads `/etc/os-release` on the delivered image and stops if it is none of them. | 2 |
 | O-6 | Deployment model | **Proposal: direct deployment** (Python virtual environment, Gunicorn, nginx, MariaDB from the vendor repository, systemd). Rationale: D-015 prefers simple, established, maintained components; the application needs a terminal for management commands (D-005, D-008); the supervision (mail worker, importer, timer) is plain systemd; a container runtime would add a daemon, image supply chain and storage layer without a decision for it, and `docs/ARCHITECTURE.md` lists container versus direct deployment as open. A proposal only; the owner decides. | 4 |
 | O-7 | TLS approach | **Proposal:** Let's Encrypt certificate through Certbot with the HTTP-01 challenge on port 80, renewal by Certbot's scheduled task, nginx reload by a deploy hook. Alternative: a certificate from another CA delivered by the owner. Let's Encrypt no longer offers OCSP (responders off since 2025-08-06), so no stapling is configured. | 7 |
-| O-8 | Source of the code and the exact commit | Where the code is fetched from (the GitHub repository once published, or a Git bundle transferred by the owner, `docs/OPERATIONS.md` A), the full commit hash `<COMMIT_SHA>`, and the owner's confirmation that CI passed for exactly this commit on both jobs. How a private source is authenticated (a read-only deploy key held by the operator; never a personal token on the server). | 4 |
+| O-8 | Source of the code and the exact commit | Reuse the approved Git source/access method and resolve the release as in section 0.5. The operator verifies CI for the full `<COMMIT_SHA>` on both variants, without asking the owner to interpret CI. Initial private-source access needs an approved read-only mechanism; never store a personal token on the server. | 4 |
 | O-9 | Python source | The distribution's `python3` (3.12 on Ubuntu 24.04, 3.14 on Ubuntu 26.04) is the proposal, because it receives the vendor's security updates. CI tests 3.12 and 3.14; any other minor version is outside the tested matrix. | 4 |
 | O-10 | Instance presentation | `INSTANCE_NAME`, `INSTANCE_PRIVACY_URL` (required; content is open, D-022), `INSTANCE_WEBSITE_URL`, branding colours and logo files (light and dark, `.svg` or `.png`); who checks the SVG files for scripts and external references and that accents are not red or confusable with status colours (`docs/INSTALLATION.md`, D-024). | 5, 6 |
 | O-11 | Microsoft Graph | The sender mailbox (`EMAIL_SENDER_ADDRESS`), the tenant and application registration, who performs the Entra ID and Exchange Online steps, who creates the certificate (the private key must not pass through this server's history), SPF, DKIM and DMARC of the sender domain, switching off automatic replies. Needed for gate 1. | 10 |
@@ -62,13 +113,13 @@ Everything in this section must be answered before the step that needs it. The e
 | O-13 | Backups | Target of the off-server copy, schedule, retention (deleted data stays in backups until they expire, `docs/SECURITY.md` section 5), encryption of the copy, who tests the restore and how often. Infomaniak does not back up a Cloud VPS or VPS Lite itself; snapshots are stated as unavailable for the VPS Lite in one guide and offered in another (contradiction, **UNVERIFIED**); Swiss Backup with an Acronis agent is offered (FAQ 2007, 2812, 1495, 1660, checked 2026-10-14). | 12 |
 | O-14 | Incident contact and monitoring | Who is told when a service fails, a certificate nears expiry or the customer-number warning appears; through which channel (the server sends no email itself: outgoing port 25 is blocked and cannot be opened on a VPS Lite, FAQ 2822). | 12 |
 | O-15 | Logs and privacy | Retention of the nginx access log (it contains IP addresses) and of the journal; whether the journal is persistent; the privacy notice must match (D-022). Proposal: 14 days for the access log, persistent journal with a size limit. | 7, 12 |
-| O-16 | Client IP behind the proxy | `AXES_IPWARE_PROXY_COUNT` and the forwarded header format (section 7.4). The proposal in this runbook was only verified offline against the installed code; the owner and the `security-reviewer` confirm it before go-live (finding F-1, section 13.3). | 5, 7 |
+| O-16 | Client IP behind the proxy | The operator and security reviewer verify the proxy count and forwarded header format together (section 7.4, finding F-1). Reuse a verified existing setup. The owner is asked about unresolved risk, not to calculate proxy headers. | 5, 7 |
 | O-17 | Rate limits at the proxy | The values in section 7.3 are proposals (10 requests per second per address, burst 40). | 7 |
 | O-18 | First administrator | The email address, the person, the secure channel for the initial password, and who types the password. **The password is chosen and typed by a human in an interactive terminal; the executing AI must not choose, see, store or transmit it** (section 9). | 9 |
 | O-19 | Update policy | Whether operating system security updates install automatically (proposal: yes, no automatic reboot), whether MariaDB packages from the vendor repository update automatically (proposal: no, a monthly operator window, because a restart interrupts the service), reboot windows. | 2, 12 |
 | O-20 | HSTS | `includeSubDomains` (default off, D-028) and when to move from the short test value to the one-year default. | 5, 11 |
 | O-21 | IPv6 | Whether the VPS has a public IPv6 address and whether an AAAA record is published (**UNVERIFIED**: not stated in the product page read on 2026-10-14). | 7 |
-| O-22 | Resources | The delivered plan. The product page lists the smallest VPS Lite as 1 vCPU, 2 GB RAM, 20 GB disk; which entry is called "VPS Lite 1" was not found on the page (read 2026-10-14, **UNVERIFIED**). The address directory import and its retained generations need disk (section 10.2). | 2, 10 |
+| O-22 | Resources | The operator measures the delivered CPU, RAM and disk (section 2.1), including import/backup space. The owner approves a paid upgrade only if needed; no repeated plan questionnaire. Historical product-page details were not sufficient to identify "VPS Lite 1". | 2, 10 |
 | O-23 | Database transport | The database listens only on `127.0.0.1`, so network encryption is not applicable. `docs/SECURITY.md` section 9 requires encrypted transport in stage and production; the owner confirms that loopback satisfies it (D-028 leaves the remote case open). | 3 |
 
 Sources: `docs/DECISIONS.md` D-008, D-013, D-015, D-022, D-025, D-028, D-030, D-033, D-049 to D-052; Infomaniak guides 1933, 1973, 2007, 2812, 2822, 1495, 1660 on infomaniak.com (read through the public pages on 2026-10-14); `https://www.infomaniak.com/en/hosting/vps-lite` (plans, read 2026-10-14); Ubuntu release list (`https://documentation.ubuntu.com/project/release-team/list-of-releases/`) and package page `https://packages.ubuntu.com/resolute/python3` (3.14.3) and `.../noble/python3` (3.12.3); Debian releases (`https://www.debian.org/releases/`); MariaDB repository suites `https://mirror.mariadb.org/repo/12.3/ubuntu/dists/` (jammy, noble, plucky, questing, resolute) and `.../debian/dists/` (bullseye, bookworm, sid, trixie), InRelease of noble, bookworm checked 2026-10-14; Let's Encrypt "Ending OCSP Support in 2025" (`https://letsencrypt.org/2024/12/05/ending-ocsp/`).
@@ -172,6 +223,8 @@ The service user owns nothing and cannot log in. The code and the virtual enviro
 Preconditions: section 2 complete. MariaDB 12.3 is the current long-term-support series (status "Stable", "Long Term Support", end of life 2029-06-12; latest release 12.3.3 of 2026-08-22; `https://downloads.mariadb.org/rest-api/mariadb/`, checked 2026-10-14). The application's minimum is 10.11 and it is tested on 12.3 (D-015, D-030).
 
 ### 3.1 Create the secrets file skeleton and the database passwords (never printed)
+
+**Initial installation only.** Before running this block, verify that neither destination file exists. If either exists, do not run `install /dev/null`, append duplicate keys or regenerate secrets: inspect the installation state using checks without secret values and resume only the missing setup. Updates skip this section entirely.
 
 ```bash
 sudo install -m 0600 -o root -g root /dev/null /etc/leg-platform/app.env
@@ -679,7 +732,7 @@ nginx keeps its own access log; the verification, password-reset, second-factor-
 
 ## 8. systemd units and timers
 
-All units use the same hardening. Options verified in `systemd.exec(5)`, `systemd.service(5)`, `systemd.timer(5)` and `systemd.unit(5)` (checked 2026-10-14). **UNVERIFIED** on the image: that the syscall filter and the namespace options work with the installed Python; after the first start read `journalctl -u <unit>`, and if the filter blocks something remove only that line, then record it in the report. `systemd-analyze security <unit>` rates the result.
+All units use the same hardening. Options verified in `systemd.exec(5)`, `systemd.service(5)`, `systemd.timer(5)` and `systemd.unit(5)` (checked 2026-10-14). **UNVERIFIED** on the image: that the syscall filter and the namespace options work with the installed Python. After the first start inspect the journal without exposing secrets; if a protection blocks a required operation, diagnose it and stop for a reviewed correction. Do not remove a hardening line merely to make the service start (section 0.2 rule 9). `systemd-analyze security <unit>` rates the result.
 
 ### 8.1 Web service (Gunicorn)
 
@@ -900,7 +953,7 @@ WantedBy=multi-user.target
 
 The download uses a temporary file in `/tmp`, which `PrivateTmp=yes` gives the service on the disk; it ignores proxy variables and `.netrc` (`session.trust_env = False` in `leg_platform/addresses/importer.py`), so outbound HTTPS to `data.geo.admin.ch` must work directly. Allow outbound HTTPS only to `data.geo.admin.ch` for this process if the owner wants a stricter egress policy (**UNVERIFIED** how to express it with the chosen firewall; the host firewall above allows all outbound traffic).
 
-**Danger, do not stop or restart this service while an import runs.** The command has no signal handling; a hard-killed running job leaves the state `running` and the worker then never takes over that job (`leg_platform/addresses/jobs.py`: "Do not take over RUNNING work"). Before `systemctl stop|restart leg-platform-addresses` or a reboot window, check the state (section 11 prints it): it must not be `running`. **STOP** and ask the owner if it is. Do not reset the state blindly (`docs/INSTALLATION.md`).
+**Danger, do not stop or restart this service while an import runs.** The command has no signal handling; a hard-killed running job leaves the state `running` and the worker then never takes over that job (`leg_platform/addresses/jobs.py`: "Do not take over RUNNING work"). Before `systemctl stop|restart leg-platform-addresses` or a reboot window, check the state (section 11 prints it): it must not be `running`. While an import progresses, wait within the deployment window and recheck; ask only if it is stalled or exceeds the window. Do not reset the state blindly (`docs/INSTALLATION.md`). Prevent new import requests during the maintenance window before stopping an idle worker, and recheck immediately before stopping it. If a new import started in the meantime, wait for it rather than killing it.
 
 ### 8.5 Enable and start (in this order)
 
@@ -977,7 +1030,7 @@ Run after sections 2 to 10 and after every update. Each check has an expected re
 
 | No. | Command | Expected |
 | --- | --- | --- |
-| V1 | `sudo leg-manage web check --deploy --fail-level WARNING` | `System check identified no issues (N silenced).`, exit code 0, with the real production environment |
+| V1 | `sudo leg-manage web check --deploy --fail-level WARNING` | `System check identified no issues (N silenced).`, exit code 0, with the real target environment (stage or production); do not lower the failure level for stage |
 | V2 | `sudo leg-manage web showmigrations --plan \| grep -c '\[ \]'` | `0` |
 | V3 | `sudo leg-manage import migrate addresses --database=address_import --plan` | no planned operations |
 | V4 | `systemctl is-active mariadb nginx leg-platform-web leg-platform-mail` and `systemctl is-enabled leg-platform-tasks.timer` | `active` four times, `enabled` |
@@ -1094,16 +1147,37 @@ Dropping the scratch database is the only deletion; do not run it against any ot
 
 ### 12.3 Updates and rollback
 
-1. Announce the window (O-19). Check the gates still hold for the new commit (CI passed on both jobs for exactly `<NEW_COMMIT_SHA>`, owner approval for a production update).
-2. Backup: run `sudo /usr/local/sbin/leg-backup`; record the file name. Record the current commit and `pip freeze` for the rollback.
-3. Check the importer state is not `running` (section 8.4).
-4. `sudo git -C /opt/leg-platform/app fetch` and `checkout --detach <NEW_COMMIT_SHA>`; verify `rev-parse` and `status` as in 4.1.
-5. `sudo /opt/leg-platform/venv/bin/python -m pip install --upgrade -e /opt/leg-platform/app gunicorn`, `pip check`, `compileall` (4.2). Record the changed versions.
-6. `sudo leg-manage web check --deploy --fail-level WARNING`, `sudo leg-manage web showmigrations --plan` (read the pending migrations; **STOP** and ask for a destructive one, `AGENTS.md` section 9).
-7. Stop `leg-platform-web` and `leg-platform-mail` (not the importer unless idle), `sudo leg-manage web migrate`, `sudo leg-manage import migrate addresses --database=address_import`, `collectstatic` and `rsync` (6.2), start the services, run section 11.
-8. Operating system and MariaDB updates: `sudo apt-get update && apt list --upgradable`; MariaDB packages from the vendor repository are not installed automatically (O-19; to include them in `unattended-upgrades` the origin pattern would be `origin=MariaDB,codename=${distro_codename}` in `50unattended-upgrades`, **UNVERIFIED** on the image, test with `unattended-upgrade --dry-run --debug`). A MariaDB restart interrupts the service; do it in the window and check `systemctl is-active` afterwards.
+Use the actual paths, profiles and unit names from section 0.6. The commands below use the initial-installation layout of this document; they are not a reason to rename a working installation. Complete the steps in order for **both stage and production**. At a failure, stop the sequence, retain recovery material and report the exact state; do not continue with later steps.
 
-Rollback: if no migration was applied, check out the previous commit, reinstall the recorded package versions, restart. If a migration was applied, the previous code may not run on the new schema: restore the pre-update backup into the database (stop the services, `DROP`/`CREATE` of the database and the restore are destructive: **ask the owner first**), data entered after the backup is lost.
+1. **Preflight and release.** Complete section 0.5. Record the current full SHA and verify that the checkout has no tracked or untracked local changes; never overwrite local changes. Fetch from the recorded Git source, resolve `<NEW_COMMIT_SHA>` and verify its successful CI on both variants. Inspect the release diff before activating it: migration files (including data migrations), dependency manifests, `.env.example` variable names, static assets, worker commands and configuration requirements. Preserve current instance settings. Missing required values are resolved from the approved record or reported as blockers, never filled with dummy values.
+2. **Recovery readiness.** Record the previous full SHA and installed package inventory outside the checkout and verify a usable way to recover the previous package environment, not just the code. Check available disk for packages, static files, backup and migration work. Verify the approved backup command, destination, retention and previous restore evidence; production requires a tested restore before first use. Do not install the suggested backup script with an unapproved deletion policy merely to pass this step.
+3. **Quiesce before changing live files.** Announce the interruption using the recorded maintenance policy. Block new application requests using the instance's maintenance mechanism, stop the web and mail services and the cleanup timer, and wait for any active cleanup job to finish. Wait for the address importer to finish any running import (section 8.4), then stop the idle importer and any importer timer. Prevent new jobs during this transition and recheck the state. Preserve the pre-deployment enabled/active states. No old application, worker or scheduled task may keep running while its checkout, packages or schema are being changed. Keep nginx and MariaDB running. If the instance has no safe way to quiesce requests/jobs, report the missing mechanism rather than improvising a kill.
+4. **Pre-update backup, including stage.** With application writers stopped, run the recorded backup command (example: `sudo /usr/local/sbin/leg-backup`), verify its successful exit and validate the new archive (`sudo gzip -t <BACKUP_FILE>` for the gzip dump format in section 12.2). Record its exact file name and timestamp. Ensure recovery secrets are already held separately in the approved secret store; never print or copy them to this report. No valid backup means no migration.
+5. **Activate the exact code and packages.** Check out `<NEW_COMMIT_SHA>` detached; verify the full SHA and clean status as in section 4.1. Install the release's compatible dependencies and Gunicorn in the recorded venv, then run `pip check` and `compileall` as in section 4.2. Record the new package versions. Do not combine an application deployment with an OS/MariaDB upgrade unless that maintenance was also authorised.
+6. **Check and plan.** Run the real target deployment check with `--fail-level WARNING` and inspect both migration plans:
+
+   ```bash
+   sudo leg-manage web check --deploy --fail-level WARNING
+   sudo leg-manage web migrate --database=default --plan
+   sudo leg-manage import migrate addresses --database=address_import --settings=leg_platform.import_settings --plan
+   ```
+
+   The operator reads the pending migration source and evaluates data loss and reversibility; a plan alone is insufficient. Ordinary non-destructive migrations in the requested release are part of the deployment, not a new question for the owner. **STOP** for destructive changes without explicit approval and a recovery plan. Never use `makemigrations`, `--fake`, manual table creation, a database reset or an account reset to work around an error. If the approved instance does not use the address directory, skip its commands explicitly; do not create a new directory database during an update.
+7. **Apply and publish static files.** Run:
+
+   ```bash
+   sudo leg-manage web migrate --database=default --noinput
+   sudo leg-manage import migrate addresses --database=address_import --settings=leg_platform.import_settings --noinput
+   ```
+
+   Collect and publish static files using section 6.2 and the recorded paths; keep branding and ownership intact. Prove no pending operations remain on each configured alias (`migrate --check --database=default` for the application; the importer plan must show no planned operations). Do not run the bootstrap administrator command or force a full address import.
+8. **Restart all changed processes.** Restore the recorded services and timers that should be running: web, mail, isolated address importer and cleanup timer (plus an importer timer only if the verified setup uses one). A long-running `process_address_imports` command requires a supervised `Type=simple` service, not a `Type=oneshot` timeout. Check active state, timer next run, failures and sanitised journal output. Keep public maintenance enabled until basic application, database and static-file checks pass, then reopen traffic for the end-to-end checks.
+9. **Verify the outcome.** Run section 11 against the target, including trusted HTTPS (no `-k`), request limits, proxy/client-IP handling, token-log redaction, mail/cleanup/importer health and static files. Use the recorded safe test procedure and test accounts; do not send to arbitrary real users. Reuse the evidence for unchanged one-time external setup, but verify current mail operation; a missing test or unavailable evidence is reported, not assumed passed. Production fault-injection or load probes (notably V41 and V43) require the maintenance window and must not expose users or real security links. Confirm the running service's working directory and that the checkout still resolves to `<NEW_COMMIT_SHA>`.
+10. **Persist the hand-over.** Update the instance record and section 13 report with old/new SHA, CI, backup, migration results, package versions, service states and each check's outcome. For stage, record the tested SHA; owner acceptance of that release is recorded separately before it can be selected for production. Do not mark an incomplete release as accepted.
+
+**Recovery after a failed update:** keep traffic in maintenance and report the failure and the last completed step. If no migration was applied, return to the recorded previous code **and package environment**, restore static files and the previous service states, then repeat the applicable checks before reopening. If any migration was applied (including an earlier successful migration in a failed migration command), do not assume the previous code matches the schema. Inspect the actual migration state and propose a compatible forward fix or an approved restore. Database restoration/reversal and any loss of data require the owner's explicit approval; never automatically drop/recreate a database. A failed deployment or recovery is reported as failed, even if some services start.
+
+**Separate OS/MariaDB maintenance:** `sudo apt-get update && apt list --upgradable`; MariaDB packages from the vendor repository are not installed automatically (O-19; to include them in `unattended-upgrades` the origin pattern would be `origin=MariaDB,codename=${distro_codename}` in `50unattended-upgrades`, **UNVERIFIED** on the image, test with `unattended-upgrade --dry-run --debug`). A MariaDB restart interrupts the service; do it in the approved window, respecting importer state, and check `systemctl is-active` afterwards.
 
 `SECRET_KEY` rotation (`docs/INSTALLATION.md`, "Changing `SECRET_KEY`"): put the new key into `DJANGO_SECRET_KEY` and the old one into `DJANGO_SECRET_KEY_FALLBACKS` in **both** environment files (without displaying them), restart the services, run `sudo leg-manage web emergency_access reencrypt-second-factor-keys` (asks for confirmation; reports keys that cannot be decrypted) and only afterwards, when it reports none, remove the old key from the fallbacks. Recovery codes keep working only while the old key stays in the fallbacks.
 
@@ -1136,9 +1210,10 @@ Fill it in, without any secret values:
 
 ```
 Hand-over report: <instance>, <date>, <executing AI/operator>
-Owner decisions received: O-1 ... O-23 (list the answers; "open" where not answered)
+Target and task: stage/production, update/initial installation, instance record location
+Owner decisions: reused record references, new approvals and only the unresolved blockers relevant to this task
 Server: provider/plan, image (os-release), architecture, CPU/RAM/disk, IP address (no secrets), host name
-Code: repository source, <COMMIT_SHA>, CI confirmation by the owner, Python version, pip freeze of the key packages (Django, mysqlclient, django-axes, django-otp, cryptography, msal, requests, gunicorn)
+Code: repository source, previous/new full SHA, CI run/link and both variant results verified by the operator, Python version, package inventory location (Django, mysqlclient, django-axes, django-otp, cryptography, msal, requests, gunicorn)
 Done: section 2 ... section 10 (per step: done / skipped / failed, with the command evidence)
 Checks (section 11): per check number: passed / failed / not run, with the observed result
 Secrets created (names and locations only, no values): DJANGO_SECRET_KEY, DB_PASSWORD, ADDRESS_DB_PASSWORD, ADDRESS_IMPORT_DB_PASSWORD in /etc/leg-platform/*.env (0600 root); database accounts; certificate/key of Graph (not on the server); initial administrator password (typed by <person>, not seen by the AI)

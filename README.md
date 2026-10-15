@@ -40,7 +40,7 @@ Read the relevant rules before every larger change.
 ## Operation Documents
 
 * `docs/STARTUP.md`: start, check, use and stop the complete local environment (Windows, PowerShell), for developers and for the designer and tester agents; test commands and troubleshooting.
-* `docs/DEPLOYMENT.md`: runbook to deploy an instance to a VPS (Infomaniak "VPS Lite"), for an operator or another AI assistant; a proposal that needs the owner's decisions (D-053), not yet run on a server.
+* `docs/DEPLOYMENT.md`: entry point for "deploy to stage" and "deploy to production" (section 0.5), with a reusable non-secret instance record, a separate update procedure and one-time VPS installation instructions (D-053, D-064). Production requires explicit release approval. The current stage configuration and the revised procedure still need live verification.
 * `docs/INSTALLATION.md`: configuration variables, local setup of MariaDB, Microsoft Graph steps and the address directory.
 * `docs/OPERATIONS.md`: roles, rules, CI and the step list for stage and production.
 
@@ -101,7 +101,7 @@ Open work:
 * **Proof of work for the mail forms** (ALTCHA) is only a recommendation (D-058); it needs the approval of the designer and the study of the manufacturer's documentation.
 * **Backlog from the security reviews:** a redirect of invalid links to a fixed URL instead of rendering under the token URL (D-055); ASGI deployments need the proxy body limit (D-052); a new admin URL must be wrapped with `admin_site.admin_view()` (the route walk test fails otherwise); the lower `requests` minimum needs a support source (D-048); the lockout page sends no `Cache-Control` header (Axes renders it).
 * **Not verifiable locally:** CI passed for commit `5602760` on 2026-10-14 in both jobs (run 38630847244: minimum with Python 3.12, Django 6.0 and MariaDB 10.11; latest with Python 3.14, Django 6.1 and MariaDB 12.3). The MariaDB-tagged tests run only in CI, because Docker and MariaDB are not set up on the development machine; the CI run is the only evidence for them. Any later code change needs a new CI run; real Microsoft Graph delivery and the Entra/Exchange setup; the real address-directory database with SELECT-only grants and a real import; HTTPS, HSTS, cookies and the request body limit on a real host; the supervised services and the scheduler (D-008); a check of the pages on real phones and browsers (WCAG 2.2 AA is not established by automated tests); every step of `docs/DEPLOYMENT.md`.
-* **Owner and operator:** AGOV answer (D-004), imprint and privacy notice content (D-022), the operator of stage and production and the other owner decisions O-1 to O-23 of `docs/DEPLOYMENT.md` (D-053), the proxy and client-IP approach (finding F-1 there), the import account credentials (D-049), and a human review of the security-critical changes (D-019).
+* **Owner and operator:** AGOV answer (D-004), imprint and privacy notice content (D-022), the operator of stage and production and unresolved initial-setup decisions in `docs/DEPLOYMENT.md` (D-053, D-064), the proxy and client-IP verification (finding F-1 there), the import account credentials (D-049), and a human review of the security-critical changes (D-019). The owner reports that stage exists; its technical setup must be inspected and recorded once, not asked for again on every deployment.
 
 Deployment gates: no stage or production instance is deployed before
 

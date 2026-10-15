@@ -2,7 +2,7 @@
 
 This guide grows with the project. Installation of stage and production instances is documented once the hosting details are decided (D-008).
 
-Related documents: `docs/STARTUP.md` starts, checks, uses and stops the complete local environment (including the synthetic local address directory); `docs/DEPLOYMENT.md` is the runbook for a VPS (a proposal, D-053); `docs/OPERATIONS.md` describes roles, rules and the CI.
+Related documents: `docs/STARTUP.md` starts, checks, uses and stops the complete local environment (including the synthetic local address directory); `docs/DEPLOYMENT.md`, section 0.5, is the entry point for stage and production deployments, distinguishing routine updates from initial VPS setup (D-053, D-064; live verification remains open); `docs/OPERATIONS.md` describes roles, rules and the CI.
 
 ## Instance Presentation
 

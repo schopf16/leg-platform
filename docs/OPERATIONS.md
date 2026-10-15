@@ -19,7 +19,7 @@ Roles:
 * **Stage:** the test system. The owner checks it here first.
 * **Production:** the real system for the users.
 
-Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DECISIONS.md`, D-008). The server details are still open (section 6). A proposed step-by-step runbook for the server is in `docs/DEPLOYMENT.md` (D-053); it is not yet run on a server and every owner decision it lists is open. The local environment is described in `docs/STARTUP.md`.
+Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DECISIONS.md`, D-008). On 2026-10-15 the owner reported that stage has been set up; the actual configuration has not been inspected for this revision. Start every deployment with `docs/DEPLOYMENT.md`, section 0.5 (D-053, D-064): reuse the instance record and discover technical facts rather than repeating initial-setup questions. The local environment is described in `docs/STARTUP.md`.
 
 ## 2. Rules that always apply
 
@@ -81,6 +81,8 @@ The file is `.github/workflows/ci.yml`.
 
 ### D. Deploy to stage (first)
 
+**Routine deployment:** use `docs/DEPLOYMENT.md`, section 0.5, then section 12.3 for an existing instance. Steps D2 to D10 below describe one-time setup only; do not repeat them on an update. The detailed runbook specifies the technical execution; the gates and safety rules in this guide still apply. The operator verifies CI and server facts and runs ordinary non-destructive migrations without asking the owner to design the database.
+
 Status: **NOT YET VERIFIED**. The install guide says that stage and production steps are documented only after the hosting is decided (`docs/INSTALLATION.md`, top of the file; `docs/DECISIONS.md`, D-008). The steps below are collected from the rules in the project documents. They are not yet tested on a server.
 
 **D1. Check the deployment gates.** Read the list in `README.md` ("Current Status", "Deployment gates"). If any gate is open, stop. On 2026-10-14 the gates are open. The list is:
@@ -141,6 +143,8 @@ python manage.py migrate
 **D14. Report.** Tell the owner what was done. List every step that is still NOT YET VERIFIED.
 
 ### E. Deploy to production
+
+For an existing production instance use the same update procedure in `docs/DEPLOYMENT.md`, section 12.3, with its own instance record and explicit owner approval for the exact release accepted on stage. Do not rerun initial setup or copy stage databases, accounts or secrets. The first production installation follows the steps below.
 
 Status: **NOT YET VERIFIED**
 
