@@ -316,6 +316,9 @@ class PasswordChangeView(ProfileCardView):
                 # An initial password that had to be replaced is replaced (D-005).
                 user.password_change_required = False
                 form.save()
+                # A request for a new address made before the change must not be confirmed
+                # afterwards (security review, final, M-A).
+                user.discard_email_change_requests()
                 # Links of earlier password resets must not work after the change.
                 VerificationToken.objects.filter(
                     user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET

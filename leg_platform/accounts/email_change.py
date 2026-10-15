@@ -71,8 +71,9 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
     removed at once (nothing needs confirming). Every request counts against the limits of the
     mail requests (D-038), and the old addresses get the notice with the stop link.
 
-    The notice is queued before the links, so that it is sent first (security review of phase 4):
-    nobody can confirm before the old address was told. If a limit refuses one of the requests,
+    The notice is queued before the links and, if delivery works, sent first (security review of
+    phase 4; the queue works in order, but a failed delivery of the notice is repeated later while
+    the link may already go out). If a limit refuses one of the requests,
     ``RequestRefused`` is raised and everything of this call is rolled back (the earlier request
     stays as it was, and no job is left without its row).
     """
@@ -268,12 +269,17 @@ def confirm_change(token):
                 if user.secondary_email == address:
                     # The same address cannot be both: it is the login address now.
                     user.set_secondary_email("")
-        except IntegrityError:
+        except (IntegrityError, ValueError):
+            # ValueError: the address is refused by the rules of the account; it was checked when
+            # requested, so this is defensive (security review, final, R5).
             locked_token.delete()
             return None
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE).delete()
         pending.delete()
-        _drop_stop_tokens_if_idle(user)
+        # The stop links went to addresses that are no longer entitled to the account: all of
+        # them end, also while a request for the second address is still open (security
+        # review, final, L2).
+        VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
         user.end_all_sessions()
         # The old login address and the second address are told (D-059).
         enqueue_for_account(MailJob.Kind.EMAIL_CHANGED, user, addresses=recipients)

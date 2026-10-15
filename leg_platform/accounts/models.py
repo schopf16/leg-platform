@@ -930,6 +930,25 @@ class User(AbstractBaseUser, PermissionsMixin):
                 self._check_other_system_administrator(using)
             return super().delete(using=using, keep_parents=keep_parents)
 
+    def discard_email_change_requests(self, using=None):
+        """Delete the open requests for new addresses of the account and every link that belongs
+        to them: the confirmations and the stop links (security review, final, M-A).
+
+        Called where the person's hold on the account changes (new password, status other than
+        active, reset of the second factor), so that a request made before cannot be confirmed
+        afterwards. It does nothing for an account without a request.
+        """
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        PendingEmailChange.objects.using(using).filter(user_id=self.pk).delete()
+        VerificationToken.objects.using(using).filter(
+            user_id=self.pk,
+            purpose__in=(
+                VerificationToken.Purpose.EMAIL_CHANGE,
+                VerificationToken.Purpose.SECONDARY_EMAIL,
+                VerificationToken.Purpose.EMAIL_CHANGE_STOP,
+            ),
+        ).delete()
+
     def set_status(self, status):
         """Change the account status and end its existing sessions (D-016)."""
         using = self._state.db or router.db_for_write(type(self), instance=self)
@@ -937,6 +956,8 @@ class User(AbstractBaseUser, PermissionsMixin):
             account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
             account._change(status=status)
             account.end_all_sessions()
+            if status != self.Status.ACTIVE:
+                account.discard_email_change_requests(using)
             self.refresh_from_db(using=using)
 
     def delete_or_deactivate(self):
@@ -945,18 +966,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         with transaction.atomic(using=using):
             account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
             # The second address and the requests for new addresses are no longer needed, also
-            # for an account that is kept under the retention obligation (D-059).
-            PendingEmailChange.objects.using(using).filter(user=account).delete()
-            # The links of a change in progress hold the proposed address; they go as well
-            # (security review of phase 4, M2).
-            VerificationToken.objects.using(using).filter(
-                user=account,
-                purpose__in=(
-                    VerificationToken.Purpose.EMAIL_CHANGE,
-                    VerificationToken.Purpose.SECONDARY_EMAIL,
-                    VerificationToken.Purpose.EMAIL_CHANGE_STOP,
-                ),
-            ).delete()
+            # for an account that is kept under the retention obligation (D-059). The links of
+            # a change in progress hold the proposed address; they go as well (security review
+            # of phase 4, M2).
+            account.discard_email_change_requests(using)
             if account.secondary_email:
                 account.secondary_email = ""
                 account.save(using=using, update_fields=["secondary_email"])

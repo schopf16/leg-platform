@@ -96,6 +96,9 @@ def remove_second_factor(user, event, *, actor=None):
     VerificationToken.objects.filter(
         user=user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
     ).delete()
+    # A request for a new address made before the reset must not be confirmed afterwards
+    # (security review, final, M-A).
+    user.discard_email_change_requests()
     user.end_all_sessions()
     from leg_platform.accounts.mail_queue import enqueue_for_account
 

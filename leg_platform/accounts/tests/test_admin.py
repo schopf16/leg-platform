@@ -160,7 +160,7 @@ class AdminAuthorizationTests(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(
-                    response, "Nur Konten mit eingerichteter Zwei-Faktor-Authentifizierung"
+                    response, "Nur Konten mit eingerichteter Zwei-Faktor-Anmeldung (2FA)"
                 )
                 self.assertEqual(
                     response.context["adminform"].form.errors["is_staff"], [german_message()]
@@ -401,6 +401,25 @@ class AdminPresentationTests(TestCase):
         self.assertNotIn("Sicherheitsprotokoll", content)
         self.assertNotIn("Gesperrte und fehlgeschlagene Anmeldungen", content)
         self.assertNotIn(">System<", content)
+
+    def test_the_hint_is_shown_only_to_an_account_that_sees_the_group_content(self):
+        from django.contrib.auth.models import Permission
+
+        def hint_for(codename):
+            staff = create_active_user(f"{codename}@example.org")
+            staff.set_privileges(is_staff=True, is_superuser=False)
+            staff.user_permissions.set(Permission.objects.filter(codename=codename))
+            client = VerifiedClient()
+            client.force_login(staff)
+            with translation.override("de-ch"):
+                return client.get(reverse("admin:index")).content.decode()
+
+        only_users = hint_for("view_user")
+        with_content = hint_for("change_emailtext")
+
+        self.assertIn("Konten", only_users)
+        self.assertNotIn("pflegen Sie unter Inhalte", only_users)
+        self.assertIn("pflegen Sie unter Inhalte", with_content)
 
     def test_the_page_of_one_app_keeps_the_list_of_that_app(self):
         self.client.force_login(self.administrator)

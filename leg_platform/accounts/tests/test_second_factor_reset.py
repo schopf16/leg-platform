@@ -261,7 +261,7 @@ class AdministrationResetTests(TestCase):
     def test_an_account_without_a_factor_has_nothing_to_reset(self):
         plain = create_active_user("plain@example.org")
         self.client.force_login(self.administrator)
-        self.assertContains(self.client.get(reset_url(plain)), "keine Zwei-Faktor-Authentifizierung")
+        self.assertContains(self.client.get(reset_url(plain)), "keine Zwei-Faktor-Anmeldung (2FA)")
         self.client.post(reset_url(plain), {})
         self.assertFalse(MailJob.objects.exists())
         self.assertFalse(SecurityEvent.objects.exists())

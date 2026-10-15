@@ -1,28 +1,8 @@
 {% extends "admin/change_list.html" %}
 {% load i18n %}
-
-{% block result_list %}
+{# The list of the email texts: a short explanation. The placeholders are explained on the page of #}
+{# each email, where they can be used (design package, acceptance, P1-2). #}
+{% block content %}
+<p class="help">{% translate "Every email of the portal has a default text. Open an email to see its text, to change it or to use the default text again. Which placeholders an email can use is shown when the email is edited." %}</p>
 {{ block.super }}
-<h2>{% translate "Placeholders" %}</h2>
-<p>{% translate "Write a placeholder in curly brackets. It is replaced when the email is sent. Which placeholders an email can use is shown when the email is edited." %}</p>
-<table>
-  <thead>
-    <tr>
-      <th>{% translate "Placeholder" %}</th>
-      <th>{% translate "Meaning" %}</th>
-      <th>{% translate "Can be used in" %}</th>
-      <th>{% translate "Required in" %}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for placeholder, used_in, required_in in overview %}
-    <tr>
-      <td><code>{% templatetag openbrace %}{{ placeholder.name }}{% templatetag closebrace %}</code></td>
-      <td>{{ placeholder.description }}</td>
-      <td>{{ used_in|join:", " }}</td>
-      <td>{{ required_in|join:", " }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

@@ -46,7 +46,9 @@ def frame_restricted(request):
 
 def instance(request):
     # The addresses of the footer are read from the database only when a template uses them: an
-    # error page, which does not show the footer, must not need the database (D-054, D-056).
+    # error page, which does not show the footer, does not need it for them (D-054, D-056). The
+    # frame state below reads the session of a logged-in account; the 500 page is rendered without
+    # this processor, and if it fails for a 403 or 404 page, Django answers with the 500 page.
     links = SimpleLazyObject(lambda: legal_links(request))
     return {
         "frame_restricted": frame_restricted(request),

@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+{# The lists of failed and blocked logins: an explanation and how to unblock (acceptance, P2-6). #}
+{# The entries carry a pseudonym, never a name or an address, and none is shown here. #}
+{% block content %}
+<p class="help">{% blocktranslate %}These lists show failed and blocked logins. The "username" is a code, not an address: the portal does not show who tried to log in. A temporary lockout ends by itself after {{ lockout_minutes }} minutes.{% endblocktranslate %}</p>
+<p class="help">{% translate "If a person cannot log in because an administrator blocked the account, open the account under Users, Accounts and choose Unblock account." %}</p>
+{{ block.super }}
+{% endblock %}

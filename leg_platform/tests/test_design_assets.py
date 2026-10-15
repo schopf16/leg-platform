@@ -164,9 +164,9 @@ class StyleSheetTests(SimpleTestCase):
             with self.subTest(selector=selector):
                 block = re.search(re.escape(selector) + r"[^{]*\{([^}]*)\}", CSS).group(1)
                 self.assertIn(f"font-size: {size}", block)
-        # Hints and error texts may be 15 px, not smaller.
+        # Hints and error texts are 14 px (K6: 14 or 16), not smaller.
         block = re.search(r"\.register-clear \.form-hint,\s*\.register-clear \.invalid-feedback \{([^}]*)\}", CSS)
-        self.assertIn("font-size: 0.9375rem", block.group(1))
+        self.assertIn("font-size: 0.875rem", block.group(1))
 
 
 class ScriptTests(SimpleTestCase):

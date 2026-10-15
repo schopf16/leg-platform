@@ -571,6 +571,10 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         if not second_factor.has_second_factor(self.user):
             del self.fields["otp_token"]
 
+    def check_changes(self, cleaned_data):
+        """Hook for the forms that ask for more than the proof: add errors here. The code is
+        checked, and so used up, only when nothing else is wrong (security review, final, R2)."""
+
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get("current_password")
@@ -579,8 +583,9 @@ class ReauthenticationForm(PortalFormMixin, forms.Form):
         if not second_factor.verify_password(self.request, self.user, password):
             self.add_error("current_password", self.password_error)
             return cleaned_data
-        # The code is checked only after the password was right.
-        if "otp_token" in self.fields and "otp_token" in cleaned_data:
+        self.check_changes(cleaned_data)
+        # The code is checked only after the password was right and the rest is valid.
+        if "otp_token" in self.fields and not self.errors:
             if second_factor.verify_second_factor(
                 self.request, self.user, cleaned_data["otp_token"]
             ) is None:
@@ -649,10 +654,9 @@ class EmailChangeForm(ReauthenticationForm):
             return ""
         return self._normalised(value, _("Enter a valid email address."))
 
-    def clean(self):
-        cleaned_data = super().clean()
+    def check_changes(self, cleaned_data):
         if self.errors:
-            return cleaned_data
+            return
         user = self.user
         login = cleaned_data["email"]
         secondary = cleaned_data.get("secondary_email", "")
@@ -670,8 +674,7 @@ class EmailChangeForm(ReauthenticationForm):
                 _("The second address must differ from the address for login."),
             )
         elif not (self.login_change or self.secondary_change or self.remove_secondary):
-            raise ValidationError(_("Nothing was changed."), code="unchanged")
-        return cleaned_data
+            self.add_error(None, ValidationError(_("Nothing was changed."), code="unchanged"))
 
 
 class AccountDeleteForm(ReauthenticationForm):
@@ -734,17 +737,6 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        # The code is checked only after the password was right.
-        if (
-            "otp_token" in self.fields
-            and "current_password" in cleaned_data
-            and "otp_token" in cleaned_data
-            and second_factor.verify_second_factor(
-                self.request, self.user, cleaned_data["otp_token"]
-            )
-            is None
-        ):
-            self.add_error("otp_token", CodeForm.invalid_code_message)
         # An initial password that must be replaced is not replaced by itself (D-005).
         if (
             self.user.password_change_required
@@ -753,6 +745,18 @@ class ChangePasswordForm(PortalFormMixin, SetPasswordForm):
             and cleaned_data["new_password2"] == cleaned_data["current_password"]
         ):
             self.add_error("new_password1", self.different_password_message)
+        # The code is checked, and so used up, only after the password was right and every other
+        # field is valid: a recovery code must not be lost to a form that fails anyway (security
+        # review, final, R2).
+        if (
+            "otp_token" in self.fields
+            and not self.errors
+            and second_factor.verify_second_factor(
+                self.request, self.user, cleaned_data["otp_token"]
+            )
+            is None
+        ):
+            self.add_error("otp_token", CodeForm.invalid_code_message)
         return cleaned_data
 
 

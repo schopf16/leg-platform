@@ -1,0 +1,19 @@
+{% load i18n %}{% comment %}
+"Which rights do I need for what?": only text. The portal ships no groups or roles (D-012); this
+explains the rights of the list that a system administrator can put into a group.
+{% endcomment %}
+<div class="portal-help">
+  <h2>{% translate "Which rights do I need for what?" %}</h2>
+  <p>{% translate "The portal has no ready-made groups. Make a group, choose the rights below and add the group to the account of a staff member." %}</p>
+  <table>
+    <thead>
+      <tr><th scope="col">{% translate "To do this" %}</th><th scope="col">{% translate "Choose this right" %}</th></tr>
+    </thead>
+    <tbody>
+      {% for what, right in rights_help %}
+        <tr><td>{{ what }}</td><td>{{ right }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p>{% translate "Only system administrators can do the following, and no right gives it to a staff member: change the portal settings and the email delivery, read the security log and the blocked logins, manage groups and rights, block, unblock and delete accounts, and reset two-factor authentication." %}</p>
+</div>

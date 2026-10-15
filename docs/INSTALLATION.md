@@ -28,6 +28,8 @@ Colour mode and language (D-056): the pages start light and German. The person s
 
 The platform defaults of the colours are the values of the design package of the owner (accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22`; D-056); an instance replaces them with the variables above. The addresses of the privacy notice and the legal notice in the footer are maintained by the system administrator in the administration ("Portal-Einstellungen"); the privacy address falls back to `INSTANCE_PRIVACY_URL` while the setting is empty. The footer also shows the host of `INSTANCE_WEBSITE_URL` as a link.
 
+**Hint for the administrator of an instance:** the texts of the login and registration pages (title, lead sentence, benefit points, field labels) are not editable in the administration. They can only be changed in the translation files `locale/<language>/LC_MESSAGES/django.po` (compile with `msgfmt`, then deploy). Logo, colours, name and website are deployment settings (above). The start page of the administration shows what still has to be set (box "Erste Schritte"); see `docs/OPERATIONS.md`, section 5a.
+
 Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, Safari 17.5
 or newer, and Opera 109 or newer. Devices that cannot update to these versions are not
 supported. Responsive checks do not establish full WCAG 2.2 AA conformity.

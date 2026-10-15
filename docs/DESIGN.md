@@ -9,7 +9,7 @@ The design language was developed with the project owner on 2026-10-11 from mock
 ## 1. Scope
 
 * Applies to all application views built with Tabler (D-003): login, registration, profile, later member views and any later administration views built as application views.
-* The Django admin keeps its own appearance. Whether later administrative functions are built in the Django admin or as application views is decided per function (`docs/ARCHITECTURE.md`, "Deliberately Open"). If they are built as application views, this document applies.
+* The Django admin keeps its own appearance. Whether later administrative functions are built in the Django admin or as application views is decided per function (`docs/ARCHITECTURE.md`, "Deliberately Open"). If they are built as application views, this document applies. The administration has one small stylesheet of its own, `static/css/admin-portal.css` (field widths, the box "Erste Schritte" and the help about the rights); it uses the colour variables of Django's admin and changes nothing else (D-061).
 * User-facing texts follow `AGENTS.md`, section 2 (Swiss German, no "ß", translatable).
 
 ## 2. Principle: One Foundation, Two Registers

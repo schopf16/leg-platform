@@ -11,6 +11,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 # The groups of the start page of the administration (design package, WL-23): what a person looks
@@ -43,7 +44,67 @@ class PortalAdminSite(AdminSite):
         return context
 
     def index(self, request, extra_context=None):
-        return super().index(request, {"index_hint": INDEX_HINT, **(extra_context or {})})
+        # The hint names the group "Content": only an account that sees that group gets it. An
+        # account that sees nothing gets Django's own sentence for it (reworded in the catalogue).
+        groups = self.get_app_list(request)
+        sees_content = any(group["app_label"] == "content" for group in groups)
+        context = {
+            "index_hint": INDEX_HINT if sees_content else "",
+            "first_steps": self.first_steps(request),
+        }
+        return super().index(request, {**context, **(extra_context or {})})
+
+    def first_steps(self, request):
+        """The live status of the settings that a new administrator must make (acceptance, P1-1).
+
+        Reads only, shows no secret (no key, no address of an account), and lists an item only
+        when the account may open its page. Each item: label, state (True, False or None for a
+        plain fact), status text and the link.
+        """
+        from leg_platform.accounts.models import EmailText, GraphConfiguration, PortalSettings
+
+        def may_open(model):
+            model_admin = self._registry.get(model)
+            return model_admin is not None and model_admin.has_view_permission(request)
+
+        steps = []
+        if may_open(PortalSettings):
+            row = PortalSettings.objects.filter(pk=1).first()
+            url = reverse("admin:accounts_portalsettings_change", args=(1,), current_app=self.name)
+            for label, field in (
+                (_("Address of the privacy notice"), "privacy_url"),
+                (_("Address of the legal notice"), "imprint_url"),
+            ):
+                is_set = bool(row and getattr(row, field))
+                steps.append(
+                    {"label": label, "ok": is_set, "status": _("set") if is_set else _("not set yet"), "url": url}
+                )
+        if may_open(EmailText):
+            total = len(EmailText.Key.values)
+            customised = EmailText.objects.exclude(subject="", body="").count()
+            steps.append(
+                {
+                    "label": _("Texts of the emails"),
+                    "ok": None,
+                    "status": gettext("%(total)d texts, %(customised)d customised")
+                    % {"total": total, "customised": customised},
+                    "url": reverse("admin:accounts_emailtext_changelist", current_app=self.name),
+                }
+            )
+        if may_open(GraphConfiguration):
+            row = GraphConfiguration.objects.filter(pk=1).first()
+            ready = bool(row and row.is_configured)
+            steps.append(
+                {
+                    "label": _("Sending of emails (Microsoft Graph)"),
+                    "ok": ready,
+                    "status": _("ready") if ready else _("not ready"),
+                    "url": reverse(
+                        "admin:accounts_graphconfiguration_changelist", current_app=self.name
+                    ),
+                }
+            )
+        return steps
 
     def get_app_list(self, request, app_label=None):
         """The start page and the side navigation show three groups instead of the apps.

@@ -291,7 +291,7 @@ class AdminTests(TestCase):
     def post(self, key, **data):
         return self.client.post(self.change_url(key), data)
 
-    def test_the_list_shows_every_email_and_the_placeholder_cheat_sheet(self):
+    def test_the_list_shows_every_email_and_no_placeholder_table(self):
         self.client.force_login(self.administrator)
         with translation.override("de-ch"):
             response = self.client.get(self.list_url)
@@ -300,10 +300,8 @@ class AdminTests(TestCase):
         self.assertEqual(EmailText.objects.count(), len(Key.values))
         for key in Key:
             self.assertIn(str(key.label), content)
-        for name in ("instance_name", "contact_url", "privacy_url", "login_url",
-                     "verification_url", "reset_url", "lifetime_hours"):
-            self.assertIn("{%s}" % name, content)
-        self.assertIn("Platzhalter", content)
+        # The placeholders are explained on the page of each email, not on the list (acceptance, P1-2).
+        self.assertNotIn("<code>{", content)
         self.assertIn("Mailtexte", content)
         self.assertNotIn("\u00df", content)
 

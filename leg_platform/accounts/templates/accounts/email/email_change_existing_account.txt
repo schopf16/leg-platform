@@ -1,7 +1,7 @@
-{% load i18n %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
 Someone tried to change an account's email address to this address at {{ instance_name }}. No change was made. If this was you, use the email address already registered to log in or contact the operator.{% endblocktranslate %}
 
 {% if contact_url %}{% blocktranslate %}Contact information for the operator:
 
-{{ contact_url }}{% endblocktranslate %}{% endif %}
+{{ contact_url }}{% endblocktranslate %}{% endif %}{% endautoescape %}

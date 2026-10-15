@@ -116,6 +116,9 @@ def complete_reset(token, form):
         form.user = user
         user.password_change_required = False
         form.save()
+        # A request for a new address made before the reset must not be confirmed afterwards
+        # (security review, final, M-A).
+        user.discard_email_change_requests()
         VerificationToken.objects.filter(
             user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
         ).delete()

@@ -459,7 +459,7 @@ class TwoFactorPageTests(TestCase):
             follow=True,
         )
 
-        self.assertContains(response, "Die Zwei-Faktor-Authentifizierung wurde ausgeschaltet.")
+        self.assertContains(response, "Die Zwei-Faktor-Anmeldung (2FA) wurde ausgeschaltet.")
         self.assertNotContains(response, "wurde entfernt")
 
     def test_the_setup_has_two_steps_one_form_each_and_the_manual_key_as_text(self):
@@ -471,7 +471,7 @@ class TwoFactorPageTests(TestCase):
         # The session logged in just now: the button starts the setup without a password (D-055).
         self.assertNotIn('name="current_password"', first)
         self.assertIn("2FA einrichten", first)
-        self.assertNotIn("Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht.", first)
+        self.assertNotIn("Für Ihre Rolle ist die Zwei-Faktor-Anmeldung (2FA) Pflicht.", first)
 
         client.post(SETUP_URL, {})
         second = client.get(CONFIRM_URL).content.decode()
@@ -501,7 +501,7 @@ class TwoFactorPageTests(TestCase):
         log_in(client, staff.email, address="10.9.5.1")
 
         setup = client.get(SETUP_URL).content.decode()
-        self.assertIn("Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht.", setup)
+        self.assertIn("Für Ihre Rolle ist die Zwei-Faktor-Anmeldung (2FA) Pflicht.", setup)
         self.assertNotIn("Abbrechen", setup)
         client.post(SETUP_URL, {"current_password": PASSWORD}, REMOTE_ADDR="10.9.5.1")
         confirm = client.get(CONFIRM_URL).content.decode()

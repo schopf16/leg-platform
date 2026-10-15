@@ -1,4 +1,4 @@
-{% load i18n %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
 Someone requested a change to your email address at {{ instance_name }}. To confirm the new address, open this link:
 
@@ -8,4 +8,4 @@ The link expires in {{ lifetime_hours }} hours. The new address is not used unti
 
 {% if contact_url %}{% blocktranslate %}If you did not request this change, contact the operator immediately. You will find contact information here:
 
-{{ contact_url }}{% endblocktranslate %}{% else %}{% translate "If you did not request this change, contact the operator of this portal immediately." %}{% endif %}
+{{ contact_url }}{% endblocktranslate %}{% else %}{% translate "If you did not request this change, contact the operator of this portal immediately." %}{% endif %}{% endautoescape %}

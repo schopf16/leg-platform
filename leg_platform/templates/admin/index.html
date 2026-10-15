@@ -1,6 +1,21 @@
 {% extends "admin/index.html" %}
-{# The start page of the administration: Django's page with one hint above the groups (WL-23). #}
+{% load i18n %}
+{# The start page of the administration: Django's page with the box "First steps" (the live status of #}
+{# the settings) and one hint above the groups (WL-23, acceptance P1-1, P2-4). #}
 {% block content %}
+  {% if first_steps %}
+    <section class="portal-box" aria-labelledby="first-steps-title">
+      <h2 id="first-steps-title">{% translate "First steps" %}</h2>
+      <ul class="portal-steps">
+        {% for step in first_steps %}
+          <li>
+            <span class="portal-state {% if step.ok is True %}portal-state-ok{% elif step.ok is False %}portal-state-todo{% endif %}">{{ step.status }}</span>
+            <a href="{{ step.url }}">{{ step.label }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
   {% if index_hint %}<p class="help">{{ index_hint }}</p>{% endif %}
   {{ block.super }}
 {% endblock %}

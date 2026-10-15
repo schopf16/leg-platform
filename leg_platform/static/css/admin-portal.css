@@ -1,0 +1,64 @@
+/* Additions for the pages of the portal in the administration (design package, acceptance).
+   The look of the administration stays that of Django; this file only sets widths and the small
+   boxes of the portal's own pages. No inline style is used anywhere (Content Security Policy). */
+
+/* The subject of an email and the addresses of the portal settings use the width of the page. */
+.field-subject input[type="text"],
+.field-privacy_url input,
+.field-imprint_url input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 60em;
+}
+
+/* The box "First steps" and the help about the rights. */
+.portal-box,
+.portal-help {
+  margin: 0 0 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 4px;
+  background: var(--darkened-bg, #f8f8f8);
+}
+
+.portal-box h2,
+.portal-help h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  text-transform: none;
+}
+
+.portal-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.portal-state {
+  flex: none;
+  min-width: 12em;
+  font-weight: 600;
+}
+
+.portal-state-ok::before {
+  content: "\2713\00a0";
+}
+
+.portal-state-todo::before {
+  content: "!\00a0";
+}
+
+.portal-state-todo {
+  color: var(--error-fg, #ba2121);
+}
+
+.portal-help table {
+  margin: 8px 0;
+}

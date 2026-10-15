@@ -12,6 +12,7 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
+from django.db.models import Case, IntegerField, Value, When
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -32,6 +33,7 @@ from leg_platform.accounts import (
     security_log,
 )
 from leg_platform.accounts.forms import clean_postal_code, postal_code_field
+from leg_platform.accounts.permission_names import PermissionLabelsMixin, rights_help
 from leg_platform.accounts.models import (
     AccountIntegrityError,
     CERTIFICATE_EXPIRED,
@@ -57,6 +59,41 @@ Event = SecurityEvent.Event
 
 # Versions of an email text that are kept per email (D-039).
 MAX_EMAIL_TEXT_VERSIONS = 100
+
+# The email texts in the order of the process of a person (design package, acceptance, P1-2). Every
+# key is named once (a test checks it); a key that is not named is listed last.
+_Key = EmailText.Key
+EMAIL_TEXT_PROCESSES = (
+    (
+        _("Registration"),
+        (_Key.REGISTRATION_VERIFICATION, _Key.REGISTRATION_EXISTING_ACCOUNT),
+    ),
+    (_("Login and password"), (_Key.PASSWORD_RESET, _Key.PASSWORD_CHANGED)),
+    (
+        _("Email addresses"),
+        (
+            _Key.EMAIL_CHANGE_VERIFICATION,
+            _Key.EMAIL_CHANGE_EXISTING_ACCOUNT,
+            _Key.EMAIL_CHANGE_NOTICE,
+            _Key.EMAIL_CHANGED,
+            _Key.SECONDARY_EMAIL_VERIFICATION,
+            _Key.SECONDARY_EMAIL_CHANGED,
+        ),
+    ),
+    (
+        _("Two-factor authentication (2FA)"),
+        (
+            _Key.TWO_FACTOR_ENABLED,
+            _Key.TWO_FACTOR_DISABLED,
+            _Key.RECOVERY_CODES_RENEWED,
+            _Key.RECOVERY_CODE_USED,
+            _Key.CODE_ATTEMPTS_WARNING,
+            _Key.TWO_FACTOR_RESET_LINK,
+            _Key.TWO_FACTOR_RESET,
+        ),
+    ),
+    (_("Account"), (_Key.ACCOUNT_DELETED,)),
+)
 
 # Plain, instance-neutral titles instead of Django's defaults, which name Django (D-036). The
 # header and the title of the site are the name of the instance (``PortalAdminSite.each_context``).
@@ -145,7 +182,7 @@ class ResetSecondFactorForm(forms.Form):
             del self.fields["identity_verified"]
 
 
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
     form = UserAdminForm
     list_display = (
         "customer_number_column",
@@ -579,7 +616,20 @@ class UserAdmin(admin.ModelAdmin):
         )
 
 
-class RestrictedGroupAdmin(DjangoGroupAdmin):
+class RestrictedGroupAdmin(PermissionLabelsMixin, DjangoGroupAdmin):
+    """Groups are made by the system administrators from the rights of the list; the portal ships
+    none (D-012). The pages carry the help "Which rights do I need for what?"."""
+
+    change_form_template = "admin/auth/group/change_form.html"
+    change_list_template = "admin/auth/group/change_list.html"
+
+    def changelist_view(self, request, extra_context=None):
+        return super().changelist_view(request, {"rights_help": rights_help(), **(extra_context or {})})
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        return super().changeform_view(
+            request, object_id, form_url, {"rights_help": rights_help(), **(extra_context or {})}
+        )
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         security_log.record(Event.ACCESS_RELATIONS_CHANGED, actor=request.user)
@@ -654,20 +704,53 @@ class EmailTextForm(forms.ModelForm):
 
 class EmailTextAdmin(admin.ModelAdmin):
     form = EmailTextForm
-    list_display = ("title", "customised", "updated_at")
+    list_display = ("title", "process", "text_status", "last_changed")
     list_display_links = ("title",)
-    ordering = ("key",)
     fields = ("title", "subject", "body", "reset_to_default", "placeholder_help")
     readonly_fields = ("title", "placeholder_help")
     change_list_template = "admin/accounts/emailtext/change_list.html"
 
-    @admin.display(description=_("email"), ordering="key")
+    def get_queryset(self, request):
+        # In the order of the process of a person: registration, login, addresses, 2FA, account.
+        order = [key for _name, keys in EMAIL_TEXT_PROCESSES for key in keys]
+        position = Case(
+            *[When(key=key, then=Value(index)) for index, key in enumerate(order)],
+            default=Value(len(order)),
+            output_field=IntegerField(),
+        )
+        # Not ``super().get_queryset()``: that one orders by the names of ``get_ordering`` before
+        # the position exists.
+        queryset = self.model._default_manager.get_queryset().annotate(process_position=position)
+        return queryset.order_by(*self.get_ordering(request))
+
+    def get_ordering(self, request):
+        return ("process_position", "key")
+
+    @admin.display(description=_("email"))
     def title(self, obj):
         return str(obj)
 
-    @admin.display(boolean=True, description=_("changed"))
-    def customised(self, obj):
+    @admin.display(description=_("process"))
+    def process(self, obj):
+        for name, keys in EMAIL_TEXT_PROCESSES:
+            if obj.key in keys:
+                return name
+        return "-"
+
+    @staticmethod
+    def _customised(obj):
         return bool(obj.subject or obj.body)
+
+    @admin.display(description=_("text"))
+    def text_status(self, obj):
+        # Plain words, not an icon: a default text is the normal state, not an error.
+        return _("Customised") if self._customised(obj) else _("Default text")
+
+    @admin.display(description=_("last changed"))
+    def last_changed(self, obj):
+        if not self._customised(obj):
+            return "-"
+        return date_format(localtime(obj.updated_at), "DATETIME_FORMAT")
 
     @admin.display(description=_("Placeholders"))
     def placeholder_help(self, obj):
@@ -855,7 +938,6 @@ class EmailTextAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         if self.has_view_or_change_permission(request):
             EmailText.objects.ensure_all()
-        extra_context = {**(extra_context or {}), "overview": email_texts.overview()}
         return super().changelist_view(request, extra_context)
 
     def history_view(self, request, object_id, extra_context=None):
@@ -934,7 +1016,13 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
         "attempt_time",
     )
     search_fields = ("username", "path_info")
+    change_list_template = "admin/axes_change_list.html"
 
+    def changelist_view(self, request, extra_context=None):
+        from leg_platform.accounts.login_protection import LOGIN_COOLOFF
+
+        minutes = int(LOGIN_COOLOFF.total_seconds() // 60)
+        return super().changelist_view(request, {"lockout_minutes": minutes, **(extra_context or {})})
     def has_module_permission(self, request):
         return request.user.is_superuser
 
@@ -1259,8 +1347,30 @@ class PortalSettingsAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("privacy_preview", "imprint_preview")
     # The own preview link below opens a new tab; the standard "Currently" link of the widget is
-    # not needed.
-    formfield_overrides = {models.URLField: {"widget": forms.URLInput(attrs={"size": 60})}}
+    # not needed. The width of the fields is set in ``static/css/admin-portal.css``.
+    formfield_overrides = {models.URLField: {"widget": forms.URLInput()}}
+    # The example and the hint of each address (design package, acceptance, P2-5).
+    address_examples = {
+        "privacy_url": _("https://www.example.org/privacy"),
+        "imprint_url": _("https://www.example.org/imprint"),
+    }
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if field is not None and db_field.name in self.address_examples:
+            field.widget.attrs["placeholder"] = str(self.address_examples[db_field.name])
+            field.help_text = "{} {}".format(
+                field.help_text, gettext("It must start with https://. It opens in a new tab.")
+            ).strip()
+        return field
+
+    def response_change(self, request, obj):
+        if any(name in request.POST for name in ("_continue", "_addanother", "_saveasnew")):
+            return super().response_change(request, obj)
+        self.message_user(
+            request, _("Saved. The addresses now appear in the footer."), messages.SUCCESS
+        )
+        return HttpResponseRedirect(self._change_url())
 
     @staticmethod
     def _preview(address):

@@ -251,7 +251,7 @@ class RecentAuthenticationTests(TestCase):
         page = client.get(SETUP_URL)
 
         self.assertNotContains(page, 'name="current_password"')
-        self.assertContains(page, "Für Ihre Rolle ist die Zwei-Faktor-Authentifizierung Pflicht.")
+        self.assertContains(page, "Für Ihre Rolle ist die Zwei-Faktor-Anmeldung (2FA) Pflicht.")
         self.assertRedirects(client.post(SETUP_URL, {}), CONFIRM_URL, fetch_redirect_response=False)
 
     def test_starting_needs_a_login_and_a_csrf_token_and_the_page_changes_nothing(self):

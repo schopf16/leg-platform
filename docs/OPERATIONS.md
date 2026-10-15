@@ -218,6 +218,20 @@ Status: **not built.** Step A (research) is done. The owner decided the licence,
 | Integrity check before use | Planned: compare the SHA-256 value of the downloaded file with the value in the swisstopo catalogue for the same file. Do not use the file if they differ. | Decided as a rule for step B (D-049) |
 | Columns kept locally | **Decided 2026-10-14 (owner):** street, house number, postal code and locality. Nothing else is stored (D-049). | Owner (D-049) |
 
+## 5a. Settings in the administration and settings that only the operator changes
+
+The start page of the administration ("Verwaltung") has the box "Erste Schritte" with the live status of the settings that a new instance needs: the addresses of the privacy notice and the legal notice, the email texts (how many of the 18 are customised) and the email delivery (Microsoft Graph, ready or not). Nothing secret is shown there.
+
+| What | Who changes it | Where |
+| --- | --- | --- |
+| Address of the privacy notice, address of the legal notice (footer, registration, deleting the account) | System administrator | Administration, group "Inhalte", "Portal-Einstellungen" (https only; empty means the text without a link) |
+| Texts of the emails (subject and text of each of the 18 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
+| Microsoft Graph (sender, certificate), security log, blocked logins, groups | System administrator only | Administration, group "System" and "Benutzer" |
+| Name of the instance, website, logos, colours, base URL, email mode | Operator, with environment variables and the instance static directory | `docs/INSTALLATION.md`, `docs/DESIGN.md` section 3.2 |
+| **Texts of the login and registration pages** (title, lead sentence, the benefit points, the labels) | **Operator only, through the translation files** (`locale/<language>/LC_MESSAGES/django.po`, compiled with `msgfmt`, then deploy). They are not editable in the administration. | Source texts in the templates under `leg_platform/templates` and `leg_platform/accounts/templates` |
+
+There are no ready-made groups or roles (`AGENTS.md`, section 6; D-012). A system administrator makes a group from the rights of the list; the pages "Gruppen" explain which right is needed for what. The names of the rights in the lists are German ("Mailtext: ändern").
+
 ## 6. Open items
 
 Each item must be decided or answered before the step that depends on it.

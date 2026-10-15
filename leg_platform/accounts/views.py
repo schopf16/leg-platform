@@ -793,6 +793,7 @@ class TwoFactorResetVerifyView(TokenPageMixin, View):
         found = second_factor_reset.find_link(token)
         if found is None:
             return render(request, "accounts/two_factor_reset_invalid.html")
+        request.session.cycle_key()
         request.session[TWO_FACTOR_RESET_SESSION_KEY] = found.digest
         return redirect("accounts:two_factor_reset_confirm")
 

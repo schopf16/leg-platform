@@ -160,7 +160,7 @@ body {
 
 .register-clear .form-hint,
 .register-clear .invalid-feedback {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   margin-top: 0.25rem;
 }
 
@@ -528,6 +528,12 @@ body {
 .entry-card .form-hint {
   margin: 0;
   font-size: 14px;
+}
+
+/* The label of a field is 16 px (login/VORGABEN.md, section 4); the hint stays 14 px (K6). */
+.entry-card .form-label {
+  font-size: 16px;
+  font-weight: 600;
 }
 
 /* A hint or a note below a heading or a button, in the muted colour. */

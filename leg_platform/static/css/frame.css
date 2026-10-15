@@ -632,6 +632,10 @@
     flex: 1 1 100%;
   }
 
+  .task-actions > form:first-child .btn {
+    width: 100%;
+  }
+
   .task-hide {
     min-height: 48px;
   }
@@ -829,7 +833,7 @@
 }
 
 .profile-form .form-hint {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .profile-form .form-control,
