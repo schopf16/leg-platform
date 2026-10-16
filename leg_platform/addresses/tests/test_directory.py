@@ -826,13 +826,42 @@ class DirectoryDatabaseTests(TestCase):
         folder = str(Path(str(connections["addresses"].settings_dict["NAME"])).parent)
         self.assertNotIn(folder, logs.output[0])
 
-    def test_exactly_the_minimum_of_free_disk_is_enough_and_the_folder_of_the_file_is_measured(self):
+    def test_exactly_the_minimum_of_free_disk_is_enough_and_both_folders_are_measured(self):
         self.assertEqual(importer.MIN_FREE_DISK_BYTES, 4 * 1024**3)
         enough = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES)
         with patch.object(importer.shutil, "disk_usage", return_value=enough) as usage:
             with patch.object(importer.requests, "Session", return_value=session_for()):
                 self.assertEqual(importer.import_directory(), 1)
-        usage.assert_called_once_with(Path(str(connections["addresses"].settings_dict["NAME"])).parent)
+        # The disk of the directory file and the disk of the temporary download (N-4).
+        self.assertEqual(
+            [call.args[0] for call in usage.call_args_list],
+            [Path(str(connections["addresses"].settings_dict["NAME"])).parent, Path(tempfile.gettempdir())],
+        )
+
+    def test_a_nearly_full_temporary_folder_refuses_the_import_before_the_download(self):
+        # N-4: the download goes to the temporary folder, which can be on another disk.
+        temporary = Path(tempfile.gettempdir())
+        enough = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES)
+        too_little = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES - 1)
+
+        def usage(folder):
+            return too_little if Path(folder) == temporary else enough
+
+        directory_folder = Path(str(connections["addresses"].settings_dict["NAME"])).parent
+        self.assertNotEqual(directory_folder, temporary)
+        session = session_for()
+        with patch.object(importer.shutil, "disk_usage", side_effect=usage):
+            with patch.object(importer.requests, "Session", return_value=session):
+                with self.assertLogs("leg_platform.addresses.importer", level="WARNING") as logs:
+                    with self.assertRaises(importer.ImportFailure):
+                        importer.import_directory()
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+        self.assertEqual(logs.output, [
+            "WARNING:leg_platform.addresses.importer:Address directory import refused: "
+            "less than 4 GB free on the disk of the temporary download."
+        ])
+        self.assertNotIn(str(temporary), logs.output[0])
+        self.assertEqual(Directory.objects.get(pk=1).generation, self.generation)
 
     def test_the_disk_check_uses_the_nearest_existing_folder_and_fails_closed(self):
         file_in_missing_folders = Path(tempfile.gettempdir()) / "leg-missing-a" / "leg-missing-b" / "x.sqlite3"
@@ -840,8 +869,12 @@ class DirectoryDatabaseTests(TestCase):
             with patch.object(importer.shutil, "disk_usage") as usage:
                 usage.return_value = types.SimpleNamespace(total=1, used=0, free=importer.MIN_FREE_DISK_BYTES)
                 importer._require_free_disk()
-        self.assertEqual(usage.call_args.args[0], Path(tempfile.gettempdir()))
+        self.assertEqual(usage.call_args_list[0].args[0], Path(tempfile.gettempdir()))
         with patch.object(importer.shutil, "disk_usage", side_effect=OSError("/private/path")):
+            with self.assertRaises(importer.ImportFailure) as raised:
+                importer._require_free_disk()
+        self.assertNotIn("/private/path", str(raised.exception))
+        with patch.object(importer.tempfile, "gettempdir", side_effect=FileNotFoundError("/private/path")):
             with self.assertRaises(importer.ImportFailure) as raised:
                 importer._require_free_disk()
         self.assertNotIn("/private/path", str(raised.exception))
@@ -926,6 +959,164 @@ class DirectoryDatabaseTests(TestCase):
             importer._publish(io.BytesIO(archive_bytes(invalid)), "0" * 64, timezone.localdate(), repair=True)
         self.assertEqual(Directory.objects.get(pk=1).generation, self.generation)
         self.assertEqual(Address.objects.count(), 0)
+
+    def older_metadata(self, archive):
+        """The catalogue entry of the official file, dated before the published directory."""
+        item = json.loads(item_bytes(archive))
+        item["properties"]["datetime"] = (timezone.localdate() - timedelta(days=1)).isoformat() + "T00:00:00Z"
+        return json.dumps(item).encode()
+
+    def test_an_older_catalogue_is_refused_before_the_download(self):
+        # N-2: the refusal costs one catalogue request, not the archive and its hash.
+        archive = archive_bytes()
+        for how in ("a new checksum", "a damaged directory with the same checksum"):
+            with self.subTest(how=how):
+                if how != "a new checksum":
+                    Directory.objects.filter(pk=1).update(checksum=hashlib.sha256(archive).hexdigest())
+                    Address.objects.all().delete()
+                session = session_for(archive, metadata=self.older_metadata(archive))
+                with patch.object(importer.requests, "Session", return_value=session):
+                    with patch.object(importer, "_require_free_disk") as disk:
+                        with self.assertRaisesMessage(importer.ImportFailure, "predates the published directory"):
+                            importer.import_directory(repair=True)
+                self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+                disk.assert_not_called()
+                self.assertEqual(Directory.objects.get(pk=1).generation, self.generation)
+                self.assertIsNone(Directory.objects.get(pk=1).import_token)
+
+    def test_an_older_catalogue_is_refused_before_the_download_in_a_manual_request_and_an_automatic_attempt(self):
+        archive = archive_bytes()
+        self.assertTrue(request_import())
+        session = session_for(archive, metadata=self.older_metadata(archive))
+        with patch.object(importer.requests, "Session", return_value=session):
+            with self.assertLogs("leg_platform.addresses.jobs", level="ERROR"):
+                with self.assertRaises(importer.ImportFailure):
+                    process_one()
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.FAILED)
+        session = session_for(archive, metadata=self.older_metadata(archive))
+        with patch.object(importer.requests, "Session", return_value=session):
+            with self.assertRaises(importer.ImportFailure):
+                importer.import_directory()
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+
+    def test_a_catalogue_of_the_same_date_or_a_newer_one_is_not_refused_and_an_unreadable_file_is_replaced(self):
+        importer._require_catalogue_not_older(timezone.localdate())
+        importer._require_catalogue_not_older(timezone.localdate() + timedelta(days=1))
+        with patch.object(importer.Directory.objects, "filter", side_effect=DatabaseError("private detail")):
+            importer._require_catalogue_not_older(timezone.localdate() - timedelta(days=30))
+
+    def repair(self, archive):
+        with patch.object(importer.requests, "Session", return_value=session_for(archive)) as session:
+            try:
+                return importer.import_directory(repair=True), session.return_value
+            except importer.ImportFailure:
+                return None, session.return_value
+
+    def last_failed_repair(self):
+        return ImportRequest.objects.get(pk=1).last_failed_repair_at
+
+    def test_a_repair_that_ends_with_a_failing_quick_check_blocks_the_next_one_for_six_hours(self):
+        # N-2: a defect that survives a new generation must not cost a download on every click.
+        archive = self.prepare_damaged_directory()
+        ImportRequest.objects.create(pk=1)
+        now = timezone.now()
+        with patch.object(importer, "_is_intact", return_value=False):
+            with patch("django.utils.timezone.now", return_value=now):
+                count, session = self.repair(archive)
+                self.assertEqual(count, 1)
+                self.assertEqual({call.args[0] for call in session.get.call_args_list}, {importer.ITEM_URL, importer.ASSET_URL})
+                self.assertEqual(self.last_failed_repair(), now)
+                generation = Directory.objects.get(pk=1).generation
+            for waited in (timedelta(0), timedelta(hours=6) - timedelta(seconds=1)):
+                with patch("django.utils.timezone.now", return_value=now + waited):
+                    with self.assertLogs("leg_platform.addresses.importer", level="WARNING") as logs:
+                        count, session = self.repair(archive)
+                self.assertIsNone(count)
+                # One catalogue request only: no download, no new generation.
+                self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+                self.assertEqual(Directory.objects.get(pk=1).generation, generation)
+                self.assertEqual(logs.output, [
+                    "WARNING:leg_platform.addresses.importer:Address directory repair refused: "
+                    "the last repair did not succeed less than 6 hours ago."
+                ])
+                # The refusal does not extend the time.
+                self.assertEqual(self.last_failed_repair(), now)
+            with patch("django.utils.timezone.now", return_value=now + timedelta(hours=6)):
+                count, session = self.repair(archive)
+                self.assertEqual(count, 1)
+                self.assertEqual({call.args[0] for call in session.get.call_args_list}, {importer.ITEM_URL, importer.ASSET_URL})
+                self.assertEqual(self.last_failed_repair(), now + timedelta(hours=6))
+
+    def test_a_failed_repair_blocks_the_next_one_and_an_intact_result_clears_the_block(self):
+        # The official file (by its checksum) is the published one, but the directory lost its rows
+        # and the archive cannot be imported: the repair fails.
+        broken = archive_bytes(HEADER + "Bad;1;not-a-postal-label;x;x\n")
+        Directory.objects.filter(pk=1).update(checksum=hashlib.sha256(broken).hexdigest())
+        Address.objects.all().delete()
+        ImportRequest.objects.create(pk=1)
+        count, _session = self.repair(broken)
+        self.assertIsNone(count)
+        self.assertIsNotNone(self.last_failed_repair())
+        count, session = self.repair(broken)
+        self.assertIsNone(count)
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+        # Six hours later the repair is allowed, and a repair that ends intact clears the block.
+        valid = archive_bytes()
+        Directory.objects.filter(pk=1).update(checksum=hashlib.sha256(valid).hexdigest())
+        ImportRequest.objects.filter(pk=1).update(last_failed_repair_at=timezone.now() - timedelta(hours=6))
+        count, session = self.repair(valid)
+        self.assertEqual(count, 1)
+        self.assertEqual({call.args[0] for call in session.get.call_args_list}, {importer.ITEM_URL, importer.ASSET_URL})
+        self.assertIsNone(self.last_failed_repair())
+        self.assertTrue(importer._is_intact(Directory.objects.get(pk=1)))
+
+    def test_the_block_applies_to_a_repair_only(self):
+        # An intact directory ends at the shortcut, new data is loaded and an automatic attempt
+        # is not a repair: none of them is refused or changes the time.
+        blocked = timezone.now() - timedelta(hours=1)
+        ImportRequest.objects.create(pk=1, last_failed_repair_at=blocked)
+        archive = archive_bytes()
+        Directory.objects.filter(pk=1).update(checksum=hashlib.sha256(archive).hexdigest())
+        count, session = self.repair(archive)
+        self.assertEqual(count, 1)
+        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
+        # New official data although the directory is damaged and a repair was refused a moment ago.
+        Directory.objects.filter(pk=1).update(checksum="1" * 64)
+        Address.objects.all().delete()
+        count, session = self.repair(archive)
+        self.assertEqual(count, 1)
+        self.assertEqual({call.args[0] for call in session.get.call_args_list}, {importer.ITEM_URL, importer.ASSET_URL})
+        # The automatic attempt trusts the checksum and is never a repair.
+        Directory.objects.filter(pk=1).update(checksum=hashlib.sha256(archive).hexdigest())
+        with patch.object(importer.requests, "Session", return_value=session_for(archive)):
+            self.assertEqual(importer.import_directory(), 1)
+        self.assertEqual(self.last_failed_repair(), blocked)
+
+    def test_a_failed_disk_check_of_a_repair_does_not_start_the_block(self):
+        archive = self.prepare_damaged_directory()
+        ImportRequest.objects.create(pk=1)
+        too_little = types.SimpleNamespace(total=10**12, used=0, free=0)
+        with patch.object(importer.shutil, "disk_usage", return_value=too_little):
+            with self.assertLogs("leg_platform.addresses.importer", level="WARNING"):
+                count, _session = self.repair(archive)
+        self.assertIsNone(count)
+        self.assertIsNone(self.last_failed_repair())
+
+    def test_an_empty_published_directory_is_never_taken_as_published(self):
+        # N-5: "empty" means the same here as in jobs.directory_is_empty: row_count 0.
+        Address.objects.all().delete()
+        Directory.objects.filter(pk=1).update(row_count=0)
+        directory = Directory.objects.get(pk=1)
+        self.assertTrue(directory.imported_at)
+        for repair in (False, True):
+            self.assertFalse(importer._is_published(directory, directory.checksum, repair=repair))
+        self.assertIsNone(importer._published_row_count(directory.checksum, repair=False))
+        self.assertEqual(
+            importer._publish(io.BytesIO(archive_bytes()), directory.checksum, timezone.localdate()), 1,
+        )
+        self.assertEqual(Directory.objects.get(pk=1).row_count, 1)
+        self.assertTrue(importer._is_published(Directory.objects.get(pk=1), directory.checksum, repair=False))
 
     def test_exact_advisory_match_and_unknown_address(self):
         self.assertTrue(lookup({"street": "previous street", "house_number": "1", "postal_code": "9999", "locality": "example town"}, mode="check")["match"])
@@ -1450,12 +1641,70 @@ class DirectoryDatabaseTests(TestCase):
                 download.assert_not_called()
         self.assertTrue(request_import())
 
-    def test_running_job_not_recovered_or_requeued_automatically(self):
-        ImportRequest.objects.create(pk=1, state=ImportRequest.State.RUNNING)
-        self.assertFalse(request_import())
+    def test_a_running_job_with_a_valid_lease_is_not_recovered_or_requeued(self):
+        now = timezone.now()
+        ImportRequest.objects.create(
+            pk=1, state=ImportRequest.State.RUNNING, started_at=now - jobs.RUNNING_JOB_LEASE + timedelta(seconds=1),
+        )
+        with patch("leg_platform.addresses.jobs.timezone.now", return_value=now):
+            self.assertFalse(request_import())
+            with patch("leg_platform.addresses.importer.import_directory") as download:
+                self.assertFalse(process_one(schedule_automatic=True))
+                download.assert_not_called()
+        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
+
+    def test_the_lease_of_a_running_job_is_the_lease_of_the_importer(self):
+        # jobs.py must not import the importer (the web process reaches jobs), so the value is
+        # repeated there and kept equal here.
+        self.assertEqual(jobs.RUNNING_JOB_LEASE, importer.IMPORT_LEASE)
+        self.assertEqual(jobs.RUNNING_JOB_LEASE, timedelta(hours=6))
+
+    def test_a_hard_killed_running_job_is_taken_over_when_its_lease_has_expired(self):
+        # N-3: after an out-of-memory kill or a power loss the state stays "running".
+        now = timezone.now()
+        for started_at in (now - jobs.RUNNING_JOB_LEASE, now - timedelta(days=3), None):
+            with self.subTest(started_at=started_at):
+                ImportRequest.objects.all().delete()
+                ImportRequest.objects.create(
+                    pk=1, state=ImportRequest.State.RUNNING, started_at=started_at,
+                    last_automatic_attempt_at=now - timedelta(days=100),
+                )
+                with patch("leg_platform.addresses.jobs.timezone.now", return_value=now):
+                    with patch("leg_platform.addresses.importer.import_directory") as download:
+                        with self.assertLogs("leg_platform.addresses.jobs", level="WARNING") as logs:
+                            self.assertTrue(process_one(schedule_automatic=True))
+                download.assert_called_once_with()
+                self.assertEqual(
+                    logs.output,
+                    ["WARNING:leg_platform.addresses.jobs:An address directory import job exceeded its lease and was taken over."],
+                )
+                job = ImportRequest.objects.get(pk=1)
+                self.assertEqual(job.state, ImportRequest.State.SUCCEEDED)
+                self.assertTrue(job.is_automatic)
+
+    def test_an_expired_running_job_does_not_start_an_import_before_the_automatic_interval(self):
+        now = timezone.now()
+        ImportRequest.objects.create(
+            pk=1, state=ImportRequest.State.RUNNING, started_at=now - timedelta(days=1),
+            last_automatic_attempt_at=now - timedelta(days=1),
+        )
+        with patch("leg_platform.addresses.jobs.timezone.now", return_value=now):
+            with patch("leg_platform.addresses.importer.import_directory") as download:
+                with self.assertLogs("leg_platform.addresses.jobs", level="WARNING"):
+                    self.assertFalse(process_one(schedule_automatic=True))
+        download.assert_not_called()
+        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.FAILED)
+
+    def test_the_button_works_again_after_the_lease_of_a_running_job_expired(self):
+        now = timezone.now()
+        ImportRequest.objects.create(pk=1, state=ImportRequest.State.RUNNING, started_at=now - timedelta(hours=7))
+        self.assertTrue(request_import())
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual(job.state, ImportRequest.State.QUEUED)
+        self.assertIsNone(job.started_at)
         with patch("leg_platform.addresses.importer.import_directory") as download:
-            self.assertFalse(process_one(schedule_automatic=True))
-            download.assert_not_called()
+            self.assertTrue(process_one())
+        download.assert_called_once_with(repair=True)
 
     def test_long_worker_continues_after_expected_failure(self):
         module = "leg_platform.addresses.management.commands.process_address_imports"
@@ -2112,6 +2361,8 @@ class MigrateTests(SimpleTestCase):
             first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=120, check=False)
             self.assertEqual(first.returncode, 0, first.stderr[-500:])
             self.assertIn("Applying addresses.0001_initial... OK", first.stdout)
+            # 0002 only changes the queue table, which is not in the file: recorded, nothing else.
+            self.assertIn("Applying addresses.0002_importrequest_last_failed_repair_at... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2126,7 +2377,9 @@ class MigrateTests(SimpleTestCase):
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory"})
-            self.assertEqual(recorded, {("addresses", "0001_initial")})
+            self.assertEqual(recorded, {
+                ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
+            })
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)

@@ -19,6 +19,13 @@ AUTOMATIC_INTERVAL = timedelta(days=90)
 # backup, D-075), the automatic attempt is due again after this time instead of after 90 days, so
 # that the suggestions come back without anyone pressing the button (security review of D-075, M-5).
 EMPTY_DIRECTORY_INTERVAL = timedelta(hours=24)
+# A RUNNING job older than this is taken over (security review of D-076, N-3): after a hard kill
+# (out of memory, power loss, a stop during an import) the state stays "running" and nothing else
+# would ever clear it. It is the lease of the importer on the directory
+# (``importer.IMPORT_LEASE``, a test keeps the two equal; this module must not import the importer,
+# the web process reaches it). An import that really runs renews its own lease with every chunk and
+# takes far less than this, and a second importer is refused by that lease anyway.
+RUNNING_JOB_LEASE = timedelta(hours=6)
 
 
 def directory_is_empty():
@@ -29,13 +36,22 @@ def directory_is_empty():
         return True
 
 
+def _is_running(job, now):
+    """A job that runs and whose lease has not expired. A running job without a start time is expired."""
+    return (
+        job.state == ImportRequest.State.RUNNING
+        and job.started_at is not None
+        and now < job.started_at + RUNNING_JOB_LEASE
+    )
+
+
 def request_import():
     """Coalesce pending/running clicks; completed manual imports may retry."""
     now = timezone.now()
     with transaction.atomic():
         ImportRequest.objects.get_or_create(pk=1)
         job = ImportRequest.objects.select_for_update().get(pk=1)
-        if job.state in {ImportRequest.State.QUEUED, ImportRequest.State.RUNNING}:
+        if job.state == ImportRequest.State.QUEUED or _is_running(job, now):
             return False
         job.state = ImportRequest.State.QUEUED
         job.is_automatic = False
@@ -55,10 +71,17 @@ def process_one(*, schedule_automatic=False):
         ImportRequest.objects.get_or_create(pk=1)
         job = ImportRequest.objects.select_for_update().get(pk=1)
         now = timezone.now()
-        # A queued manual request always wins. Do not take over RUNNING work:
-        # operator exclusion is required after a hard-killed worker.
+        # A queued manual request always wins. A RUNNING job is not taken over while its lease is
+        # valid; after a hard-killed worker its lease expires (six hours) and the job counts as
+        # failed (N-3). The request that was lost with it is not repeated: whoever wants it presses
+        # the button again, the automatic attempt follows its own interval.
         if job.state == ImportRequest.State.RUNNING:
-            return False
+            if _is_running(job, now):
+                return False
+            logger.warning("An address directory import job exceeded its lease and was taken over.")
+            job.state = ImportRequest.State.FAILED
+            job.finished_at = now
+            job.save(update_fields=["state", "finished_at"])
         if job.state != ImportRequest.State.QUEUED:
             if not schedule_automatic:
                 return False

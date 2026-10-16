@@ -109,6 +109,12 @@ class ImportRequest(models.Model):
         null=True, verbose_name=_("Last automatic attempt at"),
     )
     is_automatic = models.BooleanField(default=False, editable=False)
+    # When the last manual repair of a damaged directory (same official file, failed integrity
+    # check) ended without an intact directory, or failed. The next repair is refused for six
+    # hours (importer.REPAIR_RETRY_INTERVAL, security review of D-076, N-2). It lives here and not
+    # in the directory file, because that file is the thing that is damaged. Cleared by a repair
+    # that ends intact.
+    last_failed_repair_at = models.DateTimeField(null=True, editable=False)
 
     class Meta:
         default_permissions = ()

@@ -123,8 +123,10 @@ hours). After a successful import only the new and the previous generation of th
 kept (D-075); older rows are deleted in batches of 900 rows. Reserve disk capacity for **three**
 generations at the peak of an import (about 0.9 GB each, unmeasured on a server: the file keeps
 its size because freed pages are reused by the next import), the temporary download and the
-write-ahead log. A hard-killed running job requires investigation; confirm no importer remains
-active before operator recovery. Do not blindly reset its state.
+write-ahead log. A hard-killed running job (the state stays `running`) is taken over by the worker
+only when its 6-hour lease has expired (it is then set to `failed`); before that it needs the
+operator: confirm that no importer remains active (`docs/DEPLOYMENT.md`, section 8.4). Do not
+blindly reset its state.
 
 For local development only, `manage.py seed_local_address_directory` writes a few invented addresses into the local directory file; it refuses to run unless `APP_ENV=local` and refuses to replace a directory of a real import. The steps are in `docs/STARTUP.md`, section 10. Never use it for stage or production.
 

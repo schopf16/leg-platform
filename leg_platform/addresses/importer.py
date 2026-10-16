@@ -35,7 +35,7 @@ from django.db import DatabaseError, connections, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import DIRECTORY_ALIAS, Address, Directory
+from .models import DIRECTORY_ALIAS, Address, Directory, ImportRequest
 
 ITEM_URL = (
     "https://data.geo.admin.ch/api/stac/v0.9/collections/"
@@ -75,6 +75,10 @@ MIN_FREE_DISK_BYTES = 4 * 1024**3
 # lease on the row of the directory that expires, so that a killed importer does not block the next
 # import for ever. It is renewed with every chunk.
 IMPORT_LEASE = timedelta(hours=6)
+# After a manual repair that ended without an intact directory (or failed), the next repair of a
+# damaged directory is refused for this long, so that a defect that survives a new generation never
+# causes a download and an import on every click (security review of D-076, N-2).
+REPAIR_RETRY_INTERVAL = timedelta(hours=6)
 
 logger = logging.getLogger(__name__)
 
@@ -340,33 +344,50 @@ def _is_published(directory, checksum, *, repair):
     The automatic attempt trusts the recorded checksum. A manual request (``repair``, D-076) also
     needs the integrity checks to pass, so that it repairs a damaged directory but ends early,
     without a download and without an import, when everything is intact (security review of
-    D-076, M-3: a repeated request must stay cheap).
+    D-076, M-3: a repeated request must stay cheap). A directory without addresses is never
+    published (security review of D-076, N-5: the same meaning of "empty" as ``jobs``).
     """
-    if directory is None or not directory.imported_at or directory.checksum != checksum:
+    if (
+        directory is None or not directory.imported_at or directory.row_count <= 0
+        or directory.checksum != checksum
+    ):
         return False
     return not repair or _is_intact(directory)
 
 
-def _require_free_disk():
-    """Refuse the import when the disk of the directory file is nearly full (M-4).
-
-    Checked before the download. Nothing is written and the published generation is not touched.
-    The log line names no path.
-    """
-    folder = Path(str(connections[DIRECTORY_ALIAS].settings_dict["NAME"])).parent
+def _free_bytes(folder):
+    """Free space for the service user at ``folder`` (the nearest existing parent if it is missing)."""
     try:
         # The folder is created by the first connection; before that its nearest parent counts.
         while not folder.exists() and folder != folder.parent:
             folder = folder.parent
-        free = shutil.disk_usage(folder).free
+        return shutil.disk_usage(folder).free
     except OSError:
         raise ImportFailure("The free disk space could not be checked.") from None
-    if free < MIN_FREE_DISK_BYTES:
-        logger.warning(
-            "Address directory import refused: less than %d GB free on the disk of the directory file.",
-            MIN_FREE_DISK_BYTES // 1024**3,
-        )
-        raise ImportFailure("Not enough free disk space for an import.")
+
+
+def _require_free_disk():
+    """Refuse the import when the disk of the directory file or of the temporary download is nearly
+    full (M-4, N-4).
+
+    Checked before the download. Nothing is written and the published generation is not touched.
+    The log line names no path. The download (at most ``MAX_ARCHIVE_BYTES``) goes to the temporary
+    folder of the process (``/tmp``, a private folder of the service, which can be on another file
+    system than the state folder); the same threshold is used for both, because it is a margin,
+    not a calculation. The space is checked once: growth during the import is not covered.
+    """
+    directory_folder = Path(str(connections[DIRECTORY_ALIAS].settings_dict["NAME"])).parent
+    try:
+        temporary_folder = Path(tempfile.gettempdir())
+    except OSError:
+        raise ImportFailure("The free disk space could not be checked.") from None
+    for folder, purpose in ((directory_folder, "the directory file"), (temporary_folder, "the temporary download")):
+        if _free_bytes(folder) < MIN_FREE_DISK_BYTES:
+            logger.warning(
+                "Address directory import refused: less than %d GB free on the disk of %s.",
+                MIN_FREE_DISK_BYTES // 1024**3, purpose,
+            )
+            raise ImportFailure("Not enough free disk space for an import.")
 
 
 def _publish(archive, checksum, data_date, *, repair=False):
@@ -425,14 +446,82 @@ def _published_row_count(checksum, *, repair):
         return None
 
 
+def _require_catalogue_not_older(data_date):
+    """Refuse a catalogue older than the published directory BEFORE the download (N-2).
+
+    Without this the refusal in ``_publish`` came after the download and the hash, so every click
+    cost the whole archive. ``_publish`` keeps its own check under the lease. An unreadable file
+    is not a reason to refuse: the import replaces it.
+    """
+    try:
+        directory = Directory.objects.filter(pk=1).first()
+    except DatabaseError:
+        return
+    if directory is not None and directory.data_date and data_date < directory.data_date:
+        raise ImportFailure("Catalogue data date predates the published directory.")
+
+
+def _repair_is_needed(checksum):
+    """True when the published directory is the official file ``checksum`` but fails the checks
+    (or cannot be read): a manual request then repairs it instead of loading new data.
+
+    Called only after ``_published_row_count`` found nothing to skip.
+    """
+    try:
+        directory = Directory.objects.filter(pk=1).first()
+    except DatabaseError:
+        return True
+    return directory is not None and bool(directory.imported_at) and directory.checksum == checksum
+
+
+def _require_repair_allowed():
+    """After a repair that did not end intact (or failed), the next one waits six hours (N-2)."""
+    last = ImportRequest.objects.filter(pk=1).values_list("last_failed_repair_at", flat=True).first()
+    if last is not None and timezone.now() < last + REPAIR_RETRY_INTERVAL:
+        logger.warning(
+            "Address directory repair refused: the last repair did not succeed less than %d hours ago.",
+            REPAIR_RETRY_INTERVAL // timedelta(hours=1),
+        )
+        raise ImportFailure("A repair was tried recently and did not succeed.")
+
+
+def _record_repair_result(succeeded):
+    try:
+        ImportRequest.objects.filter(pk=1).update(last_failed_repair_at=None if succeeded else timezone.now())
+    except DatabaseError:
+        logger.warning("The result of the address directory repair could not be recorded.")
+
+
+def _published_directory_is_intact():
+    try:
+        directory = Directory.objects.filter(pk=1).first()
+    except DatabaseError:
+        return False
+    return directory is not None and _is_intact(directory)
+
+
+def _download_and_publish(session, archive, checksum, data_date, *, repair):
+    digest = hashlib.sha256()
+    for chunk in _chunks(session, ASSET_URL, MAX_ARCHIVE_BYTES):
+        digest.update(chunk)
+        archive.write(chunk)
+    if not hmac.compare_digest(digest.hexdigest(), checksum):
+        raise ImportFailure("Official archive checksum mismatch.")
+    archive.seek(0)
+    return _publish(archive, checksum, data_date, repair=repair)
+
+
 def import_directory(*, repair=False):
     """Download, verify and publish; called only by the worker process (D-075).
 
     The order: the official catalogue entry (a few KB); if the published directory already is that
-    file, the import ends here (with ``repair`` only if the integrity checks pass); the check of
-    the free disk space; the download, the checksum and every limit; the import. ``repair`` (a
-    manual request, D-076) only adds the integrity checks to the first shortcut; it never skips a
-    check of the download.
+    file, the import ends here (with ``repair`` only if the integrity checks pass); a catalogue
+    older than the published directory is refused; a repair within six hours after a repair that
+    did not succeed is refused; the check of the free disk space; the download, the checksum and
+    every limit; the import. ``repair`` (a manual request, D-076) only adds the integrity checks
+    to the first shortcut; it never skips a check of the download. A repair (the published
+    directory is the official file but fails the checks) is followed by one more integrity check
+    of the new file, and its outcome starts or clears the six hours (N-2).
     """
     try:
         # Ignore netrc/proxy credentials inherited from an operator environment.
@@ -442,15 +531,20 @@ def import_directory(*, repair=False):
             row_count = _published_row_count(checksum, repair=repair)
             if row_count is not None:
                 return row_count
+            _require_catalogue_not_older(data_date)
+            repairing = repair and _repair_is_needed(checksum)
+            if repairing:
+                _require_repair_allowed()
             _require_free_disk()
-            digest = hashlib.sha256()
-            for chunk in _chunks(session, ASSET_URL, MAX_ARCHIVE_BYTES):
-                digest.update(chunk)
-                archive.write(chunk)
-            if not hmac.compare_digest(digest.hexdigest(), checksum):
-                raise ImportFailure("Official archive checksum mismatch.")
-            archive.seek(0)
-            return _publish(archive, checksum, data_date, repair=repair)
+            try:
+                count = _download_and_publish(session, archive, checksum, data_date, repair=repair)
+            except Exception:
+                if repairing:
+                    _record_repair_result(False)
+                raise
+            if repairing:
+                _record_repair_result(_published_directory_is_intact())
+            return count
     except ImportFailure:
         raise
     except (requests.RequestException, zipfile.BadZipFile, csv.Error, UnicodeError, OSError) as exc:
