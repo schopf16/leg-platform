@@ -1,9 +1,9 @@
 /* Texts of the pages that can be shown in more than one language (D-056).
 
    German is the source and the default. French, Italian and English exist for the login page
-   only (LEG-Design-Vorgaben/login/VORGABEN.md, section 8); they are drafts that native speakers
-   still have to review. Every other page stays German. The file is plain JSON assigned to one
-   variable, so that a test can compare the German values with the Swiss German catalogue. */
+   only (LEG-Design-Vorgaben/login/VORGABEN.md, section 8). Every other page stays German. The file
+   is plain JSON assigned to one variable, so that a test can compare the German values with the
+   Swiss German catalogue. */
 window.LEG_PAGE_TEXTS = {
   "de": {
     "lang": "de-CH",

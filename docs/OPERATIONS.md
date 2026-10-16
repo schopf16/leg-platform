@@ -12,7 +12,7 @@ Roles:
 
 * **Project owner (LEG Ittigen):** decides the scope and the risks. Approves each deployment to production.
 * **Developer:** implements the code on the development computer. The tester and main session also run checks and tests there (D-019); no production data is used.
-* **Operator:** the person who sets up and runs the stage and production servers. In plain words: this is the person who types the commands on the servers, keeps the secrets and makes the backups. It can be the owner or another person. **Open:** the owner names the operator (section 6, item 19).
+* **Operator:** the person who sets up and runs the stage and production servers. In plain words: this is the person who types the commands on the servers, keeps the secrets and makes the backups. It can be the owner or another person. The owner states (2026-10-16, D-074) that **Infomaniak** operates stage and production; which person at Infomaniak acts, what product and access are used, and who keeps the secrets is not recorded and is not assumed (`docs/DEPLOYMENT.md`, section 1).
 * **Development computer:** a Windows computer for development. It uses local test settings only. It never holds stage or production secrets (`docs/DECISIONS.md`, D-020; `docs/SECURITY.md`, section 7).
 * **Second computer:** a second computer that receives the code by USB. **NOT YET VERIFIED:** its setup.
 * **GitHub:** stores the code and runs the automatic checks (CI). It does not deploy anything.
@@ -214,13 +214,15 @@ Status: **not built.** Step A (research) is done. The owner decided the licence,
 | --- | --- | --- |
 | Use of the data | Planned. Addresses are checked only against the local copy. The stored profile address stays exactly as entered. No address is sent to an external service. | Decided (D-049, item 4) |
 | Terms of use and licence | **Decided 2026-10-14 (owner):** free use; the source must be named. Basis: the owner's copy of the swisstopo terms and the general opendata.swiss rule "Open use. Must provide the source." The STAC record says "proprietary"; this is recorded as a difference (D-049). | Owner (D-049) |
-| Attribution text | **Decided 2026-10-14 (owner):** "Bundesamt für Landestopografie swisstopo". **Changed 2026-10-15 (owner, D-066):** the software shows no attribution in the user interface; the text belongs to the privacy notice and the imprint of each instance (owner content, D-022). Whether that place satisfies the terms of use is an open owner question (D-066). | Owner (D-049, D-066) |
+| Attribution text | **Decided 2026-10-14 (owner):** "Bundesamt für Landestopografie swisstopo". **Changed 2026-10-15 (owner, D-066):** the software shows no attribution in the user interface; the text belongs to the privacy notice and the imprint of each instance (owner content, D-022). Whether that place satisfies the terms of use is **settled by the owner on 2026-10-16** (D-074): the source reference goes into the privacy notice and the imprint, which the operator writes and maintains elsewhere; the portal only links the two addresses. | Owner (D-049, D-066, D-074) |
 | Update rule | **Decided 2026-10-14 (owner): option C** (D-050). An import can be started by a user with a dedicated permission from the admin area; it runs as a background job. The operator's own import command stays available. The server needs an outbound HTTPS connection to `data.geo.admin.ch`. Security conditions apply (D-050); the security reviewer must review them. | Owner (D-050) |
 | Reminder for old data | **Decided 2026-10-14 (owner):** a warning after 92 days, which matches "once per quarter or manually". | Owner (D-050) |
-| Import account and database alias | **OPEN.** The names are not decided. The import needs its own account and its own read-only database alias. | Owner and operator (D-049, step B) |
+| Import account and database alias | **OPEN.** The names are not decided. The import needs its own account and its own read-only database alias. The operator creates the account during the initial setup; see the explanation below the table. | Operator (D-049, step B, D-074) |
 | Import schedule per server | **OPEN.** | Owner (D-049, item 5) |
 | Integrity check before use | Planned: compare the SHA-256 value of the downloaded file with the value in the swisstopo catalogue for the same file. Do not use the file if they differ. | Decided as a rule for step B (D-049) |
 | Columns kept locally | **Decided 2026-10-14 (owner):** street, house number, postal code and locality. Nothing else is stored (D-049). | Owner (D-049) |
+
+**What the "import account" (also called "import account credentials", D-049) means.** It is a second database account, separate from the account that the application uses. The application's account may only read (`SELECT`) the address database. The import account has write rights, and only the address-import worker uses it: this worker loads the swisstopo address directory into the address database. The operator creates the account on the server during the initial setup (`docs/DEPLOYMENT.md`, section 3.5). Its credentials (user name and password) are stored only in the environment file of the import worker and nowhere else; the web application never receives them. Because the operator does this on the server, it is not an owner decision (D-074).
 
 ## 5a. Settings in the administration and settings that only the operator changes
 
@@ -242,9 +244,9 @@ There are no ready-made groups or roles (`AGENTS.md`, section 6; D-012). A syste
 Each item must be decided or answered before the step that depends on it.
 
 1. **Licence and terms of the address register:** decided 2026-10-14 (section 5). Closed.
-2. **Attribution:** decided 2026-10-14 (section 5); changed 2026-10-15 (D-066): not shown in the user interface, to be placed in the privacy notice and the imprint; the question whether this satisfies the terms of use is open with the owner.
+2. **Attribution:** decided 2026-10-14 (section 5); changed 2026-10-15 (D-066): not shown in the user interface, placed in the privacy notice and the imprint; settled by the owner on 2026-10-16 (D-074). Closed.
 3. **Update option and 92-day reminder:** decided 2026-10-14, option C (section 5). Closed. The security review of option C is open.
-4. **Import account, its name and its database alias:** open (D-049, step B). Owner and operator decide the names; the password is entered only on the server.
+4. **Import account, its name and its database alias:** open (D-049, step B). The operator decides the names and creates the account during the initial setup; the password is entered only on the server.
 5. **Import schedule per server:** open (D-049, item 5).
 6. **Hosting details:** operating system and its maintenance, web server, TLS, backups, server access, the scheduler (D-008)
 7. **Installation method on the server and how the configuration is loaded:** (D-027, D-008)
@@ -259,7 +261,7 @@ Each item must be decided or answered before the step that depends on it.
 16. **Deployment gates:** all five gates in `README.md` are open on 2026-10-14
 17. **Backup method, schedule, retention and restore test** (`docs/SECURITY.md`, section 9)
 18. **Mail worker and scheduler:** choice of supervisor and scheduler on the server (D-008, D-041)
-19. **Operator:** who sets up and runs stage and production (section 1). Owner decision.
+19. **Operator:** who sets up and runs stage and production (section 1). Answered by the owner on 2026-10-16: Infomaniak (D-074). Not recorded: the product, the person who acts and the access arrangements.
 
 ## 7. Sources
 

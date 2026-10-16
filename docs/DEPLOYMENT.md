@@ -96,6 +96,8 @@ First-time human password entry, external Microsoft administration, initial acce
 
 This is an **initial-setup checklist**, not a questionnaire to repeat on every deployment. Use recorded decisions and verified server facts first (sections 0.5 and 0.6). Ask one focused question at a time only for an unresolved owner decision needed for the next step. The operator investigates technical choices and supplies a recommendation with evidence rather than asking the owner to choose table names, package commands or proxy parameters. Preserve earlier approvals in the hand-over (section 13).
 
+Owner statement of 2026-10-16 (D-074): **Infomaniak operates stage and production.** Nothing else follows from this statement: the product type, the person who acts, the access arrangements and every open item below stay as they are, unless an item is answered by this statement alone.
+
 | No. | DECISION or input | Options and proposal | Needed in |
 | --- | --- | --- | --- |
 | O-1 | Release of the deployment gates (`README.md`) and approval of this deployment | Written decision of the project owner. Required for every production deployment (`docs/OPERATIONS.md`). | before step 2 |
@@ -332,7 +334,7 @@ Expected: exactly one grant line with those eight privileges on `leg\_platform`.
 
 ### 3.5 Separate address directory database (D-033, D-049, D-052)
 
-The web service gets a **SELECT-only** account; a separate write account exists only for the importer. The names are proposals (O-12); the application refuses the same database name or the same user as the application database (`leg_platform/address_configuration.py`).
+The web service gets a **SELECT-only** account; a separate write account exists only for the importer. The names are proposals (O-12); the application refuses the same database name or the same user as the application database (`leg_platform/address_configuration.py`). The write account is the "import account" of D-049: the operator creates it here during the initial setup, and its credentials live only in the importer's environment file (explained in plain words in `docs/OPERATIONS.md`, section 5; not an owner decision, D-074).
 
 ```bash
 reader_password=$(sudo sed -n 's/^ADDRESS_DB_PASSWORD=//p' /etc/leg-platform/app.env)
@@ -1287,4 +1289,19 @@ On 2026-10-14 all five are open (`README.md`, "Current Status").
 * **F-7: MariaDB transport encryption** is not applicable on loopback; the owner confirms (O-23).
 * **F-8: Snapshots and backups.** The Infomaniak guides contradict each other for the VPS Lite snapshot; own backups with an off-server copy are the baseline.
 * **Not verified at all** (no real server, no nginx, no systemd available while writing): every command in sections 2 to 12 (they were checked against official documentation for existence of the options and directives, not run), the Infomaniak image list and firewall defaults, the exact repository file format of the MariaDB Foundation tool, the Certbot timer name, `EnvironmentFile` in transient units, the systemd hardening with the installed Python, the importer's duration and disk use, the Gunicorn worker count against the CPU, and every expected output.
-* Agent and human review: this runbook and its security-relevant parts (hardening, proxy headers, secrets handling) are to be reviewed by the `security-reviewer` and by a human before use (D-019).
+* Agent and human review: this runbook and its security-relevant parts (hardening, proxy headers, secrets handling) are to be reviewed by the `security-reviewer` and by a human before use (D-019). The human review is done by the project owner himself (D-074).
+
+## 14. Notes for the operator's privacy notice and imprint
+
+This section is information for the operator. It is **not a task of the project** and not legal advice. The portal contains neither the privacy notice nor the imprint; it only links the two addresses that the administrator enters in the portal settings (D-022, D-073, D-074). The texts are written, kept up to date and answered for by the operator (the community). The points below are facts about the software and the documentation that the operator may want to cover; whether they are sufficient is the operator's decision. The operator checks each point against the instance before the notice is published, because several depend on the instance (hosting, backups, logs, mail provider).
+
+1. **swisstopo source reference.** The address suggestions use the public address directory of the Federal Office of Topography. The terms of use require a source reference; the owner decided that it stands in the privacy notice and the imprint, not in the portal (D-066, D-074). One of the permitted texts, for example "Bundesamt für Landestopografie swisstopo" (D-049). The directory holds no personal data, and profile addresses are never sent to an external service (the suggestions query a local copy).
+2. **Security notifications and the name.** A security notification greets the account holder by first and last name. The owner of the mailbox of a confirmed second address therefore learns the account holder's name, also if the mailbox is shared, a role mailbox or later reassigned to someone else (D-068, L4).
+3. **How long the name is kept in a queued notification.** The name is stored in the queued job only until the job is sent, given up after three failed attempts, or purged after 24 hours, and it is erased at once when the account is deleted or deactivated; the notice about a deleted account carries no name (D-068). The 24-hour purge needs the scheduled task `run_scheduled_tasks`.
+4. **Purposes of the profile data.** Customer number, name, postal address and email address for identification and for invoices by post or email, and the optional phone number for queries (`docs/PROJECT.md`, "Profile Data and Purpose"; DSG Art. 6 para. 3 and Art. 19; D-016, D-022). The registration stores the consent to the privacy notice with its time and the address that was shown (`docs/SECURITY.md`, section 3).
+5. **Account deletion and retention obligation.** Deleting an account removes its data; if a retention obligation is set, the account is deactivated instead (D-016). In phase 1 no function sets a retention obligation. Which obligations apply and for how long is not decided (D-016).
+6. **Logs.** Security log entries of deleted accounts are kept without personal reference; the retention is set per instance (default 1 year for the long-lived events and 30 days for the others, `docs/SECURITY.md`, section 10 on logging). The retention of the nginx access log, which contains IP addresses, and of the journal is open (O-15; proposal 14 days); the notice must match what the operator sets up.
+7. **Backups.** Deleted data stays in backups until they expire (`docs/SECURITY.md`, section 5; D-016). The retention is open (O-13). Until a backup is confirmed, `docs/SERVICES.md` (S-3) asks not to name one in the notice.
+8. **Services that receive personal data.** The register `docs/SERVICES.md` lists them: email delivery through Microsoft Graph (S-1), the hosting provider (S-2) and backups (S-3); several fields there are still open (country, contract basis, encryption). It also records what does **not** send data to third parties: no external fonts, scripts, analytics, error trackers or bot checks; the language and colour mode stay in the `sessionStorage` of the browser tab, in no cookie.
+
+Sources: `docs/DECISIONS.md` D-016, D-022, D-049, D-066, D-068, D-073, D-074; `docs/PROJECT.md`; `docs/SECURITY.md`; `docs/SERVICES.md`.

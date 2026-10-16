@@ -223,7 +223,7 @@ Configuration and credentials are separated between local, stage and production,
 
 The first version supports login with the email address and a password, combined with an authenticator app (TOTP) as the second factor.
 
-AGOV (the login service of the Swiss authorities) is intended as the second factor. The project owner has asked AGOV whether this use is permitted; the answer is pending. Until it is available, the documented TOTP second factor is used. If AGOV is permitted, the second factor is to be switched to AGOV without changing the architecture and without weakening security. The switch is expected to take place before the instance goes live, so that no productive TOTP enrolments have to be migrated.
+AGOV (the login service of the Swiss authorities) is intended as the second factor. The project owner has asked AGOV whether this use is permitted; the answer is still pending and the owner is waiting for it (a waiting item, not a task; D-074). Until it is available, the documented TOTP second factor is used. If AGOV is permitted, the second factor is to be switched to AGOV without changing the architecture and without weakening security. The switch is expected to take place before the instance goes live, so that no productive TOTP enrolments have to be migrated.
 
 Preparation in the first phase is limited to the following; no AGOV integration is built:
 
@@ -261,8 +261,7 @@ Databases, secrets and email configurations must be separated per environment. S
 * additional user interface languages and language selection
 * a public home page and information about the LEG (provided by the instance's website, D-025)
 * publication of aggregated figures (e.g. number of members, production and use within the LEG); the minimum number of participants for such figures is decided per instance when they are introduced (D-025)
-* the content of the privacy notice (provided by the operator)
-* an imprint (legal notice): deliberately open; expected on the instance's website; whether the login page links to it is decided together with the imprint (D-022, D-025)
+* the content of the privacy notice and of the imprint (legal notice): written and maintained by the operator elsewhere, e.g. on the instance's website; the portal only links the two addresses that the administrator enters in the portal settings (D-022, D-025, D-073, D-074)
 
 ## Extensibility
 
