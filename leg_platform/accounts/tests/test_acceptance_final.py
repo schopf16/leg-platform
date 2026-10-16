@@ -227,18 +227,19 @@ class StopLinkIsDeadAfterwardsTests(TestCase):
         return link_in(mails_to(address)[-1], "email-change/stop")
 
     def use_the_link(self, path):
+        """Open the link; a link that is valid would lead to the confirmation page, and its button
+        is pressed as well. Every page that is returned is followed to its end."""
         visitor = Client()
-        opened = visitor.get(path)
+        opened = visitor.get(path, follow=True)
         pages = [opened]
-        if opened.status_code == 302:
-            pages.append(visitor.post(STOP_CONFIRM_URL, {}))
+        if opened.redirect_chain and opened.redirect_chain[-1][0] == STOP_CONFIRM_URL:
+            pages.append(visitor.post(STOP_CONFIRM_URL, {}, follow=True))
         return pages
 
     def assert_invalid_and_harmless(self, path, *, session_client):
         for response in self.use_the_link(path):
-            if response.status_code == 200:
-                self.assertContains(response, INVALID_LINK_TEXT)
-        direct = Client().post(STOP_CONFIRM_URL, {})
+            self.assertContains(response, INVALID_LINK_TEXT)
+        direct = Client().post(STOP_CONFIRM_URL, {}, follow=True)
         self.assertContains(direct, INVALID_LINK_TEXT)
         self.assertEqual(session_client.get(PROFILE_URL).status_code, 200)
         self.assertFalse(
@@ -292,8 +293,7 @@ class StopLinkIsDeadAfterwardsTests(TestCase):
         self.assertNotEqual(old_path, new_path)
 
         for response in self.use_the_link(old_path):
-            if response.status_code == 200:
-                self.assertContains(response, INVALID_LINK_TEXT)
+            self.assertContains(response, INVALID_LINK_TEXT)
 
         # The old link neither stopped the newer request nor ended the session.
         self.assertEqual(

@@ -50,9 +50,9 @@ def process_reset_request(address):
     return lambda: emails.send_password_reset(email, raw_token, PASSWORD_RESET_LIFETIME)
 
 
-def process_password_changed(address):
+def process_password_changed(address, greeting_name=""):
     """Handle the notification of a changed password; return the sending function."""
-    return lambda: emails.send_password_changed(address)
+    return lambda: emails.send_password_changed(address, greeting_name)
 
 
 def delete_expired_reset_tokens(now=None):

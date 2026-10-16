@@ -1,6 +1,6 @@
-{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{{ greeting }}
 
-The operator started the removal of two-factor authentication for your account at {{ instance_name }}.
+{% blocktranslate %}The operator started the removal of two-factor authentication for your account at {{ instance_name }}.
 
 To remove it, open this link within {{ lifetime_hours }} hours:
 

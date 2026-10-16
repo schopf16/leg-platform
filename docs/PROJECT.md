@@ -207,7 +207,7 @@ Intended use:
 * security notifications: changes of email address, password and two-factor authentication
 * account notifications where needed
 
-Security notifications state that the person should contact the operator immediately if they did not request the change, and name the instance's contact information where configured; they do not invite a reply (D-038). The installation guide describes the procedure after such a report (block the account, verify the person's identity, restore the email address or password, log the incident).
+Security notifications state that the person should contact the operator immediately if they did not request the change, and name the instance's contact information where configured; they do not invite a reply (D-038). They greet the person by first and last name when the account belongs to a person with a suitable name, and neutrally ("Guten Tag") otherwise, and only at addresses that belong to the account at that time; the name is stored in the queued job until the job ends (sent, given up after three failed attempts, or deleted after 24 hours by the clean-up), and is blanked at once in the queued jobs of an account that is deleted or deactivated, so it never outlives the account; the deletion notice is always neutral (D-068). The owner of the mailbox of a confirmed second address learns the account holder's name (D-068, L4; input for the privacy notice). The installation guide describes the procedure after such a report (block the account, verify the person's identity, restore the email address or password, log the incident).
 
 The system administrator configures Microsoft Graph in a dedicated section of the Django admin:
 

@@ -1007,7 +1007,7 @@ class DirectoryDatabaseTests(TransactionTestCase):
 
         self.assertEqual((found["status"], found["match"], found["warning"]), ("available", True, ""))
         self.assertEqual((unknown["status"], unknown["match"]), ("available", False))
-        self.assertIn("not found in the official directory", unknown["warning"])
+        self.assertIn("This address was not found.", unknown["warning"])
         self.assertEqual(suggest["warning"], "")
 
     def _staff_client(self, with_permission):

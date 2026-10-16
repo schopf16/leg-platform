@@ -284,7 +284,7 @@ class SecondStepOfTheLoginTests(TestCase):
 @tag("mariadb")
 class ResultPagesTests(TestCase):
     def test_the_invalid_email_change_link_says_nothing_changed(self):
-        page = self.client.get(reverse("accounts:email_change_verify", args=["x" * 43]))
+        page = self.client.get(reverse("accounts:email_change_verify", args=["x" * 43]), follow=True)
 
         self.assertContains(page, "Link nicht mehr gültig")
         self.assertContains(page, "Dieser Link kann nicht mehr verwendet werden. Falls Sie die Änderung soeben bestätigt haben, melden Sie sich mit der neuen Adresse an.")
@@ -292,7 +292,9 @@ class ResultPagesTests(TestCase):
         self.assertContains(page, f'href="{reverse("accounts:login")}">Zur Anmeldung</a>')
         self.assertContains(page, "Mein Konto")
         self.assertContains(page, "Ihre Angaben im LEG-Portal.")
-        self.assertEqual(page["Referrer-Policy"], "no-referrer")
+        # The fixed page is a normal page: no token in its URL, the project default policy.
+        self.assertEqual(page.redirect_chain, [(reverse("accounts:email_change_invalid"), 302)])
+        self.assertEqual(page["Referrer-Policy"], "same-origin")
 
     def test_the_prepared_pages_render_with_the_texts_of_the_package(self):
         request = RequestFactory().get("/")
@@ -316,21 +318,23 @@ class ResultPagesTests(TestCase):
 
     @override_settings(INSTANCE_WEBSITE_URL="https://www.example.org/")
     def test_the_removal_of_the_second_factor_pages_use_the_entry_shell(self):
-        page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]))
+        page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]), follow=True)
 
         self.assertContains(page, 'class="entry-split"')
         self.assertContains(page, "Link nicht mehr gültig")
         self.assertNotContains(page, "Link ungültig")
         # A real way to the operator: the website of the instance, not the name of the portal.
         self.assertContains(page, 'href="https://www.example.org/"')
-        self.assertContains(page, "wenden Sie sich an die LEG")
+        self.assertContains(page, "wenden Sie sich an die Betreiber")
         self.assertNotContains(page, "wenden Sie sich an LEG-Portal")
+        # The same term as the emails of the portal ("die Betreiber"), not "die LEG".
+        self.assertNotContains(page, "an die LEG")
 
     @override_settings(INSTANCE_WEBSITE_URL="")
     def test_the_invalid_removal_link_without_a_website_still_names_the_operator(self):
-        page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]))
+        page = self.client.get(reverse("accounts:two_factor_reset_verify", args=["x" * 43]), follow=True)
 
-        self.assertContains(page, "wenden Sie sich an die LEG")
+        self.assertContains(page, "wenden Sie sich an die Betreiber")
 
 
 @tag("mariadb")

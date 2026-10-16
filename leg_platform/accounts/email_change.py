@@ -181,7 +181,7 @@ def process_secondary_request(account_id, address):
         return lambda: emails.send_secondary_email_verification(address, raw_token, lifetime)
 
 
-def process_notice(account_id, address):
+def process_notice(account_id, address, greeting_name=""):
     """Make the stop link for the notice about a requested change and send it to ``address``.
 
     Nothing is sent when no change is pending any more. One link stops every pending change of the
@@ -202,7 +202,7 @@ def process_notice(account_id, address):
             return None
         lifetime = max(_remaining(row) for row in rows)
         raw_token = VerificationToken.objects.issue(user, Purpose.EMAIL_CHANGE_STOP, lifetime)
-        return lambda: emails.send_email_change_notice(address, raw_token, lifetime)
+        return lambda: emails.send_email_change_notice(address, raw_token, lifetime, greeting_name)
 
 
 def confirm_change(token):

@@ -1,16 +1,44 @@
 """Tests of the instance configuration and of the token redaction in logs."""
 
 import logging
+import re
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
-from django.urls import reverse
+from django.urls import get_resolver, reverse
+from django.urls.resolvers import RegexPattern
 
 from leg_platform.environment import DEFAULT_INSTANCE_NAME, load_environment
 from leg_platform.log_filters import REDACTED, TokenRedactionFilter, redact_tokens
 from leg_platform.tests.test_environment import make_env
 
 SECRET = "A" * 43
+TOKEN_PARAMETER = re.compile(r"<(?:\w+:)?token>")
+
+
+def token_routes():
+    """Return ``(route, path)`` of every route of the URL configuration with a ``token`` parameter.
+
+    The path is the route with the token replaced by ``SECRET``. The URL configuration is
+    walked, so a new token route is found without a change of this test (security review of
+    unit A, L-2).
+    """
+    found = []
+
+    def walk(patterns, prefix):
+        for entry in patterns:
+            route = prefix + str(entry.pattern)
+            if isinstance(entry.pattern, RegexPattern):
+                if "token" in route:
+                    raise AssertionError(f"A regular-expression route with a token: {route}")
+                continue
+            if hasattr(entry, "url_patterns"):
+                walk(entry.url_patterns, route)
+            elif TOKEN_PARAMETER.search(route):
+                found.append((route, "/" + TOKEN_PARAMETER.sub(SECRET, route)))
+
+    walk(get_resolver().url_patterns, "")
+    return found
 
 
 class InstanceConfigurationTests(SimpleTestCase):
@@ -141,35 +169,52 @@ class SenderAddressTests(SimpleTestCase):
 
 
 class TokenRedactionTests(SimpleTestCase):
-    def test_the_pattern_matches_the_url_of_the_verification_view(self):
-        path = reverse("accounts:registration_verify", args=[SECRET])
+    def test_the_walk_of_the_url_configuration_finds_the_token_routes(self):
+        # Guards the enumeration itself: an empty result would let the tests below pass.
+        routes = [route for route, _path in token_routes()]
 
-        self.assertEqual(
-            redact_tokens(f"Not Found: {path}"), f"Not Found: /register/verify/{REDACTED}/"
-        )
+        self.assertGreaterEqual(len(routes), 5, routes)
+        self.assertIn("register/verify/<slug:token>/", routes)
 
-    def test_the_pattern_matches_the_url_of_the_password_reset_view(self):
-        path = reverse("accounts:password_reset_verify", args=[SECRET])
+    def test_every_route_with_a_token_is_redacted(self):
+        for route, path in token_routes():
+            with self.subTest(route=route):
+                self.assertEqual(
+                    redact_tokens(f"Not Found: {path}"),
+                    f"Not Found: {path.replace(SECRET, REDACTED)}",
+                )
 
-        self.assertEqual(
-            redact_tokens(f"Not Found: {path}"), f"Not Found: /password-reset/verify/{REDACTED}/"
-        )
+    def test_every_route_with_a_token_is_redacted_with_percent_encoded_slashes(self):
+        # The server decodes the path before it routes, so the encoded form reaches the view
+        # (security review of unit A, L-1); the request line of the development server is raw.
+        for route, path in token_routes():
+            variants = (
+                path.replace("/", "%2F"),
+                path.replace("/", "%2f"),
+                path.replace("/", "%2F", 2),
+                path.replace("/", "%2f", 1),
+            )
+            for variant in variants:
+                with self.subTest(route=route, variant=variant):
+                    for line in (f"Not Found: {variant}", f'"GET {variant} HTTP/1.1" 302 0'):
+                        redacted = redact_tokens(line)
+                        self.assertNotIn(SECRET, redacted)
+                        self.assertIn(REDACTED, redacted)
 
-    def test_the_pattern_matches_the_url_of_the_second_factor_reset_view(self):
-        path = reverse("accounts:two_factor_reset_verify", args=[SECRET])
-
-        self.assertEqual(
-            redact_tokens(f"Not Found: {path}"),
-            f"Not Found: /two-factor-reset/verify/{REDACTED}/",
-        )
-
-    def test_the_pattern_matches_the_url_of_the_email_change_view(self):
-        path = reverse("accounts:email_change_verify", args=[SECRET])
-
-        self.assertEqual(
-            redact_tokens(f"Not Found: {path}"),
-            f"Not Found: /email-change/verify/{REDACTED}/",
-        )
+    def test_the_fixed_pages_and_the_confirmation_pages_are_not_redacted(self):
+        for name in (
+            "email_change_invalid",
+            "email_change_stop_invalid",
+            "two_factor_reset_invalid",
+            "email_change_confirm",
+            "email_change_stop_confirm",
+            "two_factor_reset_confirm",
+            "registration_invalid",
+            "password_reset_invalid",
+        ):
+            path = reverse(f"accounts:{name}")
+            with self.subTest(name=name):
+                self.assertEqual(redact_tokens(f"Not Found: {path}"), f"Not Found: {path}")
 
     def test_the_request_lines_of_the_development_server_are_redacted(self):
         line = f'"GET /register/verify/{SECRET}/ HTTP/1.1" 302 0'

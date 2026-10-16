@@ -184,6 +184,18 @@ class ProjectCatalogueTests(SimpleTestCase):
     def test_every_entry_is_translated(self):
         self.assertEqual([msgid for msgid, msgstr in self.catalogue.items() if not msgstr], [])
 
+    def test_the_english_source_uses_the_article_a_before_recovery_code(self):
+        # D-067: "an recovery code" was wrong English in a mail source and two messages.
+        self.assertEqual([msgid for msgid in self.catalogue if "an recovery code" in msgid], [])
+        templates = Path(settings.BASE_DIR) / "leg_platform"
+        offenders = [
+            str(path)
+            for path in templates.rglob("*")
+            if path.suffix in {".py", ".html", ".txt"} and "tests" not in path.parts
+            and "an recovery code" in path.read_text(encoding="utf-8")
+        ]
+        self.assertEqual(offenders, [])
+
     def test_django_texts_with_sharp_s_are_overridden(self):
         django_de = {}
         for path in DJANGO_CATALOGUES:

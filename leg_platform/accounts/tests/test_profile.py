@@ -322,7 +322,7 @@ class EmailCardTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, "holder.person@example.org")
         client.post(reverse("accounts:email_change_confirm"), {})
-        again = client.post(reverse("accounts:email_change_confirm"), {})
+        again = client.post(reverse("accounts:email_change_confirm"), {}, follow=True)
         self.assertContains(
             again,
             "Dieser Link kann nicht mehr verwendet werden. Falls Sie die Änderung soeben bestätigt "
@@ -592,9 +592,9 @@ class StopLinkTests(TestCase):
         stopper.get(self.stop_path)
         stopper.post(reverse("accounts:email_change_stop_confirm"), {})
 
-        again = Client().get(self.stop_path)
-        forged = Client().get(reverse("accounts:email_change_stop_verify", args=["x" * 43]))
-        direct = Client().post(reverse("accounts:email_change_stop_confirm"), {})
+        again = Client().get(self.stop_path, follow=True)
+        forged = Client().get(reverse("accounts:email_change_stop_verify", args=["x" * 43]), follow=True)
+        direct = Client().post(reverse("accounts:email_change_stop_confirm"), {}, follow=True)
 
         for response in (again, forged, direct):
             self.assertEqual(response.status_code, 200)

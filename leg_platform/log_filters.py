@@ -8,10 +8,20 @@ the token is removed from every log message before it is written.
 import logging
 import re
 
+# A slash of the path, or its percent-encoded form: the server decodes the path before it routes,
+# so "/email-change%2Fstop/<token>/" reaches the view, while the request line of the development
+# server shows the raw form (security review of unit A, L-1).
+_SLASH = r"(?:/|%2[Ff])"
+
 # The paths of the token views (registration link, password reset link, link to remove the
-# second factor); a test checks that the pattern matches the URL configuration.
+# second factor, the two links of an address change); a test enumerates the URL configuration
+# and requires every route with a ``token`` converter to be redacted. Since D-067 these views
+# redirect and render nothing, but the token is still in the request line and in "Not Found"
+# lines of the log.
 TOKEN_URL_PATTERN = re.compile(
-    r"(/(?:register|password-reset|two-factor-reset|email-change)/verify/)[^/\s\"'?#]+"
+    rf"({_SLASH}(?:(?:register|password-reset|two-factor-reset|email-change){_SLASH}verify"
+    rf"|email-change{_SLASH}stop){_SLASH})"
+    r"[^/\s\"'?#]+"
 )
 REDACTED = "<redacted>"
 

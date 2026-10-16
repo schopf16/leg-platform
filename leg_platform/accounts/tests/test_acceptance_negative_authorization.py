@@ -450,13 +450,13 @@ class CrossAccountTests(TestCase):
         session.save()
         before = snapshot()
 
-        stopped = client.post(reverse("accounts:email_change_stop_confirm"), {})
+        stopped = client.post(reverse("accounts:email_change_stop_confirm"), {}, follow=True)
 
         self.assertContains(stopped, "Link nicht mehr gültig")
         self.assertEqual(snapshot(), before)
         other = Client()
         other.get(reverse("accounts:email_change_stop_verify", args=[stop]))
-        done = other.post(reverse("accounts:email_change_confirm"), {})
+        done = other.post(reverse("accounts:email_change_confirm"), {}, follow=True)
         self.assertContains(done, "Link nicht mehr gültig")
         self.b.refresh_from_db()
         self.assertEqual(self.b.email, "user.b@example.org")

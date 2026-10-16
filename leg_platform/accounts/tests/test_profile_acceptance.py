@@ -202,5 +202,5 @@ class AccessibleNameAndMailTests(TestCase):
         self.assertContains(done, f'href="{PROFILE_URL}"')
         self.assertContains(done, "Zum Profil")
         self.assertNotContains(done, "Zur Anmeldung")
-        anonymous = Client().get(path)
+        anonymous = Client().get(path, follow=True)
         self.assertContains(anonymous, "Zur Anmeldung")

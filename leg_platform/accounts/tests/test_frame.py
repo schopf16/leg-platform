@@ -151,11 +151,16 @@ class FrameTests(TestCase):
         self.assertIn('href="/admin/"', staff_menu)
         self.assertIn("Verwaltung", staff_menu)
 
-    def test_a_page_without_a_referrer_has_no_logout_form(self):
-        # D-054: with Referrer-Policy no-referrer the browser would send Origin: null.
+    def test_a_link_with_a_token_renders_no_page_and_the_fixed_page_has_no_logout_form(self):
+        # D-054, D-067: the link of an email only redirects (with no-referrer); the fixed page it
+        # leads to is an entry page that has no header and no form that posts.
         response = self.client.get(reverse("accounts:email_change_verify", args=["x" * 43]))
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Referrer-Policy"], "no-referrer")
-        self.assertNotIn("/logout/", response.content.decode())
+        self.assertEqual(response.content, b"")
+        fixed = self.client.get(response["Location"])
+        self.assertEqual(fixed.status_code, 200)
+        self.assertNotIn("/logout/", fixed.content.decode())
 
     def test_the_frame_needs_no_inline_script_or_style(self):
         html = self.client.get(HOME_URL).content.decode()
@@ -184,7 +189,7 @@ class FrameTests(TestCase):
 
     def test_a_person_without_a_login_gets_the_entry_shell_not_the_frame(self):
         # The pages of a link of an email are entry pages since phase 3 (D-058).
-        response = Client().get(reverse("accounts:email_change_verify", args=["x" * 43]))
+        response = Client().get(reverse("accounts:email_change_verify", args=["x" * 43]), follow=True)
         html = response.content.decode()
         self.assertIn('class="entry-split"', html)
         self.assertNotIn('class="frame-menu', html)

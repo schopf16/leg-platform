@@ -1,6 +1,9 @@
 """Axes integration for independent account and client-IP lockouts (D-017)."""
 
 from axes.handlers.database import AxesDatabaseHandler
+from django.conf import settings
+from django.shortcuts import render
+from django.utils.cache import add_never_cache_headers
 
 from leg_platform.accounts import security_log
 from leg_platform.accounts.login_protection import (
@@ -10,6 +13,24 @@ from leg_platform.accounts.login_protection import (
 )
 from leg_platform.accounts.models import SecurityEvent, User
 from leg_platform.accounts.normalization import normalize_email_address
+
+LOCKOUT_TEMPLATE = "accounts/lockout.html"
+
+
+def lockout_response(request, response=None, credentials=None):
+    """The answer of every lockout (``AXES_LOCKOUT_CALLABLE``): the lockout page, never stored.
+
+    Axes calls this instead of its own response (django-axes 8.3.1, ``axes/helpers.py``,
+    ``get_lockout_response``; the configuration is documented as ``AXES_LOCKOUT_CALLABLE``). The
+    page is the same one that ``AXES_LOCKOUT_TEMPLATE`` rendered before, with the status of
+    ``AXES_HTTP_RESPONSE_CODE``; it needs nothing from the Axes context (it never shows the
+    submitted address). Axes' own response sends no ``Cache-Control`` header, so a browser or a
+    proxy could keep a page that says "blocked" (D-067). The JSON answer that Axes gives to
+    ``X-Requested-With: XMLHttpRequest`` is not used: the portal has no script that posts a login.
+    """
+    response = render(request, LOCKOUT_TEMPLATE, status=settings.AXES_HTTP_RESPONSE_CODE)
+    add_never_cache_headers(response)
+    return response
 
 
 class LoginProtectionHandler(AxesDatabaseHandler):

@@ -679,14 +679,22 @@ class SentAndInvalidPageTests(TestCase):
         registration = self.client.get(reverse("accounts:registration_verify", args=["x"]), follow=True)
         reset = self.client.get(reverse("accounts:password_reset_verify", args=["x"]), follow=True)
 
-        for response, target in (
-            (registration, "accounts:registration"),
-            (reset, "accounts:password_reset"),
+        for response, target, lead in (
+            (
+                registration,
+                "accounts:registration",
+                "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie sich bereits registriert haben, "
+                "melden Sie sich an. Andernfalls fordern Sie einen neuen Link an.",
+            ),
+            (
+                reset,
+                "accounts:password_reset",
+                "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie bereits ein neues Passwort "
+                "gewählt haben, melden Sie sich an. Andernfalls fordern Sie einen neuen Link an.",
+            ),
         ):
             self.assertContains(response, "Link nicht mehr gültig")
-            self.assertContains(
-                response, "Der Link ist abgelaufen oder wurde schon verwendet. Fordern Sie einen neuen Link an."
-            )
+            self.assertContains(response, lead)
             self.assertContains(response, "Neuen Link senden")
             self.assertContains(response, f'<form method="post" action="{reverse(target)}"')
             self.assertContains(response, f'href="{LOGIN_URL}">Zur Anmeldung</a>')
@@ -717,6 +725,53 @@ class SentAndInvalidPageTests(TestCase):
         for marker in ('class="entry-split"', 'class="entry-warm"', 'class="corner', 'class="alert alert-danger"'):
             self.assertIn(marker, html)
         self.assertEqual(html.count("<h1"), 1)
+        # A page that says "blocked" is never stored by a browser or a proxy (D-067).
+        for directive in ("no-store", "no-cache", "private", "max-age=0"):
+            self.assertIn(directive, response["Cache-Control"])
+        self.assertIn("Expires", response)
+
+    def lock_the_account(self, username):
+        # Every failure comes from another address, so that only the lockout of the account applies.
+        for attempt in range(LOGIN_FAILURE_LIMIT):
+            self.client.post(
+                LOGIN_URL, {"username": username, "password": "x"}, REMOTE_ADDR=f"10.7.3.{attempt + 1}"
+            )
+
+    def test_the_lockout_of_an_account_is_not_stored_either(self):
+        # The same answer as the lockout of an address (security review of unit A, L-4).
+        self.lock_the_account("person@example.org")
+
+        response = self.client.post(
+            LOGIN_URL, {"username": "person@example.org", "password": "x"}, REMOTE_ADDR="10.7.3.99"
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, "Anmeldung vorübergehend gesperrt", status_code=429)
+        for directive in ("no-store", "no-cache", "private", "max-age=0"):
+            self.assertIn(directive, response["Cache-Control"])
+        self.assertIn("Expires", response)
+
+    def test_a_lockout_answers_a_script_with_the_page_and_without_cors_headers(self):
+        # Axes would answer ``X-Requested-With: XMLHttpRequest`` with JSON that echoes the
+        # submitted username and sets ``Access-Control-Allow-Origin`` (``*`` by default). That
+        # answer is not used any more (D-067, hardening; security review of unit A, L-4).
+        self.lock_the_account("person@example.org")
+
+        response = self.client.post(
+            LOGIN_URL,
+            {"username": "person@example.org", "password": "x"},
+            REMOTE_ADDR="10.7.3.99",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_ORIGIN="https://other.example.net",
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(response["Content-Type"].startswith("text/html"))
+        self.assertContains(response, "Anmeldung vorübergehend gesperrt", status_code=429)
+        self.assertNotContains(response, "person@example.org", status_code=429)
+        self.assertNotIn("Access-Control-Allow-Origin", response)
+        self.assertIn("no-store", response["Cache-Control"])
+
 
 @tag("mariadb")
 class AlertAndMessageMarkupTests(TestCase):

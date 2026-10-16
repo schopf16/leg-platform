@@ -66,6 +66,23 @@ LIFETIME_HOURS = Placeholder(
 STOP_URL = Placeholder(
     "stop_url", _("Personal link that stops the requested change of an email address.")
 )
+# Offered only in the notifications to the addresses of an account (``MailJob.NOTIFICATION_KINDS``,
+# D-068), never in an email to an unverified or foreign address.
+GREETING = Placeholder(
+    "greeting",
+    _(
+        "Greeting with the name of the person the account belongs to, or a neutral greeting if "
+        "no suitable name is known. Best written on a line of its own at the start."
+    ),
+)
+# The notice about a deleted account never uses a name: the person asked for the erasure.
+GREETING_NEUTRAL = Placeholder(
+    "greeting",
+    _(
+        "Neutral greeting without a name: the name of a deleted account is not kept. The preview "
+        "and the test email show the same. Best written on a line of its own at the start."
+    ),
+)
 
 COMMON_PLACEHOLDERS = (INSTANCE_NAME, CONTACT_URL, PRIVACY_URL, LOGIN_URL)
 # Only the name of the portal is available in the subject.
@@ -114,61 +131,61 @@ DEFINITIONS = {
     Key.EMAIL_CHANGED: Definition(
         "accounts/email/email_changed.txt",
         lambda: gettext("Your email address at %(instance_name)s was changed"),
-        (CONTACT_URL,),
+        (GREETING, CONTACT_URL),
         (),
     ),
     Key.SECONDARY_EMAIL_CHANGED: Definition(
         "accounts/email/secondary_email_changed.txt",
         lambda: gettext("The second email address at %(instance_name)s was changed"),
-        (CONTACT_URL,),
+        (GREETING, CONTACT_URL),
         (),
     ),
     Key.PASSWORD_CHANGED: Definition(
         "accounts/email/password_changed.txt",
         lambda: gettext("Your password at %(instance_name)s was changed"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.TWO_FACTOR_ENABLED: Definition(
         "accounts/email/two_factor_enabled.txt",
         lambda: gettext("Two-factor authentication was set up at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.TWO_FACTOR_DISABLED: Definition(
         "accounts/email/two_factor_disabled.txt",
         lambda: gettext("Two-factor authentication was turned off at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.RECOVERY_CODES_RENEWED: Definition(
         "accounts/email/recovery_codes_renewed.txt",
         lambda: gettext("New recovery codes were created at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.RECOVERY_CODE_USED: Definition(
         "accounts/email/recovery_code_used.txt",
         lambda: gettext("A recovery code was used at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.CODE_ATTEMPTS_WARNING: Definition(
         "accounts/email/code_attempts_warning.txt",
         lambda: gettext("Wrong codes were entered for your account at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.TWO_FACTOR_RESET_LINK: Definition(
         "accounts/email/two_factor_reset_link.txt",
         lambda: gettext("Remove two-factor authentication at %(instance_name)s"),
-        (TWO_FACTOR_RESET_URL, LIFETIME_HOURS),
+        (GREETING, TWO_FACTOR_RESET_URL, LIFETIME_HOURS),
         (TWO_FACTOR_RESET_URL,),
     ),
     Key.TWO_FACTOR_RESET: Definition(
         "accounts/email/two_factor_reset.txt",
         lambda: gettext("Two-factor authentication was reset at %(instance_name)s"),
-        (),
+        (GREETING,),
         (),
     ),
     Key.SECONDARY_EMAIL_VERIFICATION: Definition(
@@ -180,25 +197,25 @@ DEFINITIONS = {
     Key.EMAIL_CHANGE_NOTICE: Definition(
         "accounts/email/email_change_notice.txt",
         lambda: gettext("An email address change was requested at %(instance_name)s"),
-        (STOP_URL, LIFETIME_HOURS),
+        (GREETING, STOP_URL, LIFETIME_HOURS),
         (STOP_URL,),
     ),
     Key.ACCOUNT_DELETED: Definition(
         "accounts/email/account_deleted.txt",
         lambda: gettext("Your account at %(instance_name)s was deleted"),
-        (),
+        (GREETING_NEUTRAL,),
         (),
     ),
     Key.SESSION_ENDED_WRONG_CODES: Definition(
         "accounts/email/session_ended_wrong_codes.txt",
         lambda: gettext("A session at %(instance_name)s was ended"),
-        (CONTACT_URL,),
+        (GREETING, CONTACT_URL),
         (),
     ),
     Key.ALL_SESSIONS_ENDED: Definition(
         "accounts/email/all_sessions_ended.txt",
         lambda: gettext("All sessions at %(instance_name)s were ended"),
-        (CONTACT_URL,),
+        (GREETING, CONTACT_URL),
         (),
     ),
 }
@@ -220,7 +237,8 @@ _FORBIDDEN_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
 _DOTS = str.maketrans({"\u3002": ".", "\uff61": ".", "\uff0e": "."})
 
 
-def _looks_like_an_address(text):
+def looks_like_an_address(text):
+    """Return whether the text looks like a web or email address (also used for names, D-068)."""
     # NFKC maps full-width and look-alike forms to plain ones; format characters (zero-width
     # characters, bidi controls) are removed so that they cannot split a scheme.
     text = unicodedata.normalize("NFKC", text).translate(_DOTS)
@@ -307,7 +325,7 @@ def validate_subject(key, subject):
         errors.append(gettext("The subject must be a single line."))
     elif _has_forbidden_characters(subject):
         errors.append(gettext("The text contains control characters."))
-    if _looks_like_an_address(subject):
+    if looks_like_an_address(subject):
         errors.append(_address_message())
     _used, marker_errors = _check_placeholders(
         subject, {placeholder.name for placeholder in SUBJECT_PLACEHOLDERS}
@@ -329,7 +347,7 @@ def validate_body(key, body):
         )
     if _has_forbidden_characters(body, allowed="\n\t"):
         errors.append(gettext("The text contains control characters."))
-    if _looks_like_an_address(body):
+    if looks_like_an_address(body):
         errors.append(_address_message())
     used, marker_errors = _check_placeholders(
         body, {placeholder.name for placeholder in placeholders_of(key)}

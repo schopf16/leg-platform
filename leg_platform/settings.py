@@ -107,8 +107,9 @@ AXES_USERNAME_CALLABLE = "leg_platform.accounts.login_protection.axes_username"
 AXES_USERNAME_FORM_FIELD = "username"
 AXES_USE_ATTEMPT_EXPIRATION = True
 AXES_VERBOSE = False
-# The lockout page is the same for every cause and never shows the submitted value.
-AXES_LOCKOUT_TEMPLATE = "accounts/lockout.html"
+# The lockout page is the same for every cause, never shows the submitted value and is not stored
+# by a browser or proxy (D-067): Axes calls this function instead of its own response.
+AXES_LOCKOUT_CALLABLE = "leg_platform.accounts.axes_handler.lockout_response"
 
 # Login and logout (D-025: the login page is the entry point of the application).
 LOGIN_URL = "accounts:login"

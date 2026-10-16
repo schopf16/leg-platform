@@ -295,9 +295,12 @@ class SecondFactorLoginTests(TestCase):
         responses = [send_code(self.client, "000000") for _ in range(LOGIN_FAILURE_LIMIT)]
 
         self.assertEqual(responses[-1].status_code, 429)
+        # The lockout answer after wrong codes is never stored (security review of unit A, L-4).
+        self.assertIn("no-store", responses[-1]["Cache-Control"])
         response = send_code(self.client, code_for(self.device))
 
         self.assertEqual(response.status_code, 429)
+        self.assertIn("no-store", response["Cache-Control"])
         self.assertNotIn("_auth_user_id", self.client.session)
         # The same account is locked at the password step as well.
         self.assertEqual(log_in(Client(), self.user.email, address="10.1.9.9").status_code, 429)
@@ -1579,6 +1582,7 @@ class CodeBudgetTests(TestCase):
 
         self.assertEqual(response.status_code, 429)
         self.assertContains(response, "pausiert", status_code=429)
+        self.assertIn("no-store", response["Cache-Control"])
         self.assertNotContains(response, "\u00df", status_code=429)
         self.assertContains(response, reverse("accounts:password_reset"), status_code=429)
         self.assertNotIn("_auth_user_id", self.client.session)

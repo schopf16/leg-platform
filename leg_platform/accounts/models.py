@@ -74,6 +74,9 @@ logger = logging.getLogger(__name__)
 EXACT_COLLATION = "utf8mb4_bin"
 
 EMAIL_MAX_LENGTH = 254
+# The longest cleaned name a mail job may hold for the greeting (D-068): first name (30) and last
+# name (30) with one space need 61; a longer result of the cleaning gives the neutral greeting.
+GREETING_NAME_MAX_LENGTH = 64
 
 CUSTOMER_NUMBER_DIGITS = 6
 CUSTOMER_NUMBER_SPACE = 10**CUSTOMER_NUMBER_DIGITS
@@ -928,6 +931,8 @@ class User(AbstractBaseUser, PermissionsMixin):
                 )
             if self._is_system_administrator(stored):
                 self._check_other_system_administrator(using)
+            # The name for the greeting must not outlive the account in a queued job (D-068).
+            self.erase_greeting_names(using)
             return super().delete(using=using, keep_parents=keep_parents)
 
     def discard_email_change_requests(self, using=None):
@@ -960,11 +965,47 @@ class User(AbstractBaseUser, PermissionsMixin):
                 account.discard_email_change_requests(using)
             self.refresh_from_db(using=using)
 
+    def erase_greeting_names(self, using=None):
+        """Blank the name for the greeting in the queued notifications to the addresses of the
+        account (D-068).
+
+        Called where the account is deleted or deactivated on the person's or an administrator's
+        request: the name is personal data that must not outlive the account in a job that the
+        worker has not sent yet. The notices are still sent, with the neutral greeting. The
+        addresses are read from the stored row and compared normalised, like everywhere else.
+        """
+        using = using or self._state.db or router.db_for_write(type(self), instance=self)
+        row = (
+            type(self)
+            ._base_manager.using(using)
+            .filter(pk=self.pk)
+            .values("email", "secondary_email")
+            .first()
+        )
+        if row is None:
+            return 0
+        wanted = {
+            normalize_email_address(address)
+            for address in (row["email"], row["secondary_email"])
+            if address
+        }
+        job_ids = [
+            pk
+            for pk, address in MailJob.objects.using(using)
+            .exclude(greeting_name="")
+            .values_list("pk", "address")
+            if normalize_email_address(address) in wanted
+        ]
+        return MailJob.objects.using(using).filter(pk__in=job_ids).update(greeting_name="")
+
     def delete_or_deactivate(self):
         """Apply the account deletion rule: retain-and-deactivate, otherwise erase (D-016)."""
         using = self._state.db or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
             account = type(self)._base_manager.using(using).select_for_update().get(pk=self.pk)
+            # Before the second address goes: the queued notifications to both addresses lose
+            # the name, also if the account is kept under the retention obligation (D-068).
+            account.erase_greeting_names(using)
             # The second address and the requests for new addresses are no longer needed, also
             # for an account that is kept under the retention obligation (D-059). The links of
             # a change in progress hold the proposed address; they go as well (security review
@@ -1396,6 +1437,12 @@ class MailJob(models.Model):
         blank=True,
         editable=False,
         related_name="mail_jobs",
+    )
+    # The cleaned name of the person for the greeting of a notification (D-068), captured once when
+    # the job is queued and only for an address that belongs to the account at that time. Empty
+    # means the neutral greeting. It is personal data: it lives and dies with the job. Never logged.
+    greeting_name = models.CharField(
+        max_length=GREETING_NAME_MAX_LENGTH, blank=True, default="", editable=False
     )
     # A request above a limit is stored like any other and discarded by the worker.
     suppressed = models.BooleanField(default=False, editable=False)

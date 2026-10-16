@@ -37,7 +37,7 @@
         <a class="frame-logo" href="{% url 'home' %}"><span class="logo-plate">{% include "_brand.html" %}</span></a>
         {% if user.is_authenticated %}
           <span class="frame-name">{{ user.display_name }}</span>
-          {% if frame_restricted and not request.no_referrer_page %}
+          {% if frame_restricted %}
             <form method="post" action="{% url 'accounts:logout' %}" class="frame-logout">
               {% csrf_token %}
               <button type="submit" class="btn btn-secondary-action">{% translate "Log out" %}</button>

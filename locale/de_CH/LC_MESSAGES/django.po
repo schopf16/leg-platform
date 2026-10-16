@@ -372,8 +372,8 @@ msgstr "Das Adressverzeichnis ist nicht verfügbar."
 msgid "The import runs in a separate background worker. Addresses already entered are not changed."
 msgstr "Der Import läuft in einem separaten Hintergrundprozess. Bereits eingegebene Adressen werden nicht verändert."
 
-msgid "This address was not found in the official directory. Please check street, house number, postal code and town. You can still save it as entered."
-msgstr "Diese Adresse wurde im amtlichen Verzeichnis nicht gefunden. Bitte prüfen Sie Strasse, Hausnummer, PLZ und Ort. Sie können sie trotzdem so speichern, wie Sie sie eingegeben haben."
+msgid "This address was not found. Please check street, house number, postal code and town. You can still save it as entered."
+msgstr "Diese Adresse wurde nicht gefunden. Bitte prüfen Sie Strasse, Hausnummer, PLZ und Ort. Sie können sie trotzdem so speichern, wie Sie sie eingegeben haben."
 
 msgid "Too many import requests. Please try again later."
 msgstr "Zu viele Importanfragen. Bitte versuchen Sie es später erneut."
@@ -889,14 +889,8 @@ msgstr ""
 
 #: leg_platform/accounts/templates/accounts/email/password_changed.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"The password of your account at %(instance_name)s was changed. All other sessions were ended."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Das Passwort Ihres Kontos bei %(instance_name)s wurde geändert. Alle anderen Sitzungen wurden beendet."
+msgid "The password of your account at %(instance_name)s was changed. All other sessions were ended."
+msgstr "Das Passwort Ihres Kontos bei %(instance_name)s wurde geändert. Alle anderen Sitzungen wurden beendet."
 
 #, python-format
 msgid ""
@@ -1056,14 +1050,10 @@ msgstr "Für Ihr Konto bei %(instance_name)s wurden falsche Codes eingegeben"
 #: leg_platform/accounts/templates/accounts/email/code_attempts_warning.txt
 #, python-format
 msgid ""
-"Hello\n"
-"\n"
 "Several wrong codes were entered for your account at %(instance_name)s after the correct password was given. Code entry is paused if this continues.\n"
 "\n"
 "If this was you, check that the clock of your phone is set automatically. If it was not you, someone may know your password: choose a new password with \"Forgot password\" on the login page."
 msgstr ""
-"Guten Tag\n"
-"\n"
 "Für Ihr Konto bei %(instance_name)s wurden mehrere falsche Codes eingegeben, nachdem das richtige Passwort angegeben worden war. Wenn das so weitergeht, wird die Code-Eingabe pausiert.\n"
 "\n"
 "Wenn Sie das waren, prüfen Sie, ob die Uhr Ihres Telefons automatisch eingestellt ist. Wenn Sie es nicht waren, kennt möglicherweise jemand Ihr Passwort: Wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
@@ -1100,14 +1090,8 @@ msgstr "Bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt"
 
 #: leg_platform/accounts/templates/accounts/email/two_factor_enabled.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or an recovery code, to log in."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
+msgid "Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or a recovery code, to log in."
+msgstr "Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
 
 #, python-format
 msgid ""
@@ -1124,14 +1108,8 @@ msgstr "Wenn Sie das nicht veranlasst haben, wenden Sie sich sofort an die Betre
 
 #: leg_platform/accounts/templates/accounts/email/two_factor_disabled.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"Two-factor authentication was turned off for your account at %(instance_name)s. All recovery codes became invalid."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) ausgeschaltet. Alle Wiederherstellungscodes sind ungültig geworden."
+msgid "Two-factor authentication was turned off for your account at %(instance_name)s. All recovery codes became invalid."
+msgstr "Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) ausgeschaltet. Alle Wiederherstellungscodes sind ungültig geworden."
 
 #, python-format
 msgid "A recovery code was used at %(instance_name)s"
@@ -1139,25 +1117,13 @@ msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
 
 #: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
+msgid "A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
+msgstr "Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
 
 #: leg_platform/accounts/templates/accounts/email/recovery_codes_renewed.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"New recovery codes were created for your account at %(instance_name)s. The earlier recovery codes became invalid."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Für Ihr Konto bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt. Die früheren Wiederherstellungscodes sind ungültig geworden."
+msgid "New recovery codes were created for your account at %(instance_name)s. The earlier recovery codes became invalid."
+msgstr "Für Ihr Konto bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt. Die früheren Wiederherstellungscodes sind ungültig geworden."
 
 msgid "Confirm sign-in"
 msgstr "Anmeldung bestätigen"
@@ -1306,8 +1272,6 @@ msgstr "Die Zwei-Faktor-Anmeldung (2FA) bei %(instance_name)s wurde zurückgeset
 #: leg_platform/accounts/templates/accounts/email/two_factor_reset_link.txt
 #, python-format
 msgid ""
-"Hello\n"
-"\n"
 "The operator started the removal of two-factor authentication for your account at %(instance_name)s.\n"
 "\n"
 "To remove it, open this link within %(lifetime_hours)s hours:\n"
@@ -1316,8 +1280,6 @@ msgid ""
 "\n"
 "The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged."
 msgstr ""
-"Guten Tag\n"
-"\n"
 "Die Betreiber haben das Entfernen der Zwei-Faktor-Anmeldung (2FA) für Ihr Konto bei %(instance_name)s veranlasst.\n"
 "\n"
 "Um sie zu entfernen, öffnen Sie innerhalb von %(lifetime_hours)s Stunden diesen Link:\n"
@@ -1328,14 +1290,8 @@ msgstr ""
 
 #: leg_platform/accounts/templates/accounts/email/two_factor_reset.txt
 #, python-format
-msgid ""
-"Hello\n"
-"\n"
-"Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Anmeldung erneut einrichten."
+msgid "Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
+msgstr "Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Anmeldung erneut einrichten."
 
 #, python-format
 msgid ""
@@ -1593,12 +1549,12 @@ msgid "The codes could not be copied. Please write them down."
 msgstr "Die Codes konnten nicht kopiert werden. Bitte schreiben Sie sie auf."
 
 #, python-format
-msgid "You used an recovery code. %(count)d code is left. You can create new codes in your profile."
-msgid_plural "You used an recovery code. %(count)d codes are left. You can create new codes in your profile."
+msgid "You used a recovery code. %(count)d code is left. You can create new codes in your profile."
+msgid_plural "You used a recovery code. %(count)d codes are left. You can create new codes in your profile."
 msgstr[0] "Sie haben einen Wiederherstellungscode verwendet. Es ist noch %(count)d Code übrig. Neue Codes können Sie in Ihrem Profil erstellen."
 msgstr[1] "Sie haben einen Wiederherstellungscode verwendet. Es sind noch %(count)d Codes übrig. Neue Codes können Sie in Ihrem Profil erstellen."
 
-msgid "You used an recovery code. You have no recovery codes left. Create new codes in your profile."
+msgid "You used a recovery code. You have no recovery codes left. Create new codes in your profile."
 msgstr "Sie haben einen Wiederherstellungscode verwendet. Sie haben keine Wiederherstellungscodes mehr. Erstellen Sie in Ihrem Profil neue Codes."
 
 msgid "Please tick the box to confirm that you want to delete your account."
@@ -1757,14 +1713,8 @@ msgstr "Hinweis: zweite E-Mail-Adresse geändert"
 msgid "The second email address at %(instance_name)s was changed"
 msgstr "Die zweite E-Mail-Adresse bei %(instance_name)s wurde geändert"
 
-msgid ""
-"Hello\n"
-"\n"
-"The second email address for your account at %(instance_name)s was changed."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Die zweite E-Mail-Adresse für Ihr Konto bei %(instance_name)s wurde geändert."
+msgid "The second email address for your account at %(instance_name)s was changed."
+msgstr "Die zweite E-Mail-Adresse für Ihr Konto bei %(instance_name)s wurde geändert."
 
 msgid "Second address confirmed"
 msgstr "Zweite Adresse bestätigt"
@@ -1813,8 +1763,11 @@ msgid_plural "We send you a link. It is valid for %(counter)s hours."
 msgstr[0] "Wir senden Ihnen einen Link. Er ist %(counter)s Stunde gültig."
 msgstr[1] "Wir senden Ihnen einen Link. Er ist %(counter)s Stunden gültig."
 
-msgid "The link has expired or was already used. Request a new link."
-msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Fordern Sie einen neuen Link an."
+msgid "The link has expired or was already used. If you have already registered, go to the login. Otherwise request a new link."
+msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie sich bereits registriert haben, melden Sie sich an. Andernfalls fordern Sie einen neuen Link an."
+
+msgid "The link has expired or was already used. If you have already chosen a new password, go to the login. Otherwise request a new link."
+msgstr "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie bereits ein neues Passwort gewählt haben, melden Sie sich an. Andernfalls fordern Sie einen neuen Link an."
 
 msgid "Send new link"
 msgstr "Neuen Link senden"
@@ -1840,6 +1793,20 @@ msgstr "Passwort festlegen"
 # The profile in cards and the second address (D-059)
 msgid "Personal link that stops the requested change of an email address."
 msgstr "Persönlicher Link, der die beantragte Änderung einer E-Mail-Adresse stoppt."
+
+msgid "Greeting with the name of the person the account belongs to, or a neutral greeting if no suitable name is known. Best written on a line of its own at the start."
+msgstr "Anrede mit dem Namen der Person, der das Konto gehört, oder eine neutrale Anrede, wenn kein passender Name bekannt ist. Am besten auf einer eigenen Zeile am Anfang."
+
+msgid "Neutral greeting without a name: the name of a deleted account is not kept. The preview and the test email show the same. Best written on a line of its own at the start."
+msgstr "Neutrale Anrede ohne Namen: Der Name eines gelöschten Kontos wird nicht aufbewahrt. Die Vorschau und die Test-E-Mail zeigen dasselbe. Am besten auf einer eigenen Zeile am Anfang."
+
+#: leg_platform/accounts/greeting.py
+msgid "Hello"
+msgstr "Guten Tag"
+
+#, python-format
+msgid "Hello %(name)s"
+msgstr "Guten Tag %(name)s"
 
 msgid "Confirm your second email address at %(instance_name)s"
 msgstr "Bestätigen Sie Ihre zweite E-Mail-Adresse bei %(instance_name)s"
@@ -1919,40 +1886,24 @@ msgstr "Ihre Angaben sind entfernt. Sie sind abgemeldet. Falls Sie wieder teilne
 msgid "To the start page"
 msgstr "Zur Startseite"
 
-msgid ""
-"Hello\n"
-"\n"
-"Your account at %(instance_name)s and your personal details were deleted. Invoices and booking records are kept for as long as the law requires."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Ihr Konto bei %(instance_name)s und Ihre persönlichen Angaben wurden gelöscht. Rechnungen und Buchungsbelege bewahren wir so lange auf, wie das Gesetz es verlangt."
+msgid "Your account at %(instance_name)s and your personal details were deleted. Invoices and booking records are kept for as long as the law requires."
+msgstr "Ihr Konto bei %(instance_name)s und Ihre persönlichen Angaben wurden gelöscht. Rechnungen und Buchungsbelege bewahren wir so lange auf, wie das Gesetz es verlangt."
 
 msgid ""
-"Hello\n"
-"\n"
 "A change of an email address was requested for your account at %(instance_name)s. Until the new address is confirmed, which is possible for %(lifetime_hours)s hours, your current addresses stay valid.\n"
 "\n"
 "Did you not request this change? Then click here to stop it at once:\n"
 "\n"
 "%(stop_url)s"
 msgstr ""
-"Guten Tag\n"
-"\n"
 "Für Ihr Konto bei %(instance_name)s wurde die Änderung einer E-Mail-Adresse beantragt. Bis die neue Adresse bestätigt ist, was %(lifetime_hours)s Stunden lang möglich ist, gelten Ihre bisherigen Adressen weiter.\n"
 "\n"
 "Haben Sie diese Änderung nicht veranlasst? Dann klicken Sie hier, um sie sofort zu stoppen:\n"
 "\n"
 "%(stop_url)s"
 
-msgid ""
-"Hello\n"
-"\n"
-"The email address for your account at %(instance_name)s was changed. You have to log in again."
-msgstr ""
-"Guten Tag\n"
-"\n"
-"Die E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Sie müssen sich erneut anmelden."
+msgid "The email address for your account at %(instance_name)s was changed. You have to log in again."
+msgstr "Die E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Sie müssen sich erneut anmelden."
 
 msgid ""
 "Hello\n"
@@ -2119,10 +2070,10 @@ msgid "Too many requests, please try again later."
 msgstr "Zu viele Anfragen, bitte versuchen Sie es später erneut."
 
 msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator: you find the contact details on <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. The removal can be started again there."
-msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die LEG: Die Kontaktangaben finden Sie auf <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. Dort kann das Entfernen erneut veranlasst werden."
+msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die Betreiber: Die Kontaktangaben finden Sie auf <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. Dort kann das Entfernen erneut veranlasst werden."
 
 msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator of this portal. The removal can be started again there."
-msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die LEG. Dort kann das Entfernen erneut veranlasst werden."
+msgstr "Dieser Link ist nicht mehr gültig oder abgelaufen. Wenn Sie die Zwei-Faktor-Anmeldung dennoch entfernen müssen, wenden Sie sich an die Betreiber. Dort kann das Entfernen erneut veranlasst werden."
 
 msgid "This page no longer exists."
 msgstr "Diese Seite gibt es nicht mehr."
@@ -2359,28 +2310,20 @@ msgstr "Eine Sitzung bei %(instance_name)s wurde beendet"
 
 #, python-format
 msgid ""
-"Hello\n"
-"\n"
 "Unusual entries were made in a session of your account at %(instance_name)s: several wrong codes or passwords were entered where a confirmation asks for them. For your safety the session was ended.\n"
 "\n"
 "If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with \"Forgot password\" on the login page."
 msgstr ""
-"Guten Tag\n"
-"\n"
 "In einer Sitzung Ihres Kontos bei %(instance_name)s wurden ungewöhnliche Eingaben gemacht: Es wurden mehrmals falsche Codes oder Passwörter eingegeben, wo eine Bestätigung sie verlangt. Zu Ihrer Sicherheit wurde die Sitzung beendet.\n"
 "\n"
 "Wenn Sie das waren, können Sie sich wieder anmelden. Wenn Sie es nicht waren, hat möglicherweise jemand Zugriff auf ein Gerät, auf dem Sie angemeldet sind: Wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
 
 #, python-format
 msgid ""
-"Hello\n"
-"\n"
 "Several wrong codes or passwords were entered in the confirmations of your account at %(instance_name)s within a short time. For your safety all sessions of your account were ended, on every device.\n"
 "\n"
 "If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with \"Forgot password\" on the login page."
 msgstr ""
-"Guten Tag\n"
-"\n"
 "In den Bestätigungen Ihres Kontos bei %(instance_name)s wurden innert kurzer Zeit mehrere falsche Codes oder Passwörter eingegeben. Zu Ihrer Sicherheit wurden alle Sitzungen Ihres Kontos beendet, auf jedem Gerät.\n"
 "\n"
 "Wenn Sie das waren, können Sie sich wieder anmelden. Wenn Sie es nicht waren, hat möglicherweise jemand Zugriff auf ein Gerät, auf dem Sie angemeldet sind: Wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."

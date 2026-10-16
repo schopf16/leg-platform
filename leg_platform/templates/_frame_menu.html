@@ -2,8 +2,7 @@
 The entries of the menu, shared by the left menu of the desktop and the menu of the phone
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
 (team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
-aria-current. Log out is a real POST form; it is left out on a page that sends no referrer (a form
-there would be refused by the CSRF check, D-054). "Administration" is only for staff users (K13);
+aria-current. Log out is a real POST form. "Administration" is only for staff users (K13);
 the permissions are checked by the administration itself.
 {% endcomment %}{% with view=request.resolver_match.view_name %}
 <p class="frame-group">{% translate "My area" %}</p>
@@ -36,14 +35,12 @@ the permissions are checked by the administration itself.
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
 <div class="frame-menu-foot">
-  {% if not request.no_referrer_page %}
-    <form method="post" action="{% url 'accounts:logout' %}">
-      {% csrf_token %}
-      <button type="submit" class="frame-item">
-        <svg class="frame-icon" aria-hidden="true"><use href="#i-logout"/></svg><span>{% translate "Log out" %}</span>
-      </button>
-    </form>
-  {% endif %}
+  <form method="post" action="{% url 'accounts:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="frame-item">
+      <svg class="frame-icon" aria-hidden="true"><use href="#i-logout"/></svg><span>{% translate "Log out" %}</span>
+    </button>
+  </form>
   <div class="frame-legal">
     {% if instance_privacy_url %}<a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>{% else %}<span>{% translate "Privacy notice" %}</span>{% endif %}
     {% if instance_imprint_url %}<a href="{{ instance_imprint_url }}" target="_blank" rel="noopener noreferrer">{% translate "Legal notice" %}</a>{% else %}<span>{% translate "Legal notice" %}</span>{% endif %}

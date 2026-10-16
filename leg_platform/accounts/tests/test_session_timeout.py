@@ -15,6 +15,7 @@ from leg_platform.accounts.tests.helpers import (
     VerifiedClient,
     create_active_user,
 )
+from leg_platform.tests.test_instance_configuration import token_routes
 
 START = 1_000_000.0
 MINUTE = 60
@@ -117,11 +118,17 @@ class SessionTimeoutTests(TestCase):
         self.assertTrue(User.objects.get(pk=self.user.pk).check_password(PASSWORD))
 
     def test_a_link_with_a_token_is_not_put_into_the_login_url(self):
+        # Every route with a token of the URL configuration (the five links of an email), not
+        # a list that has to be kept up to date (security review of unit A, L-3).
+        routes = token_routes()
+        self.assertGreaterEqual(len(routes), 5, routes)
         self.open_session(self.user)
-        url = reverse("accounts:two_factor_reset_verify", args=["x" * 43])
-        response = self.get(31 * MINUTE, url)
-        self.assertEnded(response)
-        self.assertNotIn("next=", response["Location"])
+        for route, path in routes:
+            with self.subTest(route=route):
+                response = self.get(31 * MINUTE, path)
+                self.assertEnded(response)
+                self.assertNotIn("next=", response["Location"])
+                self.open_session(self.user)
 
     def test_a_logged_in_session_without_the_times_is_ended(self):
         self.open_session(self.user)

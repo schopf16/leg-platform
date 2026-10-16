@@ -598,6 +598,8 @@ class AccountDeleteView(ProfileCardView):
         addresses = user.notification_addresses()
         try:
             with transaction.atomic():
+                # delete_or_deactivate also blanks the name in the queued notifications of the
+                # account (D-068); they are still sent, with the neutral greeting.
                 outcome = user.delete_or_deactivate()
                 event = (
                     SecurityEvent.Event.ACCOUNT_DEACTIVATED

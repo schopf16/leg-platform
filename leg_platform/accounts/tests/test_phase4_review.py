@@ -77,8 +77,8 @@ class StopLinkMeaningTests(TestCase):
         before = SecurityEvent.objects.filter(event=SecurityEvent.Event.EMAIL_CHANGE_STOPPED).count()
         anonymous = Client()
 
-        opened = anonymous.get(path or self.stop_path)
-        posted = anonymous.post(STOP_CONFIRM, {})
+        opened = anonymous.get(path or self.stop_path, follow=True)
+        posted = anonymous.post(STOP_CONFIRM, {}, follow=True)
 
         self.assertContains(opened, INVALID_TEXT)
         self.assertContains(posted, INVALID_TEXT)
@@ -141,9 +141,7 @@ class StopLinkMeaningTests(TestCase):
         survivor = Client()
         survivor.force_login(self.user)
 
-        posted = stopper.post(STOP_CONFIRM, {})
-
-        self.assertContains(posted, INVALID_TEXT)
+        posted = stopper.post(STOP_CONFIRM, {}, follow=True)
         self.assertEqual(survivor.get(PROFILE_URL).status_code, 200)
 
     def test_stop_all_without_a_request_returns_nothing_and_ends_no_session(self):

@@ -1,6 +1,6 @@
-{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{{ greeting }}
 
-The second email address for your account at {{ instance_name }} was changed.{% endblocktranslate %}
+{% blocktranslate %}The second email address for your account at {{ instance_name }} was changed.{% endblocktranslate %}
 
 {% if contact_url %}{% blocktranslate %}If you did not request this change, contact the operator immediately. You will find contact information here:
 

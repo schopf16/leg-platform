@@ -168,7 +168,7 @@ class AdministrationResetTests(TestCase):
         self.assertFalse(has_second_factor(self.user))
         # The consumed link cannot be used again, not even from the remembered session.
         self.assertContains(Client().get(second, follow=True), "Link nicht mehr gültig")
-        self.assertContains(owner.post(confirm), "Link nicht mehr gültig")
+        self.assertContains(owner.post(confirm, follow=True), "Link nicht mehr gültig")
 
     def test_an_expired_link_is_not_valid(self):
         self.client.force_login(self.administrator)

@@ -190,7 +190,7 @@ def lookup(values, *, mode="suggest"):
             if not result["match"] and not directory.is_stale:
                 # A directory that is more than 92 days old may lack a new address: no notice then.
                 result["warning"] = _(
-                    "This address was not found in the official directory. Please check street, "
+                    "This address was not found. Please check street, "
                     "house number, postal code and town. You can still save it as entered."
                 )
         elif len(values["street"]) >= 2:

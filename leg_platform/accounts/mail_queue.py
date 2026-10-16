@@ -29,6 +29,7 @@ from django.utils import timezone
 
 from leg_platform.accounts import (
     emails,
+    greeting,
     password_reset,
     rate_limits,
     registration,
@@ -49,9 +50,15 @@ STALE_AFTER = timedelta(hours=1)
 NOTIFICATION_STALE_AFTER = timedelta(hours=24)
 
 
-def _notification(sender):
-    """A handler for an email that tells the owner of an account about a change."""
-    return lambda address: lambda: sender(address)
+def _notification(sender, greets=True):
+    """A handler for an email that tells the owner of an account about a change.
+
+    The handler gets the cleaned name that was stored in the job (D-068). The notice about a
+    deleted account passes no name on: it is always neutral.
+    """
+    if greets:
+        return lambda address, greeting_name="": lambda: sender(address, greeting_name)
+    return lambda address, greeting_name="": lambda: sender(address)
 
 
 HANDLERS = {
@@ -68,7 +75,7 @@ HANDLERS = {
     MailJob.Kind.RECOVERY_CODE_USED: _notification(emails.send_recovery_code_used),
     MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
     MailJob.Kind.TWO_FACTOR_RESET: _notification(emails.send_two_factor_reset),
-    MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted),
+    MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted, greets=False),
 }
 
 # Handlers of jobs about an account get the account key and the address of the request (D-044).
@@ -149,11 +156,27 @@ def submit_mail_request(request, kind, email, *, account=None):
     return True
 
 
-def enqueue(kind, address, account=None):
-    """Queue an email that no request limit applies to (e.g. a notification)."""
+def enqueue(kind, address, account=None, greeting_name=""):
+    """Queue an email that no request limit applies to (e.g. a notification).
+
+    ``greeting_name`` is the cleaned name for the greeting of a notification (D-068); callers
+    other than ``enqueue_for_account`` leave it empty, which means the neutral greeting. A name
+    for any other kind (a request, which has no account) or for the notice about a deleted
+    account is dropped here, so that no caller can store a name that is never used.
+    """
+    if kind not in MailJob.NOTIFICATION_KINDS or kind == MailJob.Kind.ACCOUNT_DELETED:
+        greeting_name = ""
     MailJob.objects.create(
-        kind=kind, address=address, account=account, next_attempt_at=timezone.now()
+        kind=kind,
+        address=address,
+        account=account,
+        greeting_name=greeting_name,
+        next_attempt_at=timezone.now(),
     )
+
+
+# The jobs that keep the account key, because the worker makes a personal link for them.
+ACCOUNT_KEY_KINDS = (MailJob.Kind.EMAIL_CHANGE_NOTICE, MailJob.Kind.TWO_FACTOR_RESET_LINK)
 
 
 def enqueue_for_account(kind, user, addresses=None):
@@ -161,12 +184,28 @@ def enqueue_for_account(kind, user, addresses=None):
 
     The login address and the confirmed second address by default, or the addresses that the
     caller names (e.g. the addresses before a change). One job per address: a failing delivery to
-    one address does not hold back the other. A notice about a requested change keeps the account
-    key, because the worker makes a personal link for it.
+    one address does not hold back the other. A notice about a requested change and the link to
+    remove the second factor keep the account key, because the worker makes a personal link.
+
+    This is the single place that captures the name for the greeting (D-068): the cleaned name
+    of the account at this time, stored in the job, and only for an address that belongs to the
+    account now (so not for the former login address, a removed second address, or any address
+    after the account was deleted). The notice about a deleted account never gets a name.
     """
-    with_account = user if kind == MailJob.Kind.EMAIL_CHANGE_NOTICE else None
+    with_account = user if kind in ACCOUNT_KEY_KINDS else None
+    name = ""
+    current = set()
+    if kind in MailJob.NOTIFICATION_KINDS and kind != MailJob.Kind.ACCOUNT_DELETED:
+        name = greeting.name_for(user)
+        current = {normalize_email_address(address) for address in user.notification_addresses()}
     for address in addresses if addresses is not None else user.notification_addresses():
-        enqueue(kind, address, account=with_account)
+        belongs = normalize_email_address(address) in current
+        enqueue(
+            kind,
+            address,
+            account=with_account,
+            greeting_name=name if belongs else "",
+        )
 
 
 def process_pending(limit=50):
@@ -190,7 +229,8 @@ def process_pending(limit=50):
 
 
 def _claim():
-    """Take the next due job; return (id, kind, address, account id), DONE/FAILED if discarded."""
+    """Take the next due job; return (id, kind, address, account id, greeting name), or
+    DONE/FAILED if a job was discarded. The name is personal data and is never logged."""
     now = timezone.now()
     with transaction.atomic():
         job = (
@@ -211,14 +251,14 @@ def _claim():
         job.attempts += 1
         job.next_attempt_at = now + RETRY_DELAY * job.attempts
         job.save(update_fields=["attempts", "next_attempt_at"])
-        return job.pk, job.kind, job.address, job.account_id
+        return job.pk, job.kind, job.address, job.account_id, job.greeting_name
 
 
 def _process_next():
     claimed = _claim()
     if claimed is None or isinstance(claimed, str):
         return claimed
-    job_id, kind, address, account_id = claimed
+    job_id, kind, address, account_id, greeting_name = claimed
     try:
         with transaction.atomic():
             if kind == MailJob.Kind.EMAIL_CHANGE_REQUEST:
@@ -234,10 +274,13 @@ def _process_next():
             elif kind == MailJob.Kind.EMAIL_CHANGE_NOTICE:
                 from leg_platform.accounts import email_change
 
-                send = email_change.process_notice(account_id, address)
+                send = email_change.process_notice(account_id, address, greeting_name)
             elif kind in ACCOUNT_HANDLERS:
-                send = ACCOUNT_HANDLERS[kind](account_id, address)
+                send = ACCOUNT_HANDLERS[kind](account_id, address, greeting_name)
+            elif kind in MailJob.NOTIFICATION_KINDS:
+                send = HANDLERS[kind](address, greeting_name)
             else:
+                # Requests of persons without an account never get a name (D-068).
                 send = HANDLERS[kind](address)
         if send is not None:
             send()

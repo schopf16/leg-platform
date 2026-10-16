@@ -27,6 +27,7 @@ from axes.models import AccessAttempt, AccessFailureLog
 from leg_platform.accounts import (
     email_texts,
     emails,
+    greeting,
     rate_limits,
     second_factor,
     second_factor_reset,
@@ -871,7 +872,14 @@ class EmailTextAdmin(admin.ModelAdmin):
     def _send_test(self, request, obj):
         # Only to the address of the person who asks, never to a typed address.
         try:
-            emails.send_test(request.user.email, obj.key, obj.subject, obj.body)
+            # The real rule of the greeting, applied to the administrator's own account (D-068).
+            emails.send_test(
+                request.user.email,
+                obj.key,
+                obj.subject,
+                obj.body,
+                greeting_name=greeting.name_for(request.user),
+            )
         except Exception as error:  # noqa: BLE001 - any delivery error; only its class is logged
             logger.error("A test email could not be sent: %s.", type(error).__name__)
             self.message_user(request, _("The test email could not be sent."), messages.ERROR)

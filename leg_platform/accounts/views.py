@@ -88,12 +88,12 @@ def no_referrer(view):
     which Django's CSRF check refuses (Fetch standard, "append a request Origin header"; Django
     ``CsrfViewMiddleware._origin_verified``). The pages after the redirect have no token in
     their URL and use the project default ``same-origin`` (docs/DECISIONS.md, D-054).
+
+    Every response of such a view is a redirect (D-067): no page is ever rendered under a token
+    URL, so no template has to leave out its forms for this policy.
     """
 
     def wrapped(request, *args, **kwargs):
-        # Templates of this response leave out forms that post to another URL: with this policy
-        # the browser would send "Origin: null" and the CSRF check would refuse them.
-        request.no_referrer_page = True
         response = view(request, *args, **kwargs)
         response["Referrer-Policy"] = "no-referrer"
         return response
@@ -222,13 +222,13 @@ class SecondFactorLoginView(FormView):
         remaining = totp.remaining_recovery_codes(user)
         if remaining:
             text = ngettext(
-                "You used an recovery code. %(count)d code is left. You can create new codes in your profile.",
-                "You used an recovery code. %(count)d codes are left. You can create new codes in your profile.",
+                "You used a recovery code. %(count)d code is left. You can create new codes in your profile.",
+                "You used a recovery code. %(count)d codes are left. You can create new codes in your profile.",
                 remaining,
             ) % {"count": remaining}
         else:
             text = _(
-                "You used an recovery code. You have no recovery codes left. Create new codes in your profile."
+                "You used a recovery code. You have no recovery codes left. Create new codes in your profile."
             )
         messages.info(self.request, text)
 
@@ -657,13 +657,26 @@ def find_confirmation_token(raw_token=None, digest=None):
     return None
 
 
+class LinkNoLongerValidView(NeverCacheMixin, TemplateView):
+    """The fixed page "Link no longer valid" of a confirmation flow (D-067).
+
+    Every link of an email that is invalid, expired, used or replaced redirects here, so the
+    page is the same for everyone and for every cause: it is not an oracle for tokens, and it
+    reads nothing from the request, the session or the database. The page is a normal page
+    (no token in its URL, project default ``same-origin``). ``template_name`` is set in the URL
+    configuration.
+    """
+
+    http_method_names = ["get", "head"]
+
+
 class EmailChangeVerifyView(TokenPageMixin, View):
     """Opening the link remembers the digest and removes the token from the address bar."""
 
     def get(self, request, token):
         found = find_confirmation_token(raw_token=token)
         if found is None or found.user.status != User.Status.ACTIVE:
-            return render(request, "accounts/email_change_invalid.html")
+            return redirect("accounts:email_change_invalid")
         # A new session ID for the person who opens the link; the data of the session stays.
         request.session.cycle_key()
         request.session[EMAIL_CHANGE_SESSION_KEY] = found.digest
@@ -679,7 +692,9 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
         digest = request.session.get(EMAIL_CHANGE_SESSION_KEY)
         self.token = find_confirmation_token(digest=digest) if digest else None
         if self.token is None or self.token.user.status != User.Status.ACTIVE:
-            return render(request, "accounts/email_change_invalid.html")
+            # A state that is no longer valid is not kept (it is re-validated on every use anyway).
+            request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
+            return redirect("accounts:email_change_invalid")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -695,7 +710,7 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
         user = email_change.confirm_change(self.token)
         self.request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
         if user is None:
-            return render(self.request, "accounts/email_change_invalid.html")
+            return redirect("accounts:email_change_invalid")
         # The result page (WL-18). A login address ends every session of the account, so the
         # person logs in; a second address changes nothing about the sessions.
         if secondary:
@@ -724,7 +739,7 @@ class EmailChangeStopVerifyView(TokenPageMixin, View):
             or found.user.status != User.Status.ACTIVE
             or not email_change.has_open_request(found.user)
         ):
-            return render(request, "accounts/email_change_stop_invalid.html")
+            return redirect("accounts:email_change_stop_invalid")
         request.session.cycle_key()
         request.session[EMAIL_CHANGE_STOP_SESSION_KEY] = found.digest
         return redirect("accounts:email_change_stop_confirm")
@@ -751,7 +766,8 @@ class EmailChangeStopConfirmView(NeverCacheMixin, FormView):
             or self.token.user.status != User.Status.ACTIVE
             or not email_change.has_open_request(self.token.user)
         ):
-            return render(request, "accounts/email_change_stop_invalid.html")
+            request.session.pop(EMAIL_CHANGE_STOP_SESSION_KEY, None)
+            return redirect("accounts:email_change_stop_invalid")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -760,7 +776,7 @@ class EmailChangeStopConfirmView(NeverCacheMixin, FormView):
         if stopped is None:
             # The request ended between the page and the button: nothing was stopped, and no
             # session ended.
-            return render(self.request, "accounts/email_change_stop_invalid.html")
+            return redirect("accounts:email_change_stop_invalid")
         return render(self.request, "accounts/email_change_stopped.html")
 
 
@@ -778,7 +794,7 @@ class TwoFactorResetVerifyView(TokenPageMixin, View):
     def get(self, request, token):
         found = second_factor_reset.find_link(token)
         if found is None:
-            return render(request, "accounts/two_factor_reset_invalid.html")
+            return redirect("accounts:two_factor_reset_invalid")
         request.session.cycle_key()
         request.session[TWO_FACTOR_RESET_SESSION_KEY] = found.digest
         return redirect("accounts:two_factor_reset_confirm")
@@ -796,13 +812,15 @@ class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
         digest = request.session.get(TWO_FACTOR_RESET_SESSION_KEY)
         self.token = second_factor_reset.find_link_by_digest(digest) if digest else None
         if self.token is None:
-            return render(request, "accounts/two_factor_reset_invalid.html")
+            request.session.pop(TWO_FACTOR_RESET_SESSION_KEY, None)
+            return redirect("accounts:two_factor_reset_invalid")
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        if second_factor_reset.confirm_link(self.token) is None:
-            return render(self.request, "accounts/two_factor_reset_invalid.html")
+        confirmed = second_factor_reset.confirm_link(self.token)
         self.request.session.pop(TWO_FACTOR_RESET_SESSION_KEY, None)
+        if confirmed is None:
+            return redirect("accounts:two_factor_reset_invalid")
         messages.success(
             self.request,
             _("Two-factor authentication was removed. You can now log in with your password."),

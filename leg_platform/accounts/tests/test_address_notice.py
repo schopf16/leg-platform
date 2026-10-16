@@ -24,7 +24,7 @@ from leg_platform.addresses.models import Address, Directory
 PROFILE_URL = reverse("accounts:profile")
 PROFILE_EDIT_URL = reverse("accounts:profile_edit")
 ADDRESS_DATABASES = {"default", "addresses", "address_import"}
-NOT_FOUND_DE = "Diese Adresse wurde im amtlichen Verzeichnis nicht gefunden."
+NOT_FOUND_DE = "Diese Adresse wurde nicht gefunden."
 # Texts that the pages must never show (D-066): the source of the directory, and the texts for a
 # directory that cannot answer or for a browser without a script.
 FORBIDDEN_TEXTS = (
@@ -103,6 +103,7 @@ class CatalogueTests(SimpleTestCase):
             "Your address could not be checked and is saved as you entered it.",
             "Saved. Please check your address below.",
             'msgid "Check address"',
+            "This address was not found in the official directory.",
         ):
             self.assertNotIn(msgid, PO_FILE)
 

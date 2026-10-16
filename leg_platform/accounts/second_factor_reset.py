@@ -64,10 +64,11 @@ def _lock(*users):
     return [rows.get(user.pk) for user in users]
 
 
-def _enqueue(kind, address, account=None):
-    from leg_platform.accounts.mail_queue import enqueue
+def _enqueue(kind, user, address):
+    # The single place that captures the name for the greeting (D-068).
+    from leg_platform.accounts.mail_queue import enqueue_for_account
 
-    enqueue(kind, address, account=account)
+    enqueue_for_account(kind, user, addresses=[address])
 
 
 def _check_administrator(actor, target):
@@ -117,7 +118,7 @@ def request_link(actor, target):
         _check_administrator(actor_row, target_row)
         if _privileged(target_row):
             raise ResetRefused
-        _enqueue(MailJob.Kind.TWO_FACTOR_RESET_LINK, target_row.email, account=target_row)
+        _enqueue(MailJob.Kind.TWO_FACTOR_RESET_LINK, target_row, target_row.email)
         security_log.record(Event.TWO_FACTOR_RESET_REQUESTED, account=target_row, actor=actor_row)
 
 
@@ -135,7 +136,7 @@ def reset_privileged(actor, target):
         remove_second_factor(target_row, Event.TWO_FACTOR_RESET, actor=actor_row)
 
 
-def process_reset_link(account_id, address):
+def process_reset_link(account_id, address, greeting_name=""):
     """Handle the request for a link in the background worker; return the sending function.
 
     The account is found by the key of the job, not by the address: an address can have been
@@ -159,7 +160,9 @@ def process_reset_link(account_id, address):
         user, VerificationToken.Purpose.TWO_FACTOR_RESET, RESET_LIFETIME
     )
     email = user.email
-    return lambda: emails.send_two_factor_reset_link(email, raw_token, RESET_LIFETIME)
+    return lambda: emails.send_two_factor_reset_link(
+        email, raw_token, RESET_LIFETIME, greeting_name
+    )
 
 
 def find_link(raw_token):

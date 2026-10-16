@@ -1,6 +1,6 @@
-{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{{ greeting }}
 
-A change of an email address was requested for your account at {{ instance_name }}. Until the new address is confirmed, which is possible for {{ lifetime_hours }} hours, your current addresses stay valid.
+{% blocktranslate %}A change of an email address was requested for your account at {{ instance_name }}. Until the new address is confirmed, which is possible for {{ lifetime_hours }} hours, your current addresses stay valid.
 
 Did you not request this change? Then click here to stop it at once:
 
