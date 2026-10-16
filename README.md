@@ -103,7 +103,7 @@ The imprint and the privacy notice are not part of the portal: the portal only l
 
 A. **Verification on a real system**, when nothing is left under "Open now" (cannot be done on the development machine). The operator of stage and production is Infomaniak (owner statement, D-074).
 
-* The push for the CI run: the last passed run is commit `5602760` (2026-10-14, run 38630847244, both jobs: minimum with Python 3.12, Django 6.0 and MariaDB 10.11; latest with Python 3.14, Django 6.1 and MariaDB 12.3). Every later code change needs a new CI run. The MariaDB-tagged tests run only there.
+* The push for the CI run (done by the owner from another computer, not by the agents): the last passed run is commit `5602760` (2026-10-14, run 38630847244, both jobs: minimum with Python 3.12, Django 6.0 and MariaDB 10.11; latest with Python 3.14, Django 6.1 and MariaDB 12.3). Every later code change needs a new CI run. The MariaDB-tagged tests run only there.
 * Inspect the existing stage setup once and record it (D-064).
 * Microsoft Graph delivery with real credentials and the Entra/Exchange setup. Afterwards open one link mail in Outlook, Apple Mail, Gmail and a Swiss webmail and click the link (plain text mails, D-069).
 * Address directory: a real import into its own SQLite file (time, file size, `StateDirectory=` and the file modes on Linux); the query plans of the lookup with the real directory (`docs/DEPLOYMENT.md` section 10.2); the bounds 1000 streets, 300 comparisons, 0.25 s and the threshold 0.75 are not measured against the real directory; `AXES_IPWARE_PROXY_COUNT` must be correct (`docs/INSTALLATION.md`).
