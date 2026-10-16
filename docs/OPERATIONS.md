@@ -67,7 +67,7 @@ Status: **NOT YET VERIFIED** (the Git remote has not been checked)
 
 ### C. What the automatic checks (CI) do
 
-Status: the workflow file was read on 2026-10-14. A CI run for the current code is **NOT YET VERIFIED**.
+Status: the workflow file was read on 2026-10-14.
 
 The file is `.github/workflows/ci.yml`.
 
@@ -264,7 +264,7 @@ Each item must be decided or answered before the step that depends on it.
 Read on 2026-10-14. Only the parts named here were used.
 
 * `AGENTS.md`, `CLAUDE.md`: rules on secrets, language, verification and the security keeper role.
-* `README.md`: project status, the deployment gates ("Current Status"), the CI run recorded for commit 8da72f3, the open items.
+* `README.md`: project status, the deployment gates ("Current Status"), the open items.
 * `docs/INSTALLATION.md`: local setup, "Database privileges", "Changing `SECRET_KEY`", "Trusted Proxies for Login IP Protection", the cleanup command, the note that stage and production steps are not yet documented. Local setup steps are for development only.
 * `docs/SECURITY.md`: sections 3, 7, 8, 9, 10 (secrets, credentials per instance, backups, deployment checks).
 * `docs/DECISIONS.md`: D-008 (hosting), D-020 (no production or stage secrets on development machines), D-027 (environment variables, public repository, CI), D-028 (settings defaults, HSTS), D-033 (address validation), D-041 and D-042 (scheduled tasks, first administrator, second factor), D-044 (emergency procedure), D-049 and D-050 (address register).
