@@ -1,10 +1,15 @@
 """Tests of the environment validation (docs/SECURITY.md, sections 3, 6 and 11)."""
 
+import os
+import tempfile
+from pathlib import Path
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from leg_platform.environment import (
     DEFAULT_HSTS_SECONDS,
+    REPOSITORY_ROOT,
     email_backend,
     load_environment,
     security_settings,
@@ -440,6 +445,72 @@ class AllowedRecipientsTests(SimpleTestCase):
             config.email_allowed_recipients,
             ("a.tester+dev@example.org", "b@mail.test", "c@host.invalid"),
         )
+
+
+class AddressDirectoryFileTests(SimpleTestCase):
+    """ADDRESS_DIRECTORY_FILE: the own SQLite file of the address directory (D-075)."""
+
+    def test_the_defaults(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                self.assertEqual(
+                    load_environment(make_env(app_env)).address_directory_file,
+                    "/var/lib/leg-platform/address-directory.sqlite3",
+                )
+        local = Path(load_environment(make_env("local")).address_directory_file)
+        self.assertEqual(local, Path.home() / ".leg-platform-dev" / "address-directory.sqlite3")
+        self.assertNotIn(REPOSITORY_ROOT, local.resolve().parents)
+        self.assertEqual(
+            load_environment(make_env("local", ADDRESS_DIRECTORY_FILE="   ")).address_directory_file, str(local),
+        )
+
+    def test_the_default_is_the_same_for_every_missing_or_empty_value(self):
+        self.assertEqual(
+            load_environment(make_env("production", ADDRESS_DIRECTORY_FILE="")).address_directory_file,
+            "/var/lib/leg-platform/address-directory.sqlite3",
+        )
+
+    def test_a_configured_absolute_path_outside_the_repository_is_accepted_and_nothing_is_created(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = str(Path(folder) / "state" / "directory.sqlite3")
+            for app_env in ("local", "stage", "production"):
+                with self.subTest(app_env=app_env):
+                    config = load_environment(make_env(app_env, ADDRESS_DIRECTORY_FILE=path))
+                    self.assertEqual(config.address_directory_file, path)
+            self.assertFalse((Path(folder) / "state").exists())
+
+    def test_relative_paths_and_non_paths_are_refused(self):
+        for value in ("directory.sqlite3", "./directory.sqlite3", "var/lib/x.sqlite3", ":memory:",
+                      "file:directory.sqlite3?mode=ro", "~/directory.sqlite3", "..\\x"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "ADDRESS_DIRECTORY_FILE must be an absolute path"):
+                    load_environment(make_env(ADDRESS_DIRECTORY_FILE=value))
+
+    def test_paths_with_control_characters_are_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for character in ("\x00", "\n", "\r", "\t", "\x1b", "\u200b", "\u202e", "\u2028"):
+                with self.subTest(character=repr(character)):
+                    with self.assertRaisesMessage(ImproperlyConfigured, "control characters"):
+                        load_environment(make_env(ADDRESS_DIRECTORY_FILE=str(Path(folder) / f"a{character}b.sqlite3")))
+
+    def test_a_path_inside_the_repository_is_refused_also_through_dot_dot_and_a_link_free_spelling(self):
+        for value in (
+            str(REPOSITORY_ROOT / "directory.sqlite3"),
+            str(REPOSITORY_ROOT / "leg_platform" / "x" / "directory.sqlite3"),
+            str(REPOSITORY_ROOT / "docs" / ".." / "directory.sqlite3"),
+            str(REPOSITORY_ROOT),
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(ImproperlyConfigured) as error:
+                    load_environment(make_env(ADDRESS_DIRECTORY_FILE=value))
+                self.assertNotIn(str(REPOSITORY_ROOT), str(error.exception))
+
+    def test_a_folder_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for value in (folder, folder + os.sep):
+                with self.subTest(value=value):
+                    with self.assertRaisesMessage(ImproperlyConfigured, "not a folder"):
+                        load_environment(make_env(ADDRESS_DIRECTORY_FILE=value))
 
 
 class DatabaseSettingsTests(SimpleTestCase):

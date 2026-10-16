@@ -1,23 +1,40 @@
-"""Application-DB queue, consumed only by the isolated importer worker."""
+"""Queue of the address directory import, consumed only by the worker process (D-075).
+
+The admin view calls ``request_import`` only, which writes the queue row. ``process_one`` is
+called only by the management command ``process_address_imports``; the web process never
+downloads or imports anything.
+"""
 
 import logging
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from .models import APPLICATION_ALIAS, ImportRequest
+from .models import Directory, ImportRequest
 
 logger = logging.getLogger(__name__)
 AUTOMATIC_INTERVAL = timedelta(days=90)
+# While the directory is missing or empty (a new instance, a restore: the file is not part of the
+# backup, D-075), the automatic attempt is due again after this time instead of after 90 days, so
+# that the suggestions come back without anyone pressing the button (security review of D-075, M-5).
+EMPTY_DIRECTORY_INTERVAL = timedelta(hours=24)
+
+
+def directory_is_empty():
+    """True when there is no published directory: no row, no addresses, or a file that cannot be read."""
+    try:
+        return not Directory.objects.filter(pk=1, row_count__gt=0).exists()
+    except DatabaseError:
+        return True
 
 
 def request_import():
     """Coalesce pending/running clicks; completed manual imports may retry."""
     now = timezone.now()
-    with transaction.atomic(using=APPLICATION_ALIAS):
-        ImportRequest.objects.using(APPLICATION_ALIAS).get_or_create(pk=1)
-        job = ImportRequest.objects.using(APPLICATION_ALIAS).select_for_update().get(pk=1)
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        job = ImportRequest.objects.select_for_update().get(pk=1)
         if job.state in {ImportRequest.State.QUEUED, ImportRequest.State.RUNNING}:
             return False
         job.state = ImportRequest.State.QUEUED
@@ -25,19 +42,18 @@ def request_import():
         job.requested_at = now
         job.started_at = None
         job.finished_at = None
-        job.save(using=APPLICATION_ALIAS)
+        job.save()
         return True
 
 
 def process_one(*, schedule_automatic=False):
-    # Import locally, so admin requests never load the downloader or access its
-    # configuration. No external parameters are ever passed from a queued job.
-    from .importer import import_directory, require_writer
+    # Import locally, so admin requests never load the downloader. No external parameters are
+    # ever passed from a queued job.
+    from .importer import import_directory
 
-    require_writer()
-    with transaction.atomic(using=APPLICATION_ALIAS):
-        ImportRequest.objects.using(APPLICATION_ALIAS).get_or_create(pk=1)
-        job = ImportRequest.objects.using(APPLICATION_ALIAS).select_for_update().get(pk=1)
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        job = ImportRequest.objects.select_for_update().get(pk=1)
         now = timezone.now()
         # A queued manual request always wins. Do not take over RUNNING work:
         # operator exclusion is required after a hard-killed worker.
@@ -46,9 +62,10 @@ def process_one(*, schedule_automatic=False):
         if job.state != ImportRequest.State.QUEUED:
             if not schedule_automatic:
                 return False
+            interval = EMPTY_DIRECTORY_INTERVAL if directory_is_empty() else AUTOMATIC_INTERVAL
             if (
                 job.last_automatic_attempt_at is not None
-                and now < job.last_automatic_attempt_at + AUTOMATIC_INTERVAL
+                and now < job.last_automatic_attempt_at + interval
             ):
                 return False
             job.is_automatic = True
@@ -59,20 +76,29 @@ def process_one(*, schedule_automatic=False):
         job.started_at = now
         job.finished_at = None
         if job.is_automatic:
-            # Commit BEFORE any download. Failure consumes this 90-day attempt.
+            # Commit BEFORE any download. Failure consumes this attempt (24 hours while the
+            # directory is empty, otherwise 90 days).
             job.last_automatic_attempt_at = now
-        job.save(using=APPLICATION_ALIAS)
+        job.save()
+        # A manual request (the admin button) also repairs: an unchanged official file is skipped
+        # only when the published directory passes the integrity checks, otherwise it is loaded
+        # again, so that "sync again" repairs a damaged directory without a repeated request being
+        # expensive (D-076). The automatic attempt trusts the recorded checksum.
+        manual = not job.is_automatic
     try:
-        import_directory()
+        if manual:
+            import_directory(repair=True)
+        else:
+            import_directory()
     except Exception:
-        ImportRequest.objects.using(APPLICATION_ALIAS).filter(pk=1).update(
+        ImportRequest.objects.filter(pk=1).update(
             state=ImportRequest.State.FAILED, finished_at=timezone.now(),
         )
         logger.error("Address directory import attempt failed.")
         # Only a generic failure reaches the command output; the row deliberately
         # stores no exception, URL, credentials or upstream data.
         raise
-    ImportRequest.objects.using(APPLICATION_ALIAS).filter(pk=1).update(
+    ImportRequest.objects.filter(pk=1).update(
         state=ImportRequest.State.SUCCEEDED, finished_at=timezone.now(),
     )
     return True

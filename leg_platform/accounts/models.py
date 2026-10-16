@@ -2198,6 +2198,11 @@ class SecurityEvent(models.Model):
         TWO_FACTOR_REMOVED_PHONE_LOST = "two_factor_removed_phone_lost", _(
             "Two-factor authentication removed with a recovery code (phone lost)"
         )
+        # D-076 (security review, M-3): a manual request of the address directory import. The
+        # entry names the account that asked (the actor) and nothing else.
+        ADDRESS_IMPORT_REQUESTED = "address_import_requested", _(
+            "Address directory import requested"
+        )
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.

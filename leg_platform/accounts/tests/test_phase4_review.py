@@ -176,7 +176,7 @@ class StopLinkMeaningTests(TestCase):
 class ProfileSaveTests(TestCase):
     """M1: a stale instance does not write back what a parallel request changed."""
 
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     def test_a_stale_instance_keeps_the_end_of_the_sessions_the_password_and_the_second_address(self):
         user = create_active_user("holder.person@example.org")

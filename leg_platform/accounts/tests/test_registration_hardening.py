@@ -47,7 +47,7 @@ REGISTRATION_URL = reverse("accounts:registration")
 RESET_URL = reverse("accounts:password_reset")
 PASSWORD_URL = reverse("accounts:registration_password")
 COMPLETE_URL = reverse("accounts:registration_complete")
-ADDRESS_DATABASES = {"default", "addresses", "address_import"}
+ADDRESS_DATABASES = {"default", "addresses"}
 HOME_URL = reverse("home")
 
 

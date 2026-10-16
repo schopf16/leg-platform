@@ -54,6 +54,7 @@ MESSAGES = {
     Event.TWO_FACTOR_REMOVED_PHONE_LOST: (
         "Two-factor authentication was removed with a recovery code (phone lost)"
     ),
+    Event.ADDRESS_IMPORT_REQUESTED: "An address directory import was requested",
 }
 
 

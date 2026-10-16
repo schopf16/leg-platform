@@ -65,7 +65,7 @@ from leg_platform.accounts.tests.test_second_factor import (
 )
 from leg_platform.accounts.views import ENROLMENT_SESSION_KEY
 
-ADDRESS_DATABASES = {"default", "addresses", "address_import"}
+ADDRESS_DATABASES = {"default", "addresses"}
 HOME_URL = reverse("home")
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")

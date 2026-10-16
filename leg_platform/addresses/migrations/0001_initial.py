@@ -17,6 +17,8 @@ class Migration(migrations.Migration):
                 ("imported_at", models.DateTimeField(null=True, verbose_name="Imported at")),
                 ("checksum", models.CharField(blank=True, max_length=64)),
                 ("row_count", models.PositiveIntegerField(default=0, verbose_name="Address count")),
+                ("import_token", models.UUIDField(editable=False, null=True)),
+                ("import_lease_until", models.DateTimeField(editable=False, null=True)),
             ],
             options={"default_permissions": (), "verbose_name": "Address directory", "verbose_name_plural": "Address directory"},
         ),
@@ -29,12 +31,21 @@ class Migration(migrations.Migration):
                 ("house_number", models.CharField(blank=True, max_length=32)),
                 ("postal_code", models.CharField(max_length=4)),
                 ("locality", models.CharField(max_length=255)),
+                ("street_key", models.CharField(default="", editable=False, max_length=255)),
+                ("house_number_key", models.CharField(blank=True, default="", editable=False, max_length=32)),
+                ("locality_key", models.CharField(default="", editable=False, max_length=255)),
             ],
             options={
                 "default_permissions": (),
                 "indexes": [
-                    models.Index(fields=["generation", "postal_code", "street"], name="addr_generation_postal_street"),
-                    models.Index(fields=["generation", "street"], name="addr_generation_street"),
+                    models.Index(
+                        fields=["generation", "postal_code", "street_key", "street", "house_number_key"],
+                        name="addr_generation_postal_street",
+                    ),
+                    models.Index(
+                        fields=["generation", "street_key", "street", "house_number", "postal_code", "locality"],
+                        name="addr_generation_street",
+                    ),
                 ],
             },
         ),

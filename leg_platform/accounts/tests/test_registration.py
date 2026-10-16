@@ -381,7 +381,7 @@ class RegistrationTests(TestCase):
 @tag("mariadb")
 class VerificationTests(TestCase):
     # Completing the registration reads the address directory (advisory check, D-033).
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
     def setUp(self):
         register(self.client)
         self.path = verification_path(mail.outbox[0])
@@ -887,7 +887,7 @@ class VerificationTests(TestCase):
 
 @tag("mariadb")
 class ConcurrentCompletionTests(TransactionTestCase):
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
     def test_two_simultaneous_submissions_activate_the_account_once(self):
         register(Client())
         path = verification_path(mail.outbox[0])

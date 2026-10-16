@@ -1513,7 +1513,7 @@ class ServerConfigurationPanelTests(TestCase):
             if secret:
                 self.assertNotIn(secret, page)
         for name in ("DB_PASSWORD", "DB_USER", "DJANGO_SECRET_KEY", "BOOTSTRAP_SYSTEM_ADMIN_EMAIL",
-                     "ADDRESS_", "PRIVATE KEY"):
+                     "BOOTSTRAP_SYSTEM_ADMIN_PASSWORD", "ADDRESS_", "PRIVATE KEY"):
             self.assertNotIn(name, page)
 
     def test_the_allowed_recipients_are_only_counted(self):

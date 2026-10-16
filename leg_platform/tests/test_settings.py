@@ -237,6 +237,20 @@ class ExceptionReporterFilterTests(SimpleTestCase):
         )
         self.assertTrue(ExceptionReporterFilter.hidden_settings.flags & re.IGNORECASE)
 
+    def test_the_initial_administrator_password_is_masked(self):
+        # The name contains "PASS": Django's default pattern masks it like DB_PASSWORD (D-076).
+        reporter_filter = ExceptionReporterFilter()
+        request = RequestFactory().get(
+            "/", BOOTSTRAP_SYSTEM_ADMIN_PASSWORD="initial-test-value",
+            BOOTSTRAP_SYSTEM_ADMIN_EMAIL="admin@example.org",
+        )
+        meta = reporter_filter.get_safe_request_meta(request)
+        self.assertEqual(meta["BOOTSTRAP_SYSTEM_ADMIN_PASSWORD"], reporter_filter.cleansed_substitute)
+        self.assertEqual(
+            reporter_filter.cleanse_setting("BOOTSTRAP_SYSTEM_ADMIN_PASSWORD", "initial-test-value"),
+            reporter_filter.cleansed_substitute,
+        )
+
     def test_django_defaults_are_kept(self):
         reporter_filter = ExceptionReporterFilter()
         for name in ("SECRET_KEY", "DB_PASSWORD", "API_TOKEN", "HTTP_COOKIE", "AUTH_HEADER"):

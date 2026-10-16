@@ -41,7 +41,7 @@ The security-relevant acceptance criteria are defined only in `docs/SECURITY.md`
 
 ## 5. First System Administrator
 
-* [ ] The first system administrator account is set up with a management command on the server; the email address is read from the local `.env`, the initial password is entered interactively.
+* [ ] The first system administrator account is set up automatically at the first start by `manage.py setup_instance` from `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` of the environment (D-076; the interactive `setup_initial_administrator` remains an alternative, D-005); the password is checked, never printed or logged and ignored once a system administrator exists; the account is created only while the account table is completely empty (accounts without an administrator: nothing is created, an error is printed); the initial password has no expiry, so the instance is not public until the first login is complete (`docs/DEPLOYMENT.md`, section 9); two starts cannot create two administrators.
 * [ ] At the first login, the password must be changed and two-factor authentication must be set up.
 
 ## 6. Roles and Permissions

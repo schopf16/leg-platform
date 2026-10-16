@@ -158,7 +158,7 @@ class ResendTests(TestCase):
 
 @tag("mariadb")
 class StepBarTests(TestCase):
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     def bar(self, html):
         match = re.search(r'role="progressbar"[^>]*aria-valuenow="(\d)".*?step-fill step-fill-(\d)', html, re.S)

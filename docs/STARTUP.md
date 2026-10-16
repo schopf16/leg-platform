@@ -25,7 +25,7 @@ Never do any of the following (`AGENTS.md` sections 8 and 9, `CONDUCT.md`, D-020
 | Python environment | `.venv` in the repository root | `.venv\Scripts\python.exe`. Created as described in `docs/INSTALLATION.md`. |
 | Development server | `http://127.0.0.1:8000/` (the designer and the acceptance); `http://127.0.0.1:8001/` (the developer's own server) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use the host `127.0.0.1`, never `localhost`: the cookies are host-only and the links in emails use `127.0.0.1`. **Port 8000 belongs to the session that checks the design or accepts the work; the developer starts an own server on port 8001 (`$Port = 8001`, section 6) and never on 8000 while another session uses it.** The server has no reload and caches templates: restart it after a change of a template. |
 | Mail worker | background process | `manage.py process_mail_queue --loop`. Required, see section 6. |
-| Address directory (optional) | SQLite file outside the repository | Synthetic data only, section 10. |
+| Address directory (optional) | SQLite file `$HOME\.leg-platform-dev\address-directory.sqlite3` | Created by the first process that opens it. Synthetic data only, section 10. Not part of any backup. |
 | Logs and process IDs | `$HOME\.leg-platform-dev\` | Outside the repository. Nothing there is committed. |
 
 All commands below are PowerShell and run from the repository root (the folder that contains `manage.py`). Every tool call starts a fresh process: environment variables set with `$env:NAME = ...` live only for that call, and a block that starts a process must set what the process needs in the same call.
@@ -70,9 +70,9 @@ The application reads its configuration only from environment variables (`leg_pl
 | `INSTANCE_BASE_URL` | not set; the default `http://127.0.0.1:8000` applies | Base of all links in emails. Only if you use another port, set `http://127.0.0.1:<port>` for the server and the worker (its host must be in `DJANGO_ALLOWED_HOSTS`). |
 | `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, in the start block of section 6 | The local instance presentation of the design package (D-056); since D-073 these are the **fallback**: a value that is saved in "Portal-Einstellungen" (including uploaded logos, which are stored in the local database) wins. The name "LEG-Portal", the website `https://leg-ittigen.ch` (the third item of the footer row), the directory `$HOME\.leg-platform-dev\instance-static` that holds the two logo files unchanged in its sub-folder `instance` (copied from `LEG-Design-Vorgaben\logo\`: `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`; they contain no script and no external reference), and their relative paths `instance/LEG-Ittigen_pos_rgb.svg` and `instance/LEG-Ittigen_neg_sw.svg`. Without them the pages show the instance name as text instead of the logo. These are public values and no secrets. |
 | `DJANGO_DEBUG` | not set (False) | `True` is allowed only with `APP_ENV=local`. Not needed: production-like error handling and the full Content Security Policy are the better basis for a design review. |
-| `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` | optional, per process | Path of the SQLite file of section 10. Default: `$HOME\.leg-platform-local-address-directory.sqlite3`. |
+| `ADDRESS_DIRECTORY_FILE` | not set; the default applies | The SQLite file of the address directory (D-075). Default with `APP_ENV=local`: `$HOME\.leg-platform-dev\address-directory.sqlite3`. Set it only to use another absolute path outside the repository. |
 
-Must not be set locally: `ADDRESS_IMPORT_DB_USER` and `ADDRESS_IMPORT_DB_PASSWORD` (the normal settings refuse to start when they are present, `leg_platform/address_configuration.py`), `ADDRESS_DB_*` (there is no local MariaDB directory; section 10 explains the SQLite alternative), `BOOTSTRAP_SYSTEM_ADMIN_EMAIL`, `EMAIL_ALLOWED_RECIPIENTS`.
+Must not be set locally as permanent user variables: `BOOTSTRAP_SYSTEM_ADMIN_EMAIL`, `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`, `EMAIL_ALLOWED_RECIPIENTS`. The two bootstrap variables are only for the single `setup_instance` run of section 5, in that one PowerShell session.
 
 ## 5. Database and migrations
 
@@ -91,15 +91,30 @@ Apply pending migrations to the **default database** only after the main session
 .\.venv\Scripts\python manage.py migrate --database=default
 ```
 
-The router (`leg_platform/addresses/router.py`) keeps the queue table `addresses_importrequest` in the default database; the directory tables of the optional address database are never created by this command.
-
-The **optional address directory** is a separate database alias (`addresses` for reading, `address_import` for writing, D-049, D-052). Locally it is a throw-away SQLite file with synthetic data, provided by `leg_platform.local_directory_settings` (section 10). Its tables are created by a separate command with that settings module:
+The address directory is an own SQLite file (`$HOME\.leg-platform-dev\address-directory.sqlite3` by default, or `ADDRESS_DIRECTORY_FILE`; D-075), not a table of this database. Its two tables (`addresses_directory`, `addresses_address`) are created by a second command (the queue table `addresses_importrequest` is created by the command above):
 
 ```powershell
-.\.venv\Scripts\python manage.py migrate addresses --database=address_import --settings=leg_platform.local_directory_settings
+.\.venv\Scripts\python manage.py migrate addresses --database=addresses
 ```
 
-Stage and production use `leg_platform.import_settings` for the same purpose (`docs/INSTALLATION.md`, "Local Address Directory"); it needs the importer credentials and must not be used locally.
+The directory is loaded by the import worker or, for a development machine, by the synthetic seed of section 10. A `manage.py check` or a server start opens the file and creates it empty if it is missing; that is harmless.
+
+**One command for both (D-076).** `manage.py setup_instance` does what a server does at every start (`leg-setup.service`, `docs/DEPLOYMENT.md` section 8.0): it applies the pending migrations of the default database, creates the SQLite file of the address directory with its two tables, and, only while the account table is completely empty and the email variable is set, creates the first system administrator (if accounts exist but no system administrator it creates nothing and reports an error on standard error). It is idempotent (a second run changes nothing), never deletes data and never flushes. Use it instead of the two `migrate` commands above, for example on a new local database:
+
+```powershell
+.\.venv\Scripts\python manage.py setup_instance
+```
+
+Without the two bootstrap variables it only migrates and prints that no administrator exists (the local accounts of the design review come from `seed_design_accounts`, section 10). To also create an administrator on an empty local database, set the variables **in this PowerShell session only**, never as user variables, and remove them again; the password is read from the variable and never printed:
+
+```powershell
+$env:BOOTSTRAP_SYSTEM_ADMIN_EMAIL = 'admin@example.org'
+$env:BOOTSTRAP_SYSTEM_ADMIN_PASSWORD = (Read-Host 'Initial password (15+ characters)' -MaskInput)
+.\.venv\Scripts\python manage.py setup_instance
+Remove-Item Env:BOOTSTRAP_SYSTEM_ADMIN_EMAIL, Env:BOOTSTRAP_SYSTEM_ADMIN_PASSWORD
+```
+
+The first login of that account demands a new password and then the second factor. Do not run it against the local database as a test of "empty database": the local database is throw-away but is used by the running design review; the automated tests (`scripts/test.ps1 -Area second-factor`) run the command against their own fresh test database and file.
 
 ## 6. Start the development server and the mail worker
 
@@ -112,7 +127,7 @@ $Repo = (Get-Location).Path
 $State = Join-Path $HOME '.leg-platform-dev'
 New-Item -ItemType Directory -Force -Path $State | Out-Null
 $Port = 8000
-$Settings = 'leg_platform.settings'     # use 'leg_platform.local_directory_settings' to enable address suggestions (section 10)
+$Settings = 'leg_platform.settings'
 
 if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
     "Port $Port is in use. Do not kill the process. Use the running server, or choose another port and set INSTANCE_BASE_URL (section 4)."
@@ -258,23 +273,17 @@ Replace the example key with the one on the page. This is RFC 6238 with SHA-1, s
 
 ## 10. Synthetic address directory (optional)
 
-The registration (step "Your details") and the profile edit form offer address suggestions from a local copy of the official directory (D-033, D-066). Locally there is no MariaDB directory; without a directory the forms show no suggestions and say nothing about it (the failure is only logged; the operator page "Address directory" of the administration shows the status). To test suggestions, use a throw-away SQLite file with a few invented addresses:
-
-* `leg_platform/local_directory_settings.py` adds the two SQLite aliases `addresses` and `address_import` to the normal settings. It **refuses to be imported unless `APP_ENV=local`**, refuses a file inside the repository or a relative path, and changes no security setting. The file is `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` or, by default, `$HOME\.leg-platform-local-address-directory.sqlite3`.
-* `manage.py seed_local_address_directory` loads eight invented addresses (streets "Example Street", "Sample Avenue", "Test Lane", "Throwaway Road", postal codes 9997 to 9999). It refuses outside `APP_ENV=local`, refuses if either alias is not SQLite, and refuses to replace a directory whose checksum is not its synthetic marker (so a file that holds a real import is never overwritten).
-
-Steps (once per file; stop nothing, but the server must be started with the settings module afterwards):
+The registration (step "Your details") and the profile edit form offer address suggestions from a local copy of the official directory (D-033, D-066). The directory is stored in the local application database like everything else (D-075). Without a directory the forms show no suggestions and say nothing about it (the failure is only logged; the operator page "Address directory" of the administration shows the status). To test suggestions, load a few invented addresses:
 
 ```powershell
-.\.venv\Scripts\python manage.py migrate addresses --database=address_import --settings=leg_platform.local_directory_settings
-.\.venv\Scripts\python manage.py seed_local_address_directory --settings=leg_platform.local_directory_settings
+.\.venv\Scripts\python manage.py seed_local_address_directory
 ```
 
-Then start the server with `$Settings = 'leg_platform.local_directory_settings'` in the block of section 6 (the worker does not need it). In the forms, type for example `Exa` in the street field to get "Example Street". The lookup is a CSRF-protected POST to `/addresses/lookup/`, limited to 60 requests per minute per client IP and 4096 bytes of body.
+The command loads eight invented addresses (streets "Example Street", "Sample Avenue", "Test Lane", "Throwaway Road", postal codes 9997 to 9999) into the local directory file. The tables must exist (`migrate addresses --database=addresses`, section 5). It **refuses to run unless `APP_ENV=local`** and refuses to replace a directory whose checksum is not its synthetic marker (so a directory from a real import is never overwritten). Run it again to replace the synthetic rows. No settings module and no restart are needed (a running server reads the file on every request). In the forms, type for example `Exa` in the street field to get "Example Street". The lookup is a CSRF-protected POST to `/addresses/lookup/`, limited to 60 requests per minute per client IP and 4096 bytes of body.
 
-Reset: stop the server, delete only that synthetic file (`Remove-Item "$HOME\.leg-platform-local-address-directory.sqlite3"`), then repeat the two commands. Never point `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` at a file you did not create for this purpose. This replaces the out-of-repository settings module and seed script that were used earlier; the two commands above are all that is needed.
+To remove the synthetic rows, stop the processes and delete only that one file with its `-wal` and `-shm` files (`Remove-Item "$HOME\.leg-platform-dev\address-directory.sqlite3*"`), then run the two commands again. The real import (`manage.py import_address_directory`) downloads about 143 MB from `data.geo.admin.ch` and inserts about 3.3 million rows (about 12 minutes and about 0.9 GB per generation, unmeasured on a server; D-075); do not run it casually on a development machine.
 
-Verification status: the refusals and the module are covered by database-free tests (`leg_platform/addresses/tests/test_local_directory.py`, section 13). The three commands above were **not executed end to end** when this was written (the session that wrote it was not allowed to run migrations or seeds); the first user reports the result to the main session.
+Verification status: the refusals and the command are covered by tests (`leg_platform/addresses/tests/test_local_directory.py`, section 13), including a run of the command against the temporary test file.
 
 ## 11. Stop everything
 
@@ -307,7 +316,7 @@ Do this only when the main session or the project owner orders it and no designe
 2. Confirm `APP_ENV` is `local` and `DB_HOST` is `127.0.0.1` (section 3).
 3. Remove all rows of the default database and keep the schema: `.\.venv\Scripts\python manage.py flush --noinput`. This deletes all accounts, including the seeded design accounts.
 4. Delete the credentials file of the seeded accounts (`Remove-Item "$HOME\.leg-platform-design-accounts.json"`) and create the accounts again (section 9.1). The old file would otherwise make the creation refuse.
-5. Delete the logs in `$HOME\.leg-platform-dev\` if wanted, and reset the SQLite directory (section 10) if it was used.
+5. Delete the logs in `$HOME\.leg-platform-dev\` if wanted. The synthetic address directory (section 10) is the file `address-directory.sqlite3` in the same folder.
 6. Start the server and the worker again (section 6).
 
 `flush` and the commands above were not run (UNVERIFIED in this environment); `flush` is a standard Django command listed by `manage.py help`.
@@ -318,7 +327,7 @@ Facts about the test database (verified in the installed Django 6.1.2 source and
 
 * The default database of the tests is `test_<DB_NAME>` (`TEST_DATABASE_PREFIX = "test_"` and `_get_test_db_name()` in `django/db/backends/base/creation.py`); the project sets no `TEST["NAME"]`. For the local setup that is `test_leg_platform`. The setup script grants the application account the privileges on this database.
 * The runner creates the test database through a connection without a database name, switches the connection to the test name for the run and drops the database afterwards. `--noinput` drops an already existing `test_leg_platform` without asking (`autoclobber`). **The data of `leg_platform` is not read or changed by a test run.** A running development server and a design session are therefore not affected in their data; they only share the CPU (the full suite takes about 3 minutes since D-071; before the fast test hasher it took 14 minutes, see below) and the MariaDB server.
-* `leg_platform.test_settings` replaces the address aliases with in-memory SQLite databases (`:memory:`), so tests never touch a directory file or a MariaDB directory.
+* The address directory of a test run is a temporary SQLite file (`leg_platform/test_settings.py`, a folder of the run in the system temporary folder, removed at the end); a test run never opens the file of section 10. A test class that touches the directory declares `databases = {"default", "addresses"}`; without it Django raises `DatabaseOperationForbidden` for the alias `addresses`.
 * Two test runs against the same MariaDB server overlap on the same `test_leg_platform` database: the second run drops the database the first still uses, which corrupts both (D-046). **Run only one test process at a time** and check first:
 
   ```powershell
@@ -343,7 +352,7 @@ How the areas are chosen: a changed source file selects every area that maps its
 
 Measured on 2026-10-16 (fast test hasher, a machine with an i7-1265U, 10 cores; full details in D-071): `docs` 0.4 s, `packaging` 0.4 s, `branding` 3.9 s, `static` 8.3 s, `address-directory` 10.1 s, `environment` 18.3 s, `migrations` 21.7 s, `mail` 25.4 s, `translations` 27.6 s, `admin` 29.9 s, `login` 40.2 s, `registration` 41.5 s, `profile` 58.4 s, `templates` 66.6 s, `second-factor` 71.2 s ("Ran N tests in", without the start-up of about 2 s), against 185 s for the full suite (1833 tests). These are the values of step 3a. Step 3b (removal of redundant tests, shared test data, one child-process run for the production settings; D-071, addendum) lowered them further: in a paired measurement on the same day, with the old and the new tests run alternately on the same machine, the areas `admin` (31.6 s to 25.7 s), `templates` (70.6 s to 64.9 s), `profile` (47.7 s to 42.9 s), `mail` (25.9 s to 23.0 s) and `second-factor` (74.7 s to 69.5 s) became 7 to 19 % faster, and `leg_platform.tests.test_production_settings` takes 3.8 s instead of 19.4 s. The machine was slower on that afternoon than during step 3a (creating the test database took 9 to 10 s instead of 3.3 s), so compare only values of the same series.
 
-**Writing fast tests (D-071, step 3b):** most of the time of a test is MariaDB round trips (about 80 SQL statements per test on average; creating an account with a second factor is about 24, `force_login` about 20). A class whose tests only read the same accounts creates them once in `setUpTestData` (Django 6.1 `TestCase.setUpTestData`: the class-level objects are copied for each test, so a test can change them without affecting the next one); the client and its login stay in `setUp`. Use `TransactionTestCase` only where the test needs real commits or threads (concurrency tests, a test that needs no open transaction, the address directory reader that is a second connection); the flush after each such test costs 0.1 to 0.3 s. Child processes (as in `test_production_settings`) are started together once per module, not once per test.
+**Writing fast tests (D-071, step 3b):** most of the time of a test is MariaDB round trips (about 80 SQL statements per test on average; creating an account with a second factor is about 24, `force_login` about 20). A class whose tests only read the same accounts creates them once in `setUpTestData` (Django 6.1 `TestCase.setUpTestData`: the class-level objects are copied for each test, so a test can change them without affecting the next one); the client and its login stay in `setUp`. Use `TransactionTestCase` only where the test needs real commits or threads (concurrency tests, a test that needs no open transaction); the flush after each such test costs 0.1 to 0.3 s. Child processes (as in `test_production_settings`) are started together once per module, not once per test.
 
 **When the full suite is required:** only for a core change (the runner decides), before a deployment gate, in CI (both jobs always run the full suite), and by the team lead at most once per commit block. It is not run after every small change, and agents do not start it unless the main session orders it. A report always names the area or labels and the number of tests and never presents a scoped run as a full run.
 
@@ -381,8 +390,7 @@ Targeted runs without the script (each needs MariaDB unless stated; the same one
 .\.venv\Scripts\python manage.py test leg_platform.accounts.tests.test_registration.RegistrationTests.test_the_link_is_built_from_the_configuration_not_from_the_request --settings=leg_platform.test_settings --noinput
 # One app
 .\.venv\Scripts\python manage.py test leg_platform.addresses --settings=leg_platform.test_settings --noinput
-# Database-free only (no MariaDB needed; for example the local directory tests, the settings tests, the repository checks)
-.\.venv\Scripts\python manage.py test leg_platform.addresses.tests.test_local_directory --settings=leg_platform.test_settings --noinput
+# Database-free only (no MariaDB needed; for example the settings tests and the repository checks)
 .\.venv\Scripts\python manage.py test --exclude-tag mariadb --settings=leg_platform.test_settings --noinput
 ```
 
@@ -440,14 +448,12 @@ After a change to the `.po` file, regenerate the catalogue with `.\.venv\Scripts
 | A staff user or administrator is sent to the two-factor setup page and cannot reach anything else | Privileged accounts must have a second factor (D-042). The seeded accounts already have one; a new or reset privileged account does not | For the seeded accounts nothing is needed. For others complete `/profile/two-factor/setup/` (section 9.3 computes the code). |
 | The code is refused | The code was already used in this 30-second step, the clock is off by more than one step, or the wrong account's key was used | Wait for the next step and compute a new code. Do not repeat wrong codes (15 pause code entry for 24 hours). |
 | `ImportError: cannot import name ... (most likely due to a circular import)` or other import errors at startup | The worktree is in the middle of a change (D-051 recorded circular imports during integration), or an unfinished edit | Run `manage.py check` and read the first traceback line to see the module. Do not edit code; report to the main session with the output and `git status`. |
-| `DatabaseOperationForbidden` for the `addresses` alias in a test | A test class touches the address alias but does not declare it | Add the alias to the test class: `databases = {"default", "addresses", "address_import"}` (as in `leg_platform/addresses/tests/test_directory.py`). |
 | `IntegrityError (1062, "Duplicate entry ...")` in the test setup | Two test runs overlapped on `test_leg_platform` (D-046) | Wait until no other test process runs (section 13), then run again. |
 | `OperationalError (2003, "Can't connect to MySQL server on '127.0.0.1'")` | The MariaDB service is not running | Section 3. Starting it needs administrator rights; report it. |
 | `OperationalError (1045, "Access denied for user ...")` | The values of `DB_USER` and `DB_PASSWORD` no longer match the database account | Report to the main session; the project owner re-runs the setup script. Never print the variables. |
-| `ImproperlyConfigured: Address importer credentials must not be present in the web process.` | `ADDRESS_IMPORT_DB_USER` or `ADDRESS_IMPORT_DB_PASSWORD` is set in the user environment | Report it; these variables must not exist on a development machine. |
-| `ImproperlyConfigured: leg_platform.local_directory_settings can only be used with APP_ENV=local.` or `... must point outside the repository` | The guard of the local directory settings (section 10) | Fix the cause (environment or path); never weaken the guard. |
-| `seed_local_address_directory`: "The directory tables do not exist yet" | The directory migration was not applied to the SQLite file | Run the `migrate addresses --database=address_import` command of section 10. |
-| `seed_local_address_directory`: "may contain imported data; refusing to replace it" | The file holds data that is not the synthetic marker | Use another file through `LEG_LOCAL_ADDRESS_DIRECTORY_FILE`; do not delete a file you did not create. |
+| `seed_local_address_directory`: "The directory tables do not exist yet" | The tables of the directory file were not created | Run `manage.py migrate addresses --database=addresses` (section 5). |
+| `seed_local_address_directory`: "may contain imported data; refusing to replace it" | The directory file holds data that is not the synthetic marker (a real import) | Leave it; the command never overwrites imported data. To start again, delete the file (section 10). |
+| `DatabaseOperationForbidden` for the alias `addresses` in a test | A test class touches the directory but does not declare the alias | Add `databases = {"default", "addresses"}` to the class. |
 | `seed_design_accounts`: "A design account already exists" or "exists. Delete it first" | The accounts and the credentials file already exist | Use them. Do not delete anything (section 1). |
 | `msgfmt` or `msgunfmt` is not found | `C:\Program Files\gettext-iconv\bin` is not on `PATH` of this shell | Use the full path of the tool, or report it. |
 
@@ -465,7 +471,7 @@ This deletes the Axes failure records, the login IP counters (their attempts fol
 | --- | --- |
 | Versions Python 3.14.8, Django 6.1.2; the service `MySQL` runs; MariaDB listens on `127.0.0.1:3306` only | Commands of section 3 run on 2026-10-14 (read-only). |
 | `manage.py check` and the production-style `check --deploy` (3 silenced) pass; `showmigrations --plan` shows no unapplied migration | Run on 2026-10-14 with the commands of sections 5 and 13. |
-| Environment variable names, defaults and refusals | Read `leg_platform/environment.py`, `leg_platform/settings.py`, `leg_platform/address_configuration.py`, `leg_platform/import_settings.py`, `leg_platform/test_settings.py`. |
+| Environment variable names, defaults and refusals | Read `leg_platform/environment.py`, `leg_platform/settings.py`, `leg_platform/test_settings.py`. |
 | `runserver` needs `DJANGO_ALLOWED_HOSTS` or debug, and serves static files only with debug or `--insecure` | Read the installed Django 6.1.2 sources `core/management/commands/runserver.py` and `contrib/staticfiles/management/commands/runserver.py`; `manage.py help runserver`. |
 | Venv launcher plus child process; hidden console host | `Get-CimInstance Win32_Process` on the running processes and on a dummy process (read-only; nothing was stopped except the dummy). |
 | Console email format (quoted-printable, soft line breaks) and the link helper | Offline run with Django's console backend and a sample log; no database. |
@@ -473,6 +479,6 @@ This deletes the Axes failure records, the login IP counters (their attempts fol
 | Login lockout (5 attempts, 15 minutes), request limits, session timeouts, 15 wrong codes pause | Read `login_protection.py`, `session_timeout` settings in `settings.py`, `models.py`, D-038, D-040, D-041. |
 | Test database name, runner behaviour | Read installed Django `db/backends/base/creation.py` and `test/runner.py`; D-046. |
 | Scenario runner, areas, timing, `--keepdb` and `--parallel` (section 13) | Run on 2026-10-16: every area once with `scripts/test.ps1`, the full suite with `--timing --durations 50` (1833 tests, OK), `--keepdb` twice, `--parallel 2` (stopped with MariaDB error 1044, as stated); `manage.py test --help` lists `--durations`, `--timing`, `--keepdb`, `--parallel`; the numbers are in D-071. |
-| `leg_platform.local_directory_settings` and `seed_local_address_directory` refusals | Database-free tests in `leg_platform/addresses/tests/test_local_directory.py`: 15 tests OK with deprecation warnings as errors. |
+| `seed_local_address_directory` refusals and its run | Tests in `leg_platform/addresses/tests/test_local_directory.py` (D-075). |
 | Translation check commands | Run on 2026-10-14 (results 0, 0, 0). |
 | Not verified | End-to-end run of the directory migration and seed, `flush`, the lockout-clearing snippet, a start of the block of section 6 for `manage.py` (a server was already running) and `--parallel` with a MariaDB account that may create `test_leg_platform_N`. |

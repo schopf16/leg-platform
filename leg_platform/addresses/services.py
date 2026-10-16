@@ -1,23 +1,33 @@
-"""Local-only advisory matching; never mutate or reject a stored profile."""
+"""Local-only advisory matching; never mutate or reject a stored profile.
+
+The directory is read from its own SQLite file (D-075; the router sends these models there).
+Every query is restricted to the current generation; nothing in this module writes. The searches
+use the folded key columns (``leg_platform.addresses.keys``): case and accents are ignored, a prefix
+is a range over an indexed key column and ``LIKE`` is never used.
+"""
 
 import difflib
 import logging
 import time
-import unicodedata
 
 from django.db import DatabaseError
 from django.utils.connection import ConnectionDoesNotExist
 from django.utils.translation import gettext as _
 
-from .models import Address, Directory, READ_ALIAS
+from .keys import fold, key, prefix_range
+from .models import Address, Directory
 
 FIELDS = ("street", "house_number", "postal_code", "locality")
+# The order of an answer: the key of the street first, so that the index of the suggestions can
+# deliver the rows in this order (models.Address, index addr_generation_street).
+ANSWER_ORDER = ("street_key", "street", "house_number", "postal_code", "locality")
 LIMITS = {"street": 255, "house_number": 32, "postal_code": 4, "locality": 255, "country": 2}
 RESULT_LIMIT = 10
 # Approximate matching (D-065). It runs only after the prefix search found nothing and only for a
-# complete postal code, so the candidates are the streets of one postal code (the query is
-# restricted by the index (generation, postal_code, street); whether the database really uses it is
-# not verified, see docs/DEPLOYMENT.md). Bounds, all hard, and every one fails closed (no result):
+# complete postal code, so the candidates are the streets of one postal code (the query is an
+# equality on the postal code in the index (generation, postal_code, street_key, house_number_key);
+# a test asserts the query plan, tests/test_directory.py). Bounds, all hard, and every one fails
+# closed (no result):
 #   * at most APPROXIMATE_STREET_LIMIT distinct streets are returned by the candidate query (the
 #     LIMIT bounds the streets returned, not the rows the database reads for them); if the postal
 #     code has more, no approximate result is returned;
@@ -39,12 +49,6 @@ APPROXIMATE_TIME_BUDGET = 0.25
 # unrelated names it rejects.
 APPROXIMATE_THRESHOLD = 0.75
 logger = logging.getLogger(__name__)
-
-
-def fold(text):
-    """Lower case without accents, for comparing street names only (never stored or shown)."""
-    decomposed = unicodedata.normalize("NFKD", text.casefold())
-    return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
 def clean_input(values):
@@ -72,7 +76,7 @@ def directory_status():
         "warning": _("The address directory is unavailable."),
     }
     try:
-        directory = Directory.objects.using(READ_ALIAS).filter(pk=1).first()
+        directory = Directory.objects.filter(pk=1).first()
     except (DatabaseError, ConnectionDoesNotExist):
         logger.warning("Address directory status is unavailable.")
         return result, None
@@ -109,9 +113,12 @@ def approximate_matches(query, values):
     if not APPROXIMATE_MIN_LENGTH <= len(folded_typed) <= APPROXIMATE_MAX_LENGTH:
         return [], "approximate"
     in_postal_code = query.filter(postal_code=values["postal_code"])
-    # One more than the limit tells whether the limit was exceeded; then nothing is matched.
+    # One more than the limit tells whether the limit was exceeded; then nothing is matched. No
+    # ORDER BY: the candidates are ranked below, and a sort would make SQLite walk the index of the
+    # whole directory instead of the rows of the one postal code (measured with 400,000 rows). The
+    # shown text of the street is the spelling of the directory.
     streets = list(
-        in_postal_code.order_by("street").values_list("street", flat=True).distinct()
+        in_postal_code.order_by().values_list("street", flat=True).distinct()
         [:APPROXIMATE_STREET_LIMIT + 1]
     )
     if len(streets) > APPROXIMATE_STREET_LIMIT:
@@ -147,10 +154,12 @@ def approximate_matches(query, values):
         remaining = RESULT_LIMIT - len(rows)
         if remaining <= 0:
             break
-        per_street = in_postal_code.filter(street=street)
+        # The key of the street narrows the query to the index; the exact spelling keeps two
+        # streets that differ only in accents apart.
+        per_street = in_postal_code.filter(street_key=key(street), street=street)
         if values["house_number"]:
-            per_street = per_street.filter(house_number__istartswith=values["house_number"])
-        rows.extend(per_street.values(*FIELDS).order_by(*FIELDS).distinct()[:remaining])
+            per_street = per_street.filter(**prefix_range("house_number_key", key(values["house_number"])))
+        rows.extend(per_street.order_by(*ANSWER_ORDER).values(*FIELDS).distinct()[:remaining])
     return rows, kind
 
 
@@ -178,14 +187,14 @@ def lookup(values, *, mode="suggest"):
     if directory is None:
         return result
     try:
-        query = Address.objects.using(READ_ALIAS).filter(generation=directory.generation)
+        query = Address.objects.filter(generation=directory.generation)
         if mode == "check":
             if len(values["postal_code"]) != 4 or not values["locality"]:
                 result["match"] = False
             else:
                 result["match"] = query.filter(
-                    street__iexact=values["street"], house_number__iexact=values["house_number"],
-                    postal_code=values["postal_code"], locality__iexact=values["locality"],
+                    street_key=key(values["street"]), house_number_key=key(values["house_number"]),
+                    postal_code=values["postal_code"], locality_key=key(values["locality"]),
                 ).exists()
             if not result["match"] and not directory.is_stale:
                 # A directory that is more than 92 days old may lack a new address: no notice then.
@@ -193,15 +202,21 @@ def lookup(values, *, mode="suggest"):
                     "This address was not found. Please check street, "
                     "house number, postal code and town. You can still save it as entered."
                 )
-        elif len(values["street"]) >= 2:
-            prefix_query = query.filter(street__istartswith=values["street"])
-            if values["postal_code"]:
-                prefix_query = prefix_query.filter(postal_code__startswith=values["postal_code"])
+        elif len(values["street"]) >= 2 and key(values["street"]):
+            # A prefix is a range over the key columns (never LIKE): case and accents are ignored.
+            prefix_query = query.filter(**prefix_range("street_key", key(values["street"])))
+            postal_code = values["postal_code"]
+            if len(postal_code) == 4:
+                prefix_query = prefix_query.filter(postal_code=postal_code)
+            elif postal_code:
+                prefix_query = prefix_query.filter(**prefix_range("postal_code", postal_code))
             if values["house_number"]:
-                prefix_query = prefix_query.filter(house_number__istartswith=values["house_number"])
+                prefix_query = prefix_query.filter(**prefix_range("house_number_key", key(values["house_number"])))
             if values["locality"]:
-                prefix_query = prefix_query.filter(locality__istartswith=values["locality"])
-            result["results"] = list(prefix_query.values(*FIELDS).order_by(*FIELDS).distinct()[:RESULT_LIMIT])
+                prefix_query = prefix_query.filter(**prefix_range("locality_key", key(values["locality"])))
+            result["results"] = list(
+                prefix_query.order_by(*ANSWER_ORDER).values(*FIELDS).distinct()[:RESULT_LIMIT]
+            )
             # Only a complete postal code bounds the candidates (D-065).
             if not result["results"] and len(values["postal_code"]) == 4:
                 rows, kind = approximate_matches(query, values)

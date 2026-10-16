@@ -24,12 +24,11 @@ from leg_platform.environment import (
     silenced_system_checks,
 )
 from leg_platform.branding import instance_static_directory, load_branding
-from leg_platform.address_configuration import address_database, validate_process_credentials
+from leg_platform.addresses.storage import DIRECTORY_ALIAS, directory_database
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 ENVIRONMENT = load_environment(os.environ)
-validate_process_credentials(os.environ)
 
 # Environment
 
@@ -206,9 +205,11 @@ DATABASES = {
     }
 }
 
-_address_database = address_database(os.environ, DATABASE_SQL_MODE)
-if _address_database is not None:
-    DATABASES["addresses"] = _address_database
+# The address directory (D-075) is an own SQLite file, not part of any backup, next to the MariaDB
+# database; the web process and the worker open it with the same settings (the web process
+# read-only, leg_platform.addresses.storage). The router keeps the directory tables in the file
+# and the import queue in "default".
+DATABASES[DIRECTORY_ALIAS] = directory_database(ENVIRONMENT.address_directory_file)
 DATABASE_ROUTERS = ["leg_platform.addresses.router.AddressRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

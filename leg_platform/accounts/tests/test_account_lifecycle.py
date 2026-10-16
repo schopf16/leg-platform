@@ -43,7 +43,7 @@ DELETE_URL = reverse("accounts:account_delete")
 @tag("mariadb")
 class ProfileEditingTests(TestCase):
     # Saving the profile reads the address directory (advisory check, D-033).
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):

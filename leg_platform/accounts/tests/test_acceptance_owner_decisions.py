@@ -817,8 +817,8 @@ class FieldAttributesTests(TestCase):
 
 @tag("mariadb")
 class NoSharpSInRenderedPagesTests(TestCase):
-    # The details step of the registration reads the address directory (second and third alias).
-    databases = {"default", "addresses", "address_import"}
+    # The details step of the registration reads the address directory (the alias "addresses").
+    databases = {"default", "addresses"}
 
     def assert_clean(self, html, label):
         self.assertNotIn(SHARP_S, html, f"{label} contains the sharp s.")

@@ -30,7 +30,7 @@ def card(html, name):
 
 @tag("mariadb")
 class CardLayoutTests(TestCase):
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):
@@ -118,7 +118,7 @@ class CardLayoutTests(TestCase):
 
 @tag("mariadb")
 class CardMessageTests(TestCase):
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):

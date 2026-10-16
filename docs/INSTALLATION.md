@@ -42,7 +42,7 @@ Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, 
 or newer, and Opera 109 or newer. Devices that cannot update to these versions are not
 supported. Responsive checks do not establish full WCAG 2.2 AA conformity.
 
-## Local Address Directory
+## Address Directory
 
 The application never sends profile addresses to an external service. Suggestions query
 only a local copy of the official directory. The user interface shows no source and no warning
@@ -53,39 +53,54 @@ and shown on the operator page "Address directory" of the administration only; i
 registration or saving, and the people who type an address are told nothing.
 Foreign addresses and post office boxes are not checked against building addresses.
 
-The operator creates a separate MariaDB database with
-`CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci` and InnoDB tables.
-Give each environment/instance its own account with **SELECT only** on that directory.
-Configure the `ADDRESS_DB_*` variables. Do not reuse the application account.
-The public directory may be shared across instances and is not part of application
-backups. It can be reconstructed from the official source.
+The directory is an own SQLite file on the server (D-075), **not part of any backup**: the owner
+wants it out of the backup of the main database. There is no separate database, no separate
+account and no manual creation step. The optional variable `ADDRESS_DIRECTORY_FILE` names the file
+(an absolute path outside the repository, without control characters). Default outside
+`APP_ENV=local`: `/var/lib/leg-platform/address-directory.sqlite3`; the systemd units of
+`docs/DEPLOYMENT.md` have `StateDirectory=leg-platform`, so systemd creates `/var/lib/leg-platform`
+for the service user. Default with `APP_ENV=local`: `~/.leg-platform-dev/address-directory.sqlite3`.
+The application creates a missing file as mode 0600 (and a missing folder as 0700) when the first
+process opens it. Every process opens the file read-only unless it declares itself a writer (the
+worker, `import_address_directory`, `seed_local_address_directory`, `setup_instance` and `migrate`
+do; the web processes never do), so a new entry point cannot write by accident (a protection against
+a mistake in the code, not against a compromised web process: the same user may write the file).
+Both use the same
+settings and the same file, so they must run on the same host. The file uses SQLite's write-ahead
+log (`-wal` and `-shm` files next to it) and must not be on a network file system.
 
-Create a different importer account for this same database with schema and write
-privileges. Put `ADDRESS_IMPORT_DB_USER` and `ADDRESS_IMPORT_DB_PASSWORD` only in the
-protected environment of the isolated importer, never in the web service. Normal settings
-refuse to start if importer credentials are present. Importer settings cannot run a web server.
-Apply the traceable migrations:
-
-```powershell
-python manage.py migrate --database=default
-python manage.py migrate addresses --database=address_import --settings=leg_platform.import_settings
-```
-
-The first command runs with the web/migration environment without importer credentials.
-The second runs with the isolated importer environment. The router creates the queue only
-in the application database and the directory tables only in the address database.
-Actual grants and MariaDB directory migration/import must be checked by the operator;
-local synthetic SQLite tests do not verify these.
-
-Run a supervised isolated worker:
+The tables of the file are created by `python manage.py setup_instance` (below), which also creates
+the file when it is missing; the manual equivalent is:
 
 ```powershell
-python manage.py process_address_imports --settings=leg_platform.import_settings
+python manage.py migrate addresses --database=addresses
 ```
 
-It handles queued manual imports and, once implemented and verified under D-052, makes
-one automatic attempt every 90 days. Failed automatic attempts are logged and wait
-another 90 days; manual attempts do not alter that clock. A user with the runtime permission
+(`python manage.py migrate` alone creates everything else and never the directory tables.) A
+missing, empty or unreadable file is not an error for the people who type: there are no
+suggestions, and the operator page "Address directory" shows the status. **Restore:** the file is
+not restored from a backup; start the services (`setup_instance` creates the file and its tables
+again) and the worker makes its first automatic attempt within 24 hours at the latest, or an
+administrator presses the button (about 12 minutes and a download of about 143 MB,
+unmeasured on a server, D-075). A corrupted file is deleted and rebuilt (`docs/DEPLOYMENT.md`,
+section 10.2).
+
+Run a supervised worker (the same settings and environment as the web application, but a
+separate process; the web process never downloads or imports anything):
+
+```powershell
+python manage.py process_address_imports
+```
+
+It handles queued manual imports and makes one automatic attempt every 90 days (D-052), or every 24
+hours while the directory is missing or empty (a new instance, a restore; D-076 corrections). A failed
+automatic attempt waits for its interval again; manual attempts do not alter that clock. A manual
+request is recorded in the security log (the account number only) and is cheap when nothing is wrong:
+if the published directory is already the official file and passes the integrity check
+(`PRAGMA quick_check` and the row count of the published generation), it ends after reading the
+small catalogue entry, without a download; otherwise it imports again, so that "sync again" repairs
+a damaged directory (D-076). Before any download the importer refuses to run when less than 4 GB of
+disk space is free where the directory file lives. A user with the runtime permission
 `addresses.request_directory_import` can request a manual import in the admin.
 Concurrent requests are coalesced. The web request itself performs no download.
 The public lookup `POST /addresses/lookup/` accepts at most 4096 bytes of body; the application
@@ -97,16 +112,21 @@ deployment.
 An operator can also run:
 
 ```powershell
-python manage.py import_address_directory --settings=leg_platform.import_settings
+python manage.py import_address_directory
 ```
 
-Allow outbound HTTPS only to `data.geo.admin.ch` for the importer. It verifies the official
-SHA-256 multihash before parsing, bounds the download/archive/rows and publishes atomically.
-Existing directory generations are retained; reserve disk capacity for them and for temporary
-downloads and database transaction logs. A hard-killed running job requires investigation;
-confirm no importer remains active before operator recovery. Do not blindly reset its state.
+Allow outbound HTTPS only to `data.geo.admin.ch` for the worker. It verifies the official
+SHA-256 multihash before parsing, bounds the download/archive/rows, loads the rows in chunked
+transactions as a generation that nobody sees and publishes it by one short transaction. A
+second import cannot run at the same time (a lease on the directory row; it expires after 6
+hours). After a successful import only the new and the previous generation of the directory are
+kept (D-075); older rows are deleted in batches of 900 rows. Reserve disk capacity for **three**
+generations at the peak of an import (about 0.9 GB each, unmeasured on a server: the file keeps
+its size because freed pages are reused by the next import), the temporary download and the
+write-ahead log. A hard-killed running job requires investigation; confirm no importer remains
+active before operator recovery. Do not blindly reset its state.
 
-For local development only, `leg_platform.local_directory_settings` adds a throw-away SQLite directory with a few invented addresses (`manage.py seed_local_address_directory`); it refuses to be imported unless `APP_ENV=local`. The steps are in `docs/STARTUP.md`, section 10. Never use it for stage or production.
+For local development only, `manage.py seed_local_address_directory` writes a few invented addresses into the local directory file; it refuses to run unless `APP_ENV=local` and refuses to replace a directory of a real import. The steps are in `docs/STARTUP.md`, section 10. Never use it for stage or production.
 
 Run the complete local tests sequentially:
 
@@ -114,8 +134,9 @@ Run the complete local tests sequentially:
 python -W error::DeprecationWarning -W error::PendingDeprecationWarning manage.py test --settings=leg_platform.test_settings --noinput
 ```
 
-The application tests use the configured local MariaDB test database; address tests use
-isolated synthetic SQLite databases. Never use production credentials or data.
+The application tests use the configured local MariaDB test database and a temporary SQLite
+file for the address directory (never the file of the instance). Never use production
+credentials or data.
 
 ## Local Development
 
@@ -262,7 +283,7 @@ Scheduled tasks (the scheduler itself is decided with the hosting, D-008, D-037,
 * `python manage.py run_scheduled_tasks` runs every cleanup task once: `delete_expired_registrations` (unverified accounts whose verification link expired or does not exist), `cleanup_mail_requests` (unused request counters, expired reset and email change links, unprocessed jobs), `cleanup_login_ip_attempts` (see below), `cleanup_security_log` (security log entries after their retention), `cleanup_confirmation_failures` (the counts of wrong codes and passwords in the confirmations of the profile: after 30 days for sessions, after 24 hours for the cap of the account) and Django's `clearsessions` (expired sessions). Schedule this one command, for example every 15 minutes, with the scheduler of the server (cron or a systemd timer on Linux, the task scheduler on Windows); the exact setup is written down when the hosting is decided. A failing task does not stop the others; the command then exits with an error, which the scheduler must report. A test makes sure that every `cleanup_*` and `delete_expired_*` command is part of it.
 * The worker `process_mail_queue --loop` is not part of it; it runs as a supervised service (see above).
 
-Initial system administrator (D-005, D-041): set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` in the environment of the instance and run `python manage.py setup_initial_administrator` in a terminal on the server. The command asks for the password twice with hidden input (it refuses to read it from a pipe or a file), runs only while no system administrator exists, never changes an existing account and logs its use. Give the person the initial password through a secure channel; at the first login the password must be replaced and two-factor authentication must be set up before anything else is possible. Remove `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` afterwards.
+Setup of the instance and initial system administrator (D-005, D-041, D-076): `python manage.py setup_instance` is idempotent and is run on every start of the services (on a server by the systemd unit `leg-setup.service` of `docs/DEPLOYMENT.md`, section 8.0; locally by hand, `docs/STARTUP.md`). It (1) applies the pending migrations to the application database (`migrate --noinput`: it never flushes or deletes data), (2) while no system administrator exists and `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` is set, creates the initial system administrator with the password of `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`, and (3) creates the address directory file and its tables (a failure there is reported but never stops the rest). So the only things an installation needs are an **empty** database with its one account (see "Database privileges") and the environment file; nothing is created by hand. The password variable is a secret: the file must be readable only by its owner (mode 0600), debug pages and error reports mask it, there is no command line argument for it, and it is ignored as soon as a system administrator exists (the start then only prints a reminder to remove it). A password that is missing or does not pass the password validators (at least 15 characters) makes the command refuse, with a message that does not contain the password. At the first login the password must be replaced and two-factor authentication must be set up before anything else is possible. **Remove `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` from the environment file after the first login.** Two commands at once cannot create two administrators (a database lock). Alternative for operators who do not want a password in a file: leave the password variable unset and run `python manage.py setup_initial_administrator` in a terminal with `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` set for that one command; it asks for the password twice with hidden input (it refuses to read it from a pipe or a file), runs only while no system administrator exists, never changes an existing account and logs its use.
 
 Emergency commands (D-004, D-005, D-041), only on the server, each use is logged (kept for the long period) and asks for confirmation (`--no-input`, given before the action, skips it). The accounts are named by their internal number, shown on the change form of an account in the administration:
 
@@ -344,6 +365,6 @@ Pattern for stage and production: the same privileges, only on the instance's ow
 
 The privileges were taken from the sources above and verified on 2026-10-12 on the development machine: creating the test database (which runs all migrations) and the full test suite ran with this account (D-030).
 
-Apply migrations with `python manage.py migrate` only to a database created for this project; the custom user model `accounts` (D-021) is part of the migrations. The test runner creates and removes its own test database.
+Apply migrations to a database created for this project, with `python manage.py setup_instance` (or `python manage.py migrate` by hand); the custom user model `accounts` (D-021) is part of the migrations. The test runner creates and removes its own test database.
 
 Continuous integration (`.github/workflows/ci.yml`) runs the same checks and tests with the minimum versions (Python 3.12, Django 6.0, MariaDB 10.11) and with the newest versions (Python 3.14, Django 6.1, MariaDB 12.3), with an application account that has exactly the privileges above (created by root in a CI step).

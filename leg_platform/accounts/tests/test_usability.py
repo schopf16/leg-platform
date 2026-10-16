@@ -48,7 +48,7 @@ COMPLETE_URL = reverse("accounts:registration_complete")
 PROFILE_EDIT_URL = reverse("accounts:profile_edit")
 SETUP_URL = reverse("accounts:two_factor_setup")
 CONFIRM_URL = reverse("accounts:two_factor_confirm")
-ADDRESS_DATABASES = {"default", "addresses", "address_import"}
+ADDRESS_DATABASES = {"default", "addresses"}
 SHARP_S = "\u00df"
 
 

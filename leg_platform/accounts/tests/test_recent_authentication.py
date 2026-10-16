@@ -44,7 +44,7 @@ PROFILE_URL = reverse("accounts:profile")
 COMPLETE_URL = reverse("accounts:registration_complete")
 PASSWORD_URL = reverse("accounts:registration_password")
 INVALID_URL = reverse("accounts:registration_invalid")
-ADDRESS_DATABASES = {"default", "addresses", "address_import"}
+ADDRESS_DATABASES = {"default", "addresses"}
 
 
 class FakeRequest:

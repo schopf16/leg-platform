@@ -1,105 +1,29 @@
-"""Tests of the local throw-away address directory (docs/STARTUP.md); no database is used."""
+"""Tests of the synthetic address directory of a development machine (docs/STARTUP.md)."""
 
-import importlib
-import os
+import io
 import re
-import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import uuid
+from unittest.mock import MagicMock
 
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings, tag
+from django.utils import timezone
 
-import leg_platform.settings as normal_settings
 from leg_platform.addresses.management.commands import seed_local_address_directory as command
+from leg_platform.addresses.models import Address, Directory
+from leg_platform.addresses.services import lookup
 
-MODULE = "leg_platform.local_directory_settings"
-FILE_VARIABLE = "LEG_LOCAL_ADDRESS_DIRECTORY_FILE"
 COMMAND = "seed_local_address_directory"
 
 
-class LocalDirectorySettingsTests(SimpleTestCase):
-    def import_settings_module(self, remove=(), **environment):
-        # A failed import leaves nothing in sys.modules; a successful one is removed again.
-        sys.modules.pop(MODULE, None)
-        self.addCleanup(sys.modules.pop, MODULE, None)
-        with patch.dict(os.environ, environment):
-            for name in remove:
-                os.environ.pop(name, None)
-            return importlib.import_module(MODULE)
-
-    def test_refuses_to_be_imported_outside_local_development(self):
-        for app_env in ("stage", "production", "Local", "unknown", ""):
-            with self.subTest(app_env=app_env), self.assertRaises(ImproperlyConfigured):
-                self.import_settings_module(APP_ENV=app_env)
-
-    def test_refuses_to_be_imported_without_an_environment_name(self):
-        with self.assertRaises(ImproperlyConfigured):
-            self.import_settings_module(remove=("APP_ENV",))
-
-    def test_refuses_a_file_inside_the_repository(self):
-        inside = Path(settings.BASE_DIR) / "directory.sqlite3"
-        for path in (inside, Path(settings.BASE_DIR)):
-            with self.subTest(path=path.name), self.assertRaises(ImproperlyConfigured):
-                self.import_settings_module(APP_ENV="local", **{FILE_VARIABLE: str(path)})
-
-    def test_refuses_a_relative_path(self):
-        with self.assertRaises(ImproperlyConfigured):
-            self.import_settings_module(APP_ENV="local", **{FILE_VARIABLE: "directory.sqlite3"})
-
-    def test_default_file_is_outside_the_repository(self):
-        module = self.import_settings_module(remove=(FILE_VARIABLE,), APP_ENV="local")
-
-        name = Path(module.DATABASES["addresses"]["NAME"])
-        self.assertEqual(name, module.LOCAL_DIRECTORY_DEFAULT_FILE.resolve())
-        base = Path(settings.BASE_DIR).resolve()
-        self.assertNotIn(base, name.parents)
-
-    def test_adds_two_sqlite_aliases_for_one_file_and_changes_nothing_else(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "directory.sqlite3"
-            module = self.import_settings_module(APP_ENV="local", **{FILE_VARIABLE: str(path)})
-
-        for alias in ("addresses", "address_import"):
-            with self.subTest(alias=alias):
-                self.assertEqual(module.DATABASES[alias]["ENGINE"], "django.db.backends.sqlite3")
-                self.assertEqual(Path(module.DATABASES[alias]["NAME"]), path.resolve())
-        # The application database is the very same configuration, the normal settings are not
-        # modified.
-        self.assertIs(module.DATABASES["default"], normal_settings.DATABASES["default"])
-        self.assertIsNot(module.DATABASES, normal_settings.DATABASES)
-        self.assertNotIn("address_import", normal_settings.DATABASES)
-        self.assertEqual(module.APP_ENV, "local")
-        self.assertEqual(module.SESSION_COOKIE_SECURE, normal_settings.SESSION_COOKIE_SECURE)
-        self.assertEqual(module.SECURE_CSP, normal_settings.SECURE_CSP)
-
-
 @override_settings(APP_ENV="local")
-class SeedLocalAddressDirectoryTests(SimpleTestCase):
+class SeedLocalAddressDirectoryUnitTests(SimpleTestCase):
     def test_refuses_outside_local_development(self):
         # SimpleTestCase forbids database queries: reaching the database would fail the test.
         for app_env in ("stage", "production"):
             with self.subTest(app_env=app_env), override_settings(APP_ENV=app_env):
                 with self.assertRaisesMessage(CommandError, "APP_ENV=local"):
-                    call_command(COMMAND)
-
-    def test_refuses_an_alias_that_is_not_sqlite(self):
-        for alias in ("addresses", "address_import"):
-            with self.subTest(alias=alias):
-                with patch.dict(
-                    settings.DATABASES[alias], {"ENGINE": "django.db.backends.mysql"}
-                ), self.assertRaisesMessage(CommandError, f"'{alias}' is not a SQLite"):
-                    call_command(COMMAND)
-
-    def test_refuses_a_missing_alias(self):
-        for alias in ("addresses", "address_import"):
-            with self.subTest(alias=alias), patch.dict(settings.DATABASES):
-                del settings.DATABASES[alias]
-                with self.assertRaisesMessage(CommandError, f"'{alias}' is not a SQLite"):
                     call_command(COMMAND)
 
     def test_an_empty_directory_may_be_filled(self):
@@ -138,23 +62,61 @@ class SeedLocalAddressDirectoryTests(SimpleTestCase):
                     street, r"^(Example|Sample|Test|Throwaway) ", "synthetic street name"
                 )
 
-    def test_replace_directory_writes_one_generation_through_the_given_alias(self):
-        address_model, directory_model, transaction = MagicMock(), MagicMock(), MagicMock()
-        with patch.object(command, "Address", address_model), patch.object(
-            command, "Directory", directory_model
-        ), patch.object(command, "transaction", transaction):
-            count = command.replace_directory(using="address_import")
 
+@tag("mariadb")
+@override_settings(APP_ENV="local")
+class SeedLocalAddressDirectoryDatabaseTests(TestCase):
+    """The command writes into the directory file (the alias addresses, D-075), only with APP_ENV=local."""
+
+    databases = {"default", "addresses"}
+
+    def run_command(self):
+        output = io.StringIO()
+        call_command(COMMAND, stdout=output)
+        return output.getvalue()
+
+    def test_it_loads_one_synthetic_generation_that_the_lookup_finds(self):
+        self.assertIn("Loaded", self.run_command())
+        directory = Directory.objects.get(pk=1)
+        self.assertEqual(directory.checksum, command.SYNTHETIC_CHECKSUM)
+        self.assertEqual(directory.row_count, len(command.SYNTHETIC_ROWS))
+        self.assertEqual(Address.objects.count(), len(command.SYNTHETIC_ROWS))
+        self.assertEqual(set(Address.objects.values_list("generation", flat=True)), {directory.generation})
+        result = lookup({"street": "Example Street", "postal_code": "9999"})
+        self.assertEqual(result["status"], "available")
+        self.assertEqual(len(result["results"]), 3)
+
+    def test_a_second_run_replaces_the_synthetic_directory(self):
+        self.run_command()
+        first = Directory.objects.get(pk=1).generation
+        self.run_command()
+        self.assertNotEqual(Directory.objects.get(pk=1).generation, first)
+        self.assertEqual(Address.objects.count(), len(command.SYNTHETIC_ROWS))
+
+    def test_it_never_replaces_a_directory_of_a_real_import(self):
+        generation = uuid.uuid4()
+        Directory.objects.create(
+            pk=1, generation=generation, data_date=timezone.localdate(),
+            imported_at=timezone.now(), checksum="0" * 64, row_count=1,
+        )
+        Address.objects.create(
+            generation=generation, street="Imported Street", house_number="1",
+            postal_code="9999", locality="Example Town",
+        )
+        with self.assertRaisesMessage(CommandError, "may contain imported data"):
+            self.run_command()
+        self.assertEqual(list(Address.objects.values_list("street", flat=True)), ["Imported Street"])
+        self.assertEqual(Directory.objects.get(pk=1).generation, generation)
+
+    def test_it_refuses_and_writes_nothing_outside_local_development(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env), override_settings(APP_ENV=app_env):
+                with self.assertRaisesMessage(CommandError, "APP_ENV=local"):
+                    self.run_command()
+        self.assertFalse(Address.objects.exists())
+        self.assertFalse(Directory.objects.exists())
+
+    def test_replace_directory_publishes_one_generation(self):
+        count = command.replace_directory()
         self.assertEqual(count, len(command.SYNTHETIC_ROWS))
-        transaction.atomic.assert_called_once_with(using="address_import")
-        address_model.objects.using.assert_called_with("address_import")
-        created = address_model.objects.using.return_value.bulk_create.call_args.args[0]
-        self.assertEqual(len(created), len(command.SYNTHETIC_ROWS))
-        generations = {call.kwargs["generation"] for call in address_model.call_args_list}
-        self.assertEqual(len(generations), 1)
-        update = directory_model.objects.using.return_value.update_or_create
-        self.assertEqual(update.call_args.kwargs["pk"], 1)
-        defaults = update.call_args.kwargs["defaults"]
-        self.assertEqual(defaults["checksum"], command.SYNTHETIC_CHECKSUM)
-        self.assertEqual(defaults["row_count"], len(command.SYNTHETIC_ROWS))
-        self.assertEqual(defaults["generation"], generations.pop())
+        self.assertEqual(Address.objects.values("generation").distinct().count(), 1)

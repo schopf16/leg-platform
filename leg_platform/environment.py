@@ -14,11 +14,13 @@ Error messages never contain the values of secret variables.
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from ipaddress import ip_address
+from pathlib import Path
 from urllib.parse import SplitResult, urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
@@ -44,6 +46,22 @@ SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
 
 PORT_MIN = 1
 PORT_MAX = 65535
+
+# The file of the address directory (D-075, owner decision of 2026-10-16): an own SQLite file, not
+# part of any backup. Outside APP_ENV=local the default is below the state directory that the
+# systemd units create (StateDirectory=leg-platform); locally it is a file in the development
+# folder of the user. A configured value must be an absolute path outside the repository.
+ADDRESS_DIRECTORY_FILE_VARIABLE = "ADDRESS_DIRECTORY_FILE"
+ADDRESS_DIRECTORY_DEFAULT_FILE = "/var/lib/leg-platform/address-directory.sqlite3"
+ADDRESS_DIRECTORY_LOCAL_FOLDER = ".leg-platform-dev"
+ADDRESS_DIRECTORY_FILE_NAME = "address-directory.sqlite3"
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+
+# The first-start variables of the initial system administrator (D-005, D-076). The password is a
+# secret; its name contains "PASS", so Django's exception reporter filter masks it on debug pages
+# and in error reports like DB_PASSWORD.
+BOOTSTRAP_ADMIN_EMAIL_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_EMAIL"
+BOOTSTRAP_ADMIN_PASSWORD_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_PASSWORD"
 
 # Security log retention in days (docs/SECURITY.md, section 10; D-018). The defaults are also the
 # minimum: an instance can keep entries longer, never shorter.
@@ -101,6 +119,8 @@ class EnvironmentConfig:
     db_port: str
     security_log_retention_days: int
     security_log_long_retention_days: int
+    # The SQLite file of the address directory (D-075); a path, never a secret.
+    address_directory_file: str = ""
 
     @property
     def is_local(self) -> bool:
@@ -483,6 +503,77 @@ def parse_database(env: Mapping[str, str]) -> dict[str, str]:
     return values
 
 
+@dataclass(frozen=True)
+class BootstrapAdministrator:
+    """The optional first-start variables of the initial system administrator (D-076)."""
+
+    email: str
+    password: str
+
+    def __repr__(self) -> str:
+        # Never expose the password through repr(), e.g. in tracebacks or debug output.
+        return f"BootstrapAdministrator(email_set={bool(self.email)!r}, password_set={bool(self.password)!r})"
+
+
+def parse_bootstrap_administrator(env: Mapping[str, str]) -> BootstrapAdministrator:
+    """Read the variables of the initial system administrator (D-005, D-076).
+
+    Both are optional and are read only by ``manage.py setup_instance`` and
+    ``setup_initial_administrator``, and the password only while no system administrator exists.
+    They are never loaded into Django's settings, so the application process never holds them
+    there (and so no debug page can show them); they are not validated at the start of the
+    application, because the web process must keep starting when the operator leaves the
+    password in the file after the first login. The password is used exactly as given (a value of
+    only whitespace counts as not set); its strength is checked by Django's password validators
+    when the account is created. The email address is trimmed; the account model validates it.
+    """
+    password = env.get(BOOTSTRAP_ADMIN_PASSWORD_VARIABLE, "")
+    return BootstrapAdministrator(
+        email=_get(env, BOOTSTRAP_ADMIN_EMAIL_VARIABLE),
+        password=password if password.strip() else "",
+    )
+
+
+def parse_address_directory_file(env: Mapping[str, str], app_env: str) -> str:
+    """Return the path of the SQLite file of the address directory (D-075).
+
+    A configured value must be an absolute path to a file outside the repository, without NUL or
+    other control characters. Nothing is created here. When it is not set, the default applies:
+    ``/var/lib/leg-platform/address-directory.sqlite3`` outside ``APP_ENV=local`` and a file in
+    ``~/.leg-platform-dev`` locally, so that the development machine never writes into the
+    repository. The path is not a secret; the error messages do not repeat it.
+    """
+    raw = env.get(ADDRESS_DIRECTORY_FILE_VARIABLE, "")
+    value = raw.strip()
+    if not value:
+        if app_env != APP_ENV_LOCAL:
+            return ADDRESS_DIRECTORY_DEFAULT_FILE
+        try:
+            home = Path.home()
+        except RuntimeError:
+            raise ImproperlyConfigured(
+                "ADDRESS_DIRECTORY_FILE must be set: the home folder cannot be determined."
+            ) from None
+        return str(home / ADDRESS_DIRECTORY_LOCAL_FOLDER / ADDRESS_DIRECTORY_FILE_NAME)
+    if any(unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp") for character in value):
+        raise ImproperlyConfigured(
+            "ADDRESS_DIRECTORY_FILE must not contain NUL or other control characters."
+        )
+    if not os.path.isabs(value):
+        raise ImproperlyConfigured("ADDRESS_DIRECTORY_FILE must be an absolute path.")
+    if value.endswith(("/", "\\")):
+        raise ImproperlyConfigured("ADDRESS_DIRECTORY_FILE must name a file, not a folder.")
+    try:
+        resolved = Path(value).resolve()
+    except (OSError, ValueError, RuntimeError):
+        raise ImproperlyConfigured("ADDRESS_DIRECTORY_FILE is not a valid path.") from None
+    if resolved == REPOSITORY_ROOT or REPOSITORY_ROOT in resolved.parents:
+        raise ImproperlyConfigured("ADDRESS_DIRECTORY_FILE must point outside the repository.")
+    if resolved.is_dir():
+        raise ImproperlyConfigured("ADDRESS_DIRECTORY_FILE must name a file, not a folder.")
+    return value
+
+
 def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     """Validate the environment and return the configuration; raise ImproperlyConfigured."""
     app_env = parse_app_env(env)
@@ -522,6 +613,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         db_port=database["DB_PORT"],
         security_log_retention_days=security_log_retention[0],
         security_log_long_retention_days=security_log_retention[1],
+        address_directory_file=parse_address_directory_file(env, app_env),
     )
 
 

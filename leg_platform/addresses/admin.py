@@ -1,9 +1,13 @@
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.translation import gettext as _
+
+from leg_platform.accounts import security_log
+from leg_platform.accounts.models import SecurityEvent
 
 from .jobs import request_import
 from .limits import allow_request
@@ -44,10 +48,17 @@ class ImportRequestAdmin(admin.ModelAdmin):
         if request.method == "POST":
             if not allow_request(request, admin=True):
                 self.message_user(request, _("Too many import requests. Please try again later."), messages.WARNING)
-            elif request_import():
-                self.message_user(request, _("The address directory import has been queued."), messages.SUCCESS)
             else:
-                self.message_user(request, _("An import is already queued or running."), messages.WARNING)
+                # Every request that passes the limit is recorded with the account that asked
+                # (security log, D-041; D-076 M-3), in the same transaction as the queue row: the
+                # import costs a download and a long import, so who asks must be traceable.
+                with transaction.atomic():
+                    security_log.record(SecurityEvent.Event.ADDRESS_IMPORT_REQUESTED, actor=request.user)
+                    queued = request_import()
+                if queued:
+                    self.message_user(request, _("The address directory import has been queued."), messages.SUCCESS)
+                else:
+                    self.message_user(request, _("An import is already queued or running."), messages.WARNING)
             return HttpResponseRedirect(reverse("admin:addresses_importrequest_changelist"))
         status, directory = directory_status()
         context = {

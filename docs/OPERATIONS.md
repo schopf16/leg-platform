@@ -32,7 +32,7 @@ Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DE
 7. Do not deploy to production before the owner has checked stage and approved the deployment.
 8. Do not deploy while a deployment gate in `README.md` ("Current Status") is still open (see step D1).
 9. The application reads its settings only from environment variables. It does not read a `.env` file (`leg_platform/settings.py` passes `os.environ` to the loader; `.env.example`; `docs/DECISIONS.md`, D-027).
-10. Change the database structure only through Django migrations (`python manage.py migrate`). Never change tables by hand.
+10. Change the database structure only through Django migrations. On a server they run automatically at every start (`setup_instance`, D-076); never change tables by hand.
 11. Backups are the operator's job. Test a restore before the first production use (`docs/SECURITY.md`, section 9).
 12. If a secret may have leaked, tell the project owner at once and replace the secret. **NOT YET VERIFIED:** the replacement steps for each secret.
 13. Report a check as passed only after you have seen it pass.
@@ -95,7 +95,7 @@ Status: **NOT YET VERIFIED**. The install guide says that stage and production s
 
 **D2. Prepare the server.** Operating system, web server with HTTPS, reverse proxy, log settings and maintenance: **open** (`docs/DECISIONS.md`, D-008). Do not guess these values. A proposed runbook with the owner decisions it needs is `docs/DEPLOYMENT.md` (D-053); it is not yet verified on a server.
 
-**D3. Create the database and the application account.** Use the statement from `docs/INSTALLATION.md` ("Database privileges"):
+**D3. Create the database and the application account.** This is the one thing the application cannot do itself (it needs the database root or the hosting panel). Create an **empty** database and its one account; nothing else is created by hand (D-076). Use the statement from `docs/INSTALLATION.md` ("Database privileges"):
 
 ```sql
 CREATE DATABASE leg_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;
@@ -115,20 +115,15 @@ python manage.py check --deploy --database default --fail-level WARNING
 
 Stop if the command reports an error.
 
-**D7. Apply the database structure.**
+**D7. Apply the database structure.** Nothing to run by hand (D-076): the setup command `python manage.py setup_instance` applies the migrations at every start of the services (on a server through the unit `leg-setup.service`, `docs/DEPLOYMENT.md`, section 8.0). It runs from an **empty** database; never run `migrate` or edit tables by hand on a server.
 
-```
-python manage.py migrate
-```
+**D8. The first system administrator.** Created automatically at the first start by the same command (D-076), from two variables in the protected environment file:
 
-**D8. Create the first system administrator.**
-
-1. Set the variable `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` for this one command only.
-2. Run `python manage.py setup_initial_administrator`.
-3. Type the password when asked. The input is hidden.
-4. Remove `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` again.
-5. Give the administrator the password through a secure channel. The method is open.
-6. The administrator must change the password and set up the second factor at the first login. Rights work only with a second factor (`docs/DECISIONS.md`, D-041 and D-042).
+1. The person who will administer the instance writes `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (at least 15 characters) into the environment file themselves, before the first start (`docs/DEPLOYMENT.md`, section 9). The AI does not choose or see the password.
+2. Start the services. The account is created only while the account table is completely empty (a first start). If accounts exist but no system administrator, nothing is created and a clear error is printed (`docs/DEPLOYMENT.md`, section 9).
+3. The administrator must change the password and set up the second factor at the first login. Rights work only with a second factor (`docs/DECISIONS.md`, D-041 and D-042). **The instance must not be publicly reachable until this is done:** the initial password has no expiry, and whoever knows it and reaches the login first can take the account (`docs/DEPLOYMENT.md`, section 9).
+4. **Remove `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` from the environment file after the first login and restart the services.** The start prints a reminder while it is still set; it is ignored once a system administrator exists.
+5. Alternative without a password in a file: leave the password variable unset and run `python manage.py setup_initial_administrator` once in a terminal (it asks for the password with hidden input; the email variable is set for that one command only).
 
 **D9. Start the mail worker as a supervised service.** Run `python manage.py process_mail_queue --loop`. Restart it after a failure. Without it, no email is sent. The supervisor tool is open.
 
@@ -197,7 +192,8 @@ Legend: **Required** = must be set. **Optional** = may be set. **Conditional** =
 | `DB_PORT` | Optional | Optional | Database port. Default `3306`. |
 | `SECURITY_LOG_RETENTION_DAYS` | Optional | Optional | Retention of the security log in days. Default 30. |
 | `SECURITY_LOG_LONG_RETENTION_DAYS` | Optional | Optional | Longer retention for selected events in days. Default 365. |
-| `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` | Required once | Required once | Address of the first system administrator. Set only for `setup_initial_administrator`, then remove it. |
+| `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` | Required once | Required once | Address of the first system administrator. Used by `setup_instance` only while the account table is completely empty, and by `setup_initial_administrator` only while no system administrator exists; may stay afterwards. |
+| `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` | Required once (secret) | Required once (secret) | Initial password of the first system administrator, at least 15 characters. Used only while the account table is completely empty. It has no expiry until the first login (`docs/DEPLOYMENT.md`, section 9). **Remove it from the environment file after the first login and restart the services** (D-076). |
 
 Notes:
 
@@ -208,7 +204,7 @@ Notes:
 
 The portal may check postal addresses against an official register of the Swiss federal topographic office, swisstopo (`docs/DECISIONS.md`, D-033, D-049, D-050).
 
-Status: **not built.** Step A (research) is done. The owner decided the licence, the attribution, the update option and the columns on 2026-10-14. Step B (import) has not started.
+Status: **built** (D-049 to D-052, D-075); not yet run against the real directory. Step A (research) is done. The owner decided the licence, the attribution, the update option and the columns on 2026-10-14.
 
 | Topic | Status | Who decides |
 | --- | --- | --- |
@@ -217,12 +213,12 @@ Status: **not built.** Step A (research) is done. The owner decided the licence,
 | Attribution text | **Decided 2026-10-14 (owner):** "Bundesamt für Landestopografie swisstopo". **Changed 2026-10-15 (owner, D-066):** the software shows no attribution in the user interface; the text belongs to the privacy notice and the imprint of each instance (owner content, D-022). Whether that place satisfies the terms of use is **settled by the owner on 2026-10-16** (D-074): the source reference goes into the privacy notice and the imprint, which the operator writes and maintains elsewhere; the portal only links the two addresses. | Owner (D-049, D-066, D-074) |
 | Update rule | **Decided 2026-10-14 (owner): option C** (D-050). An import can be started by a user with a dedicated permission from the admin area; it runs as a background job. The operator's own import command stays available. The server needs an outbound HTTPS connection to `data.geo.admin.ch`. Security conditions apply (D-050); the security reviewer must review them. | Owner (D-050) |
 | Reminder for old data | **Decided 2026-10-14 (owner):** a warning after 92 days, which matches "once per quarter or manually". | Owner (D-050) |
-| Import account and database alias | **OPEN.** The names are not decided. The import needs its own account and its own read-only database alias. The operator creates the account during the initial setup; see the explanation below the table. | Operator (D-049, step B, D-074) |
+| Import account | **None (D-075).** There is no separate import account and no separate address database account: the directory is an own SQLite file on the server (not part of any backup) that the web application reads and the worker writes with the normal settings. Nothing to create during the initial setup; the folder comes from the service unit (`StateDirectory=`). | Decided (owner, D-075) |
 | Import schedule per server | **OPEN.** | Owner (D-049, item 5) |
 | Integrity check before use | Planned: compare the SHA-256 value of the downloaded file with the value in the swisstopo catalogue for the same file. Do not use the file if they differ. | Decided as a rule for step B (D-049) |
 | Columns kept locally | **Decided 2026-10-14 (owner):** street, house number, postal code and locality. Nothing else is stored (D-049). | Owner (D-049) |
 
-**What the "import account" (also called "import account credentials", D-049) means.** It is a second database account, separate from the account that the application uses. The application's account may only read (`SELECT`) the address database. The import account has write rights, and only the address-import worker uses it: this worker loads the swisstopo address directory into the address database. The operator creates the account on the server during the initial setup (`docs/DEPLOYMENT.md`, section 3.5). Its credentials (user name and password) are stored only in the environment file of the import worker and nowhere else; the web application never receives them. Because the operator does this on the server, it is not an owner decision (D-074).
+**What the "import account" (D-049, D-074) was, and why it does not exist any more.** The earlier plan had a second database account with write rights that only the address-import worker would use, next to a read-only account for the web application and a separate address database. The owner did not want to create accounts and said that the address directory is not important data and can simply be loaded again (2026-10-16, D-075). The directory is therefore stored in an own SQLite file on the server (the owner added that it must not be in the backup, so it is not in the main database) and the import worker uses the same settings as the web application. Nothing has to be created for it. **The file is not backed up:** the backup is the MariaDB database and the environment file. After a restore of a server, start the services; the worker makes the first automatic attempt within 24 hours at the latest (while the directory is missing or empty the attempt is due again 24 hours after the last one, instead of 90 days), or an administrator with the permission to request an import presses the button in the administration. Until the import has finished there are no address suggestions (nobody is told). The web application still never downloads or imports anything: the admin button only queues a request, and the worker `process_address_imports` does the work. After each successful import only the new and the previous version of the directory are kept (D-075).
 
 ## 5a. Settings in the administration and settings that only the operator changes
 
@@ -246,7 +242,7 @@ Each item must be decided or answered before the step that depends on it.
 1. **Licence and terms of the address register:** decided 2026-10-14 (section 5). Closed.
 2. **Attribution:** decided 2026-10-14 (section 5); changed 2026-10-15 (D-066): not shown in the user interface, placed in the privacy notice and the imprint; settled by the owner on 2026-10-16 (D-074). Closed.
 3. **Update option and 92-day reminder:** decided 2026-10-14, option C (section 5). Closed. The security review of option C is open.
-4. **Import account, its name and its database alias:** open (D-049, step B). The operator decides the names and creates the account during the initial setup; the password is entered only on the server.
+4. **Import account, its name and its database alias:** closed (D-075): there is no import account and no separate alias.
 5. **Import schedule per server:** open (D-049, item 5).
 6. **Hosting details:** operating system and its maintenance, web server, TLS, backups, server access, the scheduler (D-008)
 7. **Installation method on the server and how the configuration is loaded:** (D-027, D-008)

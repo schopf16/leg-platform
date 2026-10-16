@@ -158,7 +158,7 @@ class CardPageTests(TestCase):
 @tag("mariadb")
 class PersonalCardTests(TestCase):
     # Saving reads the address directory (advisory check, D-033).
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):

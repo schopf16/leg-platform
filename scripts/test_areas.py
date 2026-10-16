@@ -87,7 +87,6 @@ CORE_PATHS = (
     "leg_platform/accounts/urls.py",
     "leg_platform/addresses/__init__.py",
     "leg_platform/addresses/apps.py",
-    "leg_platform/addresses/router.py",
     # Shared test infrastructure of many modules.
     "leg_platform/accounts/tests/__init__.py",
     "leg_platform/accounts/tests/helpers.py",
@@ -191,22 +190,14 @@ AREAS: dict[str, Area] = {
         tests=_labels(
             T, "test_environment", "test_settings", "test_production_settings", "test_responses",
             "test_instance_configuration", "test_request_body_limit", "test_database",
-            "test_error_pages", "test_address_configuration",
+            "test_error_pages",
         ),
     ),
     "address-directory": Area(
         "The address directory, its import jobs and the address suggestions.",
-        paths=(
-            "leg_platform/addresses/", "leg_platform/address_configuration.py",
-            "leg_platform/local_directory_settings.py", "leg_platform/import_settings.py",
-        ),
-        exclude=(
-            "leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py",
-            "leg_platform/addresses/router.py",
-        ),
-        tests=(
-            ("leg_platform.addresses.tests", T + "test_address_configuration", A + "test_address_notice")
-        ),
+        paths=("leg_platform/addresses/",),
+        exclude=("leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py"),
+        tests=("leg_platform.addresses.tests", A + "test_address_notice"),
     ),
     "registration": Area(
         "Registration, verification links, entry pages and the abuse protection of the forms.",
@@ -250,13 +241,16 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/forms.py",
             "leg_platform/accounts/management/commands/emergency_access.py",
             "leg_platform/accounts/management/commands/setup_initial_administrator.py",
+            "leg_platform/accounts/management/commands/setup_instance.py",
+            "leg_platform/accounts/initial_administrator.py",
             "leg_platform/accounts/management/commands/seed_design_accounts.py",
             "leg_platform/accounts/management/commands/cleanup_confirmation_failures.py",
         ),
         tests=(
             _labels(A, "test_second_factor", "test_second_factor_reset", "test_lost_phone",
                     "test_one_proof", "test_one_proof_review", "test_recent_authentication",
-                    "test_session_code_limit", "test_session_limit_review", "test_design_accounts")
+                    "test_session_code_limit", "test_session_limit_review", "test_design_accounts",
+                    "test_setup_instance")
             + _FLOW_REVIEWS
         ),
     ),
@@ -332,6 +326,7 @@ AREAS["accounts-support"] = Area(
         "leg_platform/accounts/management/commands/cleanup_*.py",
         "leg_platform/accounts/management/commands/emergency_access.py",
         "leg_platform/accounts/management/commands/setup_initial_administrator.py",
+        "leg_platform/accounts/management/commands/setup_instance.py",
         "leg_platform/accounts/management/commands/seed_design_accounts.py",
         "leg_platform/accounts/management/commands/process_mail_queue.py",
         "leg_platform/accounts/management/commands/run_scheduled_tasks.py",

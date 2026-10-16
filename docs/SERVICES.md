@@ -22,7 +22,7 @@ Entries marked **open** are not verified by the developer: the owner or the oper
 | N-2 | **Icons and flags**: Tabler Icons, the four flags of the language menu | Files of the own origin (`static/vendor/tabler-icons/`, `static/img/flags/`); `img-src 'self'` | No external image host |
 | N-3 | **Scripts and styles**: Tabler (stylesheet), the own scripts | Own origin only (`script-src 'self'`); no CDN, no analytics, no tag manager | No external script host |
 | N-4 | **Logos of the instance** | Static files of the instance (`INSTANCE_STATIC_DIRECTORY`), embedded as images | Own origin |
-| N-5 | **Address check** (swisstopo address directory, D-033, D-049, D-052) | A **local copy** of the public directory; suggestions query only the local copy | Profile addresses are never sent to an external service. The copy is imported by the operator from the public source of the Federal Office of Topography (public data, no personal data of the visitors) |
+| N-5 | **Address check** (swisstopo address directory, D-033, D-049, D-052, D-075) | A **local copy** of the public directory in an own SQLite file on the server (not part of any backup); suggestions query only the local copy | Profile addresses are never sent to an external service. The copy is imported by the worker of the instance from the public source of the Federal Office of Topography (public data, no personal data of the visitors) |
 | N-6 | **Language and colour mode of the page** | `sessionStorage` of the browser tab (D-056, K3) | Nothing is stored in a cookie and nothing is sent to the server |
 | N-7 | **Error tracker, log service, analytics, bot check** | **None are used** in the code of this repository | – |
 

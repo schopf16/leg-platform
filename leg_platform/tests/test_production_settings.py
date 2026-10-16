@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -316,8 +317,13 @@ class TestSettingsGuardTests(SimpleTestCase):
 
     def test_the_test_settings_load_locally(self):
         # The control of the two refusals above: the same child process works for APP_ENV=local.
-        result = import_test_settings(APP_ENV="local", EMAIL_MODE="console")
+        # The child has no home folder, so it names the address directory file (D-075).
+        directory_file = str(Path(tempfile.gettempdir()) / "leg-platform-settings-test.sqlite3")
+        result = import_test_settings(
+            APP_ENV="local", EMAIL_MODE="console", ADDRESS_DIRECTORY_FILE=directory_file,
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(Path(directory_file).exists())
 
     def test_the_entry_points_default_to_the_real_settings_module(self):
         # Nothing but an explicit DJANGO_SETTINGS_MODULE can select another module.

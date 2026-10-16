@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
-from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings, tag
+from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone
 
@@ -23,7 +23,7 @@ from leg_platform.addresses.models import Address, Directory
 
 PROFILE_URL = reverse("accounts:profile")
 PROFILE_EDIT_URL = reverse("accounts:profile_edit")
-ADDRESS_DATABASES = {"default", "addresses", "address_import"}
+ADDRESS_DATABASES = {"default", "addresses"}
 NOT_FOUND_DE = "Diese Adresse wurde nicht gefunden."
 # Texts that the pages must never show (D-066): the source of the directory, and the texts for a
 # directory that cannot answer or for a browser without a script.
@@ -296,8 +296,8 @@ class ReadOnlyViewTests(TestCase):
 
 
 @tag("mariadb")
-class RealDirectoryTests(TransactionTestCase):
-    """With a real directory (no patch); the rows must be committed for the reader."""
+class RealDirectoryTests(TestCase):
+    """With a real directory (no patch) in the directory file (D-075)."""
 
     databases = ADDRESS_DATABASES
 
@@ -305,13 +305,13 @@ class RealDirectoryTests(TransactionTestCase):
         self.user = create_active_user()
         self.client.force_login(self.user)
         self.generation = uuid.uuid4()
-        Directory.objects.using("address_import").create(
+        Directory.objects.create(
             pk=1, generation=self.generation, data_date=timezone.localdate(), imported_at=timezone.now(),
             checksum="0" * 64, row_count=1,
         )
 
     def test_an_address_that_is_not_in_the_directory_is_saved_as_entered_without_any_notice(self):
-        Address.objects.using("address_import").create(
+        Address.objects.create(
             generation=self.generation, street="Another Street", house_number="1",
             postal_code="3000", locality="Bern",
         )

@@ -242,7 +242,7 @@ class AbandonedSecondStepTests(TestCase):
     """Security review L1: an abandoned second step leaves no wish behind that a later login of
     the same browser could use."""
 
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     def test_a_registration_after_an_abandoned_ticked_login_is_not_persistent(self):
         user, _device = create_user_with_totp("holder.person@example.org")

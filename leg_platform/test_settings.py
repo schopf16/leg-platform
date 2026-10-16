@@ -1,7 +1,13 @@
-"""Application MariaDB tests with isolated synthetic address-directory databases."""
+"""Application MariaDB tests; the address directory is a temporary SQLite file (D-075)."""
+
+import atexit
+import shutil
+import tempfile
+from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from .addresses.storage import mark_writer
 from .settings import *  # noqa: F403
 
 # These settings are for the automated tests on a development machine or in CI, where the
@@ -29,11 +35,22 @@ MAIL_FORM_MINIMUM_SECONDS = 0
 # Django's default hashers and that the production hasher still hashes and verifies (D-071).
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
+# The address directory of the tests: a file of this run in the temporary folder of the system,
+# never the configured file of the instance and never inside the repository. Django creates the test
+# database at this path (TEST NAME) and removes it when the run ends; the folder is removed at exit
+# as well. The file of the instance (settings.DATABASES["addresses"]["NAME"]) is not opened by a
+# test run.
+_ADDRESS_TEST_FOLDER = tempfile.mkdtemp(prefix="leg-platform-address-tests-")
+atexit.register(shutil.rmtree, _ADDRESS_TEST_FOLDER, True)
 DATABASES = {  # noqa: F405
     **DATABASES,
-    "address_import": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"},
     "addresses": {
-        "ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:",
-        "TEST": {"MIRROR": "address_import"},
+        **DATABASES["addresses"],  # noqa: F405
+        "TEST": {"NAME": str(Path(_ADDRESS_TEST_FOLDER) / "address-directory.sqlite3")},
     },
 }
+
+# The test process fills the directory file of the tests itself (creating the test database,
+# the fixtures of the tests), so it is a writer. The tests of the read-only default switch the
+# flag off explicitly (leg_platform/addresses/tests/test_directory.py).
+mark_writer()

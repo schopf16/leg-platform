@@ -203,7 +203,7 @@ class PageSecurityAndLanguageTests(TestCase):
     """All pages follow the Content Security Policy and the language rules (D-010, D-028)."""
 
     # The details step of the registration reads the status of the address directory (D-058).
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     def pages(self):
         user = create_active_user("active.person@example.org")

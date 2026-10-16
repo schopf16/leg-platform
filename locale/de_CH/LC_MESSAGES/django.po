@@ -1382,6 +1382,9 @@ msgstr "Microsoft-Graph-Zertifikat hochgeladen"
 msgid "Microsoft Graph test email requested"
 msgstr "Test-E-Mail über Microsoft Graph angefordert"
 
+msgid "Address directory import requested"
+msgstr "Import des Adressverzeichnisses angefordert"
+
 msgid "The certificate or the private key cannot be read (PEM, no password)."
 msgstr "Das Zertifikat oder der private Schlüssel kann nicht gelesen werden (PEM, ohne Passwort)."
 

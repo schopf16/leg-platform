@@ -1,11 +1,11 @@
-"""Load a few clearly synthetic addresses into the local throw-away address directory.
+"""Load a few clearly synthetic addresses into the address directory file of a development machine.
 
 Only for a development machine, to try address suggestions without the real directory
 (docs/STARTUP.md). The command
 
 * refuses to run unless ``APP_ENV=local``;
-* writes only to the SQLite aliases of ``leg_platform.local_directory_settings``, never to a
-  MariaDB directory database or with importer credentials;
+* writes to the directory file (the alias ``addresses``, D-075), which must have its tables
+  (``python manage.py migrate addresses --database=addresses``);
 * refuses to replace a directory that does not carry the synthetic marker, so that data from
   a real import is never overwritten.
 
@@ -19,9 +19,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from leg_platform.addresses.models import READ_ALIAS, WRITE_ALIAS, Address, Directory
-
-SQLITE_ENGINE = "django.db.backends.sqlite3"
+from leg_platform.addresses.models import DIRECTORY_ALIAS, Address, Directory
+from leg_platform.addresses.storage import mark_writer
 
 # Not a SHA-256 value, so that it can never equal the checksum of a real import (64 hex digits).
 SYNTHETIC_CHECKSUM = "synthetic-local-directory"
@@ -39,22 +38,7 @@ SYNTHETIC_ROWS = (
     ("Throwaway Road", "21", "9997", "Test Village"),
 )
 
-MIGRATE_HINT = (
-    "python manage.py migrate addresses --database=address_import "
-    "--settings=leg_platform.local_directory_settings"
-)
-
-
-def ensure_local_sqlite_aliases() -> None:
-    """Refuse unless both directory aliases are SQLite databases (the local throw-away file)."""
-    for alias in (READ_ALIAS, WRITE_ALIAS):
-        engine = settings.DATABASES.get(alias, {}).get("ENGINE")
-        if engine != SQLITE_ENGINE:
-            raise CommandError(
-                f"The database alias '{alias}' is not a SQLite database. This command works "
-                "only with --settings=leg_platform.local_directory_settings and never writes "
-                "to a MariaDB directory."
-            )
+MIGRATE_HINT = "python manage.py migrate addresses --database=addresses"
 
 
 def ensure_replaceable(directory, has_addresses: bool) -> None:
@@ -73,17 +57,16 @@ def ensure_replaceable(directory, has_addresses: bool) -> None:
     if directory.checksum != SYNTHETIC_CHECKSUM:
         raise CommandError(
             "The directory was not created by this command (its checksum is not the synthetic "
-            "marker) and may contain imported data; refusing to replace it. Use another file "
-            "through LEG_LOCAL_ADDRESS_DIRECTORY_FILE."
+            "marker) and may contain imported data; refusing to replace it."
         )
 
 
-def replace_directory(rows=SYNTHETIC_ROWS, using=WRITE_ALIAS) -> int:
+def replace_directory(rows=SYNTHETIC_ROWS) -> int:
     """Replace all addresses with ``rows`` and publish them as one new generation."""
     generation = uuid.uuid4()
-    with transaction.atomic(using=using):
-        Address.objects.using(using).all().delete()
-        Address.objects.using(using).bulk_create(
+    with transaction.atomic(using=DIRECTORY_ALIAS):
+        Address.objects.all().delete()
+        Address.objects.bulk_create(
             [
                 Address(
                     generation=generation,
@@ -95,7 +78,7 @@ def replace_directory(rows=SYNTHETIC_ROWS, using=WRITE_ALIAS) -> int:
                 for street, house_number, postal_code, locality in rows
             ]
         )
-        Directory.objects.using(using).update_or_create(
+        Directory.objects.update_or_create(
             pk=1,
             defaults={
                 "generation": generation,
@@ -110,17 +93,18 @@ def replace_directory(rows=SYNTHETIC_ROWS, using=WRITE_ALIAS) -> int:
 
 class Command(BaseCommand):
     help = (
-        "Load a few synthetic addresses into the local throw-away address directory "
-        "(APP_ENV=local and leg_platform.local_directory_settings only)."
+        "Load a few synthetic addresses into the address directory of a development machine "
+        "(APP_ENV=local only)."
     )
 
     def handle(self, *args, **options):
         if settings.APP_ENV != "local":
             raise CommandError("This command runs only with APP_ENV=local.")
-        ensure_local_sqlite_aliases()
+        # The seed writes the directory file; every other process opens it read-only (D-075).
+        mark_writer()
         try:
-            directory = Directory.objects.using(WRITE_ALIAS).filter(pk=1).first()
-            has_addresses = Address.objects.using(WRITE_ALIAS).exists()
+            directory = Directory.objects.filter(pk=1).first()
+            has_addresses = Address.objects.exists()
         except DatabaseError:
             raise CommandError(
                 f"The directory tables do not exist yet. Create them first: {MIGRATE_HINT}"

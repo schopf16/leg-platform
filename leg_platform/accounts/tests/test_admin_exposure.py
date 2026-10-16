@@ -59,7 +59,7 @@ def administration_paths():
 @tag("mariadb")
 class AdministrationExposureTests(TestCase):
     # The walk also opens the pages of the address directory administration, which read it.
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):

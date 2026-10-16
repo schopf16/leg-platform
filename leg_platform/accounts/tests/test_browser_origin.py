@@ -106,7 +106,7 @@ class LoginOriginTests(BrowserOriginMixin, TestCase):
 @tag("mariadb")
 class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
     # Completing the registration reads the address directory (advisory check, D-033).
-    databases = {"default", "addresses", "address_import"}
+    databases = {"default", "addresses"}
 
     def setUp(self):
         self.client = browser_client()
