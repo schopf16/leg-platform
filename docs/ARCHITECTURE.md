@@ -183,6 +183,17 @@ Security-relevant events are logged centrally (D-018). Logs contain no passwords
 
 Sources: https://github.com/tabler/tabler, https://getbootstrap.com/docs/5.3/getting-started/introduction/ (checked on 2026-10-09)
 
+## Management Area and the Community Domain
+
+Phase 2 (D-077) adds two Django apps.
+
+* **`leg_platform.community`**: the domain, without pages. Models: `TransformerCircuit`, `Location` (unique on the normalised address, through a SHA-256 digest), `MeteringPoint` (33-character number, direction consumption or feed-in, optional location, dates that drive a derived status), `Leg`, `PersonAssignment` and `LegAssignment` (periods; the previous assignment ends the day before the new one), `HistoryEntry` (append only), `ManagementSettings` (one row), `PersonRecord` (the staff-only side record of an account: note, BKW customer number, shares, IBAN and paper invoice read-only, address suggestion state) and `ListPreference`. The rules are plain modules, tested without a browser: `numbers` (metering point and transformer circuit numbers), `status`, `assignments`, `legs` (members, consumer:producer ratio, discount tier, quota problems), `problems`, `addressing` (normalisation and the directory suggestion on top of `leg_platform.addresses.services`), `locations` (accept or dismiss a suggestion), `history`, `settings_service` and `preferences`. Identifier columns use the exact collation (D-031). The models are not registered in the Django administration; their rights (default rights and `correct_person_address`) are offered to roles by `accounts/permission_names.py`.
+* **`leg_platform.management`**: views, forms, templates and static files under `/management/`. Every view uses `access.ManagementAccessMixin` or `@management_view` (staff, second factor completed, the permissions of the page; 404 for non-staff, 403 for missing rights); the menu group is built from `navigation.MENU` (one line per page); `returns.py` is the safe way back; the shared building blocks are the includes `management/_*.html`, `page.html`, `dialog.html`, `management.css` and `info-bubble.js`. A test walks the URL configuration and fails for a route without the access check.
+
+Permissions are the only access rule (D-012); the menu only reflects them. The status of a metering point follows from its dates and the day, without a scheduler. The address directory stays advisory (D-066): a suggestion for a location is stored on it so that lists can filter without asking the directory per row.
+
+Sources: D-077 and its sources.
+
 ## Data Storage
 
 MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.

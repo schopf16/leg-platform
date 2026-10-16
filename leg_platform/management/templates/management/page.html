@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+The frame of a page of the management area (D-077): the header with "VERWALTUNG", the title and the
+buttons, then the content. The view gives ``page_title`` (a translated text) and may give
+``page_subtitle``. A child template fills the blocks ``header_actions`` (the buttons of the head,
+right of the title) and ``page_content``. A list page sets ``inner_class`` to "mgmt-wide" for the
+width of the lists. The symbols and the stylesheet are loaded here, once.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <div class="mgmt-header">
+    <div>
+      <p class="page-label">{% translate "Management" %}</p>
+      <h1 class="start-title">{{ page_title }}</h1>
+      {% if page_subtitle %}<p class="mgmt-subtitle">{{ page_subtitle }}</p>{% endif %}
+    </div>
+    <div class="mgmt-header-actions">{% block header_actions %}{% endblock %}</div>
+  </div>
+  {% block page_content %}{% endblock %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+{% endblock %}

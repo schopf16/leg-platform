@@ -1,0 +1,7 @@
+{% load i18n %}{% comment %}
+The info button "i" with its bubble (LISTEN-STANDARD.md, section 5; D-077). Context: ``name`` (what the
+button explains, for the accessible name), ``tip_id`` (unique on the page), ``text`` (plain text; a
+rich bubble writes the markup of ``mgmt-info`` and ``mgmt-tip`` itself) and ``placement`` ("left" for
+the bubbles of the right columns, "left-up" for the status, empty otherwise). The bubble shows on
+hover and while the button has the focus; it wraps and never scrolls.
+{% endcomment %}{% blocktranslate asvar info_label %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info{% if placement == 'left' %} is-left{% elif placement == 'left-up' %} is-left-up{% endif %}"><button type="button" class="mgmt-info-btn" aria-label="{{ info_label }}" aria-describedby="{{ tip_id }}">i</button><span class="mgmt-tip" role="tooltip" id="{{ tip_id }}">{{ text }}</span></span>

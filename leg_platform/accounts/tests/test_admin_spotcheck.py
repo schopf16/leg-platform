@@ -87,14 +87,37 @@ class GroupRightsTests(TestCase):
         options = re.findall(r'<option value="\d+"[^>]*>([^<]+)</option>', page)
         self.assertEqual(
             sorted(options),
-            [
-                "Konto: ansehen",
-                "Konto: ändern",
-                "Mailtext: ansehen",
-                "Mailtext: ändern",
-                "Portal-Einstellungen: ansehen",
-                "Portal-Einstellungen: ändern",
-            ],
+            sorted(
+                [
+                    "Konto: ansehen",
+                    "Konto: ändern",
+                    "Mailtext: ansehen",
+                    "Mailtext: ändern",
+                    "Portal-Einstellungen: ansehen",
+                    "Portal-Einstellungen: ändern",
+                    # The management area (D-077): the rights that its pages check.
+                    "Person: ansehen",
+                    "Person: ändern",
+                    "Person: Adresse korrigieren",
+                    "Standort: ansehen",
+                    "Standort: hinzufügen",
+                    "Standort: ändern",
+                    "Standort: löschen",
+                    "Trafokreis: ansehen",
+                    "Trafokreis: hinzufügen",
+                    "Trafokreis: ändern",
+                    "LEG: ansehen",
+                    "LEG: hinzufügen",
+                    "LEG: ändern",
+                    "LEG: löschen",
+                    "Messpunkt: ansehen",
+                    "Messpunkt: hinzufügen",
+                    "Messpunkt: ändern",
+                    "Messpunkt: löschen",
+                    "Einstellungen der Verwaltung: ansehen",
+                    "Einstellungen der Verwaltung: ändern",
+                ]
+            ),
         )
 
     def test_the_script_of_the_widget_is_german_and_has_no_sharp_s(self):

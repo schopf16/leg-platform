@@ -1,9 +1,11 @@
-{% load i18n %}{% comment %}
+{% load i18n management_ui %}{% comment %}
 The entries of the menu, shared by the left menu of the desktop and the menu of the phone
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
 (team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
-aria-current. Log out is a real POST form. "Administration" is only for staff users (K13);
-the permissions are checked by the administration itself.
+aria-current. Log out is a real POST form. "System administration" (the Django administration) is
+only for staff users (K13); the permissions are checked by the administration itself. The group
+"Management" lists the entries of leg_platform.management.navigation.MENU that the account may use
+(D-077); it is left out when there are none.
 {% endcomment %}{% with view=request.resolver_match.view_name %}
 <p class="frame-group">{% translate "My area" %}</p>
 <a class="frame-item{% if view == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if view == 'home' %} aria-current="page"{% endif %}>
@@ -14,9 +16,16 @@ the permissions are checked by the administration itself.
 </a>
 {% if user.is_staff %}
   <a class="frame-item" href="{% url 'admin:index' %}">
-    <svg class="frame-icon" aria-hidden="true"><use href="#i-settings"/></svg><span>{% translate "Administration" %}</span>
+    <svg class="frame-icon" aria-hidden="true"><use href="#i-settings"/></svg><span>{% translate "System administration" %}</span>
   </a>
 {% endif %}
+{% management_menu as management_entries %}{% if management_entries %}
+<p class="frame-group">{% translate "Management" %}</p>
+{% for entry in management_entries %}
+<a class="frame-item{% if entry.active %} is-active{% endif %}" href="{{ entry.url }}"{% if entry.active %} aria-current="page"{% endif %}>
+  <svg class="frame-icon" aria-hidden="true"><use href="#{{ entry.icon }}"/></svg><span>{{ entry.label }}</span>
+</a>
+{% endfor %}{% endif %}
 <p class="frame-group">{% translate "Coming next" %}</p>
 <a class="frame-item is-later" role="link" aria-disabled="true">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-building"/></svg><span>{% translate "Locations" %}</span>

@@ -2622,3 +2622,361 @@ msgstr "Die Einstellungen des Portals ansehen"
 
 msgid "Change name, logo, colours and addresses of the portal"
 msgstr "Name, Logo, Farben und Adressen des Portals ändern"
+
+# The management area (D-077). The texts of the pages are the final texts of the owner's design
+# specification (LEG-Design-Vorgaben/verwaltung); a text that the specification does not contain is
+# the smallest neutral wording and is listed as an open point in D-077.
+
+msgid "Community"
+msgstr "Gemeinschaft"
+
+msgid "Management"
+msgstr "Verwaltung"
+
+msgid "Overview"
+msgstr "Übersicht"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+# The Django administration, named differently from the group "Management" (both would read
+# "Verwaltung").
+msgid "System administration"
+msgstr "Systemverwaltung"
+
+msgid "Invoice sender"
+msgstr "Absender der Rechnungen"
+
+msgid "Metering points"
+msgstr "Messpunkte"
+
+msgid "Production quota"
+msgstr "Produktionsquote"
+
+msgid "Applies to all metering points. The BKW assigns the identifier."
+msgstr "Gilt für alle Messpunkte. Die BKW vergibt den Identifikator."
+
+#, python-format
+msgid "Applies to all LEGs. The law requires at least %(minimum)d %%."
+msgstr "Gilt für alle LEGs. Gesetzlich nötig sind mindestens %(minimum)d %%."
+
+msgctxt "management"
+msgid "optional"
+msgstr "optional"
+
+msgctxt "unit"
+msgid "in"
+msgstr "in"
+
+msgid "Accept"
+msgstr "Übernehmen"
+
+msgid "Do not accept"
+msgstr "Nicht übernehmen"
+
+#, python-format
+msgid "The address differs from the address directory. Suggestion: %(address)s."
+msgstr "Die Adresse weicht vom Adressverzeichnis ab. Vorschlag: %(address)s."
+
+#, python-format
+msgid "Information: %(name)s"
+msgstr "Information: %(name)s"
+
+msgid "Enter two capital letters, for example CH."
+msgstr "Geben Sie zwei Grossbuchstaben ein, z. B. CH."
+
+msgid "Enter 11 characters: capital letters and digits."
+msgstr "Geben Sie 11 Zeichen ein: Grossbuchstaben und Ziffern."
+
+msgid "Enter a number of 33 characters: capital letters and digits."
+msgstr "Geben Sie eine Nummer mit 33 Zeichen ein: Grossbuchstaben und Ziffern."
+
+msgid "Enter up to 20 digits."
+msgstr "Geben Sie bis zu 20 Ziffern ein."
+
+msgid "Enter the BKW number: TRA followed by digits."
+msgstr "Geben Sie die BKW-Nummer ein: TRA und Ziffern."
+
+msgid "This address already exists."
+msgstr "Diese Adresse gibt es schon."
+
+# Field names and names of the models (they appear in forms and in the lists of rights)
+msgid "created"
+msgstr "angelegt"
+
+msgid "changed"
+msgstr "geändert"
+
+msgid "name"
+msgstr "Name"
+
+msgid "BKW number"
+msgstr "BKW-Nummer"
+
+msgid "transformer circuit"
+msgstr "Trafokreis"
+
+msgid "transformer circuits"
+msgstr "Trafokreise"
+
+msgid "remark"
+msgstr "Bemerkung"
+
+msgid "archived"
+msgstr "archiviert"
+
+msgid "not yet confirmed"
+msgstr "noch nicht bestätigt"
+
+msgid "location"
+msgstr "Standort"
+
+msgid "locations"
+msgstr "Standorte"
+
+msgid "metering point number"
+msgstr "Messpunkt-Nummer"
+
+msgid "direction"
+msgstr "Richtung"
+
+msgid "PV power (kWp)"
+msgstr "PV-Leistung (kWp)"
+
+msgid "battery (kWh)"
+msgstr "Batterie (kWh)"
+
+msgid "wallbox (kW)"
+msgstr "Wallbox (kW)"
+
+msgid "notified to the BKW on"
+msgstr "Bei der BKW angemeldet am"
+
+msgid "confirmed on"
+msgstr "Bestätigt am"
+
+msgid "start date"
+msgstr "Startdatum"
+
+msgid "terminated on"
+msgstr "Gekündigt zum"
+
+msgid "metering point"
+msgstr "Messpunkt"
+
+msgid "metering points"
+msgstr "Messpunkte"
+
+msgid "LEG"
+msgstr "LEG"
+
+msgid "LEGs"
+msgstr "LEGs"
+
+msgid "production quota (%)"
+msgstr "Produktionsquote (%)"
+
+msgid "checked on"
+msgstr "Geprüft am"
+
+msgid "valid from"
+msgstr "Gilt ab"
+
+msgid "valid to"
+msgstr "Gilt bis"
+
+msgid "person assignment"
+msgstr "Personenzuordnung"
+
+msgid "person assignments"
+msgstr "Personenzuordnungen"
+
+msgid "LEG assignment"
+msgstr "LEG-Zuordnung"
+
+msgid "LEG assignments"
+msgstr "LEG-Zuordnungen"
+
+msgid "history entry"
+msgstr "Verlaufseintrag"
+
+msgid "history entries"
+msgstr "Verlaufseinträge"
+
+msgid "identifier"
+msgstr "Identifikator"
+
+msgid "warning threshold"
+msgstr "Warnschwelle"
+
+msgid "management settings"
+msgstr "Einstellungen der Verwaltung"
+
+msgid "note"
+msgstr "Notiz"
+
+msgid "BKW customer number"
+msgstr "BKW-Kundennummer"
+
+msgid "shares"
+msgstr "Anteile"
+
+msgid "shares from"
+msgstr "Anteile ab"
+
+msgid "shares to"
+msgstr "Anteile bis"
+
+msgid "IBAN"
+msgstr "IBAN"
+
+msgid "paper invoice"
+msgstr "Papierrechnung"
+
+msgid "person"
+msgstr "Person"
+
+msgid "persons"
+msgstr "Personen"
+
+msgid "list preference"
+msgstr "Listeneinstellung"
+
+msgid "list preferences"
+msgstr "Listeneinstellungen"
+
+msgid "Consumption"
+msgstr "Bezug"
+
+msgid "Feed-in"
+msgstr "Einspeisung"
+
+# The status of a metering point, in lower case as in the design specification
+msgctxt "metering point status"
+msgid "registered"
+msgstr "registriert"
+
+msgctxt "metering point status"
+msgid "notified"
+msgstr "angemeldet"
+
+msgctxt "metering point status"
+msgid "confirmed"
+msgstr "bestätigt"
+
+msgctxt "metering point status"
+msgid "active"
+msgstr "aktiv"
+
+msgctxt "metering point status"
+msgid "terminated"
+msgstr "gekündigt"
+
+# The discount tier of a LEG
+msgid "none"
+msgstr "keine"
+
+msgid "Basic discount"
+msgstr "Basis-Rabatt"
+
+msgid "Price optimised"
+msgstr "Preisoptimiert"
+
+# Problems (LISTEN-STANDARD.md, sections 9 to 12)
+msgid "Production quota below 5 % (required by law)"
+msgstr "Produktionsquote unter 5 % (gesetzlich nötig)"
+
+msgid "Production quota below the warning threshold"
+msgstr "Produktionsquote unter der Warnschwelle"
+
+msgid "Metering points added since the value was read, read the value again"
+msgstr "Messpunkte seit dem Stand hinzugefügt, Wert neu ablesen"
+
+msgid "No producer"
+msgstr "Kein Produzent"
+
+msgid "No consumer"
+msgstr "Kein Verbraucher"
+
+#, python-format
+msgid "Problem: Production quota below %(threshold)s %%"
+msgstr "Problem: Produktionsquote unter %(threshold)s %%"
+
+#, python-format
+msgid "Problem: %(problem)s"
+msgstr "Problem: %(problem)s"
+
+msgid "Problem: Address correction open"
+msgstr "Problem: Adresskorrektur offen"
+
+msgid "This metering point is not assigned to a location."
+msgstr "Dieser Messpunkt ist keinem Standort zugeordnet."
+
+msgid "This metering point is not assigned to a LEG."
+msgstr "Dieser Messpunkt ist keiner LEG zugeordnet."
+
+msgid "This metering point is not assigned to a person."
+msgstr "Dieser Messpunkt ist keiner Person zugeordnet."
+
+# The history (the events)
+msgid "Created"
+msgstr "Angelegt"
+
+msgid "Address correction accepted"
+msgstr "Adresskorrektur übernommen"
+
+msgid "Address correction not accepted"
+msgstr "Adresskorrektur nicht übernommen"
+
+msgid "Person assigned"
+msgstr "Person zugewiesen"
+
+msgid "Person assignment ended"
+msgstr "Zuordnung beendet"
+
+msgid "Person assignment deleted"
+msgstr "Zuordnung gelöscht"
+
+msgid "LEG assigned"
+msgstr "LEG zugewiesen"
+
+msgid "LEG assignment ended"
+msgstr "LEG-Zuordnung beendet"
+
+msgid "LEG assignment deleted"
+msgstr "LEG-Zuordnung gelöscht"
+
+msgid "Sender address changed"
+msgstr "Absender-Adresse geändert"
+
+msgid "Country changed"
+msgstr "Land geändert"
+
+msgid "Identifier changed"
+msgstr "Identifikator geändert"
+
+# The rights of the management area (the lists of rights and the help "Which rights do I need for what?")
+msgctxt "right"
+msgid "correct the address"
+msgstr "Adresse korrigieren"
+
+msgid "See persons, locations, LEGs and metering points"
+msgstr "Personen, Standorte, LEGs und Messpunkte ansehen"
+
+msgid "Change persons, locations, LEGs and metering points, and assign them"
+msgstr "Personen, Standorte, LEGs und Messpunkte ändern und zuordnen"
+
+msgid "Create locations, LEGs, metering points and transformer circuits"
+msgstr "Standorte, LEGs, Messpunkte und Trafokreise anlegen"
+
+msgid "Delete locations, LEGs and metering points"
+msgstr "Standorte, LEGs und Messpunkte löschen"
+
+msgid "Correct the address of a person"
+msgstr "Die Adresse einer Person korrigieren"
+
+msgid "See the settings of the management area"
+msgstr "Die Einstellungen der Verwaltung ansehen"
+
+msgid "Change the settings of the management area"
+msgstr "Die Einstellungen der Verwaltung ändern"

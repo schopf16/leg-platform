@@ -1,0 +1,5 @@
+{% comment %}
+The warning triangle of a problem in a list (LISTEN-STANDARD.md, section 9; D-077). Context: ``text``,
+the short name of the problem; it is the hint (title) and the accessible text, so the triangle is
+never the only sign. Only in lists that have the filter "Filter problems".
+{% endcomment %}<span class="mgmt-warning" title="{{ text }}"><svg class="mgmt-warning-icon" aria-hidden="true"><use href="#m-warning"/></svg><span class="visually-hidden">{{ text }}</span></span>

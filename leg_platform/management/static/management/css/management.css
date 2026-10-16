@@ -1,0 +1,498 @@
+/* The management area for staff users (D-077): the shared building blocks of its pages.
+   Ported from the owner's templates in LEG-Design-Vorgaben/verwaltung/*/referenz (sizes, spacing,
+   structure) with the tokens of portal.css instead of the colour values of the templates, so that
+   the light and the dark mode and the instance colours apply (docs/DESIGN.md, section 3).
+   No inline styles and no inline scripts (Content Security Policy). */
+
+/* ---- Wide pages (the lists): the content is as wide as the templates (1200 px) ---- */
+.frame-content:has(> .mgmt-wide) {
+  max-width: 1200px;
+}
+
+/* ---- Page header: "VERWALTUNG", the title and the buttons ---- */
+.mgmt-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 24px;
+}
+
+.mgmt-header .page-label {
+  margin: 0;
+}
+
+.mgmt-header .start-title {
+  margin-top: 4px;
+}
+
+.mgmt-subtitle {
+  margin: 8px 0 0;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.mgmt-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mgmt-header-actions .btn,
+.mgmt-actions .btn {
+  min-height: 44px;
+}
+
+/* The button "Filter problems" has the border of the warning colour (uebersicht). */
+.btn-warning-outline {
+  background: var(--panel);
+  border: 1.5px solid var(--warn);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.btn-warning-outline:hover,
+.btn-warning-outline:focus-visible {
+  background: var(--warm);
+  border-color: var(--warn);
+  color: var(--fg);
+}
+
+/* ---- Cards and rows of label and field ---- */
+.mgmt-card {
+  margin: 0 0 16px;
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.mgmt-card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.mgmt-row {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-row:first-of-type {
+  border-top: 0;
+}
+
+.mgmt-row-label {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.mgmt-row-label .mgmt-optional {
+  font-size: 14px;
+}
+
+.mgmt-row .form-control {
+  min-height: 44px;
+}
+
+.mgmt-field-short {
+  max-width: 120px;
+}
+
+.mgmt-field-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mgmt-field-error {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--bad);
+}
+
+.mgmt-hint {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Text that exists on one kind of device only (the phone template says "Warning threshold in %"). */
+.mgmt-phone-only {
+  display: none;
+}
+
+.mgmt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mgmt-card .tnum,
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Banner in the warning colour (problems, address correction) ---- */
+.mgmt-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--warn);
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.mgmt-banner p {
+  margin: 0;
+}
+
+.mgmt-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mgmt-banner-actions .btn {
+  min-height: 40px;
+  font-size: 15px;
+}
+
+/* ---- Info button "i" with its bubble (LISTEN-STANDARD section 5) ---- */
+.mgmt-info {
+  position: relative;
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.mgmt-info-btn {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The picture stays 14 px; the area that can be hit is 24 px (WCAG 2.2, 2.5.8). */
+.mgmt-info-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.mgmt-info-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-tip {
+  display: none;
+  position: absolute;
+  top: 30px;
+  left: -8px;
+  z-index: 20;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--fg);
+  color: var(--panel);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* The bubbles of the right columns open to the left; the one of the status to the left and up. */
+.mgmt-info.is-left .mgmt-tip {
+  left: auto;
+  right: 0;
+}
+
+.mgmt-info.is-left-up .mgmt-tip {
+  left: auto;
+  right: 0;
+  top: auto;
+  bottom: 30px;
+}
+
+.mgmt-info:hover .mgmt-tip,
+.mgmt-info:focus-within .mgmt-tip {
+  display: block;
+}
+
+/* Escape closes the bubble until the pointer or the focus comes back (WCAG 1.4.13). */
+.mgmt-info.is-dismissed .mgmt-tip {
+  display: none;
+}
+
+/* ---- The link to the detail page: two linked chain links, 16 px in a 24 px area ---- */
+.mgmt-goto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--accent);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.mgmt-goto:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-goto-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- Status: a dot and a word, never colour alone (docs/DESIGN.md, section 3.5) ---- */
+.mgmt-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.mgmt-status::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--dot, var(--muted));
+}
+
+.mgmt-status.is-warn { --dot: var(--warn); }
+.mgmt-status.is-accent { --dot: var(--accent); }
+.mgmt-status.is-ok { --dot: var(--ok); }
+.mgmt-status.is-bad { --dot: var(--bad); }
+.mgmt-status.is-muted { --dot: var(--muted); }
+
+/* "Confirmed": a green ring around a dark centre. */
+.mgmt-status.is-ring {
+  --dot: var(--fg);
+}
+
+.mgmt-status.is-ring::before {
+  box-shadow: inset 0 0 0 3px var(--ok);
+}
+
+/* ---- Direction badge: consumption blue (the accent), feed-in green ---- */
+.mgmt-direction {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.mgmt-direction.is-consumption {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  color: var(--accent);
+}
+
+.mgmt-direction.is-feed-in {
+  background: color-mix(in srgb, var(--ok) 16%, var(--panel));
+  color: var(--ok);
+}
+
+/* ---- Warning triangle (a problem in a list) ---- */
+.mgmt-warning {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.mgmt-warning-icon {
+  width: 18px;
+  height: 18px;
+  fill: var(--warn);
+  /* The exclamation mark and its dot take the colour of the surface. */
+  color: var(--panel);
+}
+
+/* ---- An empty list: one row over the full width ---- */
+.mgmt-empty td,
+.mgmt-empty-text {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ---- Dialog: a centred card over a dimmed page on a desktop, the full view on a phone ---- */
+.mgmt-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+
+.mgmt-dialog {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  padding: 24px 28px;
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--fg) 20%, transparent);
+}
+
+.mgmt-dialog h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.mgmt-dialog-lead {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.mgmt-dialog .mgmt-actions {
+  margin-top: 16px;
+}
+
+/* ---- Phone ---- */
+@media (max-width: 760px) {
+  .mgmt-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .mgmt-header-actions .btn {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .mgmt-card {
+    padding: 14px 16px;
+  }
+
+  .mgmt-card h2 {
+    font-size: 17px;
+    margin-bottom: 8px;
+  }
+
+  .mgmt-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 0;
+    margin-bottom: 12px;
+    border-top: 0;
+  }
+
+  .mgmt-row .form-control {
+    min-height: 48px;
+  }
+
+  .mgmt-field-short {
+    max-width: none;
+  }
+
+  .mgmt-row-label {
+    font-size: 14px;
+  }
+
+  .mgmt-row-label:empty {
+    display: none;
+  }
+
+  .mgmt-phone-only {
+    display: inline;
+  }
+
+  .mgmt-desktop-only {
+    display: none;
+  }
+
+  .mgmt-banner {
+    flex-direction: column;
+    align-items: stretch;
+    font-size: 15px;
+  }
+
+  .mgmt-banner-actions {
+    flex-direction: column;
+  }
+
+  .mgmt-banner-actions .btn,
+  .mgmt-actions .btn {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .mgmt-actions {
+    flex-direction: column;
+  }
+
+  /* The dialog is the whole view. */
+  .mgmt-dialog-layer {
+    display: block;
+    padding: 0;
+    background: var(--panel);
+  }
+
+  .mgmt-dialog {
+    width: 100%;
+    min-height: 100%;
+    padding: 20px 16px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .mgmt-dialog h1 {
+    font-size: 24px;
+  }
+}
+
+@media print {
+  .mgmt-dialog-layer {
+    position: static;
+    background: none;
+  }
+
+  .mgmt-dialog {
+    box-shadow: none;
+  }
+}

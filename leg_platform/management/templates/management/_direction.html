@@ -1,0 +1,4 @@
+{% comment %}
+The badge of the direction of a metering point (D-077): consumption in blue, feed-in in green, with the
+word. Context: ``direction`` ("consumption" or "feed_in").
+{% endcomment %}{% load management_ui %}<span class="mgmt-direction is-{{ direction|direction_class }}">{{ direction|direction_label }}</span>

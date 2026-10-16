@@ -896,7 +896,7 @@ class AdministrationAccessTests(TestCase):
                 self.assertNotContains(page, 'href="/admin/"')
                 staff_page = staff_client.get(url)
                 self.assertContains(staff_page, 'href="/admin/"')
-                self.assertContains(staff_page, "Verwaltung")
+                self.assertContains(staff_page, "Systemverwaltung")
 
 
 @tag("mariadb")

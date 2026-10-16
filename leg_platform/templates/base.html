@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/portal.css' %}">
   <link rel="stylesheet" href="{% static 'css/frame.css' %}">
+  {% block extra_head %}{% endblock %}
   <link rel="stylesheet" href="{% url 'instance_stylesheet' %}">
 </head>
 <body class="register-clear">

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+The frame of a dialog (D-077): a centred card over the dimmed page on a desktop, the full view on a
+phone (LEG-Design-Vorgaben/verwaltung/standorte/UMSETZUNG.md, "Dialoge"). It is a normal page, so it
+works without JavaScript: "Cancel" is a link back to the place the person came from. The view gives
+``page_title``, ``back_url`` (a safe address, ``management.returns.return_url``), optionally
+``dialog_lead`` and ``submit_label``. A child fills ``dialog_fields`` with the fields of the form.
+The form posts to the same address with the CSRF token and the ``next`` value.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block messages %}{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <div class="mgmt-dialog-layer">
+    <section class="mgmt-dialog" role="dialog" aria-labelledby="dialog-title">
+      <h1 id="dialog-title">{{ page_title }}</h1>
+      {% if dialog_lead %}<p class="mgmt-dialog-lead">{{ dialog_lead }}</p>{% endif %}
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ back_url }}">
+        {% include "accounts/_error_summary.html" %}
+        {% block dialog_fields %}{% endblock %}
+        <div class="mgmt-actions">
+          <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Cancel" %}</a>
+          <button type="submit" class="btn btn-primary">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+{% endblock %}

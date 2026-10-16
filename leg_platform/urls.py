@@ -14,6 +14,8 @@ urlpatterns = [
     # The uploaded logos (D-073): public, because they are on every page, also before the login.
     path("branding/logo/<logo_variant:variant>/", instance_logo, name="instance_logo"),
     path("addresses/", include("leg_platform.addresses.urls")),
+    # The management area for staff users (D-077); every view checks its permissions itself.
+    path("management/", include("leg_platform.management.urls")),
     path("", HomeView.as_view(), name="home"),
     path("", include("leg_platform.accounts.urls")),
     path("admin/", admin.site.urls),

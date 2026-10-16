@@ -1,0 +1,5 @@
+{% comment %}
+The first button of a form: the one that the key Enter presses. Put it as the first element of a form
+whose buttons are not all "Save" (for example a banner with "Accept" above the fields). It is not
+shown and not reachable. Context: ``value`` (the action of the default button, "save").
+{% endcomment %}<button type="submit" name="action" value="{{ value|default:'save' }}" class="visually-hidden" tabindex="-1" aria-hidden="true"></button>

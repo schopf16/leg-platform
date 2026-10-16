@@ -63,7 +63,7 @@ Read the relevant rules before every larger change.
 
 ## Not Part of the First Phase
 
-* LEGs as entities and all domain functions
+* LEGs as entities and all domain functions (phase 2 starts with them, see "Current Status" and D-077)
 * Billing logic and invoicing
 * Calculation of electricity costs or energy distribution
 * Productive financial processes
@@ -94,6 +94,8 @@ The first phase is implemented: login and entry pages, the frame with the start 
 
 The imprint and the privacy notice are not part of the portal: the portal only links their two addresses (portal settings); the operator writes and maintains the texts elsewhere (D-022, D-074). Notes for the operator are in `docs/DEPLOYMENT.md`, section 14.
 
+**Phase 2 has started (D-077): the management area ("Verwaltung") for staff users.** Block 1, the foundation, exists: the apps `leg_platform.community` (locations, transformer circuits, metering points, LEGs, assignments of persons and LEGs, history, settings, the staff-only record of a person, and the domain rules such as the derived status of a metering point, the flying change of an assignment, the discount tier and the quota problems) and `leg_platform.management` (the one access check, the menu group "Verwaltung", the overview skeleton at `/management/`, the settings page at `/management/settings/` and the shared building blocks of the pages: page header, dialog, info bubble, link icon, status, direction badge, warning triangle, banner, safe way back). The pages for persons, locations, LEGs and metering points, the problem rows of the overview and the PDF printing follow in the next blocks; "Person anlegen" and "Anmeldung starten" are not built (open points for the owner in D-077). A staff user needs the rights assigned to a role by a system administrator; the menu shows only what the account may use.
+
 **Open now**
 
 * The AGOV answer: waiting for the external answer (D-004). Nothing to do until it arrives.
@@ -113,7 +115,7 @@ A. **Verification on a real system**, when nothing is left under "Open now" (can
 
 B. **Later phases, not built:** Mitteilungen, Standorte, Rechnungen and Energie (menu entries marked "später", WL-27); proof of work for the mail forms (ALTCHA, D-069); address suggestions on the account page of the administration (D-069); the notification of system administrators when the portal addresses change (D-073). See also "Not Part of the First Phase".
 
-**Rule for developers:** a new admin URL must be wrapped with `admin_site.admin_view()` (the route walk test fails otherwise).
+**Rule for developers:** a new admin URL must be wrapped with `admin_site.admin_view()` (the route walk test fails otherwise). A new management URL (`/management/`) must use `ManagementAccessMixin` or `@management_view` from `leg_platform/management/access.py` (the route walk test of `leg_platform/management/tests/test_access.py` fails otherwise), and a new page adds one line to `leg_platform/management/navigation.py`.
 
 Deployment gates: no stage or production instance is deployed before
 

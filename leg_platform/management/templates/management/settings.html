@@ -1,0 +1,45 @@
+{% extends "management/page.html" %}
+{% load i18n %}{% comment %}
+The settings page (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077): three cards, one button
+"Save". With only the right to view the fields are shown disabled and there is no button. The
+banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
+(the directory does not know the address) is at the top of the first card; it is made on the server.
+{% endcomment %}
+{% block page_content %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if can_change %}{% include "management/_default_submit.html" %}{% endif %}
+    {% include "accounts/_error_summary.html" %}
+
+    <section class="mgmt-card" aria-labelledby="sender-title">
+      <h2 id="sender-title">{% translate "Invoice sender" %}</h2>
+      {% if suggestion_text %}
+        {% include "management/_banner.html" with text=suggestion_text actions="management/_suggestion_actions.html" %}
+      {% elif notice_text %}
+        {% include "management/_banner.html" with text=notice_text %}
+      {% endif %}
+      {% include "management/_field_row.html" with field=form.sender_street %}
+      {% include "management/_field_row.html" with field=form.sender_house_number %}
+      {% include "management/_field_row.html" with field=form.sender_address_addition optional=True %}
+      {% include "management/_field_row.html" with field=form.sender_postal_code %}
+      {% include "management/_field_row.html" with field=form.sender_town %}
+    </section>
+
+    <section class="mgmt-card" aria-labelledby="metering-title">
+      <h2 id="metering-title">{% translate "Metering points" %}</h2>
+      {% include "management/_field_row.html" with field=form.country_code %}
+      {% include "management/_field_row.html" with field=form.identifier %}
+      <div class="mgmt-row"><span class="mgmt-row-label"></span><span class="mgmt-hint">{% translate "Applies to all metering points. The BKW assigns the identifier." %}</span></div>
+    </section>
+
+    <section class="mgmt-card" aria-labelledby="quota-title">
+      <h2 id="quota-title">{% translate "Production quota" %}</h2>
+      {% include "management/_field_row.html" with field=form.warning_threshold_percent unit="%" %}
+      <div class="mgmt-row"><span class="mgmt-row-label"></span><span class="mgmt-hint">{{ quota_hint }}</span></div>
+    </section>
+
+    {% if can_change %}
+      <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
+    {% endif %}
+  </form>
+{% endblock %}

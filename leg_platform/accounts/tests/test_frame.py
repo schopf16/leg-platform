@@ -153,7 +153,7 @@ class FrameTests(TestCase):
         client.force_login(staff)
         staff_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
         self.assertIn('href="/admin/"', staff_menu)
-        self.assertIn("Verwaltung", staff_menu)
+        self.assertIn("Systemverwaltung", staff_menu)
 
     def test_a_link_with_a_token_renders_no_page_and_the_fixed_page_has_no_logout_form(self):
         # D-054, D-067: the link of an email only redirects (with no-referrer); the fixed page it

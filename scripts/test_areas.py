@@ -41,6 +41,8 @@ TEST_LABEL = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 T = "leg_platform.tests."
 A = "leg_platform.accounts.tests."
 D = "leg_platform.addresses.tests."
+C = "leg_platform.community.tests."
+M = "leg_platform.management.tests."
 
 
 def _labels(prefix, *names):
@@ -153,15 +155,17 @@ AREAS: dict[str, Area] = {
                     "test_password_reset", "test_phase4_review", "test_portal_branding")
             + _FLOW_REVIEWS
             + _labels(T, "test_error_pages", "test_presentation", "test_sizes", "test_design_assets")
+            + _labels(M, "test_access", "test_settings_page", "test_components")
         ),
     ),
     "static": Area(
         "Style sheets, scripts, images and vendor files.",
-        paths=("leg_platform/static/",),
+        paths=("leg_platform/static/", "leg_platform/*/static/"),
         tests=(
             _labels(T, "test_design_assets", "test_sizes", "test_presentation", "test_error_pages")
             + _labels(A, "test_entry_shell", "test_frame", "test_usability", "test_address_notice",
                       "test_portal_branding")
+            + _labels(M, "test_components")
         ),
     ),
     "branding": Area(
@@ -197,7 +201,20 @@ AREAS: dict[str, Area] = {
         "The address directory, its import jobs and the address suggestions.",
         paths=("leg_platform/addresses/",),
         exclude=("leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py"),
-        tests=("leg_platform.addresses.tests", A + "test_address_notice"),
+        tests=("leg_platform.addresses.tests", A + "test_address_notice", C + "test_address_check"),
+    ),
+    "community": Area(
+        "The domain of the community (D-077): models, rules, services, the address check, the rights "
+        "of the management area, and the pages built on them (the migrations have their own area).",
+        paths=("leg_platform/community/", "leg_platform/accounts/permission_names.py"),
+        exclude=("leg_platform/community/migrations/",),
+        tests=("leg_platform.community.tests", "leg_platform.management.tests"),
+    ),
+    "management": Area(
+        "The management area for staff users (D-077): the access check and the route walk, the menu, "
+        "the pages, the shared building blocks, the stylesheet and the script.",
+        paths=("leg_platform/management/",),
+        tests=("leg_platform.management.tests", C + "test_rights"),
     ),
     "registration": Area(
         "Registration, verification links, entry pages and the abuse protection of the forms.",
@@ -278,6 +295,7 @@ AREAS: dict[str, Area] = {
                     "test_email_texts", "test_translations", "test_acceptance_negative_authorization",
                     "test_portal_branding")
             + _labels(T, "test_mail_graph")
+            + _labels(C, "test_rights")
         ),
     ),
     "mail": Area(
@@ -306,6 +324,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue")
             + _labels(T, "test_database")
+            + _labels(C, "test_models")
             + ("leg_platform.addresses.tests",)
         ),
         fresh_db=True,

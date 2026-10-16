@@ -54,6 +54,10 @@ INSTALLED_APPS = [
     # First, so that its createsuperuser command replaces Django's (D-005, D-034).
     "leg_platform.accounts",
     "leg_platform.addresses.apps.AddressesConfig",
+    # The domain of the community (locations, metering points, LEGs; D-077) and the management
+    # pages for staff users built on it.
+    "leg_platform.community",
+    "leg_platform.management",
     # The administration with the second factor check (D-040); replaces django.contrib.admin.
     "leg_platform.admin_site.PortalAdminConfig",
     "django.contrib.auth",
