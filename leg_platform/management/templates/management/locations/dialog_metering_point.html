@@ -5,9 +5,7 @@ the direction is required (a choice of two), the number is optional (only the la
 country and identifier come from the settings) and so is the LEG. No person and no date.
 {% endcomment %}
 {% block dialog_notice %}
-  {% if duplicate %}
-    <div class="mgmt-banner" role="status"><p><b>{% translate "This metering point number already exists." %}</b> {{ duplicate.number }}, {{ duplicate.direction }}{% if duplicate.location %}, {{ duplicate.location }}{% endif %}{% if duplicate.leg %}, {{ duplicate.leg }}{% endif %}, {{ duplicate.status }}.</p></div>
-  {% endif %}
+  {% if duplicate %}{% include "management/_duplicate.html" %}{% endif %}
 {% endblock %}
 {% block dialog_fields %}
   <div class="mgmt-dialog-row is-single">

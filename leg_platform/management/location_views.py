@@ -27,7 +27,7 @@ from leg_platform.community import (
     transformer_circuits,
 )
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, LegAssignment, Location, PersonAssignment, TransformerCircuit
+from leg_platform.community.models import Location, PersonAssignment, TransformerCircuit
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_forms import (
@@ -40,6 +40,7 @@ from leg_platform.management.location_forms import (
 )
 from leg_platform.management.navigation import AREA_VIEW_PERMISSIONS
 from leg_platform.management.returns import return_url, with_next
+from leg_platform.management.summaries import duplicate_summary
 
 VIEW = "community.view_location"
 ADD = "community.add_location"
@@ -597,16 +598,7 @@ class LocationMeteringPointNewView(LocationObjectDialog):
 
     def render_dialog(self, request, form, **extra):
         duplicate = getattr(form, "duplicate", None)
-        summary = None
-        if duplicate is not None:
-            leg = LegAssignment.objects.not_ended().filter(metering_point=duplicate).select_related("leg").first()
-            summary = {
-                "number": duplicate.number,
-                "direction": Direction(duplicate.direction).label,
-                "location": str(duplicate.location) if duplicate.location_id else "",
-                "leg": leg.leg.name if leg else "",
-                "status": duplicate.get_status_display(),
-            }
+        summary = duplicate_summary(duplicate) if duplicate is not None else None
         return super().render_dialog(request, form, duplicate=summary, **extra)
 
 

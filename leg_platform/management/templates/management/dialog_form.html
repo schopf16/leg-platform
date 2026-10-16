@@ -14,6 +14,7 @@ lead and the buttons are shown.
         {% for name in names %}{% include "management/_dialog_field.html" with field=form|bound:name %}{% endfor %}
       </div>
     {% endfor %}
+    {% if form.hint %}<div class="mgmt-hint mgmt-dialog-hint">{{ form.hint }}</div>{% endif %}
   {% endif %}
   {% block dialog_after_fields %}{% endblock %}
 {% endblock %}

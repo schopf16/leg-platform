@@ -44,6 +44,7 @@ AREA_VIEW_PERMISSIONS = (
 MENU = (
     MenuEntry("overview", _("Overview"), "i-overview", any_of=AREA_VIEW_PERMISSIONS),
     MenuEntry("locations", _("Locations"), "i-building", ("community.view_location",)),
+    MenuEntry("metering_points", _("Metering points"), "i-metering", ("community.view_meteringpoint",)),
     MenuEntry("settings", _("Settings"), "i-settings", ("community.view_managementsettings",)),
 )
 

@@ -5,9 +5,10 @@
      width is saved for the account (POST to data-widths-url, protected by the CSRF header);
    - a field with data-autosubmit sends its form when it changes; the search field a short moment
      after typing;
-   - a row with data-expand-id opens and closes by a click on the row or on its arrow; the state is
+    - a row with data-expand-id opens and closes by a click on the row or on its arrow; the state is
      saved for the account (POST to data-expand-url). A click on a link or a button inside the row
-     does not toggle it (the link to the detail page never opens or closes the row).
+     does not toggle it (the link to the detail page never opens or closes the row);
+   - the strip of the quick filters (.mgmt-chips) scrolls so that the active filter stands at the left.
 
    Nothing is read from the page except these attributes; no network except the two addresses above;
    no dynamic code. */
@@ -116,6 +117,13 @@
       const end = search.value.length;
       search.setSelectionRange(end, end);
     }
+  }
+
+  // ---- The quick filters on a phone: the active one stands at the left of the strip ----
+  const strip = document.querySelector(".mgmt-chips");
+  const active = strip && strip.querySelector(".mgmt-chip.is-on");
+  if (active && strip.scrollWidth > strip.clientWidth) {
+    strip.scrollLeft = active.offsetLeft - strip.offsetLeft - 16;
   }
 
   // ---- Rows that open ----

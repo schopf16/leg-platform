@@ -7,6 +7,7 @@ LEGs and, only for an account that may see persons, the names of the persons; ne
 (``LISTEN-STANDARD.md``, section 4).
 """
 
+import re
 from dataclasses import dataclass
 
 from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Value, When
@@ -198,3 +199,40 @@ def details(locations, today=None, *, see_persons=False):
 def locations_for_choice():
     """All locations for a field with suggestions (not archived), by address."""
     return Location.objects.filter(is_archived=False).order_by("street", "house_number")
+
+
+# Choosing a location by typing (the dialog "Create metering point" of the overview) ----------------
+
+LOCATION_CHOICE_LIMIT = 10
+_LOCATION_TEXT = re.compile(r"(?P<street>.+) (?P<number>\S+), (?P<postal>\d{4}) (?P<town>.+)")
+
+
+def location_suggestions(text, limit=LOCATION_CHOICE_LIMIT):
+    """At most ``limit`` locations (not archived) that match the text: the parts of the address or the
+    number of one of their metering points. For the suggestions of the field; never the remarks."""
+    return list(apply_search(locations_for_choice(), text)[:limit])
+
+
+@dataclass(frozen=True)
+class LocationFound:
+    """``location`` is the location or None; ``code`` is "" for one match, else ``none`` or ``several``."""
+
+    location: Location | None = None
+    code: str = ""
+
+
+def resolve(text):
+    """The one location that the text names: the text of a suggestion (``str(location)``) or a part of
+    the address or a metering point number that only one location matches."""
+    text = (text or "").strip()
+    match = _LOCATION_TEXT.fullmatch(text)
+    if match:
+        found = Location.find_by_address(match["street"], match["number"], match["postal"], match["town"])
+        if found is not None and not found.is_archived:
+            return LocationFound(found)
+    found = location_suggestions(text, limit=2)
+    if not found:
+        return LocationFound(code="none")
+    if len(found) > 1:
+        return LocationFound(code="several")
+    return LocationFound(found[0])

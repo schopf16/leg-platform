@@ -1,0 +1,19 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n %}{% comment %}
+The dialog "Assign LEG" / "Change LEG" with the move mask (LEG-Design-Vorgaben/verwaltung/legs/referenz/
+leg-messpunkt-wechseln-desktop and messpunkte/detail/referenz/messpunkt-leg-zuweisen-desktop; D-079). The same
+dialog serves the page of the metering point and the page of a LEG. The mask lists the other metering points of the
+same person at the same location with a checkbox each; none is preselected and only the ticked ones change along.
+{% endcomment %}
+{% block dialog_after_fields %}
+  {% if related %}
+    <div class="mgmt-mask">
+      <b>{{ related_title }}</b>
+      {% for item in related %}
+        <label><input type="checkbox" name="also" value="{{ item.point.pk }}"{% if item.point.pk|stringformat:"s" in checked %} checked{% endif %}> <span class="tnum">{{ item.text }}</span></label>
+      {% endfor %}
+      <p class="mgmt-hint">{% translate "These metering points belong to the same person at the same location. They only change along if you select them here." %}</p>
+    </div>
+    {% if form.also.errors %}<div class="mgmt-field-error">{{ form.also.errors.0 }}</div>{% endif %}
+  {% endif %}
+{% endblock %}

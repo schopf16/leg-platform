@@ -1308,3 +1308,240 @@ a.mgmt-sort:hover {
     display: none;
   }
 }
+
+/* ---- Metering points (D-079) ---- */
+.mgmt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mgmt-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.mgmt-chip:hover {
+  background: var(--warm);
+  color: var(--fg);
+}
+
+.mgmt-chip.is-on {
+  background: var(--warm);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.mgmt-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-chips-problems {
+  margin-left: auto;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+
+.mgmt-point-nr {
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mgmt-point-nr .mgmt-goto {
+  margin-left: 6px;
+}
+
+.mgmt-point-title {
+  overflow-wrap: anywhere;
+}
+
+.mgmt-points .mgmt-point-label {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-header .mgmt-point-title {
+  margin: 2px 0 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.mgmt-header .mgmt-point-direction {
+  margin-top: 6px;
+}
+
+.mgmt-points .mgmt-list-card {
+  overflow-x: auto;
+}
+
+.mgmt-points .mgmt-fact {
+  grid-template-columns: 170px minmax(0, 1fr);
+}
+
+.mgmt-warn-text {
+  color: var(--warn);
+}
+
+.mgmt-note-inline {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-card-action {
+  margin: 8px 0 0;
+}
+
+.mgmt-card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mgmt-banner-lines,
+.mgmt-duplicate {
+  display: block;
+}
+
+.mgmt-duplicate p + p {
+  margin-top: 6px;
+}
+
+.mgmt-phone-end {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.mgmt-dialog-row.is-pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.mgmt-dialog-row.is-triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mgmt-dialog-divider {
+  margin: 4px 0 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-dialog-hint {
+  margin: -4px 0 12px;
+}
+
+.mgmt-mask {
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.mgmt-mask b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+}
+
+.mgmt-mask label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 15px;
+}
+
+.mgmt-mask input {
+  flex-shrink: 0;
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.mgmt-mask .mgmt-hint {
+  margin: 4px 0 0;
+}
+
+@media (max-width: 760px) {
+  .mgmt-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px 12px;
+    padding: 0 16px 4px;
+  }
+
+  .mgmt-chip {
+    flex-shrink: 0;
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  .mgmt-points .mgmt-fact {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
+    gap: 8px;
+  }
+
+  /* The order of the reference: the search, then the quick filters, then the cards. */
+  .mgmt-points-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mgmt-points-list > * {
+    order: 3;
+  }
+
+  .mgmt-points-list > .mgmt-header {
+    order: 0;
+  }
+
+  .mgmt-points-list > .mgmt-filters {
+    order: 1;
+  }
+
+  .mgmt-points-list > .mgmt-chips {
+    order: 2;
+  }
+
+  .mgmt-phone-end.mgmt-phone-only {
+    display: flex;
+  }
+
+  .mgmt-desktop-only-row {
+    display: none;
+  }
+
+  .mgmt-header .mgmt-point-title {
+    font-size: 17px;
+  }
+
+  .mgmt-card-head {
+    flex-wrap: wrap;
+  }
+
+  .mgmt-dialog-row.is-pair,
+  .mgmt-dialog-row.is-triple {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

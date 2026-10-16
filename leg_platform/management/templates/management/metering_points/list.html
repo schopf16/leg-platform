@@ -1,0 +1,102 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list of metering points (LEG-Design-Vorgaben/verwaltung/messpunkte/referenz/messpunkte-liste-desktop and
+handy/referenz/messpunkte-liste-handy; D-079). On a desktop a table, on a phone one card per metering point.
+The quick filters are links; with a quick filter that has a step the last column shows the next step (a
+button that opens the dialog of the step, or the grey text "LEG missing"), otherwise the status. The page works
+without a script: the filters are a GET form; the script adds the resizing of the columns and the sending of
+the form on change.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-points mgmt-points-list{% endblock %}
+{% block header_actions %}
+  {% if problem_count %}<a class="btn btn-warning-outline mgmt-phone-only" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create metering point" %}</a>{% endif %}
+{% endblock %}
+{% block page_content %}
+  <div class="mgmt-chips">
+    {% for filter in quick_filters %}<a class="mgmt-chip{% if filter.active %} is-on{% endif %}" href="{{ filter.url }}"{% if filter.active %} aria-current="true"{% endif %}>{{ filter.label }}</a>{% endfor %}
+    {% if problem_count %}<a class="btn btn-warning-outline mgmt-chips-problems mgmt-desktop-only" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  </div>
+
+  {% translate "Metering point number, street or name" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    {% if list_state.values.step != "all" %}<input type="hidden" name="step" value="{{ list_state.values.step }}">{% endif %}
+    <label class="mgmt-filter mgmt-filter-select mgmt-desktop-only-flex">
+      <span class="mgmt-filter-label">{% translate "LEG" %}</span>
+      <select name="leg" class="form-select" data-autosubmit>
+        <option value="">{% translate "All" %}</option>
+        {% for value, text in leg_options %}<option value="{{ value }}"{% if value == list_state.values.leg %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            {% with point=entry.point %}
+            <tr>
+              <td>
+                <div class="mgmt-nr-row">
+                  {% if point.number %}<span class="mgmt-nr">{{ point.number|slice:":13" }}<wbr>{{ point.number|slice:"13:" }}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}
+                  {% include "management/_direction.html" with direction=point.direction %}
+                  {% if entry.problem_text %}{% include "management/_warning.html" with text=entry.problem_text %}{% endif %}
+                </div>
+              </td>
+              <td>{% if point.location %}<span class="mgmt-cut-inline" title="{{ point.location.street }} {{ point.location.house_number }}">{{ point.location.street }} {{ point.location.house_number }}</span>{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>{% if point.current_leg_id %}<span class="mgmt-cut-inline" title="{{ point.current_leg_name }}">{{ point.current_leg_name }}</span>              {% if see_legs %}{% optional_url "management:legs_detail" point.current_leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% endif %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>
+                {% if show_steps %}
+                  {% if entry.action_url %}<a class="btn btn-accent-outline btn-xs" href="{{ entry.action_url }}">{{ entry.action_label }}</a>
+                  {% elif entry.leg_missing %}<span class="mgmt-muted">{% translate "LEG missing" %}</span>
+                  {% else %}<span class="mgmt-muted">–</span>{% endif %}
+                {% else %}
+                  {% include "management/_status.html" with tone=entry.status|status_tone label=entry.status|status_label %}
+                {% endif %}
+              </td>
+              <td class="mgmt-link-col">{% translate "Go to the details of the metering point" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+            </tr>
+            {% endwith %}
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=5 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        {% with point=entry.point %}
+        <article class="mgmt-place">
+          <div class="mgmt-mp-nr mgmt-point-nr">
+            {% if point.number %}{{ point.number }}{% else %}–{% endif %}
+            {% include "management/_direction.html" with direction=point.direction %}
+            {% if entry.problem_text %}{% include "management/_warning.html" with text=entry.problem_text %}{% endif %}
+            {% translate "Go to the details of the metering point" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}
+          </div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Location" %}</dt><dd>{% if point.location %}{{ point.location.street }} {{ point.location.house_number }}{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "LEG" %}</dt><dd>{% if point.current_leg_id %}{{ point.current_leg_name }}{% if see_legs %}{% optional_url "management:legs_detail" point.current_leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% endif %}{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</dd></div>
+            {% if show_steps %}
+              <div class="mgmt-fact"><dt>{% translate "Next step" %}</dt><dd>{% if entry.action_url %}<a class="btn btn-accent-outline btn-xs" href="{{ entry.action_url }}">{{ entry.action_label }}</a>{% elif entry.leg_missing %}<span class="mgmt-muted">{% translate "LEG missing" %}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}</dd></div>
+            {% else %}
+              <div class="mgmt-fact"><dt>{% translate "Status" %}</dt><dd>{% include "management/_status.html" with tone=entry.status|status_tone label=entry.status|status_label %}</dd></div>
+            {% endif %}
+          </dl>
+        </article>
+        {% endwith %}
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

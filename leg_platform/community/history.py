@@ -39,6 +39,12 @@ class HistoryEvent(models.TextChoices):
     LEG_ASSIGNED = "leg_assigned", _("LEG assigned")
     LEG_ASSIGNMENT_ENDED = "leg_assignment_ended", _("LEG assignment ended")
     LEG_ASSIGNMENT_DELETED = "leg_assignment_deleted", _("LEG assignment deleted")
+    # The steps of a metering point towards the BKW (D-079): the labels follow the history of the
+    # specification ("Als angemeldet gesetzt", "Bestätigung erfasst, Startdatum ...").
+    REGISTERED_WITH_BKW = "registered_with_bkw", _("Marked as notified")
+    CONFIRMATION_RECORDED = "confirmation_recorded", _("Confirmation recorded")
+    START_DATE_RECORDED = "start_date_recorded", _("Start date recorded")
+    TERMINATION_RECORDED = "termination_recorded", _("Termination recorded")
     SENDER_ADDRESS_CHANGED = "sender_address_changed", _("Sender address changed")
     SENDER_SUGGESTION_ACCEPTED = "sender_suggestion_accepted", _("Sender address correction accepted")
     SENDER_SUGGESTION_DISMISSED = "sender_suggestion_dismissed", _("Sender address correction not accepted")

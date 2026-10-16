@@ -196,6 +196,10 @@ Block 2 (D-078) adds the list framework and the pages of the locations. Domain m
 
 Sources: D-077, D-078 and their sources.
 
+Block 3 (D-079) adds the metering points. Domain modules: `metering_points` (now also the steps towards the BKW, `next_step`, archive, delete and `chain`), `metering_point_list` (search, quick filters with counts, problems, sort), `person_search` (the bounded search of accounts for an assignment), `leg_switch` (the move mask: the related metering points of the same person at the same location, one transaction) and `location_list.resolve` (a location by typing). In `management`: `metering_point_views.py`, `metering_point_forms.py`, `summaries.py`, the templates `metering_points/*.html` and `_duplicate.html`, and `static/management/js/lookup.js` (suggestions and the check of the number on leaving the field; only an enhancement). `management:metering_points_leg` is the one dialog "assign / change LEG" for the page of the metering point and for the pages of the LEGs.
+
+Sources: D-077, D-078, D-079 and their sources.
+
 ## Data Storage
 
 MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.

@@ -3317,7 +3317,7 @@ msgid "This metering point number already exists."
 msgstr "Diese Messpunkt-Nummer gibt es schon."
 
 msgid "Only the last digits. Country and identifier come from the settings."
-msgstr "Nur die letzten Ziffern. Land und Kennung stammen aus den Einstellungen."
+msgstr "Nur die letzten Stellen. Land und Identifikator kommen aus den Einstellungen."
 
 #, python-format
 msgid "Filter problems (%(problem_count)s)"
@@ -3350,3 +3350,325 @@ msgstr "Korrektur der Absender-Adresse übernommen"
 
 msgid "Sender address correction not accepted"
 msgstr "Korrektur der Absender-Adresse nicht übernommen"
+
+# Phase 2, block 3: metering points (D-079). The texts of the specification are taken 1:1; texts that the
+# specification does not give are marked "invented" in D-079.
+msgid "Marked as notified"
+msgstr "Als angemeldet gesetzt"
+
+msgid "Confirmation recorded"
+msgstr "Bestätigung erfasst"
+
+msgid "Start date recorded"
+msgstr "Startdatum erfasst"
+
+msgid "Termination recorded"
+msgstr "Kündigung erfasst"
+
+msgid "Notified on"
+msgstr "Angemeldet am"
+
+msgid "Confirmed on"
+msgstr "Bestätigt am"
+
+msgid "Start date"
+msgstr "Startdatum"
+
+msgid "Without a start date the registration stays on standby."
+msgstr "Ohne Startdatum bleibt die Anmeldung auf Standby."
+
+msgid "Terminated to"
+msgstr "Gekündigt zum"
+
+msgid "The date is the end of a month."
+msgstr "Das Datum ist ein Monatsende."
+
+msgid "Enter the last day of a month."
+msgstr "Geben Sie den letzten Tag eines Monats ein."
+
+msgid "Search name, customer number or e-mail address"
+msgstr "Name, Kundennummer oder E-Mail suchen"
+
+msgid "Applies from"
+msgstr "Gilt ab"
+
+msgid "Valid from"
+msgstr "Gültig ab"
+
+msgid "No person found."
+msgstr "Keine Person gefunden."
+
+msgid "Several persons match. Type more of the name or the customer number."
+msgstr "Mehrere Personen passen. Geben Sie mehr vom Namen oder von der Kundennummer ein."
+
+msgid "Ends on"
+msgstr "Endet am"
+
+msgid "Afterwards the metering point has no person. The person stays visible in the history."
+msgstr "Danach hat der Messpunkt keine Person. Die Person bleibt im Verlauf sichtbar."
+
+msgid "New LEG"
+msgstr "Neue LEG"
+
+msgid "The date must be after the start of the current assignment."
+msgstr "Das Datum muss nach dem Beginn der jetzigen Zuordnung liegen."
+
+msgid "The end date must not be before the start of the assignment."
+msgstr "Das Enddatum darf nicht vor dem Beginn der Zuordnung liegen."
+
+msgid "This assignment has already ended."
+msgstr "Diese Zuordnung ist schon beendet."
+
+msgid "This assignment cannot be deleted. End it instead."
+msgstr "Diese Zuordnung kann nicht gelöscht werden. Beenden Sie sie stattdessen."
+
+msgid "This account cannot be assigned."
+msgstr "Dieses Konto kann nicht zugeordnet werden."
+
+msgid "This LEG is archived."
+msgstr "Diese LEG ist archiviert."
+
+msgid "A selected metering point does not belong to this one."
+msgstr "Ein gewählter Messpunkt gehört nicht zu diesem."
+
+msgid "This change is not possible."
+msgstr "Diese Änderung ist nicht möglich."
+
+msgid "This metering point is archived."
+msgstr "Dieser Messpunkt ist archiviert."
+
+msgid "This step is not possible in the current status of the metering point."
+msgstr "Dieser Schritt ist im jetzigen Status des Messpunkts nicht möglich."
+
+msgid "The date must not be in the future."
+msgstr "Das Datum darf nicht in der Zukunft liegen."
+
+msgid "The date must not be before the earlier step."
+msgstr "Das Datum darf nicht vor dem vorherigen Schritt liegen."
+
+msgid "Search street or metering point number"
+msgstr "Strasse oder Messpunkt-Nummer suchen"
+
+msgid "Choose a location from the list."
+msgstr "Wählen Sie einen Standort aus der Liste."
+
+msgid "Several locations match. Type more of the address."
+msgstr "Mehrere Standorte passen. Geben Sie mehr von der Adresse ein."
+
+msgid "PV power"
+msgstr "PV-Leistung"
+
+msgid "Battery"
+msgstr "Batterie"
+
+msgid "Wallbox"
+msgstr "Wallbox"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Number of the smart meter at the BKW, followed by the direction. Blue is consumption, green is feed-in."
+msgstr "Nummer des Smart Meters bei der BKW, dahinter die Richtung. Blau ist Bezug, grün Einspeisung."
+
+msgid "The address where the metering point is installed."
+msgstr "Adresse, an der der Messpunkt liegt."
+
+msgid "The billing group the metering point belongs to. Required before the registration at the BKW."
+msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört. Vor der BKW-Anmeldung Pflicht."
+
+msgid "Next step"
+msgstr "Nächster Schritt"
+
+msgid "Mark as notified"
+msgstr "Als angemeldet setzen"
+
+msgid "Record confirmation"
+msgstr "Bestätigung erfassen"
+
+msgid "Record start date"
+msgstr "Startdatum erfassen"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d metering points"
+msgstr "%(first)d–%(last)d von %(total)d Messpunkten"
+
+#, python-format
+msgid "All (%(count)d)"
+msgstr "Alle (%(count)d)"
+
+#, python-format
+msgid "Notify the BKW (%(count)d)"
+msgstr "Bei der BKW anmelden (%(count)d)"
+
+#, python-format
+msgid "Confirmation pending (%(count)d)"
+msgstr "Bestätigung ausstehend (%(count)d)"
+
+#, python-format
+msgid "Start date pending (%(count)d)"
+msgstr "Startdatum ausstehend (%(count)d)"
+
+#, python-format
+msgid "archived (%(count)d)"
+msgstr "archiviert (%(count)d)"
+
+msgid "All metering points with their state. Here you see what is still to do at the BKW."
+msgstr "Alle Messpunkte mit ihrem Stand. Hier sieht man, was bei der BKW noch ansteht."
+
+msgid "No metering points yet. Create the first metering point."
+msgstr "Noch keine Messpunkte. Legen Sie den ersten Messpunkt an."
+
+#, python-format
+msgid "until %(date)s"
+msgstr "bis %(date)s"
+
+#, python-format
+msgid "from %(date)s"
+msgstr "ab %(date)s"
+
+msgid "former"
+msgstr "bisher"
+
+msgid "Assigned"
+msgstr "Zugeordnet"
+
+#, python-format
+msgid "%(label)s, start date %(date)s"
+msgstr "%(label)s, Startdatum %(date)s"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The registration at the BKW has taken place."
+msgstr "Messpunkt %(number)s (%(direction)s). Die Anmeldung bei der BKW ist erfolgt."
+
+msgid "Mark as notified to the BKW"
+msgstr "Als bei der BKW angemeldet setzen"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The BKW has confirmed the registration."
+msgstr "Messpunkt %(number)s (%(direction)s). Die BKW hat die Anmeldung bestätigt."
+
+msgid "Save confirmation"
+msgstr "Bestätigung speichern"
+
+msgid "Record termination"
+msgstr "Kündigung erfassen"
+
+msgid "Save termination"
+msgstr "Kündigung speichern"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). Enter the date that the BKW gives."
+msgstr "Messpunkt %(number)s (%(direction)s). Tragen Sie das Datum ein, das die BKW angibt."
+
+msgid "Change person"
+msgstr "Person wechseln"
+
+msgid "Assign person"
+msgstr "Person zuweisen"
+
+msgid "If the metering point already has a person, the person ends on the day before \"Applies from\"."
+msgstr "Hat der Messpunkt schon eine Person, endet diese am Tag vor \"Gilt ab\"."
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s)."
+msgstr "Messpunkt %(number)s (%(direction)s)."
+
+msgid "End assignment"
+msgstr "Zuordnung beenden"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The assignment to %(name)s ends."
+msgstr "Messpunkt %(number)s (%(direction)s). Die Zuordnung zu %(name)s endet."
+
+msgid "Delete assignment"
+msgstr "Zuordnung löschen"
+
+#, python-format
+msgid "The assignment to %(name)s is deleted. This is possible only for an entry made by mistake."
+msgstr "Die Zuordnung zu %(name)s wird gelöscht. Das ist nur für eine Fehleingabe möglich."
+
+msgid "Change LEG"
+msgstr "LEG wechseln"
+
+msgid "Assign LEG"
+msgstr "LEG zuweisen"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s) at %(location)s changes from %(leg)s to:"
+msgstr "Messpunkt %(number)s (%(direction)s) bei %(location)s wechselt von %(leg)s zu:"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s) changes from %(leg)s to:"
+msgstr "Messpunkt %(number)s (%(direction)s) wechselt von %(leg)s zu:"
+
+#, python-format
+msgid "Also related: %(count)d more metering point"
+msgid_plural "Also related: %(count)d more metering points"
+msgstr[0] "Auch zusammengehörig: %(count)d weiterer Messpunkt"
+msgstr[1] "Auch zusammengehörig: %(count)d weitere Messpunkte"
+
+msgid "A metering point belongs to a location. Choose the location before you enter the other details."
+msgstr "Ein Messpunkt gehört zu einem Standort. Wählen Sie den Standort aus, bevor Sie die übrigen Angaben machen."
+
+msgid "Go to the existing metering point"
+msgstr "Zum bestehenden Messpunkt wechseln"
+
+msgid "Delete metering point"
+msgstr "Messpunkt löschen"
+
+#, python-format
+msgid "The metering point %(number)s is deleted for good."
+msgstr "Der Messpunkt %(number)s wird endgültig gelöscht."
+
+msgid "This metering point has a history and cannot be deleted. Archive it instead."
+msgstr "Dieser Messpunkt hat einen Verlauf und kann nicht gelöscht werden. Archivieren Sie ihn stattdessen."
+
+msgid "Metering point number, street or name"
+msgstr "Messpunkt-Nummer, Strasse oder Name"
+
+msgid "Go to the location"
+msgstr "Zum Standort"
+
+msgid "Go to the details of the metering point"
+msgstr "Zur Detailseite des Messpunkts"
+
+msgid "LEG missing"
+msgstr "LEG fehlt"
+
+msgid "Back to metering points"
+msgstr "Zurück zu Messpunkte"
+
+msgctxt "metering point"
+msgid "History"
+msgstr "Verlauf"
+
+msgctxt "metering point"
+msgid "By"
+msgstr "Von"
+
+msgid "State"
+msgstr "Stand"
+
+msgid "missing"
+msgstr "fehlt"
+
+msgid "Registration on standby, start date missing."
+msgstr "Anmeldung auf Standby, Startdatum fehlt."
+
+msgid "Recorded, not yet notified to the BKW."
+msgstr "Erfasst, noch nicht bei der BKW angemeldet."
+
+msgid "Terminate"
+msgstr "Kündigen"
+
+msgid "The assignment is entered with a date \"Applies from\"."
+msgstr "Die Zuordnung wird mit einem Datum \"Gilt ab\" eingetragen."
+
+msgid "Archive metering point"
+msgstr "Messpunkt archivieren"
+
+msgid "Restore metering point"
+msgstr "Messpunkt wiederherstellen"
+
+msgid "These metering points belong to the same person at the same location. They only change along if you select them here."
+msgstr "Diese Messpunkte gehören zur gleichen Person am gleichen Standort. Sie werden nur mitgewechselt, wenn Sie sie hier auswählen."

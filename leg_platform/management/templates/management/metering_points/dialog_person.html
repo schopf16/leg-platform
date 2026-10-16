@@ -1,0 +1,19 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n static %}{% comment %}
+The dialog "Assign person" / "Change person" (LEG-Design-Vorgaben/verwaltung/messpunkte/detail/referenz/
+messpunkt-person-zuweisen-desktop; D-079): the person is found by name, customer number or e-mail address
+(at most ten suggestions from ``metering-points/person-search/``; without a script the typed text must name one
+person), then "Applies from". The hint is the one of the form.
+{% endcomment %}
+{% block dialog_fields %}
+  <div class="mgmt-dialog-row is-single" data-suggest-url="{{ suggest_url }}">
+    {% include "management/_dialog_field.html" with field=form.person %}
+    <datalist id="person-options"></datalist>
+  </div>
+  <div class="mgmt-dialog-row is-single">{% include "management/_dialog_field.html" with field=form.valid_from %}</div>
+  {% if form.hint %}<div class="mgmt-hint mgmt-dialog-hint">{{ form.hint }}</div>{% endif %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/lookup.js' %}"></script>
+{% endblock %}
