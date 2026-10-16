@@ -77,10 +77,16 @@ Security findings must be resolved before considering a task complete.
 A task is only complete when:
 
 - implementation exists
-- tests pass
+- the tests of the touched area pass (scenario run, `scripts/test.ps1`; `docs/STARTUP.md`, section 13; D-071)
 - security findings are addressed
 - documentation is updated
 - acceptance criteria are fulfilled
+
+## Test Runs
+
+- Agents run the scenario of the touched area (`.\scripts\test.ps1 -Changed` or `-Area <name>`), not the full suite. The full suite is a decision of the team lead: at most once per commit block, for core changes, before a deployment gate and in CI. Order it explicitly when needed; do not let an agent run it after every small change.
+- Only one database-backed test run at a time (D-046).
+- Every report names the area or labels and the number of tests, and says whether the full suite ran.
 
 ## Phase Completion
 

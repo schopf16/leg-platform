@@ -225,8 +225,11 @@ class DescriptionOrderAndForcedPageTests(TestCase):
 
 @tag("mariadb")
 class AbuseProtectionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp("abuse.a@example.org")
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp("abuse.a@example.org")
         self.client = Client()
         self.client.force_login(self.user)
 

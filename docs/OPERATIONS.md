@@ -16,7 +16,7 @@ Roles:
 * **Development computer:** a Windows computer for development. It uses local test settings only. It never holds stage or production secrets (`docs/DECISIONS.md`, D-020; `docs/SECURITY.md`, section 7).
 * **Second computer:** a second computer that receives the code by USB. **NOT YET VERIFIED:** its setup.
 * **GitHub:** stores the code and runs the automatic checks (CI). It does not deploy anything.
-* **Stage:** the test system. The owner checks it here first.
+* **Stage:** the test system. The owner checks it here first. It behaves exactly like production (D-070): only its label `APP_ENV=stage`, its database, secrets and logs differ. It sends real emails.
 * **Production:** the real system for the users.
 
 Hosting: the Ittigen instance is planned on an Infomaniak "VPS Lite 1" (`docs/DECISIONS.md`, D-008). On 2026-10-15 the owner reported that stage has been set up; the actual configuration has not been inspected for this revision. Start every deployment with `docs/DEPLOYMENT.md`, section 0.5 (D-053, D-064): reuse the instance record and discover technical facts rather than repeating initial-setup questions. The local environment is described in `docs/STARTUP.md`.
@@ -134,11 +134,11 @@ python manage.py migrate
 
 **D10. Schedule the cleanup tasks.** Run `python manage.py run_scheduled_tasks` regularly. The planned interval is every 15 minutes (`docs/INSTALLATION.md`). The scheduler is open (D-008). The command bundles these cleanups: expired registrations, mail requests, login IP attempts, the security log, the counts of wrong entries in the confirmations and sessions.
 
-**D11. Set the email mode for stage.** On stage, `EMAIL_MODE` is `allowlist`. Only the addresses in `EMAIL_ALLOWED_RECIPIENTS` receive email. The Microsoft Graph sender steps are in `docs/INSTALLATION.md`. **NOT YET VERIFIED** on a server.
+**D11. Set the email mode for stage.** On stage, `EMAIL_MODE` is `graph`, exactly as in production (D-070): stage sends real emails to the addresses that are typed in, without restriction. `console` and `allowlist` are refused. Remove `EMAIL_ALLOWED_RECIPIENTS` if an earlier setup had it (a non-empty value stops the application at startup on stage and production). Testers use only their own or test addresses; a mistyped address receives real mail. The Microsoft Graph sender steps are in `docs/INSTALLATION.md`; stage has its own Graph configuration. **NOT YET VERIFIED** on a server.
 
 **D12. Emergency command.** The command `emergency_access` is for lost second factors and blocked accounts. Use it only when the owner asks you to. The procedure is in `docs/INSTALLATION.md` and `docs/DECISIONS.md` (D-044). **NOT YET VERIFIED** on a server.
 
-**D13. Acceptance test.** Run the checks in `docs/ACCEPTANCE.md` on stage with test accounts only. Never use real personal data.
+**D13. Acceptance test.** Run the checks in `docs/ACCEPTANCE.md` on stage with test accounts only. Do not use real personal data of third parties without need (D-070, `docs/DEPLOYMENT.md`, section 5.4). Stage sends real emails (D11): use only addresses that you control. Before the test, confirm the checklist of `docs/DEPLOYMENT.md`, section 5.4: a clear stage marker in `INSTANCE_NAME` and, recommended, access protection of the stage host at the reverse proxy.
 
 **D14. Report.** Tell the owner what was done. List every step that is still NOT YET VERIFIED.
 
@@ -187,8 +187,8 @@ Legend: **Required** = must be set. **Optional** = may be set. **Conditional** =
 | `INSTANCE_BASE_URL` | Required | Required | Canonical origin of the portal. `https://`, no path. Its host must be in `DJANGO_ALLOWED_HOSTS`. Used for links in email. |
 | `INSTANCE_PRIVACY_URL` | Required | Required | Address of the privacy notice. Required outside `local`. |
 | `INSTANCE_WEBSITE_URL` | Optional | Optional | Address of the municipality's website. |
-| `EMAIL_MODE` | Required | Required | Stage: `allowlist`. Production: `graph`. |
-| `EMAIL_ALLOWED_RECIPIENTS` | Conditional | Not used | Required with `EMAIL_MODE=allowlist` (stage). List of complete addresses. |
+| `EMAIL_MODE` | Required | Required | Stage and production: `graph` (identical, D-070). `console` and `allowlist` are refused. |
+| `EMAIL_ALLOWED_RECIPIENTS` | Not used | Not used | Applies only to `EMAIL_MODE=allowlist`, which exists only for `local`. Do not set it on stage or production: a non-empty value stops the application at startup (D-070). |
 | `EMAIL_SENDER_ADDRESS` | Optional | Optional | Sender address. Default `noreply@` plus the host of `INSTANCE_BASE_URL`. |
 | `DB_NAME` | Required | Required | Name of the instance database (for example `leg_platform`). |
 | `DB_USER` | Required | Required | Name of the application database account. |
@@ -224,14 +224,15 @@ Status: **not built.** Step A (research) is done. The owner decided the licence,
 
 ## 5a. Settings in the administration and settings that only the operator changes
 
-The start page of the administration ("Verwaltung") has the box "Erste Schritte" with the live status of the settings that a new instance needs: the addresses of the privacy notice and the legal notice, the email texts (how many of the 18 are customised) and the email delivery (Microsoft Graph, ready or not). Nothing secret is shown there.
+The start page of the administration ("Verwaltung") has the box "Erste Schritte" with the live status of the settings that a new instance needs: name, logo and colours ("own settings" or "server configuration"), the addresses of the privacy notice and the legal notice, the email texts (how many of the 18 are customised) and the email delivery (Microsoft Graph, ready or not). Nothing secret is shown there.
 
 | What | Who changes it | Where |
 | --- | --- | --- |
-| Address of the privacy notice, address of the legal notice (footer, registration, deleting the account) | System administrator | Administration, group "Inhalte", "Portal-Einstellungen" (https only; empty means the text without a link) |
+| Name of the portal, website, address of the privacy notice, address of the legal notice, the two logos (PNG or SVG), the colours (D-073) | A system administrator, or a staff member with the rights "Portal-Einstellungen: ansehen/ändern" (a role gets them at runtime; give them only to people who are responsible for the portal) | Administration, group "Inhalte", "Portal-Einstellungen" (https only; an empty field uses the server configuration; the uploaded logos belong to the database backup) |
+| Host name, base URL, allowed hosts, email mode and sender, database, secrets, retention, proxy settings | Operator only, with the environment variables | Shown read only to system administrators in "Portal-Einstellungen", "Serverkonfiguration (nur lesen)"; `docs/INSTALLATION.md` |
 | Texts of the emails (subject and text of each of the 20 emails) | System administrator, or a staff member with the rights "Mailtext: ansehen/ändern" | Administration, group "Inhalte", "Mailtexte" (preview, test email, earlier versions, "use the default text again") |
 | Microsoft Graph (sender, certificate), security log, blocked logins, groups | System administrator only | Administration, group "System" and "Benutzer" |
-| Name of the instance, website, logos, colours, base URL, email mode | Operator, with environment variables and the instance static directory | `docs/INSTALLATION.md`, `docs/DESIGN.md` section 3.2 |
+| Fallback values of the name, website, logos and colours (used while the field is empty in the administration) | Operator, with environment variables and the instance static directory | `docs/INSTALLATION.md`, `docs/DESIGN.md` section 3.2 |
 | **Texts of the login and registration pages** (title, lead sentence, the benefit points, the labels) | **Operator only, through the translation files** (`locale/<language>/LC_MESSAGES/django.po`, compiled with `msgfmt`, then deploy). They are not editable in the administration. | Source texts in the templates under `leg_platform/templates` and `leg_platform/accounts/templates` |
 
 There are no ready-made groups or roles (`AGENTS.md`, section 6; D-012). A system administrator makes a group from the rights of the list; the pages "Gruppen" explain which right is needed for what. The names of the rights in the lists are German ("Mailtext: ändern").

@@ -849,8 +849,9 @@ class RetentionObligationTests(TestCase):
 
 @tag("mariadb")
 class BulkChangeTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("person@example.org")
 
     def test_bulk_update_of_protected_fields_is_rejected(self):
         values = {

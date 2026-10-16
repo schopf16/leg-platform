@@ -1,13 +1,10 @@
 """Template context of the instance configuration (docs/DESIGN.md, section 3.2)."""
 
-from urllib.parse import urlsplit
-
-from django.conf import settings
 from django.utils import timezone
 from django.utils.functional import SimpleLazyObject
 
 from leg_platform.accounts.login_protection import LOGIN_COOLOFF
-from leg_platform.accounts.portal_settings import legal_links
+from leg_platform.accounts.portal_settings import portal_values
 from leg_platform.accounts.second_factor import is_second_factor_complete, requires_second_factor
 
 
@@ -46,11 +43,13 @@ def frame_restricted(request):
 
 
 def instance(request):
-    # The addresses of the footer are read from the database only when a template uses them: an
-    # error page, which does not show the footer, does not need it for them (D-054, D-056). The
-    # frame state below reads the session of a logged-in account; the 500 page is rendered without
-    # this processor, and if it fails for a 403 or 404 page, Django answers with the 500 page.
-    links = SimpleLazyObject(lambda: legal_links(request))
+    # The values of the portal settings (name, addresses, logos) are read from the database only
+    # when a template uses them: an error page, which does not show the footer, does not need
+    # them for them (D-054, D-056). One query per request, shared with the other users of the
+    # accessor (D-073). The frame state below reads the session of a logged-in account; the 500
+    # page is rendered without this processor, and if it fails for a 403 or 404 page, Django
+    # answers with the 500 page.
+    values = SimpleLazyObject(lambda: portal_values(request))
     return {
         "frame_restricted": frame_restricted(request),
         # The "Profile" entry of the menu is active on the profile pages only (review N-/E-4).
@@ -58,16 +57,17 @@ def instance(request):
             getattr(request, "resolver_match", None), "view_name", None
         )
         in PROFILE_VIEWS,
-        "instance_name": settings.INSTANCE_NAME,
+        "instance_name": SimpleLazyObject(lambda: values.name),
         # The addresses of the footer: maintained in the portal settings (the privacy address
-        # falls back to the instance configuration), D-056.
-        "instance_privacy_url": SimpleLazyObject(lambda: links.privacy_url),
-        "instance_imprint_url": SimpleLazyObject(lambda: links.imprint_url),
-        "instance_website_url": settings.INSTANCE_WEBSITE_URL,
+        # falls back to the instance configuration), D-056, D-073.
+        "instance_privacy_url": SimpleLazyObject(lambda: values.privacy_url),
+        "instance_imprint_url": SimpleLazyObject(lambda: values.imprint_url),
+        "instance_website_url": SimpleLazyObject(lambda: values.website_url),
         # Only the host is shown as the text of the link (validated https URL, so it has one).
-        "instance_website_host": urlsplit(settings.INSTANCE_WEBSITE_URL).hostname or "",
-        "instance_logo_light": settings.INSTANCE_BRANDING.logo_light,
-        "instance_logo_dark": settings.INSTANCE_BRANDING.logo_dark,
+        "instance_website_host": SimpleLazyObject(lambda: values.website_host),
+        # The addresses of the logos (uploaded or static files of the server; "" without a logo).
+        "instance_logo_light": SimpleLazyObject(lambda: values.logo_light),
+        "instance_logo_dark": SimpleLazyObject(lambda: values.logo_dark),
         "print_date": timezone.localdate(),
         # The duration of a temporary lockout, for the lockout page (the same value the abuse
         # protection uses, docs/SECURITY.md, section 3).

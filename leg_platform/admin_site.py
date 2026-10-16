@@ -32,7 +32,10 @@ ADMIN_GROUPS = (
         ),
     ),
 )
-INDEX_HINT = _("You maintain the texts of the emails and the addresses of the footer under Content.")
+INDEX_HINT = _(
+    "You maintain the name, the logo, the colours and the addresses of the portal and the "
+    "texts of the emails under Content."
+)
 
 
 class PortalAdminSite(AdminSite):
@@ -44,10 +47,14 @@ class PortalAdminSite(AdminSite):
         return "system", dict((k, n) for k, n, _o in ADMIN_GROUPS)["system"]
 
     def each_context(self, request):
+        from leg_platform.accounts.portal_settings import portal_values
+
         context = super().each_context(request)
-        # One name for the portal and its administration: the name of the instance (D-013).
-        context["site_header"] = settings.INSTANCE_NAME
-        context["site_title"] = settings.INSTANCE_NAME
+        # One name for the portal and its administration: the name of the instance, as the
+        # administrator set it or else the server configuration (D-013, D-073).
+        name = portal_values(request).name
+        context["site_header"] = name
+        context["site_title"] = name
         # The pages of a model show the group of the start page in the breadcrumb ("Inhalte >
         # Mailtexte"), not the name of the app (design package, final spot check, 3).
         context["portal_group"] = self._group_of_request(request)
@@ -93,8 +100,27 @@ class PortalAdminSite(AdminSite):
 
         steps = []
         if may_open(PortalSettings):
-            row = PortalSettings.objects.filter(pk=1).first()
+            row = PortalSettings.objects.defer(*PortalSettings.LOGO_DATA_FIELDS).filter(pk=1).first()
             url = reverse("admin:accounts_portalsettings_change", args=(1,), current_app=self.name)
+            # A plain fact, not a task: name, logo and colours always work, with the settings of
+            # the portal or with the server configuration (D-073).
+            own = bool(
+                row
+                and (
+                    row.name
+                    or row.logo_light_sha256
+                    or row.logo_dark_sha256
+                    or any(getattr(row, field) for field in PortalSettings.COLOUR_FIELDS)
+                )
+            )
+            steps.append(
+                {
+                    "label": _("Name, logo and colours"),
+                    "ok": None,
+                    "status": _("own settings") if own else _("server configuration"),
+                    "url": url,
+                }
+            )
             for label, field in (
                 (_("Address of the privacy notice"), "privacy_url"),
                 (_("Address of the legal notice"), "imprint_url"),

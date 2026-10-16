@@ -271,18 +271,19 @@ class RenderTests(TestCase):
 class AdminTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.editor = create_active_user("editor@example.org")
-        self.editor.set_privileges(is_staff=True, is_superuser=False)
-        self.editor.user_permissions.add(
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.editor = create_active_user("editor@example.org")
+        cls.editor.set_privileges(is_staff=True, is_superuser=False)
+        cls.editor.user_permissions.add(
             Permission.objects.get(content_type__app_label="accounts", codename="change_emailtext"),
             Permission.objects.get(content_type__app_label="accounts", codename="view_emailtext"),
         )
-        self.plain_staff = create_active_user("plain@example.org")
-        self.plain_staff.set_privileges(is_staff=True, is_superuser=False)
-        self.list_url = reverse("admin:accounts_emailtext_changelist")
+        cls.plain_staff = create_active_user("plain@example.org")
+        cls.plain_staff.set_privileges(is_staff=True, is_superuser=False)
+        cls.list_url = reverse("admin:accounts_emailtext_changelist")
 
     def change_url(self, key):
         EmailText.objects.ensure_all()
@@ -460,26 +461,27 @@ class AdminTests(TestCase):
 class PreviewAndVersionTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.editor = create_active_user("editor@example.org")
-        self.editor.set_privileges(is_staff=True, is_superuser=False)
-        self.editor.user_permissions.add(
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.editor = create_active_user("editor@example.org")
+        cls.editor.set_privileges(is_staff=True, is_superuser=False)
+        cls.editor.user_permissions.add(
             Permission.objects.get(content_type__app_label="accounts", codename="change_emailtext"),
             Permission.objects.get(content_type__app_label="accounts", codename="view_emailtext"),
         )
-        self.viewer = create_active_user("viewer@example.org")
-        self.viewer.set_privileges(is_staff=True, is_superuser=False)
-        self.viewer.user_permissions.add(
+        cls.viewer = create_active_user("viewer@example.org")
+        cls.viewer.set_privileges(is_staff=True, is_superuser=False)
+        cls.viewer.user_permissions.add(
             Permission.objects.get(content_type__app_label="accounts", codename="view_emailtext")
         )
-        self.plain_staff = create_active_user("plain@example.org")
-        self.plain_staff.set_privileges(is_staff=True, is_superuser=False)
+        cls.plain_staff = create_active_user("plain@example.org")
+        cls.plain_staff.set_privileges(is_staff=True, is_superuser=False)
         EmailText.objects.ensure_all()
-        self.text = EmailText.objects.get(key=Key.PASSWORD_RESET)
-        self.change_url = reverse("admin:accounts_emailtext_change", args=(self.text.pk,))
-        self.versions_url = reverse("admin:accounts_emailtext_versions", args=(self.text.pk,))
+        cls.text = EmailText.objects.get(key=Key.PASSWORD_RESET)
+        cls.change_url = reverse("admin:accounts_emailtext_change", args=(cls.text.pk,))
+        cls.versions_url = reverse("admin:accounts_emailtext_versions", args=(cls.text.pk,))
 
     def restore_url(self, version_id):
         return reverse("admin:accounts_emailtext_restore", args=(self.text.pk, version_id))

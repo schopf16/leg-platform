@@ -123,8 +123,9 @@ def send_code(client, code, address="10.1.0.1"):
 
 @tag("mariadb")
 class SecondFactorLoginTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_the_password_alone_does_not_log_in(self):
         response = log_in(self.client, self.user.email)
@@ -338,10 +339,11 @@ class SecondFactorLoginTests(TestCase):
 
 @tag("mariadb")
 class CentralCheckTests(TestCase):
-    def setUp(self):
-        self.staff = promote(create_active_user("staff.person@example.org"))
-        self.administrator = create_active_user("admin.person@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = promote(create_active_user("staff.person@example.org"))
+        cls.administrator = create_active_user("admin.person@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
 
     def test_the_check_fails_closed_without_the_middleware(self):
         request = RequestFactory().get("/")
@@ -458,8 +460,11 @@ class CentralCheckTests(TestCase):
 
 @tag("mariadb")
 class EnrolmentTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client.force_login(self.user)
         # These tests are about the password prompt; the five minutes without it have their own
         # tests (RecentAuthenticationTests).
@@ -666,8 +671,11 @@ class EnrolmentTests(TestCase):
 
 @tag("mariadb")
 class RecoveryCodesAndRemovalTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp()
         self.client.force_login(self.user)
         complete_second_factor(self.client, self.user)
 
@@ -832,8 +840,9 @@ class RecoveryCodesAndRemovalTests(TestCase):
 
 @tag("mariadb")
 class VerifyCodeTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_a_code_of_the_app_is_accepted_once(self):
         code = code_for(self.device)
@@ -921,8 +930,11 @@ class VerifyCodeTests(TestCase):
 
 @tag("mariadb")
 class PasswordChangeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client.force_login(self.user)
         self.url = reverse("accounts:password_change")
 
@@ -1334,6 +1346,52 @@ class ParallelUseTests(TransactionTestCase):
             second_factor.ACCOUNT_FAILURE_LIMIT,
         )
 
+    def test_logout_in_parallel_with_wrong_passwords_of_the_same_sessions_does_not_deadlock(self):
+        # D-072: the logout deletes the count of the session under the lock of the account, like
+        # the confirmations do. Each session is used by two clients that share its cookie: one
+        # logs out while the other enters wrong passwords. A guard against a lock cycle between
+        # the logout and the counter rows (probabilistic; the deterministic proof is
+        # ``test_the_logout_waits_for_the_lock_of_the_account``). Bounded: 6 sessions, 2 wrong
+        # entries each, below the limit of the session (5) and the cap of the account (15).
+        user = create_active_user()
+        functions = []
+        for number in range(6):
+            confirming = Client()
+            confirming.force_login(user)
+            leaving = Client()
+            cookie = settings.SESSION_COOKIE_NAME
+            leaving.cookies[cookie] = confirming.cookies[cookie].value
+            address = f"10.7.2.{number + 1}"
+
+            def wrong_passwords(client=confirming, address=address):
+                return [
+                    client.post(
+                        reverse("accounts:password_change"),
+                        {
+                            "current_password": "wrong password for this account",
+                            "new_password1": OTHER_PASSWORD,
+                            "new_password2": OTHER_PASSWORD,
+                        },
+                        REMOTE_ADDR=address,
+                    ).status_code
+                    for _twice in range(2)
+                ]
+
+            def log_out(client=leaving, address=address):
+                return [client.post(reverse("accounts:logout"), REMOTE_ADDR=address).status_code]
+
+            functions += [wrong_passwords, log_out]
+
+        results = self.run_all(functions)
+
+        statuses = [status for result in results for status in result]
+        # A thread that raised (a deadlock is an exception of the test client) gives no result.
+        self.assertEqual(len(results), len(functions))
+        self.assertNotIn(500, statuses)
+        self.assertFalse(
+            SecurityEvent.objects.filter(event=SecurityEvent.Event.ALL_SESSIONS_ENDED).exists()
+        )
+
 
 class EncryptionTests(SimpleTestCase):
     PURPOSE = b"LEG-Platform test purpose v1"
@@ -1398,8 +1456,9 @@ class EncryptionTests(SimpleTestCase):
 
 @tag("mariadb")
 class DeviceRulesTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_other_forms_of_a_code_are_refused(self):
         for code in ("+12345", "1_2345", "\u0661\u0662\u0663\u0664\u0665\u0666", "\u00b2\u00b2\u00b2\u00b2\u00b2\u00b2", " 12345", "123456\n"):
@@ -1492,8 +1551,9 @@ def budget_of(device):
 class CodeBudgetTests(TestCase):
     """The budget of wrong codes per account: notice, pause, relief (D-040)."""
 
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_the_owner_is_notified_once_when_the_notice_is_reached(self):
         for _attempt in range(totp.CODE_NOTICE_AT - 1):
@@ -1663,8 +1723,9 @@ class CodeBudgetTests(TestCase):
 
 @tag("mariadb")
 class PendingLoginBindingTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_a_password_change_between_the_two_steps_ends_the_pending_login(self):
         log_in(self.client, self.user.email, address="10.9.0.1")
@@ -1752,8 +1813,9 @@ class CleanupConcurrencyTests(TransactionTestCase):
 
 @tag("mariadb")
 class CodeBudgetPauseTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def reset_password(self):
         raw = VerificationToken.objects.issue(

@@ -462,8 +462,9 @@ class RenderedGreetingTests(TestCase):
 class NotificationGreetingTests(TestCase):
     """Name captured at queue time, used only for addresses of the account."""
 
-    def setUp(self):
-        self.user = create_active_user("person@example.org", first_name="Maria", last_name="Muster")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("person@example.org", first_name="Maria", last_name="Muster")
 
     def send_password_changed(self):
         password_reset.notify_password_changed(self.user)
@@ -873,12 +874,15 @@ class NotificationGreetingTests(TestCase):
 class AdministrationGreetingTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user(
             "admin@example.org", first_name="Anna", last_name="Beispiel"
         )
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
         EmailText.objects.ensure_all()
+
+    def setUp(self):
         self.client.force_login(self.administrator)
 
     def change_url(self, key):
@@ -1027,10 +1031,13 @@ class AdministrationGreetingTests(TestCase):
 class DeletionErasesTheNameTests(TestCase):
     """The name for the greeting does not outlive the account in a queued job (D-068, M1)."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("person@example.org", first_name="Maria", last_name="Muster")
+        cls.user.set_secondary_email(SECOND)
+        cls.other = create_active_user("other.person@example.org", first_name="Otto", last_name="Anders")
+
     def setUp(self):
-        self.user = create_active_user("person@example.org", first_name="Maria", last_name="Muster")
-        self.user.set_secondary_email(SECOND)
-        self.other = create_active_user("other.person@example.org", first_name="Otto", last_name="Anders")
         self.client = VerifiedClient()
         self.client.force_login(self.user)
         # Notifications that were queued before the deletion: two jobs per kind for the account,

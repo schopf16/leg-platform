@@ -28,10 +28,11 @@ LOGIN_URL = reverse("accounts:login")
 class SessionTimeoutTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.user = create_active_user()
-        self.staff = create_active_user("staff@example.org")
-        self.staff.set_privileges(is_staff=True, is_superuser=False)
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+        cls.staff = create_active_user("staff@example.org")
+        cls.staff.set_privileges(is_staff=True, is_superuser=False)
 
     def open_session(self, user):
         self.client.force_login(user)

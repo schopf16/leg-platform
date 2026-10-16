@@ -13,7 +13,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 from django.db.models import Case, IntegerField, Q, Value, When
-from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect
+from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.formats import date_format
@@ -39,6 +40,8 @@ from leg_platform.accounts.permission_names import (
     assignable_permissions_filter,
     rights_help,
 )
+from leg_platform.accounts.portal_settings import environment_values, portal_values
+from leg_platform.accounts.portal_settings_form import PortalSettingsForm
 from leg_platform.accounts.models import (
     AccountIntegrityError,
     CERTIFICATE_EXPIRED,
@@ -55,8 +58,10 @@ from leg_platform.accounts.models import (
     User,
     customer_numbers_nearly_exhausted,
 )
+from leg_platform.branding import HEX_COLOUR
 from leg_platform.environment import EMAIL_MODE_ALLOWLIST, EMAIL_MODE_CONSOLE
 from leg_platform.mail import GraphEmailBackend, GraphEmailError
+from leg_platform.presentation import accent_rules
 
 logger = logging.getLogger(__name__)
 
@@ -1357,25 +1362,24 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
 
 
 class PortalSettingsAdmin(admin.ModelAdmin):
-    """The addresses of the privacy notice and the legal notice (D-056).
+    """The settings of the portal: name, website, addresses of the legal notices, logos and colours,
+    and, for system administrators, the values of the server configuration, read only (D-073).
 
-    Only system administrators see and change them: the addresses are shown as links to every
-    visitor of the portal. No row can be added or deleted. A change is recorded in the history
-    of the administration.
+    One row, no add and no delete. The rights to see and to change it are ordinary rights that
+    a role gets at runtime (D-012); superusers pass automatically. Every change is a security event
+    and is in the history of the administration. The logos are uploads that are checked before
+    anything is stored (``portal_settings_form``, ``logo_images``).
     """
 
-    fieldsets = (
-        (
-            None,
-            {
-                "description": _(
-                    "The texts are maintained on your website. Enter only the addresses here."
-                ),
-                "fields": ("privacy_url", "privacy_preview", "imprint_url", "imprint_preview"),
-            },
-        ),
+    form = PortalSettingsForm
+    change_form_template = "admin/accounts/portalsettings/change_form.html"
+    readonly_fields = (
+        "privacy_preview",
+        "imprint_preview",
+        "logo_status",
+        "preview",
+        "server_configuration",
     )
-    readonly_fields = ("privacy_preview", "imprint_preview")
     # The own preview link below opens a new tab; the standard "Currently" link of the widget is
     # not needed. The width of the fields is set in ``static/css/admin-portal.css``.
     formfield_overrides = {models.URLField: {"widget": forms.URLInput()}}
@@ -1385,6 +1389,169 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         "imprint_url": _("https://www.example.org/imprint"),
     }
 
+    def get_fieldsets(self, request, obj=None):
+        can_change = self.has_change_permission(request, obj)
+        fieldsets = [
+            (_("Name and website"), {"fields": ("name", "website_url")}),
+            (
+                _("Legal notices"),
+                {
+                    "description": _(
+                        "The texts are maintained on your website. Enter only the addresses here."
+                    ),
+                    "fields": ("privacy_url", "privacy_preview", "imprint_url", "imprint_preview"),
+                },
+            ),
+            (
+                _("Logo"),
+                {
+                    "fields": (
+                        "logo_status",
+                        *(("logo_light_file", "logo_dark_file", "remove_logos") if can_change else ()),
+                    )
+                },
+            ),
+            (
+                _("Colours"),
+                {"fields": (*PortalSettings.COLOUR_FIELDS, *(("reset_colours",) if can_change else ()))},
+            ),
+            (_("Preview"), {"fields": ("preview",)}),
+        ]
+        if request.user.is_superuser:
+            # Only the system administrators see the server configuration: least disclosure
+            # (D-073). It is read only and holds no secret.
+            fieldsets.append(
+                (
+                    _("Server configuration (read only)"),
+                    {
+                        "classes": ("collapse",),
+                        "description": _(
+                            "These values are set by the operator in the server configuration and "
+                            "cannot be changed here: the host name, the allowed hosts and the base "
+                            "address decide where the links in emails and the security settings "
+                            "point, so they are not stored where the portal settings can change them."
+                        ),
+                        "fields": ("server_configuration",),
+                    },
+                )
+            )
+        return fieldsets
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # The acting account of a rejected upload (the security event) and the request for the
+        # check of the recent login; the class is built for this request only.
+        return type(form.__name__, (form,), {"actor": request.user, "request": request})
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        # Saving needs a recent login (``PortalSettingsForm``); say so before the person types
+        # and uploads, not only after the save was refused.
+        if (
+            request.method == "GET"
+            and self.has_change_permission(request)
+            and not second_factor.recently_authenticated(request)
+        ):
+            self.message_user(
+                request,
+                gettext(
+                    "You logged in more than %(minutes)s minutes ago. To save changes here you "
+                    "have to log in again first."
+                )
+                % {"minutes": int(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds() // 60)},
+                messages.WARNING,
+            )
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def get_urls(self):
+        # Before the catch-all of the model admin; protected like its other pages.
+        return [
+            path(
+                "preview.css",
+                self.admin_site.admin_view(self.preview_stylesheet),
+                name="accounts_portalsettings_preview_css",
+            ),
+            *super().get_urls(),
+        ]
+
+    def preview_stylesheet(self, request):
+        """The saved colours for the preview panels of the form, as a file (no inline style is
+        possible under the Content Security Policy). The script ``portal-preview.js`` changes the
+        variables while the administrator types."""
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
+        values = portal_values(request)
+        css = (
+            f".portal-preview-light{{{accent_rules(values.accent_light, values.text_light)}"
+            f"--yellow:{values.highlight};}}"
+            f".portal-preview-dark{{{accent_rules(values.accent_dark, values.text_dark)}"
+            f"--yellow:{values.highlight};}}"
+        )
+        return HttpResponse(css, content_type="text/css; charset=utf-8")
+
+    @admin.display(description=_("uploaded logos"))
+    def logo_status(self, obj):
+        server = environment_values()
+        rows = []
+        for variant, title in (("light", _("Light mode")), ("dark", _("Dark mode"))):
+            kind = getattr(obj, f"logo_{variant}_type")
+            digest = getattr(obj, f"logo_{variant}_sha256")
+            if kind and digest:
+                state = gettext("Uploaded (%(type)s, fingerprint %(digest)s).") % {
+                    "type": kind.upper(),
+                    "digest": digest[:12],
+                }
+            else:
+                state = gettext("Not uploaded. Server configuration: %(value)s.") % {
+                    "value": gettext("logo files set")
+                    if getattr(server, f"logo_{variant}")
+                    else gettext("not set")
+                }
+            rows.append((title, state))
+        return format_html_join("", "<p>{}: {}</p>", rows)
+
+    @admin.display(description=_("preview of the portal"))
+    def preview(self, obj):
+        server = environment_values()
+        return render_to_string(
+            "admin/accounts/portalsettings/_preview.html",
+            {"values": portal_values(), "server": server},
+        )
+
+    @admin.display(description=_("values of the server"))
+    def server_configuration(self, obj):
+        def on_off(value):
+            return gettext("on") if value else gettext("off")
+
+        def listed(values):
+            return ", ".join(values) if values else "-"
+
+        rows = [
+            (_("Environment"), settings.APP_ENV),
+            (_("Debug mode"), on_off(settings.DEBUG)),
+            (_("Base address of the portal (links in emails)"), settings.INSTANCE_BASE_URL),
+            (_("Allowed host names"), listed(settings.ALLOWED_HOSTS)),
+            (_("Trusted origins of forms"), listed(settings.CSRF_TRUSTED_ORIGINS)),
+            (_("Email delivery"), settings.EMAIL_MODE),
+            (_("Sender address of emails"), settings.DEFAULT_FROM_EMAIL),
+            (
+                _("Number of allowed recipients (development only)"),
+                str(len(settings.EMAIL_ALLOWED_RECIPIENTS)),
+            ),
+            (
+                _("Security log: days kept (usual, long)"),
+                f"{settings.SECURITY_LOG_RETENTION_DAYS}, {settings.SECURITY_LOG_LONG_RETENTION_DAYS}",
+            ),
+            (
+                _("Header of the reverse proxy for HTTPS"),
+                gettext("set") if settings.SECURE_PROXY_SSL_HEADER else gettext("not set"),
+            ),
+            (_("Number of proxies in front of the portal"), str(settings.AXES_IPWARE_PROXY_COUNT)),
+            (_("HSTS, seconds"), str(settings.SECURE_HSTS_SECONDS)),
+        ]
+        return render_to_string(
+            "admin/accounts/portalsettings/_server_configuration.html", {"rows": rows}
+        )
+
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
         if field is not None and db_field.name in self.address_examples:
@@ -1392,18 +1559,20 @@ class PortalSettingsAdmin(admin.ModelAdmin):
             field.help_text = "{} {}".format(
                 field.help_text, gettext("It must start with https://. It opens in a new tab.")
             ).strip()
+        if field is not None and db_field.name == "website_url":
+            field.widget.attrs["placeholder"] = gettext("https://www.example.org")
         return field
 
     def response_change(self, request, obj):
         # One message for every way of saving ("Save" and "Save and continue editing"), instead
         # of the general sentence of Django (design package, final spot check, 6).
-        if obj.privacy_url or obj.imprint_url:
-            message = _("Saved. The addresses now appear in the footer.")
-        else:
+        if getattr(request, "_portal_addresses_removed", False):
             message = _(
                 "The addresses were removed. The footer shows the privacy notice and the legal "
                 "notice without a link."
             )
+        else:
+            message = _("Saved. The changes are now visible on all pages.")
         self.message_user(request, message, messages.SUCCESS)
         return HttpResponseRedirect(self._change_url())
 
@@ -1436,24 +1605,74 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         # Checked before load(), because load() creates the row when it does not exist yet.
         if not self.has_view_or_change_permission(request):
             raise PermissionDenied
-        return PortalSettings.load()
+        # Without the two files of the logos: the page does not need them.
+        return PortalSettings.load_without_logo_files()
 
     @staticmethod
     def _host(address):
         return (urlsplit(address).hostname or "-") if address else "-"
 
-    def save_model(self, request, obj, form, change):
-        # Every change of an address is a security event (D-056): the addresses are shown as links
-        # to every visitor. Only the host names of the old and the new address are logged (public
-        # data, no personal data); the full addresses are in the history of the administration.
-        with transaction.atomic():
-            stored = PortalSettings.objects.select_for_update().get(pk=obj.pk)
-            changes = [
-                f"{name} changed, host {self._host(getattr(stored, name))} -> "
-                f"{self._host(getattr(obj, name))}"
-                for name in ("privacy_url", "imprint_url")
-                if getattr(stored, name) != getattr(obj, name)
+    @staticmethod
+    def _quoted(value):
+        """A text of the portal settings for the log line: JSON quotes it and escapes line breaks
+        and control characters, so that no value can add a line to the log."""
+        return json.dumps(value or "")
+
+    @staticmethod
+    def _colour(value):
+        return value if value and HEX_COLOUR.fullmatch(value) else ("-" if not value else "invalid")
+
+    def _audit_lines(self, stored, obj, form):
+        """One line for every changed field. Public values only; for the logos the type, the size
+        and the start of the digest, never the content."""
+        lines = []
+        if stored.name != obj.name:
+            lines.append(f"name changed, {self._quoted(stored.name)} -> {self._quoted(obj.name)}")
+        for name in ("website_url", "privacy_url", "imprint_url"):
+            if getattr(stored, name) != getattr(obj, name):
+                lines.append(
+                    f"{name} changed, host {self._host(getattr(stored, name))} -> "
+                    f"{self._host(getattr(obj, name))}"
+                )
+        changed = [
+            field for field in PortalSettings.COLOUR_FIELDS if getattr(stored, field) != getattr(obj, field)
+        ]
+        if changed and form.cleaned_data.get("reset_colours"):
+            lines.append("colours reset to server configuration")
+        else:
+            lines += [
+                f"{field} changed, {self._colour(getattr(stored, field))} -> "
+                f"{self._colour(getattr(obj, field))}"
+                for field in changed
             ]
+        for variant in ("light", "dark"):
+            old_digest = getattr(stored, f"logo_{variant}_sha256")
+            new_digest = getattr(obj, f"logo_{variant}_sha256")
+            if old_digest == new_digest:
+                continue
+            if new_digest:
+                lines.append(
+                    f"logo_{variant} replaced ({getattr(obj, f'logo_{variant}_type')}, "
+                    f"{len(getattr(obj, f'logo_{variant}_data'))} bytes, sha256 {new_digest[:12]})"
+                )
+            else:
+                lines.append(f"logo_{variant} removed")
+        return lines
+
+    def save_model(self, request, obj, form, change):
+        # Every change is a security event (D-056, D-073): the values are shown to every visitor,
+        # and the addresses are shown as links. Only public values are logged: the name, the
+        # host names of addresses, colours, and the type, size and digest start of a logo (never
+        # its content); the full addresses are in the history of the administration.
+        with transaction.atomic():
+            stored = PortalSettings.objects.defer(*PortalSettings.LOGO_DATA_FIELDS).select_for_update().get(
+                pk=obj.pk
+            )
+            changes = self._audit_lines(stored, obj, form)
+            request._portal_addresses_removed = bool(
+                (stored.privacy_url or stored.imprint_url)
+                and not (obj.privacy_url or obj.imprint_url)
+            )
             super().save_model(request, obj, form, change)
             if changes:
                 security_log.record(
@@ -1465,17 +1684,19 @@ class PortalSettingsAdmin(admin.ModelAdmin):
             raise PermissionDenied
         return HttpResponseRedirect(self._change_url())
 
+    def history_view(self, request, object_id, extra_context=None):
+        # The history names the acting account by its email address: system administrators only,
+        # as for the email texts and the accounts (D-039, D-073).
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        return super().history_view(request, object_id, extra_context)
+
     def has_add_permission(self, request):
         return False
 
     def has_module_permission(self, request):
-        return request.user.is_superuser
-
-    def has_view_permission(self, request, obj=None):
-        return request.user.is_superuser
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_superuser
+        # The group of the start page shows the module to whoever may see or change it (D-073).
+        return self.has_view_or_change_permission(request)
 
     def has_delete_permission(self, request, obj=None):
         return False

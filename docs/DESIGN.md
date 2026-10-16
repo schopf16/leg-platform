@@ -65,25 +65,28 @@ The platform itself is neutral. Each instance configures its own branding; these
 
 Without instance values, the platform defaults apply. They are the values of the design package (D-056): accent `#005BA2` (light) and `#6AA9E0` (dark), text on it `#FFFFFF` and `#0B1520`, highlight `#DDDD22` (the token `--yellow`). Without a logo, the instance name is shown as text.
 
-**Where the operator of a deployment changes the branding (WL-24, decision of the designer review: branding stays with the deployment, not in the administration).** The values change rarely, and the checks (contrast, allowed file types) and the logo files belong with the deployment, so they are not editable in the administration. Only the two addresses of the footer (privacy notice, imprint) are maintained there (D-056, "Portal-Einstellungen"). Everything else is set in the environment of the processes, once per instance:
+**Where the administrator or the operator changes the branding (D-073, owner decision of 2026-10-16; this replaces the rule of WL-24 / D-060 that branding stays with the deployment).** The administrator maintains the name, the website, the two logos and the colours in the administration, "Inhalte", "Portal-Einstellungen" (the right to see and to change it is an ordinary right of a role). The environment values are the fallback of every field that is left empty there, and the platform defaults come last (precedence per field: administration, environment, default). Everything that is a security setting of the server stays in the environment and is only shown, read only, to system administrators (D-073).
 
-| What | Where | Variable or file |
-| ---- | ----- | ---------------- |
-| Name of the instance (header, titles, mails, administration) | environment | `INSTANCE_NAME` |
-| Website of the instance (third item of the footer row) | environment | `INSTANCE_WEBSITE_URL` (`https://`) |
-| Logos (positive and negative) | static directory of the instance and environment | files in `INSTANCE_STATIC_DIRECTORY`, referenced by `INSTANCE_LOGO_LIGHT` and `INSTANCE_LOGO_DARK` (`.svg` or `.png`, relative paths) |
-| Accent colours and the text on them | environment | `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK` (contrast of 4.5:1 is checked at the start) |
-| Highlight colour | environment | `INSTANCE_HIGHLIGHT` |
-| Privacy notice (fallback) | environment | `INSTANCE_PRIVACY_URL` (used when the portal settings have no address) |
-| Privacy notice and imprint (the address) | administration, "Inhalte" | "Portal-Einstellungen" |
+| What | Where | Variable or place |
+| ---- | ----- | ----------------- |
+| Name of the instance (header, titles, mails, administration) | administration; fallback environment | "Name des Portals"; `INSTANCE_NAME` |
+| Website of the instance (third item of the footer row, contact address in emails) | administration; fallback environment | "Adresse der Website"; `INSTANCE_WEBSITE_URL` (`https://`) |
+| Logos (positive and negative) | administration (upload, stored in the database); fallback static files | "Logo für den hellen / dunklen Modus" (PNG or SVG, both or none); files in `INSTANCE_STATIC_DIRECTORY`, referenced by `INSTANCE_LOGO_LIGHT` and `INSTANCE_LOGO_DARK` (`.svg` or `.png`, relative paths) |
+| Accent colours and the text on them | administration; fallback environment | four colour fields; `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK` (contrast of 4.5:1 is checked at the start, when saving and again when reading) |
+| Highlight colour | administration; fallback environment | "Hervorhebungsfarbe"; `INSTANCE_HIGHLIGHT` |
+| Privacy notice | administration; fallback environment | "Adresse der Datenschutzerklärung"; `INSTANCE_PRIVACY_URL` |
+| Imprint (the address) | administration | "Adresse des Impressums" (no environment variable) |
 | Texts of the emails | administration, "Inhalte" | "Mailtexte" (D-039) |
+| Host name, base address, allowed hosts, mail mode and sender, Graph credentials, database, secrets, retention, proxy settings | environment only; shown read only to system administrators | "Serverkonfiguration (nur lesen)" in the portal settings; the Graph credentials are in their own module |
 | Texts of the pages (login, registration, errors) | catalogue | `locale/de_CH/LC_MESSAGES/django.po` (deployment, with the translator) |
 
 The names and the exact steps are in `docs/INSTALLATION.md` and `docs/STARTUP.md`, section 4.
 
+The page "Portal-Einstellungen" (D-073): the groups "Name und Website", "Datenschutz und Impressum", "Logo", "Farben", "Vorschau" and, for system administrators only, "Serverkonfiguration (nur lesen)" (collapsed). Under every field with a server value the page shows "Serverkonfiguration: <value>" so that an empty field is understood. The colour fields are short text fields (the hex text is always visible) with a swatch and the text "Kontrast 6.96:1 – ausreichend" or "– zu schwach" next to them (advisory, from the script `static/js/portal-preview.js`; the server decides). The preview shows the saved logos on the light surface and on the plate of the dark mode, and the colours change while the administrator types (CSS variables set through the CSSOM by the external script; the policy is not widened, so there is **no preview of a file that is chosen but not saved**: the logo shows after saving, and "remove the uploaded logos" is the way back). Removal and reset are checkboxes: the logos ("The files are deleted and cannot be restored") and the colours ("Use the server colours again"); an empty text field is the reset of that field. On 375 px the fields have the full width, the preview panels are in one column and the controls are at least 40 px high. Contrast, colour-only meaning and focus follow the rules below.
+
 Rules for instance values:
 
-* Text on the accent colour, and the accent colour used as text on the panel and the page background, reach at least 4.5:1 (WCAG 2.2, success criterion 1.4.3). The application checks this at the start against the surfaces `#FFFFFF`, `#F6F7F8` (light) and `#191C1F`, `#111315` (dark).
+* Text on the accent colour, and the accent colour used as text on the panel and the page background, reach at least 4.5:1 (WCAG 2.2, success criterion 1.4.3). The application checks this at the start against the surfaces `#FFFFFF`, `#F6F7F8` (light) and `#191C1F`, `#111315` (dark), and the form of the administration checks the same when saving. An empty text colour next to an accent colour of the administration is chosen automatically (white or `#0B1520`, whichever has the higher contrast).
 * The accent colour must not be confusable with the error colour or the energy colours (section 3.4). Red tones are not permitted as accent. This rule is not checked automatically; it is a manual check by the operator, and the installation guide describes it.
 * The highlight colour is never used as text colour or as a chart colour on a light background.
 * The accent is used for buttons, links, active navigation and the focus indicator. It is never used in charts.
@@ -92,9 +95,9 @@ Validation of instance values (`docs/SECURITY.md`, section 6):
 
 * Colour values must match `^#[0-9A-Fa-f]{6}$`.
 * Configured URLs (privacy notice, the instance's website) must be absolute `https://` URLs.
-* Logo references must point to a file inside the instance's static files with an allowlisted extension (`.svg`, `.png`); absolute paths, path traversal and external URLs are rejected.
-* Values are validated when the application starts (values from the configuration) or when they are saved (values from the database). Invalid values are rejected; they are never used.
-* Branding values are passed into CSS variables in a way that the Content Security Policy allows without `'unsafe-inline'` (e.g. a stylesheet generated from the validated values and served as a file). The concrete mechanism is decided at implementation.
+* A logo of the environment must point to a file inside the instance's static files with an allowlisted extension (`.svg`, `.png`); absolute paths, path traversal and external URLs are rejected. An uploaded logo is a PNG (checked chunk by chunk) or an SVG (checked against an allow-list); everything else is rejected (D-073).
+* Values are validated when the application starts (values from the configuration), when they are saved (values from the database) and again when they are read. Invalid values are rejected; they are never used.
+* Branding values are passed into CSS variables in a way that the Content Security Policy allows without `'unsafe-inline'` (a stylesheet generated from the validated values and served as a file, `instance.css`, with an ETag and `no-cache`, so that a change is visible at once).
 
 ### 3.3 Initiating Instance: LEG Ittigen
 
@@ -212,15 +215,15 @@ Tabler's documentation notes that changing the primary colour, base or radius ca
 
 ## 10. Security Notes
 
-* Logo files are provided by the operator as static files of the instance. In phase 1 there is no web upload for logos. SVG logos are embedded only as images (`<img>`), never inlined into the HTML, so that content of the file cannot execute in the page. According to W3C SVG Integration, an SVG document referenced through `<img>` is processed without running scripts, while an SVG file opened directly as a document can run scripts.
-* Because a logo file can be opened directly through its URL, static SVG logo files are checked for scripts and external references before deployment and/or served with a restrictive Content Security Policy. The installation guide describes the check; the concrete header is decided at implementation.
+* Logo files are either static files of the instance (the fallback of the environment) or uploads of the administrator (D-073, which replaces "in phase 1 there is no web upload for logos"). An uploaded logo is a PNG or an SVG that the form accepted exactly as it is or rejected; it is stored in the database and served by the portal itself. SVG logos are embedded only as images (`<img>`), never inlined into the HTML, so that content of the file cannot execute in the page. According to W3C SVG Integration, an SVG document referenced through `<img>` is processed without running scripts, while an SVG file opened directly as a document can run scripts.
+* Because a logo file can be opened directly through its URL, the view of the uploaded logos serves every file with a fixed content type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox; default-src 'none'` and `Cross-Origin-Resource-Policy: same-origin`, and static SVG logo files of the environment are checked for scripts and external references before deployment and served with a restrictive Content Security Policy by the web server. Whether an SVG with `style` attributes still renders in `<img>` under this policy was **not** checked in a browser (open, D-073).
 * Branding values are validated before use (section 3.2), and the colour mode cannot be changed through URL parameters (section 7).
 * The legal addresses in the footer come from the portal settings of the administrator, are validated (`https` only, no credentials) and open in a new tab with `rel="noopener noreferrer"` (D-056).
 * No fonts, icons or stylesheets are loaded from third parties (`docs/SECURITY.md`, section 6).
 
 ## 11. Open Points
 
-* Whether instance branding values are kept in environment variables, files or the database (`docs/ARCHITECTURE.md`, "Deliberately Open"). The package asks for the administration of the two legal addresses only; they are in the portal settings (D-056).
+* Instance branding values are kept in the database (the administration) with the environment as the fallback (D-073; this settles the open point of `docs/ARCHITECTURE.md`, "Deliberately Open"). The two legal addresses are in the same portal settings (D-056).
 * Final page structure of later member and administration views; this document defines how they look, not which functions they have.
 * The French, Italian and English texts of the login page and the labels of the corner buttons are drafts; native speakers must review them (package, `login/VORGABEN.md`, section 12).
 * The contrast of the energy colours on the new surfaces is verified when they are first used (section 3.4).

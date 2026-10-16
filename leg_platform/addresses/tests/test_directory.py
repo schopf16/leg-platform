@@ -16,7 +16,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.middleware.csrf import get_token
 from django.db import DatabaseError, connections
-from django.test import Client, RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -301,7 +301,7 @@ class RateLimitAdapterTests(SimpleTestCase):
 
 
 @override_settings(AXES_IPWARE_PROXY_COUNT=0)
-class RateLimitDatabaseTests(TransactionTestCase):
+class RateLimitDatabaseTests(TestCase):
     """The real counters: a refused request changes nothing (security review of D-066, N-2)."""
 
     def snapshot(self):
@@ -333,6 +333,9 @@ class RateLimitDatabaseTests(TransactionTestCase):
 
 @override_settings(LANGUAGE_CODE="en", ROOT_URLCONF="leg_platform.addresses.tests.urls")
 class DirectoryDatabaseTests(TransactionTestCase):
+    # The reader alias "addresses" is a mirror of "address_import" (a second connection to the same
+    # in-memory database); it sees only committed rows, so TestCase (one open transaction) cannot be
+    # used. Checked in D-071 step 3b: converting it fails 46 of its 59 tests.
     databases = {"default", "addresses", "address_import"}
 
     def setUp(self):

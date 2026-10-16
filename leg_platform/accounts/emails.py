@@ -17,7 +17,7 @@ from django.utils.translation import gettext
 
 from leg_platform.accounts import email_texts, greeting
 from leg_platform.accounts.models import EmailText
-from leg_platform.accounts.portal_settings import legal_links
+from leg_platform.accounts.portal_settings import portal_values
 
 Key = EmailText.Key
 
@@ -31,10 +31,13 @@ def absolute_url(path):
 
 
 def _values(specific, key=None, greeting_name=""):
+    # The effective values of the portal settings (D-073): the name is checked again for control
+    # characters when it is read, so it can never inject a header into the subject.
+    portal = portal_values()
     values = {
-        "instance_name": settings.INSTANCE_NAME,
-        "contact_url": settings.INSTANCE_WEBSITE_URL or "",
-        "privacy_url": legal_links().privacy_url or "",
+        "instance_name": portal.name,
+        "contact_url": portal.website_url or "",
+        "privacy_url": portal.privacy_url or "",
         "login_url": absolute_url(reverse("accounts:login")),
         **specific,
     }

@@ -6,9 +6,29 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 
-from leg_platform.middleware import BODY_LIMITS, RequestBodyLimitMiddleware
+from leg_platform.middleware import BODY_LIMITS, RequestBodyLimitMiddleware, body_limit
 
 LOOKUP = "/addresses/lookup/"
+PORTAL_SETTINGS = "/admin/accounts/portalsettings/"
+# Every spelling that the admin routes to the portal settings or to one of its other routes: the
+# object id is ``<path:object_id>``, so the same page has many addresses (security review of
+# D-073, M-1). ``_31`` is the admin's own escape of "1".
+PORTAL_SETTINGS_PATHS = (
+    PORTAL_SETTINGS,
+    PORTAL_SETTINGS + "1/change/",
+    PORTAL_SETTINGS + "01/change/",
+    PORTAL_SETTINGS + "+1/change/",
+    PORTAL_SETTINGS + " 1/change/",
+    PORTAL_SETTINGS + "_31/change/",
+    PORTAL_SETTINGS + "2/change/",
+    PORTAL_SETTINGS + "1/history/",
+    PORTAL_SETTINGS + "1/delete/",
+    PORTAL_SETTINGS + "add/",
+    PORTAL_SETTINGS + "preview.css",
+    PORTAL_SETTINGS + "1/",
+    PORTAL_SETTINGS + "1/change/extra/",
+    "/admin/accounts/portalsettings",
+)
 
 
 class RequestBodyLimitTests(SimpleTestCase):
@@ -23,7 +43,7 @@ class RequestBodyLimitTests(SimpleTestCase):
         return self.middleware(request)
 
     def test_a_body_at_the_limit_passes_and_above_it_is_refused_before_the_view(self):
-        limit = BODY_LIMITS[LOOKUP]
+        limit = body_limit(LOOKUP)
 
         self.assertEqual(self.post(str(limit)).status_code, 200)
         self.passed.reset_mock()
@@ -65,8 +85,67 @@ class RequestBodyLimitTests(SimpleTestCase):
                 request = getattr(self.factory, method)(
                     LOOKUP, data=b"", content_type="application/x-www-form-urlencoded"
                 )
-                request.META["CONTENT_LENGTH"] = str(BODY_LIMITS[LOOKUP] + 1)
+                request.META["CONTENT_LENGTH"] = str(body_limit(LOOKUP) + 1)
                 self.assertEqual(self.middleware(request).status_code, 413)
+
+    def test_every_route_below_the_portal_settings_is_limited_to_the_page_limit(self):
+        limit = body_limit(PORTAL_SETTINGS)
+        self.assertEqual(limit, 3 * 1024 * 1024)
+
+        for path in PORTAL_SETTINGS_PATHS:
+            with self.subTest(path=path):
+                self.passed.reset_mock()
+                self.assertEqual(body_limit(path), limit)
+                self.assertEqual(self.post(str(limit), path=path).status_code, 200)
+                self.passed.reset_mock()
+                self.assertEqual(self.post(str(limit + 1), path=path).status_code, 413)
+                self.passed.assert_not_called()
+                self.assertEqual(self.post(str(10**12), path=path).status_code, 413)
+
+    def test_the_longest_matching_prefix_decides_and_other_paths_have_no_limit(self):
+        with patch("leg_platform.middleware.BODY_LIMITS", (("/a/", 10), ("/a/b/", 100), ("/c/", 5))):
+            self.assertEqual(body_limit("/a/x"), 10)
+            self.assertEqual(body_limit("/a/b/x"), 100)
+            self.assertEqual(body_limit("/c/"), 5)
+            self.assertIsNone(body_limit("/d/"))
+        # The real list: the lookup and the portal settings only; the login page has none.
+        self.assertEqual(sorted(limit for _prefix, limit in BODY_LIMITS), [4096, 3 * 1024 * 1024])
+        self.assertIsNone(body_limit("/login/"))
+        self.assertIsNone(body_limit("/admin/accounts/user/1/change/"))
+
+    def test_every_spelling_of_a_portal_settings_route_that_the_admin_resolves_is_covered(self):
+        # The routes of the admin that resolve below the prefix all start with it, whatever the
+        # object id looks like (a test of the premise of the prefix match).
+        from django.urls import resolve
+
+        for path in (
+            PORTAL_SETTINGS + "1/change/",
+            PORTAL_SETTINGS + "01/change/",
+            PORTAL_SETTINGS + "+1/change/",
+            PORTAL_SETTINGS + " 1/change/",
+            PORTAL_SETTINGS + "_31/change/",
+            PORTAL_SETTINGS + "add/",
+            PORTAL_SETTINGS + "1/history/",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(resolve(path).view_name.startswith("admin:accounts_portalsettings"))
+                self.assertIsNotNone(body_limit(path))
+
+    def test_an_oversized_post_to_the_portal_settings_is_refused_through_the_full_stack(self):
+        from django.test import Client
+
+        client = Client(enforce_csrf_checks=True)
+        client.cookies["csrftoken"] = "x" * 64
+        for path in PORTAL_SETTINGS_PATHS:
+            with self.subTest(path=path):
+                response = client.generic(
+                    "POST",
+                    path,
+                    data=b"x" * 16,
+                    content_type="multipart/form-data; boundary=x",
+                    CONTENT_LENGTH=str(3 * 1024 * 1024 + 1),
+                )
+                self.assertEqual(response.status_code, 413)
 
     def test_only_the_exact_path_matches_and_other_spellings_do_not_resolve(self):
         from django.urls import Resolver404, resolve

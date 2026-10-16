@@ -175,7 +175,7 @@ The software is called LEG-Platform (initiated by the LEG Ittigen, developed neu
 * Use the newest possible version: the minimum versions are only declared and tested. Whenever a version is chosen for use (development environment, installation, recommendations), the newest compatible release is used; for components with long-term support tracks, the newest release of that track (D-015).
 * Prefer Django's security features.
 * Write tests for new functionality and security-critical cases.
-* Run appropriate tests and available security checks.
+* Run appropriate tests and available security checks. Run the tests of the area that a change touches (scenario run, `.\scripts\test.ps1 -Changed` or `-Area <name>`; `docs/STARTUP.md`, section 13; D-071), not the full suite after every change. The full suite is required for core changes (the runner widens the run by itself), before a deployment gate, in continuous integration and once per commit block by the main session.
 * Document failed or skipped tests.
 * Never present a dummy implementation as a finished security feature.
 * Do not change existing architecture or dependencies unnecessarily.
@@ -215,7 +215,7 @@ Report briefly:
 
 * What was changed?
 * Which security aspects were considered?
-* Which tests were run and with what result?
+* Which tests were run and with what result? Name the area or labels and the number of tests, and say whether the full suite was run; a scoped run is never reported as a full run.
 * Which points were verified, and against which sources or verification steps?
 * What is still open?
 * Which risks or unverified points remain?

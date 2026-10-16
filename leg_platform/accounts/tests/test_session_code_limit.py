@@ -7,11 +7,18 @@ of the profile do not touch the budget of the account and are no failed logins. 
 address. A format error counts nowhere.
 """
 
+import time
+from contextlib import contextmanager
+from io import StringIO
+from threading import Event, Thread
+from types import SimpleNamespace
 from unittest import mock
 
 from axes.models import AccessAttempt
 from django.core import mail
-from django.test import Client, TestCase, tag
+from django.core.management import call_command
+from django.db import connection, transaction
+from django.test import Client, TestCase, TransactionTestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,6 +27,7 @@ from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
+    ConfirmationFailure,
     LoginIpAttempt,
     MailJob,
     PendingEmailChange,
@@ -71,8 +79,11 @@ def digest_of(client):
 
 
 class Base(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp("session.limit@example.org")
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp("session.limit@example.org")
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -307,12 +318,6 @@ class ThePerSessionCounterTests(Base):
         self.assertRedirects(self.wrong("email"), LOGIN, fetch_redirect_response=False)
 
     def test_the_cleanup_removes_the_old_rows_and_keeps_the_current_ones(self):
-        from io import StringIO
-
-        from django.core.management import call_command
-
-        from leg_platform.accounts.models import ConfirmationFailure
-
         old = SessionCodeFailure.objects.create(
             account=self.user, session_digest="x" * 64, failures=2,
             updated_at=timezone.now() - second_factor.SESSION_CODE_FAILURE_RETENTION * 2,
@@ -355,9 +360,10 @@ class ThePerSessionCounterTests(Base):
 
 @tag("mariadb")
 class TheNoticeAndTheEntryTests(Base):
-    def setUp(self):
-        super().setUp()
-        self.user.set_secondary_email(SECOND)
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user.set_secondary_email(SECOND)
 
     def test_one_event_and_one_notice_to_every_address(self):
         for _attempt in range(LIMIT):
@@ -413,3 +419,175 @@ class TheNoticeAndTheEntryTests(Base):
 
         entry = SecurityEvent.objects.get(event=SecurityEvent.Event.SESSION_ENDED_WRONG_CODES)
         self.assertFalse(entry.long_retention)
+
+
+@tag("mariadb")
+class ConfirmationCounterLockOrderTests(TransactionTestCase):
+    """The counter rows are changed only under the lock of the account row (D-072).
+
+    The order is always account row, then counter rows: the requests (``second_factor``), the
+    login and logout (``forget_confirmation_failures``) and the clean-up. A second connection that
+    holds the lock of the account stands for a request that is running.
+    """
+
+    def setUp(self):
+        self.user = create_active_user()
+        self.other = create_active_user("other.lock.order@example.org")
+        now = timezone.now()
+        self.long_ago = now - second_factor.SESSION_CODE_FAILURE_RETENTION * 2
+        self.day_ago = now - second_factor.ACCOUNT_FAILURE_WINDOW * 2
+
+    def add_rows(self, account, letter):
+        """One expired and one current row of each kind; the digests differ per account."""
+        old_session = SessionCodeFailure.objects.create(
+            account=account, session_digest=letter * 64, failures=1, updated_at=self.long_ago
+        )
+        SessionCodeFailure.objects.create(account=account, session_digest=letter.upper() * 64)
+        old_entry = ConfirmationFailure.objects.create(account=account, occurred_at=self.day_ago)
+        ConfirmationFailure.objects.create(account=account, occurred_at=timezone.now())
+        return old_session, old_entry
+
+    @contextmanager
+    def account_locked(self, account):
+        locked, release = Event(), Event()
+
+        def hold():
+            try:
+                with transaction.atomic():
+                    User._base_manager.select_for_update().get(pk=account.pk)
+                    locked.set()
+                    release.wait(20)
+            finally:
+                connection.close()
+
+        holder = Thread(target=hold)
+        holder.start()
+        try:
+            self.assertTrue(locked.wait(10))
+            yield
+        finally:
+            release.set()
+            holder.join()
+
+    def test_the_cleanup_removes_the_expired_rows_of_every_account_and_keeps_the_others(self):
+        old = [self.add_rows(self.user, "a"), self.add_rows(self.other, "b")]
+        output = StringIO()
+
+        call_command("cleanup_confirmation_failures", stdout=output)
+
+        for old_session, old_entry in old:
+            self.assertFalse(SessionCodeFailure.objects.filter(pk=old_session.pk).exists())
+            self.assertFalse(ConfirmationFailure.objects.filter(pk=old_entry.pk).exists())
+        for account in (self.user, self.other):
+            self.assertEqual(SessionCodeFailure.objects.filter(account=account).count(), 1)
+            self.assertEqual(ConfirmationFailure.objects.filter(account=account).count(), 1)
+        self.assertIn("Deleted 2 counts of sessions and 2 entries", output.getvalue())
+        self.assertNotIn("Left", output.getvalue())
+
+    def test_the_cleanup_skips_an_account_that_a_request_holds_and_never_waits_for_it(self):
+        held_session, held_entry = self.add_rows(self.user, "a")
+        free_session, free_entry = self.add_rows(self.other, "b")
+        output = StringIO()
+
+        with self.account_locked(self.user):
+            started = time.monotonic()
+            call_command("cleanup_confirmation_failures", stdout=output)
+            elapsed = time.monotonic() - started
+
+            # The holder lets go after 20 s at the latest: a cleanup that waited for it would
+            # have been late, and would have deleted the rows.
+            self.assertLess(elapsed, 15)
+            self.assertTrue(SessionCodeFailure.objects.filter(pk=held_session.pk).exists())
+            self.assertTrue(ConfirmationFailure.objects.filter(pk=held_entry.pk).exists())
+            self.assertFalse(SessionCodeFailure.objects.filter(pk=free_session.pk).exists())
+            self.assertFalse(ConfirmationFailure.objects.filter(pk=free_entry.pk).exists())
+            self.assertIn("Left 2 for the next run", output.getvalue())
+
+        call_command("cleanup_confirmation_failures", stdout=StringIO())
+
+        self.assertFalse(SessionCodeFailure.objects.filter(pk=held_session.pk).exists())
+        self.assertFalse(ConfirmationFailure.objects.filter(pk=held_entry.pk).exists())
+        self.assertEqual(SessionCodeFailure.objects.filter(account=self.user).count(), 1)
+        self.assertEqual(ConfirmationFailure.objects.filter(account=self.user).count(), 1)
+
+    def test_the_cleanup_takes_the_lock_of_the_account_before_it_deletes(self):
+        self.add_rows(self.user, "a")
+        calls = []
+        real = User._base_manager.select_for_update
+
+        def record(*args, **kwargs):
+            calls.append(kwargs)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(User._base_manager, "select_for_update", side_effect=record):
+            call_command("cleanup_confirmation_failures", stdout=StringIO())
+
+        # One lock for each of the two kinds of rows; never a wait for a request.
+        self.assertEqual(calls, [{"skip_locked": True}, {"skip_locked": True}])
+
+    def forget_in_a_thread(self, user, identifier):
+        """Start ``forget_confirmation_failures`` in a thread; return its events and the thread."""
+        request = SimpleNamespace(session={second_factor.SESSION_COUNTER_KEY: identifier})
+        entered, done = Event(), Event()
+        errors = []
+        real = second_factor._session_digests
+
+        def entering(request):
+            entered.set()
+            return real(request)
+
+        def forget():
+            try:
+                with mock.patch.object(second_factor, "_session_digests", side_effect=entering):
+                    second_factor.forget_confirmation_failures(request, user)
+            except Exception as error:  # reported by the assertion of the test
+                errors.append(error)
+            finally:
+                done.set()
+                connection.close()
+
+        thread = Thread(target=forget)
+        thread.start()
+        return entered, done, errors, thread
+
+    def test_the_logout_waits_for_the_lock_of_the_account(self):
+        identifier = "an-identifier-of-a-session"
+        digest = keyed_digest(identifier, second_factor.SESSION_CODE_FAILURE_PURPOSE)
+        SessionCodeFailure.objects.create(account=self.user, session_digest=digest, failures=2)
+        SessionCodeFailure.objects.create(account=self.user, session_digest="k" * 64, failures=1)
+
+        with self.account_locked(self.user):
+            entered, done, errors, thread = self.forget_in_a_thread(self.user, identifier)
+            self.assertTrue(entered.wait(10), "The thread did not start.")
+            self.assertFalse(done.wait(1.0), "It did not wait for the lock of the account.")
+            self.assertEqual(SessionCodeFailure.objects.filter(account=self.user).count(), 2)
+        thread.join(20)
+
+        self.assertTrue(done.is_set())
+        self.assertEqual(errors, [])
+        # Only the row of this session went.
+        self.assertEqual(
+            list(SessionCodeFailure.objects.values_list("session_digest", flat=True)), ["k" * 64]
+        )
+
+    def test_forgetting_inside_the_transaction_that_holds_the_lock_does_not_wait(self):
+        identifier = "another-identifier-of-a-session"
+        digest = keyed_digest(identifier, second_factor.SESSION_CODE_FAILURE_PURPOSE)
+        SessionCodeFailure.objects.create(account=self.user, session_digest=digest, failures=2)
+        request = SimpleNamespace(session={second_factor.SESSION_COUNTER_KEY: identifier})
+
+        with transaction.atomic():
+            User._base_manager.select_for_update().get(pk=self.user.pk)
+            second_factor.reset_confirmation_failures(request, self.user)
+
+        self.assertFalse(SessionCodeFailure.objects.exists())
+
+    def test_forgetting_after_the_account_was_deleted_removes_nothing_and_does_not_fail(self):
+        identifier = "an-identifier-of-a-deleted-account"
+        request = SimpleNamespace(session={second_factor.SESSION_COUNTER_KEY: identifier})
+        gone = User.objects.get(pk=self.other.pk)
+        self.other.delete()
+
+        second_factor.forget_confirmation_failures(request, gone)
+
+        self.assertFalse(SessionCodeFailure.objects.exists())

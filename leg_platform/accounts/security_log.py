@@ -44,6 +44,7 @@ MESSAGES = {
     Event.GRAPH_CERTIFICATE_UPLOADED: "A Microsoft Graph certificate was uploaded",
     Event.GRAPH_TEST_EMAIL_REQUESTED: "A Microsoft Graph test email was requested",
     Event.PORTAL_SETTINGS_CHANGED: "The portal settings were changed",
+    Event.PORTAL_UPLOAD_REJECTED: "An upload in the portal settings was rejected",
     Event.EMAIL_CHANGE_CANCELLED: "A requested email address change was cancelled by the account",
     Event.EMAIL_CHANGE_STOPPED: "A requested email address change was stopped with the notice link",
     Event.SECONDARY_EMAIL_CHANGED: "The second email address was changed",
@@ -61,8 +62,9 @@ def record(event, *, account=None, actor=None, long_retention=False, detail=""):
 
     The log line is written only when the transaction commits, so a rolled-back change leaves
     neither a stored event nor a log line (D-018). ``detail`` is added to the log line only; it
-    must never contain personal data (the portal settings give the host names of public
-    addresses, D-056).
+    must never contain personal data (the portal settings give the name, the host names of public
+    addresses, colours and, for a logo, its type, size and the start of its digest, D-056, D-073;
+    a rejected upload gives a fixed reason code and nothing of the file).
     """
     SecurityEvent.objects.record(
         event, account=account, actor=actor, long_retention=long_retention

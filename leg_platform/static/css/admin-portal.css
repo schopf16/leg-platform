@@ -2,10 +2,12 @@
    The look of the administration stays that of Django; this file only sets widths and the small
    boxes of the portal's own pages. No inline style is used anywhere (Content Security Policy). */
 
-/* The subject and the text of an email and the addresses of the portal settings use the width of
+/* The subject and the text of an email and the fields of the portal settings use the width of
    the page. */
 .field-subject input[type="text"],
 .field-body textarea,
+.field-name input,
+.field-website_url input,
 .field-privacy_url input,
 .field-imprint_url input {
   box-sizing: border-box;
@@ -81,4 +83,174 @@ fieldset .description,
 
 .portal-help table {
   margin: 8px 0;
+}
+
+/* The portal settings (D-073). The colour fields are short; the hex text is always visible, the
+   swatch and the contrast text next to it come from portal-preview.js. */
+input.portal-colour {
+  box-sizing: border-box;
+  width: 9em;
+  min-height: 32px;
+}
+
+.portal-swatch {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  margin: 0 8px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.portal-contrast {
+  font-size: 0.875rem;
+}
+
+/* Files and checkboxes: a target of at least 24 x 24 px (WCAG 2.2, 2.5.8). */
+.field-logo_light_file input[type="file"],
+.field-logo_dark_file input[type="file"] {
+  max-width: 100%;
+  min-height: 32px;
+}
+
+.field-remove_logos input[type="checkbox"],
+.field-reset_colours input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+}
+
+.portal-hint {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+/* The preview: two panels with the surfaces of the design language (docs/DESIGN.md, 3.1). */
+.portal-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 60em;
+}
+
+.portal-preview-panel {
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 8px;
+}
+
+.portal-preview-panel h3 {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+}
+
+.portal-preview-light {
+  --pv-bg: #f6f7f8;
+  --pv-panel: #ffffff;
+  --pv-fg: #1b1d20;
+  --pv-line: #dee2e7;
+  --pv-plate: transparent;
+  background: var(--pv-bg);
+  color: var(--pv-fg);
+}
+
+.portal-preview-dark {
+  --pv-bg: #111315;
+  --pv-panel: #191c1f;
+  --pv-fg: #e6e9ec;
+  --pv-line: #2a2f35;
+  --pv-plate: #26292c;
+  background: var(--pv-bg);
+  color: var(--pv-fg);
+}
+
+.portal-preview-panel h3 {
+  color: var(--pv-fg);
+}
+
+.portal-preview-logo {
+  display: inline-block;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  max-width: 100%;
+}
+
+.portal-preview-plate {
+  padding: 4px 8px;
+  background: var(--pv-plate);
+}
+
+.portal-preview-logo img {
+  display: block;
+  max-width: 100%;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.portal-preview-card {
+  padding: 12px;
+  border: 1px solid var(--pv-line);
+  border-radius: 12px;
+  background: var(--pv-panel);
+}
+
+.portal-preview-card p {
+  margin: 0 0 8px;
+  color: var(--pv-fg);
+}
+
+.portal-preview-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.portal-preview-button {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.portal-preview-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--yellow);
+  vertical-align: middle;
+}
+
+.portal-server th {
+  width: 22em;
+  text-align: left;
+  font-weight: 600;
+}
+
+/* Below 768 px: one column, fields of the full width, controls 40 px high (375 px reflow). */
+@media (max-width: 767px) {
+  .portal-preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  input.portal-colour,
+  .field-name input,
+  .field-website_url input,
+  .field-privacy_url input,
+  .field-imprint_url input {
+    min-height: 40px;
+  }
+
+  .portal-server th {
+    width: auto;
+  }
+
+  .portal-server th,
+  .portal-server td {
+    display: block;
+    overflow-wrap: anywhere;
+  }
 }

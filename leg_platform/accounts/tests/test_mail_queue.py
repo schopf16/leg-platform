@@ -110,6 +110,7 @@ class RateLimitTests(TestCase):
 
 @tag("mariadb")
 class MailWorkerTransactionTests(TransactionTestCase):
+    # TestCase wraps every test in a transaction, so connection.in_atomic_block would always be true.
     def test_no_database_transaction_is_open_while_the_email_is_sent(self):
         post_registration("new.person@example.org")
         states = []

@@ -44,8 +44,12 @@ DELETE_URL = reverse("accounts:account_delete")
 class ProfileEditingTests(TestCase):
     # Saving the profile reads the address directory (advisory check, D-033).
     databases = {"default", "addresses", "address_import"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client.force_login(self.user)
 
     def test_the_account_can_edit_only_profile_fields(self):
@@ -108,8 +112,11 @@ class ProfileEditingTests(TestCase):
 
 @tag("mariadb")
 class EmailChangeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client = VerifiedClient()
         self.client.force_login(self.user)
 
@@ -292,8 +299,11 @@ class EmailChangeTests(TestCase):
 
 @tag("mariadb")
 class AccountDeletionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client = VerifiedClient()
         self.client.force_login(self.user)
 
@@ -405,9 +415,12 @@ class AccountDeletionTests(TestCase):
 class AdminLifecycleTests(TestCase):
     client_class = VerifiedClient
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("administrator@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+
     def setUp(self):
-        self.administrator = create_active_user("administrator@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
         self.client.force_login(self.administrator)
 
     def lifecycle_url(self, account, operation):

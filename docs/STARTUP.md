@@ -1,6 +1,6 @@
 # Local Startup for Agents and Developers
 
-Status: 2026-10-14. Checked against the code of the local worktree (Python 3.14.8, Django 6.1.2, MariaDB 12.3 on Windows 11, PowerShell). Items marked **UNVERIFIED** were not run; they are derived from the code or from official documentation (section 15).
+Status: 2026-10-14; section 13 updated on 2026-10-16 (D-071, steps 3a and 3b; D-072). Checked against the code of the local worktree (Python 3.14.8, Django 6.1.2, MariaDB 12.3 on Windows 11, PowerShell). Items marked **UNVERIFIED** were not run; they are derived from the code or from official documentation (section 15).
 
 This document is written so that a **designer agent** (browser based) and a **tester agent** can start, check, use and stop the complete local environment without asking questions. It applies to the local development machine only (`APP_ENV=local`, throw-away data). Stage and production are in `docs/DEPLOYMENT.md`; the one-time installation of Python and MariaDB is in `docs/INSTALLATION.md` ("Local Development").
 
@@ -65,10 +65,10 @@ The application reads its configuration only from environment variables (`leg_pl
 | `APP_ENV` | user environment variable, set by the setup script | `local`. Required. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | user environment variables, set by the setup script | The local MariaDB and its application account. |
 | `DJANGO_SECRET_KEY` | user environment variable, set by the setup script | Local secret key. |
-| `EMAIL_MODE` | not set; the default `console` applies | Emails are written to the standard output of the process that sends them, which is the mail worker (section 6). Never use `allowlist` or `graph` locally unless the project owner provides a dedicated development registration (D-028). |
+| `EMAIL_MODE` | not set; the default `console` applies | Emails are written to the standard output of the process that sends them, which is the mail worker (section 6). Never use `allowlist` locally unless the project owner provides a dedicated development registration (D-028); `graph` is refused locally. |
 | `DJANGO_ALLOWED_HOSTS` | set per process in the start block (section 5) | `127.0.0.1,localhost`. Django refuses to start `runserver` with debug off and no allowed hosts. Do not set it as a permanent user variable. |
 | `INSTANCE_BASE_URL` | not set; the default `http://127.0.0.1:8000` applies | Base of all links in emails. Only if you use another port, set `http://127.0.0.1:<port>` for the server and the worker (its host must be in `DJANGO_ALLOWED_HOSTS`). |
-| `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, in the start block of section 6 | The local instance presentation of the design package (D-056): the name "LEG-Portal", the website `https://leg-ittigen.ch` (the third item of the footer row), the directory `$HOME\.leg-platform-dev\instance-static` that holds the two logo files unchanged in its sub-folder `instance` (copied from `LEG-Design-Vorgaben\logo\`: `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`; they contain no script and no external reference), and their relative paths `instance/LEG-Ittigen_pos_rgb.svg` and `instance/LEG-Ittigen_neg_sw.svg`. Without them the pages show the instance name as text instead of the logo. These are public values and no secrets. |
+| `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, in the start block of section 6 | The local instance presentation of the design package (D-056); since D-073 these are the **fallback**: a value that is saved in "Portal-Einstellungen" (including uploaded logos, which are stored in the local database) wins. The name "LEG-Portal", the website `https://leg-ittigen.ch` (the third item of the footer row), the directory `$HOME\.leg-platform-dev\instance-static` that holds the two logo files unchanged in its sub-folder `instance` (copied from `LEG-Design-Vorgaben\logo\`: `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`; they contain no script and no external reference), and their relative paths `instance/LEG-Ittigen_pos_rgb.svg` and `instance/LEG-Ittigen_neg_sw.svg`. Without them the pages show the instance name as text instead of the logo. These are public values and no secrets. |
 | `DJANGO_DEBUG` | not set (False) | `True` is allowed only with `APP_ENV=local`. Not needed: production-like error handling and the full Content Security Policy are the better basis for a design review. |
 | `LEG_LOCAL_ADDRESS_DIRECTORY_FILE` | optional, per process | Path of the SQLite file of section 10. Default: `$HOME\.leg-platform-local-address-directory.sqlite3`. |
 
@@ -317,7 +317,7 @@ Do this only when the main session or the project owner orders it and no designe
 Facts about the test database (verified in the installed Django 6.1.2 source and in the project settings):
 
 * The default database of the tests is `test_<DB_NAME>` (`TEST_DATABASE_PREFIX = "test_"` and `_get_test_db_name()` in `django/db/backends/base/creation.py`); the project sets no `TEST["NAME"]`. For the local setup that is `test_leg_platform`. The setup script grants the application account the privileges on this database.
-* The runner creates the test database through a connection without a database name, switches the connection to the test name for the run and drops the database afterwards. `--noinput` drops an already existing `test_leg_platform` without asking (`autoclobber`). **The data of `leg_platform` is not read or changed by a test run.** A running development server and a design session are therefore not affected in their data; they only share the CPU (the full suite is long: D-051 recorded 559 seconds for a run of 791 tests; the current suite was not re-timed) and the MariaDB server.
+* The runner creates the test database through a connection without a database name, switches the connection to the test name for the run and drops the database afterwards. `--noinput` drops an already existing `test_leg_platform` without asking (`autoclobber`). **The data of `leg_platform` is not read or changed by a test run.** A running development server and a design session are therefore not affected in their data; they only share the CPU (the full suite takes about 3 minutes since D-071; before the fast test hasher it took 14 minutes, see below) and the MariaDB server.
 * `leg_platform.test_settings` replaces the address aliases with in-memory SQLite databases (`:memory:`), so tests never touch a directory file or a MariaDB directory.
 * Two test runs against the same MariaDB server overlap on the same `test_leg_platform` database: the second run drops the database the first still uses, which corrupts both (D-046). **Run only one test process at a time** and check first:
 
@@ -325,15 +325,43 @@ Facts about the test database (verified in the installed Django 6.1.2 source and
   Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'manage\.py"?\s+test\b' } | Select-Object ProcessId, CommandLine
   ```
 
-  It must print nothing (the running `runserver` and `process_mail_queue` processes do not match; each test run appears twice, parent and child). If it lists a process, wait for it; never stop it.
+  It must print nothing (the running `runserver` and `process_mail_queue` processes do not match; each test run appears twice, parent and child). If it lists a process, wait for it; never stop it. `scripts/test.ps1` also holds a machine-wide named mutex (`Global\LegPlatformTestRun`) for the whole run, so two starts of the script at the same moment cannot both pass; its limits (D-072): it does not see a run started by hand, a run on another machine against the same MariaDB server, or a process of another user that a non-elevated shell cannot read (the script then warns). Exit codes of the script: 0 passed; 1 a test or check failed (the code of Python is passed through); 2 wrong usage or missing virtual environment; 3 another run is active. Nothing runs for 2 and 3.
+
+Scenario runner (the normal way to run tests; D-071). Every change is tested with the tests of the area it touches, not with the whole suite. The areas (source paths to test labels) are defined in one file, `scripts/test_areas.py`; `scripts/test.ps1` resolves them and runs `manage.py test` with the same interpreter and settings as CI (`.venv\Scripts\python.exe`, `leg_platform.test_settings`, `--noinput`, deprecation warnings as errors):
+
+```powershell
+.\scripts\test.ps1 -List                              # the areas and the core files
+.\scripts\test.ps1 -Changed                           # the areas of the changed files (git status: working tree, staged, untracked)
+.\scripts\test.ps1 -Since HEAD~3                      # also the files changed since a revision
+.\scripts\test.ps1 -Area registration,mail            # named areas
+.\scripts\test.ps1 -Area translations -Timing         # with Django's --timing (database set-up and total time)
+.\scripts\test.ps1 -Changed -DryRun                   # print the plan and the commands, run nothing
+.\scripts\test.ps1 -Full -Durations 50                # the whole suite, with the 50 slowest tests
+```
+
+How the areas are chosen: a changed source file selects every area that maps its path; a changed test module selects that module; a documentation or agent file selects only the repository checks (`docs`); a migration selects `migrations`, which always uses a fresh test database and also runs `makemigrations --check --dry-run`. A **core file** (settings, test settings, the environment module `leg_platform/environment.py` that builds every security setting and the mail backend, urls, middleware, the user model, the authentication backend, `manage.py`, dependencies, shared test helpers) or a file that **no area maps** selects the **full suite** (the safe default). A changed test module whose name is not a plain dotted module name (only letters, digits, underscores and dots, starting with a letter or an underscore: `^[A-Za-z_][A-Za-z0-9_.]*$`) also selects the full suite, because its label is an argument of `manage.py test` (D-072). `-Since <revision>` is checked first: a value that starts with `-` or that is not an existing commit is refused (`git rev-parse --verify --end-of-options`, git 2.24 or later, checked with the installed git 2.44), and only the resolved commit hash reaches `git diff`. A changed file whose name is not valid UTF-8 stops the runner with a message (rename it or run `-Full`). A change of `.github/workflows/` runs the `packaging` area, which includes `test_production_settings`: CI itself cannot run locally, but that module imports the real settings for `stage` and `production` in child processes and `CiDeploymentCheckTests` keeps the stage step of `ci.yml` equal to the production step except for `APP_ENV`; the only part not run locally is the database part of `check --deploy` (section 13, deployment check with synthetic variables, run it by hand with `$env:APP_ENV = 'stage'`). The repository check (`test_repository`, no database) is added to every scoped run. `leg_platform/tests/test_areas.py` fails when a test module belongs to no area, a label or path does not exist, or a file of the repository is mapped to nothing, so the mapping cannot rot; add new files to `scripts/test_areas.py`.
+
+Measured on 2026-10-16 (fast test hasher, a machine with an i7-1265U, 10 cores; full details in D-071): `docs` 0.4 s, `packaging` 0.4 s, `branding` 3.9 s, `static` 8.3 s, `address-directory` 10.1 s, `environment` 18.3 s, `migrations` 21.7 s, `mail` 25.4 s, `translations` 27.6 s, `admin` 29.9 s, `login` 40.2 s, `registration` 41.5 s, `profile` 58.4 s, `templates` 66.6 s, `second-factor` 71.2 s ("Ran N tests in", without the start-up of about 2 s), against 185 s for the full suite (1833 tests). These are the values of step 3a. Step 3b (removal of redundant tests, shared test data, one child-process run for the production settings; D-071, addendum) lowered them further: in a paired measurement on the same day, with the old and the new tests run alternately on the same machine, the areas `admin` (31.6 s to 25.7 s), `templates` (70.6 s to 64.9 s), `profile` (47.7 s to 42.9 s), `mail` (25.9 s to 23.0 s) and `second-factor` (74.7 s to 69.5 s) became 7 to 19 % faster, and `leg_platform.tests.test_production_settings` takes 3.8 s instead of 19.4 s. The machine was slower on that afternoon than during step 3a (creating the test database took 9 to 10 s instead of 3.3 s), so compare only values of the same series.
+
+**Writing fast tests (D-071, step 3b):** most of the time of a test is MariaDB round trips (about 80 SQL statements per test on average; creating an account with a second factor is about 24, `force_login` about 20). A class whose tests only read the same accounts creates them once in `setUpTestData` (Django 6.1 `TestCase.setUpTestData`: the class-level objects are copied for each test, so a test can change them without affecting the next one); the client and its login stay in `setUp`. Use `TransactionTestCase` only where the test needs real commits or threads (concurrency tests, a test that needs no open transaction, the address directory reader that is a second connection); the flush after each such test costs 0.1 to 0.3 s. Child processes (as in `test_production_settings`) are started together once per module, not once per test.
+
+**When the full suite is required:** only for a core change (the runner decides), before a deployment gate, in CI (both jobs always run the full suite), and by the team lead at most once per commit block. It is not run after every small change, and agents do not start it unless the main session orders it. A report always names the area or labels and the number of tests and never presents a scoped run as a full run.
+
+Options of the runner (verified 2026-10-16 with the installed Django 6.1.2 and the local MariaDB 12.3):
+
+* `-KeepDb` (`--keepdb`): reuses `test_leg_platform` between runs. **Local opt-in only.** It saves only about 2.6 s per run (database set-up 3.2 s fresh, 0.7 s with an existing database): the migrations of the project are fast. The runner ignores `-KeepDb`, with a warning, when the plan needs a fresh database: the `migrations` area and the full suite (and an unmapped or core file) always create the database from the migrations, so an old database can never hide a migration problem. A kept `test_leg_platform` stays in MariaDB until a run without `-KeepDb` drops and recreates it (`--noinput`, `autoclobber`, D-046); after a manual change of the schema run any scoped run without `-KeepDb` first.
+* `-Parallel N` (`--parallel`): **does not work with the application account of the local setup.** Django clones the test database to `test_leg_platform_1` ... `_N`; the account has privileges only on `leg_platform` and `test_leg_platform` (section 2 and `docs/INSTALLATION.md`, "Database privileges"). Verified: a run with `--parallel 2` stopped with `(1044, "Access denied for user 'leg_platform'@'127.0.0.1' to database 'test_leg_platform_1'")`. Do not widen the privileges for this (security rule: privileges only on the two named databases, checked by the setup script); the option stays in the runner for a MariaDB account that may create these databases. **UNVERIFIED** with a privileged account (also the memory and CPU use: Django starts one process per database clone; the machine of this measurement has 10 cores and 31.7 GB of RAM). D-046 stays: never two test runs at the same time.
+* `-Durations N` (`--durations`) and `-Timing` (`--timing`) exist in Django 6.1.2 (`manage.py test --help`).
 
 Full suite (the same as CI; deprecation warnings are errors):
 
 ```powershell
+.\scripts\test.ps1 -Full
+# the same without the script:
 .\.venv\Scripts\python -W error::DeprecationWarning -W error::PendingDeprecationWarning manage.py test --settings=leg_platform.test_settings --noinput
 ```
 
-It prints `Ran N tests` and `OK`. On 2026-10-14 the full run had 909 tests (README "Current Status"). If a tool call cannot wait that long, run it as a background process and poll the log:
+It prints `Ran N tests` and `OK`. On 2026-10-16 the full run of step 3a had 1833 tests and took 185 seconds of test time (193 seconds wall clock); before the fast hasher (the same suite minus 19 tests added in this unit) it took 830 seconds, of which about 80 % was password hashing: the test settings used Django's default PBKDF2 with 1,500,000 iterations (0.24 s per hash). After step 3b the suite has 1830 tests (three redundant tests removed) and ran in 153 to 195 seconds of test time depending on the load of the machine on that afternoon (the same suite is that variable: the old tests took 151 to 201 s in the alternating runs; the paired run that counted SQL statements, CPU and wall time gave 9 % fewer seconds without the production-settings module and 12 % fewer SQL statements; the production-settings module itself 19.4 s to 3.8 s). `leg_platform.test_settings` now sets `PASSWORD_HASHERS` to the MD5 hasher for the tests only; `leg_platform/tests/test_production_settings.py` proves in a child process that the real settings still use Django's default hasher with at least 600,000 iterations. If a tool call cannot wait that long, run it as a background process and poll the log:
 
 ```powershell
 $State = Join-Path $HOME '.leg-platform-dev'; New-Item -ItemType Directory -Force -Path $State | Out-Null
@@ -345,7 +373,7 @@ $test.Id | Set-Content "$State\test.pid"
 Get-Content "$State\test.err.log" -Tail 5
 ```
 
-Targeted runs (each needs MariaDB unless stated; the same one-run-at-a-time rule applies):
+Targeted runs without the script (each needs MariaDB unless stated; the same one-run-at-a-time rule applies; the scenario runner above is the normal way):
 
 ```powershell
 # One module, one class or one test
@@ -358,7 +386,7 @@ Targeted runs (each needs MariaDB unless stated; the same one-run-at-a-time rule
 .\.venv\Scripts\python manage.py test --exclude-tag mariadb --settings=leg_platform.test_settings --noinput
 ```
 
-Test modules: `leg_platform/accounts/tests/` (account lifecycle, admin, abuse protection, mail queue, password reset, portal views, registration, scheduled tasks, second factor, security log, session timeout, translations), `leg_platform/tests/` (environment, settings, production settings, responses, request body limit, presentation, instance configuration, Graph mail, repository) and `leg_platform/addresses/tests/`. A run of only database-free `SimpleTestCase` classes prints `Skipping setup of unused database(s)` and creates no database.
+Test modules: `leg_platform/accounts/tests/` (account lifecycle, admin, abuse protection, mail queue, password reset, portal views, registration, scheduled tasks, second factor, security log, session timeout, translations), `leg_platform/tests/` (environment, settings, production settings, responses, request body limit, presentation, instance configuration, Graph mail, repository, test areas) and `leg_platform/addresses/tests/`. A run of only database-free `SimpleTestCase` classes prints `Skipping setup of unused database(s)` and creates no database.
 
 Other checks (they need the running MariaDB because Django 6.1 checks all databases):
 
@@ -379,7 +407,7 @@ Remove-Item Env:DJANGO_DEBUG, Env:EMAIL_ALLOWED_RECIPIENTS -ErrorAction Silently
 .\.venv\Scripts\python manage.py check --deploy --fail-level WARNING
 ```
 
-Expected: `System check identified no issues (3 silenced).` These are the same values as the CI step "Deployment checks with production settings". The three silenced checks are `security.W005`, `security.W021` and `axes.W006` (D-028, `leg_platform/settings.py`).
+Expected: `System check identified no issues (3 silenced).` These are the same values as the CI step "Deployment checks with production settings"; the same call with `$env:APP_ENV = 'stage'` gives the same result and is the CI step "Deployment checks with stage settings" (stage does not differ from production, D-070). The three silenced checks are `security.W005`, `security.W021` and `axes.W006` (D-028, `leg_platform/settings.py`).
 
 Translations (the `.po` file is maintained by hand, the `.mo` file is committed, D-034; GNU gettext is in `C:\Program Files\gettext-iconv\bin`, which is on `PATH`):
 
@@ -444,6 +472,7 @@ This deletes the Axes failure records, the login IP counters (their attempts fol
 | TOTP helper | RFC 6238 test vector and comparison with `django_otp.oath.TOTP` for random keys; offline. |
 | Login lockout (5 attempts, 15 minutes), request limits, session timeouts, 15 wrong codes pause | Read `login_protection.py`, `session_timeout` settings in `settings.py`, `models.py`, D-038, D-040, D-041. |
 | Test database name, runner behaviour | Read installed Django `db/backends/base/creation.py` and `test/runner.py`; D-046. |
+| Scenario runner, areas, timing, `--keepdb` and `--parallel` (section 13) | Run on 2026-10-16: every area once with `scripts/test.ps1`, the full suite with `--timing --durations 50` (1833 tests, OK), `--keepdb` twice, `--parallel 2` (stopped with MariaDB error 1044, as stated); `manage.py test --help` lists `--durations`, `--timing`, `--keepdb`, `--parallel`; the numbers are in D-071. |
 | `leg_platform.local_directory_settings` and `seed_local_address_directory` refusals | Database-free tests in `leg_platform/addresses/tests/test_local_directory.py`: 15 tests OK with deprecation warnings as errors. |
 | Translation check commands | Run on 2026-10-14 (results 0, 0, 0). |
-| Not verified | End-to-end run of the directory migration and seed, `flush`, the lockout-clearing snippet, a start of the block of section 6 for `manage.py` (a server was already running), the full test suite and any test that uses MariaDB (not run in this work unit). |
+| Not verified | End-to-end run of the directory migration and seed, `flush`, the lockout-clearing snippet, a start of the block of section 6 for `manage.py` (a server was already running) and `--parallel` with a MariaDB account that may create `test_leg_platform_N`. |

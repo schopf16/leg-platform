@@ -201,8 +201,11 @@ class CompletionFormTests(TestCase):
 class ProfileFormTests(TestCase):
     databases = ADDRESS_DATABASES
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user(phone_number="+41311234567")
+
     def setUp(self):
-        self.user = create_active_user(phone_number="+41311234567")
         self.client.force_login(self.user)
 
     def test_the_card_marks_optional_fields_and_keeps_the_pairs_and_the_directory(self):
@@ -371,8 +374,11 @@ class InputTypeTests(TestCase):
 
 @tag("mariadb")
 class LogoutTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("active.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("active.person@example.org")
         self.client.force_login(self.user)
 
     def test_the_menu_has_a_logout_button_and_the_profile_entry(self):
@@ -560,8 +566,9 @@ class TwoFactorPageTests(TestCase):
 
 @tag("mariadb")
 class RecoveryCodeLoginTests(TestCase):
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def log_in_with(self, code, address):
         client = Client()

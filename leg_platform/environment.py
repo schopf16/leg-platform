@@ -60,14 +60,15 @@ _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
 
 # The delivery modes each APP_ENV allows (docs/SECURITY.md, sections 8 and 11;
-# docs/ARCHITECTURE.md, "Email"; D-028): local development allows console output (the default)
-# and delivery restricted to allowed recipients, so that Microsoft Graph delivery can be
-# tested locally with a dedicated development app registration; stage delivery is restricted
-# to allowed recipients; unrestricted delivery is allowed only in production, and production
-# allows nothing else, so that security links never end up in console or server logs.
+# docs/ARCHITECTURE.md, "Email"; D-028, D-070): local development allows console output (the
+# default) and delivery restricted to allowed recipients, so that Microsoft Graph delivery can
+# be tested locally with a dedicated development app registration. Stage and production allow
+# only unrestricted Microsoft Graph delivery and nothing else, so that security links never end
+# up in console or server logs and the stage instance behaves exactly like production
+# (D-070). ``APP_ENV=stage`` is only a label of the instance role.
 ALLOWED_EMAIL_MODES = {
     APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
-    APP_ENV_STAGE: (EMAIL_MODE_ALLOWLIST,),
+    APP_ENV_STAGE: (EMAIL_MODE_GRAPH,),
     APP_ENV_PRODUCTION: (EMAIL_MODE_GRAPH,),
 }
 
@@ -289,6 +290,13 @@ def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, .
         raise ImproperlyConfigured(
             f"APP_ENV={app_env} allows only EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
         )
+    if app_env != APP_ENV_LOCAL and _get(env, "EMAIL_ALLOWED_RECIPIENTS"):
+        # Outside local only unrestricted Graph delivery exists; a list of allowed recipients
+        # would suggest a restriction that does not exist, so the start is refused (D-070).
+        raise ImproperlyConfigured(
+            f"EMAIL_ALLOWED_RECIPIENTS must not be set with APP_ENV={app_env}: delivery is "
+            f"unrestricted there and the list would have no effect. Remove the variable."
+        )
     recipients = parse_email_allowed_recipients(env)
     if mode == EMAIL_MODE_ALLOWLIST and not recipients:
         # An allowlist without entries would deliver to nobody without notice; refuse the
@@ -322,14 +330,24 @@ def parse_email_allowed_recipients(env: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(recipients)
 
 
-def parse_instance_name(env: Mapping[str, str]) -> str:
-    value = _get(env, "INSTANCE_NAME") or DEFAULT_INSTANCE_NAME
-    # The name appears in email subjects; control characters would allow header injection.
-    if len(value) > INSTANCE_NAME_MAX_LENGTH or any(
+def is_valid_instance_name(value: str) -> bool:
+    """Whether a name of the instance may be used: at most INSTANCE_NAME_MAX_LENGTH characters
+    and no control, format or line separator characters (Unicode categories C*, Zl, Zp).
+
+    The name appears in email subjects; control characters would allow header injection. The one
+    check for the environment value (at the start) and for the value of the portal settings (when
+    saved and again when read; D-073).
+    """
+    return len(value) <= INSTANCE_NAME_MAX_LENGTH and not any(
         unicodedata.category(character).startswith("C")
         or unicodedata.category(character) in ("Zl", "Zp")
         for character in value
-    ):
+    )
+
+
+def parse_instance_name(env: Mapping[str, str]) -> str:
+    value = _get(env, "INSTANCE_NAME") or DEFAULT_INSTANCE_NAME
+    if not is_valid_instance_name(value):
         raise ImproperlyConfigured(
             f"INSTANCE_NAME must have at most {INSTANCE_NAME_MAX_LENGTH} characters and "
             "no control or line separator characters."

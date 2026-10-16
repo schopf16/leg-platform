@@ -295,10 +295,13 @@ class CrossAccountTests(TestCase):
 
     databases = ADDRESS_DATABASES
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.a = create_active_user("user.a@example.org", first_name="Alma", last_name="Alphaname")
+        cls.b = create_active_user("user.b@example.org", first_name="Bertram", last_name="Betaname")
+        cls.b.set_secondary_email("b.second@example.org")
+
     def setUp(self):
-        self.a = create_active_user("user.a@example.org", first_name="Alma", last_name="Alphaname")
-        self.b = create_active_user("user.b@example.org", first_name="Bertram", last_name="Betaname")
-        self.b.set_secondary_email("b.second@example.org")
         self.client_a = Client()
         self.client_a.force_login(self.a)
         self.client_b = Client()
@@ -507,10 +510,13 @@ class CrossAccountTests(TestCase):
 class CrossAccountSecondFactorTests(TestCase):
     """The recovery codes, the devices and the setup of one account are of no use to another."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.a, cls.device_a = create_user_with_totp("user.a@example.org")
+        cls.b, cls.device_b = create_user_with_totp("user.b@example.org")
+        cls.codes_b = recovery_codes_of(cls.b.email)
+
     def setUp(self):
-        self.a, self.device_a = create_user_with_totp("user.a@example.org")
-        self.b, self.device_b = create_user_with_totp("user.b@example.org")
-        self.codes_b = recovery_codes_of(self.b.email)
         self.client_a = Client()
         self.client_a.force_login(self.a)
 
@@ -727,9 +733,12 @@ class ReauthenticationTests(TestCase):
 
 @tag("mariadb")
 class AccountDeletionNegativeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org", first_name="Holdername")
+        cls.other = create_active_user("untouched.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org", first_name="Holdername")
-        self.other = create_active_user("untouched.person@example.org")
         self.client = Client()
         self.client.force_login(self.user)
         self.url = reverse("accounts:account_delete")
@@ -794,14 +803,15 @@ class AccountDeletionNegativeTests(TestCase):
 
 @tag("mariadb")
 class AdministrationAccessTests(TestCase):
-    """Only the system administrator changes the portal settings; the menu entry is for staff only."""
+    """The portal settings need the right to see or to change them (D-073); the menu entry is for staff only."""
 
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.person = create_active_user("normal.person@example.org")
-        self.staff = create_active_user("staff.person@example.org")
-        self.staff.set_privileges(is_staff=True, is_superuser=False)
+    @classmethod
+    def setUpTestData(cls):
+        cls.person = create_active_user("normal.person@example.org")
+        cls.staff = create_active_user("staff.person@example.org")
+        cls.staff.set_privileges(is_staff=True, is_superuser=False)
 
     def attempt(self, client):
         """Try every way of reaching or changing the settings; return the final responses."""
@@ -839,10 +849,7 @@ class AdministrationAccessTests(TestCase):
             self.assertIn("/login/", response["Location"])
         self.assertEqual(snapshot(), before)
 
-    def test_a_staff_user_with_all_permissions_of_the_model_still_cannot_change_the_settings(self):
-        group = Group.objects.create(name="Test settings staff")
-        group.permissions.add(*Permission.objects.filter(content_type__app_label="accounts", content_type__model="portalsettings"))
-        self.staff.set_access_relations(groups=[group], user_permissions=[])
+    def test_a_staff_user_without_the_rights_is_refused_everywhere_and_changes_nothing(self):
         client = VerifiedClient()
         client.force_login(self.staff)
         before = snapshot()
@@ -855,6 +862,22 @@ class AdministrationAccessTests(TestCase):
         self.assertEqual(client.post(PORTAL_SETTINGS_URL, {"privacy_url": "https://evil.example/"}).status_code, 403)
         self.assertEqual(snapshot(), before)
         self.assertNotContains(client.get(reverse("admin:index")), "Portal-Einstellungen")
+
+    def test_a_staff_user_with_all_rights_of_the_model_still_cannot_add_delete_or_read_the_history(self):
+        # D-073: view and change are ordinary rights; the single row cannot be added or deleted,
+        # and the history names the acting accounts (system administrators only).
+        group = Group.objects.create(name="Test settings staff")
+        group.permissions.add(*Permission.objects.filter(content_type__app_label="accounts", content_type__model="portalsettings"))
+        self.staff.set_access_relations(groups=[group], user_permissions=[])
+        client = VerifiedClient()
+        client.force_login(self.staff)
+
+        self.assertEqual(client.get(PORTAL_SETTINGS_URL).status_code, 200)
+        self.assertEqual(client.get(reverse("admin:accounts_portalsettings_history", args=(1,))).status_code, 403)
+        self.assertEqual(client.get(reverse("admin:accounts_portalsettings_add")).status_code, 403)
+        delete = client.post(reverse("admin:accounts_portalsettings_delete", args=(1,)), {"post": "yes"})
+        self.assertEqual(delete.status_code, 403)
+        self.assertTrue(PortalSettings.objects.filter(pk=1).exists())
 
     def test_the_menu_entry_administration_is_for_staff_users_only(self):
         group = Group.objects.create(name="Test everything")
@@ -880,9 +903,10 @@ class AdministrationAccessTests(TestCase):
 class SecondAddressNegativeTests(TestCase):
     """The second address is never a login name and never the target of a password reset."""
 
-    def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
-        self.user.set_secondary_email(SECOND)
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+        cls.user.set_secondary_email(SECOND)
 
     def test_no_spelling_of_the_second_address_logs_in(self):
         unknown = Client().post(

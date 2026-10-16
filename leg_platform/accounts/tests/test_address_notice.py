@@ -112,8 +112,11 @@ class CatalogueTests(SimpleTestCase):
 class EditFormPlacementTests(TestCase):
     databases = ADDRESS_DATABASES
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client.force_login(self.user)
         self.html = self.client.get(f"{PROFILE_URL}?edit=personal").content.decode()
 
@@ -223,8 +226,11 @@ class ReadOnlyViewTests(TestCase):
 
     databases = ADDRESS_DATABASES
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.user = create_active_user()
         self.client.force_login(self.user)
 
     def test_the_overview_has_no_widget_no_script_no_notice_and_makes_no_lookup(self):

@@ -1,0 +1,259 @@
+"""The form of the portal settings in the administration (D-073).
+
+Name, website and the addresses of the legal notices, the colours, and the two logos. The logos are
+uploads that ``leg_platform.accounts.logo_images`` checks; the form keeps what it accepted and
+``save`` puts it into the row. Nothing here chooses a file name or a path: the files live in the
+database, and the name of the upload is never used.
+"""
+
+from django import forms
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils.html import format_html
+from django.utils.translation import gettext
+from django.utils.translation import gettext_lazy as _
+
+from leg_platform.accounts import second_factor, security_log
+from leg_platform.accounts.logo_images import MAX_UPLOAD_BYTES, LogoRejected, validate_logo
+from leg_platform.accounts.models import PortalSettings, SecurityEvent, validate_hex_colour
+from leg_platform.accounts.portal_settings import effective_colours, environment_values
+from leg_platform.branding import COLOUR_FIELDS, colour_problems, floor_ratio
+
+LOGOS = ("light", "dark")
+
+ONLY_ONE_LOGO = _(
+    "Upload both logos or none. The portal needs one version for light and one for dark mode."
+)
+# Saving needs a login within the window of the recent authentication (D-055; the same five
+# minutes as for setting up the second factor). Viewing the page does not.
+NEEDS_RECENT_LOGIN = _(
+    "For your safety, the portal settings can only be saved within %(minutes)s minutes after "
+    "logging in. Log out, log in again and save the changes right away. Nothing was saved."
+)
+REMOVE_AND_UPLOAD = _(
+    "Choose either new logos or the removal of the uploaded logos, not both."
+)
+ACCENT_TOO_WEAK = {
+    "light": _(
+        "This accent colour is too weak on the light background (contrast %(ratio)s:1, "
+        "required 4.5:1). Choose a darker colour."
+    ),
+    "dark": _(
+        "This accent colour is too weak on the dark background (contrast %(ratio)s:1, "
+        "required 4.5:1). Choose a lighter colour."
+    ),
+}
+TEXT_TOO_WEAK = _(
+    "The text colour on the accent colour is too weak (contrast %(ratio)s:1, required 4.5:1)."
+)
+HIGHLIGHT_TOO_WEAK = _(
+    "The highlight colour is too weak with dark text (contrast %(ratio)s:1, required 4.5:1)."
+)
+LOGO_HELP = {
+    "light": _(
+        "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. "
+        "Use the version with dark lettering."
+    ),
+    "dark": _(
+        "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. "
+        "Use the version with light lettering."
+    ),
+}
+
+
+def colour_message(problem):
+    """The message for a failed colour rule (``branding.ColourProblem``) of the form."""
+    ratio = f"{floor_ratio(problem.ratio):.2f}" if problem.ratio is not None else ""
+    if problem.code == "accent_contrast":
+        mode = "dark" if problem.field.endswith("_dark") else "light"
+        return ACCENT_TOO_WEAK[mode] % {"ratio": ratio}
+    if problem.code == "text_contrast":
+        return TEXT_TOO_WEAK % {"ratio": ratio}
+    return HIGHLIGHT_TOO_WEAK % {"ratio": ratio}
+
+
+class PortalSettingsForm(forms.ModelForm):
+    # The administration sets the acting account and the request (``PortalSettingsAdmin.get_form``):
+    # a rejected upload is a security event (D-073), and a save needs a recent login. None outside
+    # the administration, where nothing can be saved (the check fails closed).
+    actor = None
+    request = None
+
+    logo_light_file = forms.FileField(
+        required=False,
+        label=_("logo for light mode"),
+        help_text=LOGO_HELP["light"],
+        widget=forms.FileInput(attrs={"accept": ".png,.svg,image/png,image/svg+xml"}),
+    )
+    logo_dark_file = forms.FileField(
+        required=False,
+        label=_("logo for dark mode"),
+        help_text=LOGO_HELP["dark"],
+        widget=forms.FileInput(attrs={"accept": ".png,.svg,image/png,image/svg+xml"}),
+    )
+    remove_logos = forms.BooleanField(
+        required=False,
+        label=_(
+            "Remove the uploaded logos and use the server configuration. The files are deleted "
+            "and cannot be restored."
+        ),
+    )
+    reset_colours = forms.BooleanField(
+        required=False, label=_("Use the server colours again")
+    )
+
+    class Meta:
+        model = PortalSettings
+        fields = (
+            "name",
+            "website_url",
+            "privacy_url",
+            "imprint_url",
+            *COLOUR_FIELDS,
+        )
+        widgets = {
+            field: forms.TextInput(
+                attrs={
+                    "class": "portal-colour",
+                    "size": 9,
+                    "maxlength": 7,
+                    "pattern": "#[0-9A-Fa-f]{6}",
+                    "inputmode": "text",
+                    "autocomplete": "off",
+                    "spellcheck": "false",
+                }
+            )
+            for field in COLOUR_FIELDS
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The accepted logos by variant ("light", "dark"), and the reasons of rejected uploads.
+        self.new_logos = {}
+        self.rejections = []
+        self._add_server_hints()
+
+    def _add_server_hints(self):
+        """Under every field that has a server value: what an empty field means (D-073). Only
+        public values are shown; the text is escaped."""
+        server = environment_values()
+        hints = {
+            "name": server.name,
+            "website_url": server.website_url,
+            "privacy_url": server.privacy_url,
+            **{field: getattr(server, field) for field in COLOUR_FIELDS},
+        }
+        for name, value in hints.items():
+            self._append_hint(name, value or gettext("not set"))
+        for variant in LOGOS:
+            logo = getattr(server, f"logo_{variant}")
+            self._append_hint(
+                f"logo_{variant}_file", gettext("logo files set") if logo else gettext("not set")
+            )
+
+    def _append_hint(self, name, value):
+        field = self.fields.get(name)
+        if field is None:
+            return
+        hint = gettext("Server configuration: %(value)s") % {"value": value}
+        field.help_text = format_html(
+            '{}<br><span class="portal-hint">{}</span>', field.help_text, hint
+        )
+
+    def _read_logo(self, name, variant):
+        upload = self.cleaned_data.get(name)
+        if not upload:
+            return
+        # Never more than the largest allowed size is read; the name of the file is not used.
+        data = upload.read(MAX_UPLOAD_BYTES)
+        try:
+            self.new_logos[variant] = validate_logo(data)
+        except LogoRejected as rejected:
+            self.rejections.append(rejected.reason)
+            self.add_error(name, ValidationError(rejected.message, params=rejected.params, code="logo"))
+
+    def recently_authenticated(self):
+        """Whether the session of the request logged in within the window of D-055. Without a
+        request (outside the administration) it is not: the form fails closed."""
+        return self.request is not None and second_factor.recently_authenticated(self.request)
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.recently_authenticated():
+            # Nothing else is looked at: a session that did not authenticate a moment ago cannot
+            # change what every visitor sees (security review of D-073, L-5; D-055). The files
+            # of the upload are not even read.
+            self.add_error(
+                None,
+                ValidationError(
+                    NEEDS_RECENT_LOGIN,
+                    params={"minutes": int(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds() // 60)},
+                    code="recent_login",
+                ),
+            )
+            return cleaned
+        for field in COLOUR_FIELDS:
+            if cleaned.get(field):
+                cleaned[field] = cleaned[field].upper()
+        if cleaned.get("reset_colours"):
+            # Emptying the colours is the reset; a wrong value that was typed in is dropped.
+            for field in COLOUR_FIELDS:
+                cleaned[field] = ""
+                self._errors.pop(field, None)
+        elif not any(field in self._errors for field in COLOUR_FIELDS):
+            self._check_colours(cleaned)
+        self._check_logos(cleaned)
+        if self.rejections and self.actor is not None:
+            # One event for the whole request, with the reason codes only (never the content).
+            with transaction.atomic():
+                security_log.record(
+                    SecurityEvent.Event.PORTAL_UPLOAD_REJECTED,
+                    actor=self.actor,
+                    detail=", ".join(self.rejections),
+                )
+        return cleaned
+
+    def _check_colours(self, cleaned):
+        stored = {field: cleaned.get(field) or "" for field in COLOUR_FIELDS}
+        if not any(stored.values()):
+            return
+        for problem in colour_problems(effective_colours(stored)):
+            if problem.code == "format":
+                # A typed value that is no colour: the message of the field, no ratio to show.
+                try:
+                    validate_hex_colour(stored.get(problem.field, ""))
+                except ValidationError as error:
+                    self.add_error(problem.field, error)
+                continue
+            self.add_error(problem.field, colour_message(problem))
+
+    def _check_logos(self, cleaned):
+        self._read_logo("logo_light_file", "light")
+        self._read_logo("logo_dark_file", "dark")
+        if any(name in self._errors for name in ("logo_light_file", "logo_dark_file")):
+            return
+        if cleaned.get("remove_logos"):
+            if self.new_logos:
+                raise ValidationError(REMOVE_AND_UPLOAD, code="remove_and_upload")
+            return
+        stored = {
+            variant: bool(getattr(self.instance, f"logo_{variant}_sha256")) for variant in LOGOS
+        }
+        after = {variant: variant in self.new_logos or stored[variant] for variant in LOGOS}
+        if after["light"] != after["dark"]:
+            raise ValidationError(ONLY_ONE_LOGO, code="one_logo")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.cleaned_data.get("remove_logos"):
+            for variant in LOGOS:
+                setattr(instance, f"logo_{variant}_data", None)
+                setattr(instance, f"logo_{variant}_type", "")
+                setattr(instance, f"logo_{variant}_sha256", "")
+        for variant, logo in self.new_logos.items():
+            setattr(instance, f"logo_{variant}_data", logo.data)
+            setattr(instance, f"logo_{variant}_type", logo.kind)
+            setattr(instance, f"logo_{variant}_sha256", logo.sha256)
+        if commit:
+            instance.save()
+        return instance

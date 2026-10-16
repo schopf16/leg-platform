@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
-from threading import Barrier
+from threading import Barrier, Event, Thread
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -11,6 +11,7 @@ from axes.helpers import get_client_ip_address
 from axes.models import AccessAttempt
 from django.contrib.auth import authenticate
 from django.core.management import call_command
+from django.db import OperationalError, connection, transaction
 from django.test import (
     RequestFactory,
     SimpleTestCase,
@@ -155,6 +156,194 @@ class ConcurrentLoginIpAttemptTests(TransactionTestCase):
 
         self.assertEqual(sum(results), LOGIN_FAILURE_LIMIT)
         self.assertEqual(LoginIpAttempt.objects.count(), LOGIN_FAILURE_LIMIT)
+
+    def assert_settling_waits_for_the_bucket(self, address, succeeded):
+        # The lock order of D-072: every statement on the attempts of a bucket runs under the lock
+        # of the bucket. A settle that did not take it ran against the reservation of a parallel
+        # request (index scan against delete by primary key) and could deadlock (MariaDB 1213).
+        request = SimpleNamespace(axes_ip_address=address)
+        self.assertTrue(reserve_client_ip_attempt(request))
+        digest = client_ip_digest(address)
+        locked, release, entered, done = Event(), Event(), Event(), Event()
+        errors = []
+        select_for_update = LoginIpBucket.objects.select_for_update
+
+        def hold():
+            try:
+                with transaction.atomic():
+                    LoginIpBucket.objects.select_for_update().get(digest=digest)
+                    locked.set()
+                    release.wait(20)
+            finally:
+                connection.close()
+
+        def entering():
+            # The settle has reached the lock of the bucket; the wait below starts from here.
+            entered.set()
+            return select_for_update()
+
+        def settle():
+            try:
+                settle_client_ip_attempt(request, succeeded=succeeded)
+            except Exception as error:  # reported by the assertion below
+                errors.append(error)
+            finally:
+                done.set()
+                connection.close()
+
+        holder = Thread(target=hold)
+        holder.start()
+        self.assertTrue(locked.wait(10))
+        settler = Thread(target=settle)
+        with patch.object(LoginIpBucket.objects, "select_for_update", side_effect=entering):
+            settler.start()
+            try:
+                self.assertTrue(entered.wait(10), "The settle did not reach the lock.")
+                self.assertFalse(
+                    done.wait(1.0), "The settle did not wait for the lock of the bucket."
+                )
+                # Still the reserved slot, still pending, nothing changed under the lock.
+                self.assertEqual(LoginIpAttempt.objects.filter(pending=True).count(), 1)
+            finally:
+                release.set()
+                holder.join()
+                settler.join()
+        self.assertEqual(errors, [])
+        if succeeded:
+            self.assertEqual(LoginIpAttempt.objects.count(), 0)
+        else:
+            # The failed attempt stays counted until its window expires, no longer pending.
+            self.assertEqual(LoginIpAttempt.objects.count(), 1)
+            self.assertFalse(LoginIpAttempt.objects.get().pending)
+
+    def test_settling_waits_for_the_lock_of_the_bucket(self):
+        self.assert_settling_waits_for_the_bucket("10.0.0.41", succeeded=True)
+
+    def test_settling_a_failure_waits_for_the_lock_of_the_bucket(self):
+        self.assert_settling_waits_for_the_bucket("10.0.0.43", succeeded=False)
+
+    def test_settling_inside_the_transaction_that_holds_the_bucket_does_not_wait_for_itself(self):
+        # The callers in the transaction of the account lock reserved the slot in the same
+        # transaction, so they hold the lock of the bucket already (D-072).
+        address = "10.0.0.44"
+        digest = client_ip_digest(address)
+        # Committed before, so that the parallel request finds it and waits for its row lock.
+        LoginIpBucket.objects.create(digest=digest)
+        for succeeded in (True, False):
+            with self.subTest(succeeded=succeeded):
+                LoginIpAttempt.objects.all().delete()
+                request = SimpleNamespace(axes_ip_address=address)
+                reserved, parallel_done = Event(), Event()
+                errors = []
+
+                def parallel_reservation():
+                    # A parallel request of the same address: it waits for the bucket.
+                    try:
+                        reserved.wait(10)
+                        other = SimpleNamespace(axes_ip_address=address)
+                        self.assertTrue(reserve_client_ip_attempt(other))
+                    except Exception as error:  # reported by the assertion below
+                        errors.append(error)
+                    finally:
+                        parallel_done.set()
+                        connection.close()
+
+                parallel = Thread(target=parallel_reservation)
+                parallel.start()
+                with transaction.atomic():
+                    self.assertTrue(reserve_client_ip_attempt(request))
+                    reserved.set()
+                    self.assertFalse(parallel_done.wait(0.5))
+                    settle_client_ip_attempt(request, succeeded=succeeded)
+                    self.assertFalse(hasattr(request, "login_ip_attempt_id"))
+                parallel.join(20)
+
+                self.assertEqual(errors, [])
+                self.assertTrue(parallel_done.is_set())
+                bucket_attempts = LoginIpAttempt.objects.filter(bucket__digest=digest)
+                # The settled slot (released or kept) and the slot of the parallel request.
+                self.assertEqual(bucket_attempts.count(), 1 if succeeded else 2)
+
+    def test_settling_after_the_cleanup_removed_the_bucket_between_lookup_and_lock(self):
+        address = "10.0.0.45"
+        request = SimpleNamespace(axes_ip_address=address)
+        self.assertTrue(reserve_client_ip_attempt(request))
+        digest = client_ip_digest(address)
+        select_for_update = LoginIpBucket.objects.select_for_update
+
+        def remove_bucket_in_another_connection():
+            def remove():
+                try:
+                    LoginIpBucket.objects.filter(digest=digest).delete()
+                finally:
+                    connection.close()
+
+            thread = Thread(target=remove)
+            thread.start()
+            thread.join(20)
+            return select_for_update()
+
+        with patch.object(
+            LoginIpBucket.objects,
+            "select_for_update",
+            side_effect=remove_bucket_in_another_connection,
+        ):
+            settle_client_ip_attempt(request, succeeded=True)
+
+        # The bucket and, by the cascade, its attempts are gone; nothing failed.
+        self.assertFalse(LoginIpBucket.objects.filter(digest=digest).exists())
+        self.assertFalse(LoginIpAttempt.objects.exists())
+        self.assertFalse(hasattr(request, "login_ip_attempt_id"))
+
+    def test_a_failing_settle_is_no_success_and_the_slot_stays_pending(self):
+        # A deadlock or a lock wait timeout in the settle (MariaDB 1213, 1205) is an exception:
+        # it is not swallowed, the request does not go on as if the slot was released, and the
+        # slot stays reserved and pending, so the IP budget is not bypassed (D-072).
+        address = "10.0.0.46"
+        request = SimpleNamespace(axes_ip_address=address)
+        self.assertTrue(reserve_client_ip_attempt(request))
+        attempt_id = request.login_ip_attempt_id
+
+        for succeeded in (True, False):
+            with self.subTest(succeeded=succeeded):
+                with patch.object(
+                    LoginIpBucket.objects,
+                    "select_for_update",
+                    side_effect=OperationalError(1213, "Deadlock found when trying to get lock"),
+                ):
+                    with self.assertRaises(OperationalError):
+                        settle_client_ip_attempt(request, succeeded=succeeded)
+
+                self.assertEqual(request.login_ip_attempt_id, attempt_id)
+                self.assertTrue(LoginIpAttempt.objects.get(pk=attempt_id).pending)
+
+        # A repeat without the fault settles the same slot.
+        settle_client_ip_attempt(request, succeeded=True)
+        self.assertFalse(LoginIpAttempt.objects.exists())
+
+    def test_parallel_reserve_and_settle_of_one_address_do_not_deadlock(self):
+        count = 12
+        barrier = Barrier(count)
+        address = "10.0.0.42"
+        errors = []
+
+        def attempt(_index):
+            request = SimpleNamespace(axes_ip_address=address)
+            try:
+                barrier.wait()
+                for _round in range(5):
+                    if reserve_client_ip_attempt(request):
+                        settle_client_ip_attempt(request, succeeded=True)
+            except Exception as error:  # reported by the assertion below
+                errors.append(error)
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=count) as executor:
+            list(executor.map(attempt, range(count)))
+
+        self.assertEqual(errors, [])
+        self.assertEqual(LoginIpAttempt.objects.count(), 0)
 
 
 @tag("mariadb")

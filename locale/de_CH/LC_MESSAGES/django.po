@@ -2126,8 +2126,8 @@ msgstr "Inhalte"
 msgid "System"
 msgstr "System"
 
-msgid "You maintain the texts of the emails and the addresses of the footer under Content."
-msgstr "Texte der E-Mails und Adressen der Fusszeile pflegen Sie unter Inhalte."
+msgid "You maintain the name, the logo, the colours and the addresses of the portal and the texts of the emails under Content."
+msgstr "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte."
 
 msgid "blocked or failed login"
 msgstr "gesperrte oder fehlgeschlagene Anmeldung"
@@ -2166,8 +2166,8 @@ msgstr "https://www.beispiel.ch/impressum"
 msgid "It must start with https://. It opens in a new tab."
 msgstr "Muss mit https:// beginnen. Öffnet sich in einem neuen Tab."
 
-msgid "Saved. The addresses now appear in the footer."
-msgstr "Gespeichert. Die Adressen erscheinen jetzt in der Fusszeile."
+msgid "Saved. The changes are now visible on all pages."
+msgstr "Gespeichert. Die Änderungen sind jetzt auf allen Seiten sichtbar."
 
 msgctxt "right"
 msgid "view"
@@ -2240,8 +2240,11 @@ msgstr "Das möchten Sie tun"
 msgid "Choose this right"
 msgstr "Dieses Recht wählen"
 
-msgid "Only system administrators can do the following, and no right gives it to a staff member: change the portal settings and the email delivery, read the security log and the blocked logins, manage groups and rights, block, unblock and delete accounts, and reset two-factor authentication."
-msgstr "Das können nur Systemadministratoren, und kein Recht gibt es einer Mitarbeiterin oder einem Mitarbeiter: die Portal-Einstellungen und den E-Mail-Versand ändern, das Sicherheitsprotokoll und die gesperrten Anmeldungen lesen, Gruppen und Rechte verwalten, Konten sperren, entsperren und löschen sowie die Zwei-Faktor-Anmeldung (2FA) zurücksetzen."
+msgid "Only system administrators can do the following, and no right gives it to a staff member: change the email delivery, read the security log and the blocked logins, manage groups and rights, block, unblock and delete accounts, and reset two-factor authentication."
+msgstr "Das können nur Systemadministratoren, und kein Recht gibt es einer Mitarbeiterin oder einem Mitarbeiter: den E-Mail-Versand ändern, das Sicherheitsprotokoll und die gesperrten Anmeldungen lesen, Gruppen und Rechte verwalten, Konten sperren, entsperren und löschen sowie die Zwei-Faktor-Anmeldung (2FA) zurücksetzen."
+
+msgid "This right changes what every visitor sees and which links the portal shows. Give it only to people who are responsible for the portal."
+msgstr "Dieses Recht ändert, was alle Besucher sehen und welche Links das Portal zeigt. Geben Sie es nur Personen, die für das Portal verantwortlich sind."
 
 #, python-format
 msgid "These lists show failed and blocked logins. The \"username\" is a code, not an address: the portal does not show who tried to log in. A temporary lockout ends by itself after %(lockout_minutes)s minutes."
@@ -2361,8 +2364,15 @@ msgstr "Frühere Fassungen zeigen den Wortlaut früherer Texte."
 msgid "The change history shows who changed what and when."
 msgstr "Der Änderungsverlauf zeigt, wer wann was geändert hat."
 
-msgid "The name, the logo and the website address of the footer are set by the operator when the portal is installed."
-msgstr "Name, Logo und Website-Adresse der Fusszeile legt der Betrieb bei der Installation fest."
+# Portal settings: name, website, logos, colours and the server configuration (D-073)
+msgid "Name, logo and colours"
+msgstr "Name, Logo und Farben"
+
+msgid "own settings"
+msgstr "eigene Einstellungen"
+
+msgid "server configuration"
+msgstr "Serverkonfiguration"
 
 # Terms of Django's administration that are replaced by the words of the portal (P2-7, P2-4, P2-8).
 msgid "View site"
@@ -2377,3 +2387,235 @@ msgstr "Änderungsverlauf: %s"
 
 msgid "You don’t have permission to view or edit anything."
 msgstr "Ihr Konto hat noch keine Rechte in der Verwaltung. Bitte wenden Sie sich an einen Systemadministrator."
+
+# Portal settings: fields, help texts and messages (D-073)
+msgid "name of the portal"
+msgstr "Name des Portals"
+
+msgid "Shown in the header, in page titles, in the subject of emails and in the administration. At most 100 characters. Leave empty to use the name from the server configuration."
+msgstr "Wird in der Kopfzeile, in den Seitentiteln, im Betreff der E-Mails und in der Verwaltung angezeigt. Höchstens 100 Zeichen. Leer lassen, um den Namen aus der Serverkonfiguration zu verwenden."
+
+msgid "address of the website"
+msgstr "Adresse der Website"
+
+msgid "The website of your community with the contact information. It is linked in the footer and used as the contact address in emails. It must start with https://. Leave empty to use the server configuration."
+msgstr "Die Website Ihrer Gemeinde mit den Kontaktangaben. Sie ist in der Fusszeile verlinkt und dient in E-Mails als Kontaktadresse. Sie muss mit https:// beginnen. Leer lassen, um die Serverkonfiguration zu verwenden."
+
+msgid "https://www.example.org"
+msgstr "https://www.beispiel.ch"
+
+msgid "accent colour, light mode"
+msgstr "Akzentfarbe, heller Modus"
+
+msgid "text colour on the accent colour, light mode"
+msgstr "Textfarbe auf der Akzentfarbe, heller Modus"
+
+msgid "accent colour, dark mode"
+msgstr "Akzentfarbe, dunkler Modus"
+
+msgid "text colour on the accent colour, dark mode"
+msgstr "Textfarbe auf der Akzentfarbe, dunkler Modus"
+
+msgid "highlight colour"
+msgstr "Hervorhebungsfarbe"
+
+msgid "Leave empty to choose white or dark text automatically."
+msgstr "Leer lassen: weisse oder dunkle Schrift wird automatisch gewählt."
+
+msgid "Used only for the small dots in the lists of the login page, never for text."
+msgstr "Wird nur für die kleinen Punkte in den Listen der Anmeldeseite verwendet, nie für Text."
+
+#, python-format
+msgid "The name must have at most %(max)d characters and no control characters."
+msgstr "Der Name darf höchstens %(max)d Zeichen haben und keine Steuerzeichen enthalten."
+
+msgid "Enter the colour as # followed by six digits or letters from A to F, for example #005BA2."
+msgstr "Geben Sie die Farbe als # mit sechs Ziffern oder Buchstaben von A bis F ein, zum Beispiel #005BA2."
+
+msgid "Portal upload rejected"
+msgstr "Hochladen in den Portal-Einstellungen abgelehnt"
+
+msgid "logo for light mode"
+msgstr "Logo für den hellen Modus"
+
+msgid "logo for dark mode"
+msgstr "Logo für den dunklen Modus"
+
+msgid "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. Use the version with dark lettering."
+msgstr "PNG oder SVG, bis 1 MB (PNG) oder 200 KB (SVG). Ein PNG sollte mindestens 720 px breit sein. Verwenden Sie die Version mit dunkler Schrift."
+
+msgid "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. Use the version with light lettering."
+msgstr "PNG oder SVG, bis 1 MB (PNG) oder 200 KB (SVG). Ein PNG sollte mindestens 720 px breit sein. Verwenden Sie die Version mit heller Schrift."
+
+msgid "Remove the uploaded logos and use the server configuration. The files are deleted and cannot be restored."
+msgstr "Hochgeladene Logos entfernen und die Serverkonfiguration verwenden. Die Dateien werden gelöscht und können nicht wiederhergestellt werden."
+
+msgid "Use the server colours again"
+msgstr "Farben der Serverkonfiguration wieder verwenden"
+
+msgid "Upload both logos or none. The portal needs one version for light and one for dark mode."
+msgstr "Laden Sie beide Logos hoch oder keines. Das Portal braucht je eine Version für den hellen und den dunklen Modus."
+
+#, python-format
+msgid "For your safety, the portal settings can only be saved within %(minutes)s minutes after logging in. Log out, log in again and save the changes right away. Nothing was saved."
+msgstr "Aus Sicherheitsgründen können die Portal-Einstellungen nur innerhalb von %(minutes)s Minuten nach der Anmeldung gespeichert werden. Melden Sie sich ab, melden Sie sich erneut an und speichern Sie die Änderungen sofort. Es wurde nichts gespeichert."
+
+#, python-format
+msgid "You logged in more than %(minutes)s minutes ago. To save changes here you have to log in again first."
+msgstr "Sie haben sich vor mehr als %(minutes)s Minuten angemeldet. Um hier Änderungen zu speichern, müssen Sie sich zuerst erneut anmelden."
+
+msgid "Choose either new logos or the removal of the uploaded logos, not both."
+msgstr "Wählen Sie entweder neue Logos oder das Entfernen der hochgeladenen Logos, nicht beides."
+
+msgid "Only PNG and SVG files are accepted."
+msgstr "Es sind nur PNG- und SVG-Dateien erlaubt."
+
+#, python-format
+msgid "The file is too large (maximum %(max)s)."
+msgstr "Die Datei ist zu gross (höchstens %(max)s)."
+
+msgid "The file is not a valid PNG image."
+msgstr "Die Datei ist kein gültiges PNG-Bild."
+
+msgid "The image must be between 64 and 4000 pixels wide and high."
+msgstr "Das Bild muss zwischen 64 und 4000 Pixel breit und hoch sein."
+
+msgid "The image has too many pixels (at most 4 million in total, for example 2000 by 2000). Scale it down and upload it again."
+msgstr "Das Bild hat zu viele Pixel (höchstens 4 Millionen insgesamt, zum Beispiel 2000 mal 2000). Verkleinern Sie es und laden Sie es erneut hoch."
+
+msgid "The PNG contains extra data that the portal does not accept (text, a colour profile or similar). Export it again without metadata."
+msgstr "Das PNG enthält zusätzliche Daten, die das Portal nicht annimmt (Text, ein Farbprofil oder Ähnliches). Exportieren Sie es erneut ohne Metadaten."
+
+msgid "The SVG needs a viewBox so that it can be scaled."
+msgstr "Das SVG braucht eine viewBox, damit es skaliert werden kann."
+
+#, python-format
+msgid "This SVG contains content that the portal does not accept (%(what)s). Save the logo as \"plain SVG\" without scripts, images, styles or editor data and upload it again."
+msgstr "Diese SVG-Datei enthält Inhalte, die das Portal nicht annimmt (%(what)s). Speichern Sie das Logo als «einfaches SVG» ohne Skripte, Bilder, Stile und Editor-Daten und laden Sie es erneut hoch."
+
+#, python-format
+msgid "This accent colour is too weak on the light background (contrast %(ratio)s:1, required 4.5:1). Choose a darker colour."
+msgstr "Diese Akzentfarbe ist auf dem hellen Hintergrund zu schwach (Kontrast %(ratio)s:1, verlangt sind 4.5:1). Wählen Sie eine dunklere Farbe."
+
+#, python-format
+msgid "This accent colour is too weak on the dark background (contrast %(ratio)s:1, required 4.5:1). Choose a lighter colour."
+msgstr "Diese Akzentfarbe ist auf dem dunklen Hintergrund zu schwach (Kontrast %(ratio)s:1, verlangt sind 4.5:1). Wählen Sie eine hellere Farbe."
+
+#, python-format
+msgid "The text colour on the accent colour is too weak (contrast %(ratio)s:1, required 4.5:1)."
+msgstr "Die Textfarbe auf der Akzentfarbe ist zu schwach (Kontrast %(ratio)s:1, verlangt sind 4.5:1)."
+
+#, python-format
+msgid "The highlight colour is too weak with dark text (contrast %(ratio)s:1, required 4.5:1)."
+msgstr "Die Hervorhebungsfarbe ist mit dunkler Schrift zu schwach (Kontrast %(ratio)s:1, verlangt sind 4.5:1)."
+
+#, python-format
+msgid "Server configuration: %(value)s"
+msgstr "Serverkonfiguration: %(value)s"
+
+msgid "logo files set"
+msgstr "Logo-Dateien hinterlegt"
+
+msgid "Name and website"
+msgstr "Name und Website"
+
+msgid "Legal notices"
+msgstr "Datenschutz und Impressum"
+
+msgid "Logo"
+msgstr "Logo"
+
+msgid "Colours"
+msgstr "Farben"
+
+msgid "Server configuration (read only)"
+msgstr "Serverkonfiguration (nur lesen)"
+
+msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the base address decide where the links in emails and the security settings point, so they are not stored where the portal settings can change them."
+msgstr "Diese Werte legt der Betrieb in der Serverkonfiguration fest, und sie können hier nicht geändert werden: Der Host-Name, die erlaubten Hosts und die Basisadresse bestimmen, wohin die Links in E-Mails und die Sicherheitseinstellungen zeigen. Darum liegen sie nicht dort, wo die Portal-Einstellungen sie ändern können."
+
+msgid "uploaded logos"
+msgstr "Hochgeladene Logos"
+
+msgid "Light mode"
+msgstr "Heller Modus"
+
+msgid "Dark mode"
+msgstr "Dunkler Modus"
+
+#, python-format
+msgid "Uploaded (%(type)s, fingerprint %(digest)s)."
+msgstr "Hochgeladen (%(type)s, Fingerabdruck %(digest)s)."
+
+#, python-format
+msgid "Not uploaded. Server configuration: %(value)s."
+msgstr "Nicht hochgeladen. Serverkonfiguration: %(value)s."
+
+msgid "preview of the portal"
+msgstr "Vorschau des Portals"
+
+msgid "values of the server"
+msgstr "Werte des Servers"
+
+msgid "on"
+msgstr "ein"
+
+msgid "off"
+msgstr "aus"
+
+msgid "Environment"
+msgstr "Umgebung"
+
+msgid "Debug mode"
+msgstr "Debug-Modus"
+
+msgid "Base address of the portal (links in emails)"
+msgstr "Basisadresse des Portals (Links in E-Mails)"
+
+msgid "Allowed host names"
+msgstr "Erlaubte Host-Namen"
+
+msgid "Trusted origins of forms"
+msgstr "Vertrauenswürdige Herkunft von Formularen"
+
+msgid "Email delivery"
+msgstr "E-Mail-Versand"
+
+msgid "Sender address of emails"
+msgstr "Absenderadresse der E-Mails"
+
+msgid "Number of allowed recipients (development only)"
+msgstr "Anzahl erlaubter Empfänger (nur Entwicklung)"
+
+msgid "Security log: days kept (usual, long)"
+msgstr "Sicherheitsprotokoll: Aufbewahrung in Tagen (üblich, lang)"
+
+msgid "Header of the reverse proxy for HTTPS"
+msgstr "Header des Reverse-Proxys für HTTPS"
+
+msgid "Number of proxies in front of the portal"
+msgstr "Anzahl Proxys vor dem Portal"
+
+msgid "HSTS, seconds"
+msgstr "HSTS, Sekunden"
+
+msgid "Here you set how this portal presents itself. Changes are visible to all visitors immediately."
+msgstr "Hier legen Sie fest, wie sich dieses Portal präsentiert. Änderungen sind sofort für alle Besucher sichtbar."
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Button"
+msgstr "Schaltfläche"
+
+msgid "Highlight"
+msgstr "Hervorhebung"
+
+msgid "The preview shows the saved logos. The colours change while you type."
+msgstr "Die Vorschau zeigt die gespeicherten Logos. Die Farben ändern sich beim Tippen."
+
+msgid "See the settings of the portal"
+msgstr "Die Einstellungen des Portals ansehen"
+
+msgid "Change name, logo, colours and addresses of the portal"
+msgstr "Name, Logo, Farben und Adressen des Portals ändern"

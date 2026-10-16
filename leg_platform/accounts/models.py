@@ -66,7 +66,12 @@ from leg_platform.accounts.encryption import (
     reencrypt,
 )
 from leg_platform.accounts.normalization import normalize_email_address
-from leg_platform.environment import has_unsafe_url_character
+from leg_platform.branding import HEX_COLOUR
+from leg_platform.environment import (
+    INSTANCE_NAME_MAX_LENGTH,
+    has_unsafe_url_character,
+    is_valid_instance_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1735,15 +1740,81 @@ def validate_https_address(value):
         )
 
 
+def validate_instance_name(value):
+    """The name of the portal: at most 100 characters, no control or line separator characters.
+
+    The same rule as the environment value INSTANCE_NAME (``environment.is_valid_instance_name``):
+    the name appears in the subject of emails, so control characters would allow header injection.
+    """
+    if not is_valid_instance_name(value):
+        raise ValidationError(
+            _("The name must have at most %(max)d characters and no control characters."),
+            code="invalid_name",
+            params={"max": INSTANCE_NAME_MAX_LENGTH},
+        )
+
+
+def validate_hex_colour(value):
+    """A colour as # followed by six hexadecimal digits (the rule of ``leg_platform.branding``)."""
+    if HEX_COLOUR.fullmatch(value) is None:
+        raise ValidationError(
+            _(
+                "Enter the colour as # followed by six digits or letters from A to F, for "
+                "example #005BA2."
+            ),
+            code="invalid_colour",
+        )
+
+
 class PortalSettings(models.Model):
     """The portal settings that the administrator maintains. The table holds exactly one row (id 1).
 
+    Name, website, privacy notice and legal notice, the two logos and the colours of the portal
+    (D-073, owner decision of 2026-10-16). An empty text or colour means "use the server
+    configuration" (the environment value, then the default of the platform): the precedence is
+    decided per field by ``leg_platform.accounts.portal_settings.portal_values``, the one accessor.
     The privacy notice and the legal notice are texts of the owner of the instance, maintained on
     their own website; the portal only links to them (LEG-Design-Vorgaben/legal/VORGABEN.md,
     section 8; D-056).
+
+    The two logos are stored in the table itself (no file on the server): the validated file, its
+    type and its SHA-256 digest. They are written only by the form of the administration, which
+    validates them (``leg_platform.accounts.logo_images``), and are served by a dedicated view
+    (``leg_platform.presentation.instance_logo``). Queries that do not need the files must not load
+    them (``LOGO_DATA_FIELDS``).
     """
 
+    class LogoType(models.TextChoices):
+        PNG = "png", "PNG"
+        SVG = "svg", "SVG"
+
+    # The columns that hold the files: loaded only by the logo view and when a logo is replaced.
+    LOGO_DATA_FIELDS = ("logo_light_data", "logo_dark_data")
+    COLOUR_FIELDS = ("accent_light", "text_light", "accent_dark", "text_dark", "highlight")
+
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    name = models.CharField(
+        _("name of the portal"),
+        max_length=INSTANCE_NAME_MAX_LENGTH,
+        blank=True,
+        validators=[validate_instance_name],
+        help_text=_(
+            "Shown in the header, in page titles, in the subject of emails and in the "
+            "administration. At most 100 characters. Leave empty to use the name from the "
+            "server configuration."
+        ),
+    )
+    website_url = models.URLField(
+        _("address of the website"),
+        max_length=500,
+        blank=True,
+        validators=[validate_https_address],
+        help_text=_(
+            "The website of your community with the contact information. It is linked in the "
+            "footer and used as the contact address in emails. It must start with https://. "
+            "Leave empty to use the server configuration."
+        ),
+    )
     privacy_url = models.URLField(
         _("address of the privacy notice"),
         max_length=500,
@@ -1763,10 +1834,48 @@ class PortalSettings(models.Model):
             "Linked in the footer. Leave empty to show the text without a link."
         ),
     )
+    accent_light = models.CharField(
+        _("accent colour, light mode"), max_length=7, blank=True, validators=[validate_hex_colour]
+    )
+    text_light = models.CharField(
+        _("text colour on the accent colour, light mode"),
+        max_length=7,
+        blank=True,
+        validators=[validate_hex_colour],
+        help_text=_("Leave empty to choose white or dark text automatically."),
+    )
+    accent_dark = models.CharField(
+        _("accent colour, dark mode"), max_length=7, blank=True, validators=[validate_hex_colour]
+    )
+    text_dark = models.CharField(
+        _("text colour on the accent colour, dark mode"),
+        max_length=7,
+        blank=True,
+        validators=[validate_hex_colour],
+        help_text=_("Leave empty to choose white or dark text automatically."),
+    )
+    highlight = models.CharField(
+        _("highlight colour"),
+        max_length=7,
+        blank=True,
+        validators=[validate_hex_colour],
+        help_text=_(
+            "Used only for the small dots in the lists of the login page, never for text."
+        ),
+    )
+    # The logos: the validated file, its type and its SHA-256 digest (hex); empty means none.
+    logo_light_data = models.BinaryField(null=True, editable=False)
+    logo_light_type = models.CharField(max_length=3, choices=LogoType, blank=True, editable=False)
+    logo_light_sha256 = models.CharField(max_length=64, blank=True, editable=False)
+    logo_dark_data = models.BinaryField(null=True, editable=False)
+    logo_dark_type = models.CharField(max_length=3, choices=LogoType, blank=True, editable=False)
+    logo_dark_sha256 = models.CharField(max_length=64, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
     class Meta:
-        default_permissions = ()
+        # View and change are assignable to a role at runtime, like for the email texts (D-012,
+        # D-073); nothing is hard-coded. No add and no delete: the table has the one row.
+        default_permissions = ("view", "change")
         verbose_name = _("portal settings")
         verbose_name_plural = _("portal settings")
         constraints = [
@@ -1781,6 +1890,13 @@ class PortalSettings(models.Model):
     @classmethod
     def load(cls):
         settings_row, _created = cls.objects.get_or_create(id=1)
+        return settings_row
+
+    @classmethod
+    def load_without_logo_files(cls):
+        """The row without the two logo files (the administration and the dashboard do not need
+        them; saving such an instance writes only the loaded columns)."""
+        settings_row, _created = cls.objects.defer(*cls.LOGO_DATA_FIELDS).get_or_create(id=1)
         return settings_row
 
 
@@ -1903,7 +2019,11 @@ class AuthenticatorDevice(TimestampMixin, Device):
 
         https://github.com/google/google-authenticator/wiki/Key-Uri-Format
         """
-        issuer = settings.INSTANCE_NAME.replace(":", "")
+        # The name of the portal as the administrator set it (D-073); the enrolments that exist
+        # keep the issuer they were made with, which is cosmetic.
+        from leg_platform.accounts.portal_settings import portal_values
+
+        issuer = portal_values().name.replace(":", "")
         label = f"{issuer}:{self.user.get_username()}"
         parameters = urlencode(
             {
@@ -2060,6 +2180,7 @@ class SecurityEvent(models.Model):
             "Microsoft Graph test email requested"
         )
         PORTAL_SETTINGS_CHANGED = "portal_settings_changed", _("Portal settings changed")
+        PORTAL_UPLOAD_REJECTED = "portal_upload_rejected", _("Portal upload rejected")
         EMAIL_CHANGE_CANCELLED = "email_change_cancelled", _(
             "Requested email address change cancelled by the account"
         )

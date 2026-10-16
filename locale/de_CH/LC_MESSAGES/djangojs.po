@@ -36,3 +36,12 @@ msgstr "Markierte entfernen (%s)"
 #, javascript-format
 msgid "Remove all %s"
 msgstr "Alle entfernen (%s)"
+
+# The advisory contrast text of the preview of the portal settings (D-073).
+#, javascript-format
+msgid "Contrast %s:1 – sufficient"
+msgstr "Kontrast %s:1 – ausreichend"
+
+#, javascript-format
+msgid "Contrast %s:1 – too weak"
+msgstr "Kontrast %s:1 – zu schwach"

@@ -45,7 +45,7 @@ Details are in `AGENTS.md`, sections 2, 3 and 12.
 * Work in small, traceable steps.
 * Check existing files before overwriting them.
 * Prefer established, maintained solutions over custom developments; do not reinvent the wheel.
-* Run appropriate tests and report the actual results.
+* Run appropriate tests and report the actual results. Run the tests of the touched area with `.\scripts\test.ps1 -Changed` or `-Area <name>` (`docs/STARTUP.md`, section 13; D-071); the full suite runs only for core changes, before a deployment gate, in CI and once per commit block by the team lead.
 * Keep documentation and implementation in sync.
 * Ask before irreversible or security-critical decisions unless a binding rule exists.
 * Never invent functionality or test results that supposedly already exist.

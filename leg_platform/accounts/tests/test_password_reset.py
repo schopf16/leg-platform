@@ -69,8 +69,9 @@ def login(client, address, password, remote_addr):
 @tag("mariadb")
 @hour_and_day_limits
 class ResetRequestTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("active.person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("active.person@example.org")
 
     def test_an_active_account_receives_a_link_built_from_the_configuration(self):
         response = request_reset(" Active.Person@EXAMPLE.org ")

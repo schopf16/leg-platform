@@ -74,10 +74,11 @@ def has_second_factor(user):
 class AdministrationResetTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = administrator()
-        self.user = create_active_user("member@example.org")
-        with_second_factor(self.user)
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = administrator()
+        cls.user = create_active_user("member@example.org")
+        with_second_factor(cls.user)
 
     def test_the_account_page_offers_the_reset_for_other_accounts_only(self):
         self.client.force_login(self.administrator)
@@ -302,9 +303,10 @@ class AdministrationResetTests(TestCase):
 class AdministrationSessionTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = administrator()
-        self.member = create_active_user("member@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = administrator()
+        cls.member = create_active_user("member@example.org")
 
     def test_a_stale_form_cannot_restore_the_password_or_the_session_version(self):
         from django.contrib import admin

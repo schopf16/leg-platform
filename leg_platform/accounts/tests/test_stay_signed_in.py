@@ -53,8 +53,9 @@ def cookie_max_age(response):
 
 @tag("mariadb")
 class StaySignedInTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
 
     def test_the_login_page_has_the_box_and_it_is_not_ticked(self):
         response = self.client.get(LOGIN_URL)
@@ -202,8 +203,9 @@ class StaySignedInTests(TestCase):
 class StaySignedInWithSecondFactorTests(TestCase):
     """The wish survives the second step, and only there is the session persistent."""
 
-    def setUp(self):
-        self.user, self.device = create_user_with_totp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
 
     def test_ticked_the_session_is_persistent_after_the_code(self):
         response = log_in(self.client, self.user.email, remember=True)

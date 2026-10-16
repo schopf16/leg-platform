@@ -590,9 +590,12 @@ def wrong_password(client, address="10.97.4.2"):
 
 @tag("mariadb")
 class AHolderOfASessionCannotBlockTheOwnerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp("owner.blocked@example.org")
+        cls.user.set_secondary_email(SECOND_ADDRESS)
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp("owner.blocked@example.org")
-        self.user.set_secondary_email(SECOND_ADDRESS)
         self.holder = logged_in_client(self.user)
         self.owner_session = logged_in_client(self.user)
 

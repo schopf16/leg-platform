@@ -25,8 +25,8 @@
     <div class="error-card">
       <span class="logo-plate error-logo">
         {% if brand.logo_light %}
-          <img class="portal-logo portal-logo-light" src="{% static brand.logo_light %}" alt="{{ brand.name }}">
-          <img class="portal-logo portal-logo-dark" src="{% static brand.logo_dark %}" alt="{{ brand.name }}">
+          <img class="portal-logo portal-logo-light" src="{{ brand.logo_light }}" alt="{{ brand.name }}">
+          <img class="portal-logo portal-logo-dark" src="{{ brand.logo_dark }}" alt="{{ brand.name }}">
         {% else %}
           <span class="logo-name">{{ brand.name }}</span>
         {% endif %}

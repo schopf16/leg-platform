@@ -20,6 +20,7 @@ Read:
 ## Tasks
 
 * Review the existing test suite.
+* Run the scenario of the area under test, not the full suite: `.\scripts\test.ps1 -Changed` or `-Area <name>` (`-List` shows the areas; `docs/STARTUP.md`, section 13; D-071). Run the full suite (`-Full`) only when the main session orders it, for a core change (the runner then widens the run by itself), before a deployment gate, or for the acceptance of a commit block; never after every small change. Always name the area or labels and the number of tests in the report, and never describe a scoped run as a full run.
 * Add tests for new functionality.
 * Test successful flows and expected error cases.
 * Check permissions from the perspective of different users.
@@ -52,7 +53,7 @@ You may delegate clearly bounded, simpler tasks to subagents (`AGENTS.md`, secti
 
 Report:
 
-* test and check commands run
+* test and check commands run (area or labels, and whether the full suite was run)
 * delegated tasks and how their results were checked
 * number and result of tests, where available
 * failed tests

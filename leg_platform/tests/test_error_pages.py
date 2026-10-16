@@ -121,9 +121,11 @@ class ErrorPageTests(SimpleTestCase):
         self.assertIn("<title>Hoppla, da ist etwas schiefgelaufen. – LEG-Portal</title>", html)
 
     def test_the_logo_files_of_the_instance_are_shown_when_they_are_configured(self):
-        from types import SimpleNamespace
+        from dataclasses import replace
 
-        branding = SimpleNamespace(logo_light="instance/light.svg", logo_dark="instance/dark.svg")
+        from leg_platform.branding import load_branding
+
+        branding = replace(load_branding({}), logo_light="instance/light.svg", logo_dark="instance/dark.svg")
         with override_settings(INSTANCE_BRANDING=branding):
             html = page_not_found(RequestFactory().get("/x/"), Http404()).content.decode()
 

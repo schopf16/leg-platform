@@ -195,6 +195,15 @@ jobs:
           INSTANCE_PRIVACY_URL: https://www.example.org/privacy
         run: python manage.py check --deploy --database default --fail-level WARNING
 
+      - name: Deployment checks with stage settings (identical to production, D-070)
+        env:
+          APP_ENV: stage
+          EMAIL_MODE: graph
+          DJANGO_ALLOWED_HOSTS: portal.example.org
+          INSTANCE_BASE_URL: https://portal.example.org
+          INSTANCE_PRIVACY_URL: https://www.example.org/privacy
+        run: python manage.py check --deploy --database default --fail-level WARNING
+
       - name: Check for missing migrations
         run: python manage.py makemigrations --check --dry-run
 

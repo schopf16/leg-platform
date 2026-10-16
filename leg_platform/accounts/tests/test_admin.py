@@ -65,15 +65,16 @@ def create_active_user(email, customer_number=True):
 class AdminAuthorizationTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.staff_user = create_active_user("staff@example.org")
-        self.staff_user.set_privileges(is_staff=True, is_superuser=False)
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.staff_user = create_active_user("staff@example.org")
+        cls.staff_user.set_privileges(is_staff=True, is_superuser=False)
         permission = Permission.objects.get(
             content_type__app_label="accounts", codename="change_user"
         )
-        self.staff_user.user_permissions.add(permission)
+        cls.staff_user.user_permissions.add(permission)
 
     def test_staff_user_cannot_open_group_admin_urls(self):
         self.client.force_login(self.staff_user)
@@ -354,11 +355,12 @@ class AdminPresentationTests(TestCase):
 
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.member = create_active_user("member@example.org")
-        self.pending = User.objects.create_user("pending@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.member = create_active_user("member@example.org")
+        cls.pending = User.objects.create_user("pending@example.org")
 
     def test_site_titles_do_not_name_django_and_are_the_name_of_the_instance(self):
         with translation.override("en"):
@@ -383,7 +385,10 @@ class AdminPresentationTests(TestCase):
 
         groups = re.findall(r'<a href="[^"]*" class="section"[^>]*>([^<]+)</a>', content)
         self.assertEqual(groups, ["Benutzer", "Inhalte", "System"])
-        self.assertIn("Texte der E-Mails und Adressen der Fusszeile pflegen Sie unter Inhalte.", content)
+        self.assertIn(
+            "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
+            content,
+        )
         for name in ("Mailtexte", "Portal-Einstellungen", "Gesperrte und fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
             self.assertIn(name, content)
         # No product name of a package as a heading.
@@ -610,11 +615,14 @@ class AdminPostalCodeTests(TestCase):
 
     client_class = VerifiedClient
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.member = create_active_user("member@example.org")
+        cls.url = reverse("admin:accounts_user_change", args=(cls.member.pk,))
+
     def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.member = create_active_user("member@example.org")
-        self.url = reverse("admin:accounts_user_change", args=(self.member.pk,))
         self.client.force_login(self.administrator)
 
     def post(self, country, postal_code):
@@ -726,10 +734,13 @@ class AdminLogEntryTests(TestCase):
 
     client_class = VerifiedClient
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.member = create_active_user("member@example.org")
+
     def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.member = create_active_user("member@example.org")
         self.client.force_login(self.administrator)
         self.model_admin = admin.site._registry[User]
         self.request = RequestFactory().post("/admin/accounts/user/")
@@ -860,12 +871,13 @@ class AdminHistoryAccessTests(TestCase):
 
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("admin@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.member = create_active_user("member@example.org")
-        self.history_url = reverse("admin:accounts_user_history", args=(self.member.pk,))
-        self.change_url = reverse("admin:accounts_user_change", args=(self.member.pk,))
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("admin@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.member = create_active_user("member@example.org")
+        cls.history_url = reverse("admin:accounts_user_history", args=(cls.member.pk,))
+        cls.change_url = reverse("admin:accounts_user_change", args=(cls.member.pk,))
 
     def create_staff_user(self, *codenames):
         staff_user = create_active_user("staff@example.org")

@@ -6,16 +6,24 @@ Related documents: `docs/STARTUP.md` starts, checks, uses and stops the complete
 
 ## Instance Presentation
 
-Branding is configured through the variables documented in `.env.example` (D-051).
-Leave them empty to use the neutral platform defaults. Colours are six-digit hexadecimal
-values. The application refuses to start if the accent lacks 4.5:1 contrast with its text,
-the page background or the surface, or if highlight text would lack contrast.
+Since D-073 the administrator maintains the presentation of the portal in the administration ("Inhalte", "Portal-Einstellungen"): the name, the website, the addresses of the privacy notice and the legal notice, the two logos and the colours. A value that is stored there wins; every field that is left empty there falls back to the variables documented in `.env.example` (D-051), and then to the neutral platform defaults. A new instance therefore starts with its environment values and nothing has to be entered in the administration for it to work. The host name, the base address (`INSTANCE_BASE_URL`), the allowed hosts, the mail mode and sender, the Microsoft Graph credentials (they have their own module), the database, the secrets, the retention minimums and the proxy settings are never editable there: they stay in the environment of the server and are shown read only to system administrators (D-073: a host name that can be changed in the database would let anyone who may change it point all links in emails and the security settings elsewhere).
 
-Before deploying, the operator also checks that accents are not red and cannot be confused
+**Logos (D-073).** The administrator uploads one logo for light mode and one for dark mode (both or none), PNG or SVG only: a PNG up to 1 MB, 64 to 4000 pixels per side, an SVG up to 200 KB without scripts, styles, images, links or editor data (the form refuses such a file with a message; it never rewrites a file). The files are stored **in the database** (table `accounts_portalsettings`), not on the server: no directory has to be created, no path exists, the backup of the database contains them, and a restore brings them back with the settings. **The logos therefore belong to the database backup**; nothing else has to be backed up for them. They are served by the portal itself at `/branding/logo/light/` and `/branding/logo/dark/` (public, with `nosniff` and a sandboxing policy). The reverse proxy must pass these two paths to the application and may cache them for a day (the address carries the start of the digest of the file). A reverse proxy must allow a request body of at least 3 MiB for `/admin/accounts/portalsettings/1/change/` (the page that takes the two logo files); the application refuses a larger body to this page by itself (413).
+
+The environment logos `INSTANCE_LOGO_LIGHT` and `INSTANCE_LOGO_DARK` stay as the fallback while no logos are uploaded. Removing the uploaded logos in the administration returns to them at once.
+
+The variables of the environment are validated at the start. Colours are six-digit hexadecimal
+values. The application refuses to start if the accent lacks 4.5:1 contrast with its text,
+the page background or the surface, or if highlight text would lack contrast. The form of the
+administration applies the same rules when the administrator saves, and the values read from the
+database are checked again before they are used; a value that fails is not used (a warning is
+logged and the server configuration applies).
+
+Before deploying, and when the administrator changes the colours, the operator also checks that accents are not red and cannot be confused
 with the status or energy colours in `docs/DESIGN.md`. The automatic contrast check does
 not verify the meaning of colours.
 
-Provide both the light and dark logo as local static `.svg` or `.png` files. Use relative
+Logo files of the environment (the fallback): provide both the light and dark logo as local static `.svg` or `.png` files. Use relative
 static paths, never an absolute path or an external URL. Logos are embedded as images, not
 inline SVG. Set `INSTANCE_STATIC_DIRECTORY` to an existing absolute directory outside
 the repository containing these files. Its contents are public: never put configuration,
@@ -26,9 +34,9 @@ an operator error; the startup path validation does not prove that the file exis
 
 Colour mode and language (D-056): the pages start light and German. The person switches with the two buttons in the top right corner; there is no automatic mode that follows the device setting. The choice is kept only in the `sessionStorage` of the browser tab (no cookie, nothing is sent to the server), so a new tab starts light and German again. The buttons need JavaScript; without it they are hidden. Print output hides navigation, the corner buttons and interactive controls and shows the instance name and date.
 
-The platform defaults of the colours are the values of the design package of the owner (accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22`; D-056); an instance replaces them with the variables above. The addresses of the privacy notice and the legal notice in the footer are maintained by the system administrator in the administration ("Portal-Einstellungen"); the privacy address falls back to `INSTANCE_PRIVACY_URL` while the setting is empty. The footer also shows the host of `INSTANCE_WEBSITE_URL` as a link.
+The platform defaults of the colours are the values of the design package of the owner (accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22`; D-056); an instance replaces them with the variables above or in the administration (D-073). The addresses of the privacy notice and the legal notice in the footer are maintained by the administrator in the administration ("Portal-Einstellungen"); the privacy address falls back to `INSTANCE_PRIVACY_URL` while the setting is empty, and the website falls back to `INSTANCE_WEBSITE_URL`. The footer also shows the host of the website as a link.
 
-**Hint for the administrator of an instance:** the texts of the login and registration pages (title, lead sentence, benefit points, field labels) are not editable in the administration. They can only be changed in the translation files `locale/<language>/LC_MESSAGES/django.po` (compile with `msgfmt`, then deploy). Logo, colours, name and website are deployment settings (above). The start page of the administration shows what still has to be set (box "Erste Schritte"); see `docs/OPERATIONS.md`, section 5a.
+**Hint for the administrator of an instance:** the texts of the login and registration pages (title, lead sentence, benefit points, field labels) are not editable in the administration. They can only be changed in the translation files `locale/<language>/LC_MESSAGES/django.po` (compile with `msgfmt`, then deploy). Logo, colours, name and website are maintained in "Portal-Einstellungen" (D-073; the environment values are the fallback). The start page of the administration shows what still has to be set (box "Erste Schritte"); see `docs/OPERATIONS.md`, section 5a.
 
 Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, Safari 17.5
 or newer, and Opera 109 or newer. Devices that cannot update to these versions are not
@@ -208,7 +216,7 @@ Without a running MariaDB server, only the tests that need no database can run: 
 
 Local development server (for design reviews and manual tests): `python manage.py runserver --noreload` needs `DJANGO_DEBUG=True` or `DJANGO_ALLOWED_HOSTS` (for example `127.0.0.1,localhost`) in the environment of that process, because Django refuses to start the server with `DEBUG` off and no allowed hosts; both are only allowed with `APP_ENV=local`. Set them for the process only (in PowerShell: `$env:DJANGO_DEBUG = 'True'` in the terminal that starts the server). The server listens on `http://127.0.0.1:8000/`, the value `INSTANCE_BASE_URL` has locally by default. Pages that need an account use the throw-away accounts of `seed_design_accounts` (see "Instance Configuration"). The complete start, check, stop and test procedure for agents is in `docs/STARTUP.md`.
 
-Email: locally, emails are written to the console by default (`EMAIL_MODE=console`). To test delivery via Microsoft Graph locally, use `EMAIL_MODE=allowlist` with a dedicated development app registration and sender mailbox, never the credentials of stage or production, and set the allowed recipient addresses only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). The Microsoft Graph backend is implemented and authenticates with a certificate (D-006); the admin section for its configuration is not implemented yet. Until a configuration exists, every send attempt in this mode fails with an error and no email is sent. Automated tests never send real email.
+Email: locally, emails are written to the console by default (`EMAIL_MODE=console`). To test delivery via Microsoft Graph locally, use `EMAIL_MODE=allowlist` with a dedicated development app registration and sender mailbox, never the credentials of stage or production, and set the allowed recipient addresses only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). `allowlist` exists only for `APP_ENV=local`; stage and production allow only `EMAIL_MODE=graph` (unrestricted delivery; stage behaves exactly like production, D-070). The Microsoft Graph backend is implemented and authenticates with a certificate (D-006); the admin section for its configuration is not implemented yet. Until a configuration exists, every send attempt in this mode fails with an error and no email is sent. Automated tests never send real email.
 
 ### Instance Configuration
 
@@ -216,10 +224,10 @@ Design test accounts: for design reviews, `python manage.py seed_design_accounts
 
 Each instance sets its own values in the environment (`.env.example`, D-013, D-037). They are validated at startup, and invalid values prevent the start:
 
-* `INSTANCE_NAME`: shown in pages and email subjects (optional, default "LEG Platform").
+* `INSTANCE_NAME`: shown in pages and email subjects (optional, default "LEG Platform"). Since D-073 a name entered by the administrator in "Portal-Einstellungen" wins; this value is the fallback.
 * `INSTANCE_BASE_URL`: the canonical `https://` origin of the application, e.g. `https://portal.example.org` (no path). Links in emails are built from it, never from the request, so it must be correct before any email is sent. Its host must also be in `DJANGO_ALLOWED_HOSTS`. Required outside `APP_ENV=local`.
 * `INSTANCE_PRIVACY_URL`: absolute `https://` URL of the instance's privacy notice, linked at registration and on all pages without login. Required outside `APP_ENV=local`.
-* `INSTANCE_WEBSITE_URL`: absolute `https://` URL of the instance's website (optional).
+* `INSTANCE_WEBSITE_URL`: absolute `https://` URL of the instance's website (optional; fallback for the website of "Portal-Einstellungen", D-073).
 * `EMAIL_SENDER_ADDRESS`: sender address of all emails (optional; default `noreply@<host of INSTANCE_BASE_URL>`, locally `noreply@localhost`). If it is set, it replaces the default; the emails never invite a reply (D-038).
 
 Email delivery (D-038):
@@ -247,7 +255,7 @@ Microsoft Graph sender (D-006; the steps are done by the operator in Microsoft E
 
 The sender address receives replies and bounces. Its mailbox content must therefore be protected like the other mailboxes of the instance. The sender address configured in the application must be the same address as the mailbox in step 3.
 
-Upload size of the certificate (D-048): the administration accepts the certificate and the private key as files of at most 16 KiB (16384 bytes) each. The application checks this only after the whole request has been received. Django's `DATA_UPLOAD_MAX_MEMORY_SIZE` does not limit file uploads, and under ASGI the entire request may be spooled to disk before Django enforces its limit (Django documentation, https://docs.djangoproject.com/en/6.0/ref/settings/#data-upload-max-memory-size, checked 2026-10-14). The web server or reverse proxy in front of the application must therefore limit the request body size of the instance. The value of this limit is not decided yet (D-048).
+Upload size of the certificate (D-048): the administration accepts the certificate and the private key as files of at most 16 KiB (16384 bytes) each. The application checks this only after the whole request has been received. Django's `DATA_UPLOAD_MAX_MEMORY_SIZE` does not limit file uploads, and under ASGI the entire request may be spooled to disk before Django enforces its limit (Django documentation, https://docs.djangoproject.com/en/6.0/ref/settings/#data-upload-max-memory-size, checked 2026-10-14). The web server or reverse proxy in front of the application must therefore limit the request body size of the instance. The value of this limit is not decided yet (D-048). The page of the portal settings takes two logo files of at most 1 MB each (D-073); the application refuses a body of more than 3 MiB for that one page before the form is read (`leg_platform/middleware.py`), and the proxy limit must not be lower than that for the page.
 
 Scheduled tasks (the scheduler itself is decided with the hosting, D-008, D-037, D-038, D-041):
 
@@ -330,7 +338,7 @@ The application account receives only `SELECT, INSERT, UPDATE, DELETE, CREATE, D
 * Locally also on `test_leg_platform`: "The test database is created by the user specified by `USER`" (Django documentation, "Writing and running tests"); Django runs `CREATE DATABASE` and `DROP DATABASE` for it (source `django/db/backends/base/creation.py`). MariaDB allows granting `CREATE` on databases "that do not yet exist" (MariaDB documentation, "GRANT").
 * In database-level grants, `_` is a wildcard ("database names in GRANT can contain % and _ wildcards", MariaDB documentation, "GRANT"); the script escapes it (`leg\_platform`), so that the grant covers exactly the named databases, and checks the stored names.
 * Character set and collation: every database of an instance must be created with `CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci` (available from MariaDB 10.10.1 on; D-030, D-031). MariaDB 10.11 would otherwise create it with `latin1`, because that is its default server character set (`utf8mb4` is the default only from MariaDB 11.6). The setup script does this locally; operators of stage and production do it when they create the instance's database, e.g. `CREATE DATABASE leg_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;`. Django creates its test database with the same settings (`TEST` in the settings). Identifier columns (normalised email address, tokens, customer number) will use the exact collation `utf8mb4_bin` per column (D-031).
-* Parallel test runs (`manage.py test --parallel`) are not supported with this account: they clone the test database into further databases (`test_leg_platform_1`, ...), which needs other privileges and databases.
+* Parallel test runs (`manage.py test --parallel`) are not supported with this account: they clone the test database into further databases (`test_leg_platform_1`, ...), which needs other privileges and databases (verified on 2026-10-16: MariaDB error 1044, access denied to `test_leg_platform_1`; D-071). Do not widen the grants for this.
 
 Pattern for stage and production: the same privileges, only on the instance's own database, no test database and no global privileges, for an account that can connect only from the application host. `DROP` on the database level also allows dropping the whole database; a stricter split into a migration account (schema privileges) and a runtime account (`SELECT`, `INSERT`, `UPDATE`, `DELETE` only) is decided together with the hosting details (D-008).
 

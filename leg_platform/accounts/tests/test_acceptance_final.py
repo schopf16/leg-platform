@@ -218,8 +218,11 @@ class StopLinkIsDeadAfterwardsTests(TestCase):
     the change was confirmed, cancelled or replaced it does nothing, in particular it ends no
     session and keeps a newer request."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.owner = Client()
         self.owner.force_login(self.user)
 
@@ -393,15 +396,18 @@ class FirstStepsBoxTests(TestCase):
         self.assertNotIn("Erste Schritte", page)
         self.assertNotIn("Microsoft Graph", page)
 
-    def test_a_right_for_the_portal_settings_gives_no_item_to_a_staff_member(self):
+    def test_a_right_for_the_portal_settings_gives_the_items_to_a_staff_member(self):
+        # D-073: the rights to see and to change the portal settings are ordinary rights, so
+        # the box shows the items and the link for an account that holds one of them.
         client, _staff = staff_client(
             "settings.person@example.org", "view_portalsettings", "change_portalsettings"
         )
 
         page = client.get(ADMIN_INDEX).content.decode()
 
-        self.assertNotIn("Datenschutzerklärung", page)
-        self.assertNotIn(SETTINGS_URL, page)
+        self.assertIn("Name, Logo und Farben", page)
+        self.assertIn("Datenschutzerklärung", page)
+        self.assertIn(SETTINGS_URL, page)
 
     def test_the_box_is_not_shown_to_those_who_may_not_open_the_administration(self):
         anonymous = Client().get(ADMIN_INDEX)
@@ -481,27 +487,13 @@ class EmailTextListTests(TestCase):
 
 @tag("mariadb")
 class PortalSettingsFormTests(TestCase):
-    """The addresses of the footer are for system administrators only (D-056)."""
+    """The portal settings are ordinary rights (D-073): view and change, assigned at runtime. The
+    positive path of a system administrator and the refusal of add and delete are in
+    ``test_portal_settings.PortalSettingsAdminTests``; the rest of the negative cases in
+    ``test_portal_branding``."""
 
-    def test_a_system_administrator_opens_and_saves_the_form(self):
-        client, _staff = staff_client("admin.person@example.org", superuser=True)
-
-        self.assertEqual(client.get(SETTINGS_URL).status_code, 200)
-        client.post(
-            SETTINGS_URL,
-            {"privacy_url": "https://www.example.org/privacy", "imprint_url": "", "_save": "x"},
-        )
-
-        self.assertEqual(PortalSettings.load().privacy_url, "https://www.example.org/privacy")
-
-    def test_a_staff_member_with_every_right_for_the_model_is_refused(self):
-        client, _staff = staff_client(
-            "settings.person@example.org",
-            "view_portalsettings",
-            "change_portalsettings",
-            "add_portalsettings",
-            "delete_portalsettings",
-        )
+    def test_a_staff_member_without_a_right_is_refused_and_nothing_is_changed(self):
+        client, _staff = staff_client("settings.person@example.org", "view_user")
 
         get = client.get(SETTINGS_URL)
         post = client.post(
@@ -514,17 +506,34 @@ class PortalSettingsFormTests(TestCase):
             self.assertEqual(response.status_code, 403)
         self.assertEqual(PortalSettings.load().privacy_url, "")
 
-    def test_a_group_with_the_rights_does_not_open_the_form_either(self):
+    def test_a_right_to_add_or_delete_does_not_allow_adding_or_deleting_the_row(self):
+        client, _staff = staff_client(
+            "settings.person@example.org",
+            "view_portalsettings",
+            "change_portalsettings",
+            "add_portalsettings",
+            "delete_portalsettings",
+        )
+
+        self.assertEqual(client.get(SETTINGS_URL).status_code, 200)
+        self.assertEqual(client.get(reverse("admin:accounts_portalsettings_add")).status_code, 403)
+        delete = client.post(reverse("admin:accounts_portalsettings_delete", args=(1,)), {"post": "yes"})
+        self.assertEqual(delete.status_code, 403)
+        self.assertTrue(PortalSettings.objects.filter(pk=1).exists())
+
+    def test_a_group_with_the_rights_opens_the_form(self):
         group = Group.objects.create(name="settings group")
         group.permissions.set(
             Permission.objects.filter(
-                content_type__app_label="accounts", content_type__model="portalsettings"
+                content_type__app_label="accounts",
+                content_type__model="portalsettings",
+                codename__in=("view_portalsettings", "change_portalsettings"),
             )
         )
         client, staff = staff_client("member.person@example.org")
         staff.groups.add(group)
 
-        self.assertEqual(client.get(SETTINGS_URL).status_code, 403)
+        self.assertEqual(client.get(SETTINGS_URL).status_code, 200)
 
     def test_an_ordinary_account_and_a_visitor_do_not_reach_the_form(self):
         ordinary = Client()
@@ -534,16 +543,6 @@ class PortalSettingsFormTests(TestCase):
             response = client.get(SETTINGS_URL)
             self.assertIn(response.status_code, (302, 403))
             self.assertNotEqual(response.status_code, 200)
-
-    def test_nobody_can_add_or_delete_the_row(self):
-        client, _staff = staff_client("admin.person@example.org", superuser=True)
-        PortalSettings.load()  # the single row is made on first use
-        self.assertTrue(PortalSettings.objects.filter(pk=1).exists())
-
-        self.assertEqual(client.get(reverse("admin:accounts_portalsettings_add")).status_code, 403)
-        delete = client.post(reverse("admin:accounts_portalsettings_delete", args=(1,)), {"post": "yes"})
-        self.assertIn(delete.status_code, (403, 404))
-        self.assertTrue(PortalSettings.objects.filter(pk=1).exists())
 
 
 @tag("mariadb")

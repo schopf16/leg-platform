@@ -81,13 +81,20 @@ class GroupRightsTests(TestCase):
     def setUp(self):
         self.client, self.administrator = administrator_client()
 
-    def test_only_the_four_documented_rights_are_offered(self):
+    def test_only_the_documented_rights_are_offered(self):
         page = self.client.get(GROUP_ADD).content.decode()
 
         options = re.findall(r'<option value="\d+"[^>]*>([^<]+)</option>', page)
         self.assertEqual(
             sorted(options),
-            ["Konto: ansehen", "Konto: ändern", "Mailtext: ansehen", "Mailtext: ändern"],
+            [
+                "Konto: ansehen",
+                "Konto: ändern",
+                "Mailtext: ansehen",
+                "Mailtext: ändern",
+                "Portal-Einstellungen: ansehen",
+                "Portal-Einstellungen: ändern",
+            ],
         )
 
     def test_the_script_of_the_widget_is_german_and_has_no_sharp_s(self):
@@ -197,7 +204,7 @@ class MessagesAndHintsTests(TestCase):
             follow=True,
         )
 
-        self.assertContains(response, "Gespeichert. Die Adressen erscheinen jetzt in der Fusszeile.")
+        self.assertContains(response, "Gespeichert. Die Änderungen sind jetzt auf allen Seiten sichtbar.")
         self.assertNotContains(response, "wurde erfolgreich geändert")
         self.assertEqual(response.redirect_chain[-1][0], self.settings_url)
 
@@ -212,7 +219,7 @@ class MessagesAndHintsTests(TestCase):
             response,
             "Die Adressen wurden entfernt. Die Fusszeile zeigt Datenschutz und Impressum ohne Link.",
         )
-        self.assertNotContains(response, "Gespeichert. Die Adressen erscheinen")
+        self.assertNotContains(response, "Gespeichert. Die Änderungen sind")
 
     def test_the_history_says_that_the_default_text_was_restored(self):
         EmailText.objects.ensure_all()
@@ -257,12 +264,15 @@ class MessagesAndHintsTests(TestCase):
         self.assertIn(line, staff_page)
         self.assertNotIn(history, staff_page)
 
-    def test_the_start_page_says_who_sets_name_logo_and_website(self):
+    def test_the_start_page_names_name_logo_and_colours_as_a_plain_fact(self):
         page = self.client.get(INDEX_URL).content.decode()
 
-        self.assertIn(
-            "Name, Logo und Website-Adresse der Fusszeile legt der Betrieb bei der Installation fest.", page
-        )
+        # D-073: no longer "set by the operator at the installation"; an item of the box instead.
+        self.assertNotIn("legt der Betrieb bei der Installation fest", page)
+        self.assertIn("Name, Logo und Farben", page)
+        self.assertIn("Serverkonfiguration", page)
+        PortalSettings.objects.update_or_create(pk=1, defaults={"name": "Beispiel"})
+        self.assertIn("eigene Einstellungen", self.client.get(INDEX_URL).content.decode())
 
     def test_the_code_message_is_the_same_in_the_profile_and_asks_to_wait(self):
         from leg_platform.accounts.forms import CodeForm, SetupCodeForm

@@ -1,0 +1,14 @@
+{% extends "admin/change_form.html" %}
+{% load i18n static %}
+{# The portal settings (D-073). The preview uses a style sheet and a script of the portal's own #}
+{# origin: no inline style or script (Content Security Policy). #}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% url 'admin:accounts_portalsettings_preview_css' %}">{% endblock %}
+{% block extrahead %}{{ block.super }}<script defer src="{% static 'js/portal-preview.js' %}"></script>{% endblock %}
+
+{# The history names the acting accounts and is for system administrators only (D-073). #}
+{% block object-tools %}{% if request.user.is_superuser %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+<p class="help">{% translate "Here you set how this portal presents itself. Changes are visible to all visitors immediately." %}</p>
+{% endblock %}

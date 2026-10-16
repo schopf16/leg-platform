@@ -431,8 +431,9 @@ class ErrorPageWithAFailingSessionTests(TestCase):
     """R3: the 403 and 404 pages are rendered with the request; when the session cannot be read,
     the answer is the 500 page, without any detail."""
 
-    def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
 
     def failing_session(self):
         store = import_module(settings.SESSION_ENGINE).SessionStore

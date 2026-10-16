@@ -1,6 +1,6 @@
-{% load static %}{% if instance_logo_light %}
-  <img class="portal-logo portal-logo-light" src="{% static instance_logo_light %}" alt="{{ instance_name }}">
-  <img class="portal-logo portal-logo-dark" src="{% static instance_logo_dark %}" alt="{{ instance_name }}">
+{% if instance_logo_light %}
+  <img class="portal-logo portal-logo-light" src="{{ instance_logo_light }}" alt="{{ instance_name }}">
+  <img class="portal-logo portal-logo-dark" src="{{ instance_logo_dark }}" alt="{{ instance_name }}">
 {% else %}
   <span class="logo-name">{{ instance_name }}</span>
 {% endif %}

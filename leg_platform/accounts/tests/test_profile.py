@@ -68,8 +68,11 @@ def mails_to(address):
 
 @tag("mariadb")
 class CardPageTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def test_the_actions_need_a_login(self):
@@ -157,8 +160,11 @@ class PersonalCardTests(TestCase):
     # Saving reads the address directory (advisory check, D-033).
     databases = {"default", "addresses", "address_import"}
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def test_the_details_are_saved_and_the_card_is_shown_again(self):
@@ -206,8 +212,11 @@ class PersonalCardTests(TestCase):
 
 @tag("mariadb")
 class EmailCardTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
         self.url = reverse("accounts:email_change_request")
 
@@ -396,8 +405,11 @@ class EmailCardTests(TestCase):
 
 @tag("mariadb")
 class SecondAddressTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def add_second(self):
@@ -526,8 +538,11 @@ class SecondAddressTests(TestCase):
 
 @tag("mariadb")
 class StopLinkTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
         self.client.post(
             reverse("accounts:email_change_request"),
@@ -618,8 +633,11 @@ class StopLinkTests(TestCase):
 
 @tag("mariadb")
 class PasswordCardTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
         self.url = reverse("accounts:password_change")
 
@@ -658,9 +676,12 @@ class PasswordCardTests(TestCase):
 
 @tag("mariadb")
 class TwoFactorCardTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+        cls.user.set_secondary_email(SECOND)
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
-        self.user.set_secondary_email(SECOND)
         self.client.force_login(self.user)
         age_authentication(self.client)
 
@@ -738,9 +759,12 @@ class TwoFactorCardTests(TestCase):
 
 @tag("mariadb")
 class TwoFactorActionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp("holder.person@example.org")
+        cls.user.set_secondary_email(SECOND)
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp("holder.person@example.org")
-        self.user.set_secondary_email(SECOND)
         self.client.force_login(self.user)
 
     def test_new_codes_need_the_code_and_the_password_alone_is_no_proof(self):
@@ -832,9 +856,12 @@ class RestrictedAccountTests(TestCase):
 
 @tag("mariadb")
 class DeleteCardTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+        cls.user.set_secondary_email(SECOND)
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
-        self.user.set_secondary_email(SECOND)
         self.client.force_login(self.user)
         self.url = reverse("accounts:account_delete")
 

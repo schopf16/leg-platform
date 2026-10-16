@@ -81,8 +81,9 @@ class WindowRuleTests(SimpleTestCase):
 
 @tag("mariadb")
 class RecentAuthenticationTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("active.person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("active.person@example.org")
 
     def fresh_client(self):
         client = Client()
@@ -402,9 +403,10 @@ class CrossAccountWindowTests(TestCase):
     """The window of five minutes belongs to one login of one account (D-055, review finding 5):
     a login of account A never grants it for account B."""
 
-    def setUp(self):
-        self.first = create_active_user("first.person@example.org")
-        self.second = create_active_user("second.person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.first = create_active_user("first.person@example.org")
+        cls.second = create_active_user("second.person@example.org")
 
     def start_setup(self, client):
         return client.post(SETUP_URL, {})

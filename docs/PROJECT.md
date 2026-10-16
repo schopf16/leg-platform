@@ -13,7 +13,7 @@ These terms are binding for all project documents and for naming in code.
 | LEG-Platform | Name of this software. Python package name: `leg_platform`. |
 | LEG | Local electricity community (German: "lokale Elektrizitätsgemeinschaft") under Art. 17d of the Swiss Electricity Supply Act (StromVG). By law, an LEG covers at most the area of one political municipality. It may span several localities with different postal codes within that municipality. |
 | Instance | One independent installation of the application with its own database, configuration and users, operated for one municipality. |
-| Instance configuration | All instance-specific values (e.g. name of the community or municipality, domain, canonical base URL, contact details, link to the privacy notice, link to the instance's website, branding such as logo and accent colour). Kept outside the code. |
+| Instance configuration | All instance-specific values (e.g. name of the community or municipality, domain, canonical base URL, contact details, link to the privacy notice, link to the instance's website, branding such as logo and accent colour). Kept outside the code: the server environment, and for the presentation (name, website, privacy and legal addresses, colours, logos) the portal settings of the administration with the environment as the fallback (D-073). |
 | System administrator | Responsible for one instance: technical configuration, user management, management of roles and permissions. Has all permissions within the instance. Implemented as a Django superuser (`is_superuser`, together with `is_staff`, which Django requires for access to the admin). |
 | Staff user | An account with access to the Django admin (`is_staff`) without superuser status. Can only use the functions for which permissions have been assigned, directly or through roles. Depending on these permissions, it can work with user data and contact users. |
 | User | A person who can log in: their email address is verified and a password is set. |
@@ -217,7 +217,7 @@ The system administrator configures Microsoft Graph in a dedicated section of th
 
 The private key is stored encrypted. The application authenticates with the certificate, not with a client secret (D-006). In Microsoft Entra / Exchange Online, the application is restricted to the sender mailbox. The installation guide explains these steps for operators without in-depth IT knowledge.
 
-Configuration and credentials are separated between local, stage and production, and between instances. Local and stage delivery is controlled by default.
+Configuration and credentials are separated between local, stage and production, and between instances. Local delivery is controlled by default (console or allowed recipients). Stage delivers like production: without restriction via Microsoft Graph (D-070).
 
 ## AGOV and Passkeys
 
@@ -241,10 +241,10 @@ Passkeys are to be considered as a security goal. They are only implemented once
 ## Environments
 
 * Local: development and tests
-* Stage: tests in a separate, production-like environment
+* Stage: tests in a separate environment that does not differ from production in behaviour or configuration, so that the platform can be tested correctly before go-live (D-070); it sends real emails like production
 * Production: later productive operation
 
-Databases, secrets and email configurations must be separated per environment.
+Databases, secrets and email configurations must be separated per environment. Stage receives no copy of production data.
 
 ## Explicitly Not Included
 

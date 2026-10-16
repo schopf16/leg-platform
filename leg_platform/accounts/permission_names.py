@@ -34,15 +34,16 @@ def permission_label(permission):
 
 def assignable_permissions_filter():
     """The rights that a group may hold (design package, final spot check, 1): exactly the ones that
-    the help names. The portal settings, Microsoft Graph, the security log and the other pages of
-    the system stay with the system administrators; no right is offered for them."""
+    the help names. Microsoft Graph, the security log and the other pages of the system stay with
+    the system administrators; no right is offered for them. The portal settings are offered since
+    D-073 (view and change, assigned at runtime like every right)."""
     from django.db.models import Q
 
-    from leg_platform.accounts.models import EmailText, User
+    from leg_platform.accounts.models import EmailText, PortalSettings, User
 
     # Joined by the names of the model, not looked up: the form is built without a query.
     condition = Q(pk__in=[])
-    for model in (User, EmailText):
+    for model in (User, EmailText, PortalSettings):
         codenames = [f"{action}_{model._meta.model_name}" for action in ("view", "change")]
         condition |= Q(
             content_type__app_label=model._meta.app_label,
@@ -66,7 +67,7 @@ class PermissionLabelsMixin:
 def rights_help():
     """The rows of the help "Which rights do I need for what?": what a person wants to do, and
     the rights to give for it. Only text; nothing is created or assigned."""
-    from leg_platform.accounts.models import EmailText, User
+    from leg_platform.accounts.models import EmailText, PortalSettings, User
 
     def right(model, action):
         return f"{capfirst(model._meta.verbose_name)}: {ACTIONS[action]}"
@@ -76,4 +77,9 @@ def rights_help():
         (_("Change the details of accounts"), right(User, "change")),
         (_("Read the email texts"), right(EmailText, "view")),
         (_("Change the email texts"), right(EmailText, "change")),
+        (_("See the settings of the portal"), right(PortalSettings, "view")),
+        (
+            _("Change name, logo, colours and addresses of the portal"),
+            right(PortalSettings, "change"),
+        ),
     ]

@@ -23,6 +23,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.dispatch import receiver
 from django.shortcuts import redirect
+from django.urls import Resolver404, resolve
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 from django.utils.translation import gettext, gettext_lazy
@@ -90,14 +91,29 @@ UNRESTRICTED_VIEWS = frozenset(
         "accounts:two_factor_qr",
         # Public endpoints used before authentication; they do not expose account data.
         "instance_stylesheet",
+        "instance_logo",
         "addresses:lookup",
     }
 )
 # The same for an account that must replace its password first (D-005, D-041). The branding
-# stylesheet is presentation only, so that the page is rendered correctly.
+# stylesheet and the logos are presentation only, so that the page is rendered correctly.
 PASSWORD_CHANGE_VIEWS = frozenset(
-    {"accounts:logout", "accounts:password_change", "instance_stylesheet"}
+    {"accounts:logout", "accounts:password_change", "instance_stylesheet", "instance_logo"}
 )
+# Views whose response must not depend on the session: neither the second-factor nor the timeout
+# middleware reads ``request.user`` for them, so the response has no ``Set-Cookie`` and no
+# ``Vary: Cookie`` and nothing from the session reaches a cache (security review of D-073, L-2).
+# Only for public presentation files that need no account.
+SESSION_FREE_VIEWS = frozenset({"instance_logo"})
+
+
+def is_session_free(request):
+    """Whether the request is for a view of ``SESSION_FREE_VIEWS``. The path is resolved here
+    because the timeout middleware runs before the URL is resolved; an unknown path is not free."""
+    try:
+        return resolve(request.path_info).view_name in SESSION_FREE_VIEWS
+    except Resolver404:
+        return False
 
 
 def requires_second_factor(user):
@@ -170,6 +186,9 @@ class SecondFactorMiddleware:
         return self.get_response(request)
 
     def process_view(self, request, view_func, view_args, view_kwargs):
+        if request.resolver_match.view_name in SESSION_FREE_VIEWS:
+            # Before ``request.user`` is read: reading it touches the session.
+            return None
         user = request.user
         if user.is_authenticated and user.password_change_required:
             if request.resolver_match.view_name in PASSWORD_CHANGE_VIEWS:
@@ -438,10 +457,20 @@ def reset_confirmation_failures(request, user):
 
 
 def forget_confirmation_failures(request, user):
-    """Delete the count of this session (all digests that it can have)."""
+    """Delete the count of this session (all digests that it can have).
+
+    Every statement on the counter rows (``SessionCodeFailure``, ``ConfirmationFailure``) runs
+    under the lock of the account row, so the order is always account row, then counter rows
+    (D-072). At the login and the logout this is a short transaction of its own; inside the
+    transaction of a check (``reset_confirmation_failures``) the account row is already locked by
+    the same transaction and the lock is no wait. The account may be gone already (deleted
+    account): then there is nothing to lock and the rows go with the cascade.
+    """
     digests = _session_digests(request)
     if digests:
-        SessionCodeFailure.objects.filter(account=user, session_digest__in=digests).delete()
+        with transaction.atomic():
+            User._base_manager.select_for_update().filter(pk=user.pk).first()
+            SessionCodeFailure.objects.filter(account=user, session_digest__in=digests).delete()
 
 
 def end_session_for_wrong_codes(request):

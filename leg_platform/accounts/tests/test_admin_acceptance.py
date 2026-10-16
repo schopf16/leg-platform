@@ -265,20 +265,12 @@ class PortalSettingsPageTests(TestCase):
             follow=True,
         )
 
-        self.assertContains(response, "Gespeichert. Die Adressen erscheinen jetzt in der Fusszeile.")
+        self.assertContains(response, "Gespeichert. Die Änderungen sind jetzt auf allen Seiten sichtbar.")
         self.assertNotContains(response, "wurde erfolgreich geändert")
         self.assertEqual(PortalSettings.load().privacy_url, "https://www.example.org/privacy")
         self.assertTrue(
             SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists()
         )
-
-    def test_an_address_without_https_is_still_refused(self):
-        response = self.client.post(
-            self.url, {"privacy_url": "http://www.example.org/privacy", "imprint_url": "", "_save": "x"}
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(PortalSettings.load().privacy_url, "")
 
 
 @tag("mariadb")

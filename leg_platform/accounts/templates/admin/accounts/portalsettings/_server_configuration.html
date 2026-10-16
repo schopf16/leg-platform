@@ -1,0 +1,12 @@
+{% comment %}
+The values of the server configuration, read only (D-073). Only values that are no secret: never a
+database value, an address of the address directory, a key or a password. Every row is built in
+PortalSettingsAdmin.server_configuration; the values are escaped by the template engine.
+{% endcomment %}
+<table class="portal-server">
+  <tbody>
+    {% for label, value in rows %}
+      <tr><th scope="row">{{ label }}</th><td>{{ value }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

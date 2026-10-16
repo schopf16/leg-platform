@@ -39,8 +39,9 @@ def error_text(response):
 
 @tag("mariadb")
 class LoginTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("active.person@example.org")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("active.person@example.org")
 
     def test_login_works_with_the_email_address_in_any_case(self):
         for number, address in enumerate(
@@ -131,9 +132,10 @@ class LoginTests(TestCase):
 
 @tag("mariadb")
 class LogoutAndProfileTests(TestCase):
-    def setUp(self):
-        self.user = create_active_user("active.person@example.org")
-        self.other = create_active_user("other.person@example.org", first_name="Berta")
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("active.person@example.org")
+        cls.other = create_active_user("other.person@example.org", first_name="Berta")
 
     def test_logout_works_only_by_post_and_ends_the_session(self):
         login(self.client, self.user.email)

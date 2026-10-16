@@ -161,12 +161,13 @@ class LegalLinksTests(TestCase):
 class PortalSettingsAdminTests(TestCase):
     client_class = VerifiedClient
 
-    def setUp(self):
-        self.administrator = create_active_user("administrator@example.org")
-        self.administrator.set_privileges(is_staff=True, is_superuser=True)
-        self.staff = create_active_user("staff@example.org")
-        self.staff.set_privileges(is_staff=True, is_superuser=False)
-        self.url = reverse("admin:accounts_portalsettings_change", args=(1,))
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = create_active_user("administrator@example.org")
+        cls.administrator.set_privileges(is_staff=True, is_superuser=True)
+        cls.staff = create_active_user("staff@example.org")
+        cls.staff.set_privileges(is_staff=True, is_superuser=False)
+        cls.url = reverse("admin:accounts_portalsettings_change", args=(1,))
 
     def test_the_administrator_edits_the_addresses_with_german_labels(self):
         self.client.force_login(self.administrator)

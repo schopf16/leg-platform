@@ -64,11 +64,9 @@ class AdministrationExposureTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.paths = administration_paths()
-
-    def setUp(self):
-        self.plain = create_active_user("plain.person@example.org")
-        self.staff = create_active_user("staff.person@example.org")
-        self.staff.set_privileges(is_staff=True, is_superuser=False)
+        cls.plain = create_active_user("plain.person@example.org")
+        cls.staff = create_active_user("staff.person@example.org")
+        cls.staff.set_privileges(is_staff=True, is_superuser=False)
 
     def test_the_walk_covers_the_administration(self):
         # Guards against a walk that silently finds nothing.

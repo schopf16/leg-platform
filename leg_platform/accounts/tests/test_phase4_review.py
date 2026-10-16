@@ -276,8 +276,11 @@ class CleanupTests(TestCase):
 class RefusedChangeTests(TestCase):
     """M3: a refused request leaves nothing behind, and a refusal does not use up a code."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def test_a_refusal_of_the_second_request_rolls_back_the_first(self):
@@ -372,9 +375,12 @@ class SilentRequestTests(TestCase):
 class SecondAddressMailTests(TestCase):
     """M5: the text for the second address has no sentence about logging in again."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+        cls.user.set_secondary_email(SECOND)
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
-        self.user.set_secondary_email(SECOND)
         self.client.force_login(self.user)
 
     def test_removing_the_second_address_sends_the_text_without_the_login_sentence(self):
@@ -415,8 +421,11 @@ class SecondAddressMailTests(TestCase):
 class PasswordCardCodeTests(TestCase):
     """The card "Passwort" asks for the code where a second factor is set up (K12)."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp("holder.person@example.org")
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp("holder.person@example.org")
         self.client.force_login(self.user)
         self.url = reverse("accounts:password_change")
 

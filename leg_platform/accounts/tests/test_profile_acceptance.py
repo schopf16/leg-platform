@@ -32,8 +32,11 @@ def card(html, name):
 class CardLayoutTests(TestCase):
     databases = {"default", "addresses", "address_import"}
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def page(self, query=""):
@@ -117,8 +120,11 @@ class CardLayoutTests(TestCase):
 class CardMessageTests(TestCase):
     databases = {"default", "addresses", "address_import"}
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("holder.person@example.org")
+
     def setUp(self):
-        self.user = create_active_user("holder.person@example.org")
         self.client.force_login(self.user)
 
     def test_the_message_is_inside_the_card_under_its_title_and_not_above_the_page_title(self):

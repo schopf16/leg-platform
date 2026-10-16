@@ -30,6 +30,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.models import EmailText
+from leg_platform.accounts.portal_settings import portal_values
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +273,7 @@ def default_texts(key):
     with translation.override(settings.LANGUAGE_CODE):
         values = {p.name: "{%s}" % p.name for p in placeholders_of(key)}
         # Without a website the sent default has no contact branch, so neither does the text.
-        if not settings.INSTANCE_WEBSITE_URL:
+        if not portal_values().website_url:
             values[CONTACT_URL.name] = ""
         subject = definition.default_subject() % values
         body = render_to_string(definition.template, values)

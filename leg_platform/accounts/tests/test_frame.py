@@ -36,8 +36,12 @@ def part(html, start, end):
 
 @tag("mariadb")
 class FrameTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.client, self.user = login()
+        self.client, _user = login(self.user)
 
     def test_the_frame_has_header_menu_drawer_and_bottom_bar(self):
         html = self.client.get(PROFILE_URL).content.decode()
@@ -279,8 +283,12 @@ class FrameStyleTests(SimpleTestCase):
 
 @tag("mariadb")
 class StartPageTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.client, self.user = login()
+        self.client, _user = login(self.user)
 
     def test_the_root_leads_a_visitor_to_the_login_and_a_member_to_the_start_page(self):
         self.assertRedirects(Client().get(HOME_URL), LOGIN_URL, fetch_redirect_response=False)
@@ -397,8 +405,12 @@ class StartPageTests(TestCase):
 
 @tag("mariadb")
 class HideTaskTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+
     def setUp(self):
-        self.client, self.user = login()
+        self.client, _user = login(self.user)
         self.url = reverse("accounts:task_hide", args=["two_factor"])
 
     def test_hiding_removes_the_tile_for_good_on_every_device_and_after_every_login(self):

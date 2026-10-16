@@ -147,15 +147,15 @@ The Microsoft Graph configuration is kept in the database and maintained in a de
 
 The exact `cryptography` API is verified against the documentation of the installed version before implementation.
 
-Local development, stage and production have separate settings and credentials. So do different instances. The environment variable `EMAIL_MODE` controls delivery; which values are allowed depends on `APP_ENV`:
+Local development, stage and production have separate settings and credentials. So do different instances. The environment variable `EMAIL_MODE` controls delivery; which values are allowed depends on `APP_ENV`. Stage behaves exactly like production (D-070): `APP_ENV=stage` is only a label of the instance role, and the rows `stage` and `production` are identical.
 
 | Value | `local` | `stage` | `production` | Behaviour |
 | ----- | ------- | ------- | ------------ | --------- |
 | `console` | allowed (default) | refused | refused | Emails are only written to the console or test output. Outside local development, security links would end up in server logs. |
-| `allowlist` | allowed | required | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. Locally only with a dedicated development app registration and sender mailbox, separate from stage and production (D-020, `docs/SECURITY.md`, sections 7 and 8); the local recipient addresses are kept only in the developer's user environment variable `EMAIL_ALLOWED_RECIPIENTS`, never in the repository. Without allowed recipients, or with an entry that is not one complete address, the application refuses to start. |
-| `graph` | refused | refused | required | Emails are sent via Microsoft Graph without restriction. |
+| `allowlist` | allowed | refused | refused | Emails are sent via Microsoft Graph, but only to the addresses in `EMAIL_ALLOWED_RECIPIENTS`; all others are discarded and logged without content. Only locally, with a dedicated development app registration and sender mailbox, separate from stage and production (D-020, `docs/SECURITY.md`, sections 7 and 8); the local recipient addresses are kept only in the developer's user environment variable `EMAIL_ALLOWED_RECIPIENTS`, never in the repository. Without allowed recipients, or with an entry that is not one complete address, the application refuses to start. A non-empty `EMAIL_ALLOWED_RECIPIENTS` is refused at startup with `APP_ENV=stage` and `APP_ENV=production` (D-070). |
+| `graph` | refused | required | required | Emails are sent via Microsoft Graph without restriction. On stage this means real emails to real addresses (D-070). |
 
-"Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`. `allowlist` and `graph` use the Microsoft Graph backend `leg_platform.mail.GraphEmailBackend` (D-006), which fails closed while no configuration exists (D-028). Automated tests never send real email: Django's test runner replaces the backend with its in-memory backend, and tests use only addresses under reserved domains (RFC 2606), which a test checks for the whole repository.
+"Refused" means that the application refuses to start. Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; a missing or unknown `APP_ENV` prevents the application from starting. Security settings are secure by default and are only relaxed explicitly for `APP_ENV=local` (`docs/SECURITY.md`, sections 3, 8 and 11). Enforced in `leg_platform/environment.py`, which contains no rule that distinguishes stage from production. `allowlist` and `graph` use the Microsoft Graph backend `leg_platform.mail.GraphEmailBackend` (D-006), which fails closed while no configuration exists (D-028). Automated tests never send real email: Django's test runner replaces the backend with its in-memory backend, and tests use only addresses under reserved domains (RFC 2606), which a test checks for the whole repository.
 
 Links in emails (verification, password reset, email change) are built from the canonical base URL in the instance configuration, not from the request. This also works for emails that are not triggered by a request (e.g. management commands). `ALLOWED_HOSTS` still lists only the host names of the application (not the instance's website; D-025).
 
@@ -177,8 +177,8 @@ Security-relevant events are logged centrally (D-018). Logs contain no passwords
 * Tabler is "built on Bootstrap 5"; Bootstrap "is developed mobile first" and requires the responsive viewport meta tag.
 * Tabler's README states minimum browser versions (Chrome/Edge 123, Firefox 128, Safari 17.5, Opera 109) because it uses CSS features without fallbacks. Older devices whose browser cannot be updated beyond these versions (e.g. older iPhones) are therefore not supported. The supported browsers are documented for operators and users.
 * Static assets, including Tabler, fonts and icons, are served by the instance itself in fixed versions.
-* The design language is defined in `docs/DESIGN.md` (D-024). It is implemented through Tabler's CSS variables and attributes (section 9 there); instance branding (logo, accent colours) comes from the instance configuration.
-* Instance branding uses validated environment variables and a same-origin generated stylesheet (D-051, D-056). The colour mode and the language are not handled by the server: the page is always rendered light, and the choice of the person is kept in the `sessionStorage` of the tab by external scripts (no cookie, no request). No inline CSS, theme URL parameters or third-party assets are introduced.
+* The design language is defined in `docs/DESIGN.md` (D-024). It is implemented through Tabler's CSS variables and attributes (section 9 there); instance branding (logo, accent colours) is maintained in the administration with the instance configuration as the fallback (D-073).
+* Instance branding: the portal settings of the administration (name, website, colours, two logos stored in the database) win per field over the validated environment variables, which win over the platform defaults; one accessor (`leg_platform.accounts.portal_settings.portal_values`) resolves them and checks them again when it reads them, and a same-origin generated stylesheet carries the colours (D-051, D-056, D-073). The uploaded logos are served by a dedicated public view (`/branding/logo/<light|dark>/`) with a fixed content type, `nosniff` and a sandbox policy. The colour mode and the language are not handled by the server: the page is always rendered light, and the choice of the person is kept in the `sessionStorage` of the tab by external scripts (no cookie, no request). No inline CSS, theme URL parameters or third-party assets are introduced.
 * The application has no public home page; its entry point is the login page. It runs on its own host name, never under a path of another website (D-025). A subdomain of the website's registrable domain provides origin isolation but is still the same site; the cookie rules in `docs/SECURITY.md`, section 3, apply.
 
 Sources: https://github.com/tabler/tabler, https://getbootstrap.com/docs/5.3/getting-started/introduction/ (checked on 2026-10-09)
@@ -192,10 +192,10 @@ Later documents and receipts must not be stored exclusively in an ephemeral cont
 ## Environments
 
 * Local
-* Stage
+* Stage: behaves exactly like production (same security configuration, same delivery mode `graph`, same validation); it differs only by its label `APP_ENV=stage`, its own database, credentials and secrets, and its own logs (D-070)
 * Production
 
-Each environment uses separate credentials and configurations. Production data is not copied into development environments.
+Each environment uses separate credentials and configurations. Production data is not copied into development environments or into stage.
 
 ## Portability
 
@@ -216,10 +216,10 @@ Not yet decided:
 * whether AGOV may be used as the second factor (request by the project owner pending), AGOV integration details, and whether password login can later be disabled for system administrators
 * architecture of the later billing and financial modules
 * concrete roles and their permissions, and whether they use the Django admin or application views; decided per function in phase 2: pure data maintenance is a candidate for the Django admin, frequent guided work of the LEG's management for application views in the Clear register (`docs/DESIGN.md`)
-* any later web upload for instance branding (phase 1 uses environment variables and self-hosted static logo files, D-051); uploads require a separate security design (`docs/SECURITY.md`, section 6)
+* the review of the uploaded logos (D-073: web upload of logos is built, in the database, with the rules of `docs/SECURITY.md`, section 6; the security review and the browser checks are open)
 * whether Django's `redirect_authenticated_user` option of the login view is used to send logged-in users from the login page to their profile; Django's documentation warns that enabling it can allow social media fingerprinting (https://docs.djangoproject.com/en/5.2/topics/auth/default/, as cited in the security review of 2026-10-11); decided at implementation
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025)
-* which instance-specific values are kept in environment variables and which in the database
+* which instance-specific values are kept in environment variables and which in the database: decided in D-073 (name, website, colours, logos, privacy and legal addresses in the database with the environment as the fallback; host name, base address, allowed hosts, mail mode and sender, credentials, retention and proxy settings only in the environment)
 * scheduling of the automatic deletion of expired log entries and of unverified accounts whose verification link has expired
 * redaction of tokens in request logs: Django's request logging writes the path of every response with status 400 or higher; a logging filter that removes tokens from paths is in place for the registration link, the password reset link, the second-factor removal link and the two links of an address change (confirmation and stop; `leg_platform/log_filters.py`, D-037, D-067) and must be extended, with a test, for every further URL with a token (`docs/SECURITY.md`, sections 6 and 10)
 * an optional guard in the settings that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (security review of 2026-10-11, I-6; not implemented, the deployment gates in the README apply instead)

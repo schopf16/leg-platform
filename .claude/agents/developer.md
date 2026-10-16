@@ -27,6 +27,7 @@ Read:
 * Use established Django features before developing your own security mechanisms.
 * Keep views, forms, models and permissions understandable and maintainable.
 * Write tests for new functionality.
+* Run the tests of the area you touched, not the full suite: `.\scripts\test.ps1 -Changed` (or `-Area <name>`, `-List` shows the areas; `docs/STARTUP.md`, section 13; D-071). The runner widens the run to the full suite by itself for core files and unmapped files. Do not start a full run yourself unless the main session orders it; it is the main session's task (once per commit block, before a deployment gate, in CI). When you add a test module or a source file that no area maps, add it to `scripts/test_areas.py` (the test `leg_platform/tests/test_areas.py` fails otherwise).
 * Use Django migrations for schema changes.
 * Document relevant decisions together with their sources.
 * Avoid unnecessary dependencies and speculative abstractions.
@@ -86,7 +87,7 @@ Report:
 
 * changed files
 * implemented functionality
-* tests run
+* tests run (area or labels, number of tests, result; state when the full suite was not run, and never describe a scoped run as a full run)
 * delegated tasks and how their results were checked
 * verified points with source or verification step
 * open and unverified points as well as risks

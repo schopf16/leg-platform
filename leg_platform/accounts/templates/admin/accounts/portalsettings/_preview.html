@@ -1,0 +1,38 @@
+{% load i18n %}{% comment %}
+The preview of the portal settings (D-073): two small panels, light and dark mode. The colours come
+from variables that the style sheet "preview.css" sets for the saved values and that portal-preview.js
+changes while the administrator types; no inline style. The data attributes hold the colours of the
+server configuration, which the script uses for an empty field.
+{% endcomment %}
+<div class="portal-preview" id="portal-preview"
+     data-accent-light="{{ server.accent_light }}" data-text-light="{{ server.text_light }}"
+     data-accent-dark="{{ server.accent_dark }}" data-text-dark="{{ server.text_dark }}"
+     data-highlight="{{ server.highlight }}">
+  <section class="portal-preview-panel portal-preview-light" data-mode="light" aria-label="{% translate 'Light mode' %}">
+    <h3>{% translate "Light mode" %}</h3>
+    <div class="portal-preview-page">
+      <div class="portal-preview-logo">
+        {% if values.logo_light %}<img src="{{ values.logo_light }}" alt="{{ values.name }}">{% else %}<span class="portal-preview-name">{{ values.name }}</span>{% endif %}
+      </div>
+      <div class="portal-preview-card">
+        <p><span class="portal-preview-link">{% translate "Link" %}</span></p>
+        <p><span class="portal-preview-button">{% translate "Button" %}</span></p>
+        <p><span class="portal-preview-dot"></span> {% translate "Highlight" %}</p>
+      </div>
+    </div>
+  </section>
+  <section class="portal-preview-panel portal-preview-dark" data-mode="dark" aria-label="{% translate 'Dark mode' %}">
+    <h3>{% translate "Dark mode" %}</h3>
+    <div class="portal-preview-page">
+      <div class="portal-preview-logo portal-preview-plate">
+        {% if values.logo_dark %}<img src="{{ values.logo_dark }}" alt="{{ values.name }}">{% else %}<span class="portal-preview-name">{{ values.name }}</span>{% endif %}
+      </div>
+      <div class="portal-preview-card">
+        <p><span class="portal-preview-link">{% translate "Link" %}</span></p>
+        <p><span class="portal-preview-button">{% translate "Button" %}</span></p>
+        <p><span class="portal-preview-dot"></span> {% translate "Highlight" %}</p>
+      </div>
+    </div>
+  </section>
+</div>
+<p class="help">{% translate "The preview shows the saved logos. The colours change while you type." %}</p>

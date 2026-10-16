@@ -53,9 +53,12 @@ def remaining(user):
 
 @tag("mariadb")
 class LostPhoneSuccessTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()  # the default account with known codes
+        cls.user.set_secondary_email(SECOND)
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp()  # the default account with known codes
-        self.user.set_secondary_email(SECOND)
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -120,12 +123,15 @@ class LostPhoneSuccessTests(TestCase):
 class LostPhoneRefusalTests(TestCase):
     """Negative tests: nothing is changed and no code is used up unless both are right."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
+        cls.other, _other_device = create_user_with_totp("someone.else.lost@example.org")
+        cls.other_code = recovery_codes_of(cls.other.email)[0]
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp()
         self.client = Client()
         self.client.force_login(self.user)
-        self.other, _other_device = create_user_with_totp("someone.else.lost@example.org")
-        self.other_code = recovery_codes_of(self.other.email)[0]
 
     def lost(self, **data):
         return self.client.post(LOST_URL, data, REMOTE_ADDR="10.92.2.1")
@@ -309,8 +315,11 @@ class LostPhoneAccessTests(TestCase):
 
 @tag("mariadb")
 class LostPhonePageTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp()
         self.client = Client()
         self.client.force_login(self.user)
 
@@ -387,8 +396,11 @@ class LostPhonePageTests(TestCase):
 class LostPhoneOneStepTests(TestCase):
     """L-1 (security review, block 9): the check of the code and the removal are one step."""
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.user, cls.device = create_user_with_totp()
+
     def setUp(self):
-        self.user, self.device = create_user_with_totp()
         self.client = Client()
         self.client.force_login(self.user)
 

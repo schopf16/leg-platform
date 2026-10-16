@@ -16,7 +16,11 @@ from django.dispatch import receiver
 from django.shortcuts import redirect
 from django.utils.translation import gettext
 
-from leg_platform.accounts.second_factor import STAY_WISH_ATTRIBUTE, requires_second_factor
+from leg_platform.accounts.second_factor import (
+    STAY_WISH_ATTRIBUTE,
+    is_session_free,
+    requires_second_factor,
+)
 from leg_platform.log_filters import TOKEN_URL_PATTERN
 
 STARTED_KEY = "session_started"
@@ -84,7 +88,9 @@ class SessionTimeoutMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated:
+        # A view that is free of the session (the public logo) is not a request of the session:
+        # it neither ends it nor extends it, and the session is not read.
+        if not is_session_free(request) and request.user.is_authenticated:
             expired = self._check(request)
             if expired:
                 logout(request)
