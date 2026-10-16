@@ -192,7 +192,9 @@ Phase 2 (D-077) adds two Django apps.
 
 Permissions are the only access rule (D-012); the menu only reflects them. The status of a metering point follows from its dates and the day, without a scheduler. The address directory stays advisory (D-066): a suggestion for a location is stored on it so that lists can filter without asking the directory per row.
 
-Sources: D-077 and its sources.
+Block 2 (D-078) adds the list framework and the pages of the locations. Domain modules: `transformer_circuits`, `metering_points` (creating one at a location), `location_list` (search, filters, sort and the rows of the lists as queries) and more services in `locations` (create, change the address with the merge, circuit, confirm, archive, delete). In `management`: `lists.py` (state of a list from the address, pages, head cells, saved widths; used by every later list), `location_views.py`, `location_forms.py`, the templates `_list_*.html`, `dialog_form.html`, `locations/*.html` and `static/management/js/list.js` (resizing, submit on change, expanding rows; only an enhancement, the pages work without JavaScript).
+
+Sources: D-077, D-078 and their sources.
 
 ## Data Storage
 

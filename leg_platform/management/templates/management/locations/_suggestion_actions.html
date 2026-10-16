@@ -1,0 +1,5 @@
+{% load i18n %}<form method="post" action="{% url 'management:locations_suggestion' location.pk %}" class="mgmt-inline-form">
+  {% csrf_token %}
+  <button type="submit" name="action" value="accept" class="btn btn-accent-outline">{% translate "Accept" %}</button>
+  <button type="submit" name="action" value="dismiss" class="btn btn-secondary-action">{% translate "Do not accept" %}</button>
+</form>

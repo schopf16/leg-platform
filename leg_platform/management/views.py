@@ -72,8 +72,9 @@ class SettingsView(ManagementAccessMixin, View):
             suggestion = addressing.suggest_correction(*values)
             if suggestion is not None and action == "accept_suggestion":
                 initial.update(zip(ADDRESS_FIELDS, suggestion.as_tuple(), strict=True))
+                settings_service.accept_sender_suggestion(suggestion, request.user)
             elif suggestion is not None:
-                settings_service.dismiss_sender_suggestion(addressing.address_signature(*values))
+                settings_service.dismiss_sender_suggestion(addressing.address_signature(*values), request.user)
         row = ManagementSettings.load()
         shown = tuple(initial[name].strip() for name in ADDRESS_FIELDS)
         return self.show(

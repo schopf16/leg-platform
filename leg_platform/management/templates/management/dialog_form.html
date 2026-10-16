@@ -1,0 +1,19 @@
+{% extends "management/dialog.html" %}
+{% load i18n management_ui %}{% comment %}
+A dialog whose form is laid out by ``form.layout``, a list of ``(row class, [field names])`` (the rows
+are grids: ``street`` = street and house number, ``postal`` = postal code and town, ``single``).
+``form.optional`` names the fields whose label says "(optional)". Blocks for a dialog with a notice:
+``dialog_notice`` (above the fields) and ``dialog_after_fields``. Without a form (a question) only the
+lead and the buttons are shown.
+{% endcomment %}
+{% block dialog_fields %}
+  {% if form %}
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% for row, names in form.layout %}
+      <div class="mgmt-dialog-row is-{{ row }}">
+        {% for name in names %}{% include "management/_dialog_field.html" with field=form|bound:name %}{% endfor %}
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% block dialog_after_fields %}{% endblock %}
+{% endblock %}

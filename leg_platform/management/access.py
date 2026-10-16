@@ -3,8 +3,9 @@
 A request reaches a management view only if the account
 
 * is logged in (otherwise: sent to the login page),
-* is active and a staff user (otherwise: 404, so that a person without access does not learn that
-  the area exists),
+* is active and a staff user (otherwise: 404, the answer for a page that does not exist; this does
+  not hide the area completely: the redirect to the login for a visitor who is not logged in and the
+  CSRF refusal of a POST are other answers, and the area is public in the open source code),
 * has completed the second factor in this session (the second-factor middleware already sends an
   account without it to the setup; this is the second line, ``second_factor.is_second_factor_complete``),
 * and holds the permissions of the page (otherwise: 403, the project's page "You have no access
@@ -39,7 +40,7 @@ def check_access(request, permissions=(), any_of=()):
     raise ``Http404`` / ``PermissionDenied``.
 
     ``permissions`` are all required; ``any_of`` needs at least one. Both empty is an error."""
-    permissions, any_of = tuple(permissions), tuple(any_of)
+    permissions, any_of = _names(permissions), _names(any_of)
     if not permissions and not any_of:
         raise ImproperlyConfigured("A management view must name the permissions it needs.")
     user = request.user
@@ -59,20 +60,29 @@ def check_access(request, permissions=(), any_of=()):
     return None
 
 
+def _names(value):
+    """A tuple of permission names; a single string is one name, never its letters (security review
+    L-2: ``tuple("community.view_leg")`` would be a tuple of characters, and every check would fail
+    or, worse, pass an empty one)."""
+    if isinstance(value, str):
+        return (value,)
+    return tuple(value)
+
+
 class ManagementAccessMixin:
     """For class-based views: set ``permission_required`` (all of) or ``any_permission_required``
     (at least one), or override ``get_required_permissions`` to depend on the method (for example
-    view for GET and change for POST)."""
+    view for GET and change for POST). A single string is accepted for one permission."""
 
     permission_required = ()
     any_permission_required = ()
     management_protected = True
 
     def get_required_permissions(self):
-        return tuple(self.permission_required)
+        return _names(self.permission_required)
 
     def get_any_permissions(self):
-        return tuple(self.any_permission_required)
+        return _names(self.any_permission_required)
 
     @method_decorator(never_cache)
     def dispatch(self, request, *args, **kwargs):

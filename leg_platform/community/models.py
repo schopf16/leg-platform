@@ -151,6 +151,10 @@ class Location(AddressSuggestionMixin, TimestampedModel):
     house_number = models.CharField(_("house number"), max_length=30)
     postal_code = models.CharField(_("postal code"), max_length=4, validators=[validate_postal_code])
     town = models.CharField(_("town"), max_length=100)
+    # Not part of the address that must be unique and not checked against the directory.
+    address_addition = models.CharField(_("address addition"), max_length=150, blank=True)
+    # The SHA-256 (hex) of the normalised address with case and accents ignored; maintained by
+    # ``save``. It makes the address unique (``addressing.address_digest``).
     # The SHA-256 (hex) of the normalised address with case and accents ignored; maintained by
     # ``save``. It makes the address unique (``addressing.address_digest``).
     address_digest = models.CharField(
@@ -186,6 +190,7 @@ class Location(AddressSuggestionMixin, TimestampedModel):
             *self.current_address()
         )
         self.address_digest = addressing.address_digest(*self.current_address())
+        self.address_addition = addressing.collapse(self.address_addition)
 
     def clean_fields(self, exclude=None):
         self.normalise()
@@ -227,10 +232,14 @@ class MeteringPointQuerySet(models.QuerySet):
 
 
 class MeteringPoint(TimestampedModel):
+    # Empty until the BKW has assigned it ("Fehlt sie, ist der Messpunkt angelegt, aber bei der BKW
+    # noch nicht bekannt", personen/detail/VORGABEN.md); several rows may have none.
     number = models.CharField(
         _("metering point number"),
         max_length=numbers.METERING_POINT_LENGTH,
         unique=True,
+        null=True,
+        blank=True,
         db_collation=EXACT_COLLATION,
         validators=[numbers.validate_metering_point_number],
     )
@@ -271,10 +280,11 @@ class MeteringPoint(TimestampedModel):
         ordering = ("number",)
 
     def __str__(self):
-        return self.number
+        return self.number or "–"
 
     def save(self, *args, **kwargs):
-        self.number = numbers.normalise_metering_point_number(self.number)
+        # An empty number is stored as NULL, so that several metering points may have none.
+        self.number = numbers.normalise_metering_point_number(self.number) or None
         self.remark = self.remark.strip()
         super().save(*args, **kwargs)
 

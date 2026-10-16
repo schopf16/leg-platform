@@ -19,6 +19,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from leg_platform.accounts import security_log
 from leg_platform.community import history
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import LegAssignment, MeteringPoint, PersonAssignment
@@ -46,7 +47,8 @@ _KINDS = {
 
 class AssignmentError(Exception):
     """A change that the rules refuse. ``code`` is one of: ``starts_not_after_previous``,
-    ``end_before_start``, ``already_ended``, ``not_deletable``, ``not_a_person``."""
+    ``end_before_start``, ``already_ended``, ``not_deletable``, ``not_a_person``,
+    ``person_not_active``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -76,16 +78,22 @@ def is_deletable(assignment, today=None):
     return assignment.valid_from > today and assignment.valid_to is None
 
 
-def assign(kind, metering_point, subject, valid_from, actor=None):
-    """Assign a person (an account with a customer number) or a LEG from ``valid_from``.
+def assign(kind, metering_point, subject, valid_from, actor=None, today=None):
+    """Assign a person (an active account with a customer number) or a LEG from ``valid_from``.
 
-    Returns the new assignment. Raises ``AssignmentError``."""
+    Returns the new assignment. Raises ``AssignmentError``. Assigning a person whose assignment is in
+    force now (``valid_from`` is today or earlier) sets the retention obligation of the account
+    (D-016, D-077, security review M-1: a future-dated assignment does not, so that deleting one that
+    never took effect leaves the account untouched); the account is then also logged in the security
+    log (M-2). The person is read again under a lock, so that an account that was blocked or
+    deactivated in the meantime is refused (L-1)."""
     spec = _kind(kind)
     model = spec["model"]
-    if kind == PERSON and subject.customer_number_id is None:
-        raise AssignmentError("not_a_person")
+    today = today or timezone.localdate()
     with transaction.atomic():
         locked = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
+        if kind == PERSON:
+            subject = _lock_person(subject)
         last = model.objects.select_for_update().filter(metering_point=locked).order_by("-valid_from").first()
         previous = None
         if last is not None:
@@ -104,15 +112,31 @@ def assign(kind, metering_point, subject, valid_from, actor=None):
             previous.valid_to = valid_from - timedelta(days=1)
             previous.save(update_fields=["valid_to", "updated_at"])
         assignment.save()
-        if kind == PERSON and not subject.retention_obligation:
+        if kind == PERSON and valid_from <= today and not subject.retention_obligation:
             # The person is now part of the accounting: the account is kept, not deleted, when
             # the person closes it (D-016).
             subject.set_retention_obligation()
+            security_log.record(security_log.Event.RETENTION_OBLIGATION_SET, account=subject, actor=actor)
         history.record(
             locked, spec["assigned"], actor,
             {f"{spec['subject']}_id": subject.pk, "valid_from": valid_from.isoformat()},
         )
     return assignment
+
+
+def _lock_person(person):
+    """The account of the person, read again under a lock: it must exist, be active and have a
+    customer number (a person in the sense of the specification)."""
+    user_model = type(person)
+    try:
+        fresh = user_model._base_manager.select_for_update().get(pk=person.pk)
+    except user_model.DoesNotExist:
+        raise AssignmentError("not_a_person") from None
+    if fresh.customer_number_id is None:
+        raise AssignmentError("not_a_person")
+    if fresh.status != user_model.Status.ACTIVE:
+        raise AssignmentError("person_not_active")
+    return fresh
 
 
 def end(kind, assignment, valid_to, actor=None):

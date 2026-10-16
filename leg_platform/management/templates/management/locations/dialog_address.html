@@ -1,0 +1,7 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n %}
+{% block dialog_notice %}
+  {% if merge %}
+    <div class="mgmt-banner" role="alert"><p><b>{% translate "This address already exists:" %}</b> {% blocktranslate count counter=merge.count with address=merge.address %}{{ address }} with {{ counter }} metering point. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone.{% plural %}{{ address }} with {{ counter }} metering points. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone.{% endblocktranslate %}</p></div>
+  {% endif %}
+{% endblock %}

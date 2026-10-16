@@ -930,7 +930,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         using = using or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
             stored = self._locked_row(using)
-            if stored["retention_obligation"]:
+            if stored["retention_obligation"] or self._has_person_assignment(using):
                 raise AccountIntegrityError(
                     "Accounts with a retention obligation are deactivated, not deleted."
                 )
@@ -1003,6 +1003,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         ]
         return MailJob.objects.using(using).filter(pk__in=job_ids).update(greeting_name="")
 
+    def _has_person_assignment(self, using):
+        """Whether any assignment of a person to a metering point refers to the account (D-077,
+        security review M-1). Such an account is kept and deactivated like one with a retention
+        obligation: the reference is protected, a deletion would fail. The relation comes from the
+        community app; without it nothing refers to the account."""
+        related = getattr(self, "metering_point_assignments", None)
+        return related is not None and related.using(using).exists()
+
     def delete_or_deactivate(self):
         """Apply the account deletion rule: retain-and-deactivate, otherwise erase (D-016)."""
         using = self._state.db or router.db_for_write(type(self), instance=self)
@@ -1019,7 +1027,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             if account.secondary_email:
                 account.secondary_email = ""
                 account.save(using=using, update_fields=["secondary_email"])
-            if account.retention_obligation:
+            if account.retention_obligation or account._has_person_assignment(using):
                 account._change(status=self.Status.DEACTIVATED)
                 account.end_all_sessions()
                 self.refresh_from_db(using=using)
@@ -2203,6 +2211,10 @@ class SecurityEvent(models.Model):
         ADDRESS_IMPORT_REQUESTED = "address_import_requested", _(
             "Address directory import requested"
         )
+        # D-077 (security review, M-2): assigning a person to a metering point sets the retention
+        # obligation of the account, which can never be unset. The entry names the account and the
+        # actor (internal numbers) and nothing else.
+        RETENTION_OBLIGATION_SET = "retention_obligation_set", _("Retention obligation set")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.

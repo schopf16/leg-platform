@@ -18,6 +18,7 @@ from leg_platform.management import returns
 STATIC = Path(settings.BASE_DIR) / "leg_platform" / "management" / "static" / "management"
 CSS = (STATIC / "css" / "management.css").read_text(encoding="utf-8")
 JS = (STATIC / "js" / "info-bubble.js").read_text(encoding="utf-8")
+LIST_JS = (STATIC / "js" / "list.js").read_text(encoding="utf-8")
 
 
 def render(template, **context):
@@ -154,6 +155,34 @@ class StyleAndScriptTests(SimpleTestCase):
                           "localStorage", "sessionStorage", "document.cookie"):
             self.assertNotIn(forbidden, JS)
         self.assertIn('event.key !== "Escape"', JS)
+
+    def test_the_comments_of_the_stylesheet_are_balanced(self):
+        # A "*/" inside a comment ends it early and swallows the rules that follow (found in block 2).
+        self.assertEqual(CSS.count("/*"), CSS.count("*/"))
+        depth = 0
+        for token in re.findall(r"/\*|\*/", CSS):
+            depth += 1 if token == "/*" else -1
+            self.assertIn(depth, (0, 1))
+
+    def test_the_script_of_the_lists_only_saves_through_the_endpoints_with_the_csrf_header(self):
+        for forbidden in ("eval(", "Function(", "XMLHttpRequest", "innerHTML", "document.write",
+                          "localStorage", "sessionStorage", "document.cookie", "outerHTML", "insertAdjacentHTML"):
+            self.assertNotIn(forbidden, LIST_JS)
+        self.assertIn('"X-CSRFToken"', LIST_JS)
+        self.assertEqual(LIST_JS.count("fetch("), 1)  # one helper posts the widths and the opened rows
+        self.assertNotIn("http://", LIST_JS)
+        self.assertNotIn("https://", LIST_JS)
+
+    def test_a_goto_link_leads_only_to_a_path_of_this_site(self):
+        for url in ("https://evil.example/", "//evil.example/", "javascript:alert(1)", "legs/3/", "", "\\evil"):
+            self.assertEqual(render("_goto.html", url=url, label="x"), "", url)
+        self.assertIn('href="/management/legs/3/"', render("_goto.html", url="/management/legs/3/", label="x"))
+
+    def test_a_link_to_a_page_that_does_not_exist_yet_is_empty(self):
+        from leg_platform.management.templatetags import management_ui as ui
+
+        self.assertEqual(ui.optional_url("management:legs_detail", 1), "")
+        self.assertEqual(ui.optional_url("management:locations_detail", 5), "/management/locations/5/")
 
 
 @tag("mariadb")

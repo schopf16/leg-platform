@@ -131,6 +131,8 @@ PHONENUMBER_DB_FORMAT = "E164"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    # No response under /management/ is cached, also the 403 and 404 pages (security review L-3).
+    "leg_platform.middleware.NoStoreForManagementMiddleware",
     # Before anything reads a request body (sessions, CSRF): bounded bodies for open endpoints.
     "leg_platform.middleware.RequestBodyLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

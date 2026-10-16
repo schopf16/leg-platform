@@ -1,0 +1,25 @@
+{% load i18n %}{% comment %}
+The head of a list table (D-078; LISTEN-STANDARD.md, sections 1 to 3 and 5). Context from
+``management.lists.list_context``: ``list_columns``. A sortable column is a link (first click
+ascending, second descending, third ascending again; the active column is blue with an arrow), a
+column can carry an info bubble (a plain ``info`` text or an ``info_template`` with markup) and a
+handle at its right edge to change the width (``management/js/list.js``; the width is saved per
+account). The last column is the narrow link column: 56 px, no title, no handle. The widths are
+set with the ``width`` attribute of ``col`` (an inline style would be refused by the Content
+Security Policy).
+{% endcomment %}<colgroup>
+  {% for column in list_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}>
+  {% endfor %}<col class="mgmt-link-col" width="56">
+</colgroup>
+<thead>
+  <tr>
+    {% for column in list_columns %}
+      <th data-col="{{ column.key }}"{% if column.aria_sort %} aria-sort="{{ column.aria_sort }}"{% endif %}>
+        {% if column.sortable %}<a class="mgmt-sort{% if column.active %} is-active{% endif %}" href="{{ column.url }}">{{ column.label }} <span aria-hidden="true">{{ column.arrow }}</span></a>{% else %}<span class="mgmt-sort">{{ column.label }}</span>{% endif %}
+        {% if column.info or column.info_template %}{% blocktranslate asvar info_label with name=column.label %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info{% if column.info_placement == 'left' %} is-left{% elif column.info_placement == 'left-up' %} is-left-up{% endif %}"><button type="button" class="mgmt-info-btn" aria-label="{{ info_label }}" aria-describedby="{{ column.tip_id }}">i</button><span class="mgmt-tip" role="tooltip" id="{{ column.tip_id }}">{% if column.info_template %}{% include column.info_template %}{% else %}{{ column.info }}{% endif %}</span></span>{% endif %}
+        {% if column.resizable %}<span class="mgmt-grip" role="separator" aria-orientation="vertical" tabindex="0" aria-label="{% translate 'Change the width of the column' %}"></span>{% endif %}
+      </th>
+    {% endfor %}
+    <th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th>
+  </tr>
+</thead>

@@ -1,0 +1,22 @@
+{% extends "management/dialog.html" %}
+{% load i18n %}{% comment %}
+The dialog "Create transformer circuit" (dialog-trafokreis-anlegen). If the number exists already the
+page says so and the button reads "Use this one": the existing circuit is used, a second one is never
+created, and its name is shown (not editable).
+{% endcomment %}
+{% block dialog_notice %}
+  {% if existing %}
+    <div class="mgmt-banner" role="status"><p><b>{% translate "This transformer circuit already exists:" %}</b> {{ existing.bkw_number }}{% if existing.name %} · {{ existing.name }}{% endif %}. {% translate "It is assigned to the location, a second one is not created." %}</p></div>
+  {% endif %}
+{% endblock %}
+{% block dialog_fields %}
+  <div class="mgmt-dialog-row is-single">{% include "management/_dialog_field.html" with field=form.bkw_number %}</div>
+  <div class="mgmt-dialog-row is-single">
+    {% if existing %}
+      <input type="hidden" name="use_existing" value="1">
+      <div class="mgmt-dialog-field"><label class="mgmt-dialog-label" for="existing-name">{% translate "Name" %}</label><input class="form-control" id="existing-name" value="{{ existing.name }}" disabled></div>
+    {% else %}
+      {% include "management/_dialog_field.html" with field=form.name %}
+    {% endif %}
+  </div>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load i18n static management_ui %}{% comment %}
+The detail page of a location (LEG-Design-Vorgaben/verwaltung/standorte/referenz/standort-detail-desktop,
+-handy, standort-neu-desktop and standorte/adresskorrektur; D-078). Cards left and right on a
+desktop, one under the other on a phone. The one button at the top right is "Delete location" (red
+outline, only without a history) or "Archive location"; a location that a customer created shows the
+notice and "Confirm address" first.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page mgmt-wide{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to locations" %}</a>
+
+  {% if location.needs_confirmation %}
+    <div class="mgmt-banner mgmt-banner-notice"><p><b>{% translate "Newly created by the customer, not confirmed yet." %}</b> {% translate "Check the address and the metering points. If everything is correct, confirm the location." %}</p></div>
+  {% endif %}
+
+  <div class="mgmt-header mgmt-detail-header">
+    <div>
+      <h1 class="start-title">{{ page_title }}{% if location.is_archived %} <span class="mgmt-new">{% translate "archived" %}</span>{% endif %}</h1>
+      <p class="mgmt-subtitle">{{ subtitle }}</p>
+    </div>
+    <div class="mgmt-header-actions">
+      {% if location.needs_confirmation and can_change %}
+        <form method="post" action="{% url 'management:locations_confirm' location.pk %}" class="mgmt-inline-form">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Confirm address" %}</button></form>
+      {% endif %}
+      {% if show_delete %}
+        <a class="btn btn-danger-outline" href="{% url 'management:locations_delete' location.pk %}">{% translate "Delete location" %}</a>
+      {% elif show_archive %}
+        <form method="post" action="{% url 'management:locations_archive' location.pk %}" class="mgmt-inline-form">{% csrf_token %}
+          {% if location.is_archived %}<input type="hidden" name="archive" value="0"><button type="submit" class="btn btn-secondary-action">{% translate "Restore location" %}</button>
+          {% else %}<button type="submit" class="btn btn-secondary-action">{% translate "Archive location" %}</button>{% endif %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if suggestion_text %}
+    {% include "management/_banner.html" with text=suggestion_text actions="management/locations/_suggestion_actions.html" %}
+  {% endif %}
+
+  <div class="mgmt-two-cols">
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Address" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_address' location.pk %}">{% translate "Edit" %}</a>{% endif %}</div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Street" %}</dt><dd>{{ location.street }} {{ location.house_number }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Postal code, town" %}</dt><dd>{{ location.postal_code }} {{ location.town }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Address addition" %}</dt><dd>{% if location.address_addition %}{{ location.address_addition }}{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Grid" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact mgmt-fact-top"><dt>{% translate "Transformer circuit" %}</dt>
+            <dd>
+              <form method="post" action="{% url 'management:locations_circuit' location.pk %}" class="mgmt-circuit-form">
+                {% csrf_token %}
+                <input type="search" name="transformer_circuit" value="{{ circuit_text }}" list="circuit-options" class="form-control tnum" autocomplete="off" aria-label="{% translate 'Search transformer circuit' %}"{% if not can_change %} disabled{% endif %}>
+                {% if can_change %}<button type="submit" class="mgmt-icon-btn" aria-label="{% translate 'Change transformer circuit' %}" title="{% translate 'Change transformer circuit' %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-pencil"/></svg></button>{% endif %}
+              </form>
+              <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.bkw_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
+              {% if can_add_circuit or can_edit_circuit and circuit %}
+                <p class="mgmt-circuit-links">
+                  {% if can_add_circuit %}<a href="{% url 'management:locations_circuit_new' location.pk %}">+ {% translate "Create new transformer circuit" %}</a>{% endif %}
+                  {% if can_edit_circuit and circuit %}<a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a>{% endif %}
+                </p>
+              {% endif %}
+            </dd>
+          </div>
+          <div class="mgmt-fact"><dt>{% translate "Locations in the transformer circuit" %}</dt><dd class="tnum mgmt-num">{% if circuit_stats %}{{ circuit_stats.locations }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Metering points in the transformer circuit" %}</dt>
+            <dd>{% if circuit_stats %}<span class="mgmt-count-grid tnum"><span>{{ circuit_stats.consumption }}</span>{% include "management/_direction.html" with direction="consumption" %}<span>{{ circuit_stats.feed_in }}</span>{% include "management/_direction.html" with direction="feed_in" %}</span>{% else %}–{% endif %}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Remark" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_remark' location.pk %}">{% translate "Edit" %}</a>{% endif %}</div>
+        <div class="mgmt-remark">{% if location.remark %}{{ location.remark|linebreaksbr }}{% else %}–{% endif %}</div>
+      </section>
+    </div>
+  </div>
+
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points" %}</h2>{% if can_add_point %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a>{% endif %}</div>
+    <div class="mgmt-table-view">
+      <table class="mgmt-table">
+        <thead><tr><th>{% translate "Metering point" %}</th><th>{% translate "LEG" %}</th><th>{% translate "Status" %}</th><th>{% translate "Occupied by" %}</th></tr></thead>
+        <tbody>
+          {% for row in points %}
+            <tr>
+              <td><span class="mgmt-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}</span>{% include "management/_direction.html" with direction=row.metering_point.direction %}</td>
+              <td>{% if row.leg_id %}<span class="mgmt-leg">{{ row.leg_name }}</span>{% optional_url "management:legs_detail" row.leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
+              <td>{% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}</td>
+              <td>{% if row.person_id %}{% if see_persons %}{{ row.person_name }}{% optional_url "management:persons_detail" row.person_id as person_url %}{% if person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label %}{% endif %}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
+            </tr>
+          {% empty %}
+            {% translate "No metering points at this location." as empty_text %}
+            {% include "management/_empty_row.html" with colspan=4 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="mgmt-cards-view mgmt-card-pad">
+      {% for row in points %}
+        <div class="mgmt-mp">
+          <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div>
+          <div class="mgmt-mp-line">
+            <span>{% if row.leg_id %}{{ row.leg_name }}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</span>
+            {% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}
+          </div>
+          <div class="mgmt-mp-person">{% if row.person_id %}{% if see_persons %}{{ row.person_name }}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
+        </div>
+      {% empty %}
+        <p class="mgmt-empty-text">{% translate "No metering points at this location." %}</p>
+      {% endfor %}
+    </div>
+    <p class="mgmt-note mgmt-card-pad">{% translate "The assignment to a person is changed at the person or at the metering point." %}</p>
+  </section>
+
+  {% if see_persons %}
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History of the assignments" %}</h2></div>
+    <div class="mgmt-table-view">
+      <table class="mgmt-table">
+        <thead><tr><th>{% translate "Metering point" %}</th><th>{% translate "Person" %}</th><th>{% translate "From" %}</th><th>{% translate "To" %}</th></tr></thead>
+        <tbody>
+          {% for entry in assignment_history %}
+            <tr><td><span class="mgmt-nr">{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</span></td><td>{{ entry.person }}</td><td>{{ entry.from|date:"d.m.Y" }}</td><td>{% if entry.to %}{{ entry.to|date:"d.m.Y" }}{% else %}–{% endif %}</td></tr>
+          {% empty %}
+            {% translate "No assignments yet." as empty_text %}
+            {% include "management/_empty_row.html" with colspan=4 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
+      {% for entry in assignment_history %}
+        <div class="mgmt-fact"><dt>{{ entry.number|slice:":13" }}…{{ entry.number|slice:"-4:" }} · {{ entry.person }}</dt><dd>{% if entry.to %}{{ entry.from|date:"d.m.Y" }} – {{ entry.to|date:"d.m.Y" }}{% else %}{% translate "since" %} {{ entry.from|date:"d.m.Y" }}{% endif %}</dd></div>
+      {% endfor %}
+    </dl>
+  </section>
+  {% endif %}
+
+  <section class="mgmt-card mgmt-card-flush">
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History" %}</h2></div>
+    <table class="mgmt-table mgmt-history">
+      <thead><tr><th>{% translate "Date" %}</th><th>{% translate "Event" %}</th><th>{% translate "By" %}</th></tr></thead>
+      <tbody>
+        {% for entry in history %}
+          <tr><td>{{ entry.time|date:"d.m.Y H:i" }}</td><td>{{ entry.label }}</td><td>{{ entry.actor|default:"–" }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+{% endblock %}

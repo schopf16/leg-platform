@@ -1,0 +1,141 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list of locations (LEG-Design-Vorgaben/verwaltung/standorte/referenz/standorte-liste-desktop and
+-handy; D-078). On a desktop a table whose rows open to the table of their metering points, on a phone
+one card per location. The page works without a script: the arrows and the button "Expand all" post to
+``management:locations_expanded``, the filters are a GET form. The script adds the resizing of the
+columns, the opening of a row by a click and the sending of the form on change.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide{% endblock %}
+{% block extra_head %}{{ block.super }}{% endblock %}
+{% block header_actions %}
+  {% if problem_count %}<a class="btn btn-warning-outline" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  {% if expand_ids %}
+    <form method="post" action="{{ expand_url }}" class="mgmt-inline-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ current_url }}">
+      {% for id in expand_ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+      <input type="hidden" name="open" value="{% if all_open %}0{% else %}1{% endif %}">
+      <button type="submit" class="btn btn-secondary-action" data-expand-all data-label-open="{{ all_label_open }}" data-label-closed="{{ all_label_closed }}">{% if all_open %}{{ all_label_open }}{% else %}{{ all_label_closed }}{% endif %}</button>
+    </form>
+  {% endif %}
+  {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create location" %}</a>{% endif %}
+{% endblock %}
+{% block page_content %}
+  {% translate "Street, metering point number or transformer circuit" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    <label class="mgmt-filter mgmt-filter-select mgmt-desktop-only-flex">
+      <span class="mgmt-filter-label">{% translate "Transformer circuit" %}</span>
+      <select name="circuit" class="form-select" data-autosubmit>
+        <option value="">{% translate "All" %}</option>
+        {% for value, text in circuit_options %}<option value="{{ value }}"{% if value == list_state.values.circuit %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Occupancy" %}</span>
+      <select name="occupancy" class="form-select" data-autosubmit>
+        {% for value, text in occupancy_options %}<option value="{{ value }}"{% if value == list_state.values.occupancy %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <form id="expand-form" method="post" action="{{ expand_url }}">{% csrf_token %}<input type="hidden" name="next" value="{{ current_url }}"></form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-expand-url="{{ expand_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            {% with location=entry.location %}
+            <tr class="mgmt-site{% if entry.can_open %} is-expandable{% endif %}" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
+              <td>
+                <div class="mgmt-addr mgmt-cut" title="{{ location.street }} {{ location.house_number }}">
+                  {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% else %}<span class="mgmt-caret-space"></span>{% endif %}
+                  {{ location.street }} {{ location.house_number }}
+                  {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
+                  {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
+                </div>
+              </td>
+              <td class="mgmt-cut" title="{{ entry.circuit }}">{{ entry.circuit }}</td>
+              <td>{{ entry.count_phrase }}</td>
+              <td>{{ entry.occupancy }}</td>
+              <td class="mgmt-link-col">{% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+            </tr>
+            {% if entry.can_open %}
+              <tr class="mgmt-subwrap" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
+                <td colspan="5">
+                  <table class="mgmt-sub">
+                    <colgroup><col width="440"><col width="300"><col width="200"><col width="200"></colgroup>
+                    <thead>
+                      <tr>
+                        <th>{% translate "Metering point" %}</th>
+                        <th>{% translate "LEG" %}</th>
+                        <th>{% translate "Status" %}{% blocktranslate asvar status_label with name=_("Status") %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info is-left-up"><button type="button" class="mgmt-info-btn" aria-label="{{ status_label }}" aria-describedby="tip-status-{{ location.pk }}">i</button><span class="mgmt-tip mgmt-tip-status" role="tooltip" id="tip-status-{{ location.pk }}">{% include "management/_status_legend.html" %}</span></span></th>
+                        <th>{% translate "Occupied by" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in entry.points %}
+                        <tr>
+                          <td><div class="mgmt-nr-row">{% if row.metering_point.number %}<span class="mgmt-nr">{{ row.metering_point.number|slice:":13" }}<wbr>{{ row.metering_point.number|slice:"13:" }}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div></td>
+                          <td>{% if row.leg_id %}<span class="mgmt-leg mgmt-cut-inline" title="{{ row.leg_name }}">{{ row.leg_name }}</span>{% optional_url "management:legs_detail" row.leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
+                          <td>{% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}</td>
+                          <td>{% if row.person_id %}{% if see_persons %}<span class="mgmt-cut-inline" title="{{ row.person_name }}">{{ row.person_name }}</span>{% optional_url "management:persons_detail" row.person_id as person_url %}{% if person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            {% endif %}
+            {% endwith %}
+          {% empty %}
+            {% translate "No locations yet. Create the first location." as empty_text %}
+            {% include "management/_empty_row.html" with colspan=5 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        {% with location=entry.location %}
+        <article class="mgmt-place" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
+          <div class="mgmt-place-addr">
+            {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% endif %}
+            <span>{{ location.street }} {{ location.house_number }}</span>
+            {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
+            {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
+            {% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}
+          </div>
+          <div class="mgmt-place-sub">{{ entry.circuit }} · {{ entry.count_phrase }} · {{ entry.occupancy }}</div>
+          {% if entry.can_open %}
+            <div class="mgmt-place-points" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
+              {% for row in entry.points %}
+                <div class="mgmt-mp">
+                  <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div>
+                  <div class="mgmt-mp-line">
+                    <span>{% if row.leg_id %}{{ row.leg_name }}{% optional_url "management:legs_detail" row.leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label %}{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</span>
+                    {% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}
+                  </div>
+                  <div class="mgmt-mp-person">{% if row.person_id %}{% if see_persons %}{{ row.person_name }}{% optional_url "management:persons_detail" row.person_id as person_url %}{% if person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label %}{% endif %}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </article>
+        {% endwith %}
+      {% empty %}
+        <p class="mgmt-empty-text">{% translate "No locations yet. Create the first location." %}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

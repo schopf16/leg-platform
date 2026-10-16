@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+The list form (D-078): one GET form with the id ``list-form`` that carries the search, the filters and
+the page size, and the sort and the filter "problems" as hidden fields. The script sends it when a
+filter changes and a short moment after typing; without a script the button "Apply" does it
+(``<noscript>``). Include it where the fields go and close it with ``</form>`` after the fields:
+
+    {% include "management/_list_form_start.html" %} ...fields... </form>
+
+Context: ``list_state`` and ``search_placeholder``.
+{% endcomment %}<form id="list-form" method="get" action="{{ list_state.path }}" class="mgmt-filters" data-autosubmit-form>
+  {% for name, value in list_state.hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <label class="mgmt-filter mgmt-filter-search">
+    <span class="mgmt-filter-label">{% translate "Search" %}</span>
+    <input type="search" name="q" value="{{ list_state.query }}" placeholder="{{ search_placeholder }}" class="form-control" autocomplete="off" maxlength="200" data-search{% if list_state.focus == "q" %} autofocus{% endif %}>
+  </label>

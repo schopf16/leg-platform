@@ -214,7 +214,10 @@ class AddressBannerTests(TestCase):
         self.assertNotIn("Adressverzeichnis ab", html)
         row = ManagementSettings.load()
         self.assertEqual((row.sender_street, row.identifier), (before, "1A2B3C4D5E6"))
-        self.assertFalse(HistoryEntry.objects.exists())
+        # Only the decision is recorded (L-5), with the actor; the address is not changed by it.
+        entry = HistoryEntry.objects.get()
+        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_ACCEPTED, self.editor))
+        self.assertEqual(entry.detail, {"suggested": list(SUGGESTION.as_tuple())})
 
     def test_not_accepting_remembers_the_address_until_it_changes(self):
         response = self.client.post(URL, {**VALID, "sender_street": "musterstrasse", "action": "dismiss_suggestion"})
@@ -224,7 +227,8 @@ class AddressBannerTests(TestCase):
         self.assertEqual(row.sender_street, "musterstrasse")  # the address is not changed
         self.assertTrue(row.sender_suggestion_dismissed_for)
         self.assertNotIn("Adressverzeichnis ab", self.client.get(URL).content.decode())
-        self.assertFalse(HistoryEntry.objects.exists())
+        entry = HistoryEntry.objects.get()  # the decision, with the actor (L-5)
+        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_DISMISSED, self.editor))
         # A changed address (here the town) is checked again.
         self.client.post(URL, {**VALID, "sender_street": "musterstrasse", "sender_town": "Ittigen Dorf"})
         self.assertIn("Adressverzeichnis ab", self.client.get(URL).content.decode())

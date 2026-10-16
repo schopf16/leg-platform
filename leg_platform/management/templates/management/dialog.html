@@ -20,10 +20,11 @@ The form posts to the same address with the CSRF token and the ``next`` value.
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ back_url }}">
         {% include "accounts/_error_summary.html" %}
+        {% block dialog_notice %}{% endblock %}
         {% block dialog_fields %}{% endblock %}
         <div class="mgmt-actions">
           <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Cancel" %}</a>
-          <button type="submit" class="btn btn-primary">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>
+          <button type="submit" class="btn {% if danger %}btn-danger{% else %}btn-primary{% endif %}">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>
         </div>
       </form>
     </section>

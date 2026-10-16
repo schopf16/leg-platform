@@ -25,6 +25,12 @@ class HistoryEvent(models.TextChoices):
     no choices)."""
 
     CREATED = "created", _("Created")
+    ADDRESS_CHANGED = "address_changed", _("Address changed")
+    TRANSFORMER_CIRCUIT_CHANGED = "transformer_circuit_changed", _("Transformer circuit changed")
+    LOCATION_CONFIRMED = "location_confirmed", _("Address confirmed")
+    ARCHIVED = "archived", _("Archived")
+    UNARCHIVED = "unarchived", _("Restored from the archive")
+    LOCATIONS_MERGED = "locations_merged", _("Locations merged")
     ADDRESS_CORRECTION_ACCEPTED = "address_correction_accepted", _("Address correction accepted")
     ADDRESS_CORRECTION_DISMISSED = "address_correction_dismissed", _("Address correction not accepted")
     PERSON_ASSIGNED = "person_assigned", _("Person assigned")
@@ -34,6 +40,8 @@ class HistoryEvent(models.TextChoices):
     LEG_ASSIGNMENT_ENDED = "leg_assignment_ended", _("LEG assignment ended")
     LEG_ASSIGNMENT_DELETED = "leg_assignment_deleted", _("LEG assignment deleted")
     SENDER_ADDRESS_CHANGED = "sender_address_changed", _("Sender address changed")
+    SENDER_SUGGESTION_ACCEPTED = "sender_suggestion_accepted", _("Sender address correction accepted")
+    SENDER_SUGGESTION_DISMISSED = "sender_suggestion_dismissed", _("Sender address correction not accepted")
     COUNTRY_CHANGED = "country_changed", _("Country changed")
     IDENTIFIER_CHANGED = "identifier_changed", _("Identifier changed")
 
@@ -58,6 +66,23 @@ def subject_of(obj):
     raise TypeError(f"No history for {type(obj).__name__}.")
 
 
+PROTECTED_DETAIL_KEYS = frozenset({"iban", "staff_note", "note", "bkw_customer_number", "password", "email"})
+
+
+def _check_detail(detail, path=""):
+    """The history is read by every staff user with the right to see an object: it never holds the
+    IBAN, the staff note or the BKW customer number of a person record, nor credentials (security
+    review L-6). Checked on every key, also nested ones."""
+    if isinstance(detail, dict):
+        for key, value in detail.items():
+            if str(key).lower() in PROTECTED_DETAIL_KEYS:
+                raise ValueError(f"The history detail must not hold {path}{key}.")
+            _check_detail(value, f"{path}{key}.")
+    elif isinstance(detail, (list, tuple)):
+        for item in detail:
+            _check_detail(item, path)
+
+
 def record(subject, event, actor=None, detail=None):
     """Write one entry. ``subject`` is a domain object or a ``(type, id)`` pair; ``event`` is one of
     ``HistoryEvent``; ``actor`` the account that did it (None for the system)."""
@@ -65,6 +90,7 @@ def record(subject, event, actor=None, detail=None):
     if subject_type not in SUBJECT_TYPES:
         raise ValueError(f"Unknown subject type: {subject_type!r}")
     event = HistoryEvent(event).value
+    _check_detail(detail)
     return HistoryEntry.objects.create(
         subject_type=subject_type,
         subject_id=subject_id,

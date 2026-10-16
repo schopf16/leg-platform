@@ -1,0 +1,17 @@
+{% load i18n %}{% comment %}
+The foot of a list (D-078; LISTEN-STANDARD.md, section 3): "Rows per page" (30, 50, 100, all; the field
+belongs to the form ``list-form`` of the page and sends it when changed), the count ("1–50 of 1000 ...")
+and the buttons "Previous" and "Next" (disabled at the ends). Context: ``list_state``, ``list_page``,
+``list_count_text``, ``list_page_sizes``.
+{% endcomment %}<div class="mgmt-list-foot">
+  <label class="mgmt-per-page">{% translate "Rows per page" %}
+    <select name="per" form="list-form" class="form-select" data-autosubmit>
+      {% for size in list_page_sizes %}<option value="{{ size }}"{% if size == list_state.per %} selected{% endif %}>{% if size == "all" %}{% translate "All" %}{% else %}{{ size }}{% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <span>{{ list_count_text }}</span>
+  <span class="mgmt-pager">
+    {% if list_page.prev_url %}<a class="btn btn-secondary-action" href="{{ list_page.prev_url }}">{% translate "Previous" %}</a>{% else %}<button type="button" class="btn btn-secondary-action" disabled>{% translate "Previous" %}</button>{% endif %}
+    {% if list_page.next_url %}<a class="btn btn-secondary-action" href="{{ list_page.next_url }}">{% translate "Next" %}</a>{% else %}<button type="button" class="btn btn-secondary-action" disabled>{% translate "Next" %}</button>{% endif %}
+  </span>
+</div>

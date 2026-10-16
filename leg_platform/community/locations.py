@@ -11,7 +11,7 @@ from django.db import transaction
 
 from leg_platform.community import addressing, history
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Location
+from leg_platform.community.models import HistoryEntry, Location, MeteringPoint
 
 
 class SuggestionError(Exception):
@@ -21,6 +21,20 @@ class SuggestionError(Exception):
     def __init__(self, code):
         super().__init__(code)
         self.code = code
+
+
+class MergeNeeded(Exception):
+    """The new address is the address of another location: saving needs the explicit merge, which
+    moves the metering points to ``target`` and deletes the changed location (irreversible)."""
+
+    def __init__(self, target, metering_points):
+        super().__init__("merge_needed")
+        self.target = target
+        self.metering_points = metering_points
+
+
+class NotDeletable(Exception):
+    """The location has a history or metering points: it is archived, not deleted."""
 
 
 def refresh_suggestion(location):
@@ -67,3 +81,131 @@ def dismiss_suggestion(location, actor):
         fresh.save(update_fields=["suggestion_dismissed_for", "address_correction_open", "updated_at"])
         history.record(fresh, HistoryEvent.ADDRESS_CORRECTION_DISMISSED, actor)
     return fresh
+
+
+# Creating, changing, confirming, archiving, deleting, merging -------------------------------------
+
+ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town")
+
+
+def create_location(
+    *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None,
+    remark="", needs_confirmation=False, actor=None,
+):
+    """A new location. Raises ``ValidationError`` (also for an address that exists; the caller asks
+    ``Location.find_by_address`` first to offer "go to the existing location"). The directory check
+    runs once; a customer's new location (``needs_confirmation``) is marked "new" until a staff
+    user confirms it."""
+    location = Location(
+        street=street, house_number=house_number, postal_code=postal_code, town=town,
+        address_addition=address_addition, transformer_circuit=transformer_circuit,
+        remark=remark.strip(), needs_confirmation=needs_confirmation,
+    )
+    location.full_clean()
+    with transaction.atomic():
+        location.save()
+        history.record(location, HistoryEvent.CREATED, actor)
+    refresh_suggestion(location)
+    return location
+
+
+def update_address(
+    location, *, street, house_number, postal_code, town, address_addition="", actor=None, merge=False
+):
+    """Change the address (``standorte/VORGABEN.md``: only the address can be changed).
+
+    If the new address is the address of another location, ``MergeNeeded`` is raised unless
+    ``merge`` is true; then the metering points move to the other location, this one is deleted,
+    the other one is returned and the merge is logged (irreversible). Otherwise the address is
+    saved, a change of street, house number, postal code or town is logged and the directory is
+    asked again (the dismissal of an earlier suggestion holds only for the same address)."""
+    new = addressing.normalise_address(street, house_number, postal_code, town)
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        other = Location.find_by_address(*new)
+        if other is not None and other.pk != fresh.pk:
+            count = MeteringPoint.objects.filter(location=fresh).count()
+            if not merge:
+                raise MergeNeeded(other, count)
+            return _merge(fresh, other, actor, count)
+        changed = new != fresh.current_address()
+        fresh.street, fresh.house_number, fresh.postal_code, fresh.town = new
+        fresh.address_addition = address_addition
+        fresh.full_clean()
+        fresh.save()
+        if changed:
+            history.record(fresh, HistoryEvent.ADDRESS_CHANGED, actor)
+    refresh_suggestion(fresh)
+    return fresh
+
+
+def _merge(source, target, actor, count):
+    target = Location.objects.select_for_update().get(pk=target.pk)
+    MeteringPoint.objects.filter(location=source).update(location=target)
+    history.record(
+        target, HistoryEvent.LOCATIONS_MERGED, actor,
+        {"merged_location_id": source.pk, "metering_points": count},
+    )
+    source.delete()
+    return target
+
+
+def set_circuit(location, circuit, actor=None):
+    """Assign the transformer circuit (None removes it); a change is logged with the numbers."""
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().select_related("transformer_circuit").get(pk=location.pk)
+        before = fresh.transformer_circuit
+        if before == circuit:
+            return fresh
+        fresh.transformer_circuit = circuit
+        fresh.save(update_fields=["transformer_circuit", "updated_at"])
+        history.record(
+            fresh, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, actor,
+            {"old": before.bkw_number if before else "", "new": circuit.bkw_number if circuit else ""},
+        )
+    return fresh
+
+
+def confirm(location, actor=None):
+    """"Confirm the address" of a location that a customer created: the mark "new" goes."""
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        if fresh.needs_confirmation:
+            fresh.needs_confirmation = False
+            fresh.save(update_fields=["needs_confirmation", "updated_at"])
+            history.record(fresh, HistoryEvent.LOCATION_CONFIRMED, actor)
+    return fresh
+
+
+def set_archived(location, archived, actor=None):
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        if fresh.is_archived != archived:
+            fresh.is_archived = archived
+            fresh.save(update_fields=["is_archived", "updated_at"])
+            history.record(fresh, HistoryEvent.ARCHIVED if archived else HistoryEvent.UNARCHIVED, actor)
+    return fresh
+
+
+def can_delete(location):
+    """A location is deleted only without a history (``standorte/VORGABEN.md``, "Löschen nur ohne
+    Historie"); one that still has metering points is archived, because they would lose their place."""
+    return not history.has_history(location) and not location.metering_points.exists()
+
+
+def delete(location):
+    """Delete a location that has no history and no metering points. Raises ``NotDeletable``."""
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        if not can_delete(fresh):
+            raise NotDeletable
+        # Only the entry "Created" exists; it goes with the location.
+        HistoryEntry.objects.filter(subject_type=history.LOCATION, subject_id=fresh.pk).delete()
+        fresh.delete()
+
+
+__all__ = [
+    "ADDRESS_FIELDS", "MergeNeeded", "NotDeletable", "SuggestionError", "accept_suggestion",
+    "can_delete", "confirm", "create_location", "delete", "dismiss_suggestion", "refresh_suggestion",
+    "set_archived", "set_circuit", "update_address",
+]

@@ -1,5 +1,5 @@
 /* The management area for staff users (D-077): the shared building blocks of its pages.
-   Ported from the owner's templates in LEG-Design-Vorgaben/verwaltung/*/referenz (sizes, spacing,
+   Ported from the owner's templates in LEG-Design-Vorgaben/verwaltung (the folders "referenz"): sizes, spacing,
    structure) with the tokens of portal.css instead of the colour values of the templates, so that
    the light and the dark mode and the instance colours apply (docs/DESIGN.md, section 3).
    No inline styles and no inline scripts (Content Security Policy). */
@@ -494,5 +494,817 @@
 
   .mgmt-dialog {
     box-shadow: none;
+  }
+}
+
+/* ======================================================================================
+   Lists, location pages and dialogs (D-078). Ported from the templates of the owner in
+   verwaltung/standorte/referenz; colours only through the tokens.
+   ====================================================================================== */
+
+.mgmt-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.mgmt-inline-form {
+  display: inline-flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.btn-xs {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+.btn-accent-outline {
+  background: var(--panel);
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.btn-accent-outline:hover,
+.btn-accent-outline:focus-visible {
+  background: var(--warm);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mgmt-banner b {
+  color: var(--warn);
+}
+
+.mgmt-banner a {
+  font-weight: 600;
+}
+
+.mgmt-muted {
+  color: var(--muted);
+}
+
+/* ---- Search and filters ---- */
+.mgmt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mgmt-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.mgmt-filter-search {
+  flex: 1;
+  min-width: 260px;
+}
+
+.mgmt-filter-select {
+  width: 200px;
+}
+
+.mgmt-filter-label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-filters .form-control,
+.mgmt-filters .form-select {
+  min-height: 44px;
+}
+
+/* ---- Tables (LISTEN-STANDARD.md) ---- */
+.mgmt-list-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.mgmt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.mgmt-table-fixed {
+  table-layout: fixed;
+}
+
+.mgmt-table th {
+  position: relative;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mgmt-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  text-align: left;
+}
+
+.mgmt-table-fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mgmt-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.mgmt-sort:hover {
+  color: var(--fg);
+}
+
+.mgmt-sort.is-active {
+  color: var(--accent);
+}
+
+.mgmt-sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The handle at the right edge of a heading: a fine line, in the accent colour when touched. */
+.mgmt-grip {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 5;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.mgmt-grip::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 25%;
+  width: 1px;
+  height: 50%;
+  background: var(--line);
+}
+
+.mgmt-grip:hover::after,
+.mgmt-grip:focus-visible::after,
+.mgmt-grip.is-dragging::after {
+  left: 3px;
+  width: 2px;
+  background: var(--accent);
+}
+
+.mgmt-grip:focus-visible {
+  outline: none;
+}
+
+.mgmt-link-col {
+  width: 56px;
+  padding: 0;
+  text-align: center;
+}
+
+.mgmt-link-col .mgmt-goto {
+  margin: 0;
+}
+
+.mgmt-cut {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mgmt-cut-inline {
+  display: inline-block;
+  max-width: calc(100% - 40px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.mgmt-site.is-expandable {
+  cursor: pointer;
+}
+
+.mgmt-addr {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mgmt-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.mgmt-caret:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-caret-icon::before {
+  content: "▸";
+}
+
+[aria-expanded="true"] .mgmt-caret-icon::before {
+  content: "▾";
+}
+
+.mgmt-caret-space {
+  display: inline-block;
+  width: 22px;
+}
+
+.mgmt-new {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1.5px solid var(--warn);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--warn);
+  vertical-align: middle;
+}
+
+.mgmt-subwrap > td {
+  padding: 0 0 10px;
+  background: var(--bg);
+  overflow: visible;
+  white-space: normal;
+}
+
+.mgmt-sub {
+  width: auto;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.mgmt-sub th {
+  padding: 6px 12px;
+  font-size: 13px;
+  background: var(--bg);
+}
+
+.mgmt-sub td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.mgmt-nr {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mgmt-nr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.mgmt-nr-row .mgmt-direction {
+  margin: 0;
+}
+
+.mgmt-table td > .mgmt-direction {
+  margin-left: 8px;
+}
+
+.mgmt-leg {
+  color: var(--accent);
+}
+
+/* A name that is missing: a red dot and a word. */
+.mgmt-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.mgmt-missing::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bad);
+}
+
+.mgmt-list-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-per-page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.mgmt-per-page .form-select {
+  width: auto;
+  min-height: 36px;
+  padding: 4px 32px 4px 8px;
+  font-size: 14px;
+}
+
+.mgmt-pager {
+  display: flex;
+  gap: 8px;
+}
+
+.mgmt-pager .btn {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+.mgmt-pager .btn:disabled {
+  color: var(--muted);
+}
+
+/* The legend of the status in its bubble: the colours of the dots are lighter on the dark bubble. */
+.mgmt-tip b {
+  font-weight: 700;
+}
+
+.mgmt-tip-status {
+  width: 440px;
+}
+
+.mgmt-st-list {
+  display: block;
+  margin-top: 8px;
+}
+
+.mgmt-st-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 5px 0;
+}
+
+.mgmt-st-word {
+  flex: 0 0 120px;
+}
+
+.mgmt-st-text {
+  flex: 1;
+}
+
+.mgmt-tip .mgmt-status {
+  color: var(--panel);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---- Cards of the phone ---- */
+.mgmt-cards-view {
+  display: none;
+}
+
+.mgmt-place {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.mgmt-place-addr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 17px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.mgmt-place-addr .mgmt-goto {
+  margin-left: 6px;
+}
+
+.mgmt-place-sub {
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-mp {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-place-points > .mgmt-mp:first-child {
+  margin-top: 8px;
+}
+
+.mgmt-mp-nr {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.mgmt-mp-nr .mgmt-direction {
+  margin-left: 6px;
+}
+
+.mgmt-mp-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.mgmt-mp-person {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ---- The detail page ---- */
+.mgmt-two-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.mgmt-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mgmt-col .mgmt-card {
+  margin: 0;
+}
+
+.mgmt-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.mgmt-card-head h2 {
+  margin: 0;
+}
+
+.mgmt-card-flush {
+  padding: 0;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.mgmt-card-pad {
+  padding: 16px 20px 8px;
+}
+
+.mgmt-card-flush .mgmt-note {
+  padding-top: 10px;
+  padding-bottom: 16px;
+}
+
+.mgmt-facts {
+  margin: 0;
+}
+
+.mgmt-fact {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-fact:first-child {
+  border-top: 0;
+}
+
+.mgmt-fact-top {
+  align-items: start;
+}
+
+.mgmt-fact dt {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.mgmt-fact dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mgmt-num {
+  display: inline-block;
+  width: 40px;
+  text-align: right;
+}
+
+.mgmt-count-grid {
+  display: grid;
+  grid-template-columns: 40px auto;
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.mgmt-count-grid > span:nth-child(odd) {
+  text-align: right;
+}
+
+.mgmt-count-grid .mgmt-direction {
+  justify-self: start;
+}
+
+.mgmt-circuit-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.mgmt-circuit-form .form-control {
+  flex: 1;
+  min-height: 40px;
+}
+
+.mgmt-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.mgmt-icon-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-circuit-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.mgmt-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-remark {
+  line-height: 1.5;
+}
+
+.mgmt-history td:first-child {
+  white-space: nowrap;
+}
+
+/* ---- Dialogs: the layout of the fields ---- */
+.mgmt-dialog-row {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mgmt-dialog-row.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mgmt-dialog-row.is-street {
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+
+.mgmt-dialog-row.is-postal {
+  grid-template-columns: 140px minmax(0, 1fr);
+}
+
+.mgmt-dialog-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-optional {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.mgmt-dialog .form-control,
+.mgmt-dialog .form-select {
+  min-height: 44px;
+}
+
+.mgmt-seg {
+  display: flex;
+  gap: 8px;
+}
+
+.mgmt-seg-option {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.mgmt-seg-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.mgmt-seg-option::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.mgmt-seg-option.is-feedin::before {
+  background: var(--ok);
+}
+
+.mgmt-seg-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--warm);
+  font-weight: 700;
+}
+
+.mgmt-seg-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-number-field {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.mgmt-number-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--warm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mgmt-number-field .form-control {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.mgmt-dialog .mgmt-circuit-links {
+  margin-bottom: 12px;
+}
+
+/* ---- Phone: cards instead of tables, one column ---- */
+@media (max-width: 760px) {
+  .mgmt-table-view {
+    display: none;
+  }
+
+  .mgmt-cards-view {
+    display: block;
+  }
+
+  .mgmt-desktop-only-flex {
+    display: none;
+  }
+
+  .mgmt-filter-select {
+    width: 100%;
+  }
+
+  .mgmt-filter-search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mgmt-wide .mgmt-header-actions {
+    flex-direction: row;
+  }
+
+  .mgmt-wide .mgmt-header-actions > .btn,
+  .mgmt-wide .mgmt-header-actions > .mgmt-inline-form {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .mgmt-wide .mgmt-header-actions > .btn {
+    width: auto;
+    padding-inline: 8px;
+  }
+
+  .mgmt-wide .mgmt-header-actions .mgmt-inline-form .btn {
+    width: 100%;
+    padding-inline: 8px;
+  }
+
+  .mgmt-two-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mgmt-fact {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .mgmt-card-pad {
+    padding: 14px 16px 8px;
+  }
+
+  .mgmt-dialog-row.is-street {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+
+  .mgmt-dialog-row.is-postal {
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+
+  .mgmt-list-foot {
+    justify-content: center;
+  }
+
+  .mgmt-per-page {
+    display: none;
   }
 }

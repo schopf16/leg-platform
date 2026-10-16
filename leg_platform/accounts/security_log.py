@@ -55,6 +55,7 @@ MESSAGES = {
         "Two-factor authentication was removed with a recovery code (phone lost)"
     ),
     Event.ADDRESS_IMPORT_REQUESTED: "An address directory import was requested",
+    Event.RETENTION_OBLIGATION_SET: "The retention obligation of an account was set",
 }
 
 

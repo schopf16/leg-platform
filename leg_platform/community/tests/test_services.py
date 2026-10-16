@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, tag
 
+from leg_platform.accounts.models import AccountIntegrityError, SecurityEvent, User
 from leg_platform.community import assignments, history, legs, locations, preferences, problems, settings_service
 from leg_platform.community.addressing import AddressSuggestion
 from leg_platform.community.history import HistoryEvent
@@ -59,13 +60,64 @@ class AssignmentRuleTests(TestCase):
         self.assertEqual(entry.actor, self.actor)
         self.assertEqual(entry.detail, {"person_id": self.anna.pk, "valid_from": day(0).isoformat()})
 
-    def test_assigning_a_person_sets_the_retention_obligation(self):
+    def test_assigning_a_person_whose_assignment_is_in_force_sets_the_retention_obligation(self):
         # The account is kept, not deleted, when the person closes it (D-016); an assignment to a
         # protected row would otherwise make the deletion fail.
         self.assertFalse(self.anna.retention_obligation)
-        assignments.assign("person", self.mp, self.anna, day(0))
+        assignments.assign("person", self.mp, self.anna, day(0), self.actor, today=TODAY)
         self.anna.refresh_from_db()
         self.assertTrue(self.anna.retention_obligation)
+        # M-2: the security log names the account and the actor, nothing else.
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.RETENTION_OBLIGATION_SET)
+        self.assertEqual((event.account_id, event.actor_id), (self.anna.pk, self.actor.pk))
+        # Assigning again, or another assignment of the same person, logs nothing more.
+        other = make_metering_point(2)
+        assignments.assign("person", other, self.anna, day(-1), self.actor, today=TODAY)
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.RETENTION_OBLIGATION_SET).count(), 1)
+
+    def test_a_future_assignment_leaves_the_account_untouched_also_when_it_is_deleted(self):
+        # M-1: only an assignment in force makes the account part of the accounting.
+        planned = assignments.assign("person", self.mp, self.anna, day(10), self.actor, today=TODAY)
+        self.anna.refresh_from_db()
+        self.assertFalse(self.anna.retention_obligation)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.RETENTION_OBLIGATION_SET).exists())
+        assignments.delete("person", planned, self.actor, today=TODAY)
+        self.anna.refresh_from_db()
+        self.assertFalse(self.anna.retention_obligation)
+        # The day itself counts as in force.
+        assignments.assign("person", self.mp, self.bruno, TODAY, self.actor, today=TODAY)
+        self.bruno.refresh_from_db()
+        self.assertTrue(self.bruno.retention_obligation)
+
+    def test_an_account_with_any_assignment_is_deactivated_not_deleted(self):
+        # M-1: also one without the flag (a future assignment); the protected reference must not crash.
+        assignments.assign("person", self.mp, self.anna, day(10), self.actor, today=TODAY)
+        self.anna.refresh_from_db()
+        self.assertFalse(self.anna.retention_obligation)
+        self.assertEqual(self.anna.delete_or_deactivate(), "deactivated")
+        self.anna.refresh_from_db()
+        self.assertEqual(self.anna.status, self.anna.Status.DEACTIVATED)
+        with self.assertRaises(AccountIntegrityError):
+            self.anna.delete()
+        self.assertTrue(PersonAssignment.objects.filter(person=self.anna).exists())
+        # An account without any assignment is still deleted.
+        self.assertEqual(self.bruno.delete_or_deactivate(), "deleted")
+
+    def test_the_person_is_read_again_under_a_lock_and_must_be_active(self):
+        # L-1: a stale object of an account that was blocked or deactivated meanwhile is refused.
+        stale = User.objects.get(pk=self.anna.pk)
+        self.anna.set_status(User.Status.DEACTIVATED)
+        self.assertEqual(stale.status, User.Status.ACTIVE)
+        with self.assertRaises(assignments.AssignmentError) as caught:
+            assignments.assign("person", self.mp, stale, day(0), self.actor, today=TODAY)
+        self.assertEqual(caught.exception.code, "person_not_active")
+        self.assertFalse(PersonAssignment.objects.exists())
+        # An account that does not exist any more.
+        stale_bruno = User.objects.get(pk=self.bruno.pk)
+        self.assertEqual(self.bruno.delete_or_deactivate(), "deleted")
+        with self.assertRaises(assignments.AssignmentError) as caught:
+            assignments.assign("person", self.mp, stale_bruno, day(0), self.actor, today=TODAY)
+        self.assertEqual(caught.exception.code, "not_a_person")
 
     def test_a_flying_change_ends_the_previous_assignment_the_day_before(self):
         assignments.assign("person", self.mp, self.anna, day(-30))

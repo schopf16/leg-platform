@@ -19,7 +19,7 @@ SETUP_URL = reverse("accounts:two_factor_setup")
 HOME_URL = reverse("home")
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")
-LATER = ("Standorte", "Rechnungen", "Energie", "Mitteilungen")
+LATER = ("Rechnungen", "Energie", "Mitteilungen")  # "Locations" is a real page of the management area (D-078)
 
 
 def login(user=None):

@@ -43,6 +43,7 @@ AREA_VIEW_PERMISSIONS = (
 # points, settings. The pages that do not exist yet have no line yet.
 MENU = (
     MenuEntry("overview", _("Overview"), "i-overview", any_of=AREA_VIEW_PERMISSIONS),
+    MenuEntry("locations", _("Locations"), "i-building", ("community.view_location",)),
     MenuEntry("settings", _("Settings"), "i-settings", ("community.view_managementsettings",)),
 )
 

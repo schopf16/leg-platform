@@ -1,6 +1,7 @@
 """Template tags of the management area."""
 
 from django import template
+from django.urls import NoReverseMatch, reverse
 
 from leg_platform.community.models import Direction
 from leg_platform.community.status import MeteringPointStatus
@@ -21,10 +22,26 @@ def management_menu(context):
     return navigation.menu_entries(request.user, view_name)
 
 
+@register.simple_tag
+def optional_url(name, *args):
+    """The address of a page that may not exist yet, or "": the links of a list to the pages of
+    another area (LEG, person) appear as soon as that area has its pages."""
+    try:
+        return reverse(name, args=args)
+    except NoReverseMatch:
+        return ""
+
+
 @register.simple_tag(takes_context=True)
 def management_return_url(context, default):
     """The safe address to go back to (``next``), else ``default``."""
     return return_url(context["request"], default)
+
+
+@register.filter
+def bound(form, name):
+    """The bound field of a form by its name (for a layout that is a list of names)."""
+    return form[name]
 
 
 @register.filter

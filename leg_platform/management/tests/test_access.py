@@ -5,7 +5,7 @@ so that a later route without the access check is noticed (the equivalent of the
 administration URLs, ``accounts/tests/test_admin_exposure.py``)."""
 
 import re
-
+from pathlib import Path
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, Permission
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
@@ -111,8 +111,8 @@ class AccessTests(TestCase):
         cls.staff_all.user_permissions.set(Permission.objects.filter(content_type__app_label="community"))
         cls.administrator = staff_user("administrator.person@example.org", superuser=True)
 
-    def login(self, user):
-        client = VerifiedClient()
+    def login(self, user, **kwargs):
+        client = VerifiedClient(**kwargs)
         client.force_login(user)
         return client
 
@@ -152,13 +152,17 @@ class AccessTests(TestCase):
                     response = getattr(client, method)(path)
                     self.assertRedirects(response, reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
 
-    def test_an_account_with_all_rights_and_the_administrator_reach_every_route(self):
+    def test_an_account_with_all_rights_and_the_administrator_are_not_refused_on_any_route(self):
         for user in (self.staff_all, self.administrator):
             client = self.login(user)
             for path in PATHS:
                 with self.subTest(user=user.email, path=path):
-                    # GET only: the pages that change data are tested with their own data.
-                    self.assertEqual(client.get(path).status_code, 200)
+                    # GET only; the samples have the id 1, so a page may be missing (404) and a page that
+                    # only takes a POST answers 405. What must not happen: a refusal or a login redirect.
+                    response = client.get(path)
+                    self.assertIn(response.status_code, (200, 302, 404, 405))
+                    if response.status_code == 302:
+                        self.assertFalse(response["Location"].startswith(LOGIN))
 
     def test_the_right_to_view_opens_a_page_and_the_right_to_change_saves_it(self):
         settings_url = reverse("management:settings")
@@ -182,14 +186,31 @@ class AccessTests(TestCase):
         response = self.login(self.staff_all).get(reverse("management:overview"))
         self.assertIn("no-store", response["Cache-Control"])
 
+    def test_the_refusals_and_redirects_of_the_area_are_not_cached_either(self):
+        # L-3: the 403 and 404 pages, the redirect to the login and the CSRF refusal.
+        overview = reverse("management:overview")
+        csrf_client = self.login(self.staff_all, enforce_csrf_checks=True)
+        responses = {
+            "login redirect": Client().get(overview),
+            "404 for a non-staff account": self.login(self.plain).get(overview),
+            "403 without the permission": self.login(self.staff_none).get(overview),
+            "404 of an unknown page": self.login(self.staff_all).get("/management/does-not-exist/"),
+            "CSRF refusal": csrf_client.post(reverse("management:settings"), {}),
+        }
+        for name, response in responses.items():
+            with self.subTest(name):
+                self.assertIn("no-store", response["Cache-Control"])
+        self.assertEqual(responses["CSRF refusal"].status_code, 403)
+        self.assertEqual(responses["403 without the permission"].status_code, 403)
+
     def test_the_menu_offers_only_what_the_account_may_use(self):
         home = reverse("home")
         expectations = (
-            (self.plain, (), ("/management/", "/management/settings/")),
-            (self.staff_none, (), ("/management/", "/management/settings/")),
-            (self.staff_view, ("/management/", "/management/settings/"), ()),
-            (self.staff_location, ("/management/",), ("/management/settings/",)),
-            (self.administrator, ("/management/", "/management/settings/"), ()),
+            (self.plain, (), ("/management/", "/management/settings/", "/management/locations/")),
+            (self.staff_none, (), ("/management/", "/management/settings/", "/management/locations/")),
+            (self.staff_view, ("/management/", "/management/settings/"), ("/management/locations/",)),
+            (self.staff_location, ("/management/", "/management/locations/"), ("/management/settings/",)),
+            (self.administrator, ("/management/", "/management/settings/", "/management/locations/"), ()),
         )
         for user, present, absent in expectations:
             with self.subTest(user=user.email):
@@ -290,3 +311,58 @@ class MenuRuleTests(SimpleTestCase):
         request.user.is_verified = lambda: False
         with self.assertRaises(PermissionDenied):
             access.check_access(request, ("a.b",))
+
+    def test_a_single_permission_string_is_one_permission_not_its_letters(self):
+        # L-2: tuple("community.view_leg") would be a tuple of characters.
+        class One(access.ManagementAccessMixin):
+            permission_required = "community.view_leg"
+            any_permission_required = "community.view_location"
+
+        self.assertEqual(One().get_required_permissions(), ("community.view_leg",))
+        self.assertEqual(One().get_any_permissions(), ("community.view_location",))
+        request = RequestFactory().get("/management/")
+        request.user = self.User(["community.view_leg"], staff=True)
+        request.user.is_verified = lambda: True
+        self.assertIsNone(access.check_access(request, "community.view_leg"))
+        with self.assertRaises(PermissionDenied):
+            access.check_access(request, "community.view_location")
+
+
+@tag("mariadb")
+class PermissionNamesExistTests(TestCase):
+    """L-2: a permission string that is misspelled would silently deny everyone (or, in a template,
+    nobody could use the page); every one used by the views, the menu and the templates must be a
+    row of the permission table."""
+
+    NAME = re.compile(r"\b(community\.(?:view|add|change|delete|correct)_\w+)")
+    TEMPLATE_NAME = re.compile(r"perms\.(community)\.((?:view|add|change|delete|correct)_\w+)")
+
+    def used_names(self):
+        base = Path(settings.BASE_DIR) / "leg_platform" / "management"
+        names = set()
+        for path in base.rglob("*.py"):
+            if "tests" in path.parts:
+                continue
+            names.update(self.NAME.findall(path.read_text(encoding="utf-8")))
+        for path in base.rglob("*.html"):
+            names.update(f"{app}.{codename}" for app, codename in self.TEMPLATE_NAME.findall(path.read_text(encoding="utf-8")))
+        return names
+
+    def test_every_permission_of_the_views_the_menu_and_the_templates_exists(self):
+        names = self.used_names()
+        self.assertGreater(len(names), 10)  # the scan finds them
+        names.update(navigation.AREA_VIEW_PERMISSIONS)
+        for entry in navigation.MENU:
+            names.update(entry.permissions)
+        for _path, callback in ROUTES:
+            view_class = getattr(callback, "view_class", None)
+            for attribute in ("permission_required", "any_permission_required"):
+                value = getattr(view_class, attribute, ())
+                names.update((value,) if isinstance(value, str) else value)
+        for name in sorted(names):
+            with self.subTest(name):
+                app_label, codename = name.split(".")
+                self.assertTrue(
+                    Permission.objects.filter(content_type__app_label=app_label, codename=codename).exists(),
+                    f"{name} is not a permission",
+                )

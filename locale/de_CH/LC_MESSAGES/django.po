@@ -2980,3 +2980,373 @@ msgstr "Die Einstellungen der Verwaltung ansehen"
 
 msgid "Change the settings of the management area"
 msgstr "Die Einstellungen der Verwaltung ändern"
+
+# Management area, block 2: locations (verwaltung/standorte; texts 1:1 from the owner specification)
+msgid "Address changed"
+msgstr "Adresse geändert"
+
+msgid "Transformer circuit changed"
+msgstr "Trafokreis geändert"
+
+msgid "Address confirmed"
+msgstr "Adresse bestätigt"
+
+msgid "Archived"
+msgstr "Archiviert"
+
+msgid "Restored from the archive"
+msgstr "Aus dem Archiv wiederhergestellt"
+
+msgid "Locations merged"
+msgstr "Standorte zusammengeführt"
+
+msgid "Transformer circuit"
+msgstr "Trafokreis"
+
+msgid "Choose a transformer circuit from the list or create a new one."
+msgstr "Wählen Sie einen Trafokreis aus der Liste oder legen Sie einen neuen an."
+
+msgid "e.g. rear building"
+msgstr "z. B. Hinterhaus"
+
+msgid "Remark"
+msgstr "Bemerkung"
+
+msgid "Direction"
+msgstr "Richtung"
+
+msgid "Metering point number"
+msgstr "Messpunkt-Nummer"
+
+msgid "No LEG chosen yet"
+msgstr "Noch keine LEG gewählt"
+
+msgid "Enter the country and the identifier in the settings first."
+msgstr "Erfassen Sie zuerst das Land und die Kennung in den Einstellungen."
+
+msgid "Location"
+msgstr "Standort"
+
+msgid "Occupancy"
+msgstr "Belegung"
+
+msgid "no metering points"
+msgstr "keine Messpunkte"
+
+msgid "1 metering point"
+msgstr "1 Messpunkt"
+
+#, python-format
+msgid "%(count)d metering points"
+msgstr "%(count)d Messpunkte"
+
+msgid "empty"
+msgstr "leer"
+
+msgid "free"
+msgstr "frei"
+
+msgid "1 person"
+msgstr "1 Person"
+
+#, python-format
+msgid "%(count)d persons"
+msgstr "%(count)d Personen"
+
+msgid "no transformer circuit"
+msgstr "kein Trafokreis"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d locations"
+msgstr "%(first)d–%(last)d von %(total)d Standorten"
+
+msgid "All locations of the LEG with their metering points."
+msgstr "Alle Standorte der LEG mit ihren Messpunkten."
+
+msgid "All"
+msgstr "Alle"
+
+msgid "occupied"
+msgstr "belegt"
+
+msgid "Collapse all"
+msgstr "Alle zuklappen"
+
+msgid "Expand all"
+msgstr "Alle aufklappen"
+
+msgid "Create location"
+msgstr "Standort anlegen"
+
+msgid "A location is an address. You create the metering points afterwards at the location."
+msgstr "Ein Standort ist eine Adresse. Messpunkte legen Sie danach am Standort an."
+
+msgid "Edit address"
+msgstr "Adresse bearbeiten"
+
+msgid "Transfer and save"
+msgstr "Übertragen und speichern"
+
+msgid "Edit remark"
+msgstr "Bemerkung bearbeiten"
+
+msgid "Create transformer circuit"
+msgstr "Trafokreis anlegen"
+
+msgid "Use this one"
+msgstr "Diesen verwenden"
+
+#, python-format
+msgid "The location %(address)s gets this transformer circuit."
+msgstr "Der Standort %(address)s erhält diesen Trafokreis."
+
+msgid "Change transformer circuit"
+msgstr "Trafokreis ändern"
+
+msgid "The change reaches 1 location."
+msgstr "Die Änderung betrifft 1 Standort."
+
+#, python-format
+msgid "The change reaches %(count)d locations."
+msgstr "Die Änderung betrifft %(count)d Standorte."
+
+msgid "This transformer circuit already exists."
+msgstr "Diesen Trafokreis gibt es schon."
+
+msgid "Create metering point"
+msgstr "Messpunkt anlegen"
+
+#, python-format
+msgid "At the location %(address)s%(circuit)s."
+msgstr "Am Standort %(address)s%(circuit)s."
+
+msgid "There is no suggestion to decide on."
+msgstr "Es gibt keinen Vorschlag, über den zu entscheiden wäre."
+
+msgid "Delete location"
+msgstr "Standort löschen"
+
+#, python-format
+msgid "The location %(address)s is deleted for good."
+msgstr "Der Standort %(address)s wird endgültig gelöscht."
+
+msgid "This location has a history and cannot be deleted. Archive it instead."
+msgstr "Dieser Standort hat einen Verlauf und kann nicht gelöscht werden. Archivieren Sie ihn stattdessen."
+
+msgid "Deleted."
+msgstr "Gelöscht."
+
+msgid "Rows per page"
+msgstr "Zeilen pro Seite"
+
+msgid "Previous"
+msgstr "Vorherige"
+
+msgid "Next"
+msgstr "Nächste"
+
+msgid "Search"
+msgstr "Suche"
+
+msgid "Change the width of the column"
+msgstr "Breite der Spalte ändern"
+
+msgid "Details"
+msgstr "Details"
+
+msgid "Status of the metering point"
+msgstr "Status des Messpunkts"
+
+msgid "Recorded, not yet announced to the BKW."
+msgstr "Erfasst, noch nicht bei der BKW angemeldet."
+
+msgid "Announced to the BKW. The person has to confirm."
+msgstr "Bei der BKW angemeldet. Die Person muss bestätigen."
+
+msgid "The person has confirmed. The start date is not reached yet."
+msgstr "Die Person hat bestätigt. Startdatum noch nicht erreicht."
+
+msgid "Confirmed, the assignment is in effect."
+msgstr "Bestätigt, die Zuordnung ist wirksam."
+
+msgid "The assignment has ended."
+msgstr "Die Zuordnung ist beendet."
+
+msgid "The transformer circuit of the BKW that the location belongs to. The number is the reference for questions to the BKW."
+msgstr "Der Trafokreis der BKW, zu dem der Standort gehört. Die Nummer ist die Referenz für Rückfragen bei der BKW."
+
+msgid "Street and house number. A location is an address. A click on the row opens or closes the metering points."
+msgstr "Strasse und Hausnummer. Ein Standort ist eine Adresse. Ein Klick auf die Zeile klappt die Messpunkte auf oder zu."
+
+msgid "Number of persons:"
+msgstr "Anzahl Personen:"
+
+msgid "How many persons use a metering point at the location. A person with several metering points counts once."
+msgstr "Wie viele Personen am Standort einen Messpunkt nutzen. Eine Person mit mehreren Messpunkten zählt einmal."
+
+msgid "free:"
+msgstr "frei:"
+
+msgid "No active assignment."
+msgstr "Keine aktive Zuordnung."
+
+msgid "empty:"
+msgstr "leer:"
+
+msgid "No metering point has been created at the location."
+msgstr "Am Standort ist kein Messpunkt angelegt."
+
+msgid "Number of the metering points at the location. Opened, the table below shows each metering point with direction, LEG and status. Blue is consumption, green is feed-in."
+msgstr "Anzahl der Messpunkte am Standort. Aufgeklappt zeigt die Tabelle darunter jeden Messpunkt mit Richtung, LEG und Status. Blau ist Bezug, grün Einspeisung."
+
+msgid "Back to locations"
+msgstr "Zurück zu Standorte"
+
+msgid "Newly created by the customer, not confirmed yet."
+msgstr "Neu vom Kunden angelegt, noch nicht bestätigt."
+
+msgid "Check the address and the metering points. If everything is correct, confirm the location."
+msgstr "Prüfen Sie die Adresse und die Messpunkte. Ist alles korrekt, bestätigen Sie den Standort."
+
+msgid "Confirm address"
+msgstr "Adresse bestätigen"
+
+msgid "Restore location"
+msgstr "Standort wiederherstellen"
+
+msgid "Archive location"
+msgstr "Standort archivieren"
+
+msgid "Postal code, town"
+msgstr "PLZ, Ort"
+
+msgid "Grid"
+msgstr "Netz"
+
+msgid "Search transformer circuit"
+msgstr "Trafokreis suchen"
+
+msgid "Create new transformer circuit"
+msgstr "Neuen Trafokreis anlegen"
+
+msgid "Edit transformer circuit"
+msgstr "Trafokreis bearbeiten"
+
+msgid "Locations in the transformer circuit"
+msgstr "Standorte im Trafokreis"
+
+msgid "Metering points in the transformer circuit"
+msgstr "Messpunkte im Trafokreis"
+
+msgid "Metering point"
+msgstr "Messpunkt"
+
+msgid "Occupied by"
+msgstr "Belegt von"
+
+msgid "Go to the LEG page"
+msgstr "Zur LEG-Seite"
+
+msgid "no LEG"
+msgstr "keine LEG"
+
+msgid "Go to the person"
+msgstr "Zur Person"
+
+msgid "no person"
+msgstr "keine Person"
+
+msgid "No metering points at this location."
+msgstr "An diesem Standort gibt es keine Messpunkte."
+
+msgid "The assignment to a person is changed at the person or at the metering point."
+msgstr "Die Zuordnung zu einer Person ändert man bei der Person selbst oder im Messpunkt."
+
+msgid "History of the assignments"
+msgstr "Verlauf der Zuordnungen"
+
+msgid "Person"
+msgstr "Person"
+
+msgid "From"
+msgstr "Von"
+
+msgid "To"
+msgstr "Bis"
+
+msgid "No assignments yet."
+msgstr "Noch keine Zuordnungen."
+
+msgid "since"
+msgstr "seit"
+
+msgid "Date"
+msgstr "Datum"
+
+msgid "Event"
+msgstr "Ereignis"
+
+msgid "By"
+msgstr "Durch"
+
+msgid "This address already exists:"
+msgstr "Diese Adresse gibt es schon:"
+
+#, python-format
+msgid "%(address)s with %(counter)s metering point. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone."
+msgid_plural "%(address)s with %(counter)s metering points. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone."
+msgstr[0] "%(address)s mit %(counter)s Messpunkt. Beim Speichern werden die Messpunkte dieses Standorts auf jenen Standort übertragen und dieser Standort wird gelöscht. Das lässt sich nicht rückgängig machen."
+msgstr[1] "%(address)s mit %(counter)s Messpunkten. Beim Speichern werden die Messpunkte dieses Standorts auf jenen Standort übertragen und dieser Standort wird gelöscht. Das lässt sich nicht rückgängig machen."
+
+msgid "This transformer circuit already exists:"
+msgstr "Diesen Trafokreis gibt es schon:"
+
+msgid "It is assigned to the location, a second one is not created."
+msgstr "Er wird dem Standort zugeordnet, ein zweiter wird nicht angelegt."
+
+#, python-format
+msgid "%(address)s with %(counter)s metering point. If it is the same place, "
+msgid_plural "%(address)s with %(counter)s metering points. If it is the same place, "
+msgstr[0] "%(address)s mit %(counter)s Messpunkt. Wenn es derselbe Ort ist, "
+msgstr[1] "%(address)s mit %(counter)s Messpunkten. Wenn es derselbe Ort ist, "
+
+msgid "go to the existing location"
+msgstr "zum bestehenden Standort wechseln"
+
+msgid "This metering point number already exists."
+msgstr "Diese Messpunkt-Nummer gibt es schon."
+
+msgid "Only the last digits. Country and identifier come from the settings."
+msgstr "Nur die letzten Ziffern. Land und Kennung stammen aus den Einstellungen."
+
+#, python-format
+msgid "Filter problems (%(problem_count)s)"
+msgstr "Probleme filtern (%(problem_count)s)"
+
+msgid "Street, metering point number or transformer circuit"
+msgstr "Strasse, Messpunkt-Nummer oder Trafokreis"
+
+msgid "Apply"
+msgstr "Anwenden"
+
+msgid "Show or hide the metering points"
+msgstr "Messpunkte ein- oder ausblenden"
+
+msgid "new"
+msgstr "neu"
+
+msgid "Go to the details of the location"
+msgstr "Zur Detailseite des Standorts"
+
+msgid "No locations yet. Create the first location."
+msgstr "Noch keine Standorte. Legen Sie den ersten Standort an."
+
+# Security review corrections of block 1 (D-077)
+msgid "Retention obligation set"
+msgstr "Aufbewahrungspflicht gesetzt"
+
+msgid "Sender address correction accepted"
+msgstr "Korrektur der Absender-Adresse übernommen"
+
+msgid "Sender address correction not accepted"
+msgstr "Korrektur der Absender-Adresse nicht übernommen"

@@ -61,10 +61,24 @@ def update(values, actor):
     return events
 
 
-def dismiss_sender_suggestion(signature):
-    """"Do not accept" for the sender address as it is (the memory of the dismissal)."""
+def accept_sender_suggestion(suggestion, actor):
+    """"Accept" on the settings page puts the suggestion into the fields; it is saved only with the
+    button "Save", which writes ``SENDER_ADDRESS_CHANGED``. The decision itself is recorded with the
+    actor and the time (security review L-5). The address is a value of the organisation."""
+    with transaction.atomic():
+        ManagementSettings.objects.get_or_create(id=1)
+        row = ManagementSettings.objects.select_for_update().get(id=1)
+        history.record(
+            row, HistoryEvent.SENDER_SUGGESTION_ACCEPTED, actor, {"suggested": list(suggestion.as_tuple())}
+        )
+
+
+def dismiss_sender_suggestion(signature, actor=None):
+    """"Do not accept" for the sender address as it is (the memory of the dismissal), recorded with
+    the actor and the time (security review L-5)."""
     with transaction.atomic():
         ManagementSettings.objects.get_or_create(id=1)
         row = ManagementSettings.objects.select_for_update().get(id=1)
         row.sender_suggestion_dismissed_for = signature
         row.save(update_fields=["sender_suggestion_dismissed_for", "updated_at"])
+        history.record(row, HistoryEvent.SENDER_SUGGESTION_DISMISSED, actor)

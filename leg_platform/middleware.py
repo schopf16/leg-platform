@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils.cache import add_never_cache_headers
 
 # Maximum request body in bytes by path prefix (D-052, D-073); the longest matching prefix decides.
 # Checked before the CSRF middleware, which reads the form body of a POST request. The portal
@@ -18,6 +19,25 @@ def body_limit(path):
     """The limit in bytes for a path (``request.path_info``), or None if the path has none."""
     matching = [(prefix, limit) for prefix, limit in BODY_LIMITS if path.startswith(prefix)]
     return max(matching, key=lambda entry: len(entry[0]))[1] if matching else None
+
+
+class NoStoreForManagementMiddleware:
+    """No response of the management area is cached, whatever it is: also the 403 and 404 pages and
+    the CSRF refusal, which the view decorators never see (security review of block 1, L-3). The
+    pages show customer data and the answer to "may I see this" must not be kept by a browser or
+    a proxy. Outermost of the project's own middleware, so that every response of the prefix passes.
+    """
+
+    PREFIX = "/management/"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if request.path_info.startswith(self.PREFIX) or request.path_info == self.PREFIX.rstrip("/"):
+            add_never_cache_headers(response)
+        return response
 
 
 class RequestBodyLimitMiddleware:
