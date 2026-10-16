@@ -78,6 +78,8 @@ class PortalSettingsForm(forms.ModelForm):
     # the administration, where nothing can be saved (the check fails closed).
     actor = None
     request = None
+    # Set by ``clean`` when the save is refused for the login that is too old (for the template).
+    recent_login_refused = False
 
     logo_light_file = forms.FileField(
         required=False,
@@ -180,6 +182,8 @@ class PortalSettingsForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if not self.recently_authenticated():
+            # The template adds a logout action next to this message (D-073).
+            self.recent_login_refused = True
             # Nothing else is looked at: a session that did not authenticate a moment ago cannot
             # change what every visitor sees (security review of D-073, L-5; D-055). The files
             # of the upload are not even read.

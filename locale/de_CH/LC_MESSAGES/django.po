@@ -2461,8 +2461,8 @@ msgid "For your safety, the portal settings can only be saved within %(minutes)s
 msgstr "Aus Sicherheitsgründen können die Portal-Einstellungen nur innerhalb von %(minutes)s Minuten nach der Anmeldung gespeichert werden. Melden Sie sich ab, melden Sie sich erneut an und speichern Sie die Änderungen sofort. Es wurde nichts gespeichert."
 
 #, python-format
-msgid "You logged in more than %(minutes)s minutes ago. To save changes here you have to log in again first."
-msgstr "Sie haben sich vor mehr als %(minutes)s Minuten angemeldet. Um hier Änderungen zu speichern, müssen Sie sich zuerst erneut anmelden."
+msgid "To save changes you must have logged in within the last %(minutes)s minutes. Please log out and log in again first."
+msgstr "Um Änderungen zu speichern, müssen Sie sich in den letzten %(minutes)s Minuten angemeldet haben. Bitte melden Sie sich zuerst ab und wieder an."
 
 msgid "Choose either new logos or the removal of the uploaded logos, not both."
 msgstr "Wählen Sie entweder neue Logos oder das Entfernen der hochgeladenen Logos, nicht beides."

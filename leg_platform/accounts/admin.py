@@ -1444,22 +1444,19 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         return type(form.__name__, (form,), {"actor": request.user, "request": request})
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
-        # Saving needs a recent login (``PortalSettingsForm``); say so before the person types
-        # and uploads, not only after the save was refused.
+        # Saving needs a recent login (``PortalSettingsForm``); say so at the top of the page
+        # before the person types and uploads, with a logout action next to it (the template
+        # ``change_form.html``). The check at the save stays authoritative and unchanged.
         if (
             request.method == "GET"
             and self.has_change_permission(request)
             and not second_factor.recently_authenticated(request)
         ):
-            self.message_user(
-                request,
-                gettext(
-                    "You logged in more than %(minutes)s minutes ago. To save changes here you "
-                    "have to log in again first."
-                )
-                % {"minutes": int(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds() // 60)},
-                messages.WARNING,
-            )
+            extra_context = {
+                **(extra_context or {}),
+                "portal_login_stale": True,
+                "portal_login_minutes": int(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds() // 60),
+            }
         return super().change_view(request, object_id, form_url, extra_context)
 
     def get_urls(self):

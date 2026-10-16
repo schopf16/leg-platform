@@ -126,6 +126,15 @@ input.portal-colour {
   margin-top: 2px;
 }
 
+/* The logout action next to the notice about the login that is too old (D-073). */
+.portal-login-warning .portal-logout-button {
+  margin-inline-start: 12px;
+}
+
+.portal-login-refused {
+  margin: 0 0 12px;
+}
+
 /* The preview: two panels with the surfaces of the design language (docs/DESIGN.md, 3.1). */
 .portal-preview {
   display: grid;
@@ -182,11 +191,16 @@ input.portal-colour {
   background: var(--pv-plate);
 }
 
+/* An explicit box, like the header of the portal (48 px high): an SVG file with only a viewBox has
+   no intrinsic size, and a box that only has a maximum would shrink it to 0 x 0 (D-073). */
 .portal-preview-logo img {
   display: block;
+  box-sizing: border-box;
+  width: 192px;
   max-width: 100%;
-  max-height: 48px;
+  height: 48px;
   object-fit: contain;
+  object-position: left center;
 }
 
 .portal-preview-card {

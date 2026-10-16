@@ -5,6 +5,26 @@
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% url 'admin:accounts_portalsettings_preview_css' %}">{% endblock %}
 {% block extrahead %}{{ block.super }}<script defer src="{% static 'js/portal-preview.js' %}"></script>{% endblock %}
 
+{# Saving needs a login of the last minutes (D-055). A person with the right to change gets a #}
+{# warning at the top before anything is typed, and a logout action (a POST with the CSRF token, #}
+{# the logout of the administration). The form is outside the change form; the buttons point to #}
+{# it by its id, so that the second button can sit next to the error message. The save check on #}
+{# the server decides, not this page. #}
+{% block messages %}
+{% if has_change_permission %}<form id="portal-logout-form" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}</form>{% endif %}
+{% if portal_login_stale %}
+<ul class="messagelist portal-login-warning"><li class="warning">{% blocktranslate with minutes=portal_login_minutes %}To save changes you must have logged in within the last {{ minutes }} minutes. Please log out and log in again first.{% endblocktranslate %}
+<button type="submit" class="button portal-logout-button" form="portal-logout-form">{% translate "Log out" %}</button></li></ul>
+{% endif %}
+{{ block.super }}
+{% endblock %}
+
+{# After a refused save, the logout action sits right below the error message. #}
+{% block field_sets %}
+{% if adminform.form.recent_login_refused %}<p class="portal-login-refused"><button type="submit" class="button portal-logout-button" form="portal-logout-form">{% translate "Log out" %}</button></p>{% endif %}
+{{ block.super }}
+{% endblock %}
+
 {# The history names the acting accounts and is for system administrators only (D-073). #}
 {% block object-tools %}{% if request.user.is_superuser %}{{ block.super }}{% endif %}{% endblock %}
 

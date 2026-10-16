@@ -6,7 +6,9 @@ The validation of the files themselves is in ``test_logo_images``."""
 
 import importlib
 import json
+import re
 import time
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
@@ -321,6 +323,35 @@ class AccessorTests(TestCase):
             logo_light_sha256="", logo_light_type="", logo_dark_sha256="", logo_dark_type=""
         )
         self.assertEqual(portal_values().logo_light, "/static/instance/l.svg")
+
+
+class PreviewLogoBoxTests(SimpleTestCase):
+    """The logo of the preview has an explicit size (D-073, browser review): an SVG file with only
+    a viewBox has no intrinsic size, and a box with only a maximum showed it as 0 x 0 pixels."""
+
+    def rule(self, selector):
+        css = (Path(settings.BASE_DIR) / "leg_platform/static/css/admin-portal.css").read_text(encoding="utf-8")
+        match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+        self.assertIsNotNone(match, selector)
+        return match.group(1)
+
+    def test_the_image_has_a_width_and_a_height_and_is_fitted_into_the_box(self):
+        rule = self.rule(".portal-preview-logo img")
+
+        self.assertRegex(rule, r"(?<![-\w])width:\s*\d+px")
+        self.assertRegex(rule, r"(?<![-\w])height:\s*\d+px")
+        self.assertRegex(rule, r"object-fit:\s*contain")
+        self.assertNotRegex(rule, r"(?<![-\w])(width|height):\s*(auto|0)\b")
+
+    def test_the_height_is_the_one_of_the_header_of_the_portal(self):
+        frame = (Path(settings.BASE_DIR) / "leg_platform/static/css/frame.css").read_text(encoding="utf-8")
+        header = re.search(r"\.frame-header \.portal-logo,[^{]*\{([^}]*)\}", frame).group(1)
+
+        self.assertIn("height: 48px", header)
+        self.assertIn("height: 48px", self.rule(".portal-preview-logo img"))
+
+    def test_the_dark_plate_keeps_its_background(self):
+        self.assertIn("background: var(--pv-plate)", self.rule(".portal-preview-plate"))
 
 
 class SharedColourRulesTests(SimpleTestCase):
@@ -1207,22 +1238,78 @@ class RecentLoginTests(TestCase):
         self.assertFalse(PortalSettings.objects.exclude(logo_light_sha256="").exists())
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_UPLOAD_REJECTED).exists())
 
+    WARNING = "Um Änderungen zu speichern, müssen Sie sich in den letzten 5 Minuten angemeldet haben."
+
     def test_the_page_can_still_be_viewed_and_says_why_saving_will_fail(self):
         make_login_older(self.client, 3600)
 
         response = self.client.get(SETTINGS_URL)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sie haben sich vor mehr als 5 Minuten angemeldet.")
+        self.assertContains(response, self.WARNING)
+        self.assertContains(
+            response,
+            "Bitte melden Sie sich zuerst ab und wieder an.",
+        )
+
+    def test_the_warning_is_at_the_top_before_the_form_and_has_a_post_logout_with_the_token(self):
+        make_login_older(self.client, 3600)
+
+        html = self.client.get(SETTINGS_URL).content.decode()
+
+        warning = html.index(self.WARNING)
+        self.assertLess(warning, html.index('id="portalsettings_form"'))
+        self.assertLess(warning, html.index("<h1"))
+        logout = re.search(r'<form id="portal-logout-form" method="post" action="([^"]*)">(.*?)</form>', html, re.S)
+        self.assertIsNotNone(logout)
+        self.assertEqual(logout.group(1), reverse("admin:logout"))
+        self.assertIn('name="csrfmiddlewaretoken"', logout.group(2))
+        button = re.search(r'<button type="submit"[^>]*form="portal-logout-form"[^>]*>\s*Abmelden\s*</button>', html)
+        self.assertIsNotNone(button)
+        self.assertLess(warning, button.start())
+        self.assertEqual(self.client.get(reverse("admin:logout")).status_code, 405)
+
+    def test_the_logout_action_ends_the_session(self):
+        make_login_older(self.client, 3600)
+
+        response = self.client.post(reverse("admin:logout"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_a_refused_save_shows_the_logout_action_next_to_the_message(self):
+        make_login_older(self.client, 3600)
+
+        html = self.client.post(SETTINGS_URL, form_data(name="Changed")).content.decode()
+
+        message = html.index(self.MESSAGE)
+        action = html.index('class="button portal-logout-button" form="portal-logout-form"', message)
+        self.assertLess(action - message, 600)
+        self.assertTrue(self.row_is_empty())
+
+    def test_a_recent_login_gets_no_warning_block(self):
+        html = self.client.get(SETTINGS_URL).content.decode()
+
+        self.assertNotIn(self.WARNING, html)
+        self.assertNotIn("portal-login-warning", html)
+
+    def test_a_saved_input_stays_filled_after_a_refused_save(self):
+        make_login_older(self.client, 3600)
+
+        response = self.client.post(SETTINGS_URL, form_data(name="Typed name"))
+
+        self.assertContains(response, 'value="Typed name"')
 
     def test_a_recent_login_gets_no_warning(self):
-        self.assertNotContains(self.client.get(SETTINGS_URL), "vor mehr als 5 Minuten angemeldet")
+        self.assertNotContains(self.client.get(SETTINGS_URL), "in den letzten 5 Minuten angemeldet")
 
     def test_a_person_who_can_only_view_gets_no_warning_and_still_cannot_save(self):
         client, _person = staff_with("view.person@example.org", "view_portalsettings")
         make_login_older(client, 3600)
 
-        self.assertNotContains(client.get(SETTINGS_URL), "vor mehr als 5 Minuten angemeldet")
+        html = client.get(SETTINGS_URL).content.decode()
+        self.assertNotIn("in den letzten 5 Minuten angemeldet", html)
+        self.assertNotIn("portal-logout-form", html)
         self.assertEqual(client.post(SETTINGS_URL, form_data(name="Changed")).status_code, 403)
         self.assertTrue(self.row_is_empty())
 
