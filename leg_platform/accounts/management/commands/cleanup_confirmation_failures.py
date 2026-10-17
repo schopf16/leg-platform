@@ -14,14 +14,10 @@ from leg_platform.accounts.second_factor import (
 def delete_expired_per_account(model, field, cutoff):
     """Delete the rows of ``model`` whose ``field`` is before ``cutoff``; return (deleted, skipped).
 
-    The lock order of the confirmation counters is: account row, then counter rows (D-072); the
-    requests keep it (``second_factor``). The accounts that have expired rows are found with a
-    read that takes no lock. Then, for each account in a short transaction of its own, the account
-    row is locked (``skip_locked``: an account that a request holds is left for the next run, so
-    the clean-up never waits for a request and cannot be part of a cycle with it), and only the
-    expired rows of this account are deleted, through the index that starts with the account like
-    the requests do. A skipped account also counts an account that was deleted in the meantime
-    (its rows went with the cascade).
+    Lock order: account row, then counter rows (D-072). Accounts with expired rows are found by an
+    unlocked read; then per account, in a short transaction, the account row is locked with
+    ``skip_locked`` (an account in use is left for the next run, so the clean-up never waits for a
+    request) and only its expired rows are deleted. A skipped account also counts one deleted meanwhile.
     """
     expired = {f"{field}__lt": cutoff}
     account_ids = list(

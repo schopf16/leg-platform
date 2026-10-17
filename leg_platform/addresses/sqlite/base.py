@@ -1,14 +1,5 @@
-"""Django's SQLite backend, with a directory file that is created with mode 0600 (D-075).
-
-Nothing else differs: the options (WAL, ``busy_timeout``, ``synchronous``, the transaction mode)
-are given in ``DATABASES`` (``leg_platform.addresses.storage.directory_database``). The
-backend creates the file itself before SQLite does, so that the file is readable and writable only
-for the service user whatever the umask is (SQLite gives the ``-wal`` and ``-shm`` files the
-permissions of the database file). It also creates every missing folder of the path, each as mode
-0700 (on the servers the folder comes from ``StateDirectory=`` of the systemd unit). It refuses a
-symbolic link at the file path (security review of D-075, L-4): a link could point the importer at
-another file, and narrowing the mode would then change that file.
-"""
+"""SQLite backend that creates the directory file (mode 0600) and missing folders (0700) itself,
+and refuses a symbolic link at the file path (D-075). Options come from ``storage.directory_database``."""
 
 import os
 import stat
@@ -27,11 +18,7 @@ class DatabaseWrapper(base.DatabaseWrapper):
 
     @staticmethod
     def _make_folders(folder):
-        """Create the missing folders of ``folder``, every one of them as mode 0700.
-
-        ``Path.mkdir(parents=True)`` applies ``mode`` only to the last folder; the others get the
-        default mode (https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir).
-        """
+        """Create missing folders, each mode 0700 (``mkdir(parents=True)`` applies ``mode`` to the last only)."""
         missing = []
         while not folder.exists() and folder != folder.parent:
             missing.append(folder)
@@ -46,13 +33,10 @@ class DatabaseWrapper(base.DatabaseWrapper):
             if path.is_symlink():
                 raise OSError("The directory file is a symbolic link.")
             try:
-                # O_EXCL: the file is created or the call fails, never an existing file (or a link
-                # created in between) opened for creation.
+                # O_EXCL: create or fail, never open an existing file (or a link created meanwhile).
                 descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
             except FileExistsError:
-                # An existing file keeps its content; a broader mode is narrowed. Windows has no
-                # such modes. O_NOFOLLOW: a link that appeared after the check above is refused
-                # instead of followed.
+                # Narrow a broader mode; O_NOFOLLOW refuses a link that appeared after the check.
                 if os.name == "posix":
                     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
                     try:
@@ -63,6 +47,5 @@ class DatabaseWrapper(base.DatabaseWrapper):
             else:
                 os.close(descriptor)
         except OSError:
-            # A database error, so that the lookup and the status page treat it like any other
-            # unavailable directory instead of failing the request. No path in the message.
+            # A database error so lookup/status treat it as an unavailable directory; no path in the message.
             raise OperationalError("The address directory file cannot be prepared.") from None

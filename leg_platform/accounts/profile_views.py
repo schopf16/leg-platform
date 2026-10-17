@@ -1,14 +1,8 @@
-"""The profile: cards that change in place (D-059; LEG-Design-Vorgaben/navigation, section 3.3).
+"""The profile page ``/profile/``: cards that change in place (D-059).
 
-One page, ``/profile/``, with a card for the personal details, the email addresses, the password,
-two-factor authentication and the deletion of the account. A card shows its view or, when the
-person asks for it, its form: the state is in the address (``?edit=email``, ``?edit=two_factor&
-step=disable`` ...) and in the answers of the forms, rendered by the server, so that the page works
-without a script and a reload or "back" keeps the step. Only one card is in an edit state at a time.
-
-The forms post to the addresses of the earlier pages (they still exist, as the places where a card
-is changed); a form with errors answers with the profile page in the same state, a success leads
-back to the card with a message. The account is always ``request.user``.
+The card state is in the address (``?edit=email``, ``?edit=two_factor&step=disable``) and in the
+answers of the forms, rendered by the server (works without a script). Only one card is in an edit
+state at a time. The forms post to the earlier pages' addresses; the account is always ``request.user``.
 """
 
 import copy
@@ -27,8 +21,7 @@ from django.views import View
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django_otp import login as otp_login
 
-from leg_platform.accounts import email_change, second_factor, security_log, totp
-from leg_platform.accounts import password_reset
+from leg_platform.accounts import email_change, password_reset, second_factor, security_log, totp
 from leg_platform.accounts.forms import (
     AccountDeleteForm,
     ChangePasswordForm,
@@ -63,8 +56,7 @@ CARD_ANCHORS = {
     "two_factor": "card-two-factor",
     "delete": "card-delete",
 }
-# The steps of the card of two-factor authentication that a person can open by address; the codes
-# are only ever the answer to a form (they are stored nowhere).
+# Steps of the two-factor card that a person can open by address; codes are only ever the answer to a form.
 TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "lost_phone")
 
 
@@ -80,8 +72,7 @@ def back_to(card):
 
 
 def two_factor_state(user, edit, step, session):
-    """The state of the card of two-factor authentication that the request asks for, reduced to
-    what is possible for this account."""
+    """The state of the two-factor card that the request asks for, reduced to what is possible for this account."""
     active = second_factor.has_second_factor(user)
     if edit != "two_factor":
         return "setup" if second_factor.requires_second_factor(user) and not active else "view"
@@ -110,8 +101,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     only_two_factor = (
         second_factor.requires_second_factor(user) and not second_factor.is_second_factor_complete(user)
     )
-    # The messages of the views go into the card that they belong to (the tag "card-<name>"); the
-    # rest, and those of a card that is not shown, stay at the top of the page.
+    # Messages tagged "card-<name>" go into that card; the rest, and those of a hidden card, stay on top.
     shown = {"two_factor"} if only_two_factor else set(CARD_ANCHORS)
     card_messages = {card: [] for card in CARD_ANCHORS}
     general_messages = []
@@ -172,8 +162,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
 
 
 class ProfileCardView(NeverCacheMixin, LoginRequiredMixin, View):
-    """Base of the views of the cards: a person with a login, no caching, and the fields of the
-    passwords and codes masked in error reports."""
+    """Base of the card views: a login, no caching, passwords and codes masked in error reports."""
 
     @method_decorator(
         sensitive_post_parameters("current_password", "new_password1", "new_password2", "otp_token")
@@ -181,8 +170,7 @@ class ProfileCardView(NeverCacheMixin, LoginRequiredMixin, View):
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
         if getattr(request, second_factor.SESSION_ENDED_ATTRIBUTE, False):
-            # The check of a code ended this session (D-062, block 9): whatever the view answered,
-            # the person is logged out and told so at the login page.
+            # A wrong-code limit ended this session (D-062): log out and tell at the login page.
             second_factor.end_session_for_wrong_codes(request)
             return redirect("accounts:login")
         return response
@@ -192,13 +180,11 @@ class ProfileView(ProfileCardView):
     """The profile; ``?edit=<card>&step=<step>`` opens one card in its edit state."""
 
     def get(self, request):
-        return render_profile(
-            request, edit=request.GET.get("edit"), step=request.GET.get("step")
-        )
+        return render_profile(request, edit=request.GET.get("edit"), step=request.GET.get("step"))
 
 
 class ProfileEditView(ProfileCardView):
-    """Save the personal details (name, address, further details); no confirmation is needed."""
+    """Save the personal details; no confirmation is needed."""
 
     def get(self, request):
         return render_profile(request, edit="personal")
@@ -213,21 +199,19 @@ class ProfileEditView(ProfileCardView):
 
 
 class EmailChangeRequestView(ProfileCardView):
-    """Request new addresses (or remove the second one) with the password and, where set up, the
-    code; the response is the same for every target address (D-059)."""
+    """Request new addresses (or remove the second one) with the proof; the same response for every target address (D-059)."""
 
     def get(self, request):
         return render_profile(request, edit="email")
 
     def refused(self, request):
-        """The answer when the limit of the client address or of the instance is used up (D-038).
-        Nothing was stored. The person is logged in, so telling it hints at no account."""
+        """The answer when the client or instance limit is used up (D-038); nothing was stored."""
         messages.error(request, _("Too many requests, please try again later."), extra_tags="card-email")
         return render_profile(request, edit="email", status=429)
 
     def kinds_asked(self, request):
-        """The kinds of request that the posted values ask for, judged before the password and the
-        code are checked: a refusal must not use up a code of the authenticator app."""
+        """The kinds of request the posted values ask for, judged before the proof is checked
+        (a refusal must not use up an app code)."""
         user = request.user
         kinds = []
         if request.POST.get("email", "").strip().lower() not in ("", user.email):
@@ -252,7 +236,7 @@ class EmailChangeRequestView(ProfileCardView):
                 remove_secondary=form.remove_secondary,
             )
         except email_change.RequestRefused:
-            # A limit was reached between the check and the request: everything was rolled back.
+            # A limit was reached between the check and the request: rolled back.
             return self.refused(request)
         if form.login_change or form.secondary_change:
             messages.success(
@@ -266,7 +250,7 @@ class EmailChangeRequestView(ProfileCardView):
 
 
 class EmailChangeCancelView(ProfileCardView):
-    """The button "Anfrage abbrechen": ends a pending request of the account (D-059)."""
+    """Ends a pending request of the account (D-059)."""
 
     http_method_names = ["post"]
 
@@ -279,11 +263,8 @@ class EmailChangeCancelView(ProfileCardView):
 
 
 class PasswordChangeView(ProfileCardView):
-    """Change the password after asking for the current one: the card "Passwort" (K11).
-
-    An account that must replace its password (D-005) keeps the page of its own, which is the only
-    thing it can reach.
-    """
+    """Change the password after the proof. An account that must replace its password (D-005)
+    keeps a page of its own, the only one it can reach."""
 
     template_name = "accounts/password_change.html"
 
@@ -296,26 +277,20 @@ class PasswordChangeView(ProfileCardView):
     def get(self, request):
         if not self.required():
             return render_profile(request, edit="password")
-        return render(
-            request, self.template_name, {"form": self.form(), "required": True}
-        )
+        return render(request, self.template_name, {"form": self.form(), "required": True})
 
     def post(self, request):
-        # The state of the account at the start of the request: with the code as the proof the
-        # password is not typed, so a change of the account in between is found by this value
-        # (D-040, D-062).
+        # With a code as the proof no password is typed: a parallel change of the account is
+        # found by comparing the session hash with the one at the start (D-040, D-062).
         started_with = request.user.get_session_auth_hash()
         form = self.form(request.POST)
         if not form.is_valid():
             return self.invalid(form)
         changed_meanwhile = False
         with transaction.atomic():
-            # The row is locked and read again, so that the new password is written to the
-            # current state of the account. With the password as the proof it is checked again
-            # here: a parallel change of the password in between must not be overwritten by a
-            # request that gave the old password (D-040). With the code as the proof the code was
-            # used up by the form and cannot be checked a second time; the session hash (derived
-            # from the password) is compared with the one of the start instead.
+            # Lock and re-read the row, so the new password is written to the current state: a
+            # parallel password change must not be overwritten by a request with the old password
+            # (D-040). A code is used up by the form and cannot be checked twice, hence the hash.
             user = User._base_manager.select_for_update().get(pk=request.user.pk)
             if form.proof == "code":
                 verified = constant_time_compare(user.get_session_auth_hash(), started_with)
@@ -326,13 +301,10 @@ class PasswordChangeView(ProfileCardView):
                 )
             if verified:
                 form.user = user
-                # An initial password that had to be replaced is replaced (D-005).
                 user.password_change_required = False
                 form.save()
-                # A request for a new address made before the change must not be confirmed
-                # afterwards (security review, final, M-A).
+                # Requests made before the change must not be confirmed afterwards, nor old reset links used.
                 user.discard_email_change_requests()
-                # Links of earlier password resets must not work after the change.
                 VerificationToken.objects.filter(
                     user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
                 ).delete()
@@ -346,8 +318,7 @@ class PasswordChangeView(ProfileCardView):
             else:
                 form.add_error("current_password", ReauthenticationForm.password_error)
             return self.invalid(form)
-        # Renews the session ID and keeps this session; Django derives the session hash from
-        # the password, so every other session of the account ends (docs/SECURITY.md).
+        # Renews the session ID and keeps this session; every other session of the account ends.
         update_session_auth_hash(request, user)
         messages.success(request, _("Your password was changed."), extra_tags="card-password")
         return redirect("accounts:profile") if self.required() else back_to("password")
@@ -368,11 +339,10 @@ class TwoFactorOverviewView(ProfileCardView):
 
 
 class TwoFactorSetupView(ProfileCardView):
-    """Start setting up the authenticator app.
+    """Start setting up the authenticator app (a POST; opening the page changes nothing).
 
-    A session that authenticated at most five minutes ago starts without the password; every
-    other session enters the password first (D-055). Starting is a POST: opening the page changes
-    nothing. The page also is the place an account that must have a second factor is sent to.
+    A session authenticated at most five minutes ago starts without the password; every other
+    session enters it first (D-055). Also where an account that must have a second factor is sent.
     """
 
     def dispatch(self, request, *args, **kwargs):
@@ -387,8 +357,7 @@ class TwoFactorSetupView(ProfileCardView):
         return render_profile(request, edit="two_factor", step="setup")
 
     def post(self, request):
-        # The button of the start page and of the card sends no password. If the five minutes are
-        # over by then, the password is asked for, without an error message.
+        # The card's button sends no password; if the five minutes are over, ask for it without an error.
         if self.recent():
             form = StartSetupForm(request.POST)
         elif "current_password" not in request.POST:
@@ -432,12 +401,10 @@ class TwoFactorConfirmView(ProfileCardView):
             )
             if result is not None:
                 device, codes = result
-                # Other sessions of the account ended with the confirmation; this one stays
-                # (D-044).
+                # Other sessions ended with the confirmation; this one stays (D-044).
                 update_session_auth_hash(request, request.user)
                 request.session.pop(ENROLMENT_SESSION_KEY, None)
-                # The person just proved to own the app: this session has completed the second
-                # factor. The session ID is renewed, as after every second factor.
+                # This session has completed the second factor: renew the session ID.
                 request.session.cycle_key()
                 otp_login(request, device)
                 return render_profile(request, codes=codes, enrolled=True)
@@ -446,11 +413,7 @@ class TwoFactorConfirmView(ProfileCardView):
 
 
 class TwoFactorQrView(TwoFactorMixin, View):
-    """The QR code of the secret that is being set up, as an image of its own.
-
-    The policy of the pages allows images only from the own origin (no ``data:`` images,
-    D-028), so the code is not embedded in the page.
-    """
+    """The QR code of the secret being set up, as an own image (the CSP allows no ``data:`` images, D-028)."""
 
     def get(self, request):
         device = totp.unconfirmed_totp_device(
@@ -489,8 +452,7 @@ class RecoveryCodesView(ProfileCardView):
 
 
 class RecoveryCodesDoneView(ProfileCardView):
-    """"Fertig" after the codes: checked on the server. The codes cannot be shown again, so
-    without the tick the person is told to make new ones if they did not save them."""
+    """"Done" after the codes, checked on the server; without the tick the person is told to make new codes."""
 
     http_method_names = ["post"]
 
@@ -541,12 +503,9 @@ class TwoFactorDisableView(ProfileCardView):
 
 
 class TwoFactorLostPhoneView(TwoFactorDisableView):
-    """The way "phone lost" of turning off 2FA: the password and a recovery code (D-062).
+    """The way "phone lost" of turning off 2FA: password and a recovery code (D-062).
 
-    The same rules as turning off: not for staff users and administrators, and only with a second
-    factor. The recovery code is used up by the check. Everything after the check is the same as
-    in ``TwoFactorDisableView``: the second factor is removed, the other sessions end, every
-    address is told, the event is logged.
+    Same rules as ``TwoFactorDisableView``; the recovery code is used up by the check.
     """
 
     def get(self, request):
@@ -554,11 +513,9 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
 
     @sensitive_variables("form")
     def post(self, request):
-        """The check of the password and the code and the removal are ONE transaction under the
-        lock of the account (security review, block 9, L-1): the state is checked again before the
-        code is used up, and a refusal of the removal gives the code back. A parallel post with the
-        same code finds the second factor gone and uses up nothing. A wrong answer is committed
-        (the count of the session, D-062), a refusal is rolled back."""
+        """Check and removal are ONE transaction under the account lock: the state is re-checked
+        before the code is used up, and a refusal gives the code back. A parallel post with the
+        same code uses up nothing. A wrong answer is committed (session count, D-062)."""
         form = LostPhoneForm(request.POST, request=request)
         try:
             with transaction.atomic():
@@ -580,11 +537,9 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
 
 
 class AccountDeleteView(ProfileCardView):
-    """Delete the logged-in account, or keep it deactivated under the retention rule (D-016).
+    """Delete the account, or keep it deactivated under the retention rule (D-016).
 
-    The page and the message are the same for every account: the person is told that the account
-    is deleted and that logging in is no longer possible (owner decision of 2026-10-14, D-055).
-    The result is rendered by the answer itself, because the session ends with the deletion.
+    The page and message are the same for every account (D-055); the answer renders the result itself because the session ends.
     """
 
     def get(self, request):
@@ -598,8 +553,7 @@ class AccountDeleteView(ProfileCardView):
         addresses = user.notification_addresses()
         try:
             with transaction.atomic():
-                # delete_or_deactivate also blanks the name in the queued notifications of the
-                # account (D-068); they are still sent, with the neutral greeting.
+                # Also blanks the name in the account's queued notifications (D-068).
                 outcome = user.delete_or_deactivate()
                 event = (
                     SecurityEvent.Event.ACCOUNT_DEACTIVATED
@@ -607,7 +561,7 @@ class AccountDeleteView(ProfileCardView):
                     else SecurityEvent.Event.ACCOUNT_DELETED
                 )
                 security_log.record(event, account=user, actor=user)
-                # Every address of the account is told (D-059); the jobs hold no account key.
+                # Every address is told (D-059); the jobs hold no account key.
                 enqueue_for_account(MailJob.Kind.ACCOUNT_DELETED, user, addresses=addresses)
         except AccountIntegrityError:
             messages.error(request, _("The account could not be deleted."), extra_tags="card-delete")

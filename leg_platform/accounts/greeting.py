@@ -1,28 +1,17 @@
-"""The greeting of the security notifications (D-068, R-13).
+"""The greeting of the security notifications (D-068).
 
-A notification to an address of an account (``MailJob.NOTIFICATION_KINDS``) greets "Guten Tag
-First Last" when the account belongs to a person with a suitable name, and "Guten Tag" in every
-other case. The name is free text typed by a person, so it passes a guard before it is stored in
-a mail job or put in an email:
+A notification greets "Hello First Last" when the account belongs to a person with a suitable
+name, else a neutral "Hello". The name is free text, so it passes a guard before it is stored in a
+mail job or put in an email: NFKC; control/format/surrogate/private-use/unassigned/separator
+characters and invisible marks and Hangul fillers removed; whitespace collapsed; allow-list of
+letters, combining marks (only after a letter, at most three), space, hyphen, apostrophe and period
+(anything else gives the neutral greeting, not a name with the character cut out); a name that
+looks like a web or email address (also without marks) or is longer than
+``GREETING_NAME_MAX_LENGTH`` gives the neutral greeting. The result is a fixed point of the guard.
 
-* NFKC normalisation; control, format, surrogate, private-use, unassigned, line and paragraph
-  separator characters are removed (so no line break or zero-width character survives);
-  whitespace is collapsed to single spaces;
-* allow-list: letters, combining marks, space, hyphen-minus, apostrophe (' or the typographic
-  apostrophe) and period; any other character (digits, ``@``, ``:``, ``/``, ``<``, ``%``,
-  emoji, ...) gives the neutral greeting, not a name with the character cut out;
-* a combining mark is allowed only directly after a letter or another mark, at most three in a
-  row; invisible marks (variation selectors, the combining grapheme joiner) and the invisible
-  Hangul fillers are removed; after the removal the text is normalised again, so the result is
-  a fixed point of the guard;
-* a name that looks like a web or email address, also with all combining marks removed, gives
-  the neutral greeting;
-* a name longer than ``GREETING_NAME_MAX_LENGTH`` gives the neutral greeting.
-
-Only a person with a first and a last name is greeted by name; a company name is never used. The
-name is cleaned once, when the job is queued (``mail_queue.enqueue_for_account``), and only for an
-address that belongs to the account at that time; ``render`` checks the stored name again. The
-functions never log a name or a greeting.
+Only a person with first and last name is greeted; a company name is never used. The name is
+cleaned once at queueing (``mail_queue.enqueue_for_account``) and re-checked by ``render``. Nothing
+here logs a name or greeting.
 """
 
 import unicodedata
@@ -37,15 +26,13 @@ EXAMPLE_NAME = "Maria Muster"
 
 _REMOVED_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
 _ALLOWED_PUNCTUATION = {" ", "-", "'", "\u2019", "."}
-# The most combining marks that may follow one letter (Latin and other scripts use one to three).
+# The most combining marks that may follow one letter.
 _MAX_CONSECUTIVE_MARKS = 3
-# Combining marks (category Mn) that show nothing: the variation selectors and the combining
-# grapheme joiner. They are removed like the format characters.
+# Combining marks (Mn) that show nothing (variation selectors, combining grapheme joiner): removed like format characters.
 _INVISIBLE_MARKS = (
     set(range(0xFE00, 0xFE10)) | set(range(0xE0100, 0xE01F0)) | {0x034F}
 )
-# The Hangul fillers (category Lo) show nothing; NFKC maps U+3164 and U+FFA0 to U+1160. They are
-# removed, so a part that has only fillers has no letter left.
+# Hangul fillers (Lo) show nothing (NFKC maps U+3164 and U+FFA0 to U+1160): removed.
 _INVISIBLE_LETTERS = {0x115F, 0x1160, 0x3164, 0xFFA0}
 
 
@@ -60,16 +47,13 @@ def _is_removed(char):
 def _normalised(text):
     """Normalise (NFKC), remove the invisible characters and collapse the whitespace.
 
-    Removing a character can leave text that is no longer in NFKC (a letter, a removed character
-    and a mark: the mark now follows the letter and composes with it), and normalising can
-    produce a character that is removed. So this repeats until nothing changes: the result is a
-    fixed point, which ``is_clean`` relies on.
+    Repeats until nothing changes (removing a character can leave non-NFKC text, and normalising
+    can produce a removable character): the result is a fixed point, which ``is_clean`` relies on.
     """
     while True:
         result = unicodedata.normalize("NFKC", text)
         result = "".join(char for char in result if not _is_removed(char))
-        # str.split() splits at every Unicode whitespace character, so this also collapses the
-        # separators (category Zs) that NFKC leaves.
+        # str.split() splits at every Unicode whitespace character, also the Zs that NFKC leaves.
         result = " ".join(result.split())
         if result == text:
             return result
@@ -83,11 +67,7 @@ def _without_marks(text):
 
 
 def _looks_like_an_address(text):
-    """Whether the text, or the text without its combining marks, looks like an address.
-
-    A mark inside a domain name splits the run of letters that the address check looks for, and
-    NFKC cannot always join it again, so the check also runs without the marks.
-    """
+    """Whether the text, or the text without its combining marks, looks like an address (a mark inside a domain splits the letter run)."""
     return looks_like_an_address(text) or looks_like_an_address(_without_marks(text))
 
 
@@ -99,8 +79,7 @@ def _clean_part(text):
     for char in text:
         category = unicodedata.category(char)
         if category.startswith("M"):
-            # A mark belongs to the letter before it: after a space, a hyphen or at the start
-            # it would attach to something that is no letter.
+            # A mark belongs to the letter before it.
             marks += 1
             if not previous_is_letter_or_mark or marks > _MAX_CONSECUTIVE_MARKS:
                 return ""
@@ -133,11 +112,7 @@ def clean_name(first_name, last_name):
 
 
 def is_clean(name):
-    """Whether a stored name is a fixed point of the guard (it is what ``clean_name`` returns).
-
-    ``render`` runs this on the name of a job, so a name that was written around the queue (a
-    data fix, a future caller) gives the neutral greeting instead of reaching the email.
-    """
+    """Whether a stored name is a fixed point of the guard; ``render`` runs this so a name written around the queue gives the neutral greeting."""
     return bool(
         isinstance(name, str)
         and name
@@ -149,20 +124,14 @@ def is_clean(name):
 
 
 def name_for(user):
-    """Return the cleaned name of the person the account belongs to, or "" (neutral).
-
-    A company name is never used: the reader is a person, and a company name next to a person's
-    name is ignored.
-    """
+    """Return the cleaned name of the person the account belongs to, or "" (neutral); a company name is never used."""
     return clean_name(user.first_name, user.last_name)
 
 
 def render(name):
-    """Return the greeting for a cleaned name ("" gives the neutral greeting).
+    """Return the greeting for a cleaned name ("" gives the neutral greeting); run with the email's language active.
 
-    Built from two short catalogue texts, without a comma, like the greeting in the emails before
-    this change. Must run with the language of the email active. The name is checked again here
-    (``is_clean``): anything the guard would not have produced gives the neutral greeting.
+    The name is re-checked (``is_clean``): anything the guard would not have produced gives the neutral greeting.
     """
     if is_clean(name):
         return gettext("Hello %(name)s") % {"name": name}

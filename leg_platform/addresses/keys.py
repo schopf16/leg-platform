@@ -1,20 +1,14 @@
-"""Search keys of the address directory (D-075).
+"""Folded search keys of the address directory (D-075): lower case, no accents.
 
-SQLite compares text in binary order and its ``LIKE`` ignores case only for ASCII, so the
-directory does not rely on ``LIKE`` or on a collation. Every searched text has a key column with
-the folded text: lower case without accents. The prefix searches are ranges over these key columns
-(``key >= prefix AND key < prefix + MAX_CHARACTER``), which an index can serve; the texts shown to
-the people stay the spelling of the directory.
+Prefix searches are index ranges over the key columns (``LIKE`` is not used: SQLite ignores case only for ASCII).
 """
 
 import unicodedata
 from functools import lru_cache
 
-# The largest code point: every text that starts with the prefix is below prefix + this character
-# (UTF-8 keeps the code point order in a binary comparison).
+# Largest code point: every text starting with the prefix is below prefix + this character.
 MAX_CHARACTER = "\U0010ffff"
-# The key columns are not longer than the columns of the texts; a longer key (casefolding can
-# lengthen a text) is cut, which only affects a street that is already unusually long.
+# Column length; a longer key (casefolding can lengthen) is cut.
 KEY_LIMIT = 255
 
 
@@ -26,7 +20,7 @@ def fold(text):
 
 @lru_cache(maxsize=1 << 17)
 def key(text):
-    """The key of a stored text; cached, because streets and localities repeat a lot."""
+    """The key of a stored text (cached: streets and localities repeat)."""
     return fold(text)[:KEY_LIMIT]
 
 

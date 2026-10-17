@@ -35,8 +35,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
         return False
 
     def get_urls(self):
-        # Expose only a status page and the CSRF-protected enqueue operation,
-        # never generic model editing, bulk actions, URL inputs or job arguments.
+        # Only a status page and the CSRF-protected enqueue; no generic model editing.
         return [
             path("", self.admin_site.admin_view(self.directory_view),
                  name="addresses_importrequest_changelist"),
@@ -49,9 +48,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
             if not allow_request(request, admin=True):
                 self.message_user(request, _("Too many import requests. Please try again later."), messages.WARNING)
             else:
-                # Every request that passes the limit is recorded with the account that asked
-                # (security log, D-041; D-076 M-3), in the same transaction as the queue row: the
-                # import costs a download and a long import, so who asks must be traceable.
+                # Every request is recorded with the account in the same transaction as the queue row (D-041, D-076).
                 with transaction.atomic():
                     security_log.record(SecurityEvent.Event.ADDRESS_IMPORT_REQUESTED, actor=request.user)
                     queued = request_import()

@@ -1,17 +1,11 @@
-"""Rules for the assignments of a metering point to a person or to a LEG (D-077).
+"""Rules for the assignments of a metering point to a person or to a LEG (D-077); views only call them.
 
-* A metering point has a chain of assignments of each kind. A new assignment must start after the
-  start of the last one.
-* The previous assignment ends the day before the new "valid from" (a "flying change": the metering
-  point changes hands without a gap or an overlap). If the previous assignment had ended earlier,
-  it is left alone.
-* An open assignment is ended with "ends on"; it stays in the history.
-* An assignment can be deleted only if it never took effect (it starts in the future) and was never
-  ended. Deleting it undoes the change of the previous assignment.
-* Every change is one transaction that locks the metering point, and is written to its history.
-
-The rules are here and not in the views; a view only calls them (``messpunkte/detail/VORGABEN.md``,
-"Person wechseln", "Zuordnung beenden und löschen").
+* A new assignment must start after the last one; the previous one ends the day before (no gap, no overlap)
+  unless it had ended earlier.
+* An open assignment is ended with "ends on" and stays in the history.
+* Only an assignment that never took effect (starts in the future, never ended) can be deleted; that undoes
+  the change of the previous one.
+* Every change is one transaction that locks the metering point and is written to its history.
 """
 
 from datetime import timedelta
@@ -46,9 +40,8 @@ _KINDS = {
 
 
 class AssignmentError(Exception):
-    """A change that the rules refuse. ``code`` is one of: ``starts_not_after_previous``,
-    ``end_before_start``, ``already_ended``, ``not_deletable``, ``not_a_person``,
-    ``person_not_active``, ``leg_archived`` (D-085), ``not_related``."""
+    """A change that the rules refuse; ``code`` is one of: ``starts_not_after_previous``, ``end_before_start``,
+    ``already_ended``, ``not_deletable``, ``not_a_person``, ``person_not_active``, ``leg_archived``, ``not_related``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -72,28 +65,23 @@ def in_force(kind, metering_point, on=None):
 
 
 def is_deletable(assignment, today=None):
-    """Whether the assignment never took effect and was never ended: only then it may be deleted
-    (an entry made by mistake)."""
+    """Whether the assignment never took effect and was never ended (only then it may be deleted)."""
     today = today or timezone.localdate()
     return assignment.valid_from > today and assignment.valid_to is None
 
 
 def assign(kind, metering_point, subject, valid_from, actor=None, today=None):
-    """Assign a person (an active account with a customer number) or a LEG from ``valid_from``.
+    """Assign a person (active account with a customer number) or a LEG from ``valid_from``; returns the assignment.
 
-    Returns the new assignment. Raises ``AssignmentError``. Assigning a person whose assignment is in
-    force now (``valid_from`` is today or earlier) sets the retention obligation of the account
-    (D-016, D-077, security review M-1: a future-dated assignment does not, so that deleting one that
-    never took effect leaves the account untouched); the account is then also logged in the security
-    log (M-2). The person is read again under a lock, so that an account that was blocked or
-    deactivated in the meantime is refused (L-1)."""
+    Raises ``AssignmentError``. A person assignment in force now sets the retention obligation of the account
+    (D-016; a future-dated one does not, M-1) and logs it in the security log. The person is re-read under a
+    lock so a blocked or deactivated account is refused (L-1)."""
     spec = _kind(kind)
     model = spec["model"]
     today = today or timezone.localdate()
     with transaction.atomic():
         if kind == LEG:
-            # An archived LEG takes no new assignment (D-085). The LEG is locked first, as ``switch_leg`` does
-            # (the same order of locks everywhere).
+            # Archived LEG takes no assignment (D-085); locked first, as ``switch_leg`` does (lock order).
             if Leg.objects.select_for_update().get(pk=subject.pk).is_archived:
                 raise AssignmentError("leg_archived")
         locked = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
@@ -118,8 +106,7 @@ def assign(kind, metering_point, subject, valid_from, actor=None, today=None):
             previous.save(update_fields=["valid_to", "updated_at"])
         assignment.save()
         if kind == PERSON and valid_from <= today and not subject.retention_obligation:
-            # The person is now part of the accounting: the account is kept, not deleted, when
-            # the person closes it (D-016).
+            # The person is now part of the accounting: the account is kept when closed (D-016).
             subject.set_retention_obligation()
             security_log.record(security_log.Event.RETENTION_OBLIGATION_SET, account=subject, actor=actor)
         history.record(
@@ -130,8 +117,7 @@ def assign(kind, metering_point, subject, valid_from, actor=None, today=None):
 
 
 def _lock_person(person):
-    """The account of the person, read again under a lock: it must exist, be active and have a
-    customer number (a person in the sense of the specification)."""
+    """The account re-read under a lock: it must exist, be active and have a customer number."""
     user_model = type(person)
     try:
         fresh = user_model._base_manager.select_for_update().get(pk=person.pk)
@@ -176,8 +162,7 @@ def delete(kind, assignment, actor=None, today=None):
         previous = fresh.previous_assignment
         if previous is not None:
             previous = model.objects.select_for_update().get(pk=previous.pk)
-            # Only what this assignment changed is undone (the previous one may have been ended
-            # on its own in the meantime).
+            # Undo only what this assignment changed (the previous one may have been ended on its own since).
             if previous.valid_to == fresh.valid_from - timedelta(days=1):
                 previous.valid_to = fresh.previous_valid_to
                 previous.save(update_fields=["valid_to", "updated_at"])

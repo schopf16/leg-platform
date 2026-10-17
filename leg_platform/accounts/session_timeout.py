@@ -1,8 +1,7 @@
-"""Idle and absolute session timeouts (docs/SECURITY.md, section 3; D-041).
+"""Session timeouts: idle and absolute, enforced on the server (D-041).
 
-The timeouts are enforced on the server: the session stores when it started and when it was
-last used, and a session that is idle for too long or older than the absolute timeout is ended
-at its next request. Staff users and system administrators have shorter timeouts than users.
+The session stores when it started and was last used; an idle or too old session is ended at its
+next request. Staff users and system administrators have shorter timeouts.
 """
 
 import time
@@ -25,14 +24,11 @@ from leg_platform.log_filters import TOKEN_URL_PATTERN
 
 STARTED_KEY = "session_started"
 LAST_ACTIVITY_KEY = "session_last_activity"
-# "Stay signed in" (D-056). The login view puts the wish of the form on the request object, never
-# into the session; the signal below turns it into a persistent session, but only for an account
-# that is not a staff user or system administrator. With a second factor the wish waits in the
-# pending login (``second_factor.begin_pending_login``) and is put on the request again when the
-# code was accepted. ``STAYING_KEY`` marks a persistent session.
+# "Stay signed in" (D-056): the login view puts the wish on the request, never into the session;
+# the signal below makes a persistent session of it, but not for staff users or administrators. With a
+# second factor the wish waits in the pending login. ``STAYING_KEY`` marks a persistent session.
 STAYING_KEY = "stay_signed_in"
-# The last activity is written at most once per interval, so that a request does not always
-# write the session; the idle timeout is therefore exact to one interval.
+# The last activity is written at most once per interval; the idle timeout is exact to one interval.
 ACTIVITY_WRITE_INTERVAL = 60
 
 
@@ -43,16 +39,12 @@ def start_session(sender, request, user, **kwargs):
     request.session[STARTED_KEY] = now
     request.session[LAST_ACTIVITY_KEY] = now
     if getattr(request, STAY_WISH_ATTRIBUTE, False) is True and not requires_second_factor(user):
-        # A persistent cookie and a server-side session of the same length. A timedelta makes
-        # Django store an absolute end time: an integer would mean "that many seconds of
-        # inactivity", and every save (the activity is written once a minute) would move the end
-        # (django/contrib/sessions/backends/base.py, set_expiry and get_expiry_age). The checks of
-        # ``timeouts_for`` use the same value for the idle and the absolute timeout.
+        # A timedelta makes Django store an absolute end time (an integer would mean seconds of
+        # inactivity and every save would move the end); ``timeouts_for`` uses the same value.
         request.session.set_expiry(settings.STAY_SIGNED_IN_DURATION)
         request.session[STAYING_KEY] = True
     else:
-        # Also when Django kept the data of an earlier login of the same session: the expiry
-        # of a persistent session must not carry over to this one.
+        # Also when Django kept an earlier login's data: a persistent expiry must not carry over.
         request.session.set_expiry(None)
         request.session.pop(STAYING_KEY, None)
 
@@ -60,8 +52,7 @@ def start_session(sender, request, user, **kwargs):
 def timeouts_for(user, session=None):
     """Return (idle, absolute) timeouts in seconds; shorter for staff users and administrators.
 
-    A session that was started with "stay signed in" has the configured duration for both, unless
-    the account is a staff user or administrator (their shorter timeouts always apply).
+    A "stay signed in" session has the configured duration for both, unless the account is privileged.
     """
     if requires_second_factor(user):
         return (
@@ -88,8 +79,7 @@ class SessionTimeoutMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # A view that is free of the session (the public logo) is not a request of the session:
-        # it neither ends it nor extends it, and the session is not read.
+        # A session-free view (the public logo) neither ends nor extends the session, and does not read it.
         if not is_session_free(request) and request.user.is_authenticated:
             expired = self._check(request)
             if expired:

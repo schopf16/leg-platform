@@ -1,10 +1,7 @@
-"""Queries of the list of locations (D-078; ``standorte/VORGABEN.md``, ``LISTEN-STANDARD.md``).
+"""Queries of the list of locations (D-078): search, filters, sorting and the metering point rows.
 
-Search, filters, sorting and the rows of the metering point tables under the locations. Pure query
-code, no request: the page passes the values it parsed. The search finds what the list and the
-detail page show: the address, the circuit, the numbers of the metering points, the names of their
-LEGs and the names of the persons; never the remarks
-(``LISTEN-STANDARD.md``, section 4).
+Pure query code, no request. The search finds what the list and detail page show (address, circuit,
+metering point numbers, LEG names, person names), never the remarks.
 """
 
 import re
@@ -21,15 +18,13 @@ OCCUPANCY_OCCUPIED = "occupied"
 OCCUPANCY_FREE = "free"
 OCCUPANCY_EMPTY = "empty"
 OCCUPANCY_ARCHIVED = "archived"
-OCCUPANCIES = (OCCUPANCY_ALL, OCCUPANCY_OCCUPIED, OCCUPANCY_FREE, OCCUPANCY_EMPTY, OCCUPANCY_ARCHIVED)
 
-SORT_KEYS = ("address", "circuit", "metering_points", "occupancy")
 DEFAULT_SORT = "address"
 
 
 def base_queryset(today=None):
-    """All locations with ``mp_count`` (metering points that are not archived) and ``person_count``
-    (the persons with an assignment that is valid now or later, each once)."""
+    """All locations with ``mp_count`` (metering points not archived) and ``person_count``
+    (persons with an assignment valid now or later, each once)."""
     today = today or timezone.localdate()
     points = (
         MeteringPoint.objects.filter(location=OuterRef("pk"), is_archived=False)
@@ -53,8 +48,7 @@ def base_queryset(today=None):
 
 
 def apply_occupancy(queryset, value):
-    """The filter "Occupancy". Archived locations appear only with "archived", and then only they
-    do; every other value hides them (``LISTEN-STANDARD.md``, section 4)."""
+    """The filter "Occupancy": only "archived" shows archived locations, every other value hides them."""
     if value == OCCUPANCY_ARCHIVED:
         return queryset.filter(is_archived=True)
     queryset = queryset.filter(is_archived=False)
@@ -76,11 +70,8 @@ def apply_problems(queryset):
 
 
 def apply_search(queryset, text, *, include_assignments=True, today=None):
-    """Every word of the text must match something that the list or the page shows: the parts of the address, the
-    circuit (number and name), a metering point number and, with ``include_assignments``, the name of a LEG of
-    a metering point and the name of a person who uses one. Letters match without regard to case or
-    accents (the collation of the columns); the identifiers of the exact collation are compared
-    in capitals."""
+    """Every word must match the address parts, the circuit (number, name), a metering point number and,
+    with ``include_assignments``, a LEG name or a person name. Identifiers are compared in capitals."""
     today = today or timezone.localdate()
     for word in (text or "").split():
         upper = word.upper()
@@ -109,9 +100,8 @@ def apply_search(queryset, text, *, include_assignments=True, today=None):
 
 
 def apply_sort(queryset, key, descending=False):
-    """Sort by a column. The address is sorted by street, then the house number as a number, then as
-    text; the other columns end with the address as the tie breaker. "Occupancy" puts the locations
-    without a metering point first, then those that nobody uses, then by the number of persons."""
+    """Sort by a column (address: street, house number numerically, then as text; other columns tie-break by
+    address). "occupancy": no metering points first, then unused, then by number of persons."""
     address = [F("street"), Cast("house_number", IntegerField()), F("house_number"), F("pk")]
     first = []
     if key == "circuit":
@@ -158,10 +148,8 @@ def person_name(person):
 
 
 def details(locations, today=None):
-    """For the locations of one page: ``(rows, persons)`` with ``rows[location_id]`` the list of
-    ``MeteringPointRow`` (metering points that are not archived, by number) and
-    ``persons[location_id]`` the number of different persons with an assignment that is valid now
-    or later (the figure that "Occupancy" shows). Three queries."""
+    """``(rows, persons)``: ``rows[location_id]`` the ``MeteringPointRow`` list (not archived, by number),
+    ``persons[location_id]`` the number of distinct persons with an assignment valid now or later. Three queries."""
     today = today or timezone.localdate()
     ids = [location.pk for location in locations]
     points = list(
@@ -196,20 +184,16 @@ def details(locations, today=None):
 
 
 def locations_for_choice():
-    """All locations for a field with suggestions (not archived), by address."""
+    """All locations not archived, by address."""
     return Location.objects.filter(is_archived=False).order_by("street", "house_number")
 
-
-# Choosing a location by typing (the dialog "Create metering point" of the overview) ----------------
 
 LOCATION_CHOICE_LIMIT = 10
 _LOCATION_TEXT = re.compile(r"(?P<street>.+) (?P<number>\S+), (?P<postal>\d{4}) (?P<town>.+)")
 
 
 def location_suggestions(text, limit=LOCATION_CHOICE_LIMIT):
-    """At most ``limit`` locations (not archived) that match the text: the parts of the address or the
-    number of one of their metering points. For the suggestions of the field; never the remarks and never the
-    name of a LEG or of a person (the field finds a place by its address or a number)."""
+    """At most ``limit`` locations (not archived) matching address parts or a metering point number."""
     return list(apply_search(locations_for_choice(), text, include_assignments=False)[:limit])
 
 
@@ -222,8 +206,7 @@ class LocationFound:
 
 
 def resolve(text):
-    """The one location that the text names: the text of a suggestion (``str(location)``) or a part of
-    the address or a metering point number that only one location matches."""
+    """The one location the text names (``str(location)`` or a part matched by exactly one location)."""
     text = (text or "").strip()
     match = _LOCATION_TEXT.fullmatch(text)
     if match:

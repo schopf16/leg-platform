@@ -19,9 +19,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         cutoff = timezone.now() - IP_ATTEMPT_WINDOW
         expired_count = bucket_count = 0
-        # One short transaction per bucket, locking the bucket first like the requests do
-        # (reserve_client_ip_attempt), and skipping a bucket that a request holds: the cleanup
-        # never waits for a request and cannot deadlock with it.
+        # One short transaction per bucket, locked first like ``reserve_client_ip_attempt``, skipping a
+        # bucket a request holds: never waits for a request, cannot deadlock with it.
         for digest in list(LoginIpBucket.objects.values_list("digest", flat=True)):
             with transaction.atomic():
                 bucket = (

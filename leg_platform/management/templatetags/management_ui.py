@@ -14,7 +14,7 @@ register = template.Library()
 
 @register.simple_tag(takes_context=True)
 def management_menu(context):
-    """The entries of the menu group "Management" (empty for an account that is no active staff account); see ``leg_platform.management.navigation``."""
+    """Menu entries (empty for a non-staff account); see ``navigation``."""
     request = context.get("request")
     if request is None or not hasattr(request, "user"):
         return []
@@ -24,15 +24,13 @@ def management_menu(context):
 
 @register.simple_tag
 def operator_name():
-    """The name of the grid operator of the instance, for the texts that name it: ``{% operator_name as operator %}``
-    and then ``{% blocktranslate %}... {{ operator }} ...{% endblocktranslate %}`` (D-086)."""
+    """The grid operator name: ``{% operator_name as operator %}`` (D-086)."""
     return grid_operator.name()
 
 
 @register.simple_tag
 def optional_url(name, *args):
-    """The address of a page that may not exist yet, or "": the links of a list to the pages of
-    another area (LEG, person) appear as soon as that area has its pages."""
+    """The URL of a page that may not exist yet, or ""."""
     try:
         return reverse(name, args=args)
     except NoReverseMatch:
@@ -53,7 +51,7 @@ def bound(form, name):
 
 @register.filter
 def direction_class(value):
-    """"consumption" or "feed_in" as the CSS class suffix ("consumption" or "feed-in")."""
+    """"consumption" or "feed_in" as the CSS suffix "consumption" or "feed-in"."""
     return "consumption" if value == Direction.CONSUMPTION else "feed-in"
 
 
@@ -62,9 +60,7 @@ def direction_label(value):
     return Direction(value).label
 
 
-# The tone of the dot of each status of a metering point (docs/DESIGN.md, section 3.5; the
-# specification: registered yellow-brown, notified blue, confirmed a green ring around a dark centre,
-# active green, terminated grey).
+# Dot tone per status (docs/DESIGN.md, section 3.5).
 STATUS_TONES = {
     MeteringPointStatus.REGISTERED: "warn",
     MeteringPointStatus.NOTIFIED: "accent",

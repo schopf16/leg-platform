@@ -84,7 +84,7 @@ CORE_PATHS = (
     "leg_platform/middleware.py",
     "leg_platform/accounts/__init__.py",
     "leg_platform/accounts/apps.py",
-    "leg_platform/accounts/models.py",
+    "leg_platform/accounts/models/",
     "leg_platform/accounts/backends.py",
     "leg_platform/accounts/urls.py",
     "leg_platform/addresses/__init__.py",
@@ -287,7 +287,7 @@ AREAS: dict[str, Area] = {
     ),
     "admin": Area(
         "The administration: users, rights, email texts, Graph configuration and portal settings.",
-        paths=("leg_platform/accounts/admin.py", "leg_platform/admin_site.py",
+        paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py",
                "leg_platform/addresses/admin.py", "leg_platform/accounts/permission_names.py",
                "leg_platform/accounts/forms.py", "leg_platform/templates/admin/",
                "leg_platform/*/templates/admin/"),

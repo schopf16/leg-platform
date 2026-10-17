@@ -1,12 +1,9 @@
-"""A first, cheap protection of the forms that ask for an email (D-038, D-058; security review of
-phase 3): a hidden field that a person never fills and a signed time stamp of the form.
+"""A cheap first protection of the forms that ask for an email (D-038, D-058): a hidden field a
+person never fills and a signed time stamp of the form.
 
-A script that posts the form at once, without having loaded it, or that fills every field, is
-recognised. A hit is answered with the same page as a real request, without an email and without a
-job, so the script learns nothing. This stops only simple bots; it is level 0 of the protection (a
-proof of work is level 1, not built: ``docs/DECISIONS.md``, D-038/D-058). The visible refusal
-(HTTP 429) is reserved for the limits of the client address and of the instance, which do not
-depend on an account.
+A script that posts at once or fills every field is recognised; a hit gets the same page as a real
+request, without email or job, so it learns nothing. Level 0 only (proof of work is not built). The
+visible refusal (HTTP 429) is reserved for the client-address and instance limits.
 """
 
 import time
@@ -47,9 +44,8 @@ def looks_automated(honeypot_value, stamp):
 class BotCheckMixin:
     """Adds the hidden field and the stamp to a form; ``automated`` tells the view about a hit.
 
-    The hidden field has no label that a person could see and is hidden by a style sheet class
-    (the Content Security Policy allows no style attribute); it is excluded from the tab order,
-    from assistive technology and from the autofill of browsers.
+    The field has no visible label and is hidden by a style sheet class (the CSP allows no style
+    attribute); it is out of the tab order, assistive technology and autofill.
     """
 
     def __init__(self, *args, **kwargs):

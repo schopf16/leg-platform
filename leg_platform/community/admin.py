@@ -1,11 +1,4 @@
-"""The Django administration of the community app: the grid operator of the instance (D-086).
-
-Only the grid operator is registered; the other community models have their own pages in the management area
-(D-077) and stay out of the administration. The operator is one row (the current operator of the instance, no add
-and no delete; the list page leads straight to the form), maintained by system administrators only, like the Microsoft
-Graph settings: the name is shown to every staff account in the texts of the management area, and the owner plans a
-catalogue of operators here later.
-"""
+"""Django administration of the community app: the single grid operator row, superusers only (D-086)."""
 
 from django import forms
 from django.contrib import admin
@@ -30,7 +23,7 @@ class GridOperatorAdmin(admin.ModelAdmin):
     def get_object(self, request, object_id, from_field=None):
         if str(object_id) != "1" or not request.user.is_superuser:
             return None
-        # Checked before load(), because load() creates the row when it does not exist yet.
+        # Checked before load(), which creates the row.
         return GridOperator.load()
 
     def changelist_view(self, request, extra_context=None):
@@ -56,8 +49,7 @@ class GridOperatorAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        # The name is in every text and in the PDFs of the management area (review L-8): a change is a security
-        # event kept for the long period. The log line names the event and the actor only.
+        # The name appears in every management text and PDF: a change is a security event.
         if "name" in form.changed_data:
             security_log.record(SecurityEvent.Event.GRID_OPERATOR_CHANGED, actor=request.user)
 

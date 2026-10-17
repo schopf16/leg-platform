@@ -14,7 +14,6 @@ class Command(BaseCommand):
         parser.add_argument("--once", action="store_true", help="Process one queued job and exit.")
 
     def handle(self, **options):
-        # The worker writes the directory file; every other process opens it read-only (D-075).
         mark_writer()
         while True:
             try:
@@ -22,8 +21,7 @@ class Command(BaseCommand):
             except ImportFailure:
                 if options["once"]:
                     raise CommandError("Address import worker failed; inspect the job status before restarting.") from None
-                # process_one recorded FAILED and the automatic-attempt date.
-                # Keep servicing manual requests without an early automatic retry.
+                # process_one recorded FAILED; keep servicing manual requests without an early automatic retry.
                 processed = False
             except Exception:
                 raise CommandError("Address import worker failed; inspect the job status before restarting.") from None

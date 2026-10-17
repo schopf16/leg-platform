@@ -1,13 +1,7 @@
-"""The pages of the LEGs (D-080; LEG-Design-Vorgaben/verwaltung/legs).
+"""The LEG pages (D-080): list, detail with its metering points, and the dialogs (create, quota, master data,
+archive, delete). Rules live in ``leg_platform.community`` (``legs``, ``leg_list``, ``leg_services``).
 
-The list (a table on a desktop, cards on a phone), the detail page with its table of the metering points,
-and the dialogs: create, edit the production quota, edit the master data, archive and delete. Every view
-uses the access check of ``management.access``; objects are looked up by the id in the address, and the rules are in ``leg_platform.community`` (``legs``, ``leg_list``,
-``leg_services``). A dialog is a normal page: it works without JavaScript and returns to the place it was
-opened from.
-
-Access (D-086): every staff account may use every page; what is shown depends on the state of the data only
-(an archived LEG is read-only, D-085), never on a permission.
+Every staff account may use every page (D-086); an archived LEG is read-only (D-085).
 """
 
 from dataclasses import dataclass
@@ -37,8 +31,7 @@ TIER_TONES = {legs.DiscountTier.OPTIMISED: "ok", legs.DiscountTier.BASIC: "warn"
 
 
 def list_columns(threshold):
-    """The columns of the list (the widths of ``leg-liste-desktop``; the last one takes what is left, as in the
-    other lists, because the link column is fixed)."""
+    """The list columns; the last one takes the rest because the link column is fixed."""
     return (
         lists.Column(
             "name", gettext_lazy("LEG"), width=280,
@@ -69,8 +62,7 @@ def list_columns(threshold):
 
 
 def member_columns():
-    """The columns of the table "Metering points of this LEG" (the widths of the reference). The column of
-    the action is fixed (170 px) and has no heading."""
+    """The columns of "Metering points of this LEG"; the action column is fixed (170 px) and has no heading."""
     return (
         lists.Column("number", gettext_lazy("Metering point"), width=400, keep=True),
         lists.Column("address", gettext_lazy("Address"), width=150),
@@ -81,7 +73,7 @@ def member_columns():
 
 
 def problem_text(summary, kinds, threshold):
-    """The texts of the problems of the given kinds as one text (the hint of the warning triangle)."""
+    """The texts of the problems of the given kinds as one text (the warning triangle hint)."""
     return " ".join(
         str(problems.describe(problem, threshold)) for problem in summary.problems if problem in kinds
     )
@@ -93,8 +85,8 @@ def display_options():
 
 @dataclass
 class LegList:
-    """The list of LEGs as the address asks for it: the state, and every row of the view (the search, the
-    display and the problem switch applied, sorted), not only one page. The page and the printing use it."""
+    """Every row of the list as the address asks for it (search, display, problem switch applied, sorted), not
+    one page; the page and the printing use it."""
 
     state: lists.ListState
     columns: tuple
@@ -114,7 +106,7 @@ def build_list(params):
     )
     queryset = leg_list.apply_search(leg_list.base_queryset(state.values["display"]), state.query, today)
     rows = leg_list.rows_for(queryset, threshold, today)
-    # The button counts the LEGs with a problem in the current view (the search and the display).
+    # The button counts the LEGs with a problem in the current view.
     problem_count = len(leg_list.apply_problems(rows))
     if state.problems:
         rows = leg_list.apply_problems(rows)
@@ -123,7 +115,7 @@ def build_list(params):
 
 
 def list_entry(row, threshold):
-    """What the list shows of one LEG (the template and the printing read the same texts)."""
+    """What the list shows of one LEG (shared by the template and the printing)."""
     summary = row.summary
     return {
         "leg": row.leg,
@@ -140,8 +132,6 @@ def list_entry(row, threshold):
 
 
 class LegListView(ManagementAccessMixin, View):
-    """The list (``leg-liste-desktop`` and ``leg-liste-handy``)."""
-
     def get(self, request):
         found = build_list(request.GET)
         state, columns, threshold, problem_count = found.state, found.columns, found.threshold, found.problem_count
@@ -169,15 +159,12 @@ class LegListView(ManagementAccessMixin, View):
 
 
 class LegDetailView(ManagementAccessMixin, View):
-    """The detail page (``leg-detail-desktop``, ``leg-detail-ein-trafokreis-desktop`` and the two phone views)."""
-
     def get(self, request, pk):
         leg = get_object_or_404(Leg, pk=pk)
         today = timezone.localdate()
         threshold = ManagementSettings.load().warning_threshold_percent
         summary = legs.summaries([leg], threshold, today)[leg.pk]
-        # An archived LEG is read-only (D-085): no edit buttons, only "Restore LEG", also when it could be
-        # deleted.
+        # An archived LEG is read-only (D-085): only "Restore LEG", even if it could be deleted.
         can_change = not leg.is_archived
         show_delete = leg_services.can_delete(leg) and can_change
         level = legs.quota_level(leg.production_quota_percent, threshold)
@@ -245,11 +232,8 @@ class LegDetailView(ManagementAccessMixin, View):
         }
 
 
-# Dialogs ---------------------------------------------------------------------------------------
-
-
 class LegCreateView(DialogView):
-    """"LEG anlegen" (``leg-anlegen-desktop``): after saving back to the list."""
+    """Create a LEG; afterwards back to the list."""
 
     title = gettext_lazy("Create LEG")
     lead = gettext_lazy("A LEG is a virtual grid association. You assign metering points to the LEG afterwards.")
@@ -273,17 +257,21 @@ class LegCreateView(DialogView):
         return redirect(self.back(request))
 
 
+def archived_refusal(request, pk):
+    """Redirect with a message if the LEG is archived (D-085, D-079), else None; for GET and direct POST alike."""
+    if get_object_or_404(Leg, pk=pk).is_archived:
+        messages.error(request, _("This LEG is archived."))
+        return redirect(return_url(request, reverse("management:legs_detail", args=[pk])))
+    return None
+
+
 class LegObjectDialog(DialogView):
-    """A dialog about one LEG. An archived LEG is read-only (D-085): the dialog is refused, with a message in
-    the style of D-079, for a GET and for a direct POST alike."""
+    """A dialog about one LEG; refused for an archived LEG."""
 
     template_name = "management/legs/dialog_quota.html"
 
     def refusal(self, request, *args, **kwargs):
-        if get_object_or_404(Leg, pk=kwargs["pk"]).is_archived:
-            messages.error(request, _("This LEG is archived."))
-            return redirect(return_url(request, reverse("management:legs_detail", args=[kwargs["pk"]])))
-        return None
+        return archived_refusal(request, kwargs["pk"])
 
     def leg(self):
         if not hasattr(self, "_leg"):
@@ -296,7 +284,7 @@ class LegObjectDialog(DialogView):
 
 
 class LegQuotaView(LegObjectDialog):
-    """"Produktionsquote bearbeiten" (``leg-quote-bearbeiten-desktop``): the quota and its date together."""
+    """Edit the quota and its date together."""
 
     title = gettext_lazy("Edit production quota")
     lead = grid_operator.text(gettext_lazy(
@@ -322,7 +310,7 @@ class LegQuotaView(LegObjectDialog):
 
 
 class LegMasterDataView(LegObjectDialog):
-    """"Stammdaten bearbeiten" (``leg-stammdaten-bearbeiten-desktop``): name and remark."""
+    """Edit name and remark."""
 
     title = gettext_lazy("Edit master data")
     lead = gettext_lazy("Name and remark of the LEG. The remark is internal only.")
@@ -347,7 +335,7 @@ class LegMasterDataView(LegObjectDialog):
 
 
 class LegArchiveView(ManagementAccessMixin, View):
-    """The button "LEG archivieren" (and "Restore LEG" for an archived one): POST only."""
+    """Archive (or restore) button: POST only."""
 
     http_method_names = ["post"]
 
@@ -359,14 +347,10 @@ class LegArchiveView(ManagementAccessMixin, View):
 
 
 class LegDeleteView(ManagementAccessMixin, View):
-    """"LEG löschen": a question first, then the deletion; only possible without a history, never for an
-    archived LEG (D-085, D-086: the restore is the only action on it)."""
+    """Confirmation, then deletion; only without a history and never for an archived LEG (D-085, D-086)."""
 
     def refusal(self, request, *args, **kwargs):
-        if get_object_or_404(Leg, pk=kwargs["pk"]).is_archived:
-            messages.error(request, _("This LEG is archived."))
-            return redirect(return_url(request, reverse("management:legs_detail", args=[kwargs["pk"]])))
-        return None
+        return archived_refusal(request, kwargs["pk"])
 
     def get(self, request, pk):
         leg = get_object_or_404(Leg, pk=pk)

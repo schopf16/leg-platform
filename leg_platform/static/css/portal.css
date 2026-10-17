@@ -25,12 +25,9 @@
   font-display: swap;
 }
 
-/* Design tokens of the design language (docs/DESIGN.md, section 3; LEG-Design-Vorgaben/login/
-   VORGABEN.md, section 6). The light values are the default. The dark values apply only when
-   the person chooses dark with the button (data-theme="dark" on <html>, set by
-   static/js/theme-init.js); there is no automatic mode and no prefers-color-scheme rule
-   (docs/DECISIONS.md, D-056). instance.css replaces --accent, --accent-rgb, --on-accent and
-   --yellow with the values of the instance. */
+/* Design tokens (docs/DESIGN.md, section 3; D-056). Dark values apply only with data-theme="dark"
+   on <html> (static/js/theme-init.js); no prefers-color-scheme rule. instance.css replaces
+   --accent, --accent-rgb, --on-accent and --yellow. */
 :root {
   color-scheme: light;
   --bg: #f6f7f8;
@@ -45,13 +42,11 @@
   --bad: #b42318;
   --bad-rgb: 180, 35, 24;
   --ok: #2f8f5b;
-  /* Green as text: 6.5:1 on --panel and 5.4:1 on the 16 % tint of the chips (--ok itself is 4.0:1 and 3.3:1, fine for
-     a dot or a ring, too light for text; D-084). */
+  /* Green text: 6.5:1 on --panel (--ok itself is too light for text; D-084). */
   --ok-text: #1d6b40;
-  /* Status "open" and "not set up". Text on --panel: 5.9:1 (light), 8.9:1 (dark). */
+  /* Status "open" and "not set up". */
   --warn: #8a5a00;
-  /* The warning triangle only (the colours of the reference templates, 5.0:1 on --panel light, 8.4:1 dark); text
-     in the warning colour keeps --warn. */
+  /* The warning triangle only; text in the warning colour keeps --warn. */
   --warn-icon: #b45309;
   --warm: color-mix(in srgb, var(--accent) 9%, var(--bg));
   --logo-plate: transparent;
@@ -80,7 +75,6 @@
   --tblr-font-sans-serif: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --tblr-font-monospace: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --portal-font-display: "Bricolage Grotesque", "Source Sans 3", system-ui, sans-serif;
-  /* The variables of Tabler follow the tokens. */
   --tblr-primary: var(--accent);
   --tblr-primary-rgb: var(--accent-rgb);
   --tblr-primary-fg: var(--on-accent);
@@ -96,12 +90,10 @@
   --tblr-border-color: var(--line);
   --tblr-danger: var(--bad);
   --tblr-danger-rgb: var(--bad-rgb);
-  /* Light tint of the accent for the "warm" areas. */
   --portal-tint: var(--warm);
   --portal-surface: var(--panel);
   --portal-field-border: var(--muted);
-  /* Alerts (docs/DESIGN.md, D-054): the text token on a tint, a 4 px border and an icon in the
-     colour of the meaning. The tint of the information alert follows the accent. */
+  /* Alerts (D-054): text token on a tint, 4 px border and icon in the colour of the meaning. */
   --portal-alert-success-bg: color-mix(in srgb, var(--ok) 12%, var(--panel));
   --portal-alert-success-accent: var(--ok);
   --portal-alert-warning-bg: color-mix(in srgb, var(--warn) 12%, var(--panel));
@@ -129,18 +121,14 @@ body {
   color: var(--fg);
 }
 
-/* Register "Clear" (docs/DESIGN.md, section 2): 16 px text, controls at least 48 px high,
-   small corner radii, lines instead of shadows. */
+/* Register "Clear" (docs/DESIGN.md, section 2): 16 px text, controls at least 48 px high, lines
+   instead of shadows. Tabler's own sizes are 14 px; the Django admin does not use this file. */
 .register-clear {
   --tblr-body-font-size: 1rem;
-  /* The design package sets text with a line height of 1.5 (login/VORGABEN.md, reference). */
   --tblr-body-line-height: 1.5;
-  /* No resting shadows (rule R7): Tabler's own shadows of buttons and fields are switched off;
-     the focus rings are the outline and the ring set below, not these. */
   --tblr-btn-box-shadow: none;
   --tblr-shadow-input: none;
-  /* Tabler sets text with the alternate glyphs of Inter; the typeface of the package is Source
-     Sans 3 without them. */
+  /* Neutralise Tabler's Inter glyph alternates (the typeface is Source Sans 3). */
   font-feature-settings: normal;
   font-variant-ligatures: normal;
   text-rendering: auto;
@@ -153,9 +141,6 @@ body {
   font-weight: 700;
 }
 
-/* Members: base size 16 px for page titles, labels, controls, hints and error texts, and at least
-   48 px high controls (docs/DESIGN.md, section 2). Tabler's own sizes are 14 px for these. The
-   administration (Django admin) does not use this stylesheet and stays compact. */
 .register-clear .card h1 {
   font-size: 1.75rem;
   line-height: 1.2;
@@ -175,19 +160,6 @@ body {
 .register-clear .form-control,
 .register-clear .form-select {
   font-size: 1rem;
-}
-
-.register-clear .btn {
-  --tblr-btn-font-size: 1rem;
-  font-size: 1rem;
-}
-
-.register-clear .form-check-label {
-  font-size: 1rem;
-}
-
-.register-clear .form-control,
-.register-clear .form-select {
   min-height: 3rem;
   padding: 0.75rem 0.875rem;
   border: 1.5px solid var(--muted);
@@ -196,7 +168,18 @@ body {
   color: var(--fg);
 }
 
-/* A field in focus: border in the accent and a ring of 30 % accent (login/VORGABEN.md, 4). */
+.register-clear .btn {
+  --tblr-btn-font-size: 1rem;
+  font-size: 1rem;
+  min-height: 3rem;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.register-clear .form-check-label {
+  font-size: 1rem;
+}
+
 .register-clear .form-control:focus,
 .register-clear .form-select:focus {
   border-color: var(--accent);
@@ -206,16 +189,9 @@ body {
 }
 
 .register-clear .form-select {
-  /* Tabler's arrow is a data: image, which the Content Security Policy does not allow. It is
-     set as a property of this rule, because a url() in a custom property would be resolved
-     relative to Tabler's stylesheet. */
+  /* A data: image is blocked by the CSP; a url() in a custom property would resolve relative to
+     Tabler's stylesheet, so it is set as a property here. */
   background-image: url("../img/select-arrow.svg");
-}
-
-.register-clear .btn {
-  min-height: 3rem;
-  border-radius: 8px;
-  font-weight: 600;
 }
 
 .register-clear .btn .icon {
@@ -224,13 +200,11 @@ body {
   margin-inline-end: 0.5rem;
 }
 
-/* Cards and tiles: 12 px radius, a line instead of a shadow. */
 .register-clear .card {
   border-radius: 12px;
   box-shadow: none;
 }
 
-/* The second action next to a primary one: transparent, a 1.5 px border in the muted colour. */
 .btn-secondary-action {
   background: transparent;
   border: 1.5px solid var(--muted);
@@ -244,8 +218,7 @@ body {
   color: var(--fg);
 }
 
-/* While it waits ("send again" within the pause) the button keeps the look of the image; the note
-   below it says why nothing happens, and the button is really disabled. */
+/* Disabled while waiting ("send again"): keeps the look of the enabled button. */
 .btn-secondary-action:disabled {
   background: transparent;
   border-color: var(--muted);
@@ -255,10 +228,8 @@ body {
 }
 
 /* ---- Entry shell (entry_base.html): login, registration, password reset, lockout ----
-   Desktop: two equal columns. Left the warm panel, right the form on the page background.
-   Phone (760 px and below): the panel shrinks to a top bar with the logo; the text is hidden
-   (LEG-Design-Vorgaben/login/VORGABEN.md, sections 2 to 4a). Spacing from 4, 8, 12, 16, 24,
-   32 and 48 px; no shadows, no gradients. */
+   Desktop: two columns (warm panel left, form right). Phone (760 px and below): the panel
+   shrinks to a top bar with the logo and the text is hidden. */
 .entry-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -314,7 +285,6 @@ body {
   align-items: center;
 }
 
-/* The yellow dot never carries text or an icon. */
 .entry-benefits li::before {
   content: "";
   flex: none;
@@ -339,7 +309,6 @@ body {
   height: auto;
 }
 
-/* Only the logo of the colour mode is shown (the plate is the dark-mode background). */
 .entry-warm .portal-logo-light { display: block; }
 :root[data-theme="dark"] .entry-warm .portal-logo-light { display: none; }
 :root[data-theme="dark"] .entry-warm .portal-logo-dark { display: block; }
@@ -350,9 +319,7 @@ body {
   color: var(--fg);
 }
 
-/* ---- Error pages (error_base.html; navigation/VORGABEN.md, 8a) ----
-   A centred card on the page background with the logo, a friendly heading, one sentence and one
-   way out. No shadow; the same tokens as every page. */
+/* ---- Error pages (error_base.html) ---- */
 .error-page {
   min-height: 100vh;
   display: grid;
@@ -375,7 +342,7 @@ body {
 }
 
 .error-logo {
-  /* The plate of the dark mode has 8 px of padding; the logo itself lines up with the text. */
+  /* The dark-mode plate has 8 px padding; the logo itself lines up with the text. */
   margin-inline-start: -8px;
 }
 
@@ -525,8 +492,6 @@ body {
   color: var(--muted);
 }
 
-/* A field of the shared field partial inside an entry card: label, control, hint and error
-   in the rhythm of the shell. */
 .entry-card .mb-3 {
   display: grid;
   gap: 8px;
@@ -538,13 +503,11 @@ body {
   font-size: 14px;
 }
 
-/* The label of a field is 16 px (login/VORGABEN.md, section 4); the hint stays 14 px (K6). */
 .entry-card .form-label {
   font-size: 16px;
   font-weight: 600;
 }
 
-/* A hint or a note below a heading or a button, in the muted colour. */
 .entry-hint {
   font-size: 14px;
   color: var(--muted);
@@ -554,7 +517,6 @@ body {
   text-align: center;
 }
 
-/* The link below its divider ("Wrong address?"): close to it and in semibold. */
 .entry-card .entry-divider + .entry-center {
   margin-top: -12px;
 }
@@ -563,7 +525,7 @@ body {
   font-weight: 600;
 }
 
-/* The hidden field of the bot check (accounts/bot_check.py): out of sight and reach of a person. */
+/* Honeypot of the bot check (accounts/bot_check.py): out of sight and reach. */
 .hp-field {
   position: absolute;
   left: -10000px;
@@ -577,8 +539,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Registration: step bar (4 px) and step label. The share filled is a class, because the
-   Content Security Policy allows no style attribute. */
+/* Step bar; the share filled is a class because the CSP allows no style attribute. */
 .step-progress {
   display: grid;
   gap: 20px;
@@ -606,7 +567,6 @@ body {
   color: var(--muted);
 }
 
-/* The rules of the password as a list under the first password field. */
 .password-rules {
   margin: 0;
   padding-left: 20px;
@@ -616,8 +576,7 @@ body {
   gap: 2px;
 }
 
-/* A value that is shown as text: the address of the account on the password step (a real field,
-   so that the password manager finds the user name) and on the details step. */
+/* A value shown as text in a real field (so that the password manager finds the user name). */
 .entry-card input.plain-value,
 .entry-card input.plain-value:focus {
   border: 0;
@@ -632,8 +591,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* The address of the details step: as plain text with its status beside it, no border, no
-   background, no box (team lead decision K7: the text wins over the image). */
+/* Plain text with its status beside it (no border, background or box). */
 .plain-line {
   display: flex;
   flex-wrap: wrap;
@@ -657,9 +615,7 @@ body {
   color: var(--muted);
 }
 
-/* Two fields side by side, on the phone as well (register/VORGABEN.md, details step). The cells may
-   shrink (min-width 0), so that no field reaches over the edge of the card at 360 px. The house
-   number has a fixed 96 px, the postal code 128 px. */
+/* Two fields side by side, also on a phone. min-width 0 keeps the cells inside the card at 360 px. */
 .field-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -680,11 +636,9 @@ body {
 .field-pair-street { grid-template-columns: minmax(0, 1fr) 96px; }
 .field-pair-locality { grid-template-columns: 128px minmax(0, 1fr); }
 
-/* A field with an error: a red border of 2 px, in the light and the dark mode (the colour is the
-   error token); the error text below it says what is wrong, so the meaning is not only colour. */
+/* An error field: a 2 px border in the error colour (the error text says what is wrong). */
 .register-clear .form-control[aria-invalid="true"],
-.register-clear .form-select[aria-invalid="true"],
-.register-clear .form-control.is-invalid {
+.register-clear .form-select[aria-invalid="true"] {
   border: 2px solid var(--bad);
   background-image: none;
 }
@@ -698,7 +652,6 @@ body {
   text-align: left;
 }
 
-/* Footer row: three items spread over the width. Underlined only on hover. */
 .legal-links {
   display: flex;
   flex-wrap: wrap;
@@ -751,7 +704,6 @@ body {
     height: 40px;
   }
 
-  /* Room for the corner buttons that sit in the top bar. */
   .entry-warm .logo-plate {
     max-width: calc(100% - 112px);
   }
@@ -770,12 +722,10 @@ body {
   }
 }
 
-/* A message of an entry page (the instance name as text where no logo is set). */
 .entry-card .alert {
   margin: 0;
 }
 
-/* A status is shown as a dot plus a word, never by colour alone (docs/DESIGN.md, 3.5). */
 .status-dot {
   display: inline-block;
   width: 0.65rem;
@@ -805,7 +755,6 @@ body {
   a, h1, h2, p, dt, dd { color: #000000 !important; }
   form, button, .btn { display: none !important; }
   .print-heading { display: block !important; margin-bottom: 1rem; }
-  .page-body { padding-bottom: 0 !important; }
 }
 
 .print-heading { display: none; }
@@ -815,10 +764,7 @@ body {
 :root[data-theme="dark"] .portal-logo-dark { display: inline-block; }
 
 /* ---- Corner controls (_corner_controls.html): language menu and light/dark button ----
-   The same on every page: fixed in the top right corner, round, 40 px, a 1 px line, the icon in
-   the muted colour; on hover the icon turns to the text colour and the line to the muted colour
-   (login/VORGABEN.md, section 5). Without JavaScript the buttons would do nothing, so they are
-   shown only when theme-init.js has marked the page with the class "js". */
+   Shown only when theme-init.js has marked the page with the class "js". */
 .corner {
   display: none;
   position: fixed;
@@ -868,8 +814,7 @@ body {
 
 .lang { position: relative; }
 
-/* An invisible bridge between the button and the menu keeps the menu open while the pointer
-   moves from the one to the other. */
+/* Invisible bridge: keeps the menu open while the pointer moves to it. */
 .lang::after {
   content: "";
   position: absolute;
@@ -896,7 +841,7 @@ body {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  /* The only shadow of the design: a floating menu (as in the reference of the owner). */
+  /* The only shadow of the design: a floating menu. */
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
 }
 
@@ -907,7 +852,7 @@ body {
   gap: 2px;
 }
 
-/* Escape closes the menu until the pointer or the focus leaves and comes back. */
+/* Escape closes the menu until pointer/focus leaves and returns. */
 .lang.dismissed::after,
 .lang.dismissed .lang-menu {
   display: none;
@@ -950,10 +895,8 @@ body {
   object-fit: cover;
   box-shadow: 0 0 0 1px var(--line);
 }
-/* The suggestions of the address directory (D-065): a bordered list of buttons directly under the
-   street input, no shadow. The title and the note say what the list is (matching addresses, or
-   "did you mean" for an approximate match); the data-kind attribute is for tests, not for styling.
-   Tokens only; the focus ring is inset so that overflow:hidden does not clip it. */
+/* Suggestions of the address directory (D-065): a bordered list of buttons under the street
+   input. The focus ring is inset so that overflow:hidden does not clip it. */
 .address-assist {
   display: grid;
   gap: 8px;
@@ -1011,29 +954,20 @@ body {
   color: var(--muted);
 }
 .address-more[hidden] { display: none; }
-/* The notice after the postal code and town is always in the page; empty, it adds nothing (it
-   cancels the gap of the form grid). */
+/* Always in the page; empty, it cancels the gap of the form grid. */
 .address-notice:empty { margin-top: -16px; }
 .address-notice .alert { margin: 0; }
-.page-body { padding-bottom: 4rem; }
-/* Focus is always visible: a 2 px outline in the accent with a 2 px offset. */
 a:focus-visible, button:focus-visible, summary:focus-visible,
 input:focus-visible, select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-@media (min-width: 768px) {
-  .page-body { padding-bottom: 0; }
-}
 
-/* A button that is shown only by a script stays hidden without it, although .btn sets display. */
+/* .btn sets display, which would defeat [hidden] on a script-only button. */
 .btn[hidden] { display: none; }
 
-/* Alerts (docs/DESIGN.md, D-054): the text token on a tint, a 4 px border and an icon in the
-   colour of the meaning, so that the meaning never rests on colour alone and the text reaches
-   4.5:1. Tabler's own alert colours (green and orange text on pale tints) do not. The icons are
-   Tabler Icons served by the instance and used as masks: they take the colour of the border, and
-   the images come from the own origin (Content Security Policy, img-src 'self'). */
+/* Alerts (D-054): text token on a tint, 4 px border and a Tabler icon as mask (own origin, CSP
+   img-src 'self'); Tabler's own alert colours do not reach 4.5:1. */
 .register-clear .alert {
   --portal-alert-bg: var(--portal-alert-info-bg);
   --portal-alert-accent: var(--portal-alert-info-accent);
@@ -1073,7 +1007,6 @@ input:focus-visible, select:focus-visible {
   --portal-alert-bg: var(--portal-alert-danger-bg);
   --portal-alert-accent: var(--portal-alert-danger-accent);
   --portal-alert-icon: url("../vendor/tabler-icons/alert-circle.svg");
-  /* The error colour of the register is the text colour of an error (section 3.1). */
   color: var(--portal-alert-danger-accent);
 }
 .register-clear .alert a { color: inherit; text-decoration: underline; }
@@ -1086,11 +1019,9 @@ input:focus-visible, select:focus-visible {
   outline-offset: 3px;
 }
 
-/* Check marks of checkboxes and radio buttons. Tabler draws them with a mask whose image is a
-   data: URL, which the Content Security Policy does not allow (img-src 'self'); the own files
-   replace it. The mark takes the text colour of the accent, so it follows the instance colours
-   in light and dark mode. A url() in a custom property would be resolved relative to Tabler's
-   stylesheet, so the property mask-image is set directly. */
+/* Check marks: Tabler's mask image is a data: URL (blocked by the CSP), so the own files replace
+   it. mask-image is set directly because a url() in a custom property would resolve relative to
+   Tabler's stylesheet. */
 .register-clear .form-check-input {
   --tblr-form-check-icon-color: var(--tblr-primary-fg);
   width: 1.5rem;
@@ -1120,10 +1051,7 @@ input:focus-visible, select:focus-visible {
   padding-top: 0.125rem;
 }
 
-/* QR code on a white tile with a quiet zone, in light and dark mode: scanners need dark modules
-   on a light background with a light margin of at least four modules. The code is shown at
-   198 px for about 57 modules (a module is about 3.5 px), so the 24 px of the tile plus the two
-   modules of the image make about nine modules. */
+/* QR code on a white tile: scanners need a light margin of at least four modules. */
 .qr-tile-wrap { text-align: center; margin: 1rem 0 0.5rem; }
 .qr-tile {
   display: inline-block;
@@ -1135,7 +1063,7 @@ input:focus-visible, select:focus-visible {
 }
 .qr-tile img { display: block; max-width: 100%; height: auto; }
 
-/* "Show password": a small eye icon inside the field (team lead decision K20). */
+/* "Show password": an eye icon inside the field. */
 .password-field { position: relative; }
 .password-field .form-control { padding-inline-end: 3.25rem; }
 .password-toggle {

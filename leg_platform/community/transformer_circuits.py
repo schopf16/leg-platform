@@ -1,10 +1,4 @@
-"""Circuits of the grid: creating and changing them, and the figures of the card "Netz" (D-078).
-
-A transformer circuit is identified by the number the grid operator assigns (``TRA`` and digits, unique after
-conversion to capital letters and trimming); the name is free and not unique
-(``standorte/VORGABEN.md``, "Nachtrag: Trafokreis"). A circuit has no page of its own: it is chosen
-or created in the card "Netz" of a location.
-"""
+"""Transformer circuits (unique by normalised grid number, free name) and the figures of the card "Netz" (D-078)."""
 
 from django.db import transaction
 
@@ -22,8 +16,7 @@ def label(circuit):
 
 
 def number_of_choice(text):
-    """The grid number in what a person typed or chose in the field ("TRA21359 · Ittigen Nord" or just
-    "tra21359"): the part before the separator, converted as the numbers are stored; "" if empty."""
+    """The normalised grid number of a typed or chosen value ("TRA21359 · Ittigen Nord", "tra21359"); "" if empty."""
     return numbers.normalise_transformer_circuit_number((text or "").split(SEPARATOR.strip())[0])
 
 
@@ -44,13 +37,12 @@ def create(number, name=""):
 
 
 def affected_locations(circuit):
-    """The number of locations a change of the circuit reaches (name or number)."""
+    """The number of locations a change of the circuit reaches."""
     return circuit.locations.count()
 
 
 def update(circuit, number, name):
-    """Change number and name of a circuit; the change reaches every location with it. Raises
-    ``ValidationError`` (wrong number, or another circuit has it)."""
+    """Change number and name; raises ``ValidationError`` (wrong or taken number)."""
     with transaction.atomic():
         fresh = TransformerCircuit.objects.select_for_update().get(pk=circuit.pk)
         fresh.grid_number = numbers.normalise_transformer_circuit_number(number)
@@ -61,8 +53,7 @@ def update(circuit, number, name):
 
 
 def stats(circuit):
-    """The figures of the card "Netz": locations in the circuit and its metering points by
-    direction (archived locations and metering points do not count)."""
+    """Locations and metering points by direction of the circuit, archived ones not counted."""
     locations = Location.objects.filter(transformer_circuit=circuit, is_archived=False)
     points = MeteringPoint.objects.filter(location__in=locations, is_archived=False)
     return {
@@ -73,5 +64,5 @@ def stats(circuit):
 
 
 def choices():
-    """All circuits for a field with suggestions, each number once."""
+    """All circuits, ordered by number."""
     return list(TransformerCircuit.objects.order_by("grid_number"))

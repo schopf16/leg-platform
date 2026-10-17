@@ -1,9 +1,4 @@
-"""Queue of the address directory import, consumed only by the worker process (D-075).
-
-The admin view calls ``request_import`` only, which writes the queue row. ``process_one`` is
-called only by the management command ``process_address_imports``; the web process never
-downloads or imports anything.
-"""
+"""Queue of the address directory import; the web process only writes the row, the worker consumes it (D-075)."""
 
 import logging
 from datetime import timedelta
@@ -15,16 +10,10 @@ from .models import Directory, ImportRequest
 
 logger = logging.getLogger(__name__)
 AUTOMATIC_INTERVAL = timedelta(days=90)
-# While the directory is missing or empty (a new instance, a restore: the file is not part of the
-# backup, D-075), the automatic attempt is due again after this time instead of after 90 days, so
-# that the suggestions come back without anyone pressing the button (security review of D-075, M-5).
+# While the directory is missing or empty (new instance, restore), the automatic attempt is due after this time.
 EMPTY_DIRECTORY_INTERVAL = timedelta(hours=24)
-# A RUNNING job older than this is taken over (security review of D-076, N-3): after a hard kill
-# (out of memory, power loss, a stop during an import) the state stays "running" and nothing else
-# would ever clear it. It is the lease of the importer on the directory
-# (``importer.IMPORT_LEASE``, a test keeps the two equal; this module must not import the importer,
-# the web process reaches it). An import that really runs renews its own lease with every chunk and
-# takes far less than this, and a second importer is refused by that lease anyway.
+# A RUNNING job older than this is taken over (D-076, hard-killed worker). Keep equal to
+# ``importer.IMPORT_LEASE`` (a test checks); this module must not import the importer.
 RUNNING_JOB_LEASE = timedelta(hours=6)
 
 
@@ -63,18 +52,14 @@ def request_import():
 
 
 def process_one(*, schedule_automatic=False):
-    # Import locally, so admin requests never load the downloader. No external parameters are
-    # ever passed from a queued job.
+    # Imported locally so web requests never load the downloader.
     from .importer import import_directory
 
     with transaction.atomic():
         ImportRequest.objects.get_or_create(pk=1)
         job = ImportRequest.objects.select_for_update().get(pk=1)
         now = timezone.now()
-        # A queued manual request always wins. A RUNNING job is not taken over while its lease is
-        # valid; after a hard-killed worker its lease expires (six hours) and the job counts as
-        # failed (N-3). The request that was lost with it is not repeated: whoever wants it presses
-        # the button again, the automatic attempt follows its own interval.
+        # A queued manual request wins. An expired RUNNING job counts as failed and is not repeated.
         if job.state == ImportRequest.State.RUNNING:
             if _is_running(job, now):
                 return False
@@ -99,14 +84,10 @@ def process_one(*, schedule_automatic=False):
         job.started_at = now
         job.finished_at = None
         if job.is_automatic:
-            # Commit BEFORE any download. Failure consumes this attempt (24 hours while the
-            # directory is empty, otherwise 90 days).
+            # Commit before any download; a failure consumes this attempt.
             job.last_automatic_attempt_at = now
         job.save()
-        # A manual request (the admin button) also repairs: an unchanged official file is skipped
-        # only when the published directory passes the integrity checks, otherwise it is loaded
-        # again, so that "sync again" repairs a damaged directory without a repeated request being
-        # expensive (D-076). The automatic attempt trusts the recorded checksum.
+        # A manual request also repairs a damaged directory (D-076).
         manual = not job.is_automatic
     try:
         if manual:
@@ -118,8 +99,7 @@ def process_one(*, schedule_automatic=False):
             state=ImportRequest.State.FAILED, finished_at=timezone.now(),
         )
         logger.error("Address directory import attempt failed.")
-        # Only a generic failure reaches the command output; the row deliberately
-        # stores no exception, URL, credentials or upstream data.
+        # Only a generic failure is stored and raised: no exception, URL or upstream data.
         raise
     ImportRequest.objects.filter(pk=1).update(
         state=ImportRequest.State.SUCCEEDED, finished_at=timezone.now(),

@@ -1,15 +1,11 @@
-/* The management area for staff users (D-077): the shared building blocks of its pages.
-   Ported from the owner's templates in LEG-Design-Vorgaben/verwaltung (the folders "referenz"): sizes, spacing,
-   structure) with the tokens of portal.css instead of the colour values of the templates, so that
-   the light and the dark mode and the instance colours apply (docs/DESIGN.md, section 3).
-   No inline styles and no inline scripts (Content Security Policy). */
+/* Management area (D-077): shared building blocks. Colours only through the tokens of portal.css
+   (light/dark mode and instance colours apply). No inline styles (CSP). */
 
-/* ---- Wide pages (the lists): the content is as wide as the templates (1200 px) ---- */
+/* ---- Wide pages (lists, 1200 px) ---- */
 .frame-content:has(> .mgmt-wide) {
   max-width: 1200px;
 }
 
-/* The settings page is left aligned with the other pages, at most 900 px wide (D-084). */
 .frame-content:has(> .mgmt-settings) {
   max-width: 900px;
   margin-left: 0;
@@ -50,7 +46,6 @@
   min-height: 44px;
 }
 
-/* The button "Filter problems" has the border of the warning colour (uebersicht). */
 .btn-warning-outline {
   background: var(--panel);
   border: 1.5px solid var(--warn);
@@ -127,7 +122,6 @@
   color: var(--muted);
 }
 
-/* Text that exists on one kind of device only (the phone template says "Warning threshold in %"). */
 .mgmt-phone-only {
   display: none;
 }
@@ -173,7 +167,7 @@
   font-size: 15px;
 }
 
-/* ---- Info button "i" with its bubble (LISTEN-STANDARD section 5) ---- */
+/* ---- Info button "i" with its bubble ---- */
 .mgmt-info {
   position: relative;
   display: inline-flex;
@@ -197,7 +191,7 @@
   cursor: pointer;
 }
 
-/* The picture stays 14 px; the area that can be hit is 24 px (WCAG 2.2, 2.5.8). */
+/* The picture stays 14 px; the hit area is 24 px (WCAG 2.5.8). */
 .mgmt-info-btn::after {
   content: "";
   position: absolute;
@@ -232,7 +226,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The bubbles of the right columns open to the left; the one of the status to the left and up. */
 .mgmt-info.is-left .mgmt-tip {
   left: auto;
   right: 0;
@@ -250,7 +243,7 @@
   display: block;
 }
 
-/* Escape closes the bubble until the pointer or the focus comes back (WCAG 1.4.13). */
+/* Escape closes the bubble until pointer/focus returns (WCAG 1.4.13). */
 .mgmt-info.is-dismissed .mgmt-tip {
   display: none;
 }
@@ -285,7 +278,7 @@
   stroke-linejoin: round;
 }
 
-/* ---- Status: a dot and a word, never colour alone (docs/DESIGN.md, section 3.5) ---- */
+/* ---- Status: a dot and a word ---- */
 .mgmt-status {
   display: inline-flex;
   align-items: center;
@@ -310,7 +303,6 @@
 .mgmt-status.is-bad { --dot: var(--bad); }
 .mgmt-status.is-muted { --dot: var(--muted); }
 
-/* "Confirmed": a green ring around a dark centre. */
 .mgmt-status.is-ring {
   --dot: var(--fg);
 }
@@ -319,7 +311,7 @@
   box-shadow: inset 0 0 0 3px var(--ok);
 }
 
-/* ---- Direction badge: consumption blue (the accent), feed-in green ---- */
+/* ---- Direction badge ---- */
 .mgmt-direction {
   display: inline-block;
   padding: 1px 8px;
@@ -351,7 +343,6 @@
   width: 18px;
   height: 18px;
   fill: var(--warn-icon);
-  /* The exclamation mark and its dot take the colour of the surface. */
   color: var(--panel);
 }
 
@@ -472,7 +463,6 @@
     flex-direction: column;
   }
 
-  /* The dialog is the whole view. */
   .mgmt-dialog-layer {
     display: block;
     padding: 0;
@@ -503,10 +493,7 @@
   }
 }
 
-/* ======================================================================================
-   Lists, location pages and dialogs (D-078). Ported from the templates of the owner in
-   verwaltung/standorte/referenz; colours only through the tokens.
-   ====================================================================================== */
+/* ---- Lists, location pages and dialogs (D-078) ---- */
 
 .mgmt-back {
   display: inline-block;
@@ -587,7 +574,7 @@
   min-height: 44px;
 }
 
-/* ---- Tables (LISTEN-STANDARD.md) ---- */
+/* ---- Tables ---- */
 .mgmt-list-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -652,7 +639,7 @@ a.mgmt-sort:hover {
   outline-offset: 2px;
 }
 
-/* Every button of the area shows the same focus ring: 3 px in the accent colour (D-084). */
+/* One focus ring for every button of the area: 3 px in the accent colour (D-084). */
 .mgmt-page .btn:focus-visible,
 .mgmt-dialog .btn:focus-visible,
 .mgmt-icon-btn:focus-visible {
@@ -661,7 +648,6 @@ a.mgmt-sort:hover {
   box-shadow: none;
 }
 
-/* The handle at the right edge of a heading: a fine line, in the accent colour when touched. */
 .mgmt-grip {
   position: absolute;
   top: 0;
@@ -827,7 +813,6 @@ a.mgmt-sort:hover {
   color: var(--accent);
 }
 
-/* A name that is missing: a red dot and a word. */
 .mgmt-missing {
   display: inline-flex;
   align-items: center;
@@ -885,7 +870,7 @@ a.mgmt-sort:hover {
   color: var(--muted);
 }
 
-/* The legend of the status in its bubble: the colours of the dots are lighter on the dark bubble. */
+/* The dots are lighter on the dark bubble. */
 .mgmt-tip b {
   font-weight: 700;
 }
@@ -1280,7 +1265,7 @@ a.mgmt-sort:hover {
     flex-wrap: wrap;
   }
 
-  /* Three buttons do not fit in a row of 358 px: they wrap to the next line instead of overflowing (D-084). */
+  /* Three buttons do not fit in 358 px: they wrap instead of overflowing (D-084). */
   .mgmt-wide .mgmt-header-actions > .btn,
   .mgmt-wide .mgmt-header-actions > .mgmt-inline-form {
     flex: 1 1 140px;
@@ -1452,8 +1437,7 @@ a.mgmt-sort:hover {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-/* The field in which a location is found by typing is wider than the field of the LEG and its hint is set a little
-   smaller, so that "Strasse oder Messpunkt-Nummer suchen" is read to the end (D-084). */
+/* Wider field for the location search; hint smaller so that its text is read to the end (D-084). */
 .mgmt-dialog-row.is-pair:has([list="location-options"]) {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
 }
@@ -1539,7 +1523,6 @@ a.mgmt-sort:hover {
     gap: 8px;
   }
 
-  /* The order of the reference: the search, then the quick filters, then the cards. */
   .mgmt-points-list {
     display: flex;
     flex-direction: column;
@@ -1583,10 +1566,7 @@ a.mgmt-sort:hover {
   }
 }
 
-/* ======================================================================================
-   LEGs (D-080). Ported from the templates of the owner in verwaltung/legs/referenz; colours
-   only through the tokens.
-   ====================================================================================== */
+/* ---- LEGs (D-080) ---- */
 
 .mgmt-leg-name {
   font-weight: 700;
@@ -1600,7 +1580,6 @@ a.mgmt-sort:hover {
   font-weight: 600;
 }
 
-/* The values of the cards: the label is 170 px wide on a desktop. */
 .mgmt-legs .mgmt-fact {
   grid-template-columns: 170px minmax(0, 1fr);
 }
@@ -1631,7 +1610,6 @@ a.mgmt-sort:hover {
   color: var(--muted);
 }
 
-/* A transformer circuit as a tag. */
 .mgmt-tag {
   display: inline-block;
   margin-right: 4px;
@@ -1650,7 +1628,6 @@ a.mgmt-sort:hover {
   grid-column: 1 / -1;
 }
 
-/* The table of the metering points of a LEG: the last column holds the state and the icon "swap". */
 .mgmt-members th.mgmt-action-col,
 .mgmt-members td.mgmt-action-col {
   width: 170px;
@@ -1750,7 +1727,6 @@ a.mgmt-sort:hover {
   margin-right: 0;
 }
 
-/* The dialogs: the quota with "%" inside the field, the date next to it. */
 .mgmt-dialog-row.is-quota {
   grid-template-columns: minmax(0, 1fr) 180px;
 }
@@ -1774,7 +1750,6 @@ a.mgmt-sort:hover {
 }
 
 @media (max-width: 760px) {
-  /* The label left, the value in a fixed column of 150 px: all values start at the same edge. */
   .mgmt-legs .mgmt-fact {
     grid-template-columns: minmax(0, 1fr) 150px;
     gap: 8px;
@@ -1797,7 +1772,7 @@ a.mgmt-sort:hover {
   }
 }
 
-/* ---- Persons (D-081; personen/referenz and personen/detail/referenz) ---- */
+/* ---- Persons (D-081) ---- */
 .mgmt-person-name {
   font-weight: 600;
 }
@@ -1815,7 +1790,6 @@ a.mgmt-sort:hover {
   color: var(--fg);
 }
 
-/* Desktop: two columns of cards, the table of the metering points over the full width. */
 .mgmt-person-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1829,7 +1803,7 @@ a.mgmt-sort:hover {
   margin-top: 0;
 }
 
-/* The bubbles of the headings may reach out of the card (the template: overflow visible). */
+/* Bubbles of the headings may reach out of the card. */
 .mgmt-person-grid .mgmt-person-points {
   overflow: visible;
 }
@@ -1859,8 +1833,6 @@ a.mgmt-sort:hover {
 }
 
 @media (max-width: 760px) {
-  /* Phone: all cards one under the other in the order of the template (the metering points after the
-     payment card); the two columns dissolve and every card takes its place from data-order. */
   .mgmt-person-grid {
     display: flex;
     flex-direction: column;
@@ -1884,7 +1856,6 @@ a.mgmt-sort:hover {
     margin: 0;
   }
 
-  /* The title and the button of a card stay in one row (the template), the title wraps if it must. */
   .mgmt-person .mgmt-card-head {
     flex-wrap: nowrap;
   }
@@ -1894,20 +1865,17 @@ a.mgmt-sort:hover {
   }
 }
 
-/* The small buttons of the cards: 36 px high, 14 px text, as in the template (.btn-xs). The general rule
-   .register-clear .btn (48 px) is more specific than .btn-xs, so the template size needs its own selector. It is
-   global in the management area (D-082): the small buttons of the location, metering point, LEG and person pages
-   and of the list of metering points are all 36 px high. Only the management pages use .btn-xs. */
+/* Small buttons (.btn-xs): 36 px. Needed because .register-clear .btn (48 px) is more specific
+   than .btn-xs; global in the management area (D-082). */
 .register-clear .btn.btn-xs {
   min-height: 36px;
   padding: 4px 12px;
   font-size: 14px;
 }
 
-/* ---- Medium screens (761 to 1279 px): a table that does not fit scrolls inside its card, never the page (D-084).
-   With the script (class mgmt-js, table-fit.js) the columns are narrowed first and the card scrolls only if the
-   table is still too wide (is-overflowing); without it the card scrolls. The info bubbles of the right columns
-   open to the left. ---- */
+/* ---- Medium screens (761 to 1279 px): a table that does not fit scrolls inside its card (D-084).
+   With the script (mgmt-js, table-fit.js) the card scrolls only if the table is still too wide
+   (is-overflowing); without it the card always scrolls. ---- */
 @media (min-width: 761px) and (max-width: 1279px) {
   :root:not(.mgmt-js) .mgmt-table-view,
   .mgmt-table-view.is-overflowing {
@@ -1920,14 +1888,13 @@ a.mgmt-sort:hover {
   }
 }
 
-/* The two columns of the cards of a detail page need about 900 px; below that they stand one under the other. */
 @media (min-width: 761px) and (max-width: 1099px) {
   .mgmt-two-cols {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-/* ---- The overview (D-082; uebersicht/referenz) ---- */
+/* ---- The overview (D-082) ---- */
 .mgmt-overview-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -1969,7 +1936,7 @@ a.mgmt-sort:hover {
   margin: 12px 0 0;
 }
 
-/* ---- The dialog "Print list" (D-082; legs/referenz/liste-drucken-desktop) ---- */
+/* ---- The dialog "Print list" (D-082) ---- */
 .mgmt-print-options {
   margin: 0 0 8px;
   padding: 0;
@@ -2014,8 +1981,7 @@ a.mgmt-sort:hover {
   font-size: 16px;
 }
 
-/* The entries belong to the third option: they are shown while it is chosen (without :has() support they
-   are always shown, which works as well). */
+/* Shown while the third option is chosen (without :has() support always shown). */
 .mgmt-print-options:not(:has(input[value="selected"]:checked)) .mgmt-print-select {
   display: none;
 }

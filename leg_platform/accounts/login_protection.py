@@ -69,7 +69,7 @@ def reserve_client_ip_attempt(request):
     from django.db import transaction
     from django.utils import timezone
 
-    from leg_platform.accounts.models import LoginIpAttempt, LoginIpBucket
+    from leg_platform.accounts.models import LoginIpBucket
 
     digest = client_ip_digest(getattr(request, "axes_ip_address", None))
     if digest is None:
@@ -96,12 +96,9 @@ def reserve_client_ip_attempt(request):
 def settle_client_ip_attempt(request, *, succeeded):
     """Release a successful slot or retain a failed attempt until its window expires.
 
-    The bucket row is locked first, like ``reserve_client_ip_attempt`` and the cleanup do: every
-    statement that touches the attempts of a bucket runs under the lock of the bucket. Without it
-    this statement (a delete or update by primary key, which locks the row and then its index
-    entries) ran against the reservation of a parallel request (a scan over the index of the
-    bucket, which locks the index entries and then the rows) and the two could wait for each other:
-    MariaDB error 1213 (deadlock) as HTTP 500 under parallel confirmations (D-072).
+    The bucket row is locked first, like ``reserve_client_ip_attempt`` and the cleanup: a delete or
+    update by primary key and the reservation's index scan lock in opposite orders and could
+    deadlock (MariaDB 1213 as HTTP 500; D-072).
     """
     from django.db import transaction
 
@@ -115,8 +112,7 @@ def settle_client_ip_attempt(request, *, succeeded):
     )
     if bucket_id is not None:
         with transaction.atomic():
-            # Only the lock matters; a bucket that the cleanup removed in the meantime has no
-            # attempts left, and the statements below then match nothing.
+            # Only the lock matters; a bucket removed by the cleanup has no attempts left.
             LoginIpBucket.objects.select_for_update().filter(pk=bucket_id).first()
             attempts = LoginIpAttempt.objects.filter(pk=attempt_id, pending=True)
             if succeeded:

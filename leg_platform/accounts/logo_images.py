@@ -1,24 +1,12 @@
-"""Validation of the logo files that the administrator uploads (docs/DECISIONS.md, D-073).
+"""Validation of uploaded logo files (D-073). Files are accepted exactly as they are or rejected, never rewritten.
 
-The type of a file is decided from its content, never from its name or the content type of the
-upload. A file is either accepted exactly as it is or rejected: nothing is ever cleaned up or
-rewritten, so that what was checked is what is stored and served.
-
-* PNG: the signature, every chunk with its length and CRC-32, the header (size and the allowed
-  combinations of colour type and bit depth), the palette, the data chunks as one zlib stream that
-  inflates to exactly the size the header states (read in small steps, never more than that size),
-  the end chunk as the very last bytes. No library decodes the image.
-* SVG: a strict allow-list. The bytes are checked before any XML parser sees them (UTF-8 only; no
-  DOCTYPE, ENTITY or CDATA, no processing instruction except the XML declaration), so that no
-  entity can be declared and no external entity can be named. The parser of the standard library
-  then only has to read plain elements; depth, number of elements and size are limited. Only the
-  SVG namespace, a fixed list of elements and attributes, and values from a fixed character set
-  are accepted. ``<script>``, ``<style>``, ``<image>``, ``<foreignObject>``, ``<a>``, ``<use>``,
-  animation, filters and editor data are rejected, as is any ``url()`` that is not a reference to
-  an id of the same file.
-
-The files are shown only through ``<img>`` and served with ``nosniff`` and a sandboxing policy;
-this check is the first of several layers (docs/SECURITY.md, section 6).
+The type is decided from the content. PNG: signature, every chunk's length and CRC-32, header,
+palette, data chunks as one zlib stream inflating to exactly the stated size, end chunk last; no
+image library. SVG: strict allow-list; the bytes are checked before any XML parser sees them (UTF-8,
+no DOCTYPE/ENTITY/CDATA/processing instruction), depth, element count and size are limited, and only
+the SVG namespace, fixed elements, attributes and value characters are accepted (no script, style,
+image, foreignObject, a, use, animation, filters, editor data, or ``url()`` outside the same file).
+This is the first of several layers (docs/SECURITY.md, section 6).
 """
 
 import hashlib
@@ -38,7 +26,7 @@ PNG_MAX_SIDE = 4000
 SVG_MAX_DEPTH = 20
 SVG_MAX_ELEMENTS = 2000
 SVG_MAX_TEXT = 500
-# The most that is ever read from an upload: a file above this is too large for either type.
+# The most that is ever read from an upload.
 MAX_UPLOAD_BYTES = PNG_MAX_BYTES + 1
 
 WRONG_TYPE = _("Only PNG and SVG files are accepted.")
@@ -63,9 +51,8 @@ SVG_REJECTED = _(
 class LogoRejected(Exception):
     """A logo file that is not accepted.
 
-    ``message`` is a translatable text for the person, ``params`` its placeholders and ``reason``
-    a short fixed code for the security log (for example "svg: element not allowed"); it never
-    contains any part of the file.
+    ``message`` is translatable, ``params`` its placeholders, ``reason`` a fixed code for the
+    security log; it never contains any part of the file.
     """
 
     def __init__(self, message, reason, params=None):
@@ -105,26 +92,20 @@ def validate_logo(data):
     return Logo(kind, bytes(data), hashlib.sha256(data).hexdigest())
 
 
-# --- PNG -----------------------------------------------------------------------------------
+# --- PNG ---
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _PNG_CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 _PNG_BIT_DEPTHS = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8), 4: (8, 16), 6: (8, 16)}
 _PNG_CHUNK_TYPE = re.compile(rb"[A-Za-z]{4}")
-# The ancillary chunks that are accepted, with the fixed length of those that have one: they only
-# say how to show the image. Every other ancillary chunk is rejected: text (tEXt, zTXt, iTXt), the
-# colour profile (iCCP), Exif data (eXIf), the time and unknown private chunks could hide data in
-# a file that is shown to everybody, and some of them are parsed by the decoders of the browsers
-# (security review of D-073, L-3). A file made by an editor with such data has to be exported again
-# without metadata. Each of them is allowed once and only before the image data.
+# Accepted ancillary chunks (with fixed lengths where they have one), each once and only before the
+# image data. Every other one (text, iCCP, eXIf, time, private) could hide data or hit browser decoders (D-073).
 _PNG_ANCILLARY_LENGTHS = {b"gAMA": 4, b"cHRM": 32, b"sRGB": 1, b"pHYs": 9}
 _PNG_ANCILLARY = frozenset(_PNG_ANCILLARY_LENGTHS) | {b"tRNS", b"bKGD"}
-# The length of the background colour by colour type (bKGD) and of the transparency of a grey or
-# true colour image (tRNS; palette images have one byte per entry, no more than the palette).
+# bKGD length by colour type; tRNS length of grey/true colour images (palette: one byte per entry).
 _PNG_BACKGROUND_LENGTH = {0: 2, 4: 2, 2: 6, 6: 6, 3: 1}
 _PNG_TRANSPARENCY_LENGTH = {0: 2, 2: 6}
-# The most pixels of an image (the sides are limited as well): a PNG of the logo of a portal never
-# needs more, and the work of the check and of every browser grows with it.
+# The work of the check and of every browser grows with the pixel count.
 PNG_MAX_PIXELS = 4_000_000
 # (x start, y start, x step, y step) of the seven passes of Adam7 interlacing.
 _ADAM7 = ((0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2))
@@ -147,8 +128,7 @@ def _passes(width, height, interlaced):
 
 
 def _expected_raw_size(width, height, bits_per_pixel, interlaced):
-    """The number of bytes the image data has after inflating: a filter byte per row plus the
-    packed pixels, for every pass if the image is interlaced."""
+    """The number of bytes after inflating: a filter byte per row plus the packed pixels, per pass."""
     return sum(
         pass_height * (1 + (pass_width * bits_per_pixel + 7) // 8)
         for pass_width, pass_height in _passes(width, height, interlaced)
@@ -183,9 +163,9 @@ class _FilterTypes:
 
 
 def _inflate_exactly(chunks, expected, filters):
-    """Check that the data chunks form one zlib stream of exactly ``expected`` bytes, with a valid
-    filter byte at the start of every row. Never more than ``expected`` plus one byte is
-    produced, and in steps of at most 1 MiB, so that the work and the memory stay bounded."""
+    """Check the data chunks form one zlib stream of exactly ``expected`` bytes with a valid filter byte per row.
+
+    Never more than ``expected`` plus one byte is produced, in steps of at most 1 MiB (bounded work and memory)."""
     inflater = zlib.decompressobj()
     total = 0
 
@@ -275,14 +255,13 @@ def _check_png(data):
 
 
 def _check_png_ancillary(kind, length, colour_type, palette_length):
-    """The length (and, for the palette, the place) of an accepted ancillary chunk is the one
-    that the specification gives for the colour type."""
+    """Length (and, for tRNS/bKGD of a palette image, place) of an accepted ancillary chunk per the specification."""
     if kind in _PNG_ANCILLARY_LENGTHS:
         valid = length == _PNG_ANCILLARY_LENGTHS[kind]
     elif kind == b"bKGD":
         valid = length == _PNG_BACKGROUND_LENGTH[colour_type] and (colour_type != 3 or palette_length)
     elif colour_type == 3:
-        # The transparency of a palette image: one byte per entry, after the palette.
+        # tRNS of a palette image: one byte per entry, after the palette.
         valid = palette_length is not None and 1 <= length <= palette_length // 3
     else:
         valid = length == _PNG_TRANSPARENCY_LENGTH.get(colour_type)
@@ -315,7 +294,7 @@ def _check_png_header(body):
     }
 
 
-# --- SVG -----------------------------------------------------------------------------------
+# --- SVG ---
 
 _SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _SVG_ELEMENTS = frozenset(
@@ -333,10 +312,10 @@ _SVG_ATTRIBUTES = _PRESENTATION | frozenset(
     "preserveAspectRatio gradientUnits gradientTransform spreadMethod offset clipPathUnits "
     "style".split()
 )
-# The properties that a style attribute may set: the presentation attributes, nothing else.
+# A style attribute may set presentation properties only.
 _STYLE_PROPERTIES = _PRESENTATION
-# Letters, digits, white space and the few signs that numbers, colours, transforms and path data
-# need. No quote, no "<", "&", "@", ":", ";", "=", "/" or backslash.
+# Letters, digits, white space and the signs that numbers, colours, transforms and path data need.
+# No quote, "<", "&", "@", ":", ";", "=", "/" or backslash.
 _VALUE_CHARACTERS = re.compile(r"[A-Za-z0-9#%.,()+\-_ \t\r\n]*")
 _URL_OPENING = re.compile(r"url\s*\(", re.IGNORECASE)
 _URL_REFERENCE = re.compile(r"url\(#([A-Za-z_][A-Za-z0-9_.\-]*)\)", re.IGNORECASE)
@@ -350,8 +329,7 @@ _VIEW_BOX_NUMBERS = re.compile(r"\s*(-?[0-9.]+)[\s,]+(-?[0-9.]+)[\s,]+([0-9.]+)[
 
 
 def _rejected(reason, what):
-    """The rejection of an SVG: ``what`` is shown to the person, so only a name of an element or
-    attribute made of letters, or one of the fixed words below, is passed on."""
+    """An SVG rejection; ``what`` is shown to the person, so only a letters-only name passes, else "unknown"."""
     shown = what if _WHAT.fullmatch(what) else "unknown"
     return LogoRejected(SVG_REJECTED, f"svg: {reason}", {"what": shown})
 
@@ -366,7 +344,7 @@ def _local_name(name):
 
 
 def _precheck_svg(data):
-    """Checks on the bytes before a parser sees them: no DTD and so no entity of any kind."""
+    """Checks on the bytes before a parser sees them: no DTD, so no entity."""
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
@@ -381,7 +359,7 @@ def _precheck_svg(data):
     declaration = _XML_DECLARATION.match(text.lstrip("\ufeff"))
     start = text.find("<?")
     if start != -1:
-        # The only processing instruction that is allowed is the XML declaration at the very start.
+        # Only the XML declaration at the very start is an allowed processing instruction.
         if declaration is None or start != len(text) - len(text.lstrip("\ufeff")):
             raise _rejected("processing instruction", "processing-instruction")
         if text.find("<?", start + 2) != -1:

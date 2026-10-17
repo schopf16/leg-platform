@@ -1,9 +1,7 @@
-"""Run every periodic cleanup task once (docs/INSTALLATION.md, "Scheduled tasks"; D-041).
+"""Run every periodic cleanup task once (D-041); schedule it, e.g. every 15 minutes.
 
-One entry in the scheduler of the server (for example every 15 minutes) replaces one entry per
-task. The tasks are independent: a failing task does not stop the others, and the command exits
-with an error if any of them failed, so that the scheduler reports it. Not included is
-``process_mail_queue --loop``, which runs as a supervised service.
+The tasks are independent: a failing task does not stop the others, and the command exits with an
+error if any failed. ``process_mail_queue --loop`` is not included (a supervised service).
 """
 
 from django.core.management import call_command

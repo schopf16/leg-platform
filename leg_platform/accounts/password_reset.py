@@ -1,8 +1,7 @@
-"""Password reset (docs/SECURITY.md, section 3; OWASP Forgot Password Cheat Sheet; D-037).
+"""Password reset (OWASP Forgot Password Cheat Sheet; D-037).
 
-A reset email is sent only to an account that is active; an account that is temporarily locked
-still has the status active, so it can reset its password during the lockout. Nothing is sent to
-unknown, unverified, blocked or deactivated addresses, and the request makes no difference
+A reset email goes only to an active account (a temporarily locked one is still active); nothing is
+sent to unknown, unverified, blocked or deactivated addresses, and the request makes no difference
 visible to the person who typed the address.
 """
 
@@ -16,19 +15,16 @@ from leg_platform.accounts.login_protection import axes_username
 from leg_platform.accounts.models import MailJob, SecurityEvent, User, VerificationToken
 from leg_platform.accounts.normalization import normalize_email_address
 
-# The link stays valid as long as the longest window of the per-address limit (24 hours), so
-# that a person who cannot request another email because someone else used up the budget can
-# still use a link already in their mailbox (D-017). The link is single use. A proposal awaiting
-# the project owner's confirmation (D-037).
+# Valid as long as the longest per-address limit window, so a person who cannot request another
+# email (budget used up by someone else) can still use a link already in the mailbox (D-017). Single use (D-037).
 PASSWORD_RESET_LIFETIME = timedelta(hours=24)
 
 
 def process_reset_request(address):
     """Handle a reset request in the background worker; return the sending function or None."""
     address = normalize_email_address(address)
-    # The normalised unique column, never Django's email__iexact lookup (docs/SECURITY.md,
-    # section 3). The account row is locked and the status is checked under the lock, so that
-    # parallel requests replace the links one after another and only the last one stays valid.
+    # The normalised unique column, never ``email__iexact``. The row is locked and the status
+    # checked under the lock: parallel requests replace the links one after another.
     with transaction.atomic():
         user = (
             User._base_manager.select_for_update()
@@ -37,9 +33,8 @@ def process_reset_request(address):
         )
         if user is None:
             return None
-        # Only the newest link is valid: earlier links of the account stop working, as for the
-        # removal of the second factor. A request above the per-address limit never reaches this
-        # function, so links already sent stay valid then (docs/SECURITY.md, section 3).
+        # Only the newest link is valid. A request above the per-address limit never reaches here,
+        # so links already sent stay valid then.
         VerificationToken.objects.filter(
             user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
         ).delete()
@@ -56,13 +51,10 @@ def process_password_changed(address, greeting_name=""):
 
 
 def delete_expired_reset_tokens(now=None):
-    """Delete reset, second factor, email change and stop links that expired, and the requests
-    for new addresses that expired.
+    """Delete expired reset, second factor, email change and stop links and expired requests for new addresses.
 
-    The links of an email change hold the proposed address (``target_email``) and the requests
-    hold it too: neither stays in the database after it expired (D-016, data minimisation;
-    security review of phase 4, M2). The stop links of an account without an open request go too
-    (their meaning ended with the request).
+    The links and requests hold the proposed address (``target_email``), which must not stay after
+    expiry (D-016). Stop links of an account without an open request go too.
     """
     from leg_platform.accounts.models import PendingEmailChange
 
@@ -88,13 +80,10 @@ def delete_expired_reset_tokens(now=None):
 def complete_reset(token, form):
     """Save the new password and consume the token; return the account, or None if not valid.
 
-    The token must be a password reset link; a link of another purpose never sets a password.
-    The account is locked before its token, as everywhere else. A reset ends all other sessions
-    (Django derives the session hash from the password), removes every outstanding reset link
-    of the account and the temporary lockout of the account only: the failure counters and
-    lockouts of IP addresses stay as they are, so that an attacker cannot lift the lockout of
-    their IP address by resetting the password of their own account (docs/SECURITY.md,
-    section 3). The second factor is not touched.
+    Only a password reset link works; the account is locked before its token. A reset ends all other
+    sessions, removes every outstanding reset link and the temporary lockout of the account only
+    (IP failure counters and lockouts stay, so an attacker cannot lift their IP lockout by resetting
+    their own account). The second factor is not touched.
     """
     with transaction.atomic():
         user = (
@@ -116,8 +105,7 @@ def complete_reset(token, form):
         form.user = user
         user.password_change_required = False
         form.save()
-        # A request for a new address made before the reset must not be confirmed afterwards
-        # (security review, final, M-A).
+        # Requests for a new address made before the reset must not be confirmed afterwards.
         user.discard_email_change_requests()
         VerificationToken.objects.filter(
             user=user, purpose=VerificationToken.Purpose.PASSWORD_RESET
@@ -138,8 +126,7 @@ def _end_account_lockout(user):
     if digest is None:
         # reset() without a username would delete every failed attempt of every account.
         return
-    # Axes stores the keyed digest of the address, no IP address, in its attempt rows, so this
-    # only removes the account's rows; the independent IP counter is a different table.
+    # Axes stores the keyed digest of the address (no IP) in its attempt rows; the independent IP counter is another table.
     reset(username=digest)
 
 

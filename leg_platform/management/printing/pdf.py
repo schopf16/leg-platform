@@ -1,13 +1,8 @@
-"""Draws a ``PrintDocument`` as a PDF with ReportLab (D-082). In memory only: no temporary file.
+"""Draws a ``PrintDocument`` as a PDF with ReportLab, in memory only (D-082).
 
-ReportLab reads a small XML markup in its paragraphs (``<b>``, ``<font>``, ``<img src="...">``); older releases
-could be made to run code or to fetch a web address through it (CVE-2019-17626, CVE-2020-28463, CVE-2023-33733,
-all fixed in the declared minimum). Nothing a person typed is ever given to ReportLab as markup: every text
-goes through ``markup`` here, which removes control characters, limits the length and escapes ``& < >``. No
-image is drawn and no markup is built from data.
-
-The font is DejaVu Sans Condensed (``fonts/``, Bitstream Vera licence), which covers the Latin alphabets with
-all their accents, the Greek and the Cyrillic alphabet.
+Nothing a person typed reaches ReportLab as markup (CVE-2019-17626, CVE-2020-28463, CVE-2023-33733): every text
+goes through ``markup``, which strips control characters, limits the length and escapes ``& < >``. No images.
+Font: DejaVu Sans Condensed (``fonts/``, Bitstream Vera licence).
 """
 
 import re
@@ -28,10 +23,8 @@ FONT_DIRECTORY = Path(__file__).resolve().parent / "fonts"
 REGULAR = "LegSans"
 BOLD = "LegSans-Bold"
 
-# A person can type a very long text (a remark, a note). A table cell that is higher than the page cannot be
-# drawn, so a text in a table is cut at 300 characters; a line of a detail page is printed in full up to the
-# stored maximum of a remark or note (``community.models.REMARK_MAX_LENGTH`` = 5000; a test keeps them equal), as a
-# paragraph that may run over a page.
+# A table cell higher than the page cannot be drawn, so table text is cut at 300 characters; a detail-page line
+# may run over a page up to ``community.models.REMARK_MAX_LENGTH`` (a test keeps them equal).
 MAX_CELL_CHARS = 300
 MAX_FACT_CHARS = 5000
 MAX_TITLE_CHARS = 200
@@ -64,7 +57,7 @@ def register_fonts():
 
 
 def plain(value, limit):
-    """The text without control characters (a line break stays), cut to ``limit`` characters with an ellipsis."""
+    """The text without control characters (line breaks stay), cut to ``limit`` characters with an ellipsis."""
     value = "" if value is None else str(value)
     value = _CONTROL.sub("", value.replace("\r\n", "\n").replace("\r", "\n").replace("\t", " "))
     if len(value) > limit:
@@ -99,8 +92,7 @@ def _styles():
 
 
 def _scaled(columns, width, minimum=None):
-    """The widths of the columns: proportional to their weights, but never narrower than ``minimum`` (the
-    heading must fit); a column that is raised takes its room from the others."""
+    """Column widths proportional to their weights, never below ``minimum`` (the heading must fit)."""
     minimum = minimum or [0] * len(columns)
     if sum(minimum) >= width:
         total = sum(minimum)
@@ -151,9 +143,8 @@ LONG_FACT_CHARS = 400
 
 
 def _facts(facts, styles):
-    """The lines of label and value as flowables. A short value is a row of a table; a long one (a remark, a note:
-    up to the stored maximum) is a label and a paragraph of its own, which can run over a page break; a table row
-    that is higher than the page cannot be drawn."""
+    """Label/value lines: short values are table rows; a long one is its own paragraph (a table row
+    higher than the page cannot be drawn)."""
     flowables, group = [], []
 
     def flush():
@@ -251,10 +242,10 @@ def render(document, *, compress=True):
 
     doc = BaseDocTemplate(
         buffer, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN, topMargin=MARGIN, bottomMargin=BOTTOM_MARGIN,
-        title=plain(document.title, MAX_TITLE_CHARS).replace("\n", " "), author="", subject="",
+        title=footer_title, author="", subject="",
         creator="LEG-Platform", pageCompression=1 if compress else 0,
     )
-    # No padding inside the frame: the tables are exactly as wide as the text area.
+    # Zero frame padding: tables are exactly as wide as the text area.
     frame = Frame(MARGIN, BOTTOM_MARGIN, CONTENT_WIDTH, A4[1] - MARGIN - BOTTOM_MARGIN, 0, 0, 0, 0, id="content")
     doc.addPageTemplates([PageTemplate(id="page", frames=[frame], onPage=draw_footer)])
     story = _header(document, styles)

@@ -1,15 +1,9 @@
-"""Validation of the environment configuration of an instance.
+"""Validation of the environment configuration of an instance (D-027).
 
-The settings module reads its configuration only from environment variables, the method
-shown in Django's deployment checklist (docs/DECISIONS.md, D-027). This module validates
-those variables in one place and refuses to start on missing or unsafe values, so that
-security settings are secure by default and are only relaxed explicitly for
-``APP_ENV=local`` (docs/SECURITY.md, section 3).
-
-The functions take the environment as a mapping, so that tests can call them with any
-values without reloading Django's settings.
-
-Error messages never contain the values of secret variables.
+The settings module reads its configuration only from environment variables. This module
+validates them in one place and refuses to start on missing or unsafe values; security settings
+are relaxed only for ``APP_ENV=local``. The functions take the environment as a mapping, so
+tests can call them with any values. Error messages never contain secret values.
 """
 
 from __future__ import annotations
@@ -38,8 +32,7 @@ EMAIL_MODES = (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST, EMAIL_MODE_GRAPH)
 # One year, the value Django's documentation calls common for SECURE_HSTS_SECONDS.
 DEFAULT_HSTS_SECONDS = 31536000
 
-# The same criteria as Django's deployment check security.W009 (django/core/checks/
-# security/base.py), enforced at startup outside APP_ENV=local.
+# The criteria of Django's deployment check security.W009, enforced outside APP_ENV=local.
 SECRET_KEY_MIN_LENGTH = 50
 SECRET_KEY_MIN_UNIQUE_CHARACTERS = 5
 SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
@@ -47,24 +40,21 @@ SECRET_KEY_INSECURE_PREFIX = "django-insecure-"
 PORT_MIN = 1
 PORT_MAX = 65535
 
-# The file of the address directory (D-075, owner decision of 2026-10-16): an own SQLite file, not
-# part of any backup. Outside APP_ENV=local the default is below the state directory that the
-# systemd units create (StateDirectory=leg-platform); locally it is a file in the development
-# folder of the user. A configured value must be an absolute path outside the repository.
+# The address directory is an own SQLite file, not part of any backup (D-075). Outside local the
+# default is below the systemd state directory; a configured value must be an absolute path
+# outside the repository.
 ADDRESS_DIRECTORY_FILE_VARIABLE = "ADDRESS_DIRECTORY_FILE"
 ADDRESS_DIRECTORY_DEFAULT_FILE = "/var/lib/leg-platform/address-directory.sqlite3"
 ADDRESS_DIRECTORY_LOCAL_FOLDER = ".leg-platform-dev"
 ADDRESS_DIRECTORY_FILE_NAME = "address-directory.sqlite3"
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
-# The first-start variables of the initial system administrator (D-005, D-076). The password is a
-# secret; its name contains "PASS", so Django's exception reporter filter masks it on debug pages
-# and in error reports like DB_PASSWORD.
+# First-start variables of the initial system administrator (D-005, D-076). The password name
+# contains "PASS", so Django's exception reporter filter masks it.
 BOOTSTRAP_ADMIN_EMAIL_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_EMAIL"
 BOOTSTRAP_ADMIN_PASSWORD_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_PASSWORD"
 
-# Security log retention in days (docs/SECURITY.md, section 10; D-018). The defaults are also the
-# minimum: an instance can keep entries longer, never shorter.
+# Security log retention in days (D-018); the defaults are also the minimum.
 SECURITY_LOG_RETENTION_DAYS = 30
 SECURITY_LOG_LONG_RETENTION_DAYS = 365
 
@@ -77,13 +67,10 @@ LOCAL_INSTANCE_BASE_URL = "http://127.0.0.1:8000"
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
 
-# The delivery modes each APP_ENV allows (docs/SECURITY.md, sections 8 and 11;
-# docs/ARCHITECTURE.md, "Email"; D-028, D-070): local development allows console output (the
-# default) and delivery restricted to allowed recipients, so that Microsoft Graph delivery can
-# be tested locally with a dedicated development app registration. Stage and production allow
-# only unrestricted Microsoft Graph delivery and nothing else, so that security links never end
-# up in console or server logs and the stage instance behaves exactly like production
-# (D-070). ``APP_ENV=stage`` is only a label of the instance role.
+# Delivery modes per APP_ENV (D-028, D-070): local allows console output (the default) and
+# delivery restricted to allowed recipients; stage and production allow only unrestricted
+# Microsoft Graph delivery, so security links never reach console or server logs and stage
+# behaves exactly like production.
 ALLOWED_EMAIL_MODES = {
     APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
     APP_ENV_STAGE: (EMAIL_MODE_GRAPH,),
@@ -203,8 +190,7 @@ def parse_secret_keys(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[
 def parse_allowed_hosts(env: Mapping[str, str], app_env: str) -> tuple[str, ...]:
     hosts = _split_list(_get(env, "DJANGO_ALLOWED_HOSTS"))
     for host in hosts:
-        # "*" allows every host; a leading dot allows all subdomains. ALLOWED_HOSTS lists
-        # only the host names of the application (docs/SECURITY.md, section 4; D-025).
+        # "*" allows every host; a leading dot all subdomains (D-025).
         if "*" in host or host.startswith("."):
             raise ImproperlyConfigured(
                 f"DJANGO_ALLOWED_HOSTS must list exact host names; wildcards are not "
@@ -220,8 +206,7 @@ def parse_csrf_trusted_origins(env: Mapping[str, str], app_env: str) -> tuple[st
     allowed_schemes = ("https",) if app_env != APP_ENV_LOCAL else ("https", "http")
     for origin in origins:
         if "*" in origin:
-            # Django accepts "https://*.example.com"; the project never trusts a wildcard
-            # (docs/SECURITY.md, section 3).
+            # Django accepts "https://*.example.com"; the project never trusts a wildcard.
             raise ImproperlyConfigured(
                 f"DJANGO_CSRF_TRUSTED_ORIGINS must not contain wildcards (got {origin!r})."
             )
@@ -289,8 +274,7 @@ def parse_hsts_seconds(env: Mapping[str, str]) -> int:
 
 
 def parse_hsts_include_subdomains(env: Mapping[str, str]) -> bool:
-    # Off by default: the policy would also apply to every host below the application's host
-    # name; enabling it is a decision of the operator for its domain (D-028).
+    # Off by default: the policy would also apply to every host below the host name (D-028).
     return _parse_bool(env, "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
 
 
@@ -311,34 +295,28 @@ def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, .
             f"APP_ENV={app_env} allows only EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
         )
     if app_env != APP_ENV_LOCAL and _get(env, "EMAIL_ALLOWED_RECIPIENTS"):
-        # Outside local only unrestricted Graph delivery exists; a list of allowed recipients
-        # would suggest a restriction that does not exist, so the start is refused (D-070).
+        # Outside local the list would suggest a restriction that does not exist (D-070).
         raise ImproperlyConfigured(
             f"EMAIL_ALLOWED_RECIPIENTS must not be set with APP_ENV={app_env}: delivery is "
             f"unrestricted there and the list would have no effect. Remove the variable."
         )
     recipients = parse_email_allowed_recipients(env)
     if mode == EMAIL_MODE_ALLOWLIST and not recipients:
-        # An allowlist without entries would deliver to nobody without notice; refuse the
-        # start instead (D-028, re-review of 2026-10-11, N-5).
+        # An allowlist without entries would deliver to nobody without notice (D-028).
         raise ImproperlyConfigured("EMAIL_MODE=allowlist requires EMAIL_ALLOWED_RECIPIENTS.")
     return mode, recipients
 
 
 # One complete address: exactly one "@", a non-empty local part and a domain with at least two
-# labels; no white space, wildcards or list separators. Deliberately simple: the list contains
-# only addresses the operator or developer chose, and it only restricts delivery.
+# labels; no white space, wildcards or list separators. Deliberately simple.
 _ALLOWED_RECIPIENT = re.compile(
     r"[^@\s,*]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+"
 )
 
 
 def parse_email_allowed_recipients(env: Mapping[str, str]) -> tuple[str, ...]:
-    """Return the normalised (lower-case) allowed recipients; refuse invalid entries.
-
-    Error messages name only the position of an invalid entry, never the addresses, which
-    are personal data.
-    """
+    """Return the lower-case allowed recipients; errors name only the position of an entry
+    (addresses are personal data)."""
     recipients = []
     for position, entry in enumerate(_split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS")), 1):
         if not _ALLOWED_RECIPIENT.fullmatch(entry):
@@ -352,12 +330,9 @@ def parse_email_allowed_recipients(env: Mapping[str, str]) -> tuple[str, ...]:
 
 def is_valid_instance_name(value: str) -> bool:
     """Whether a name of the instance may be used: at most INSTANCE_NAME_MAX_LENGTH characters
-    and no control, format or line separator characters (Unicode categories C*, Zl, Zp).
-
-    The name appears in email subjects; control characters would allow header injection. The one
-    check for the environment value (at the start) and for the value of the portal settings (when
-    saved and again when read; D-073).
-    """
+    and no control, format or line separator characters (it appears in email subjects, so
+    control characters would allow header injection). Shared by the environment value and the
+    portal settings (D-073)."""
     return len(value) <= INSTANCE_NAME_MAX_LENGTH and not any(
         unicodedata.category(character).startswith("C")
         or unicodedata.category(character) in ("Zl", "Zp")
@@ -376,10 +351,9 @@ def parse_instance_name(env: Mapping[str, str]) -> str:
 
 
 def has_unsafe_url_character(value: str) -> bool:
-    """Whether a text from the configuration or the administration has a character that has no
-    place in an address that is printed into a page or a header: white space, control and format
-    characters (such as a zero-width space or a bidirectional override) and line or paragraph
-    separators (Unicode categories Cc, Cf, Zl, Zp; security review of phase 2, E-2)."""
+    """Whether a text has a character that has no place in an address printed into a page or a
+    header: white space, control and format characters (zero-width space, bidi override) and
+    line or paragraph separators (Cc, Cf, Zl, Zp)."""
     return any(
         character.isspace() or unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp")
         for character in value
@@ -391,8 +365,7 @@ def _parse_url(name: str, value: str, allowed_schemes: tuple[str, ...]) -> Split
         parts = urlsplit(value)
         port = parts.port
     except ValueError:
-        # An unclosed bracket or a port that is no number: a configuration error with a message,
-        # not an unexplained ValueError.
+        # An unclosed bracket or a non-numeric port: a configuration error with a message.
         raise ImproperlyConfigured(f"{name} is not a valid URL.") from None
     if (
         parts.scheme not in allowed_schemes
@@ -415,8 +388,7 @@ def parse_instance_base_url(
 ) -> str:
     """Return the canonical origin of the instance, used to build links in emails (D-013).
 
-    Links in emails never come from the request (docs/SECURITY.md, section 4). The host must be
-    one of ALLOWED_HOSTS, so that the configuration cannot point links at another host.
+    The host must be one of ALLOWED_HOSTS, so the configuration cannot point links elsewhere.
     """
     value = _get(env, "INSTANCE_BASE_URL")
     if not value:
@@ -452,11 +424,8 @@ _SENDER_ADDRESS = re.compile(
 
 
 def parse_email_sender_address(env: Mapping[str, str], base_url: str) -> str:
-    """Return the sender address of outgoing email.
-
-    The administrator configures the sender (later in the Microsoft Graph configuration, D-006);
-    until then ``EMAIL_SENDER_ADDRESS`` or, as a default, ``noreply@<host of the base URL>``.
-    """
+    """Return the sender address of outgoing email: ``EMAIL_SENDER_ADDRESS`` or
+    ``noreply@<host of the base URL>`` (the administrator sets it later, D-006)."""
     value = _get(env, "EMAIL_SENDER_ADDRESS")
     if value:
         if not _SENDER_ADDRESS.fullmatch(value):
@@ -516,16 +485,12 @@ class BootstrapAdministrator:
 
 
 def parse_bootstrap_administrator(env: Mapping[str, str]) -> BootstrapAdministrator:
-    """Read the variables of the initial system administrator (D-005, D-076).
+    """Read the optional first-start variables (D-005, D-076).
 
-    Both are optional and are read only by ``manage.py setup_instance`` and
-    ``setup_initial_administrator``, and the password only while no system administrator exists.
-    They are never loaded into Django's settings, so the application process never holds them
-    there (and so no debug page can show them); they are not validated at the start of the
-    application, because the web process must keep starting when the operator leaves the
-    password in the file after the first login. The password is used exactly as given (a value of
-    only whitespace counts as not set); its strength is checked by Django's password validators
-    when the account is created. The email address is trimmed; the account model validates it.
+    Read only by ``manage.py setup_instance`` / ``setup_initial_administrator``, never loaded into
+    Django's settings and not validated at start (the web process must keep starting when the
+    password stays in the file). The password is used as given (only whitespace counts as not
+    set); Django's password validators check it when the account is created.
     """
     password = env.get(BOOTSTRAP_ADMIN_PASSWORD_VARIABLE, "")
     return BootstrapAdministrator(
@@ -538,10 +503,9 @@ def parse_address_directory_file(env: Mapping[str, str], app_env: str) -> str:
     """Return the path of the SQLite file of the address directory (D-075).
 
     A configured value must be an absolute path to a file outside the repository, without NUL or
-    other control characters. Nothing is created here. When it is not set, the default applies:
-    ``/var/lib/leg-platform/address-directory.sqlite3`` outside ``APP_ENV=local`` and a file in
-    ``~/.leg-platform-dev`` locally, so that the development machine never writes into the
-    repository. The path is not a secret; the error messages do not repeat it.
+    other control characters. Nothing is created here. The default is below
+    ``/var/lib/leg-platform`` outside local and ``~/.leg-platform-dev`` locally. Error messages
+    do not repeat the path.
     """
     raw = env.get(ADDRESS_DIRECTORY_FILE_VARIABLE, "")
     value = raw.strip()

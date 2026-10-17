@@ -1,8 +1,4 @@
-"""Writing security events (docs/SECURITY.md, section 10; D-018, D-041).
-
-Every event is stored in the append-only security log and also written to the logger
-``leg_platform.security``. Both name the account only by its internal number.
-"""
+"""Writing security events (docs/SECURITY.md, section 10; D-018): the append-only log plus the ``leg_platform.security`` logger, naming accounts by internal number only."""
 
 import functools
 import logging
@@ -67,11 +63,9 @@ MESSAGES = {
 def record(event, *, account=None, actor=None, long_retention=False, detail=""):
     """Store the event and log it; call it in the transaction of the change it records.
 
-    The log line is written only when the transaction commits, so a rolled-back change leaves
-    neither a stored event nor a log line (D-018). ``detail`` is added to the log line only; it
-    must never contain personal data (the portal settings give the name, the host names of public
-    addresses, colours and, for a logo, its type, size and the start of its digest, D-056, D-073;
-    a rejected upload gives a fixed reason code and nothing of the file).
+    The log line is written on commit, so a rolled-back change leaves neither (D-018). ``detail``
+    goes to the log line only and must never contain personal data (e.g. portal setting names,
+    hosts, colours, a logo's type/size/digest start, a rejected upload's fixed reason code).
     """
     SecurityEvent.objects.record(
         event, account=account, actor=actor, long_retention=long_retention

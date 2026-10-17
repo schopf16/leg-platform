@@ -1,10 +1,8 @@
-"""The instance name and the logos for pages that must render without the database.
+"""The instance name and logos for pages that must render without the database.
 
-The error pages (``error_base.html``) cannot rely on a context processor: Django renders the page
-of a server error without a request. Without a request in the context the values come straight
-from the settings, so no session and no database are needed (D-054, D-056). The pages of a client
-error (403, 404, failed CSRF check) are rendered with the request and use the accessor of the
-portal settings, which falls back to the settings if the database does not answer (D-073).
+A server error page is rendered without a request, so then the values come straight from the
+settings (no session, no database; D-054, D-056); with a request the portal settings accessor is used
+(falls back to the settings if the database does not answer, D-073).
 """
 
 from types import SimpleNamespace

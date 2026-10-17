@@ -1,9 +1,7 @@
-"""The tasks of the start page (D-057; LEG-Design-Vorgaben/navigation/VORGABEN.md, section 4).
+"""The tasks of the start page (D-057): open while something is missing in the account, shown as tiles.
 
-A task is open as long as something is missing in the account. It is shown as a tile. The person
-can hide a tile for good (``HiddenTask``); a done task disappears by itself. Which tasks exist is
-fixed here; there is nothing to configure. The tasks are computed from the state of the account,
-never stored.
+A person can hide a tile for good (``HiddenTask``); a done task disappears by itself. The tasks are
+fixed here and computed from the account's state, never stored.
 """
 
 from dataclasses import dataclass

@@ -1,9 +1,9 @@
 """Emails of the account functions (docs/ARCHITECTURE.md, "Email").
 
-All sending goes through Django's email framework, so that the configured backend decides
-about delivery (console or Graph, D-006, D-028) and tests use the in-memory backend. Messages
-are plain text. Links are built from the canonical base URL of the instance configuration,
-never from the request (docs/SECURITY.md, section 4). Neither messages nor tokens are logged.
+Sent through Django's email framework (the configured backend decides about delivery, D-006, D-028),
+as plain text, in the instance's default language. Links are built from the canonical base URL of
+the instance configuration, never from the request (docs/SECURITY.md, section 4). Neither messages
+nor tokens are logged.
 """
 
 import math
@@ -21,9 +21,6 @@ from leg_platform.accounts.portal_settings import portal_values
 
 Key = EmailText.Key
 
-# The emails are written in the default language of the instance, not in the language of the
-# request that triggered them.
-
 
 def absolute_url(path):
     """Return the link for a path of the application, built from the instance configuration."""
@@ -31,8 +28,7 @@ def absolute_url(path):
 
 
 def _values(specific, key=None, greeting_name=""):
-    # The effective values of the portal settings (D-073): the name is checked again for control
-    # characters when it is read, so it can never inject a header into the subject.
+    # The portal name is re-checked for control characters when read, so it cannot inject a header (D-073).
     portal = portal_values()
     values = {
         "instance_name": portal.name,
@@ -41,10 +37,8 @@ def _values(specific, key=None, greeting_name=""):
         "login_url": absolute_url(reverse("accounts:login")),
         **specific,
     }
-    # Only the emails that offer the placeholder get a value for it; for every other email the
-    # marker is not allowed in a text (email_texts), so no name can reach it (D-068). The notice
-    # about a deleted account is always neutral, also in the preview and the test email. Must run
-    # with the language of the email active.
+    # Only emails that offer the greeting placeholder get a value (no name can reach another email,
+    # D-068); the deleted-account notice is always neutral, also in preview and test. Run with the email's language active.
     if key is not None and any(
         placeholder.name == email_texts.GREETING.name
         for placeholder in email_texts.DEFINITIONS[key].placeholders
@@ -56,19 +50,14 @@ def _values(specific, key=None, greeting_name=""):
 
 
 def _send(address, key, values, greeting_name=""):
-    """Send the email; ``values`` holds the placeholders that are specific to this email.
-
-    ``greeting_name`` is the cleaned name that was stored in the job (D-068); it is used only by
-    the emails that offer the greeting, and "" gives the neutral greeting.
-    """
+    """Send the email; ``values`` holds this email's specific placeholders, ``greeting_name`` the cleaned stored name (D-068)."""
     with translation.override(settings.LANGUAGE_CODE):
         subject, body = email_texts.render(key, _values(values, key, greeting_name))
     _deliver(address, subject, body)
 
 
 def _deliver(address, subject, body):
-    # Marks an automatic message that answers no email (RFC 3834, section 5.2), so that
-    # automatic replies are not sent to it.
+    # An automatic message that answers no email (RFC 3834, section 5.2).
     EmailMessage(
         subject=subject, body=body, to=[address], headers={"Auto-Submitted": "auto-generated"}
     ).send(fail_silently=False)
@@ -76,6 +65,13 @@ def _deliver(address, subject, body):
 
 # The personal links of a preview and of a test email carry a token that does not exist.
 EXAMPLE_TOKEN = "x" * 43
+_SAMPLE_LINK_VIEWS = {
+    email_texts.VERIFICATION_URL: "accounts:registration_verify",
+    email_texts.RESET_URL: "accounts:password_reset_verify",
+    email_texts.EMAIL_CHANGE_URL: "accounts:email_change_verify",
+    email_texts.STOP_URL: "accounts:email_change_stop_verify",
+    email_texts.TWO_FACTOR_RESET_URL: "accounts:two_factor_reset_verify",
+}
 
 
 def _sample_values(key, greeting_name=""):
@@ -85,41 +81,23 @@ def _sample_values(key, greeting_name=""):
             specific[placeholder.name] = "24"
         elif placeholder is email_texts.LIFETIME_DAYS:
             specific[placeholder.name] = "7"
-        elif placeholder is email_texts.VERIFICATION_URL:
+        elif placeholder in _SAMPLE_LINK_VIEWS:
             specific[placeholder.name] = absolute_url(
-                reverse("accounts:registration_verify", kwargs={"token": EXAMPLE_TOKEN})
-            )
-        elif placeholder is email_texts.RESET_URL:
-            specific[placeholder.name] = absolute_url(
-                reverse("accounts:password_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
-            )
-        elif placeholder is email_texts.EMAIL_CHANGE_URL:
-            specific[placeholder.name] = absolute_url(
-                reverse("accounts:email_change_verify", kwargs={"token": EXAMPLE_TOKEN})
-            )
-        elif placeholder is email_texts.STOP_URL:
-            specific[placeholder.name] = absolute_url(
-                reverse("accounts:email_change_stop_verify", kwargs={"token": EXAMPLE_TOKEN})
-            )
-        elif placeholder is email_texts.TWO_FACTOR_RESET_URL:
-            specific[placeholder.name] = absolute_url(
-                reverse("accounts:two_factor_reset_verify", kwargs={"token": EXAMPLE_TOKEN})
+                reverse(_SAMPLE_LINK_VIEWS[placeholder], kwargs={"token": EXAMPLE_TOKEN})
             )
     return _values(specific, key, greeting_name)
 
 
 def preview(key, subject, body):
-    """Return the subject and body as they would be sent, with example links and the example
-    name of the greeting (D-039, D-068)."""
+    """Return the subject and body as they would be sent, with example links and the example greeting name (D-039, D-068)."""
     with translation.override(settings.LANGUAGE_CODE):
         return email_texts.compose(key, subject, body, _sample_values(key, greeting.EXAMPLE_NAME))
 
 
 def send_test(address, key, subject, body, greeting_name=""):
-    """Send the given text with example links to the address of the administrator (D-039).
+    """Send the given text with example links to the administrator's address (D-039).
 
-    ``greeting_name`` is the cleaned name of the administrator's own account (D-068): the test
-    email uses the real rule, so the administrator sees what a person with this name receives.
+    ``greeting_name`` is the administrator's own cleaned name (D-068): the real greeting rule applies.
     """
     with translation.override(settings.LANGUAGE_CODE):
         subject, body = email_texts.compose(
@@ -131,11 +109,7 @@ def send_test(address, key, subject, body, greeting_name=""):
 
 
 def graph_test_message(address, sender_address):
-    """Return the test email of the Microsoft Graph configuration (D-006). It contains no secret.
-
-    The sender is the configured mailbox. The message is sent with GraphEmailBackend by the
-    administration, not through the email framework.
-    """
+    """The test email of the Microsoft Graph configuration (D-006), without a secret; sent by the administration with GraphEmailBackend."""
     with translation.override(settings.LANGUAGE_CODE):
         subject = gettext("Test email of the Microsoft Graph configuration")
         body = gettext(
@@ -159,8 +133,7 @@ def send_registration_verification(address, raw_token, lifetime: timedelta):
 
 
 def send_invitation(address, raw_token, lifetime: timedelta):
-    """Send the link that a person invited by staff uses to confirm the address and choose a password
-    (D-087). It is the link of the registration; the text has no name and no data of the account."""
+    """Send the registration link to a person invited by staff (D-087); the text has no name or account data."""
     _send(
         address,
         Key.INVITATION,
@@ -174,11 +147,7 @@ def send_invitation(address, raw_token, lifetime: timedelta):
 
 
 def send_registration_existing_account(address):
-    """Tell the owner of an address with an account that someone tried to register it.
-
-    Contains no link that changes anything (docs/PROJECT.md, "Registration"). Nobody is asked
-    to reply: third parties can trigger this email.
-    """
+    """Tell the owner of an address that someone tried to register it; no link, no reply requested (third parties can trigger it)."""
     _send(address, Key.REGISTRATION_EXISTING_ACCOUNT, {})
 
 
@@ -226,8 +195,7 @@ def send_email_changed(address, greeting_name=""):
 
 
 def send_secondary_email_changed(address, greeting_name=""):
-    """Tell every address that the second address was added or removed; contains no link and no
-    word about logging in again (the sessions stay)."""
+    """Tell every address that the second address was added or removed; no link."""
     _send(address, Key.SECONDARY_EMAIL_CHANGED, {}, greeting_name)
 
 

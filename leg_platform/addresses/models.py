@@ -1,12 +1,4 @@
-"""The address directory (an own SQLite file) and the import queue (the application database).
-
-The directory (``Directory``, ``Address``) is public data without a reference to any user or
-profile. It lives in its own SQLite file (alias ``addresses``) that is not part of any backup; the
-import replaces it as a whole and runs only in the worker process (``process_address_imports``,
-D-075). ``ImportRequest`` is the queue row of the admin button; it stays in the application
-database and contains no profile, address, user reference, download URL, credentials or arbitrary
-command arguments. ``leg_platform.addresses.router`` keeps the two apart.
-"""
+"""Address directory (own SQLite file, alias ``addresses``, public data) and the import queue row (application database); see ``router`` (D-075)."""
 
 import uuid
 from datetime import timedelta
@@ -26,9 +18,7 @@ class Directory(models.Model):
     imported_at = models.DateTimeField(null=True, verbose_name=_("Imported at"))
     checksum = models.CharField(max_length=64, blank=True)
     row_count = models.PositiveIntegerField(default=0, verbose_name=_("Address count"))
-    # A lease against two imports at the same time (the worker and the operator command): the
-    # importer that holds it has the token; it expires, so that a killed importer does not block
-    # the next import for ever (importer.py).
+    # Import lease against concurrent imports (importer.py).
     import_token = models.UUIDField(null=True, editable=False)
     import_lease_until = models.DateTimeField(null=True, editable=False)
 
@@ -56,8 +46,7 @@ class Address(models.Model):
     house_number = models.CharField(max_length=32, blank=True)
     postal_code = models.CharField(max_length=4)
     locality = models.CharField(max_length=255)
-    # Folded copies of the three texts that are searched (leg_platform.addresses.keys): lower case
-    # without accents. They are filled on save and in bulk_create; the searches use only them.
+    # Folded search copies (``keys``), filled on save and in bulk_create.
     street_key = models.CharField(max_length=255, editable=False, default="")
     house_number_key = models.CharField(max_length=32, editable=False, default="", blank=True)
     locality_key = models.CharField(max_length=255, editable=False, default="")
@@ -67,15 +56,12 @@ class Address(models.Model):
     class Meta:
         default_permissions = ()
         indexes = [
-            # Equality on the postal code and the street, then a range on the house number: the
-            # check of a complete address, the candidate streets of the approximate search (the
-            # index covers the street, so no table row is read for them) and the addresses of one
-            # street.
+            # Check of a complete address, candidate streets of the approximate search, addresses of one street.
             models.Index(
                 fields=["generation", "postal_code", "street_key", "street", "house_number_key"],
                 name="addr_generation_postal_street",
             ),
-            # A prefix range on the street key, in the order of the answer: the suggestions.
+            # Suggestions: prefix range on the street key, in answer order.
             models.Index(
                 fields=["generation", "street_key", "street", "house_number", "postal_code", "locality"],
                 name="addr_generation_street",
@@ -109,11 +95,8 @@ class ImportRequest(models.Model):
         null=True, verbose_name=_("Last automatic attempt at"),
     )
     is_automatic = models.BooleanField(default=False, editable=False)
-    # When the last manual repair of a damaged directory (same official file, failed integrity
-    # check) ended without an intact directory, or failed. The next repair is refused for six
-    # hours (importer.REPAIR_RETRY_INTERVAL, security review of D-076, N-2). It lives here and not
-    # in the directory file, because that file is the thing that is damaged. Cleared by a repair
-    # that ends intact.
+    # Last manual repair that ended without an intact directory; the next one waits (importer.
+    # REPAIR_RETRY_INTERVAL, D-076). Kept here because the directory file is what is damaged.
     last_failed_repair_at = models.DateTimeField(null=True, editable=False)
 
     class Meta:

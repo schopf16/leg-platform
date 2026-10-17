@@ -1,9 +1,4 @@
-"""Forms of the portal: registration, completing the registration, and login.
-
-The forms accept only the fields they define, so that any other submitted value
-(``is_staff``, ``is_superuser``, groups, permissions, customer number, status, retention flag)
-is ignored (docs/SECURITY.md, section 3).
-"""
+"""Forms of the portal: registration, login, profile, confirmations. Only declared fields are accepted."""
 
 import re
 
@@ -26,11 +21,9 @@ from leg_platform.accounts.models import (
     parse_swiss_postal_code,
     validate_account_email,
 )
-
 from leg_platform.accounts.normalization import normalize_email_address
 
-# Fields of the profile a person enters (docs/PROJECT.md, "Profile Data and Purpose"). The two
-# postal code fields of the model are replaced by one form field (D-036).
+# The two postal code fields of the model are replaced by one form field (D-036).
 PROFILE_FIELDS = (
     "salutation",
     "first_name",
@@ -44,11 +37,34 @@ PROFILE_FIELDS = (
     "country",
     "phone_number",
 )
-PROFILE_FIELD_ORDER = (
-    *PROFILE_FIELDS[:8],
-    "postal_code",
-    *PROFILE_FIELDS[8:],
-)
+PROFILE_FIELD_ORDER = (*PROFILE_FIELDS[:8], "postal_code", *PROFILE_FIELDS[8:])
+
+
+def _email_input():
+    return forms.EmailInput(attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"})
+
+
+def _username_field():
+    """The address as a read-only text field, for the password manager; the value is never used."""
+    attrs = {
+        "readonly": True,
+        "tabindex": "-1",
+        "autocomplete": "username",
+        "autocapitalize": "none",
+        "spellcheck": "false",
+    }
+    return forms.CharField(
+        label=_("Email address (username)"), required=False, widget=forms.TextInput(attrs=attrs)
+    )
+
+
+def _current_password_field():
+    return forms.CharField(
+        label=_("Current password"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
+        error_messages={"required": _("Enter your current password.")},
+    )
 
 
 def postal_code_field():
@@ -56,15 +72,9 @@ def postal_code_field():
     return forms.CharField(label=_("postal code"), max_length=15, required=False)
 
 
-def password_rules():
-    """The password rules as short lines for a list (docs/SECURITY.md, section 3; D-058).
-
-    They state the rules that the configured validators check and nothing else: the policy has
-    no composition rules (no upper-case, digit or special character is required), a long
-    sentence is advised. The minimum length is the one of the configured validator, so the text
-    cannot differ from the rule.
-    """
-    minimum = next(
+def _minimum_password_length():
+    """The minimum length of the configured validator, so the text cannot differ from the rule."""
+    return next(
         (
             validator.min_length
             for validator in password_validation.get_default_password_validators()
@@ -72,6 +82,11 @@ def password_rules():
         ),
         None,
     )
+
+
+def password_rules():
+    """The password rules as short lines for a list (D-058)."""
+    minimum = _minimum_password_length()
     rules = []
     if minimum is not None:
         rules.append(gettext("At least %(min_length)d characters.") % {"min_length": minimum})
@@ -85,20 +100,8 @@ def password_rules():
 
 
 def password_hint():
-    """The advice at the password field (docs/SECURITY.md, section 3: passphrases are advised).
-
-    Replaces the bullet list of Django's validator help texts, which stays out of the page: the
-    rules are still checked and every violation is reported at the field. The minimum length is
-    the one of the configured validator, so that the text cannot differ from the rule.
-    """
-    minimum = next(
-        (
-            validator.min_length
-            for validator in password_validation.get_default_password_validators()
-            if isinstance(validator, password_validation.MinimumLengthValidator)
-        ),
-        None,
-    )
+    """The advice at the password field; replaces Django's validator help texts."""
+    minimum = _minimum_password_length()
     if minimum is None:
         return ""
     return gettext(
@@ -107,7 +110,6 @@ def password_hint():
     ) % {"min_length": minimum}
 
 
-# Values of the HTML autocomplete attribute (HTML Standard, "Autofill").
 AUTOCOMPLETE = {
     "email": "email",
     "first_name": "given-name",
@@ -122,10 +124,7 @@ AUTOCOMPLETE = {
 
 
 class PortalBoundField(BoundField):
-    """A bound field whose ``aria-describedby`` names every text that belongs to the field: the
-    help text, the hint or the list of rules that the template shows next to it (the field says
-    which in ``described_by``, as suffixes of its id), and the error (security review, design
-    review of phase 3: the order is the one a person reads)."""
+    """``aria-describedby`` names the lead, help text, ``described_by`` suffixes and error, in reading order."""
 
     @property
     def aria_describedby(self):
@@ -133,8 +132,7 @@ class PortalBoundField(BoundField):
             return None
         ids = []
         if self.auto_id and not self.is_hidden:
-            # A lead text above the control comes first, as it is read first (``lead``).
-            ids += [f"{self.auto_id}_{suffix}" for suffix in getattr(self.field, "described_first", ())]
+            ids +=  [f"{self.auto_id}_{suffix}" for suffix in getattr(self.field, "described_first", ())]
             error_first = getattr(self.field, "error_before_hint", False)
             if error_first and self.errors:
                 ids.append(f"{self.auto_id}_error")
@@ -147,7 +145,7 @@ class PortalBoundField(BoundField):
 
 
 class PortalFormMixin:
-    """Give the widgets of a form the control classes of Tabler (docs/DESIGN.md, section 9)."""
+    """Give the widgets of a form the control classes of Tabler."""
 
     bound_field_class = PortalBoundField
 
@@ -167,11 +165,7 @@ class PortalFormMixin:
 
 
 def clean_postal_code(form, cleaned_data):
-    """Write the postal code field into the Swiss or the foreign postal code of the instance.
-
-    It is written into the Swiss postal code for Switzerland and into the foreign postal code
-    for every other country (Liechtenstein included); the other one is cleared (D-036).
-    """
+    """Write the postal code into the Swiss (Switzerland) or foreign (every other country) field; D-036."""
     if "country" not in cleaned_data or "postal_code" not in cleaned_data:
         return
     country = cleaned_data["country"]
@@ -198,21 +192,14 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
         model = User
         fields = PROFILE_FIELDS
         widgets = {
-            # A post office box is a number; the field is text with a numeric keyboard, so that
-            # the browser shows no spin buttons and does not drop leading zeros. The value is
-            # still validated on the server (an integer of at most 8 digits).
+            # Text with a numeric keyboard: no spin buttons, leading zeros kept; validated on the server.
             "post_office_box_number": forms.TextInput(attrs={"inputmode": "numeric"}),
         }
 
     field_order = PROFILE_FIELD_ORDER
 
     def save(self, commit=True):
-        """Write only the fields of the form (security review of phase 4, M1).
-
-        The instance was loaded at the start of the request. A save of every column would write
-        back what a parallel request changed in the meantime: the end of all sessions
-        (``session_version``), a new password or the second address.
-        """
+        """Write only the form's columns: a full save would undo a parallel change (session_version, password)."""
         if not commit:
             return super().save(commit=False)
         if self.errors:
@@ -225,13 +212,9 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial.setdefault("postal_code", self.instance.postal_code_display)
-        # The person sees the phone number as they would write it, not as it is stored (E.164).
         if self.instance.phone_number and not self.is_bound:
             self.initial["phone_number"] = self.instance.phone_number_display
-        # Fields that are always required. The model allows them to be empty (the administration
-        # needs that for accounts that are not completed yet), so the form states the rule, with
-        # the message and the HTML attribute. The names, the street and the post office box are
-        # conditionally required and are checked by the model (``User.clean``).
+        # Always required here; the model allows empty (uncompleted accounts). The rest is checked by ``User.clean``.
         for name, message in (
             ("town", _("Enter a town.")),
             ("country", _("Select a country.")),
@@ -239,12 +222,10 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
         ):
             self.fields[name].required = True
             self.fields[name].error_messages["required"] = message
-        # Swiss postal codes are numbers; the keyboard of other countries needs letters.
         self.fields["postal_code"].widget.attrs["inputmode"] = (
             "numeric" if self._country_code() == SWITZERLAND else "text"
         )
         self.fields["post_office_box_number"].described_by = ("hint",)
-        # The short label of the images (the registration says "Postal code" in full).
         self.fields["postal_code"].label = _("ZIP code")
 
     def _country_code(self):
@@ -259,21 +240,14 @@ class ProfileForm(PortalFormMixin, forms.ModelForm):
 
 
 class EmailAddressForm(PortalFormMixin, forms.Form):
-    """A form that asks only for an email address (registration and password reset).
-
-    A plain form instead of a model form: any other submitted value is ignored, and nothing is
-    stored by the form; the request is handled by the mail queue (D-016, D-037).
-    """
+    """Asks only for an email address (registration and password reset); stores nothing (D-016, D-037)."""
 
     email = forms.EmailField(
         label=_("Email address"),
         max_length=EMAIL_MAX_LENGTH,
         error_messages={"required": _("Enter your email address.")},
-        widget=forms.EmailInput(
-            attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
-        ),
+        widget=_email_input(),
     )
-    # The hint under the field (the time the link is valid) is read with it.
     email.described_by = ("hint",)
 
     def clean_email(self):
@@ -302,38 +276,16 @@ def describe_password_fields(form, first, second):
 
 
 def pin_username(form, address):
-    """Make the field "username" of a bound form the address that belongs to the page.
-
-    The field is shown as text and is only there for the password manager; whatever the request
-    carries, the form is bound to the address of the page, so that a re-rendered form never shows
-    or offers another one (security review of phase 3, A4).
-    """
+    """Bind the "username" field to the address of the page, whatever the request carries."""
     if form.is_bound:
         form.data = form.data.copy()
         form.data[form.add_prefix("username")] = address
 
 
 class NewPasswordForm(PortalFormMixin, SetPasswordForm):
-    """The new password after a reset link (same password policy as everywhere, twice).
+    """The new password after a reset link; the username field is for the password manager only."""
 
-    The address is shown as text and is a real field marked as the user name, as on the password
-    step of the registration, so that a password manager updates the saved login. The submitted
-    value is never used.
-    """
-
-    username = forms.CharField(
-        label=_("Email address (username)"),
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "readonly": True,
-                "tabindex": "-1",
-                "autocomplete": "username",
-                "autocapitalize": "none",
-                "spellcheck": "false",
-            }
-        ),
-    )
+    username = _username_field()
     field_order = ("username", "new_password1", "new_password2")
 
     def __init__(self, *args, **kwargs):
@@ -352,26 +304,9 @@ class NewPasswordForm(PortalFormMixin, SetPasswordForm):
 
 
 class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
-    """Step 2 of the registration: the password (D-058).
+    """Step 2 of the registration: the password (D-058); the username is the verified address."""
 
-    The address is shown as plain text but is a real field marked as the user name in the same
-    form as the two password fields, so that a password manager saves both together. The
-    submitted value is never used: the user name is the address that was verified.
-    """
-
-    username = forms.CharField(
-        label=_("Email address (username)"),
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "readonly": True,
-                "tabindex": "-1",
-                "autocomplete": "username",
-                "autocapitalize": "none",
-                "spellcheck": "false",
-            }
-        ),
-    )
+    username = _username_field()
     password1, password2 = SetPasswordMixin.create_password_fields()
 
     field_order = ("username", "password1", "password2")
@@ -398,19 +333,14 @@ class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
 
     def _post_clean(self):
         super()._post_clean()
-        # Only the address is known at this step; the names follow on the next page.
         self.validate_password_for_user(self.user, "password1")
 
 
 class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
-    """Step 3 of the registration: name, address and the consent to the privacy notice (D-058).
+    """Step 3 of the registration: name, address and consent to the privacy notice (D-058).
 
-    Only the fields of the design package (team lead decision K15). The country is Switzerland;
-    the other fields of the profile (salutation, company, address addition, post office box,
-    phone number) stay in the model and are entered in the profile later. A person whom staff
-    invited (D-087) finds the data that the staff entered in these fields and confirms or corrects
-    it; the other fields of the profile that the staff entered stay as they are, and an invitation
-    with another country keeps that country (``country_of_instance``).
+    A person invited by staff (D-087) confirms or corrects the staff's data; an invitation with
+    another country keeps it (``country_of_instance``).
     """
 
     postal_code = postal_code_field()
@@ -424,14 +354,10 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
         model = User
         fields = ("first_name", "last_name", "street", "house_number", "town")
 
-    field_order = (
-        "first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy",
-    )
+    field_order = ("first_name", "last_name", "street", "house_number", "postal_code", "town", "privacy")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # A person whom staff invited (D-087) finds the data of the staff here, with the postal code
-        # (a field of the form, not of the model), and confirms or corrects it.
         self.initial.setdefault("postal_code", self.instance.postal_code_display)
         self.country = self.country_of_instance()
         for name, label, message in (
@@ -443,8 +369,6 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
             self.fields[name].required = True
             self.fields[name].label = label
             self.fields[name].error_messages["required"] = message
-        # Not every address has a house number, so the field may stay empty (the package marks
-        # it neither as required nor as optional).
         self.fields["house_number"].label = _("House number")
         self.fields["house_number"].required = False
         self.fields["postal_code"].label = _("Postal code")
@@ -454,32 +378,26 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
             {"inputmode": "numeric", "autocomplete": "postal-code", "maxlength": "4"}
         )
         if self.country != SWITZERLAND:
-            # The postal code of a foreign address (an invitation of staff with a foreign country).
             self.fields["postal_code"].widget.attrs.update({"inputmode": "text", "maxlength": "15"})
-        # A house number has no standard autocomplete value, so that no password manager fills it.
+        # No standard autocomplete value for a house number: no password manager fills it.
         self.fields["house_number"].widget.attrs["autocomplete"] = "off"
         self.fields["privacy"].widget.attrs["class"] = "entry-check-input"
-        # The error summary names the box by a short word, not by the whole sentence.
         self.fields["privacy"].summary_label = _("Privacy policy")
 
     def country_of_instance(self):
-        """The country of this step: Switzerland (K15), except for an account that staff created with
-        another country (D-087): the person confirms the address as the staff entered it."""
+        """Switzerland, except for an account that staff created with another country (D-087)."""
         if self.instance.invited_at is not None and self.instance.country:
             return self.instance.country.code
         return SWITZERLAND
 
     def _post_clean(self):
         super()._post_clean()
-        # One clear message per field (design review of phase 3): the rules of the model for the
-        # name and the address (company name, post office box) repeat what the fields say and
-        # name things that this form does not ask for, so only the first message of a field stays.
+        # One message per field: keep only the first (the model's rules repeat what the fields say).
         for errors in self._errors.values():
             del errors.data[1:]
 
     def clean(self):
         cleaned_data = super().clean()
-        # The country of a registration is Switzerland (K15); the model default is the same.
         cleaned_data["country"] = self.country
         clean_postal_code(self, cleaned_data)
         return cleaned_data
@@ -492,8 +410,7 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
         "invalid_login": _("The email address or the password is incorrect."),
         "inactive": _("The email address or the password is incorrect."),
     }
-    # Off by default. The login view decides what it means: a persistent session for a user, and
-    # nothing for a staff user or system administrator (D-056).
+    # What "remember me" means is decided by the login view (D-056).
     remember_me = forms.BooleanField(required=False, label=_("Stay signed in"))
 
     def __init__(self, *args, **kwargs):
@@ -502,8 +419,7 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
         username.label = _("Email address")
         username.error_messages["required"] = _("Enter your email address.")
         self.fields["password"].error_messages["required"] = _("Enter your password.")
-        # An email keyboard on phones, no automatic capital letter and no spell checking. The
-        # form stays ``novalidate``: the browser does not check the address, the server does.
+        # ``novalidate`` stays: the server checks the address, not the browser.
         attrs = {
             **username.widget.attrs,
             "inputmode": "email",
@@ -512,7 +428,6 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
             "autocomplete": "username",
         }
         username.widget = forms.EmailInput(attrs=attrs)
-        # A native checkbox of 20 px (login/VORGABEN.md, section 4), not Tabler's drawn one.
         self.fields["remember_me"].widget.attrs["class"] = "entry-check-input"
 
     def confirm_login_allowed(self, user):
@@ -523,10 +438,8 @@ class LoginForm(PortalFormMixin, AuthenticationForm):
 class CodeForm(PortalFormMixin, forms.Form):
     """A code of the authenticator app or a recovery code.
 
-    The field is named ``otp_token`` because the abuse protection masks that name when it
-    stores the data of a failed attempt (``AXES_SENSITIVE_PARAMETERS``).
-
-    Recovery codes are letters and digits, so this field must not be restricted to digits.
+    The field is named ``otp_token`` because the abuse protection masks that name
+    (``AXES_SENSITIVE_PARAMETERS``). Recovery codes contain letters, so no digit restriction.
     """
 
     otp_token = forms.CharField(
@@ -535,9 +448,7 @@ class CodeForm(PortalFormMixin, forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "autofocus": True}),
         error_messages={"required": _("Enter the code.")},
     )
-    # One text for every place that asks for a code, at the login and in the profile (design
-    # package, final spot check, 5): it says what to do. It does not tell whether the code was
-    # wrong, expired or used, so it reveals nothing about the account.
+    # One text everywhere a code is asked for; it does not say whether the code was wrong, expired or used.
     invalid_code_message = _(
         "The code is wrong, expired or was already used. The app shows a new code every 30 "
         "seconds: wait for the next one and try again."
@@ -545,12 +456,9 @@ class CodeForm(PortalFormMixin, forms.Form):
 
 
 class SetupCodeForm(CodeForm):
-    """The first code of the authenticator app when it is set up.
+    """The first code of the authenticator app at setup; only six digits, never a recovery code.
 
-    Only the six digits of the app are valid here, never a recovery code. The field is a plain
-    text field like every other field (owner, block 9): no numeric keyboard, no ``maxlength`` and
-    no pattern in the browser. Spaces and hyphens that a person copies along are accepted by the
-    check (``totp.normalize_code``); the server limit of ``max_length`` is not announced.
+    A plain text field (no maxlength announced); spaces and hyphens are accepted by ``totp.normalize_code``.
     """
 
     def __init__(self, *args, **kwargs):
@@ -561,43 +469,31 @@ class SetupCodeForm(CodeForm):
 
 
 class StartSetupForm(PortalFormMixin, forms.Form):
-    """Starts the setup of the authenticator app without a field: only for a session that
-    authenticated a moment ago (``second_factor.recently_authenticated``, D-055)."""
+    """Starts the setup of the authenticator app; no field, needs a recent authentication (D-055)."""
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
 
 
 class ProofCodeInput(forms.TextInput):
-    """The field for the code of a confirmation: a plain text field that never writes a value
-    back into the page.
-
-    A code is used once, so repeating it helps nobody, and a password that was typed into the
-    field by habit must not appear in the page again (design package, one proof, 2.4). The value
-    is visible text, with no special keyboard, length or pattern in the browser (owner, block 8).
-    """
+    """A plain text field that never writes a value back into the page (a typed password must not reappear)."""
 
     def format_value(self, value):
         return None
 
 
-# What the app code can look like after ``totp.normalize_code``: six digits. A recovery code does
-# not count in a confirmation of the profile (D-062, block 8). Anything else is no code and is
-# refused before the abuse protection counts it (docs/SECURITY.md, section 3, "one proof").
+# An app code after ``totp.normalize_code``; anything else is refused before the abuse protection counts it (D-062).
 CODE_SHAPE = re.compile(r"^[0-9]{6}$")
-# A recovery code of the "phone lost" way: eight letters and digits of the base32 alphabet.
+# A recovery code of the "phone lost" way: eight base32 letters and digits.
 RECOVERY_CODE_SHAPE = re.compile(r"^[a-z2-7]{8}$")
 
 
 class OneProofMixin:
-    """One proof per confirmation: the 6-digit code of the authenticator app if a second factor
-    is set up, otherwise the password, never both (owner decision of 2026-10-15, "2FA wins";
-    D-062). A recovery code is no proof here (block 8): it counts at the login and in the way
-    "phone lost" of the card "turn off 2FA" only.
+    """One proof per confirmation: the app code if a second factor is set up, else the password (D-062).
 
-    The form removes the field that it does not need: ``current_password`` when the account has a
-    second factor (``proof == "code"``), ``otp_token`` otherwise (``proof == "password"``). The
-    code is checked after every other field is valid, and only if it has the shape of an app code.
+    A recovery code is no proof here (only at login and in ``LostPhoneForm``). The unused field
+    is removed (``proof`` is "code" or "password"); the code is checked last, and only if it has
+    the shape of an app code.
     """
 
     proof = "password"
@@ -608,16 +504,13 @@ class OneProofMixin:
         "The 2FA authentication code is wrong or has expired. Wait for the next code in your app "
         "and try again."
     )
-    code_lead = _(
-        "Enter the 6-digit code from your authenticator app. Your password is not needed here."
-    )
+    code_lead = _("Enter the 6-digit code from your authenticator app. Your password is not needed here.")
 
     def use_one_proof(self, user, *, autofocus=True):
         field = self.fields["otp_token"]
         if not second_factor.has_second_factor(user):
             self.proof = "password"
             del self.fields["otp_token"]
-            # The error stands before a hint or a note in the page, so it is read first as well.
             self.fields["current_password"].error_before_hint = True
             return
         self.proof = "code"
@@ -634,8 +527,7 @@ class OneProofMixin:
         field.error_before_hint = True
 
     def proof_changed(self):
-        """Whether the second factor was set up or removed since the form was built. The form
-        then fails closed: it asked for the other proof, so nothing is accepted."""
+        """Whether the second factor was set up or removed since the form was built (then fail closed)."""
         return second_factor.has_second_factor(self.user) != (self.proof == "code")
 
     changed_message = _("Your account was changed in the meantime. Please try again.")
@@ -647,51 +539,30 @@ class OneProofMixin:
         return value
 
     def check_code(self, cleaned_data):
-        """Check the app code; only when nothing else is wrong. A recovery code is not accepted
-        here and is never used up (the shape check refuses it, and the check is told to accept
-        the app only).
+        """Check the app code, only when nothing else is wrong; a recovery code is never accepted or used up.
 
-        When the budget of wrong codes is used up, ``verify_second_factor`` marks the request as
-        locked out and the lockout page of the abuse protection answers (with its own text about
-        the pause); the form only adds the error. A wrong code is counted for the session, not for
-        the account (``per_session``); the fifth ends the session (D-062, block 9).
+        When the budget is used up, ``verify_second_factor`` marks the request as locked out and the
+        lockout page answers. A wrong code is counted per session; the fifth ends it (D-062).
         """
         if self.proof != "code" or self.errors or "otp_token" not in cleaned_data:
             return
-        if (
-            second_factor.verify_second_factor(
-                self.request,
-                self.user,
-                cleaned_data["otp_token"],
-                recovery=False,
-                per_session=True,
-            )
-            is None
-        ):
+        if second_factor.verify_second_factor(
+            self.request, self.user, cleaned_data["otp_token"], recovery=False, per_session=True
+        ) is None:
             self.add_error("otp_token", self.code_wrong_message)
 
 
 class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
-    """Asks the logged-in person for one proof: the code of the second factor if one is set up,
-    otherwise the password (D-062).
+    """Asks the logged-in person for one proof: the 2FA code if set up, else the password (D-062).
 
-    For changes that a hijacked session must not be able to make (docs/SECURITY.md, section 3).
-    The check runs under the abuse protection of the login, so that the form cannot be used to
-    guess the password or a code.
+    The check runs under the abuse protection of the login.
     """
 
-    current_password = forms.CharField(
-        label=_("Current password"),
-        strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
-        error_messages={"required": _("Enter your current password.")},
-    )
-    # Instead of the password where a second factor is set up. Only the code of the app counts
-    # here, not a recovery code (D-062, block 8); the shape check refuses anything else.
+    current_password = _current_password_field()
+    # Instead of the password where a second factor is set up; only an app code counts, a recovery code is refused.
     otp_token = forms.CharField(
         label=_("Code from the app"),
-        # Generous on purpose: a password pasted by habit gets the message "that is not a code",
-        # not Django's message about the length (the shape check refuses it, D-062).
+        # Generous: a password pasted by habit gets "that is not a code", not a length message.
         max_length=256,
         widget=forms.TextInput(),
     )
@@ -704,8 +575,7 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
         self.use_one_proof(self.user)
 
     def check_changes(self, cleaned_data):
-        """Hook for the forms that ask for more than the proof: add errors here. The code is
-        checked, and so used up, only when nothing else is wrong (security review, final, R2)."""
+        """Hook for subclasses: add errors here. The code is checked (used up) only when nothing else is wrong."""
 
     def clean(self):
         cleaned_data = super().clean()
@@ -727,22 +597,14 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
 
 
 class LostPhoneForm(PortalFormMixin, forms.Form):
-    """The way "phone lost" of the card "turn off 2FA": the password **and** a recovery code
-    (owner decision of 2026-10-15, D-062, block 8). It is the only place where a recovery code is a
-    proof besides the login.
+    """The way "phone lost" of "turn off 2FA": the password **and** a recovery code (D-062).
 
-    The order is: the format and the required fields, then the password (under the abuse
-    protection of the login), then the code (used up only if everything before was right). A wrong
-    password and a wrong code give the same answer, so the form tells which of the two failed to
-    nobody who has only one of them.
+    Order: format and required fields, then the password (under the abuse protection), then the
+    code (used up only if everything before was right). A wrong password and a wrong code give the
+    same answer.
     """
 
-    current_password = forms.CharField(
-        label=_("Current password"),
-        strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
-        error_messages={"required": _("Enter your current password.")},
-    )
+    current_password = _current_password_field()
     otp_token = forms.CharField(
         label=_("Recovery code"),
         max_length=256,
@@ -759,7 +621,6 @@ class LostPhoneForm(PortalFormMixin, forms.Form):
         self.request = request
         self.user = request.user
         self.fields["otp_token"].error_before_hint = True
-        # A plain text field: the server limit is not announced to the browser (owner, block 8).
         self.fields["otp_token"].widget.attrs.pop("maxlength", None)
 
     def clean_otp_token(self):
@@ -775,43 +636,31 @@ class LostPhoneForm(PortalFormMixin, forms.Form):
         if not second_factor.has_second_factor(self.user):
             self.add_error(None, self.changed_message)
             return cleaned_data
-        # The password is not the last proof here: a right password must not start the count of
-        # the session again, or the recovery code could be guessed without a limit.
+        # A right password must not reset the session's count, or the recovery code could be guessed without limit.
         if not second_factor.verify_password(
             self.request, self.user, cleaned_data["current_password"], reset_on_success=False
         ):
             self.add_error(None, self.wrong_message)
             return cleaned_data
-        if (
-            second_factor.verify_second_factor(
-                self.request,
-                self.user,
-                cleaned_data["otp_token"],
-                app=False,
-                per_session=True,
-            )
-            is None
-        ):
+        if second_factor.verify_second_factor(
+            self.request, self.user, cleaned_data["otp_token"], app=False, per_session=True
+        ) is None:
             self.add_error(None, self.wrong_message)
         return cleaned_data
 
 
 class EmailChangeForm(ReauthenticationForm):
-    """The card "E-Mail-Adressen" of the profile: the login address and the second address, with
-    the current password and, where set up, the code (D-059).
+    """The profile card for the login address and the second address, with the proof (D-059).
 
-    Either address may change, or both; the second one may be emptied to remove it. A new address
-    is not stored: it is requested and confirmed with a link. The form tells nothing about
-    whether an address can be used (no account enumeration).
+    Either or both may change; the second may be emptied. A new address is only requested and
+    confirmed with a link. The form reveals nothing about whether an address can be used.
     """
 
     email = forms.EmailField(
         label=_("Email address for login (username)"),
         max_length=EMAIL_MAX_LENGTH,
         error_messages={"required": _("Enter the new email address.")},
-        widget=forms.EmailInput(
-            attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
-        ),
+        widget=_email_input(),
     )
     secondary_email = forms.EmailField(
         label=_("Second email address"),
@@ -821,9 +670,7 @@ class EmailChangeForm(ReauthenticationForm):
             "The second address receives information. You do not log in with it. Leave the field "
             "empty if you do not want one."
         ),
-        widget=forms.EmailInput(
-            attrs={"inputmode": "email", "autocapitalize": "none", "spellcheck": "false"}
-        ),
+        widget=_email_input(),
     )
     field_order = ("email", "secondary_email", "current_password", "otp_token")
 
@@ -836,13 +683,12 @@ class EmailChangeForm(ReauthenticationForm):
         super().__init__(*args, request=request, **kwargs)
         self.initial.setdefault("email", request.user.email)
         self.initial.setdefault("secondary_email", request.user.secondary_email)
-        # The proof is the third field here, so it takes no autofocus. The note about the link
-        # stands below the proof, whichever it is (one proof, 2.4).
+        # The proof is the third field: no autofocus; the note stands below it.
         proof_field = self.fields["otp_token" if self.proof == "code" else "current_password"]
         proof_field.widget.attrs.pop("autofocus", None)
         proof_field.closing_note = self.link_note
         proof_field.described_by = (*getattr(proof_field, "described_by", ()), "note")
-        # The login address and the new one(s) as the form found them; filled by ``clean``.
+        # Filled by ``clean``.
         self.login_change = None
         self.secondary_change = None
         self.remove_secondary = False
@@ -877,23 +723,18 @@ class EmailChangeForm(ReauthenticationForm):
                 self.secondary_change = secondary
             else:
                 self.remove_secondary = True
-        # The second address is never the login address (the current one, or the new one).
+        # The second address is never the login address (current or new).
         if secondary and secondary == (self.login_change or user.email):
-            self.add_error(
-                "secondary_email",
-                _("The second address must differ from the address for login."),
-            )
+            self.add_error("secondary_email", _("The second address must differ from the address for login."))
         elif not (self.login_change or self.secondary_change or self.remove_secondary):
             self.add_error(None, ValidationError(_("Nothing was changed."), code="unchanged"))
 
 
 class AccountDeleteForm(ReauthenticationForm):
-    """The confirmation of the deletion: the password (and code), and the box (D-059)."""
+    """The confirmation of the deletion: the proof and the box (D-059)."""
 
     confirm = forms.BooleanField(
-        label=_(
-            "I know that my account and my details will be deleted and that this cannot be undone."
-        ),
+        label=_("I know that my account and my details will be deleted and that this cannot be undone."),
         error_messages={
             "required": _("Please tick the box to confirm that you want to delete your account.")
         },
@@ -901,9 +742,7 @@ class AccountDeleteForm(ReauthenticationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # The confirmation is given again with every attempt: after an error the box is never
-        # shown as ticked, so that a repeated submit is never a confirmation by habit.
-        # The error summary names the box by a short word, not by the whole sentence (D11).
+        # The box is never shown as ticked after an error: no confirmation by habit.
         self.fields["confirm"].summary_label = _("Confirmation")
         self.fields["confirm"].widget = forms.CheckboxInput(
             attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
@@ -911,25 +750,13 @@ class AccountDeleteForm(ReauthenticationForm):
 
 
 class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):
-    """Change the password of the logged-in account; asks for one proof first: the code of the
-    second factor if one is set up, otherwise the current password (D-062). The new password and
-    its repetition are asked for in both cases."""
+    """Change the password; asks for one proof first (code if a second factor is set up, else the current password; D-062)."""
 
     different_password_message = _("Choose a password that is different from the current one.")
 
-    current_password = forms.CharField(
-        label=_("Current password"),
-        strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}),
-        error_messages={"required": _("Enter your current password.")},
-    )
-    # Instead of the current password where a second factor is set up; a recovery code is also
-    # accepted.
-    otp_token = forms.CharField(
-        label=_("Code from the app"),
-        max_length=256,
-        widget=forms.TextInput(),
-    )
+    current_password = _current_password_field()
+    # Instead of the current password where a second factor is set up.
+    otp_token = forms.CharField(label=_("Code from the app"), max_length=256, widget=forms.TextInput())
     field_order = ("current_password", "otp_token", "new_password1", "new_password2")
 
     def __init__(self, user, *args, request, **kwargs):
@@ -950,28 +777,17 @@ class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):
         if self.proof_changed():
             self.add_error(None, self.changed_message)
             return cleaned_data
-        # The code is checked, and so used up, only after every other field is valid: a recovery
-        # code must not be lost to a form that fails anyway (security review, final, R2).
+        # The code is checked (used up) only after every other field is valid.
         self.check_code(cleaned_data)
-        # "The new password is not the one that is set now" (D-005, D-062) is compared only after
-        # the proof was given: with the password as the proof, ``clean_current_password`` has
-        # verified it under the abuse protection (so the field is in ``cleaned_data``); with the
-        # code, ``check_code`` has accepted it (and used it up, also when the answer is then
-        # "choose another password"). Without a proof the answer is the same whatever the new
-        # password is, so the form cannot be used to guess the password (security review, H-1).
-        # The comparison has no side effect: no setter, so no rehash (L-1).
+        # The new password is compared only after the proof was given, so the form cannot be used
+        # to guess the password; no setter is used, so no rehash.
         proven = (
             "current_password" in cleaned_data
             if self.proof == "password"
             else "otp_token" in cleaned_data and not self.errors
         )
         new = cleaned_data.get("new_password2")
-        if (
-            proven
-            and new
-            and "new_password1" in cleaned_data
-            and check_password(new, self.user.password)
-        ):
+        if proven and new and "new_password1" in cleaned_data and check_password(new, self.user.password):
             self.add_error("new_password1", self.different_password_message)
         return cleaned_data
 

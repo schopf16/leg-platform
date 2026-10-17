@@ -1,15 +1,7 @@
-"""Load a few clearly synthetic addresses into the address directory file of a development machine.
+"""Load a few synthetic addresses into the directory file of a development machine (docs/STARTUP.md).
 
-Only for a development machine, to try address suggestions without the real directory
-(docs/STARTUP.md). The command
-
-* refuses to run unless ``APP_ENV=local``;
-* writes to the directory file (the alias ``addresses``, D-075), which must have its tables
-  (``python manage.py migrate addresses --database=addresses``);
-* refuses to replace a directory that does not carry the synthetic marker, so that data from
-  a real import is never overwritten.
-
-The rows are invented; they do not describe real buildings.
+Runs only with ``APP_ENV=local``, needs the migrated directory tables and refuses to replace a
+directory without the synthetic marker (real import data).
 """
 
 import uuid
@@ -22,11 +14,10 @@ from django.utils import timezone
 from leg_platform.addresses.models import DIRECTORY_ALIAS, Address, Directory
 from leg_platform.addresses.storage import mark_writer
 
-# Not a SHA-256 value, so that it can never equal the checksum of a real import (64 hex digits).
+# Not a SHA-256 value, so it never equals the checksum of a real import.
 SYNTHETIC_CHECKSUM = "synthetic-local-directory"
 
-# (street, house number, postal code, locality): invented names, postal codes at the end of the
-# Swiss range, so that nobody mistakes them for real addresses.
+# (street, house number, postal code, locality): invented, postal codes at the end of the Swiss range.
 SYNTHETIC_ROWS = (
     ("Example Street", "1", "9999", "Example Town"),
     ("Example Street", "2", "9999", "Example Town"),
@@ -42,11 +33,7 @@ MIGRATE_HINT = "python manage.py migrate addresses --database=addresses"
 
 
 def ensure_replaceable(directory, has_addresses: bool) -> None:
-    """Refuse to replace a directory that does not carry the synthetic marker.
-
-    ``directory`` is the metadata row or None; an empty directory (no row, no addresses) may be
-    filled, a synthetic one replaced. Anything else may be the result of a real import.
-    """
+    """Refuse to replace a directory without the synthetic marker; an empty one (no row, no addresses) may be filled."""
     if directory is None:
         if has_addresses:
             raise CommandError(
@@ -100,7 +87,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if settings.APP_ENV != "local":
             raise CommandError("This command runs only with APP_ENV=local.")
-        # The seed writes the directory file; every other process opens it read-only (D-075).
         mark_writer()
         try:
             directory = Directory.objects.filter(pk=1).first()

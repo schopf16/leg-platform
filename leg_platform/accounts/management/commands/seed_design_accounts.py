@@ -1,10 +1,9 @@
-"""Create test accounts of every access level for design reviews on a development machine.
+"""Create test accounts of every access level for design reviews (APP_ENV=local only).
 
-Only with APP_ENV=local. The accounts are throw-away accounts for the local database. Their
-passwords and authenticator keys are written to a file outside the repository, which only this
-command creates (owner read and write on POSIX systems); they are never printed. ``--code``
-prints the current authenticator codes of these accounts, so that a reviewer can log in as a
-staff user or system administrator, whose second factor is mandatory (docs/DECISIONS.md, D-019).
+Throw-away accounts for the local database. Passwords and authenticator keys go to a file outside the
+repository that only this command creates (owner read/write on POSIX); they are never printed.
+``--code`` prints the current authenticator codes (the second factor of staff and administrators is
+mandatory, D-019).
 """
 
 import json
@@ -23,8 +22,7 @@ from leg_platform.accounts.models import AuthenticatorDevice, User
 
 DEFAULT_OUTPUT = Path.home() / ".leg-platform-design-accounts.json"
 
-# (key, email, is_staff, is_superuser): an authenticated user, a staff user without any role or
-# permission, and a system administrator. Reserved test domain (RFC 2606).
+# (key, email, is_staff, is_superuser); reserved test domain (RFC 2606).
 ACCOUNTS = (
     ("user", "design.user@example.org", False, False),
     ("staff", "design.staff@example.org", True, False),

@@ -1,12 +1,8 @@
-"""Forms of the person pages (D-081, D-087): the note, the customer number at the grid operator, the change of the
-shares of the cooperative (D-086), and the data of a customer: creating a person and the dialogs of the cards
-"Angaben", "Kontakt", "Rechnungsadresse" and "Zahlung und Kundennummern".
-
-The rules are in ``leg_platform.community.persons``, which checks them again. The forms of the customer data reuse the
-rules of the registration and the profile: the postal code is one field that is written into the Swiss or the foreign
-postal code by the country (``accounts.forms.clean_postal_code``, D-036), and the fields, lengths, validators, names and
-address rules are the ones of the account model (``persons.group_errors``). The IBAN is checked by the package
-``python-stdnum`` (``community.iban``).
+"""Forms of the person pages (D-081, D-087): note, grid operator customer number, shares (D-086), creating a
+person and the customer data dialogs. The rules are in ``community.persons``, which checks them again; the
+fields, validators and name/address rules are those of the account model (``persons.group_errors``), the postal
+code is one field written to the Swiss or foreign code by the country (D-036), the IBAN is checked by
+``community.iban``.
 """
 
 import copy
@@ -36,9 +32,8 @@ class NoteForm(forms.Form):
 
 
 class PaymentForm(forms.Form):
-    """The dialog of the card "Zahlung und Kundennummern" (D-087): the IBAN, the paper invoice and the customer number
-    at the grid operator. The IBAN and the paper invoice are data of the customer: they are left out (``customer_data``
-    false) for an account whose data the actor may not change (a staff user or a system administrator, D-012)."""
+    """The payment card dialog (D-087). IBAN and paper invoice are customer data and are left out
+    (``customer_data`` false) when the actor may not change the account (D-012)."""
 
     iban = forms.CharField(
         label=_("IBAN"), required=False, max_length=iban_module.IBAN_MAX_LENGTH * 2,
@@ -76,15 +71,11 @@ class PaymentForm(forms.Form):
         return value
 
 
-# The data of a customer (D-087) ---------------------------------------------------------------------------
-
-
 class PersonDataForm(forms.Form):
-    """The fields of the registration and the profile that the staff enter or change: one form for creating a person
-    and one for each card. A subclass names its ``field_names`` and the ``groups`` of ``persons.GROUP_FIELDS`` whose rules
-    apply. The model rules are checked through ``persons.group_errors`` on a copy of the account (the same code as the
-    service); the postal code is one field that goes into the Swiss or the foreign postal code by the country (D-036).
-    ``values()`` gives the fields of the groups for the service."""
+    """Registration/profile fields entered by staff: one form to create a person and one per card. A subclass names
+    its ``field_names`` and the ``groups`` of ``persons.GROUP_FIELDS`` whose rules apply. The model rules run
+    through ``persons.group_errors`` on a copy of the account (same code as the service); ``values()`` feeds the
+    service."""
 
     email = forms.EmailField(
         label=_("Email"), max_length=EMAIL_MAX_LENGTH,
@@ -133,7 +124,7 @@ class PersonDataForm(forms.Form):
     optional = ()
 
     def __init__(self, data=None, *, person=None, **kwargs):
-        # A copy of the account that the cleaned values are written into for the rules of the model; never saved.
+        # A copy of the account for the model rules; never saved.
         self.instance = copy.copy(person) if person is not None else User()
         initial = kwargs.pop("initial", None) or {}
         if person is not None:
@@ -146,7 +137,7 @@ class PersonDataForm(forms.Form):
             self.fields["postal_code"].label = _("Postal code")
             self.fields["postal_code"].widget = forms.TextInput(attrs={**CONTROL, "maxlength": "15", "autocomplete": "off"})
         if "street" in self.fields:
-            # The suggestions of the address directory under the street field, as in the registration and the profile.
+            # Address directory suggestions under the street field, as in the registration and the profile.
             self.fields["street"].after_template = "addresses/widget.html"
             if "town" in self.fields:
                 self.fields["town"].after_template = "addresses/widget_notice.html"
@@ -171,23 +162,20 @@ class PersonDataForm(forms.Form):
             "country": person.country.code if person.country else SWITZERLAND,
         }
 
-    def clean_email(self):
-        value = self.cleaned_data["email"]
+    @staticmethod
+    def _clean_address(value):
         try:
             validate_account_email(value)
         except ValueError:
             raise forms.ValidationError(_("Enter a valid email address."), code="invalid") from None
         return normalize_email_address(value)
 
+    def clean_email(self):
+        return self._clean_address(self.cleaned_data["email"])
+
     def clean_secondary_email(self):
         value = self.cleaned_data.get("secondary_email")
-        if not value:
-            return ""
-        try:
-            validate_account_email(value)
-        except ValueError:
-            raise forms.ValidationError(_("Enter a valid email address."), code="invalid") from None
-        return normalize_email_address(value)
+        return self._clean_address(value) if value else ""
 
     def clean(self):
         cleaned = super().clean()
@@ -197,7 +185,6 @@ class PersonDataForm(forms.Form):
                 setattr(self.instance, name, cleaned[name])
         if "postal_code" in self.fields:
             clean_postal_code(self, cleaned)
-        # The rules of the model for the fields of the groups (names, address, validators), on the copy.
         for group in self.groups:
             for name, messages in persons.group_errors(self.instance, group).items():
                 if name in ("swiss_postal_code", "foreign_postal_code"):
@@ -208,19 +195,17 @@ class PersonDataForm(forms.Form):
         return cleaned
 
     def values(self):
-        """The cleaned values of the fields of the groups (the postal code as the Swiss or the foreign one)."""
-        result = {}
-        for group in self.groups:
-            for name in persons.GROUP_FIELDS[group]:
-                if name == "post_office_box_number" and name not in self.fields:
-                    continue
-                result[name] = getattr(self.instance, name)
-        return result
+        """The cleaned values of the group fields (the postal code as the Swiss or foreign one)."""
+        return {
+            name: getattr(self.instance, name)
+            for group in self.groups
+            for name in persons.GROUP_FIELDS[group]
+            if name != "post_office_box_number" or name in self.fields
+        }
 
 
 class PersonCreateForm(PersonDataForm):
-    """"Person anlegen": the data of the registration (D-087). The person confirms it when completing the
-    registration."""
+    """"Person anlegen": the registration data (D-087), confirmed by the person at registration."""
 
     field_names = (
         "email", "salutation", "organisation_name", "first_name", "last_name", "address_line_1", "street",
@@ -242,7 +227,7 @@ class PersonCreateForm(PersonDataForm):
 
     def clean(self):
         cleaned = super().clean()
-        # The registration asks for a street (a post office box is entered in the profile).
+        # The registration asks for a street.
         if not self.cleaned_data.get("street") and "street" not in self.errors:
             self.add_error("street", _("Enter a street or a post office box."))
         return cleaned
@@ -263,8 +248,7 @@ class DetailsForm(PersonDataForm):
 
 
 class ContactForm(PersonDataForm):
-    """The card "Kontakt": the phone and, for an active account, the second email address. The login address is
-    shown but cannot be changed (D-012)."""
+    """The card "Kontakt": phone and, for an active account, the second email. The login address cannot be changed (D-012)."""
 
     field_names = ("phone_number", "secondary_email")
     groups = (persons.GROUP_CONTACT,)
@@ -273,7 +257,7 @@ class ContactForm(PersonDataForm):
 
     def __init__(self, *args, person=None, **kwargs):
         super().__init__(*args, person=person, **kwargs)
-        # The link to a new second address works for an active account only (``persons.change_second_email``).
+        # A new second address link works for an active account only (``persons.change_second_email``).
         if person is not None and person.status != User.Status.ACTIVE:
             del self.fields["secondary_email"]
             self.layout = [("single", ["phone_number"])]
@@ -301,8 +285,7 @@ class BillingAddressForm(PersonDataForm):
 
 
 class SharesForm(forms.Form):
-    """One change of the shares: the number that holds from a day on (D-086). The number may be 0 (no shares
-    any more); the day is free, also in the past."""
+    """One change of the shares: the number (may be 0) that holds from a free day, also in the past (D-086)."""
 
     quantity = forms.IntegerField(
         label=_("Number of shares"), min_value=0, max_value=persons.SHARES_MAX,

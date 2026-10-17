@@ -20,13 +20,8 @@ LOCKOUT_TEMPLATE = "accounts/lockout.html"
 def lockout_response(request, response=None, credentials=None):
     """The answer of every lockout (``AXES_LOCKOUT_CALLABLE``): the lockout page, never stored.
 
-    Axes calls this instead of its own response (django-axes 8.3.1, ``axes/helpers.py``,
-    ``get_lockout_response``; the configuration is documented as ``AXES_LOCKOUT_CALLABLE``). The
-    page is the same one that ``AXES_LOCKOUT_TEMPLATE`` rendered before, with the status of
-    ``AXES_HTTP_RESPONSE_CODE``; it needs nothing from the Axes context (it never shows the
-    submitted address). Axes' own response sends no ``Cache-Control`` header, so a browser or a
-    proxy could keep a page that says "blocked" (D-067). The JSON answer that Axes gives to
-    ``X-Requested-With: XMLHttpRequest`` is not used: the portal has no script that posts a login.
+    Axes' own response sends no ``Cache-Control`` header, so a proxy could keep a "blocked" page (D-067).
+    The page never shows the submitted address; the portal has no script that posts a login, so no JSON answer.
     """
     response = render(request, LOCKOUT_TEMPLATE, status=settings.AXES_HTTP_RESPONSE_CODE)
     add_never_cache_headers(response)
@@ -58,8 +53,7 @@ class LoginProtectionHandler(AxesDatabaseHandler):
 
     @staticmethod
     def _record_lockout(credentials, request):
-        # Only the failure that reaches the limit, once per lockout; not the refused attempts
-        # during it (D-018).
+        # Only the failure that reaches the limit, once per lockout (D-018).
         if (
             not getattr(request, "axes_locked_out", False)
             or getattr(request, "axes_failures_since_start", None) != LOGIN_FAILURE_LIMIT

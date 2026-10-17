@@ -1,23 +1,16 @@
-"""Addresses of the community domain: normalisation, uniqueness key and the directory suggestion.
+"""Addresses of the community domain: normalisation, uniqueness key and the directory suggestion (D-033, D-065, D-075).
 
-The normalisation and the check use the machinery of ``leg_platform.addresses`` (D-033, D-065,
-D-075): the folded text of ``addresses.keys`` (lower case, no accents) for the comparison, and the
-local copy of the official directory of building addresses, read through ``addresses.services``.
-Nothing here writes to the directory, and nothing here changes a stored address by itself: a
-suggestion is only advice that a person with the right accepts or dismisses
-(``standorte/adresskorrektur/VORGABEN.md``).
+Comparison uses the folded text of ``addresses.keys``; the directory is read through ``addresses.services``.
+A suggestion is only advice: nothing here writes to the directory or changes a stored address.
 """
 
 import hashlib
-import logging
 from dataclasses import dataclass
 
 from django.utils.translation import gettext
 
 from leg_platform.addresses.keys import fold
 from leg_platform.addresses.services import directory_status, lookup
-
-logger = logging.getLogger(__name__)
 
 SWISS_POSTAL_CODE_LENGTH = 4
 
@@ -38,22 +31,17 @@ def normalise_address(street, house_number, postal_code, town):
 
 
 def address_key(street, house_number, postal_code, town):
-    """The text that makes an address unique: the four parts, folded (case and accents ignored)
-    and joined with a line break (a character that no part contains)."""
+    """The text that makes an address unique: the four parts, folded, joined with a line break."""
     return "\n".join(fold(part) for part in normalise_address(street, house_number, postal_code, town))
 
 
 def address_digest(street, house_number, postal_code, town):
-    """The SHA-256 of ``address_key`` in hexadecimal: the stored, unique form (64 characters, so that
-    the unique index stays small; MariaDB limits unique character columns, Django check mysql.W003)."""
+    """SHA-256 hex of ``address_key``: the stored unique form (short unique index, MariaDB W003)."""
     return hashlib.sha256(address_key(street, house_number, postal_code, town).encode()).hexdigest()
 
 
 def address_signature(street, house_number, postal_code, town):
-    """The four parts as typed (white space normalised): the memory of a dismissed suggestion.
-
-    The suggestion comes back only when street, house number, postal code or town changes
-    (``standorte/adresskorrektur/VORGABEN.md``), also a change of the spelling."""
+    """The four parts as typed (white space normalised): the memory of a dismissed suggestion."""
     return "\n".join(normalise_address(street, house_number, postal_code, town))
 
 
@@ -75,22 +63,12 @@ class AddressSuggestion:
 
 
 def suggest_correction(street, house_number, postal_code, town):
-    """The address of the directory that this address most likely means, or None.
+    """The directory address this address most likely means, or None (no suggestion, no warning).
 
-    None means: no suggestion, which is no warning (``standorte/VORGABEN.md``, section 10). A
-    suggestion is returned only when
-
-    * the postal code has four digits and the directory is available and not older than 92 days
-      (an old copy may lack a new address, the same rule as the notice of the profile, D-066),
-    * the directory has exactly one address with the same house number whose street starts with
-      or is similar to the typed street within that postal code (the suggestions of the profile,
-      D-065), and
-    * that address differs from the typed one in the spelling of the street, the house number
-      or the town.
-
-    An address that the directory has exactly as typed, an ambiguous answer and an unreachable
-    directory all give None.
-    """
+    Only when the postal code has four digits, the directory is available and not older than 92 days
+    (D-066), exactly one directory address has the same house number and a similar street within the
+    postal code (D-065), and it differs from the typed one. Exact matches, ambiguity and an
+    unreachable directory give None."""
     street, house_number, postal_code, town = normalise_address(street, house_number, postal_code, town)
     if not street or not town or len(postal_code) != SWISS_POSTAL_CODE_LENGTH or not postal_code.isdigit():
         return None
@@ -112,16 +90,14 @@ def suggest_correction(street, house_number, postal_code, town):
         for row in answer["results"]
         if fold(row["house_number"]) == wanted_house_number
     }
-    if not candidates or (street, house_number, postal_code, town) in candidates or len(candidates) != 1:
+    if not candidates or len(candidates) != 1 or (street, house_number, postal_code, town) in candidates:
         return None
     return AddressSuggestion(*next(iter(candidates)))
 
 
 def not_found_notice(street, house_number, postal_code, town):
-    """The notice that the directory does not know this address, or "" (no notice).
-
-    It is the text of the check of the profile (D-066): given only for a complete address, when
-    the directory is available and not old. It never blocks saving."""
+    """The notice that the directory does not know this address, or "": only for a complete address,
+    never blocks saving (D-066)."""
     street, house_number, postal_code, town = normalise_address(street, house_number, postal_code, town)
     if not street or not town:
         return ""
@@ -142,9 +118,7 @@ class AddressCheck:
 
 
 def check_address(street, house_number, postal_code, town):
-    """The directory check of one address: a suggestion, or else the not-found notice.
-
-    A suggestion explains the deviation, so the not-found notice is not given with it."""
+    """A suggestion, or else the not-found notice (a suggestion already explains the deviation)."""
     suggestion = suggest_correction(street, house_number, postal_code, town)
     if suggestion is not None:
         return AddressCheck(suggestion, "")
@@ -152,7 +126,7 @@ def check_address(street, house_number, postal_code, town):
 
 
 def suggestion_banner_text(suggestion):
-    """The sentence of the banner (``standorte/adresskorrektur/VORGABEN.md``)."""
+    """The sentence of the banner."""
     return gettext(
         "The address differs from the address directory. Suggestion: %(address)s."
     ) % {"address": suggestion.display()}

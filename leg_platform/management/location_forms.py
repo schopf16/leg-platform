@@ -1,5 +1,4 @@
-"""Forms of the location pages (D-078): the address, the remark, the transformer circuit and the
-first metering point of a location."""
+"""Forms of the location pages (D-078)."""
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -16,12 +15,10 @@ from leg_platform.community.models import (
 )
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
-SHORT = {"class": "form-control", "autocomplete": "off"}
 
 
 class CircuitChoiceField(forms.CharField):
-    """A field in which a transformer circuit is chosen by its number: the text of a suggestion
-    ("TRA21359 · Ittigen Nord") or just the number. Empty means none. The result is the circuit."""
+    """Chooses a transformer circuit by number (a suggestion text or just the number); empty means none; cleans to the circuit."""
 
     def __init__(self, **kwargs):
         kwargs.setdefault("required", False)
@@ -68,8 +65,7 @@ class AddressForm(forms.Form):
 
     def __init__(self, *args, location=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # The location that is being changed (its own address is no duplicate).
-        self.location = location
+        self.location = location  # being changed: its own address is no duplicate
         self.duplicate = None
 
     def clean_postal_code(self):
@@ -108,15 +104,13 @@ class LocationCreateForm(AddressForm):
     def clean(self):
         cleaned = super().clean()
         if self.duplicate is not None:
-            # Saving is not possible while the address exists; the page shows the hint.
             raise ValidationError(_("This address already exists."), code="duplicate_address")
         return cleaned
 
 
 class AddressEditForm(AddressForm):
-    """Change the address of a location. The page asks for a confirmation when the new address is the
-    address of another location (the merge); ``confirm_merge`` carries the answer and ``merge_target`` the id of
-    the location that was shown (the server compares it again under the lock)."""
+    """Change the address; ``confirm_merge`` and ``merge_target`` (id of the location shown) carry the merge
+    confirmation, which the server compares again under the lock."""
 
     confirm_merge = forms.BooleanField(required=False, widget=forms.HiddenInput)
     merge_target = forms.CharField(required=False, max_length=12, widget=forms.HiddenInput)
@@ -136,7 +130,7 @@ class RemarkForm(forms.Form):
 
 
 class CircuitForm(forms.Form):
-    """Create or change a transformer circuit: the grid number (TRA and digits) and a free name."""
+    """Create or change a transformer circuit (grid number and free name)."""
 
     grid_number = forms.CharField(
         max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
@@ -150,8 +144,7 @@ class CircuitForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.circuit = circuit
         self.existing = None
-        # The label names the grid operator of the instance (D-086).
-        self.fields["grid_number"].label = grid_operator.text(_("%(operator)s number"))
+        self.fields["grid_number"].label = grid_operator.text(_("%(operator)s number"))  # D-086
 
     def clean_grid_number(self):
         value = numbers.normalise_transformer_circuit_number(self.cleaned_data["grid_number"])
@@ -163,8 +156,7 @@ class CircuitForm(forms.Form):
 
 
 class MeteringPointForm(forms.Form):
-    """A metering point at a location: the direction is required; the number (only its last digits
-    are typed, the country and the identifier come from the settings) and the LEG are optional."""
+    """A metering point at a location: direction required; number (last digits only) and LEG optional."""
 
     direction = forms.ChoiceField(
         label=_("Direction"), choices=Direction.choices, initial=Direction.CONSUMPTION,

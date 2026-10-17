@@ -1,9 +1,5 @@
-/* Additions for the pages of the portal in the administration (design package, acceptance).
-   The look of the administration stays that of Django; this file only sets widths and the small
-   boxes of the portal's own pages. No inline style is used anywhere (Content Security Policy). */
+/* Additions for the portal's own pages in the Django admin (widths and small boxes only). */
 
-/* The subject and the text of an email and the fields of the portal settings use the width of
-   the page. */
 .field-subject input[type="text"],
 .field-body textarea,
 .field-name input,
@@ -15,7 +11,7 @@
   max-width: 60em;
 }
 
-/* Help texts are at least 14 px (Django's own size is 13 px). */
+/* Help texts at least 14 px (Django: 13 px). */
 .help,
 p.help,
 form p.help,
@@ -33,7 +29,6 @@ fieldset .description,
   font-size: 0.875rem;
 }
 
-/* The box "First steps" and the help about the rights. */
 .portal-box,
 .portal-help {
   margin: 0 0 24px;
@@ -56,7 +51,6 @@ fieldset .description,
   list-style: none;
 }
 
-/* A fixed column for the status, so that the links below each other start at the same place. */
 .portal-steps li {
   display: grid;
   grid-template-columns: 18em minmax(0, 1fr);
@@ -85,8 +79,7 @@ fieldset .description,
   margin: 8px 0;
 }
 
-/* The portal settings (D-073). The colour fields are short; the hex text is always visible, the
-   swatch and the contrast text next to it come from portal-preview.js. */
+/* Portal settings (D-073) */
 input.portal-colour {
   box-sizing: border-box;
   width: 9em;
@@ -107,7 +100,7 @@ input.portal-colour {
   font-size: 0.875rem;
 }
 
-/* Files and checkboxes: a target of at least 24 x 24 px (WCAG 2.2, 2.5.8). */
+/* Targets of at least 24 x 24 px (WCAG 2.5.8). */
 .field-logo_light_file input[type="file"],
 .field-logo_dark_file input[type="file"] {
   max-width: 100%;
@@ -126,7 +119,6 @@ input.portal-colour {
   margin-top: 2px;
 }
 
-/* The logout action next to the notice about the login that is too old (D-073). */
 .portal-login-warning .portal-logout-button {
   margin-inline-start: 12px;
 }
@@ -135,7 +127,7 @@ input.portal-colour {
   margin: 0 0 12px;
 }
 
-/* The preview: two panels with the surfaces of the design language (docs/DESIGN.md, 3.1). */
+/* Preview: two panels (light, dark) */
 .portal-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -153,6 +145,7 @@ input.portal-colour {
 .portal-preview-panel h3 {
   margin: 0 0 8px;
   font-size: 0.875rem;
+  color: var(--pv-fg);
 }
 
 .portal-preview-light {
@@ -175,10 +168,6 @@ input.portal-colour {
   color: var(--pv-fg);
 }
 
-.portal-preview-panel h3 {
-  color: var(--pv-fg);
-}
-
 .portal-preview-logo {
   display: inline-block;
   margin-bottom: 12px;
@@ -191,8 +180,8 @@ input.portal-colour {
   background: var(--pv-plate);
 }
 
-/* An explicit box, like the header of the portal (48 px high): an SVG file with only a viewBox has
-   no intrinsic size, and a box that only has a maximum would shrink it to 0 x 0 (D-073). */
+/* Explicit box (as the 48 px portal header): an SVG with only a viewBox has no intrinsic size and
+   would shrink to 0 x 0 with a mere maximum (D-073). */
 .portal-preview-logo img {
   display: block;
   box-sizing: border-box;
@@ -244,7 +233,7 @@ input.portal-colour {
   font-weight: 600;
 }
 
-/* Below 768 px: one column, fields of the full width, controls 40 px high (375 px reflow). */
+/* Below 768 px: one column, controls 40 px high */
 @media (max-width: 767px) {
   .portal-preview {
     grid-template-columns: minmax(0, 1fr);

@@ -13,6 +13,7 @@ from django.test import TestCase, TransactionTestCase, tag
 from django.utils import translation
 
 from leg_platform.accounts import models as account_models
+from leg_platform.accounts.models import customer_numbers
 from leg_platform.accounts.models import (
     AccountIntegrityError,
     CustomerNumberUnavailableError,
@@ -603,7 +604,7 @@ class DeletionTests(TestCase):
 @tag("mariadb")
 class StringRepresentationTests(TestCase):
     def test_customer_number_and_no_personal_data(self):
-        with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915]):
+        with mock.patch.object(customer_numbers.secrets, "randbelow", side_effect=[482915]):
             user = create_active_user("person@example.org", first_name="Anna", last_name="Muster")
         unverified = User.objects.create_user("other@example.org", first_name="Beat")
         with translation.override("en"):
@@ -617,7 +618,7 @@ class StringRepresentationTests(TestCase):
                 self.assertNotIn(personal_data, str(instance))
 
     def test_no_query_for_a_loaded_account(self):
-        with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915]):
+        with mock.patch.object(customer_numbers.secrets, "randbelow", side_effect=[482915]):
             user = create_active_user("person@example.org")
         loaded = User.objects.get(pk=user.pk)
         with self.assertNumQueries(0):
@@ -724,11 +725,11 @@ class CustomerNumberTests(TestCase):
             )
 
     def test_numbers_of_deleted_accounts_are_never_reused(self):
-        with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915]):
+        with mock.patch.object(customer_numbers.secrets, "randbelow", side_effect=[482915]):
             user = create_active_user("person@example.org")
         user.delete()
         self.assertTrue(IssuedCustomerNumber.objects.filter(number="482915").exists())
-        with mock.patch.object(account_models.secrets, "randbelow", side_effect=[482915, 7001]):
+        with mock.patch.object(customer_numbers.secrets, "randbelow", side_effect=[482915, 7001]):
             second = create_active_user("person@example.org")
         self.assertEqual(second.customer_number_id, "007001")
 
@@ -736,7 +737,7 @@ class CustomerNumberTests(TestCase):
         IssuedCustomerNumber.objects.create(number="000005")
         user = activate_account(User.objects.create_user("person@example.org"))
         with mock.patch.object(
-            account_models.secrets, "randbelow", side_effect=[5, 5, 7]
+            customer_numbers.secrets, "randbelow", side_effect=[5, 5, 7]
         ) as randbelow:
             self.assertEqual(user.assign_customer_number(), "000007")
         self.assertEqual(randbelow.call_count, 3)
@@ -745,7 +746,7 @@ class CustomerNumberTests(TestCase):
         IssuedCustomerNumber.objects.create(number="000005")
         user = create_active_user("person@example.org")
         other = activate_account(User.objects.create_user("other@example.org"))
-        with mock.patch.object(account_models.secrets, "randbelow", return_value=5) as randbelow:
+        with mock.patch.object(customer_numbers.secrets, "randbelow", return_value=5) as randbelow:
             with self.assertRaises(CustomerNumberUnavailableError):
                 other.assign_customer_number()
         self.assertEqual(randbelow.call_count, account_models.CUSTOMER_NUMBER_ATTEMPTS)
@@ -754,7 +755,7 @@ class CustomerNumberTests(TestCase):
         self.assertIsNotNone(user.customer_number_id)
 
     def test_issuing_warns_from_ninety_percent_of_the_numbers_on(self):
-        with mock.patch.object(account_models, "CUSTOMER_NUMBER_SPACE", 10):
+        with mock.patch.object(customer_numbers, "CUSTOMER_NUMBER_SPACE", 10):
             for index in range(8):
                 IssuedCustomerNumber.objects.create(number=f"00000{index}")
             with self.assertNoLogs("leg_platform.accounts.models", "WARNING"):
@@ -767,11 +768,11 @@ class CustomerNumberTests(TestCase):
         )
 
     def test_exhaustion_fails_without_searching(self):
-        with mock.patch.object(account_models, "CUSTOMER_NUMBER_SPACE", 3):
+        with mock.patch.object(customer_numbers, "CUSTOMER_NUMBER_SPACE", 3):
             for index in range(3):
                 create_active_user(f"person{index}@example.org")
             user = activate_account(User.objects.create_user("last@example.org"))
-            with mock.patch.object(account_models.secrets, "randbelow") as randbelow:
+            with mock.patch.object(customer_numbers.secrets, "randbelow") as randbelow:
                 with self.assertRaises(CustomerNumberUnavailableError):
                     user.assign_customer_number()
             randbelow.assert_not_called()

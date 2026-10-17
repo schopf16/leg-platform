@@ -1,17 +1,10 @@
-"""The one accessor of the values that the administrator maintains in the portal settings (D-056,
-D-073): name, website, privacy notice, legal notice, colours and logos.
+"""The one accessor of the values the administrator maintains in the portal settings (D-056, D-073).
 
-Per field the database value wins if it is not empty; otherwise the value of the instance
-configuration (the environment) applies, then the default of the platform. While the row is empty
-this is exactly the behaviour of the environment alone, so no data is migrated.
-
-The accessor never raises: error pages, emails and the footer must work when the database does not
-answer, and a value that was written past the form (or that no longer fits the environment, for
-example a text colour of the environment with an accent colour of the database) is checked again
-when it is read. A value that fails gives a warning and the server configuration (fail safe). It
-reads ``settings.INSTANCE_*`` when it is called, and it works without a request (emails, commands).
-With a request the database is read at most once per request, and nothing is kept between requests,
-so a change is visible at once.
+Per field the database value wins if not empty, else the instance configuration (environment), then
+the platform default. The accessor never raises (error pages, emails and the footer must work
+without the database); a stored value that fails the checks when read gives a warning and the server
+value (fail safe). Works without a request; with one the database is read at most once per request
+and nothing is kept between requests.
 """
 
 import logging
@@ -34,9 +27,9 @@ from leg_platform.environment import is_valid_instance_name
 
 logger = logging.getLogger(__name__)
 
-# The attribute that keeps the result for the rest of one request.
+# Request attribute that keeps the result for the rest of one request.
 _REQUEST_ATTRIBUTE = "_portal_values"
-# The columns that are read (never the files of the logos).
+# The columns that are read (never the logo files).
 _ROW_FIELDS = (
     "name",
     "website_url",
@@ -50,7 +43,7 @@ _ROW_FIELDS = (
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _LOGO_TYPES = ("png", "svg")
-# The length of the digest in the address of a logo, which makes the address change with the file.
+# Digest length in a logo address: the address changes with the file.
 LOGO_VERSION_LENGTH = 16
 
 
@@ -60,8 +53,7 @@ class LegalLinks(NamedTuple):
 
 
 class PortalValues(NamedTuple):
-    """The effective values (immutable). ``logo_light`` and ``logo_dark`` are addresses that can
-    be used in ``<img src>`` ("" means no logo: the name is shown as text)."""
+    """The effective values (immutable). ``logo_light``/``logo_dark`` are ``<img src>`` addresses ("" = no logo: the name is shown)."""
 
     name: str
     website_url: str
@@ -74,19 +66,17 @@ class PortalValues(NamedTuple):
     highlight: str
     logo_light: str
     logo_dark: str
-    # Whether the logos are the uploaded ones (and not the files of the server configuration).
+    # Whether the logos are the uploaded ones.
     uploaded_logos: bool
 
     @property
     def website_host(self):
-        """The host of the website, the text of its link in the footer ("" without a website)."""
+        """The host of the website (the footer link text), "" without a website."""
         return (urlsplit(self.website_url).hostname or "") if self.website_url else ""
 
 
 def _safe_link(value):
-    """The address again checked before it is printed as a link: only a clean https:// address
-    (the value of the database was written by the administrator, the rule of the form can have
-    been bypassed by a direct write, security review of phase 2, E-1). Otherwise no link."""
+    """Re-check an address before printing it as a link (a direct write can bypass the form): only a clean https:// address, else no link."""
     from leg_platform.accounts.models import validate_https_address
 
     if not value:
@@ -110,17 +100,17 @@ def _static_url(path):
 
 
 def logo_url(variant, digest):
-    """The address of an uploaded logo: the view and the first characters of the digest of the file
-    (the address changes with the file, so a cache never shows an old logo)."""
+    """The address of an uploaded logo with the digest prefix, so a cache never shows an old logo."""
     return reverse("instance_logo", kwargs={"variant": variant}) + (
         f"?v={digest[:LOGO_VERSION_LENGTH]}"
     )
 
 
 def effective_colours(stored, branding=None):
-    """The five colours that result from the stored (database) colours and the server
-    configuration: a stored colour wins; an empty text colour next to a stored accent colour is
-    chosen automatically (white or the dark default, the one with the higher contrast)."""
+    """The five colours from the stored (database) colours and the server configuration.
+
+    A stored colour wins; an empty text colour next to a stored accent is chosen automatically (white or dark, the higher contrast).
+    """
     branding = branding if branding is not None else settings.INSTANCE_BRANDING
     colours = {field: stored.get(field) or getattr(branding, field) for field in COLOUR_FIELDS}
     for mode in ("light", "dark"):
@@ -131,8 +121,7 @@ def effective_colours(stored, branding=None):
 
 
 def environment_values():
-    """The values of the server configuration alone (the environment, then the defaults). Needs no
-    database and no request."""
+    """The values of the server configuration alone (environment, then defaults); needs no database or request."""
     branding = settings.INSTANCE_BRANDING
     return PortalValues(
         name=settings.INSTANCE_NAME,

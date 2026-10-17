@@ -10,11 +10,8 @@ from .services import lookup
 @require_POST
 @csrf_protect
 def address_lookup(request):
-    # POST avoids putting a profile address in access-log query strings. Normal
-    # CSRF protection also applies during anonymous registration. The answers carry no text for
-    # the person (a "warning" is only ever the not-found notice of a check, D-066).
-    # CSRF middleware may already have parsed multipart bodies. Reject that
-    # unsupported encoding before accessing request.body (RawPostDataException).
+    # POST keeps addresses out of access logs. Reject non-urlencoded bodies (multipart may already
+    # be parsed by the CSRF middleware) before touching request.body (RawPostDataException).
     if request.content_type != "application/x-www-form-urlencoded":
         response = JsonResponse({"status": "invalid", "results": [], "match": None, "warning": ""}, status=400)
         patch_cache_control(response, no_store=True, private=True)
@@ -26,7 +23,6 @@ def address_lookup(request):
         response["Retry-After"] = "60"
     else:
         try:
-            # Limit the complete payload as well as individual input fields.
             if len(request.body) > 4096:
                 raise ValueError("Address payload too large.")
             if any(len(request.POST.getlist(key)) != 1 for key in request.POST):

@@ -1,11 +1,7 @@
-"""Encrypt the stored IBANs of the persons again with the current ``SECRET_KEY`` (D-087; docs/SECURITY.md, section 7).
+"""Encrypt the stored person IBANs again with the current ``SECRET_KEY`` (D-087, docs/SECURITY.md section 7).
 
-Run on the server after ``SECRET_KEY`` was replaced and the old key is listed in ``SECRET_KEY_FALLBACKS``, as
-``emergency_access reencrypt-second-factor-keys`` does for the second factor keys. Until then the IBANs are readable
-with the fallback key; if the old key is removed from the fallbacks before this ran, the IBANs under it cannot be
-read any more (the pages then show no IBAN and the log names the account number). A text that is not bound to its
-account yet (before L-7) is bound too. Prints the numbers only, never a value, and **fails (exit code 1) if any IBAN
-could not be decrypted**, so that a script does not go on and drop the old key (review L-6).
+Run after a key replacement while the old key is in ``SECRET_KEY_FALLBACKS``. Prints numbers only and
+exits with code 1 if any IBAN could not be decrypted, so a script does not drop the old key.
 """
 
 from django.core.management.base import BaseCommand, CommandError

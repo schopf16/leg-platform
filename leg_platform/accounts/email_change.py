@@ -1,12 +1,9 @@
-"""Verified changes of the email addresses (docs/PROJECT.md, "Changing the Email Address"; D-016,
-D-059).
+"""Verified changes of the email addresses (D-016, D-059).
 
-An account has the login address and, since D-059, an optional second address that only receives
-information. A new address of either kind is confirmed with a link sent to it and is valid for 24
-hours; until then the old address stays in use. The request makes a ``PendingEmailChange`` for every
-target address (so that the profile and the response do not depend on whether an address can be
-used), the worker makes and sends the links, the old addresses get a notice with a link that stops
-the change without a login.
+A new login or second address is confirmed with a link sent to it (valid 24 hours; the old address
+stays in use meanwhile). The request makes a ``PendingEmailChange`` per target address, so the
+profile and the response do not depend on whether an address can be used; the worker makes and
+sends the links; the old addresses get a notice with a link that stops the change without a login.
 """
 
 from datetime import timedelta
@@ -36,8 +33,7 @@ CONFIRMATION_PURPOSES = tuple(PURPOSE_OF_KIND.values())
 
 
 def _drop_stop_tokens_if_idle(user):
-    """Delete the stop links of the account when no request is open any more (security review of
-    phase 4, H1): a link of a notice only has a meaning while the change it reports is pending."""
+    """Delete the stop links when no request is open any more: they only mean something while a change is pending."""
     if not has_open_request(user):
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
 
@@ -60,26 +56,20 @@ def _remaining(pending):
 
 
 class RequestRefused(Exception):
-    """The limit of the client address or of the instance is used up (D-038): nothing was stored."""
+    """The client or instance limit is used up (D-038): nothing was stored."""
 
 
 def request_changes(request, user, *, login=None, secondary=None, remove_secondary=False, actor=None):
     """Make the requests of one submission of the profile form (D-059).
 
-    ``login`` and ``secondary`` are the new addresses (already normalised and checked); the
-    caller has asked for the password and, where set up, the code. A removed second address is
-    removed at once (nothing needs confirming). Every request counts against the limits of the
-    mail requests (D-038), and the old addresses get the notice with the stop link.
+    ``login`` and ``secondary`` are new addresses (normalised, checked; the caller has asked for the
+    proof). A removed second address is removed at once. Every request counts against the mail
+    request limits (D-038); the old addresses get the notice with the stop link, and the link goes
+    to the new address only. ``actor`` is the staff account acting for the customer (D-087, second
+    address only); the security log names it.
 
-    ``actor`` is the staff account that makes the request for the customer's account (D-087, only for
-    the second address): the security log names it. The link always goes to the new address only, the
-    old addresses are told with the stop link, nothing changes before the confirmation.
-
-    The notice is queued before the links and, if delivery works, sent first (security review of
-    phase 4; the queue works in order, but a failed delivery of the notice is repeated later while
-    the link may already go out). If a limit refuses one of the requests,
-    ``RequestRefused`` is raised and everything of this call is rolled back (the earlier request
-    stays as it was, and no job is left without its row).
+    The notice is queued before the links so it is sent first. If a limit refuses a request,
+    ``RequestRefused`` is raised and everything of this call is rolled back.
     """
     from leg_platform.accounts.mail_queue import enqueue_for_account, submit_mail_request
 
@@ -114,9 +104,8 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
                 SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=locked, actor=actor
             )
         if submissions:
-            # An older notice must not stop or report a newer request: its links end here.
+            # An older notice must not stop or report a newer request.
             VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
-            # The notice goes to the addresses that are valid now, with the link that stops it.
             enqueue_for_account(MailJob.Kind.EMAIL_CHANGE_NOTICE, locked)
             for kind, address in submissions:
                 if not submit_mail_request(request, kind, address, account=locked):
@@ -127,8 +116,7 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
 
 
 def process_request(account_id, address):
-    """Make the link for a requested login address in the worker; no raw token is stored in the
-    mail job. Returns the function that sends the email, or None."""
+    """Make the link for a requested login address in the worker (no raw token in the mail job); returns the send function or None."""
     address = normalize_email_address(address)
     if not address:
         return None
@@ -192,8 +180,8 @@ def process_secondary_request(account_id, address):
 def process_notice(account_id, address, greeting_name=""):
     """Make the stop link for the notice about a requested change and send it to ``address``.
 
-    Nothing is sent when no change is pending any more. One link stops every pending change of the
-    account; it is valid as long as the latest pending change.
+    Nothing is sent when no change is pending any more. One link stops every pending change; it is
+    valid as long as the latest one.
     """
     with transaction.atomic():
         user = (
@@ -214,10 +202,9 @@ def process_notice(account_id, address, greeting_name=""):
 
 
 def confirm_change(token):
-    """Apply a confirmed address and return the account, or None if the link is no longer valid.
+    """Apply a confirmed address and return the account, or None if the link is no longer valid (D-059).
 
-    A login address ends every session of the account; a second address changes nothing about the
-    sessions. A request that was cancelled or replaced cannot be confirmed any more (D-059).
+    A login address ends every session; a cancelled or replaced request cannot be confirmed.
     """
     kind = KIND_OF_PURPOSE.get(token.purpose)
     if kind is None:
@@ -256,8 +243,7 @@ def confirm_change(token):
             pending.delete()
             _drop_stop_tokens_if_idle(user)
             enqueue_for_account(MailJob.Kind.SECONDARY_EMAIL_CHANGED, user, addresses=recipients)
-            # A change that a staff account asked for says so in the log (D-087, review M-3): the owner of the
-            # new address confirmed it, the staff account made the request.
+            # Staff-requested changes say so in the log (D-087).
             security_log.record(
                 SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=user,
                 detail=f"requested by staff account {requested_by}" if requested_by else "",
@@ -271,8 +257,8 @@ def confirm_change(token):
             .first()
         )
         try:
-            # Include removal of a pending registration and the change in one savepoint. The
-            # unique index remains the final protection against concurrent address claims.
+            # Removal of a pending registration and the change in one savepoint; the unique index
+            # remains the final protection against concurrent address claims.
             with transaction.atomic():
                 if duplicate is not None and duplicate.status != User.Status.UNVERIFIED:
                     locked_token.delete()
@@ -284,15 +270,12 @@ def confirm_change(token):
                     # The same address cannot be both: it is the login address now.
                     user.set_secondary_email("")
         except (IntegrityError, ValueError):
-            # ValueError: the address is refused by the rules of the account; it was checked when
-            # requested, so this is defensive (security review, final, R5).
+            # ValueError: refused by the account rules; checked at request time, so defensive.
             locked_token.delete()
             return None
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE).delete()
         pending.delete()
-        # The stop links went to addresses that are no longer entitled to the account: all of
-        # them end, also while a request for the second address is still open (security
-        # review, final, L2).
+        # The stop links went to addresses no longer entitled to the account: all end, also while a second-address request is open.
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
         user.end_all_sessions()
         # The old login address and the second address are told (D-059).
@@ -316,11 +299,9 @@ def cancel(user, kind):
 def stop_all(user):
     """The link of the notice stops every pending change of the account (D-059).
 
-    Returns the account, or None when no request is open: then the link has no meaning any more
-    (the change was confirmed, cancelled or has expired) and nothing happens, in particular no
-    session ends (security review of phase 4, H1). The links of the confirmations and the other
-    stop links end with the stop, and the sessions of the account end: whoever asked for the
-    change was not the owner, or the owner wants to be sure.
+    Returns the account, or None when no request is open (nothing happens, no session ends). The
+    confirmation and other stop links end, and so do the sessions: the requester was not the owner,
+    or the owner wants to be sure.
     """
     with transaction.atomic():
         locked = User._base_manager.select_for_update().get(pk=user.pk)

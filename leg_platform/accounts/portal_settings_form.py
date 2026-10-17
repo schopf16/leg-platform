@@ -1,9 +1,7 @@
 """The form of the portal settings in the administration (D-073).
 
-Name, website and the addresses of the legal notices, the colours, and the two logos. The logos are
-uploads that ``leg_platform.accounts.logo_images`` checks; the form keeps what it accepted and
-``save`` puts it into the row. Nothing here chooses a file name or a path: the files live in the
-database, and the name of the upload is never used.
+Name, website, legal notice addresses, colours and the two logos. The logos are uploads checked by
+``logo_images``; files live in the database and the upload's name is never used.
 """
 
 from django import forms
@@ -24,8 +22,7 @@ LOGOS = ("light", "dark")
 ONLY_ONE_LOGO = _(
     "Upload both logos or none. The portal needs one version for light and one for dark mode."
 )
-# Saving needs a login within the window of the recent authentication (D-055; the same five
-# minutes as for setting up the second factor). Viewing the page does not.
+# Saving needs a login within the recent-authentication window (D-055); viewing does not.
 NEEDS_RECENT_LOGIN = _(
     "For your safety, the portal settings can only be saved within %(minutes)s minutes after "
     "logging in. Log out, log in again and save the changes right away. Nothing was saved."
@@ -73,12 +70,11 @@ def colour_message(problem):
 
 
 class PortalSettingsForm(forms.ModelForm):
-    # The administration sets the acting account and the request (``PortalSettingsAdmin.get_form``):
-    # a rejected upload is a security event (D-073), and a save needs a recent login. None outside
-    # the administration, where nothing can be saved (the check fails closed).
+    # Set by ``PortalSettingsAdmin.get_form``: a rejected upload is a security event (D-073) and a
+    # save needs a recent login. None outside the administration (fails closed).
     actor = None
     request = None
-    # Set by ``clean`` when the save is refused for the login that is too old (for the template).
+    # Set by ``clean`` when the save is refused for a login that is too old (for the template).
     recent_login_refused = False
 
     logo_light_file = forms.FileField(
@@ -130,14 +126,13 @@ class PortalSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # The accepted logos by variant ("light", "dark"), and the reasons of rejected uploads.
+        # Accepted logos by variant, and the reasons of rejected uploads.
         self.new_logos = {}
         self.rejections = []
         self._add_server_hints()
 
     def _add_server_hints(self):
-        """Under every field that has a server value: what an empty field means (D-073). Only
-        public values are shown; the text is escaped."""
+        """Under every field with a server value: what an empty field means (D-073). Only public values; escaped."""
         server = environment_values()
         hints = {
             "name": server.name,
@@ -166,7 +161,7 @@ class PortalSettingsForm(forms.ModelForm):
         upload = self.cleaned_data.get(name)
         if not upload:
             return
-        # Never more than the largest allowed size is read; the name of the file is not used.
+        # Never more than the largest allowed size is read.
         data = upload.read(MAX_UPLOAD_BYTES)
         try:
             self.new_logos[variant] = validate_logo(data)
@@ -175,8 +170,7 @@ class PortalSettingsForm(forms.ModelForm):
             self.add_error(name, ValidationError(rejected.message, params=rejected.params, code="logo"))
 
     def recently_authenticated(self):
-        """Whether the session of the request logged in within the window of D-055. Without a
-        request (outside the administration) it is not: the form fails closed."""
+        """Whether the request's session logged in within the D-055 window; without a request it is not (fails closed)."""
         return self.request is not None and second_factor.recently_authenticated(self.request)
 
     def clean(self):
@@ -184,9 +178,8 @@ class PortalSettingsForm(forms.ModelForm):
         if not self.recently_authenticated():
             # The template adds a logout action next to this message (D-073).
             self.recent_login_refused = True
-            # Nothing else is looked at: a session that did not authenticate a moment ago cannot
-            # change what every visitor sees (security review of D-073, L-5; D-055). The files
-            # of the upload are not even read.
+            # Nothing else is looked at (the upload is not even read): a session that did not
+            # authenticate a moment ago cannot change what every visitor sees (D-055).
             self.add_error(
                 None,
                 ValidationError(
@@ -200,7 +193,7 @@ class PortalSettingsForm(forms.ModelForm):
             if cleaned.get(field):
                 cleaned[field] = cleaned[field].upper()
         if cleaned.get("reset_colours"):
-            # Emptying the colours is the reset; a wrong value that was typed in is dropped.
+            # Emptying the colours is the reset; a wrong typed value is dropped.
             for field in COLOUR_FIELDS:
                 cleaned[field] = ""
                 self._errors.pop(field, None)
@@ -208,7 +201,7 @@ class PortalSettingsForm(forms.ModelForm):
             self._check_colours(cleaned)
         self._check_logos(cleaned)
         if self.rejections and self.actor is not None:
-            # One event for the whole request, with the reason codes only (never the content).
+            # One event for the whole request, with reason codes only (never the content).
             with transaction.atomic():
                 security_log.record(
                     SecurityEvent.Event.PORTAL_UPLOAD_REJECTED,
@@ -223,7 +216,7 @@ class PortalSettingsForm(forms.ModelForm):
             return
         for problem in colour_problems(effective_colours(stored)):
             if problem.code == "format":
-                # A typed value that is no colour: the message of the field, no ratio to show.
+                # A typed value that is no colour: the field's message, no ratio.
                 try:
                     validate_hex_colour(stored.get(problem.field, ""))
                 except ValidationError as error:

@@ -1,11 +1,8 @@
-"""Changing the LEG of a metering point, together with the ones that belong to it (D-079).
+"""Changing the LEG of a metering point together with related ones (D-079).
 
-One service for the page of the metering point and the page of the LEG (``messpunkte/VORGABEN.md``,
-"LEG wechseln"; ``legs/DETAIL-ENTWURF.md``, "Tausch-Symbol pro Messpunkt"; the mask is
-``legs/referenz/leg-messpunkt-wechseln-desktop``). The "move mask" offers the other metering points
-of the same person at the same location (they usually move together); none is preselected and only
-the ones that the user ticks move. The date applies to all of them. Everything happens in one
-transaction: if one assignment is refused, none is made.
+Shared by the metering point page and the LEG page. The other metering points of the same person at the same
+location may move along (user-ticked, none preselected); the date applies to all. One transaction: if one
+assignment is refused, none is made.
 """
 
 from django.db import transaction
@@ -30,8 +27,7 @@ def current_assignment(kind, metering_point, today=None):
 
 
 def related_points(metering_point, today=None):
-    """The other metering points (not archived) of the same person at the same location, by number;
-    none if the metering point has no location or no person."""
+    """The other non-archived metering points of the same person at the same location, by number."""
     today = today or timezone.localdate()
     if metering_point.location_id is None:
         return []
@@ -51,9 +47,9 @@ def related_points(metering_point, today=None):
 
 
 def switch_leg(metering_point, leg, valid_from, also=(), actor=None, today=None):
-    """Assign ``leg`` from ``valid_from`` to the metering point and to the metering points of ``also``
-    (each must be one of ``related_points``). The previous LEG of each ends the day before. A point that
-    already has this LEG is left alone. Returns the new assignments. Raises ``AssignmentError``."""
+    """Assign ``leg`` from ``valid_from`` to the metering point and ``also`` (each must be in ``related_points``);
+    the previous LEG ends the day before. A point that already has this LEG is skipped. Returns the new
+    assignments; raises ``AssignmentError``."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh_leg = Leg.objects.select_for_update().get(pk=leg.pk)
@@ -62,7 +58,7 @@ def switch_leg(metering_point, leg, valid_from, also=(), actor=None, today=None)
         allowed = {point.pk for point in related_points(metering_point, today)}
         if any(point.pk not in allowed for point in also):
             raise assignments.AssignmentError("not_related")
-        # Lock the metering points in ascending id order: two switches that share points cannot wait for each other.
+        # Lock in ascending id order so switches sharing points cannot deadlock.
         ids = sorted({metering_point.pk, *(point.pk for point in also)})
         list(MeteringPoint.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
         made = []

@@ -1,4 +1,4 @@
-"""Reuse the application's transactional, privacy-preserving request limits."""
+"""Request limits of the address endpoints, on the application's transactional rate limiter."""
 
 import logging
 from datetime import timedelta
@@ -23,8 +23,7 @@ def allow_request(request, *, admin=False):
             (scope + "-ip", ip_key(address), limits),
             (scope + "-global", "instance", ((20 if admin else 600, timedelta(minutes=1)),)),
         ]
-        # Read-only pre-check first, as for the mail requests (`mail_queue.requests_refused`): a
-        # refused client costs the database no bucket row (security review of D-066, L-4).
+        # Read-only pre-check first: a refused client costs no bucket row (D-066).
         if exhausted(checks):
             return False
         return all(consume_all(checks))

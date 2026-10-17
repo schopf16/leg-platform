@@ -1,9 +1,7 @@
-"""Back to the place you came from (D-077).
+"""Return to the page a dialog was opened from (D-077).
 
-A dialog or an action is opened from some page and returns there after saving. The place is the
-``next`` value of the request. It is never trusted: only a path of this site is accepted (starts
-with a single "/", no scheme, no host, no backslash or control character, and the host check of
-Django); anything else falls back to the default page. This also protects against open redirects.
+``next`` is never trusted: only a path of this site is accepted (single leading "/", no backslash or
+control character, Django host check); anything else falls back to the default (no open redirect).
 """
 
 from urllib.parse import urlencode
@@ -26,8 +24,7 @@ def is_safe_return_url(value, request):
 
 
 def return_url(request, default):
-    """The page to go back to: ``next`` of the form (POST) or of the link (GET) if it is safe, else
-    ``default``."""
+    """``next`` of the form (POST) or link (GET) if safe, else ``default``."""
     for source in (request.POST, request.GET):
         value = source.get("next")
         if value is not None:

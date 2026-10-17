@@ -1,10 +1,4 @@
-"""Changing the management settings, with the history (D-077; ``einstellungen/UMSETZUNG.md``, section 4).
-
-Changes to the sender address, the country and the identifier are written to the history with the
-account and the time (the entry shows the old and the new value; these are values of the
-organisation, not of a customer). The threshold is not recorded: the specification names only the
-other three.
-"""
+"""Changing the management settings, with history for sender address, country and identifier (D-077)."""
 
 from django.db import transaction
 
@@ -23,8 +17,7 @@ EDITABLE_FIELDS = ("country_code", "identifier", "warning_threshold_percent", *S
 
 
 def sender_signature(values_or_row):
-    """The memory key of the sender address (street, house number, postal code, town); the address
-    addition is not part of the directory check."""
+    """The memory key of the sender address (the address addition is not part of it)."""
     get = values_or_row.get if isinstance(values_or_row, dict) else lambda name: getattr(values_or_row, name)
     return addressing.address_signature(
         get("sender_street"), get("sender_house_number"), get("sender_postal_code"), get("sender_town")
@@ -32,8 +25,7 @@ def sender_signature(values_or_row):
 
 
 def update(values, actor):
-    """Save the editable fields of ``values`` (a dict with exactly ``EDITABLE_FIELDS``) and write the
-    history. Returns the list of history events that were recorded."""
+    """Save ``values`` (exactly ``EDITABLE_FIELDS``) and write the history; returns the recorded events."""
     if set(values) != set(EDITABLE_FIELDS):
         raise ValueError("The settings need exactly the editable fields.")
     events = []
@@ -62,9 +54,7 @@ def update(values, actor):
 
 
 def accept_sender_suggestion(suggestion, actor):
-    """"Accept" on the settings page puts the suggestion into the fields; it is saved only with the
-    button "Save", which writes ``SENDER_ADDRESS_CHANGED``. The decision itself is recorded with the
-    actor and the time (security review L-5). The address is a value of the organisation."""
+    """Record the acceptance only; the fields are saved with "Save", which writes ``SENDER_ADDRESS_CHANGED``."""
     with transaction.atomic():
         ManagementSettings.objects.get_or_create(id=1)
         row = ManagementSettings.objects.select_for_update().get(id=1)
@@ -74,8 +64,7 @@ def accept_sender_suggestion(suggestion, actor):
 
 
 def dismiss_sender_suggestion(signature, actor=None):
-    """"Do not accept" for the sender address as it is (the memory of the dismissal), recorded with
-    the actor and the time (security review L-5)."""
+    """Remember the dismissal for the sender address as it is, and record it."""
     with transaction.atomic():
         ManagementSettings.objects.get_or_create(id=1)
         row = ManagementSettings.objects.select_for_update().get(id=1)

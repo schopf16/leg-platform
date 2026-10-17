@@ -1,9 +1,8 @@
 """Encryption of stored secrets with a key derived from SECRET_KEY (docs/SECURITY.md, section 7).
 
-The key is derived with HKDF and a label for one purpose, and the value is encrypted with Fernet,
-both from the ``cryptography`` library (D-006, D-040). Keys derived from SECRET_KEY_FALLBACKS
-are tried for decryption, so that SECRET_KEY can be rotated; a value found under an old key is
-encrypted again with the current one by the caller (``is_current()``, ``reencrypt()``).
+HKDF (one label per purpose) and Fernet from ``cryptography`` (D-006, D-040). Keys from
+SECRET_KEY_FALLBACKS are tried for decryption so SECRET_KEY can be rotated; the caller re-encrypts
+values found under an old key (``is_current()``, ``reencrypt()``).
 """
 
 import base64

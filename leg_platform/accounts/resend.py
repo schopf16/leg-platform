@@ -1,11 +1,8 @@
 """The address of a pending email request and the time of the next resend (D-058).
 
-After a person asks for a link (registration or password reset) the next page says to which
-address the email goes and offers "send again" after a pause. The address and the time are kept in
-the session of this browser only, never in the URL. The pause of 60 seconds is enforced here on the
-server; the countdown on the page (``static/js/resend-cooldown.js``) only shows it. The limits per
-address, per network and for the instance (D-038, ``mail_queue.submit_mail_request``) apply to every
-resend as to every request.
+The next page names the address the email goes to and offers "send again" after a pause. Address
+and time live in this browser's session only. The 60-second pause is enforced on the server (the
+page countdown only shows it); the per-address, network and instance limits (D-038) apply to every resend.
 """
 
 import time
@@ -34,8 +31,7 @@ def remember(request, purpose, address):
 
 
 def forget(request, purpose):
-    """Remove the pending request of this browser from the session (D-058; review B2): after the
-    registration or the reset is finished, and when a link was refused."""
+    """Remove the pending request of this browser from the session (after completion, and when a link was refused)."""
     if purpose not in _PURPOSES:
         raise ValueError(purpose)
     request.session.pop(_KEY % purpose, None)

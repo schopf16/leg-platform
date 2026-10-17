@@ -1,19 +1,8 @@
-"""Bounded importer for the fixed official Swiss CSV asset.
+"""Bounded importer for the fixed official Swiss CSV asset (D-049, D-075).
 
-Sources: D-049 (owner-approved columns/licence), official STAC item, Python
-zipfile/csv documentation, Requests streaming documentation. No archive member
-is extracted. The temporary download is deleted even on verification failure.
-
-The importer runs only in the worker process (``process_address_imports`` or the operator command
-``import_address_directory``) with the normal settings; it writes the directory file through the
-alias ``addresses`` (D-075). No web request reaches this module (``leg_platform.addresses.jobs``
-imports it inside ``process_one`` only), and the web processes open the file read-only
-(``leg_platform.addresses.storage``).
-
-A new generation is inserted in chunked transactions and stays invisible: the lookup reads the
-generation of the row ``Directory`` only. One short final transaction switches that row. A
-crash or a failure before that leaves the previous generation serving, and the half-loaded rows
-are deleted (or, after a crash, by the next import).
+Worker process only (web processes open the directory file read-only). A new generation is
+inserted in chunked transactions and stays invisible until one short final transaction switches
+the ``Directory`` row; a failure or crash before that leaves the previous generation serving.
 """
 
 import csv
@@ -56,28 +45,18 @@ MAX_ROWS = 5_000_000
 MAX_DOWNLOAD_SECONDS = 1800
 CHUNK_SIZE = 64 * 1024
 BATCH_SIZE = 2000
-# One transaction inserts this many rows. The write lock is held for one chunk only, so a lookup
-# or the status page never waits long.
+# One transaction per chunk: the write lock is held briefly.
 CHUNK_ROWS = 20_000
-# Retention (D-075): after a successful import the current and the previous generation are kept,
-# every older one is deleted in batches of this many rows. Each batch is its own short statement
-# (autocommit), so the table is never locked for long and the import never holds one large delete.
-# At most 900: a statement with a list of primary keys must stay below the limit of 999 variables
-# that SQLite has before 3.32.0 (https://www.sqlite.org/limits.html, "Maximum Number Of Host
-# Parameters"); Django 6.1 accepts SQLite 3.31 (D-075).
+# Old generations are deleted in batches of primary keys; at most 900 (SQLite < 3.32 allows 999
+# host parameters per statement, D-075).
 PRUNE_BATCH_SIZE = 900
-# The import is refused when the disk of the directory file has less free space than this (security
-# review of D-075, M-4): an import writes about 1 GB per generation, keeps up to three generations
-# on the disk for a moment and the disk is shared with the database of the instance, which must
-# never run out of space because of an optional address directory.
+# Import refused below this free space (about 1 GB per generation, up to three on disk; the disk
+# is shared with the instance database).
 MIN_FREE_DISK_BYTES = 4 * 1024**3
-# Against two imports at the same time (the worker and the operator command): the importer holds a
-# lease on the row of the directory that expires, so that a killed importer does not block the next
-# import for ever. It is renewed with every chunk.
+# Lease on the ``Directory`` row against concurrent imports; expires so a killed importer does not
+# block forever, renewed with every chunk.
 IMPORT_LEASE = timedelta(hours=6)
-# After a manual repair that ended without an intact directory (or failed), the next repair of a
-# damaged directory is refused for this long, so that a defect that survives a new generation never
-# causes a download and an import on every click (security review of D-076, N-2).
+# After a failed manual repair, the next one is refused for this long (no download per click).
 REPAIR_RETRY_INTERVAL = timedelta(hours=6)
 
 logger = logging.getLogger(__name__)
@@ -124,7 +103,7 @@ def _metadata(session):
         multihash = asset["checksum:multihash"]
         if not isinstance(multihash, str) or not re.fullmatch(r"1220[0-9a-fA-F]{64}", multihash):
             raise ValueError
-        # The source data date, not the time this instance downloaded the file.
+        # The source data date, not the download time.
         data_date = datetime.fromisoformat(item["properties"]["datetime"].replace("Z", "+00:00")).date()
         if data_date > timezone.localdate() or data_date < date(2000, 1, 1):
             raise ValueError
@@ -202,29 +181,24 @@ def address_rows(archive):
         raise ImportFailure("Invalid official archive format.") from exc
 
 
-def prune_old_generations(keep):
-    """Delete the rows of every generation that is not in ``keep``, in short batches.
-
-    Called only after the new generation is committed and outside any transaction of its own, so
-    that every batch is one short statement. A failure leaves old rows behind (bounded: the next
-    successful import removes them); it never touches the kept generations.
-    """
+def _delete_generation(generation):
+    """Delete a generation in short statements, each over a bounded list of primary keys."""
     deleted = 0
+    while pks := list(
+        Address.objects.filter(generation=generation)
+        .order_by().values_list("pk", flat=True)[:PRUNE_BATCH_SIZE]
+    ):
+        deleted += Address.objects.filter(pk__in=pks).delete()[0]
+    return deleted
+
+
+def prune_old_generations(keep):
+    """Delete every generation not in ``keep`` (after the new one is committed, outside a transaction)."""
     old = list(
         Address.objects.exclude(generation__in=keep)
         .order_by().values_list("generation", flat=True).distinct()
     )
-    for generation in old:
-        while True:
-            # The primary keys of one batch are read first, so that every delete is a bounded list.
-            pks = list(
-                Address.objects.filter(generation=generation)
-                .order_by().values_list("pk", flat=True)[:PRUNE_BATCH_SIZE]
-            )
-            if not pks:
-                break
-            deleted += Address.objects.filter(pk__in=pks).delete()[0]
-    return deleted
+    return sum(_delete_generation(generation) for generation in old)
 
 
 def _acquire_lease():
@@ -280,33 +254,20 @@ def _load_generation(archive, generation, token):
 
 
 def _discard_generation(generation):
-    """Delete the rows of a generation that was not published (best effort)."""
+    """Delete the rows of an unpublished generation (best effort)."""
     try:
-        while True:
-            pks = list(
-                Address.objects.filter(generation=generation)
-                .order_by().values_list("pk", flat=True)[:PRUNE_BATCH_SIZE]
-            )
-            if not pks:
-                return
-            Address.objects.filter(pk__in=pks).delete()
+        _delete_generation(generation)
     except DatabaseError:
         # The next successful import deletes every generation that is not kept.
         logger.warning("An unpublished address directory generation could not be deleted.")
 
 
 def _finish_file():
-    """After an import: refresh the statistics of the query planner, fold the write-ahead log into
-    the file and shrink it (best effort).
-
-    The statistics matter: with them SQLite picks the index of the postal code for a query with a
-    complete postal code. ``analysis_limit`` keeps ANALYZE to a fraction of a second.
-    """
+    """Refresh planner statistics (index choice for postal codes), checkpoint and shrink the WAL (best effort)."""
     try:
         connection = connections[DIRECTORY_ALIAS]
         if connection.in_atomic_block:
-            # Not inside an open transaction (only a test or a caller that wraps the import): the
-            # checkpoint cannot run there.
+            # The checkpoint cannot run inside a transaction.
             return
         with connection.cursor() as cursor:
             cursor.execute("PRAGMA analysis_limit = 2000")
@@ -318,13 +279,7 @@ def _finish_file():
 
 
 def _is_intact(directory):
-    """Whether the published generation is undamaged (cheap checks, no download).
-
-    ``PRAGMA quick_check`` of the file reports ``ok`` AND the number of rows of the published
-    generation equals the count that the import recorded (``Directory.row_count``). A deleted,
-    truncated or half-written generation fails the second check; a damaged file structure fails
-    the first (https://www.sqlite.org/pragma.html#pragma_quick_check).
-    """
+    """Whether the published generation is undamaged: ``quick_check`` is ok and the row count matches the recorded one."""
     try:
         with connections[DIRECTORY_ALIAS].cursor() as cursor:
             cursor.execute("PRAGMA quick_check")
@@ -341,11 +296,7 @@ def _is_intact(directory):
 def _is_published(directory, checksum, *, repair):
     """Whether the published directory is the official file ``checksum`` and needs no import.
 
-    The automatic attempt trusts the recorded checksum. A manual request (``repair``, D-076) also
-    needs the integrity checks to pass, so that it repairs a damaged directory but ends early,
-    without a download and without an import, when everything is intact (security review of
-    D-076, M-3: a repeated request must stay cheap). A directory without addresses is never
-    published (security review of D-076, N-5: the same meaning of "empty" as ``jobs``).
+    With ``repair`` (manual request, D-076) the integrity checks must also pass.
     """
     if (
         directory is None or not directory.imported_at or directory.row_count <= 0
@@ -356,9 +307,8 @@ def _is_published(directory, checksum, *, repair):
 
 
 def _free_bytes(folder):
-    """Free space for the service user at ``folder`` (the nearest existing parent if it is missing)."""
+    """Free space at ``folder`` (the nearest existing parent if it is missing)."""
     try:
-        # The folder is created by the first connection; before that its nearest parent counts.
         while not folder.exists() and folder != folder.parent:
             folder = folder.parent
         return shutil.disk_usage(folder).free
@@ -367,15 +317,7 @@ def _free_bytes(folder):
 
 
 def _require_free_disk():
-    """Refuse the import when the disk of the directory file or of the temporary download is nearly
-    full (M-4, N-4).
-
-    Checked before the download. Nothing is written and the published generation is not touched.
-    The log line names no path. The download (at most ``MAX_ARCHIVE_BYTES``) goes to the temporary
-    folder of the process (``/tmp``, a private folder of the service, which can be on another file
-    system than the state folder); the same threshold is used for both, because it is a margin,
-    not a calculation. The space is checked once: growth during the import is not covered.
-    """
+    """Refuse the import before the download when the directory or temporary disk is nearly full (D-075)."""
     directory_folder = Path(str(connections[DIRECTORY_ALIAS].settings_dict["NAME"])).parent
     try:
         temporary_folder = Path(tempfile.gettempdir())
@@ -391,17 +333,7 @@ def _require_free_disk():
 
 
 def _publish(archive, checksum, data_date, *, repair=False):
-    """Publish a verified archive as a new generation.
-
-    An archive whose checksum equals the published one is not loaded again (the automatic
-    attempt). With ``repair`` (a manual request, D-076) it is loaded anyway when the published
-    generation fails the integrity check (``_is_intact``), so that a damaged directory is
-    replaced by a new complete generation.
-
-    The rows are inserted in chunked transactions as a generation that no reader sees; one short
-    final transaction switches the pointer. Until then, and after any failure or crash, the
-    previous generation serves.
-    """
+    """Publish a verified archive as a new generation (skipped if already published, see ``_is_published``)."""
     token = _acquire_lease()
     generation = uuid.uuid4()
     try:
@@ -423,7 +355,7 @@ def _publish(archive, checksum, data_date, *, repair=False):
         except BaseException:
             _discard_generation(generation)
             raise
-        # Retention (D-075): the new generation is published; keep it and the previous one only.
+        # Keep the new and the previous generation only (D-075).
         try:
             prune_old_generations({generation, previous})
         except DatabaseError:
@@ -438,7 +370,7 @@ def _publish(archive, checksum, data_date, *, repair=False):
 
 def _published_row_count(checksum, *, repair):
     """The row count of the published directory if it is the official file ``checksum`` (and, with
-    ``repair``, undamaged); None if an import is needed. A file that cannot be read needs one."""
+    ``repair``, undamaged); None if an import is needed."""
     try:
         directory = Directory.objects.filter(pk=1).first()
         return directory.row_count if _is_published(directory, checksum, repair=repair) else None
@@ -447,12 +379,7 @@ def _published_row_count(checksum, *, repair):
 
 
 def _require_catalogue_not_older(data_date):
-    """Refuse a catalogue older than the published directory BEFORE the download (N-2).
-
-    Without this the refusal in ``_publish`` came after the download and the hash, so every click
-    cost the whole archive. ``_publish`` keeps its own check under the lease. An unreadable file
-    is not a reason to refuse: the import replaces it.
-    """
+    """Refuse a catalogue older than the published directory before the download (also checked under the lease)."""
     try:
         directory = Directory.objects.filter(pk=1).first()
     except DatabaseError:
@@ -462,11 +389,7 @@ def _require_catalogue_not_older(data_date):
 
 
 def _repair_is_needed(checksum):
-    """True when the published directory is the official file ``checksum`` but fails the checks
-    (or cannot be read): a manual request then repairs it instead of loading new data.
-
-    Called only after ``_published_row_count`` found nothing to skip.
-    """
+    """True when the published directory is the official file but fails the checks or is unreadable."""
     try:
         directory = Directory.objects.filter(pk=1).first()
     except DatabaseError:
@@ -475,7 +398,7 @@ def _repair_is_needed(checksum):
 
 
 def _require_repair_allowed():
-    """After a repair that did not end intact (or failed), the next one waits six hours (N-2)."""
+    """After a repair that did not end intact (or failed), the next one waits six hours."""
     last = ImportRequest.objects.filter(pk=1).values_list("last_failed_repair_at", flat=True).first()
     if last is not None and timezone.now() < last + REPAIR_RETRY_INTERVAL:
         logger.warning(
@@ -512,16 +435,12 @@ def _download_and_publish(session, archive, checksum, data_date, *, repair):
 
 
 def import_directory(*, repair=False):
-    """Download, verify and publish; called only by the worker process (D-075).
+    """Download, verify and publish; worker process only (D-075).
 
-    The order: the official catalogue entry (a few KB); if the published directory already is that
-    file, the import ends here (with ``repair`` only if the integrity checks pass); a catalogue
-    older than the published directory is refused; a repair within six hours after a repair that
-    did not succeed is refused; the check of the free disk space; the download, the checksum and
-    every limit; the import. ``repair`` (a manual request, D-076) only adds the integrity checks
-    to the first shortcut; it never skips a check of the download. A repair (the published
-    directory is the official file but fails the checks) is followed by one more integrity check
-    of the new file, and its outcome starts or clears the six hours (N-2).
+    Order: catalogue entry; shortcut if already published (with ``repair`` only when intact);
+    refuse an older catalogue; refuse a repair within six hours of a failed one; free-disk check;
+    download with checksum and limits; import. A repair is followed by one more integrity check
+    whose outcome starts or clears the six hours (D-076).
     """
     try:
         # Ignore netrc/proxy credentials inherited from an operator environment.

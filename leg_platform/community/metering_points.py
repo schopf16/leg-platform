@@ -1,15 +1,8 @@
-"""Metering points: creating, the steps towards the grid operator, archiving and deleting (D-078, D-079).
+"""Metering points: creating, the steps towards the grid operator, archiving and deleting.
 
-Creating (``standorte/VORGABEN.md``, ``messpunkte/VORGABEN.md``): the direction is required, the
-number, the location and the LEG are optional, no person and no date. A metering point without a
-number is known here but not yet at the grid operator. The LEG is assigned from the day of the entry (the
-dialog asks for no date).
-
-The steps (``messpunkte/detail/VORGABEN.md``): registered -> "notified" (announced to the grid operator) ->
-confirmation (with or without a start date) -> a start date -> active (automatic, when the date is
-reached; no scheduler) -> termination to a month end. Each step is one transaction that locks the
-metering point, checks the status again on the server (a stale page cannot do a step twice or out of
-order) and writes the history.
+Steps: registered -> notified -> confirmation (with or without start date) -> start date -> active
+(automatic, no scheduler) -> termination to a month end. Each step locks the metering point, re-checks
+the status and writes the history.
 """
 
 import calendar
@@ -37,18 +30,16 @@ def find_by_number(number):
 
 
 def create_metering_point(*, direction, location=None, number=None, leg=None, actor=None, **details):
-    """Create the metering point; ``details`` may hold ``pv_power_kwp``, ``battery_kwh``,
-    ``wallbox_kw`` and ``remark``. Raises ``DuplicateNumber`` or ``ValidationError``."""
+    """Create the metering point; ``details``: ``pv_power_kwp``, ``battery_kwh``, ``wallbox_kw``, ``remark``.
+    Raises ``DuplicateNumber`` or ``ValidationError``."""
     metering_point = MeteringPoint(direction=direction, location=location, number=number or None, **details)
-    # The uniqueness is checked below (a clear answer with the existing metering point), not by the form check.
+    # Uniqueness is checked below, to answer with the existing metering point.
     metering_point.full_clean(validate_unique=False)
     try:
         with transaction.atomic():
             if leg is not None:
-                # Locked first, as everywhere (``assignments.assign``); an archived LEG is refused there.
                 Leg.objects.select_for_update().get(pk=leg.pk)
             if location is not None:
-                # A location that is archived is read-only: no metering point is created at it (D-085).
                 archived.ensure_open(Location.objects.select_for_update().get(pk=location.pk), archived.LOCATION)
             if number:
                 existing = find_by_number(metering_point.number)
@@ -59,15 +50,13 @@ def create_metering_point(*, direction, location=None, number=None, leg=None, ac
             if leg is not None:
                 assignments.assign(assignments.LEG, metering_point, leg, timezone.localdate(), actor)
     except IntegrityError:
-        # Two requests with the same number at the same time: the database constraint decides.
+        # Concurrent requests with the same number: the database constraint decides.
         existing = find_by_number(metering_point.number)
         if existing is None:
             raise
         raise DuplicateNumber(existing) from None
     return metering_point
 
-
-# The steps ------------------------------------------------------------------------------------
 
 NOTIFY = "notify"
 CONFIRM = "confirm"
@@ -76,8 +65,8 @@ LEG_MISSING = "leg_missing"
 
 
 class StatusError(Exception):
-    """A step that the rules refuse. ``code`` is one of: ``archived``, ``wrong_status``,
-    ``date_in_future``, ``date_before_previous``, ``not_month_end``."""
+    """A refused step; ``code``: ``archived``, ``wrong_status``, ``date_in_future``,
+    ``date_before_previous`` or ``not_month_end``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -85,9 +74,7 @@ class StatusError(Exception):
 
 
 def next_step(metering_point, has_leg, today=None):
-    """The next step of a metering point: ``NOTIFY``, ``CONFIRM``, ``START``, ``LEG_MISSING`` (a
-    metering point needs a LEG before it is announced to the grid operator, so there is no step yet) or None.
-    The list shows it for the quick filters (``messpunkte/VORGABEN.md``)."""
+    """``NOTIFY``, ``CONFIRM``, ``START``, ``LEG_MISSING`` (a LEG is needed before the registration) or None."""
     if metering_point.is_archived:
         return None
     status = metering_point.status(today)
@@ -116,8 +103,7 @@ def _not_after_today(day, today):
 
 
 def mark_notified(metering_point, registered_on, actor=None, today=None):
-    """"Als angemeldet setzen": the registration at the grid operator has happened on ``registered_on``
-    (not in the future)."""
+    """The registration at the grid operator happened on ``registered_on`` (not in the future)."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.REGISTERED, today)
@@ -129,9 +115,8 @@ def mark_notified(metering_point, registered_on, actor=None, today=None):
 
 
 def record_confirmation(metering_point, confirmed_on, start_date=None, actor=None, today=None):
-    """"Bestätigung erfassen": the grid operator confirmed on ``confirmed_on`` (not before the registration and
-    not in the future). Without a start date the registration stays on standby; with one the status
-    stays "confirmed" until the date is reached."""
+    """The grid operator confirmed on ``confirmed_on`` (not before the registration, not in the future).
+    Without a start date the registration stays on standby."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.NOTIFIED, today)
@@ -149,7 +134,7 @@ def record_confirmation(metering_point, confirmed_on, start_date=None, actor=Non
 
 
 def record_start_date(metering_point, start_date, actor=None, today=None):
-    """"Startdatum erfassen": the start date of a confirmed registration that is on standby."""
+    """The start date of a confirmed registration that is on standby."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.CONFIRMED, today)
@@ -166,8 +151,7 @@ def is_month_end(day):
 
 
 def terminate(metering_point, terminated_on, actor=None, today=None):
-    """"Kündigung erfassen": the date that the grid operator gives, always the end of a month and not before the
-    start. A date in the future keeps the status "active" until it is reached."""
+    """Record the termination date: a month end, not before the start. A future date keeps the status "active"."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.ACTIVE, today)
@@ -181,9 +165,6 @@ def terminate(metering_point, terminated_on, actor=None, today=None):
         fresh.save(update_fields=["terminated_on", "updated_at"])
         history.record(fresh, HistoryEvent.TERMINATION_RECORDED, actor, {"terminated_on": terminated_on.isoformat()})
     return fresh
-
-
-# Archiving and deleting ---------------------------------------------------------------------------
 
 
 class NotDeletable(Exception):
@@ -201,8 +182,7 @@ def set_archived(metering_point, archived, actor=None):
 
 
 def can_delete(metering_point):
-    """A metering point is deleted only without a history (``messpunkte/detail/VORGABEN.md``: at
-    least one entry other than "Created" means archive instead)."""
+    """Deletable only without a history (no entry other than "Created")."""
     return not history.has_history(metering_point)
 
 
@@ -212,7 +192,7 @@ def delete(metering_point):
         fresh = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
         if not can_delete(fresh):
             raise NotDeletable
-        # Only the entry "Created" exists; it goes with the metering point.
+        # Only "Created" exists; it goes with the metering point.
         HistoryEntry.objects.filter(subject_type=history.METERING_POINT, subject_id=fresh.pk).delete()
         fresh.delete()
 

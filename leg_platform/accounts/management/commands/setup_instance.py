@@ -1,37 +1,23 @@
-"""Set up an instance on every start: migrate the database, create the first administrator.
+"""Set up an instance on every start: migrate the database, create the first administrator (D-076).
 
-``manage.py setup_instance`` is idempotent and safe to run on every start of the services
-(docs/DECISIONS.md, D-076; the systemd unit ``leg-setup.service`` of docs/DEPLOYMENT.md does it):
+``manage.py setup_instance`` is idempotent and safe to run on every start (``leg-setup.service``):
 
-1. It applies the pending migrations to the default database (the equivalent of
-   ``migrate --noinput``). It never flushes or deletes data.
-2. Only if the account table is completely empty (a first start; no row of any status) and
-   ``BOOTSTRAP_SYSTEM_ADMIN_EMAIL`` is set, it creates the initial system administrator with the
-   password of the environment variable ``BOOTSTRAP_SYSTEM_ADMIN_PASSWORD``, through the locked
-   ``User.objects.create_superuser()`` path. The password is checked with the project's password
-   validators, is never printed or logged, and there is no command line argument for it (it would
-   show up in the process list). The account must replace the password at the first login and set
-   up two-factor authentication before anything else (D-041). If accounts exist but no system
-   administrator (any account with is_superuser, also a blocked or deactivated one, counts as
-   one), it creates nothing, writes a clear error to standard error and still exits with 0: a
-   restored backup, a manual change or an old environment file must never create a privileged
-   account later, and a missing administrator is not a reason to stop the web service.
-3. As soon as a system administrator exists, the password variable is not read at all; a still-set
-   variable only produces a reminder to remove it from the environment file.
-4. It creates the SQLite file of the address directory if it is missing and applies the migrations
-   of the directory tables to it (``migrate addresses --database=addresses``). This step runs
-   last and is never fatal: the directory is optional (D-066) and not backed up (D-075), so a
-   failure (for example a state folder that cannot be written) is reported on standard error and
-   the next start tries again; the main database and the administrator are not affected.
+1. Applies pending migrations (like ``migrate --noinput``); never flushes or deletes data.
+2. Only if the account table is completely empty and ``BOOTSTRAP_SYSTEM_ADMIN_EMAIL`` is set, creates
+   the initial system administrator with ``BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`` via the locked
+   ``User.objects.create_superuser()`` path (validated, never printed or logged, no command line
+   argument); it must change the password and set up 2FA at first login (D-041). If accounts exist
+   but no system administrator (any superuser, also blocked or deactivated, counts), it creates
+   nothing, writes an error to stderr and exits 0: a restored backup or old environment file must
+   never create a privileged account later.
+3. Once an administrator exists, the password variable is not read; a still-set variable only
+   produces a reminder.
+4. Creates the SQLite file of the address directory and migrates it. Last and never fatal: the
+   directory is optional (D-066) and not backed up (D-075).
 
-A named database lock serialises concurrent runs, so two starts can neither migrate at the same
-time nor create two administrators.
-
-Exit status: 0 when the instance is set up (also when only the directory step failed, and when
-accounts exist without an administrator, which is reported on standard error); non-zero when
-migrating the main database fails or when the first administrator is configured (email variable
-set, empty account table) but cannot be created, so that a service that requires the unit does
-not start with a half-configured instance.
+A named database lock serialises concurrent runs. Exit status: 0 when set up (also if only the
+directory step failed, or accounts exist without an administrator); non-zero when migrating fails or
+the configured first administrator cannot be created.
 """
 
 import hashlib
@@ -57,7 +43,7 @@ from leg_platform.environment import (
 )
 
 DATABASE = "default"
-# Seconds a second run waits for the first one (migrations of a large update can take a while).
+# Seconds a second run waits for the first one.
 SETUP_LOCK_TIMEOUT = 600
 
 
@@ -75,8 +61,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        # This command creates the directory file and its tables, so it is a writer of the file;
-        # every other process opens it read-only (D-075).
+        # The only writer of the directory file; every other process opens it read-only (D-075).
         mark_writer()
         # Read before the lock; nothing of it is printed, logged or stored.
         bootstrap = parse_bootstrap_administrator(os.environ)
@@ -88,7 +73,7 @@ class Command(BaseCommand):
         if acquired != 1:
             raise CommandError("Another setup of this instance is running; try again later.")
         try:
-            # Progressive output: a refusal later on must not hide what was already done.
+            # Progressive output: a later refusal must not hide what was done.
             for line in self._migrate(connection):
                 self.stdout.write(line)
             for line in self._administrator(bootstrap):
@@ -109,13 +94,9 @@ class Command(BaseCommand):
         return ["Database migrations: none pending."]
 
     def _directory(self):
-        """Create the SQLite file of the address directory and its two tables (D-075).
+        """Create the SQLite file of the address directory and its tables (D-075).
 
-        The file is not part of the backup and is rebuilt by an import, so a failure here is
-        reported (standard error, with the exception class only: no path, no detail) but never
-        stops the start: the application works without suggestions, and the next run tries again.
-        The named lock of the application database also serialises this step between two runs;
-        SQLite's own lock and ``busy_timeout`` protect the file against any other writer.
+        A failure is reported on stderr (exception class only) but never stops the start; the next run tries again.
         """
         try:
             connection = connections[DIRECTORY_ALIAS]
@@ -142,11 +123,8 @@ class Command(BaseCommand):
                 lines.append(self._reminder())
             return lines
         if accounts_exist():
-            # Not a first start (D-076, security review, M-2): the bootstrap account is created
-            # only while the account table is completely empty, so that a restored backup, a
-            # manual change or an old environment file can never create a privileged account
-            # later. The start is not stopped: a missing administrator is not a reason to take
-            # the web service down.
+            # Not a first start (D-076): the bootstrap account is created only while the account
+            # table is empty; a missing administrator must not take the web service down.
             self.stderr.write(self._not_a_first_start(bool(bootstrap.password)))
             return []
         if not bootstrap.email:
@@ -173,9 +151,8 @@ class Command(BaseCommand):
         except InitialAdministratorError as error:
             raise CommandError(f"The initial administrator was not created. {error}") from None
         except DatabaseError as error:
-            # Only the class: the text of a database error is never shown here. The account may
-            # exist already when the failure came after its creation (the security log entry is
-            # written after the commit; accepted, D-076), so the text does not claim otherwise.
+            # Only the class: a database error's text is never shown. The account may already exist
+            # (the log entry is written after the commit, D-076).
             raise CommandError(
                 "The setup of the initial administrator failed "
                 f"(database error: {type(error).__name__}); check whether the account exists."

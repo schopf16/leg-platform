@@ -1,15 +1,6 @@
-"""The IBAN of a person: validation, normal form, display and encryption (D-087).
+"""The IBAN of a person: validation (python-stdnum), normal form, display and encryption (D-087).
 
-The checksum and the structure of the country are checked by the established package ``python-stdnum``
-(``stdnum.iban``): any IBAN with a valid checksum is accepted, not only Swiss and Liechtenstein ones. The
-normal form is upper case without spaces and hyphens; the display form groups of four characters.
-
-The IBAN is stored encrypted (``PersonRecord.iban_encrypted``) with the facility of the project
-(``accounts.encryption``: a key derived from ``SECRET_KEY`` with HKDF and a label of its own, Fernet; the keys of
-``SECRET_KEY_FALLBACKS`` are tried for decryption, docs/SECURITY.md, section 7). The IBAN is never searched or
-sorted, so no keyed lookup digest is stored. It is shown only on the detail page of a person and in the PDF of the
-detail, and never written to a log, to the history or to the security log.
-"""
+Stored encrypted via ``accounts.encryption``; never searched, sorted or logged."""
 
 import logging
 
@@ -23,7 +14,7 @@ from leg_platform.accounts.encryption import DecryptionError, decrypt, encrypt
 logger = logging.getLogger(__name__)
 
 PERSON_IBAN_PURPOSE = b"LEG-Platform person IBAN v1"
-# The encrypted payload of an IBAN bound to its account (L-7); the migration 0006 repeats it on purpose.
+# Migration 0006 repeats this prefix on purpose.
 BOUND_PREFIX = "v2|"
 IBAN_MAX_LENGTH = 34
 
@@ -34,13 +25,11 @@ def compact(value):
 
 
 def validate(value):
-    """Return the IBAN in its normal form; raise a ``ValidationError`` if it is not a valid IBAN.
-
-    An empty value is valid and stays empty (the IBAN is optional)."""
+    """The IBAN in normal form; ``ValidationError`` if invalid; empty stays empty (optional)."""
     number = compact(value)
     if not number:
         return ""
-    # ASCII letters and digits only: the checksum of the package would also accept other digit characters.
+    # ASCII only: the package checksum would also accept other digit characters.
     if not number.isascii() or not number.isalnum() or len(number) > IBAN_MAX_LENGTH:
         raise ValidationError(_("Enter a valid IBAN."), code="invalid_iban")
     try:
@@ -56,10 +45,7 @@ def display(value):
 
 
 def encrypt_iban(value, account_id):
-    """The encrypted text that is stored for an IBAN (normal form); "" for no IBAN.
-
-    The number of the account is part of the encrypted text (``v2|<account>|<IBAN>``, L-7): the stored text
-    cannot be copied to the record of another person, ``decrypt_iban`` refuses it there."""
+    """The stored encrypted text (``v2|<account>|<IBAN>``, bound to the account, L-7); "" for no IBAN."""
     number = compact(value)
     if not number:
         return ""
@@ -67,9 +53,8 @@ def encrypt_iban(value, account_id):
 
 
 def decrypt_iban(token, account_id):
-    """The IBAN of a stored text; "" for none. ``DecryptionError`` if no key of the instance decrypts it or if it
-    belongs to another account. A text without the account (made by the migration 0005, before L-7) is
-    accepted and is bound by migration 0006 or ``reencrypt_ibans``."""
+    """The IBAN of a stored text; "" for none. ``DecryptionError`` if undecryptable or bound to another account.
+    Unbound texts (migration 0005) are accepted."""
     if not token:
         return ""
     payload = decrypt(token, PERSON_IBAN_PURPOSE).decode("ascii")
@@ -91,8 +76,7 @@ def is_bound(token):
 
 
 def readable(record):
-    """The IBAN of a person record for display, or "" if it cannot be decrypted (the key was replaced
-    without being kept in ``SECRET_KEY_FALLBACKS``). The failure is logged with the account number only."""
+    """The IBAN for display, or "" if it cannot be decrypted (logged with the account number only)."""
     try:
         return record.iban
     except DecryptionError:

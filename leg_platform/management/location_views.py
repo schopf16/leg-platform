@@ -1,9 +1,7 @@
-"""The pages of the locations (D-078; LEG-Design-Vorgaben/verwaltung/standorte).
+"""The pages of the locations (D-078): list, detail and dialogs.
 
-List, detail and the dialogs. Every view uses the access check of ``management.access`` (every staff
-account, D-086); objects are looked up by the id in the address, and every state change
-is validated on the server (never trusted from the browser). A dialog is a normal page: it works
-without JavaScript and returns to the place it was opened from (``management.returns``).
+Every view uses ``management.access``; objects are looked up by id and every state change is validated
+on the server. A dialog is a normal page that returns to where it was opened (``management.returns``).
 """
 
 import json
@@ -21,6 +19,7 @@ from django.views import View
 
 from leg_platform.community import assignments as assignment_rules
 from leg_platform.community import (
+    addressing,
     history,
     location_list,
     locations,
@@ -89,9 +88,7 @@ def event_label(event):
 
 
 class ListWidthsView(ManagementAccessMixin, View):
-    """Saves the column widths of a list for the account (progressive enhancement of the lists:
-    ``management/js/list.js`` posts them after a column was resized). The widths are checked
-    (``community.preferences``); the account is always the one of the session."""
+    """Saves the column widths of a list for the session's account (posted by ``management/js/list.js``)."""
 
     http_method_names = ["post"]
 
@@ -121,8 +118,7 @@ def occupancy_options():
 
 @dataclass
 class LocationList:
-    """The list of locations as the address asks for it: the state and the queryset of every row of the view
-    (search and filters applied, sorted), not only one page. The page and the printing use it."""
+    """The state and queryset of the whole filtered, sorted list (used by the page and the printing)."""
 
     state: lists.ListState
     columns: tuple
@@ -145,7 +141,7 @@ def build_list(params):
     queryset = location_list.apply_search(location_list.base_queryset(today), state.query, today=today)
     queryset = location_list.apply_circuit(queryset, state.values["circuit"])
     queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
-    # The button counts the entries with a problem in the current view (search and filters).
+    # The problem button counts the entries with a problem in the current view.
     problem_count = location_list.apply_problems(queryset.filter(is_archived=False)).count()
     if state.problems:
         queryset = location_list.apply_problems(queryset)
@@ -154,7 +150,7 @@ def build_list(params):
 
 
 class LocationListView(ManagementAccessMixin, View):
-    """The list of locations (``standorte-liste-desktop`` and ``-handy``)."""
+    """The list of locations."""
 
     def get(self, request):
         found = build_list(request.GET)
@@ -210,9 +206,8 @@ class LocationListView(ManagementAccessMixin, View):
 
 
 class LocationExpandedView(ManagementAccessMixin, View):
-    """Remembers which locations the account has expanded. Without JavaScript a button posts
-    ``toggle`` (one id) or ``ids`` with ``open`` (all of a page); the script posts JSON with the
-    same two keys. Only ids of existing locations are kept."""
+    """Remembers which locations the account has expanded: ``toggle`` (one id) or ``ids`` with ``open``,
+    as form fields or JSON. Only ids of existing locations are kept."""
 
     http_method_names = ["post"]
 
@@ -236,8 +231,7 @@ class LocationExpandedView(ManagementAccessMixin, View):
         if open_ is None:
             open_ = ids[0] not in current
         current = (current | set(ids)) if open_ else (current - set(ids))
-        # Forget locations that no longer exist.
-        current = set(Location.objects.filter(pk__in=current).values_list("pk", flat=True))
+        current = set(Location.objects.filter(pk__in=current).values_list("pk", flat=True))  # drop deleted ones
         try:
             preferences.save_expanded_locations(request.user, current)
         except ValueError:
@@ -248,8 +242,7 @@ class LocationExpandedView(ManagementAccessMixin, View):
 
 
 class LocationDetailView(ManagementAccessMixin, View):
-    """The detail page of a location (``standort-detail-desktop``, ``-handy``, ``standort-neu``,
-    ``standort-adresskorrektur``)."""
+    """The detail page of a location."""
 
     def get(self, request, pk):
         location = get_object_or_404(Location.objects.select_related("transformer_circuit"), pk=pk)
@@ -257,8 +250,7 @@ class LocationDetailView(ManagementAccessMixin, View):
         today = timezone.localdate()
         rows, persons = location_list.details([location], today)
         points = rows[location.pk]
-        # An archived location is read-only (D-085): no edit buttons, only "Restore".
-        can_change = not location.is_archived
+        can_change = not location.is_archived  # D-085: an archived location is read-only
         deletable = locations.can_delete(location)
         assignments = list(
             PersonAssignment.objects.filter(metering_point__location=location)
@@ -298,10 +290,7 @@ class LocationDetailView(ManagementAccessMixin, View):
             "current_url": request.get_full_path(),
         }
         if can_change and location.address_correction_open and location.suggestion is not None:
-            from leg_platform.community import addressing
-
             context["suggestion_text"] = addressing.suggestion_banner_text(location.suggestion)
-        # The table of the metering points: the handles and the link column of the standard (LISTEN-STANDARD, 8).
         columns = POINT_COLUMNS
         state = lists.parse({}, path=request.path, columns=columns, default_sort="number")
         saved = preferences.get_preference(user, "location_metering_points").column_widths
@@ -315,7 +304,7 @@ class LocationDetailView(ManagementAccessMixin, View):
 
 class DialogView(ManagementAccessMixin, View):
     """A dialog as a page: GET shows the form, POST saves and returns to where the person came from.
-    A subclass sets the title and the form and implements ``save``."""
+    Subclasses set title and form and implement ``save``."""
 
     template_name = "management/dialog_form.html"
     form_class = None
@@ -363,7 +352,7 @@ class DialogView(ManagementAccessMixin, View):
 
 
 class LocationCreateView(DialogView):
-    """"Standort anlegen" (``dialog-standort-anlegen``)."""
+    """The dialog "Create location"."""
 
     title = gettext_lazy("Create location")
     lead = gettext_lazy("A location is an address. You create the metering points afterwards at the location.")
@@ -408,10 +397,15 @@ class LocationCreateView(DialogView):
         return redirect(self.back(request))
 
 
+def archived_redirect(request, pk):
+    """The message "archived" and the redirect to the detail page (a race: the location was archived meanwhile)."""
+    messages.error(request, _("This location is archived."))
+    return redirect(reverse("management:locations_detail", args=[pk]))
+
+
 class ArchivedLocationGuard:
-    """An archived location is read-only (D-085): every request that changes it is refused here, before the
-    handler, with a message in the style of D-079, and the person goes back to the page. A view that must
-    work on an archived location (the restore) sets ``allow_archived``."""
+    """An archived location is read-only (D-085): requests that change it are refused before the handler
+    (D-079 message). A view that must work on one (the restore) sets ``allow_archived``."""
 
     allow_archived = False
 
@@ -437,8 +431,7 @@ class LocationObjectDialog(ArchivedLocationGuard, DialogView):
 
 
 class LocationAddressView(LocationObjectDialog):
-    """"Adresse bearbeiten": only the address can be changed. If it becomes the address of another
-    location the page warns and asks again (the merge)."""
+    """Edit the address (the only changeable part); an address of another location asks for the merge."""
 
     title = gettext_lazy("Edit address")
     form_class = AddressEditForm
@@ -467,8 +460,7 @@ class LocationAddressView(LocationObjectDialog):
                 actor=request.user, merge=confirmed, merge_target_id=form.target_id(),
             )
         except locations.Archived:
-            messages.error(request, _("This location is archived."))
-            return redirect(reverse("management:locations_detail", args=[location.pk]))
+            return archived_redirect(request, location.pk)
         except locations.MergeRefused:
             form.add_error(None, _("This address already exists."))
             return self.render_dialog(request, form)
@@ -476,8 +468,7 @@ class LocationAddressView(LocationObjectDialog):
             data = request.POST.copy()
             data["confirm_merge"] = "1"
             target = needed.target
-            # The confirmation is bound to the location that is shown now.
-            data["merge_target"] = str(target.pk)
+            data["merge_target"] = str(target.pk)  # the confirmation is bound to the location shown now
             return self.render_dialog(
                 request, self.form_class(data, location=location),
                 submit_label=_("Transfer and save"),
@@ -503,17 +494,13 @@ class LocationRemarkView(LocationObjectDialog):
         try:
             locations.update_remark(self.location(), form.cleaned_data["remark"], request.user)
         except locations.Archived:
-            messages.error(request, _("This location is archived."))
-            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
+            return archived_redirect(request, self.kwargs["pk"])
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
 
 class CircuitDialog(DialogView):
-    """The dialog "Trafokreis anlegen": the grid number and the name. If the number exists, the first
-    answer is the hint "This transformer circuit exists already" with the button "Use this one"
-    (the existing circuit is used; a second one is never created); the second answer (``use_existing``)
-    uses it."""
+    """Create a circuit; an existing number is offered with "Use this one" (``use_existing``) instead of a duplicate."""
 
     form_class = CircuitForm
     template_name = "management/locations/dialog_circuit.html"
@@ -544,8 +531,7 @@ class CircuitDialog(DialogView):
 
 
 class LocationCircuitNewView(CircuitDialog, LocationObjectDialog):
-    """"Trafokreis anlegen" at a location (``dialog-trafokreis-anlegen``): the location gets the
-    circuit."""
+    """Create a circuit at a location; the location gets it."""
 
     def get_lead(self):
         location = self.location()
@@ -557,15 +543,13 @@ class LocationCircuitNewView(CircuitDialog, LocationObjectDialog):
         try:
             locations.set_circuit(self.location(), circuit, request.user)
         except locations.Archived:
-            messages.error(request, _("This location is archived."))
-            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
+            return archived_redirect(request, self.kwargs["pk"])
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
 
 class CircuitCreateView(CircuitDialog):
-    """"Trafokreis anlegen" from the dialog "Standort anlegen" (no location yet): the circuit is
-    created and the person comes back with it chosen."""
+    """Create a circuit from the dialog "Create location": the person comes back with it chosen."""
 
     def use(self, request, circuit):
         back = self.back(request)
@@ -573,8 +557,7 @@ class CircuitCreateView(CircuitDialog):
 
 
 class CircuitEditView(DialogView):
-    """Change the name or the number of a circuit; it reaches every location with it, and the
-    dialog says how many."""
+    """Change name or number of a circuit; it reaches every location with it (the dialog says how many)."""
 
     title = gettext_lazy("Change transformer circuit")
     form_class = CircuitForm
@@ -603,8 +586,7 @@ class CircuitEditView(DialogView):
 
 
 class LocationMeteringPointNewView(LocationObjectDialog):
-    """"Messpunkt anlegen" at a location (``dialog-messpunkt-anlegen``): the location is given;
-    direction required, number and LEG optional, no person and no date."""
+    """Create a metering point at the location: direction required, number and LEG optional."""
 
     title = gettext_lazy("Create metering point")
     template_name = "management/locations/dialog_metering_point.html"
@@ -626,12 +608,10 @@ class LocationMeteringPointNewView(LocationObjectDialog):
                 leg=form.cleaned_data.get("leg"), actor=request.user,
             )
         except metering_points.DuplicateNumber as duplicate:
-            # The page shows the existing metering point (the notice of the dialog).
             form.duplicate = duplicate.existing
             return None
         except locations.Archived:
-            messages.error(request, _("This location is archived."))
-            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
+            return archived_redirect(request, self.kwargs["pk"])
         except assignment_rules.AssignmentError:
             form.add_error(None, _("This LEG is archived."))
             return None
@@ -662,8 +642,7 @@ class LocationPostView(ArchivedLocationGuard, ManagementAccessMixin, View):
 
 
 class LocationCircuitView(LocationPostView):
-    """The field with the pencil in the card "Netz": the typed or chosen circuit is assigned; an
-    empty field removes it."""
+    """The pencil field of the card "Netz": assigns the chosen circuit; an empty field removes it."""
 
     def act(self, request, location):
         try:
@@ -676,7 +655,7 @@ class LocationCircuitView(LocationPostView):
 
 
 class LocationArchiveView(LocationPostView):
-    """Archive and restore: the only change that an archived location accepts is the restore (D-085)."""
+    """Archive and restore: the restore is the only change an archived location accepts (D-085)."""
 
     allow_archived = True
 
@@ -693,7 +672,7 @@ class LocationConfirmView(LocationPostView):
 
 
 class LocationSuggestionView(LocationPostView):
-    """"Accept" and "Do not accept" of the banner (``standorte/adresskorrektur``)."""
+    """"Accept" and "Do not accept" of the address correction banner."""
 
     def act(self, request, location):
         action = request.POST.get("action")
@@ -714,8 +693,7 @@ class LocationSuggestionView(LocationPostView):
 
 
 class LocationDeleteView(ArchivedLocationGuard, ManagementAccessMixin, View):
-    """"Standort löschen": a question first, then the deletion; only possible without a history and never for an
-    archived location (D-085, D-086: the restore is the only action on it)."""
+    """A question first, then the deletion; only without history and never for an archived location (D-085, D-086)."""
 
     def location(self, pk):
         return get_object_or_404(Location, pk=pk)
@@ -745,8 +723,7 @@ class LocationDeleteView(ArchivedLocationGuard, ManagementAccessMixin, View):
         try:
             locations.delete(location)
         except locations.Archived:
-            messages.error(request, _("This location is archived."))
-            return redirect(reverse("management:locations_detail", args=[pk]))
+            return archived_redirect(request, pk)
         except locations.NotDeletable:
             messages.error(request, _("This location has a history and cannot be deleted. Archive it instead."))
             return redirect(reverse("management:locations_detail", args=[pk]))

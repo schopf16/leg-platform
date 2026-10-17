@@ -1,13 +1,9 @@
 """TOTP and recovery codes: enrolment, verification, renewal and removal (D-040).
 
-Only the parts that are specific to the authenticator app are here. Whether a session completed
-the second factor is decided in ``second_factor.py`` and does not depend on this module, so that
-the method can be replaced or supplemented later (docs/PROJECT.md, "AGOV and Passkeys").
-
-The devices are ``AuthenticatorDevice`` for the authenticator app and ``RecoveryCodeDevice``
-with ``RecoveryCode`` for the recovery codes (models of this project that follow the interface
-of django-otp; the secrets are stored encrypted or as keyed digests). An account has at most one
-of each; the account row is locked while they change, so that two requests cannot create two.
+Only the authenticator-app specifics are here; whether a session completed the second factor is
+decided in ``second_factor.py``. Devices: ``AuthenticatorDevice`` and ``RecoveryCodeDevice`` with
+``RecoveryCode`` (django-otp interface; secrets encrypted or keyed digests). An account has at most
+one of each; the account row is locked while they change.
 """
 
 import io
@@ -36,16 +32,14 @@ from leg_platform.accounts.models import (
 Event = SecurityEvent.Event
 
 RECOVERY_DEVICE_NAME = "recovery codes"
-# Ten single-use codes of 40 bits each; every attempt is counted by the abuse protection.
+# Ten single-use codes of 40 bits each.
 RECOVERY_CODE_COUNT = 10
 RECOVERY_CODE_LENGTH = 8
 # An unconfirmed secret is usable only shortly and only in the session that started the setup.
 ENROLMENT_LIFETIME = timedelta(minutes=15)
-# Budget of wrong codes per account (D-040): a window of 24 hours from the first wrong code. At
-# the notice the owner gets an email, at the pause code entry stops until the window ends or the
-# password is reset, which leaves the budget at the relief value. NIST SP 800-63B-4, section
-# 3.2.2 allows at most 100 consecutive failures per authenticator; this is much stricter, and
-# the Axes lockout (5 failures, 15 minutes) applies in addition.
+# Budget of wrong codes per account (D-040): a 24-hour window from the first wrong code. At the
+# notice the owner gets an email; at the pause code entry stops until the window ends or a password
+# reset leaves the budget at the relief value. Much stricter than NIST SP 800-63B-4 (100); Axes applies in addition.
 CODE_BUDGET_WINDOW = timedelta(hours=24)
 CODE_NOTICE_AT = 10
 CODE_PAUSE_AT = 15
@@ -109,10 +103,7 @@ def code_attempts_paused(user):
 
 
 def record_failed_code(user):
-    """Count a wrong code against the budget; call it under the lock on the account row.
-
-    The owner is notified once per window, without any link, when the notice is reached.
-    """
+    """Count a wrong code against the budget (call under the account row lock); the owner is notified once per window, without a link."""
     device = AuthenticatorDevice.objects.select_for_update().filter(user=user, confirmed=True).first()
     if device is None:
         return
@@ -133,11 +124,7 @@ def record_failed_code(user):
 
 
 def relieve_code_budget(user):
-    """After a password reset the budget is at most the relief value, once per window.
-
-    Never more attempts than before, and a second reset in the same window gives none: a person
-    who controls the mailbox gets no more than that.
-    """
+    """After a password reset the budget is at most the relief value, once per window (a second reset in the window gives none)."""
     AuthenticatorDevice.objects.filter(
         user=user, failed_codes__gt=CODE_RELIEF_TO, code_budget_relieved=False
     ).update(failed_codes=CODE_RELIEF_TO, code_budget_relieved=True)
@@ -152,10 +139,10 @@ def delete_abandoned_enrolments(now=None):
 
 
 def start_enrolment(user):
-    """Create the authenticator app secret that the person scans; not active until confirmed.
+    """Create the secret that the person scans; not active until confirmed.
 
-    An earlier, unconfirmed secret is replaced. Refused if the account already has a second
-    factor: it is removed first, which requires re-authentication again.
+    An earlier unconfirmed secret is replaced. Refused if the account already has a second factor
+    (remove it first, which needs re-authentication).
     """
     with transaction.atomic():
         _lock_account(user)
@@ -166,10 +153,7 @@ def start_enrolment(user):
 
 
 def confirm_enrolment(user, device_id, code):
-    """Confirm the secret with a code from the app; return (device, recovery codes) or None.
-
-    The account is notified, without any link.
-    """
+    """Confirm the secret with a code from the app; return (device, recovery codes) or None. The account is notified, without a link."""
     with transaction.atomic():
         _lock_account(user)
         device = unconfirmed_totp_device(user, device_id)
@@ -193,7 +177,7 @@ def _new_recovery_code():
 
 
 def _replace_recovery_codes(user):
-    # The device row stays, so that a session that a recovery code verified stays verified.
+    # The device row stays, so a session that a recovery code verified stays verified.
     device, _created = RecoveryCodeDevice.objects.get_or_create(
         user=user, defaults={"name": RECOVERY_DEVICE_NAME, "confirmed": True}
     )
@@ -220,14 +204,11 @@ def renew_recovery_codes(user):
 
 
 def disable(user, *, via_recovery_code=False):
-    """Remove the second factor of the account; staff users and administrators keep theirs.
+    """Remove the second factor; staff users and administrators keep theirs (resetting another account's is an admin function).
 
-    The reset of the second factor of another account is a function of the system
-    administrators, with its own rules (docs/SECURITY.md, section 3). ``via_recovery_code`` is
-    the "phone lost" way (D-062): it has an event of its own, kept for the long period, because it
-    is the only way in which a person weakens their own second factor without the app; the used
-    recovery code was logged by ``verify_code``. The caller of that way runs the check of the code
-    and this function in one transaction, so that a refusal here gives the code back.
+    ``via_recovery_code`` is the "phone lost" way (D-062): its own long-retention event, as the only
+    way to weaken one's own second factor without the app (``verify_code`` logged the used code). The
+    caller runs the code check and this function in one transaction, so a refusal gives the code back.
     """
     from leg_platform.accounts.second_factor import requires_second_factor
 
@@ -251,17 +232,14 @@ def disable(user, *, via_recovery_code=False):
 def verify_code(user, raw_code, *, app=True, recovery=True):
     """Verify a code of the authenticator app or a recovery code; return the device or None.
 
-    The kind of code follows from its length: six digits for the app, eight characters for a
-    recovery code. ``app`` and ``recovery`` say which kinds this check accepts: the
-    confirmations of the profile accept the app only, the "phone lost" way only a recovery code
-    (D-062); the login accepts both.
+    The kind follows from the length (six digits: app; eight characters: recovery). ``app`` and
+    ``recovery`` say which kinds are accepted: profile confirmations the app only, "phone lost" a
+    recovery code only (D-062), login both.
 
-    Precondition: the caller holds the row lock of the account, as
-    ``second_factor.verify_second_factor()`` does. ``AuthenticatorDevice.verify_token()`` reads
-    ``last_t`` and saves it without a lock of its own, so only the account lock keeps a code of
-    the app from being accepted twice in parallel. A recovery code is single use by one DELETE
-    statement and does not depend on the lock. Repeated failures are limited by the abuse
-    protection of the login (``second_factor.verify_second_factor``), not by the device (D-040).
+    Precondition: the caller holds the account row lock (``second_factor.verify_second_factor``).
+    ``AuthenticatorDevice.verify_token()`` reads and saves ``last_t`` without a lock of its own, so
+    only that lock stops an app code being accepted twice in parallel. A recovery code is single use
+    by one DELETE. Repeated failures are limited by the login abuse protection, not by the device (D-040).
     """
     code = normalize_code(raw_code)
     with transaction.atomic():

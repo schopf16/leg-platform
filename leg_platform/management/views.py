@@ -21,8 +21,7 @@ from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
 
 @dataclass(frozen=True)
 class ProblemList:
-    """A list that can have problems: the key of ``problems.problem_counts``, the URL name and the two texts.
-    The order of ``PROBLEM_LISTS`` is the order of the menu."""
+    """A list that can have problems (key of ``problem_counts``, URL name, texts), in menu order."""
 
     key: str
     url_name: str
@@ -53,9 +52,9 @@ PROBLEM_LISTS = (
 
 
 class OverviewView(ManagementAccessMixin, TemplateView):
-    """The start page of the management area (``uebersicht/UMSETZUNG.md``): a row for each list with a problem,
-    and the button "Filter problems" with the sum of those counts. The button opens the first of the affected
-    lists (in the order of the menu) with the problem filter on; from there each list has its own switch."""
+    """The start page: a row per list with problems and the "Filter problems" button.
+
+    The button opens the first affected list (menu order) with the problem filter on."""
 
     template_name = "management/overview.html"
 
@@ -85,9 +84,7 @@ class OverviewView(ManagementAccessMixin, TemplateView):
 
 
 class SettingsFieldCheckView(ManagementAccessMixin, View):
-    """The check of one field of the settings page on leaving the field (the script
-    ``settings-validate.js`` asks; without a script the server checks everything when saving): the answer is
-    the message of the form itself, so the text is the one of the server (D-084). Nothing is saved."""
+    """Validate one settings field on blur (``settings-validate.js``); returns the form's own message (D-084). Saves nothing."""
 
     http_method_names = ["get"]
 
@@ -103,9 +100,9 @@ class SettingsFieldCheckView(ManagementAccessMixin, View):
 
 
 class SettingsView(ManagementAccessMixin, View):
-    """The settings page (``einstellungen/``): every staff account may show and save it (D-086). One button
-    saves all sections. The directory check of the sender address is made on the server (when the page is
-    shown), not while typing. A read-only line names the grid operator of the instance (D-086)."""
+    """The settings page: every staff account may show and save it; one button saves all sections (D-086).
+
+    The sender address is checked against the directory on the server when the page is shown."""
 
     template_name = "management/settings.html"
     http_method_names = ["get", "head", "options", "post"]
@@ -131,8 +128,7 @@ class SettingsView(ManagementAccessMixin, View):
         return self.decide_suggestion(request, form, action)
 
     def decide_suggestion(self, request, form, action):
-        """"Accept" puts the suggestion into the fields (it is saved only with the button "Save");
-        "Do not accept" remembers the address as it is. Nothing else is saved."""
+        """"Accept" puts the suggestion into the fields (saved only with "Save"); "Do not accept" remembers the address."""
         initial = {name: form.data.get(name, "") for name in form.fields}
         suggestion = None
         if form.sender_fields_are_valid():
@@ -153,8 +149,7 @@ class SettingsView(ManagementAccessMixin, View):
 
     @staticmethod
     def address_check(address, dismissed_for):
-        """The banner or the notice about the sender address: ``{"suggestion": text, "notice": text}``
-        (at most one of them). Nothing for an incomplete address."""
+        """The banner or notice about the sender address: ``{"suggestion": text}`` or ``{"notice": text}``; ``{}`` for an incomplete one."""
         if not all(address):
             return {}
         check = addressing.check_address(*address)
@@ -177,7 +172,6 @@ class SettingsView(ManagementAccessMixin, View):
                 "notice_text": check.get("notice", ""),
                 "operator_name": grid_operator.name(),
                 "operator_url": self.operator_admin_url(request),
-                # The legal minimum is a constant of the law, shown as a fixed note.
                 "quota_hint": _("Applies to all LEGs. The law requires at least %(minimum)d %%.")
                 % {"minimum": LEGAL_MINIMUM_QUOTA_PERCENT},
             },
@@ -185,8 +179,7 @@ class SettingsView(ManagementAccessMixin, View):
 
     @staticmethod
     def operator_admin_url(request):
-        """The address of the form of the grid operator in the Django administration if this account may open
-        it (the administration decides, D-086), else empty: the name is then plain text."""
+        """The admin URL of the grid operator form if the account may open it (D-086), else empty."""
         model_admin = admin.site._registry.get(GridOperator)
         if model_admin is None or not model_admin.has_view_permission(request):
             return ""

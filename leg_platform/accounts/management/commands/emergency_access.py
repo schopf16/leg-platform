@@ -1,17 +1,15 @@
-"""Restore access in an emergency (docs/DECISIONS.md, D-004, D-005, D-041).
+"""Restore access in an emergency (D-004, D-005, D-041).
 
-Run only on the server, in a terminal. Every use is written to the security log (kept for the
-long period). The result line names the account only by its internal number, which the
-administration shows on the change form of an account. The confirmation prompt shows the email
-address and the rights of the account to the operator. Accounts with staff or administrator rights
-must be confirmed by typing their email address and cannot be changed with ``--no-input``.
+Run only on the server, in a terminal; every use is written to the security log (long retention).
+The result line names the account by internal number only; the prompt shows its email address and
+rights. Accounts with staff or administrator rights must be confirmed by typing their email address
+and cannot be changed with ``--no-input``.
 
-* ``reset-second-factor N``: remove the second factor of an account; ends all sessions of the
-  account and notifies its owner by email. The last active system administrator needs the
-  explicit option ``--allow-last-administrator``.
+* ``reset-second-factor N``: remove the second factor, end all sessions, notify the owner. The last
+  active system administrator needs ``--allow-last-administrator``.
 * ``unblock-account N``: set a blocked account active again.
-* ``reencrypt-second-factor-keys``: encrypt the second factor keys again with the current
-  ``SECRET_KEY`` after it was replaced and the old one is listed in ``SECRET_KEY_FALLBACKS``.
+* ``reencrypt-second-factor-keys``: re-encrypt the second factor keys with the current ``SECRET_KEY``
+  after it was replaced and the old one is in ``SECRET_KEY_FALLBACKS``.
 """
 
 from django.core.management.base import BaseCommand, CommandError

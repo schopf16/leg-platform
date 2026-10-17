@@ -1,14 +1,7 @@
-"""The status of a metering point, derived from its dates (D-077; ``standorte/VORGABEN.md`` section 8,
-``messpunkte/detail/VORGABEN.md``).
+"""Metering point status, derived from four dates and the day (D-077, D-086); nothing is set by hand.
 
-Nothing is set by hand and no scheduler runs: the status follows from four dates and the day.
-
-* registered: created, not yet announced to the grid operator (no date of announcement).
-* notified ("angemeldet"): announced to the grid operator; the person has to confirm.
-* confirmed: the grid operator confirmed; there is no start date yet or it is not reached.
-* active: confirmed and the start date is reached (automatic).
-* terminated: the date of the termination is reached. A termination that is recorded but lies in the future
-  does not change the status until that day (D-086: the page says "Kündigung zum DD.MM.YYYY" meanwhile).
+registered (no announcement date) -> notified -> confirmed (no start date yet) -> active (start date
+reached); terminated once the termination date is reached (a future one changes nothing yet).
 """
 
 from django.db import models
@@ -17,8 +10,7 @@ from django.utils.translation import pgettext_lazy
 
 
 class MeteringPointStatus(models.TextChoices):
-    # With a context: the words are written in lower case in the status lists of the pages
-    # ("aktiv"), unlike other texts with the same English source.
+    # Context: lower case in the status lists, unlike other texts with the same English source.
     REGISTERED = "registered", pgettext_lazy("metering point status", "registered")
     NOTIFIED = "notified", pgettext_lazy("metering point status", "notified")
     CONFIRMED = "confirmed", pgettext_lazy("metering point status", "confirmed")
@@ -40,8 +32,7 @@ def derive_status(*, registered_with_operator_on, confirmed_on, start_date, term
 
 
 def status_filter(status, today):
-    """The database condition for a status on ``today``: the same rules as ``derive_status``, so
-    that a list can filter by status in the database. The statuses exclude each other."""
+    """The database condition for a status on ``today``: same rules as ``derive_status``; the statuses exclude each other."""
     terminated = Q(terminated_on__isnull=False, terminated_on__lte=today)
     if status == MeteringPointStatus.TERMINATED:
         return terminated

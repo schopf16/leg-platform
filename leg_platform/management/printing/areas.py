@@ -1,14 +1,7 @@
-"""What each list prints (D-082): the table like the list and the detail pages of its entries.
+"""What each list prints (D-082): the table and the detail pages of its entries.
 
-Every area takes the address of the list (``request.GET``). The list is parsed again on the
-server with the list framework (``lists.parse``) and queried with the same function as the page
-(``build_list`` of the views), so the search, the filters and the sorting are the ones of the page, whatever a
-browser renders. The entries come from that queryset only: the posted ids of a selection are matched against
-it and anything else is ignored.
-
-Every staff account may print every list (D-086), and a detail page prints what the page shows. Remarks and
-notes are printed where the page shows them, nowhere else. The change history ("Verlauf") of the pages is not
-printed.
+The list is re-parsed on the server from ``request.GET`` and queried with the page's ``build_list``;
+posted ids are matched against that queryset only. A detail page prints what the page shows (no history).
 """
 
 from dataclasses import dataclass
@@ -39,12 +32,10 @@ from leg_platform.management.printing.document import Column, DetailPage, PrintD
 
 DASH = "–"
 
-# The bounds of a printout (D-082): a print builds the whole document in memory.
+# Bounds of a printout (D-082): the document is built in memory.
 MAX_LIST_ENTRIES = 1000
 MAX_DETAIL_PAGES = 100
-# The entries that the dialog offers as checkboxes: a form with a thousand boxes would end at Django's limit of
-# 1000 form fields (``DATA_UPLOAD_MAX_NUMBER_FIELDS``, which is no per-view setting) with a bare 400; a list with
-# more entries cannot be selected from, it is narrowed first (D-084, L-8).
+# Checkboxes offered by the dialog; must stay far below ``DATA_UPLOAD_MAX_NUMBER_FIELDS`` (D-084).
 MAX_SELECTABLE = 300
 MAX_ROWS = 20000
 
@@ -65,7 +56,7 @@ def with_problem(text, problem):
 
 @dataclass
 class Item:
-    """An entry of the list: the id, the name that the dialog shows, the cells of the table and the object."""
+    """A list entry: id, dialog label, table cells and the source object."""
 
     pk: int
     label: str
@@ -75,15 +66,14 @@ class Item:
 
 @dataclass
 class Prepared:
-    """A list that is ready to print: the state, the number of entries (the entries are loaded only when the
-    number is within the bound), the table columns and the lines above the list."""
+    """A list ready to print; ``load()`` (no arguments) returns the Items, called only within the bound."""
 
     area: object
     state: object
     total: int
     columns: list
     info: list
-    load: object  # a function without arguments: the list of Item
+    load: object
 
     @property
     def back_url(self):
@@ -105,7 +95,7 @@ class Area:
         return Column(str(column.label), self.widths.get(column.key, 1))
 
     def info(self, state, columns, filters, today):
-        """The lines above the list: the date, the search, the filters that are set and the sorting."""
+        """The lines above the list: date, search, set filters, sorting."""
         lines = [(_("Date"), format_date(today))]
         if state.query:
             lines.append((_("Search"), state.query))
@@ -119,7 +109,7 @@ class Area:
 
     @staticmethod
     def option_line(label, state, name, options):
-        """``[(label, text)]`` when the filter is set to something else than its default, else ``[]``."""
+        """``[(label, text)]`` if the filter differs from its default, else ``[]``."""
         value = state.values[name]
         if value == state.defaults.get(name, ""):
             return []
@@ -133,13 +123,10 @@ class Area:
         raise NotImplementedError
 
     def document(self, prepared, items, chosen, today):
-        """The document: the list with all ``items`` and the detail pages of the ``chosen`` ones."""
+        """The list of all ``items`` plus detail pages of the ``chosen`` ones."""
         table = Table(prepared.columns, [item.cells for item in items])
         pages = self.details(chosen, today) if chosen else []
         return PrintDocument(self.title(), prepared.info, table, pages)
-
-
-# The LEGs ------------------------------------------------------------------------------------------------
 
 
 class LegArea(Area):
@@ -241,9 +228,6 @@ class LegArea(Area):
         return Section(
             _("Metering points of this LEG"), table=Table(columns, rows, _("No metering points belong to this LEG yet."))
         )
-
-
-# The persons -----------------------------------------------------------------------------------------------
 
 
 class PersonArea(Area):
@@ -371,9 +355,6 @@ class PersonArea(Area):
         )
 
 
-# The locations -------------------------------------------------------------------------------------------
-
-
 class LocationArea(Area):
     key = "locations"
     filename = "locations.pdf"
@@ -431,18 +412,18 @@ class LocationArea(Area):
                     (_("Address addition"), or_dash(location.address_addition)),
                 ],
             )
-            grid_facts = [(_("Transformer circuit"), or_dash(transformer_circuits.label(circuit)))]
-            grid_facts.append(
-                (_("Locations in the transformer circuit"), str(stats["locations"]) if stats else DASH)
+            grid = Section(
+                _("Grid"),
+                [
+                    (_("Transformer circuit"), or_dash(transformer_circuits.label(circuit))),
+                    (_("Locations in the transformer circuit"), str(stats["locations"]) if stats else DASH),
+                    (
+                        _("Metering points in the transformer circuit"),
+                        f"{stats['consumption']} {Direction.CONSUMPTION.label} · {stats['feed_in']} {Direction.FEED_IN.label}"
+                        if stats else DASH,
+                    ),
+                ],
             )
-            grid_facts.append(
-                (
-                    _("Metering points in the transformer circuit"),
-                    f"{stats['consumption']} {Direction.CONSUMPTION.label} · {stats['feed_in']} {Direction.FEED_IN.label}"
-                    if stats else DASH,
-                )
-            )
-            grid = Section(_("Grid"), grid_facts)
             remark = Section(_("Remark"), [(_("Remark"), or_dash(location.remark))])
             point_rows = []
             for row in points:
@@ -504,9 +485,6 @@ class LocationArea(Area):
         ]
         columns = [Column(_("Metering point"), 3.4), Column(_("Person"), 2.6), Column(_("From"), 1.2), Column(_("To"), 1.2)]
         return Section(_("History of the assignments"), table=Table(columns, rows, _("No assignments yet.")))
-
-
-# The metering points -------------------------------------------------------------------------------------
 
 
 def step_options():

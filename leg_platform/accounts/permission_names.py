@@ -1,9 +1,8 @@
-"""Readable names of the rights in the administration (design package, acceptance, P1-3).
+"""Readable names of the rights in the administration.
 
-Django stores the name of a right in English ("Can change email text"). The lists of the
-administration show "Mailtext: ändern" instead, built from the name of the model (translated) and
-the kind of right. The portal has no predefined groups or roles (D-012): this module only names
-the rights and explains which one is needed for what.
+Django stores "Can change email text"; the lists show "Mailtext: ändern", built from the translated
+model name and the kind of right. There are no predefined groups or roles (D-012): this module only
+names the rights and explains which one is needed for what.
 """
 
 from django.contrib.auth.models import Permission
@@ -20,11 +19,7 @@ ACTIONS = {
 
 
 def permission_label(permission):
-    """The label of a right for a list: the model and the kind of right, e.g. "Konto: ansehen".
-
-    A right that does not follow the pattern of Django (view, add, change, delete of a model) keeps
-    its stored name.
-    """
+    """The label of a right for a list: model and kind, e.g. "Konto: ansehen"; a right that does not follow Django's pattern keeps its stored name."""
     action, _separator, _model = permission.codename.partition("_")
     model = permission.content_type.model_class()
     if action in ACTIONS and model is not None and permission.codename == f"{action}_{model._meta.model_name}":
@@ -33,16 +28,16 @@ def permission_label(permission):
 
 
 def assignable_permissions_filter():
-    """The rights that a group may hold (design package, final spot check, 1): exactly the ones that
-    the help names. Microsoft Graph, the security log and the other pages of the system stay with
-    the system administrators; no right is offered for them. The portal settings are offered since
-    D-073 (view and change, assigned at runtime like every right). The management area has no rights to
-    assign: every staff account may use it (D-086)."""
+    """The rights a group may hold: exactly the ones the help names (accounts, email texts, portal settings: view and change).
+
+    Graph, the security log and the other system pages stay with the system administrators; the
+    management area has no rights to assign (D-086).
+    """
     from django.db.models import Q
 
     from leg_platform.accounts.models import EmailText, PortalSettings, User
 
-    # Joined by the names of the model, not looked up: the form is built without a query.
+    # Joined by model names, not looked up: the form is built without a query.
     condition = Q(pk__in=[])
     for model in (User, EmailText, PortalSettings):
         codenames = [f"{action}_{model._meta.model_name}" for action in ("view", "change")]
@@ -66,8 +61,7 @@ class PermissionLabelsMixin:
 
 
 def rights_help():
-    """The rows of the help "Which rights do I need for what?": what a person wants to do, and
-    the rights to give for it. Only text; nothing is created or assigned."""
+    """The rows of "Which rights do I need for what?": what a person wants to do and the rights for it. Text only."""
     from leg_platform.accounts.models import EmailText, PortalSettings, User
 
     def right(model, action):

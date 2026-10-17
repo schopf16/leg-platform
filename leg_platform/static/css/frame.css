@@ -1,8 +1,5 @@
-/* The frame of the pages after the login (D-057; LEG-Design-Vorgaben/navigation/VORGABEN.md).
-   A fixed header of 64 px; on a desktop (above 760 px) a fixed left menu of 232 px; on a phone
-   (760 px and below) a fixed bottom bar of 72 px and a menu that opens from the left (290 px).
-   Spacing only from 4, 8, 12, 16, 24, 32 and 48 px (K6 sizes), no shadows, no gradients. The
-   tokens come from portal.css. */
+/* Frame of the pages after the login (D-057): header 64 px; desktop (above 760 px) left menu
+   232 px; phone (760 px and below) bottom bar 72 px and a menu from the left. Tokens: portal.css. */
 
 .frame-sprite {
   position: absolute;
@@ -22,7 +19,7 @@
   stroke-linejoin: round;
 }
 
-/* The link "Skip to content": the first element after the login; visible only while it has the focus (WCAG 2.4.1). */
+/* Skip link: visible only while focused (WCAG 2.4.1). */
 .skip-link {
   position: fixed;
   top: 8px;
@@ -59,8 +56,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Room on the right for the corner buttons: 24 px from the edge, two buttons of 40 px with a
-     gap of 12 px, and 20 px between the name and the first button (the images of the owner). */
+  /* Room on the right for the corner buttons (24 + 40 + 12 + 40 + 20 px). */
   padding: 0 136px 0 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -84,7 +80,6 @@
   height: 32px;
 }
 
-/* Only the logo of the colour mode is shown (the plate is the dark-mode background). */
 .frame-header .portal-logo-light,
 .frame-drawer-logo .portal-logo-light {
   display: block;
@@ -125,7 +120,6 @@
   min-height: 44px;
 }
 
-/* A round 40 px button of the header and of the phone menu, like the corner buttons. */
 .frame-round {
   width: 40px;
   height: 40px;
@@ -145,8 +139,6 @@
   border-color: var(--muted);
 }
 
-/* On a desktop the corner buttons of a page with the frame sit 24 px from the right edge with a gap
-   of 12 px (navigation/bilder). The entry pages and the phone keep the values of portal.css. */
 @media (min-width: 761px) {
   body:has(.frame) .corner {
     right: 24px;
@@ -154,7 +146,7 @@
   }
 }
 
-/* ---- Menu: the entries of the desktop menu and of the phone menu ---- */
+/* ---- Menu (desktop and phone) ---- */
 .frame-menu {
   position: fixed;
   top: 64px;
@@ -170,12 +162,10 @@
   border-right: 1px solid var(--line);
 }
 
-.frame-menu > .frame-group:first-child,
-.frame-drawer-nav > .frame-group:first-child {
+.frame-menu > .frame-group:first-child {
   margin-top: 0;
 }
 
-/* The phone menu starts a little lower than the first label of the desktop menu. */
 .frame-drawer-nav > .frame-group:first-child {
   margin-top: 12px;
 }
@@ -191,9 +181,7 @@
   color: var(--muted);
 }
 
-/* The rhythm of the entries: 44 px high (48 px on the phone) and 4 px between them. The 3 px bar of
-   the current page is the left border; the icon starts 24 px from the edge of the menu and the text
-   56 px (12 + 3 + 9 px of padding). */
+/* Entries 44 px high (48 px on the phone); the 3 px bar of the current page is the left border. */
 .frame-item {
   position: relative;
   display: flex;
@@ -219,7 +207,6 @@
   color: var(--fg);
 }
 
-/* The current page: bold, in the accent, with a 3 px accent bar on the left edge. */
 .frame-item.is-active {
   border-left-color: var(--accent);
   background: var(--warm);
@@ -227,7 +214,6 @@
   font-weight: 700;
 }
 
-/* Not available yet: muted, no link, no hover. */
 .frame-item.is-later {
   color: var(--muted);
   cursor: default;
@@ -301,12 +287,10 @@
   padding: 16px 24px 32px;
 }
 
-/* A page without the menu (a person without a login, an account that must change the password). */
 .frame-bare .frame-main {
   padding-left: 0;
 }
 
-/* The phone menu and the bottom bar do not exist on a desktop. */
 .frame-drawer,
 .frame-bottombar {
   display: none;
@@ -354,7 +338,6 @@
     min-height: 48px;
   }
 
-  /* Bottom bar: four equal columns of at least 56 px. */
   .frame-bottombar {
     position: fixed;
     left: 0;
@@ -404,8 +387,7 @@
     color: var(--muted);
   }
 
-  /* The menu opens from the left; it is hidden until the menu button, or the address with the
-     anchor of the menu when no script runs, opens it. */
+  /* Hidden until opened by the button or, without a script, by :target. */
   .frame-drawer {
     display: block;
     position: fixed;
@@ -429,7 +411,6 @@
     cursor: default;
   }
 
-  /* The link over the overlay (closes the menu without a script) adds no second shade. */
   a.frame-overlay {
     background: transparent;
   }
@@ -454,12 +435,10 @@
     align-items: center;
     justify-content: space-between;
     min-height: 56px;
-    /* The logo plate and the close button are 16 px from the edges of the menu (panel 12 + 4). */
     padding: 0 4px;
     margin-bottom: 8px;
   }
 
-  /* The legal row of the phone menu is indented further and spread (handy-menue-*.png). */
   .frame-drawer-nav .frame-legal {
     gap: 4px 36px;
     padding: 0 24px;
@@ -471,7 +450,6 @@
     flex-direction: column;
   }
 
-  /* The page behind the open menu does not scroll. */
   html.menu-open {
     overflow: hidden;
   }
@@ -486,9 +464,6 @@
   text-wrap: balance;
 }
 
-/* Start page: title, then the customer number and address (4 px lower than before), then the tiles
-   or the empty state at y = 231 px in the image: 16 px more than the 48 px of the scale (the image
-   wins over the spacing scale, D-057). */
 .start-sub {
   margin: 8px 0 0;
   font-size: 16px;
@@ -502,7 +477,7 @@
   margin-top: 64px;
 }
 
-/* Two tiles side by side, never narrower than 280 px; a third one goes to the next row. */
+/* Two tiles side by side from 761 px */
 @media (min-width: 761px) {
   .task-grid {
     grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -533,7 +508,6 @@
   line-height: 1.3;
 }
 
-/* The status is a dot plus a word, never colour alone. */
 .task-status {
   display: inline-flex;
   align-items: center;
@@ -570,7 +544,6 @@
   min-height: 44px;
 }
 
-/* "Hide": a link-like button at the bottom right of the tile. */
 .task-hide {
   min-height: 44px;
   padding: 0 4px;
@@ -586,8 +559,6 @@
   color: var(--fg);
 }
 
-/* The empty state: a panel as wide as the content (1 px line, 12 px radius, no shadow), the icon
-   and the texts centred in it (app/bilder/kacheln-alles-erledigt-*.png: about 912 x 359 px). */
 .empty-state {
   margin-top: 64px;
   min-height: 360px;
@@ -677,7 +648,7 @@
   }
 }
 
-/* ---- Profile (D-059): cards that change in place ---- */
+/* ---- Profile (D-059) ---- */
 .page-label {
   margin: 0 0 2px;
   font-size: 12px;
@@ -720,13 +691,10 @@
   gap: 16px;
 }
 
-/* The buttons of a card are at least 44 px high on a desktop (K5; the images show 40 px, K5 wins,
-   D-059) and 48 px on a phone (see the phone rules below). */
 .profile-card .btn {
   min-height: 44px;
 }
 
-/* Rows of label and value, separated by lines; the value column starts at 216 px. */
 .profile-rows {
   margin: 0;
   display: grid;
@@ -777,12 +745,10 @@
   color: var(--fg);
 }
 
-/* In the head of a card the status sits at the right end, also when the row wraps (a phone). */
 .profile-card-head .profile-status {
   margin-left: auto;
 }
 
-/* The message of an action, inside the card under its title (D4). */
 .profile-message {
   margin: 0;
 }
@@ -793,7 +759,6 @@
   outline-offset: 2px;
 }
 
-/* "Fertig" and its box: no extra container (the images). */
 .profile-done-form {
   display: grid;
   gap: 16px;
@@ -831,7 +796,6 @@
   margin: 0;
 }
 
-/* A form inside a card: the fields in a box of the page colour (the images of the owner). */
 .profile-form {
   display: grid;
   gap: 16px;
@@ -952,7 +916,6 @@
     flex-wrap: wrap;
   }
 
-  /* On a phone the button of a card is below its rows, as wide as the card (the images). */
   .profile-card-head.has-action {
     display: contents;
   }
@@ -999,7 +962,6 @@
     padding: 16px;
   }
 
-  /* One field per row, at least 48 px high (the images). The registration keeps its pairs. */
   .profile-form .field-pair,
   .profile-form .field-pair-street,
   .profile-form .field-pair-locality {

@@ -1,14 +1,7 @@
-"""The dialog "Print list" and the PDF (D-082; ``LISTEN-STANDARD.md``, section 10).
+"""The "Print list" dialog (GET) and the PDF (POST) per list (D-082).
 
-One view per list, all the same: GET shows the dialog (a normal page that works without JavaScript; "Cancel" is a
-link back to the list), POST answers with the PDF. The address of the dialog carries the state of the list
-(``q``, the filters, ``sort``, ``dir``, ``problems``); it is parsed again here with the list framework and
-queried with the same function as the page, so the printout is what the page shows, never what a browser says
-it shows. Every staff account may print every list (``management.access``, D-086), the same as for the page.
-
-The bounds (``areas.MAX_*``) keep a printout from using up the server: a list with more entries than the bound is
-refused with a message, so are more detail pages than the bound and a printout with too many rows. The PDF is made
-in memory, sent with ``Cache-Control: no-store`` and a fixed file name, and nothing of it is logged.
+The list state is re-parsed from the dialog address and queried with the page's ``build_list``. The bounds
+(``areas.MAX_*``) refuse oversized printouts. The PDF is made in memory, sent ``no-store``; nothing of it is logged.
 """
 
 import logging
@@ -20,7 +13,6 @@ from django.utils import timezone
 from django.utils.cache import patch_cache_control
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
-
 from django.views import View
 
 from leg_platform.accounts import security_log
@@ -67,7 +59,7 @@ class PrintView(ManagementAccessMixin, View):
         elif scope == SCOPE_ALL:
             chosen = items
         else:
-            # The ids are matched against the entries of this list; an id of another entry is ignored.
+            # Ids are matched against this list's entries; foreign ids are ignored.
             chosen = [item for item in items if str(item.pk) in selected_ids]
             if not chosen:
                 return self.show(request, prepared, selected_ids, scope, _("Select at least one entry."))
@@ -79,12 +71,11 @@ class PrintView(ManagementAccessMixin, View):
         try:
             data = pdf.render(document)
         except pdf.PdfError as error:
-            # Only the kind of the error: never a text of the document.
+            # Only the kind of the error, never document text.
             logger.error("The PDF of a list could not be created (%s).", error)
             return self.show(request, prepared, selected_ids, scope, _("The PDF could not be created."))
         response = HttpResponse(data, content_type="application/pdf")
-        # The security log (M-2 of the review of D-082): who printed which list; no content.
-        # The details of a person hold the IBAN (review L-9): the log line says so, still no content.
+        # Security log: who printed which list; no content. Person details hold the IBAN, so say so.
         with_iban = ", with IBAN" if self.area.key == "persons" and chosen else ""
         security_log.record(
             security_log.Event.LIST_PRINTED, actor=request.user,

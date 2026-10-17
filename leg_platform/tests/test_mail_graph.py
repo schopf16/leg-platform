@@ -119,7 +119,7 @@ class GraphConfigurationTests(TestCase):
 
     def test_unsupported_key_algorithm_is_refused_with_the_generic_message(self):
         with mock.patch(
-            "leg_platform.accounts.models.serialization.load_pem_private_key",
+            "leg_platform.accounts.models.mail.serialization.load_pem_private_key",
             side_effect=UnsupportedAlgorithm("test"),
         ):
             with self.assertRaisesMessage(
@@ -536,7 +536,7 @@ class GraphAdminTests(TestCase):
         client = VerifiedClient()
         client.force_login(self.superuser)
 
-        with mock.patch("leg_platform.accounts.admin.GraphEmailBackend") as backend:
+        with mock.patch("leg_platform.accounts.admin.graph.GraphEmailBackend") as backend:
             response = client.post(reverse("admin:accounts_graphconfiguration_send_test"))
 
         self.assertRedirects(

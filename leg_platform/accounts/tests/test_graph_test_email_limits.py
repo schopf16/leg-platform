@@ -45,7 +45,7 @@ class GraphTestEmailLimitTests(TestCase):
     @override_settings(EMAIL_MODE=EMAIL_MODE_GRAPH, EMAIL_ALLOWED_RECIPIENTS=[])
     def test_the_shared_address_budget_allows_exactly_twelve_test_emails(self):
         with patch(
-            "leg_platform.accounts.admin.GraphEmailBackend.send_messages", return_value=1
+            "leg_platform.accounts.admin.graph.GraphEmailBackend.send_messages", return_value=1
         ) as send:
             for _attempt in range(MAIL_ADDRESS_LIMITS[0][0]):
                 response = self.client.post(self.send_url)
@@ -73,7 +73,7 @@ class GraphTestEmailLimitTests(TestCase):
     @override_settings(EMAIL_MODE=EMAIL_MODE_CONSOLE, EMAIL_ALLOWED_RECIPIENTS=[])
     def test_console_mode_refuses_without_calling_graph_or_claiming_success(self):
         with patch(
-            "leg_platform.accounts.admin.GraphEmailBackend.send_messages"
+            "leg_platform.accounts.admin.graph.GraphEmailBackend.send_messages"
         ) as send:
             response = self.client.post(self.send_url)
 

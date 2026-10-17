@@ -1,4 +1,4 @@
-"""Forms of the LEG pages (D-080): "LEG anlegen", "Produktionsquote bearbeiten", "Stammdaten bearbeiten"."""
+"""Forms of the LEG pages (D-080): create, edit quota, edit master data."""
 
 from decimal import Decimal
 
@@ -14,8 +14,7 @@ CONTROL = {"class": "form-control", "autocomplete": "off"}
 
 
 class PercentField(forms.DecimalField):
-    """A percentage with at most two decimals; a decimal comma is accepted as a point (typed in the
-    Swiss way or the English way). The template draws the sign after the field (``unit``)."""
+    """A percentage with at most two decimals; a decimal comma is accepted. The template draws ``unit`` after the field."""
 
     unit = "%"
 
@@ -26,12 +25,8 @@ class PercentField(forms.DecimalField):
 
 
 class QuotaFields(forms.Form):
-    """The quota and its date, which are saved together (``legs/VORGABEN.md``, "Geprüft am"):
-
-    * a quota needs the date; without a quota the date stays empty (it is dropped);
-    * the date is today's date as soon as the quota changes (the script of the page does that; the
-      server only requires it), and it may be changed, for example when the value was read on another day;
-    * the day of the reading cannot be in the future."""
+    """The quota and its date, saved together: a quota needs a date, no quota drops the date, the date is not
+    in the future (the page script defaults it to today; the server only requires it)."""
 
     quota = PercentField(
         label=_("Production quota"), required=False, max_digits=5, decimal_places=2,
@@ -76,7 +71,7 @@ def _remark_field():
 
 
 class NameMixin:
-    """The name is unique: the message stands under the field and saving is not possible."""
+    """Rejects a name that is already in use."""
 
     def __init__(self, *args, leg=None, **kwargs):
         super().__init__(*args, **kwargs)

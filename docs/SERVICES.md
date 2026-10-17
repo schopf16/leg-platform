@@ -1,6 +1,6 @@
 # Service Register – LEG-Platform
 
-Status: 2026-10-14. Created by the developer as required by `LEG-Design-Vorgaben/legal/VORGABEN.md`, section 5a (D-056). The privacy notice of the owner is built from this register. The register is in English; the privacy notice and the imprint are written and maintained by the operator elsewhere and only linked from the portal (D-074).
+The register is in English (the privacy notice and the imprint are written and maintained by the operator elsewhere and only linked from the portal, D-074); the owner's privacy notice is built from it (`LEG-Design-Vorgaben/legal/VORGABEN.md`, section 5a, D-056).
 
 **Rule.** Whenever the software uses a service that receives or stores personal data, it is recorded here **before** the feature goes live: a backup service, an email or SMS provider, an API that receives user data (address check, payment, bot check), an error tracker, log service or analytics tool, and a font, script or CDN host that a page loads from another server. Each entry gives: service, provider, purpose, data categories, country or region, encryption and key holder, contract basis. The developer adds the entry, the security review checks that it is there, and the owner confirms the entry before the page is published. Every new entry is also named in the change description.
 

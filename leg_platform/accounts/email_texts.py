@@ -1,19 +1,9 @@
-"""Editable texts of the emails (docs/SECURITY.md, section 3; D-039).
+"""Editable texts of the emails (D-039): a default plus an optional administrator text (``EmailText``).
 
-Every email has a default text (the Django template and the subject in the application) and
-may have a text that the administrator wrote in the administration (``EmailText``). The written
-text is plain text with ``{placeholder}`` markers. It is never run through the template engine:
-the markers are replaced in one pass by a fixed list of values, so a text cannot read anything
-else, and every marker is checked when the text is saved.
-
-Rules that protect the person who receives the email:
-
-* only the placeholders of this email are allowed;
-* the personal links of the email are required, otherwise the function would not work;
-* no web or email address can be typed, so that a text cannot lead to another site than the
-  links that the application puts in (the instance's own addresses are available as
-  placeholders). The check is a deny-list of the usual forms and cannot be complete; the
-  permission to edit the texts is the protection against a person who wants to bypass it.
+The written text is plain text with ``{placeholder}`` markers, never run through the template
+engine: markers are replaced in one pass from a fixed list and checked when the text is saved.
+Rules: only this email's placeholders; the personal links are required; no typed web or email
+address (a deny-list, which cannot be complete; the edit permission is the protection).
 """
 
 import logging
@@ -70,8 +60,7 @@ LIFETIME_DAYS = Placeholder(
 STOP_URL = Placeholder(
     "stop_url", _("Personal link that stops the requested change of an email address.")
 )
-# Offered only in the notifications to the addresses of an account (``MailJob.NOTIFICATION_KINDS``,
-# D-068), never in an email to an unverified or foreign address.
+# Only in notifications to an account's addresses (``MailJob.NOTIFICATION_KINDS``, D-068).
 GREETING = Placeholder(
     "greeting",
     _(
@@ -79,7 +68,7 @@ GREETING = Placeholder(
         "no suitable name is known. Best written on a line of its own at the start."
     ),
 )
-# The notice about a deleted account never uses a name: the person asked for the erasure.
+# The notice about a deleted account never uses a name.
 GREETING_NEUTRAL = Placeholder(
     "greeting",
     _(
@@ -237,9 +226,8 @@ _SCHEMES = (
     "http", "https", "ftp", "ftps", "sftp", "ssh", "file", "mailto", "tel", "sms",
     "javascript", "data", "vbscript", "ws", "wss", "ldap", "smb",
 )
-# Anything that looks like a web or email address that was typed instead of a placeholder: a
-# scheme, "//", a backslash, "@", or a word with a dot and at least two letters after it
-# ("www.example.org", "bit.ly/x"). Dots of other scripts are mapped to "." before the check.
+# A typed web or email address: a scheme, "//", a backslash, "@", or a word with a dot and two
+# letters after it ("www.example.org"). Dots of other scripts are mapped to "." before the check.
 _ADDRESS = re.compile(
     r"(?i)(?:\b(?:" + "|".join(_SCHEMES) + r"):|[a-z][a-z0-9+.\-]*://|//|\\|@|[\w\-]\.[^\W\d_]{2,})"
 )
@@ -249,8 +237,7 @@ _DOTS = str.maketrans({"\u3002": ".", "\uff61": ".", "\uff0e": "."})
 
 def looks_like_an_address(text):
     """Return whether the text looks like a web or email address (also used for names, D-068)."""
-    # NFKC maps full-width and look-alike forms to plain ones; format characters (zero-width
-    # characters, bidi controls) are removed so that they cannot split a scheme.
+    # NFKC maps look-alike forms to plain ones; format characters (zero-width, bidi) are removed so they cannot split a scheme.
     text = unicodedata.normalize("NFKC", text).translate(_DOTS)
     text = "".join(char for char in text if unicodedata.category(char) != "Cf")
     return bool(_ADDRESS.search(text))
@@ -274,10 +261,7 @@ def required_placeholders(key):
 
 
 def default_texts(key):
-    """Return the default subject and body with the placeholders as markers (stripped).
-
-    Written in the default language of the instance, like the emails themselves.
-    """
+    """Return the default subject and body with the placeholders as markers (stripped), in the instance's default language."""
     definition = DEFINITIONS[key]
     with translation.override(settings.LANGUAGE_CODE):
         values = {p.name: "{%s}" % p.name for p in placeholders_of(key)}
@@ -393,8 +377,7 @@ def _usable(key, field, text, validate):
 def compose(key, subject, body, values):
     """Return the subject and body for the given texts; an empty text is the default.
 
-    The texts must have passed the validation. Must run with the default language of the
-    instance active.
+    The texts must have passed validation; the instance's default language must be active.
     """
     definition = DEFINITIONS[key]
     if subject:

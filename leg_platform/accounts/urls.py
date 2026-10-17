@@ -80,8 +80,7 @@ urlpatterns = [
         views.EmailChangeVerifyView.as_view(),
         name="email_change_verify",
     ),
-    # The fixed pages "Link no longer valid" (D-067). Their paths must not match a token route:
-    # "email-change/expired/" and "email-change/stop-expired/" have no "verify/" or "stop/" prefix.
+    # "Link no longer valid" pages (D-067): their paths must not match a token route (no "verify/" or "stop/" prefix).
     path(
         "email-change/expired/",
         views.LinkNoLongerValidView.as_view(template_name="accounts/email_change_invalid.html"),

@@ -1,16 +1,10 @@
-"""Request limits for the functions that send email (docs/SECURITY.md, section 3; D-037).
+"""Request limits for the functions that send email (D-037).
 
-Registration, password reset and, later, email change share one budget per normalised address,
-so that the total number of emails that one address can receive is bounded; a second budget
-limits the requests of one client IP address. Counters are rows in the database, serialised by a
-row lock per key like the login IP counter (D-017), so that parallel requests cannot exceed a
-limit. Keys are keyed digests (D-023); neither addresses nor IP addresses are stored here.
-
-The values follow common practice for this kind of application; OWASP names the controls (a
-limit per account, no lockout of the account) but no numbers (Forgot Password Cheat Sheet).
-A person at the device may need several attempts (mail not received, link expired, typing
-errors), so the hourly per-address budget is generous and the daily one twice as large. Offices
-behind one address share the IP budget, so it is larger than a single person needs.
+Registration, password reset and email change share one budget per normalised address (bounding the
+emails one address can receive); a second budget limits one client IP address. Counters are database
+rows serialised by a row lock per key (like the login IP counter, D-017), so parallel requests cannot
+exceed a limit. Keys are keyed digests (D-023); no addresses or IPs are stored. The numbers are
+practice, not OWASP: a person may need several attempts, and offices share one IP budget.
 """
 
 from datetime import timedelta
@@ -25,31 +19,24 @@ from leg_platform.accounts.models import RateLimitBucket
 RATE_LIMIT_PURPOSE = b"LEG-Platform rate limit v1"
 
 # (number of requests, window): a request is allowed only if every window has room. The short
-# window (D-058, security review of phase 3) stops a burst to one address that the hourly budget
-# alone would allow; a person at the device needs at most a few tries in ten minutes (the page
-# offers "send again" only after a pause of 60 seconds).
+# window (D-058) stops a burst that the hourly budget alone would allow ("send again" waits 60 seconds).
 MAIL_ADDRESS_LIMITS = ((12, timedelta(hours=1)), (24, timedelta(hours=24)), (3, timedelta(minutes=10)))
 MAIL_IP_LIMITS = ((20, timedelta(hours=1)),)
-# An instance-wide cap on requests that send email, so that many distinct victims cannot be
-# mail-bombed from many client addresses and the sender's reputation is protected. Generous for
-# one municipality; reaching it is logged (D-037).
+# Instance-wide cap on requests that send email (anti mail-bombing, sender reputation); reaching it is logged (D-037).
 MAIL_GLOBAL_LIMITS = ((300, timedelta(hours=1)),)
-# The information email to the owner of an existing address is static, so repeating it within a
-# day adds nothing; it is checked in the background job, invisible to the requester.
+# The info email to the owner of an existing address is static, so repeating it within a day adds
+# nothing; checked in the background job, invisible to the requester.
 EXISTING_ACCOUNT_NOTICE_LIMITS = ((1, timedelta(hours=24)),)
-# Requests that store nothing (a hit of the bot check, a repeat within the pause) still write the
-# session of the client; they are counted per client address so that they cannot create sessions
-# without a limit (security review of phase 4, M4). Generous for a person, who needs one or two.
+# Requests that store nothing (bot check hit, repeat within the pause) still write the session; counted
+# per client address so they cannot create sessions without limit.
 MAIL_SILENT_LIMITS = ((30, timedelta(hours=1)),)
 SCOPE_MAIL_SILENT = "mail-silent"
 SCOPE_MAIL_ADDRESS = "mail-address"
 SCOPE_MAIL_IP = "mail-ip"
 SCOPE_MAIL_GLOBAL = "mail-global"
 SCOPE_EXISTING_ACCOUNT_NOTICE = "existing-account-notice"
-# Invitations that staff send (D-087): no limit of the client IP address (an office behind one address
-# creates many persons in a day; the staff account is known), but one per staff account, and a pause per
-# invited account so that a double click sends one email. The limits of the address and of the instance
-# apply as for every email.
+# Staff invitations (D-087): no client-IP limit (an office shares one address), but one per staff
+# account and a pause per invited account (a double click sends one email); address and instance limits apply.
 SCOPE_INVITATION_ACTOR = "invitation-actor"
 SCOPE_INVITATION_ACCOUNT = "invitation-account"
 INVITATION_ACTOR_LIMITS = ((60, timedelta(hours=1)),)
@@ -62,10 +49,8 @@ LONGEST_WINDOW = timedelta(hours=24)
 def ip_key(address):
     """Return the key under which a client IP address is counted.
 
-    An IPv6 address is counted by its /64 prefix: a normal end-site assignment is a /64 or
-    larger (RFC 6177), so a client controls 2**64 addresses and a limit per full address would
-    never apply. An IPv4 address is counted as it is. Without an address, requests share one
-    bucket (fail closed).
+    IPv6 is counted by its /64 prefix (an end site has 2**64 addresses, RFC 6177); IPv4 as is.
+    Without an address, requests share one bucket (fail closed).
     """
     if not address:
         return "unknown"
@@ -76,12 +61,10 @@ def ip_key(address):
 
 
 def exhausted(checks):
-    """Whether any of the keys has no room left, read only (security review of phase 3, A1).
+    """Whether any of the keys has no room left, read only; ``checks`` is a list of ``(scope, value, limits)``.
 
-    ``checks`` is a list of ``(scope, value, limits)``. Nothing is written and no bucket is made:
-    a key that was never used has room, so a client that is refused costs the database no row. A
-    key that is being counted at the same moment may still pass here and be refused by
-    ``consume_all`` afterwards; this check only keeps a flood from making rows.
+    Nothing is written and no bucket is made (a refused client costs no row). A key counted at the
+    same moment may pass here and be refused by ``consume_all`` afterwards.
     """
     now = timezone.now()
     for scope, value, limits in checks:
@@ -101,17 +84,13 @@ def consume(scope, value, limits):
 
 
 def consume_all(checks):
-    """Count one request against several keys at once; return one boolean per check.
+    """Count one request against several keys at once; return one boolean per check (``(scope, value, limits)``).
 
-    ``checks`` is a list of ``(scope, value, limits)``. The request is counted at every key only
-    if it is within the limits of all of them, so that a request refused by one key (for example
-    the client IP address) never uses up the budget of another (for example a victim's address).
-    The buckets are locked in a fixed order, so that parallel requests neither exceed a limit nor
-    deadlock. A refused request is not counted, so that the window slides and a persistent sender
-    cannot keep a key blocked beyond the limit. The last use of every bucket is written in both
-    cases; a refused request inserts no event, which shows at most that a budget is used up,
-    never whether an account exists, because no limit depends on an account. If a bucket cannot
-    be locked, the request is refused (fail closed).
+    Counted at every key only if within all limits, so a request refused by one key (the client IP)
+    never uses up another's budget (a victim's address). Buckets are locked in a fixed order (no
+    deadlock, no excess). A refused request is not counted (the window slides); the last use of every
+    bucket is written either way; no limit depends on an account, so nothing reveals whether one
+    exists. If a bucket cannot be locked, the request is refused (fail closed).
     """
     now = timezone.now()
     keyed = sorted(

@@ -1,14 +1,9 @@
-"""What a staff user chose for a list: column widths and expanded locations (D-077).
-
-Stored per user and list (``ListPreference``), never trusted: the key of the list must be one of
-``LIST_KEYS`` and the widths are checked (``LISTEN-STANDARD.md`` section 1: at least 90 px).
-"""
+"""Per-user list preferences (column widths, expanded locations), validated on every write (D-077)."""
 
 import re
 
 from leg_platform.community.models import ListPreference
 
-# One line per list; a later page adds its key here.
 LIST_KEYS = (
     "persons",
     "locations",

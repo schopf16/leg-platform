@@ -1,8 +1,6 @@
-"""Forms of the metering point pages (D-079): the creation from the overview and the dialogs of the
-detail page. The rules are in ``leg_platform.community`` (``metering_points``, ``assignments``,
-``leg_switch``); a form only reads and checks what was typed. The dialogs are laid out by
-``layout`` (a list of ``(row class, [field names])``), ``optional`` (the fields that say
-"(optional)") and ``hint`` (one note under the rows), the way ``dialog_form.html`` expects it."""
+"""Forms of the metering point pages. A form only reads and checks input; the rules are in
+``leg_platform.community``. Dialogs are laid out by ``layout`` (``(row class, [field names])``),
+``optional`` (fields marked "(optional)") and ``hint`` (one note), as ``dialog_form.html`` expects."""
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -18,8 +16,7 @@ NUMBER_ATTRS = {"class": "form-control tnum", "autocomplete": "off", "inputmode"
 
 
 def date_field(label, *, required=True, initial=None):
-    """A date: the browser's date field (the value is ISO), today as the default if ``initial`` is
-    ``"today"``."""
+    """A browser date field; ``initial="today"`` defaults to today."""
     return forms.DateField(
         label=label, required=required,
         initial=timezone.localdate if initial == "today" else initial,
@@ -27,13 +24,16 @@ def date_field(label, *, required=True, initial=None):
     )
 
 
-# Creating -------------------------------------------------------------------------------------
+def decimal_field(label, unit):
+    return forms.DecimalField(
+        label=label, required=False, min_value=0, max_digits=8, decimal_places=2,
+        widget=forms.TextInput(attrs={"class": "form-control tnum", "placeholder": unit, "inputmode": "decimal"}),
+    )
 
 
 class LocationChoiceField(forms.CharField):
-    """A field in which a location is found by its street or a metering point number: the text of a
-    suggestion ("Musterweg 12, 3063 Ittigen") or a part of the address. Empty means none. The result
-    is the location. A text that fits several locations is refused (the field is no list)."""
+    """Finds a location by the text of a suggestion or a part of the address; empty means none.
+    Several matches are refused."""
 
     def __init__(self, **kwargs):
         kwargs.setdefault("required", False)
@@ -64,26 +64,15 @@ class LocationChoiceField(forms.CharField):
 
 
 class MeteringPointCreateForm(MeteringPointForm):
-    """"Messpunkt anlegen" from the overview: the number first (required), then the direction; under
-    "Optional" the location, the LEG, PV power, battery, wallbox and remark. No person (it is assigned on
-    the detail page)."""
+    """"Create metering point": number first, then direction; the rest is optional. No person."""
 
     number_digits = forms.CharField(
         label=_("Metering point number"), max_length=20, widget=forms.TextInput(attrs=NUMBER_ATTRS)
     )
     location = LocationChoiceField()
-    pv_power_kwp = forms.DecimalField(
-        label=_("PV power"), required=False, min_value=0, max_digits=8, decimal_places=2,
-        widget=forms.TextInput(attrs={"class": "form-control tnum", "placeholder": "kWp", "inputmode": "decimal"}),
-    )
-    battery_kwh = forms.DecimalField(
-        label=_("Battery"), required=False, min_value=0, max_digits=8, decimal_places=2,
-        widget=forms.TextInput(attrs={"class": "form-control tnum", "placeholder": "kWh", "inputmode": "decimal"}),
-    )
-    wallbox_kw = forms.DecimalField(
-        label=_("Wallbox"), required=False, min_value=0, max_digits=8, decimal_places=2,
-        widget=forms.TextInput(attrs={"class": "form-control tnum", "placeholder": "kW", "inputmode": "decimal"}),
-    )
+    pv_power_kwp = decimal_field(_("PV power"), "kWp")
+    battery_kwh = decimal_field(_("Battery"), "kWh")
+    wallbox_kw = decimal_field(_("Wallbox"), "kW")
     remark = forms.CharField(
         label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
@@ -103,9 +92,6 @@ class MeteringPointCreateForm(MeteringPointForm):
             "pv_power_kwp": data.get("pv_power_kwp"), "battery_kwh": data.get("battery_kwh"),
             "wallbox_kw": data.get("wallbox_kw"), "remark": data.get("remark", ""),
         }
-
-
-# Steps ----------------------------------------------------------------------------------------
 
 
 class DialogForm(forms.Form):
@@ -144,12 +130,8 @@ class TerminationForm(DialogForm):
         return value
 
 
-# Assignments ----------------------------------------------------------------------------------
-
-
 class PersonAssignForm(DialogForm):
-    """"Person zuweisen" / "Person wechseln": the person is found by name, customer number or e-mail
-    address (``person_search``); the date is free ("for the administrator there is no deadline")."""
+    """The person is found by name, customer number or e-mail address; the date is free."""
 
     person = forms.CharField(
         label=_("Person"),
@@ -174,14 +156,14 @@ class PersonAssignForm(DialogForm):
 
 class AssignmentEndForm(DialogForm):
     valid_to = date_field(_("Ends on"), initial="today")
-    # The id of the assignment that the dialog showed: the server ends only that one (D-084, L-6).
+    # The assignment the dialog showed: only that one is ended (D-084).
     assignment = forms.CharField(widget=forms.HiddenInput, max_length=12)
     layout = [("single", ["valid_to"])]
     hint = _("Afterwards the metering point has no person. The person stays visible in the history.")
 
 
 class LegAssignForm(DialogForm):
-    """"LEG zuweisen": a metering point without a LEG."""
+    """A metering point without a LEG."""
 
     leg = forms.ModelChoiceField(
         label=_("LEG"), queryset=Leg.objects.none(), empty_label=None,
@@ -196,8 +178,7 @@ class LegAssignForm(DialogForm):
 
 
 class LegSwitchForm(DialogForm):
-    """"LEG wechseln" with the move mask (the same on the page of the metering point and of the LEG):
-    the new LEG, the date and the related metering points to move with it; none is preselected."""
+    """The new LEG, the date and the related metering points to move along (none preselected)."""
 
     leg = forms.ModelChoiceField(
         label=_("New LEG"), queryset=Leg.objects.none(), empty_label=None,
@@ -216,14 +197,8 @@ class LegSwitchForm(DialogForm):
         self.fields["leg"].queryset = (
             Leg.objects.filter(is_archived=False).exclude(pk=current_leg_id).order_by("name")
         )
-        # Only the metering points that belong together can be moved along: the ids of the page are
-        # checked against this list, never trusted.
+        # Submitted ids are checked against the related points, never trusted.
         self.fields["also"].queryset = MeteringPoint.objects.filter(pk__in=[point.pk for point in self.related])
-
-
-def error_text(code):
-    """The message of a refused change of an assignment (``assignments.AssignmentError.code``)."""
-    return ASSIGNMENT_ERRORS.get(code, _("This change is not possible."))
 
 
 ASSIGNMENT_ERRORS = {

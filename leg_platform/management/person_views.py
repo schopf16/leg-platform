@@ -1,15 +1,9 @@
-"""The pages of the persons (D-081; LEG-Design-Vorgaben/verwaltung/personen).
+"""The pages of the persons (D-081): list, detail page with its metering point table, and the dialogs (create
+person, customer data cards, note, shares, address suggestion banner buttons, resend invitation).
 
-The list (a table on a desktop, cards on a phone), the detail page with its table of the metering points, and
-the dialogs: creating a person (D-087), the cards of the customer's data (details, contact, billing address, payment and
-customer numbers; D-087), the note and the shares of the cooperative, plus the buttons of the banner for the correction
-of the address and the button that sends an invitation again. Every view uses the access check of
-``management.access`` (every staff account, D-086); objects are looked up by the id in the address, and the
-rules are in ``leg_platform.community`` (``person_list``, ``persons``): the dialogs of the customer's data are refused
-(403) for an account whose data the actor may not change (``persons.may_change_customer_data``), and the service checks it
-again. A dialog is a normal page: it works without JavaScript and returns to the place it was opened from.
-
-"Anmeldung starten" has no specified effect and is not built (D-081, open point).
+Every view uses ``management.access`` (every staff account, D-086); rules live in ``community.person_list`` and
+``community.persons``. The customer data dialogs answer 403 for an account the actor may not change
+(``persons.may_change_customer_data``); the service checks it again. Dialogs are normal pages (no JavaScript needed).
 """
 
 from dataclasses import dataclass
@@ -53,8 +47,7 @@ STATE_TONES = {
 
 
 def list_columns():
-    """The columns of the list (the start widths of ``liste-desktop``; the last one takes what is left, as in
-    the other lists, because the link column is fixed)."""
+    """The columns of the list (start widths; the last takes what is left, the link column is fixed)."""
     return (
         lists.Column(
             "name", gettext_lazy("Name"), width=240,
@@ -116,10 +109,9 @@ def points_options():
 
 @dataclass
 class PersonList:
-    """The list of persons as the address asks for it: the state and the queryset of every row of the view
-    (search and filters applied, sorted), not only one page. The page and the printing use it. ``locked`` is the
-    set of all locked accounts if the filter or the sorting needs it, else None and ``locked_for`` asks for the
-    rows that are shown (D-084, L-4)."""
+    """The list as the address asks for it: the state and the queryset of all rows (filtered, sorted), used by the
+    page and the printing. ``locked`` is the set of all locked accounts if filter or sorting needs it, else None
+    and ``locked_for`` asks for the shown rows only (D-084, L-4)."""
 
     state: lists.ListState
     columns: tuple
@@ -143,8 +135,7 @@ def build_list(params):
         params, path=reverse("management:persons"), columns=columns, default_sort=person_list.DEFAULT_SORT,
         filters=filters,
     )
-    # The lockout of the login protection is looked up for all accounts only when the filter or the sorting
-    # needs the state of every account; otherwise for the rows that are shown.
+    # The lockout is looked up for all accounts only if filter or sorting needs every state.
     needs_all = state.values["status"] in (person_list.STATUS_ACTIVE, person_list.STATUS_BLOCKED) or state.sort == "account"
     locked = person_list.locked_account_ids() if needs_all else None
     queryset = person_list.base_queryset(today, locked or ())
@@ -156,7 +147,7 @@ def build_list(params):
 
 
 def list_entry(person, locked):
-    """What the list shows of one person (the template and the printing read the same texts)."""
+    """What the list shows of one person (template and printing read the same texts)."""
     name, contact = person_list.display_names(person)
     account = person_list.AccountState(person_list.account_state(person, locked))
     return {
@@ -202,17 +193,13 @@ class PersonListView(ManagementAccessMixin, View):
         return render(request, "management/persons/list.html", context)
 
 
-# The detail page ---------------------------------------------------------------------------------
-
-
 def format_iban(value):
-    """The IBAN in blocks of four characters ("CH93 0076 2011 6238 5295 7"); empty stays empty."""
+    """The IBAN in blocks of four characters; empty stays empty."""
     return iban_module.display(value)
 
 
 def point_columns():
-    """The columns of the table of the metering points of a person (``person-detail-desktop``): the same
-    texts as the template, without the sentence about 30 days (``personen/detail/VORGABEN.md``)."""
+    """The columns of the person's metering point table (the template texts, without the 30 days sentence)."""
     return (
         lists.Column(
             "location", gettext_lazy("Location"),
@@ -244,8 +231,7 @@ def point_columns():
 
 
 def assignment_lines(assignment):
-    """The text of the column "Assigned": "ab DD.MM.YYYY"; an assignment that is ended shows "bis DD.MM.YYYY"
-    in a second line (the person leaves, for example with a flying change: both lines one under the other)."""
+    """The lines of the column "Assigned": "from DD.MM.YYYY", plus "until DD.MM.YYYY" for an ended assignment."""
     lines = [_("from %(date)s") % {"date": format_date(assignment.valid_from)}]
     if assignment.valid_to:
         lines.append(_("until %(date)s") % {"date": format_date(assignment.valid_to)})
@@ -253,10 +239,8 @@ def assignment_lines(assignment):
 
 
 def registration_text(row):
-    """The words of the column "Registration at the grid operator" and the tone of the colour: "registriert",
-    "angemeldet am DD.MM.YYYY", "bestätigt am DD.MM.YYYY" or, once the termination date is reached,
-    "gekündigt" (the word of the status, D-086); a termination that lies in the future adds the line
-    "Kündigung zum DD.MM.YYYY" and the step stays until then. Returns ``(lines, tone)``."""
+    """The registration column as ``(lines, tone)``: registered, notified on / confirmed on a date, or (once the
+    termination date is reached) terminated; a future termination adds a line and the step stays until then (D-086)."""
     if row.registration == person_list.REGISTRATION_TERMINATED:
         return [MeteringPointStatus.TERMINATED.label], "muted"
     if row.registration == person_list.REGISTRATION_CONFIRMED:
@@ -278,8 +262,7 @@ class PersonObjectMixin:
 
 
 def history_label(entry):
-    """The text of a history entry: the event and, for a change of the customer's data, the names of the changed
-    fields as the page calls them (never a value, D-087)."""
+    """The text of a history entry; a customer data change lists the changed field names (never values, D-087)."""
     label = event_label(entry.event)
     fields = entry.detail.get("fields") if isinstance(entry.detail, dict) else None
     if entry.event == history.HistoryEvent.PERSON_DATA_CHANGED and isinstance(fields, list):
@@ -289,7 +272,6 @@ def history_label(entry):
     return label
 
 
-# The names of the fields of the customer's data as the cards call them (the words of the specification).
 FIELD_LABELS = {
     "salutation": gettext_lazy("Salutation"),
     "organisation_name": gettext_lazy("Company"),
@@ -320,7 +302,7 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
         name, contact = person_list.display_names(person)
         locked = person_list.locked_account_ids(only=[person.pk]) if person.is_active else set()
         account = person_list.AccountState(person_list.account_state(person, locked))
-        # The banner has buttons: only for an actor who may change this account (D-087, review M-1).
+        # The banner has buttons: only for an actor who may change this account (D-087, M-1).
         suggestion = persons.address_suggestion(person) if persons.may_change_customer_data(request.user, person) else None
         share_entries = persons.share_history(person)
         context = {
@@ -391,9 +373,6 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
         }
 
 
-# The dialogs ---------------------------------------------------------------------------------------
-
-
 class PersonDialog(PersonObjectMixin, DialogView):
     """A dialog about one person."""
 
@@ -415,7 +394,7 @@ class PersonDialog(PersonObjectMixin, DialogView):
 
 
 class PersonNoteView(PersonDialog):
-    """"Notiz bearbeiten": the note that only the staff see; it is never searched."""
+    """"Notiz bearbeiten": the staff-only note; never searched."""
 
     title = gettext_lazy("Edit note")
     form_class = NoteForm
@@ -430,8 +409,8 @@ class PersonNoteView(PersonDialog):
 
 
 class PersonPaymentView(PersonDialog):
-    """The card "Zahlung und Kundennummern": the IBAN and the paper invoice (data of the customer, only for an
-    account whose data the actor may change) and the optional customer number at the grid operator (D-087)."""
+    """Payment card: IBAN and paper invoice (customer data, only if the actor may change the account) and the
+    grid operator customer number (D-087)."""
 
     title = gettext_lazy("Edit payment and customer numbers")
     form_class = PaymentForm
@@ -453,18 +432,13 @@ class PersonPaymentView(PersonDialog):
         values = {"operator_customer_number": data["operator_customer_number"]}
         if form.customer_data:
             values.update(iban=data["iban"], paper_invoice=data["paper_invoice"])
-        try:
-            persons.update_payment_data(self.person(), request.user, **values)
-        except ValidationError as error:
-            add_validation_errors(form, error)
+        if not run_service(form, lambda: persons.update_payment_data(self.person(), request.user, **values)):
             return None
-        except persons.PersonError as error:
-            return refused(form, error)
         return self.finish(request)
 
 
 def add_validation_errors(form, error):
-    """Show the messages of a ``ValidationError`` of the service at the fields of the form, or at the form."""
+    """Show the messages of a service ``ValidationError`` at the form fields, or at the form."""
     for name, messages_ in error.message_dict.items():
         if name in ("swiss_postal_code", "foreign_postal_code"):
             name = "postal_code"
@@ -472,8 +446,7 @@ def add_validation_errors(form, error):
 
 
 def refused(form, error):
-    """The answer to a ``PersonError`` of a dialog: an account that is no person (any more) is not found, an account
-    that the actor may not change is refused, anything else is shown at the form."""
+    """The answer to a ``PersonError`` of a dialog: no person -> 404, not allowed -> 403, else shown at the form."""
     if error.code == "not_a_person":
         raise Http404
     if error.code == "not_allowed":
@@ -489,9 +462,22 @@ def refused(form, error):
     return None
 
 
+def run_service(form, call):
+    """Run a service call; its errors are shown at the form. True if it succeeded."""
+    try:
+        call()
+    except ValidationError as error:
+        add_validation_errors(form, error)
+    except persons.PersonError as error:
+        refused(form, error)
+    else:
+        return True
+    return False
+
+
 class CustomerDataDialog(PersonDialog):
-    """A dialog for data of the customer: refused (403) before anything is shown or saved for an account whose data the
-    actor may not change (D-087, D-012). The buttons are not shown then either; this is the check that counts."""
+    """A customer data dialog: 403 before anything is shown or saved if the actor may not change the account
+    (D-087, D-012); this check is the one that counts."""
 
     template_name = "management/persons/dialog_data.html"
     group = None
@@ -505,18 +491,13 @@ class CustomerDataDialog(PersonDialog):
         return self.form_class(data, person=self.person())
 
     def save(self, request, form):
-        try:
-            persons.update_customer_data(self.person(), self.group, form.values(), request.user)
-        except ValidationError as error:
-            add_validation_errors(form, error)
+        if not run_service(form, lambda: persons.update_customer_data(self.person(), self.group, form.values(), request.user)):
             return None
-        except persons.PersonError as error:
-            return refused(form, error)
         return self.finish(request)
 
 
 class PersonDetailsView(CustomerDataDialog):
-    """The card "Angaben": salutation, company, first and last name, second person."""
+    """The card "Angaben"."""
 
     title = gettext_lazy("Edit details")
     form_class = DetailsForm
@@ -524,7 +505,7 @@ class PersonDetailsView(CustomerDataDialog):
 
 
 class PersonAddressView(CustomerDataDialog):
-    """The card "Rechnungsadresse", with the suggestions of the address directory."""
+    """The card "Rechnungsadresse"."""
 
     title = gettext_lazy("Edit billing address")
     form_class = BillingAddressForm
@@ -532,8 +513,7 @@ class PersonAddressView(CustomerDataDialog):
 
 
 class PersonContactView(CustomerDataDialog):
-    """The card "Kontakt": the phone and the second email address. The second address is requested with the
-    existing confirmation mechanism (the link goes to the new address only); the login address is not editable."""
+    """The card "Kontakt": phone and second email (existing confirmation flow; the login address is not editable)."""
 
     title = gettext_lazy("Edit contact")
     form_class = ContactForm
@@ -543,8 +523,7 @@ class PersonContactView(CustomerDataDialog):
         person = self.person()
         second_requested = False
         try:
-            # One transaction (review L-3): the phone is validated and written first, the second address is
-            # requested after it; if either step is refused, nothing of the dialog is kept (no job, no change).
+            # One transaction (L-3): if either step is refused, nothing of the dialog is kept.
             with transaction.atomic():
                 persons.update_customer_data(person, self.group, form.values(), request.user)
                 if "secondary_email" in form.fields:
@@ -563,8 +542,8 @@ class PersonContactView(CustomerDataDialog):
 
 
 class PersonCreateView(DialogView):
-    """"Person anlegen" (D-087): the data of the registration; the person gets an email with a link to confirm the
-    address and choose a password, and appears in the list as "Invited"."""
+    """"Person anlegen" (D-087): the person gets an email with a link to confirm the address and choose a password,
+    and is listed as "Invited"."""
 
     title = gettext_lazy("Create person")
     lead = gettext_lazy(
@@ -577,19 +556,14 @@ class PersonCreateView(DialogView):
         return return_url(request, reverse("management:persons"))
 
     def save(self, request, form):
-        try:
-            persons.create_person(request.user, form.cleaned_data["email"], form.values())
-        except ValidationError as error:
-            add_validation_errors(form, error)
+        if not run_service(form, lambda: persons.create_person(request.user, form.cleaned_data["email"], form.values())):
             return None
-        except persons.PersonError as error:
-            return refused(form, error)
         messages.success(request, _("The person was created and the invitation was sent."))
         return redirect(self.back(request))
 
 
 class PersonInvitationView(PersonObjectMixin, ManagementAccessMixin, View):
-    """"Einladung erneut senden": a new link for a person who has not completed the registration (D-087)."""
+    """"Einladung erneut senden": a new link for a not yet registered person (D-087)."""
 
     http_method_names = ["post"]
 
@@ -608,7 +582,7 @@ class PersonInvitationView(PersonObjectMixin, ManagementAccessMixin, View):
 
 
 class PersonSharesView(PersonDialog):
-    """"Add change" of the shares of the cooperative: a number and the day it holds from (D-086)."""
+    """"Add change" of the shares: a number and the day it holds from (D-086)."""
 
     title = gettext_lazy("Add change")
     form_class = SharesForm
@@ -624,7 +598,7 @@ class PersonSharesView(PersonDialog):
 
 
 class PersonAddressSuggestionView(PersonObjectMixin, ManagementAccessMixin, View):
-    """"Accept" and "Do not accept" of the banner (``personen/VORGABEN.md``, "Adresskorrektur bei Personen")."""
+    """"Accept" and "Do not accept" of the address correction banner."""
 
     http_method_names = ["post"]
 
@@ -641,7 +615,7 @@ class PersonAddressSuggestionView(PersonObjectMixin, ManagementAccessMixin, View
                 persons.dismiss_address_suggestion(person, token, request.user)
         except persons.PersonError as error:
             if error.code == "not_allowed":
-                # The data of a staff user or an administrator (D-012, D-087): not for this actor.
+                # Data of a staff user or administrator (D-012, D-087): not for this actor.
                 raise PermissionDenied from None
             messages.error(request, _("There is no suggestion to decide on."))
         else:

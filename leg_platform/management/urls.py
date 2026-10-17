@@ -1,9 +1,5 @@
-"""URLs of the management area, under ``/management/`` (D-077).
-
-Every route needs a view that carries the access check (``leg_platform.management.access``); a
-test walks this module and fails for a route without it. URL names of an area start with its menu
-key (``navigation.MENU``), so that the menu marks the entry as active.
-"""
+"""URLs under ``/management/`` (D-077). Every route needs an access-checked view (a test walks this module);
+URL names start with the menu key (``navigation.MENU``)."""
 
 from django.urls import path
 

@@ -1,9 +1,6 @@
 """Numbers and codes of the community domain: metering points, transformer circuits, settings.
 
-Pure functions (D-077); the database is asked in one place only, for the name of the grid operator in an error
-message. The rules come from the owner's design specification
-(``messpunkte/VORGABEN.md``, ``einstellungen/VORGABEN.md``, ``standorte/VORGABEN.md``).
-"""
+Pure functions (D-077); the database is asked only for the grid operator name in an error message."""
 
 import re
 
@@ -18,7 +15,7 @@ SUFFIX_LENGTH = 20
 METERING_POINT_LENGTH = COUNTRY_LENGTH + IDENTIFIER_LENGTH + SUFFIX_LENGTH  # 33
 TRANSFORMER_CIRCUIT_MAX_LENGTH = 20
 
-# The kinds of text, as the specification states them: capital letters and digits only.
+# Capital letters and digits only.
 COUNTRY = re.compile(r"[A-Z]{2}")
 IDENTIFIER = re.compile(r"[A-Z0-9]{11}")
 METERING_POINT_NUMBER = re.compile(r"[A-Z0-9]{33}")
@@ -29,13 +26,12 @@ COUNTRY_MESSAGE = _("Enter two capital letters, for example CH.")
 IDENTIFIER_MESSAGE = _("Enter 11 characters: capital letters and digits.")
 METERING_POINT_MESSAGE = _("Enter a number of 33 characters: capital letters and digits.")
 ENTERED_DIGITS_MESSAGE = _("Enter up to 20 digits.")
-# The format "TRA" and digits is the one of the grid operator that the specification names; another operator may
-# number its circuits differently, then this rule is the one place to change (D-086).
+# "TRA" and digits is the format of the named grid operator; this rule is the one place to change (D-086).
 TRANSFORMER_CIRCUIT_MESSAGE = _("Enter the %(operator)s number: TRA followed by digits.")
 
 
 def validate_country(value):
-    """The country of the metering points: two capital letters (``einstellungen/VORGABEN.md``)."""
+    """The country of the metering points: two capital letters."""
     if COUNTRY.fullmatch(value or "") is None:
         raise ValidationError(COUNTRY_MESSAGE, code="invalid_country")
 
@@ -47,7 +43,7 @@ def validate_identifier(value):
 
 
 def is_valid_metering_point_number(value):
-    """A complete number: 33 characters, capital letters and digits (``messpunkte/VORGABEN.md``)."""
+    """A complete number: 33 characters, capital letters and digits."""
     return isinstance(value, str) and METERING_POINT_NUMBER.fullmatch(value) is not None
 
 
@@ -57,12 +53,9 @@ def validate_metering_point_number(value):
 
 
 def compose_metering_point_number(country, identifier, entered_digits):
-    """The complete number from the country, the identifier and the typed last digits.
+    """The complete number from country, identifier and typed last digits (zero-padded to 20).
 
-    The typed digits are padded on the left with zeros to 20 positions; the result has 33
-    characters. Country and identifier come from the settings and are checked again here. Raises
-    ``ValidationError`` with a message that names the problem.
-    """
+    Country and identifier are checked again; raises ``ValidationError``."""
     validate_country(country)
     validate_identifier(identifier)
     digits = (entered_digits or "").strip()
@@ -88,10 +81,8 @@ def normalise_metering_point_number(value):
 
 
 def format_metering_point_number(number):
-    """The number as the person page shows it: the country, then a space after every four characters
-    ("CH 1A2B 3C4D ..."; ``personen/detail/VORGABEN.md``: "mit Leerzeichen nach vier Stellen", the
-    template shows "CH 0000 0000 0001"). A value that is no complete number is returned as it is;
-    a missing number gives an empty text."""
+    """The number as the person page shows it: "CH 1A2B 3C4D ..." (country, then groups of four).
+    An invalid value is returned as it is; a missing number gives ""."""
     if not number:
         return ""
     if not is_valid_metering_point_number(number):
@@ -101,8 +92,7 @@ def format_metering_point_number(number):
 
 
 def normalise_transformer_circuit_number(value):
-    """The grid number as it is stored and compared: surrounding white space removed and converted
-    to capital letters before the comparison (``standorte/VORGABEN.md``, "Nachtrag: Trafokreis")."""
+    """The grid number as stored and compared: trimmed, capital letters."""
     return (value or "").strip().upper()
 
 
@@ -111,7 +101,6 @@ def validate_transformer_circuit_number(value):
         TRANSFORMER_CIRCUIT_NUMBER.fullmatch(value or "") is None
         or len(value) > TRANSFORMER_CIRCUIT_MAX_LENGTH
     ):
-        # Only here the database is asked, for the name of the grid operator in the message.
         raise ValidationError(
             TRANSFORMER_CIRCUIT_MESSAGE, code="invalid_transformer_circuit",
             params={"operator": grid_operator.name()},

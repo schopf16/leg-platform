@@ -1,11 +1,6 @@
-"""Finding a person for an assignment (D-079; ``messpunkte/detail/VORGABEN.md``, "Person zuweisen").
+"""Finding a person for an assignment (D-079): active accounts with a customer number, every word must match.
 
-A person is an account with a customer number. The search takes a name, a customer number or an
-e-mail address; every word must match. Only accounts that an assignment can use are found: active
-accounts with a customer number (``assignments.assign`` refuses all others). The result is always
-limited, so that the field cannot be used to list the accounts. The e-mail address is searched but never
-shown.
-"""
+The result is always limited; the e-mail address is searched but never shown."""
 
 import re
 from dataclasses import dataclass
@@ -56,15 +51,13 @@ class Found:
 
 
 def resolve(text):
-    """The one person that the text names: the text of a suggestion, a customer number, an e-mail
-    address, or a name that only one account matches."""
+    """The one person that the text names: a suggestion text, customer number, e-mail address or unique name."""
     text = (text or "").strip()
     if not text:
         return Found(code="none")
     if SEPARATOR in text:
-        # The text of a suggestion: the customer number after the separator decides.
-        tail = text.rsplit(SEPARATOR, 1)[1]
-        match = CUSTOMER_NUMBER.fullmatch(tail.strip())
+        # A suggestion text: the customer number after the separator decides.
+        match = CUSTOMER_NUMBER.fullmatch(text.rsplit(SEPARATOR, 1)[1].strip())
         if match:
             person = candidates().filter(customer_number="".join(match.groups())).first()
             return Found(person, "" if person else "none")

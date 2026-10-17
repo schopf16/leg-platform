@@ -1,9 +1,7 @@
 """Display filter for the breadcrumbs of the administration.
 
-Django 6.1 ships the template library ``admin_filters`` with the filter ``to_object_display_value``.
-Django 6.0, the declared minimum (requirements/minimum-constraints.txt), does not have that library,
-so the templates of the administration load this library instead. The filter does what the Django
-filter does: it shows the object with ``display_for_value`` and the empty-value marker ``-``.
+Django 6.1 ships ``admin_filters.to_object_display_value``; Django 6.0 (the declared minimum) does
+not, so the admin templates load this equivalent library instead.
 """
 
 from django import template
@@ -11,7 +9,7 @@ from django.contrib.admin.utils import display_for_value
 
 register = template.Library()
 
-# Django's default empty-value marker of the administration (AdminSite.empty_value_display).
+# Django's default empty-value marker of the administration.
 EMPTY_VALUE_DISPLAY = "-"
 
 

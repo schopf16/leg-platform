@@ -1,28 +1,17 @@
-"""Queries and rules of the person list and of the metering points of one person (D-081;
-``personen/VORGABEN.md``, ``personen/detail/VORGABEN.md``, ``LISTEN-STANDARD.md``).
+"""Queries and rules of the person list and of the metering points of one person (D-081). Pure query code.
 
-A person is an account of ``accounts.User`` that has a customer number (D-077, point 5), or an invited person who
-has not completed the registration yet (D-087, ``persons.person_filter``): the other unverified accounts (a
-registration that nobody completed) have no number and are not persons. The account states give four words:
+A person is an ``accounts.User`` with a customer number (D-077), or an invited person who has not completed the
+registration (D-087, ``persons.person_filter``). Account states shown in the list:
 
-* **Active** (``Aktiv``): the account state ``active`` and not temporarily locked.
-* **Blocked** (``Gesperrt``): the account state ``blocked``, or an active account that the lockout of the
-  login protection holds for the moment (five wrong logins, 15 minutes; ``accounts.login_protection``). What
-  the specification says: "vorübergehend gesperrt, zum Beispiel nach Fehlversuchen".
-* **Inactive** (``Inaktiv``): the account state ``deactivated`` (the account was deleted and is kept under the
-  retention obligation); these accounts are the archive and appear only with the filter "archived".
-* **Invited** (``Eingeladen``, D-087): the account state ``unverified`` of a person whom staff invited and who
-  has not completed the registration: no customer number yet, cannot sign in. The specification has three words
-  ("Aktiv", "Gesperrt", "Inaktiv"); none of them is true for such a person, so the fourth is added (D-087). It
-  appears in "All" and is no filter of its own.
+* **Active**: state ``active`` and not temporarily locked.
+* **Blocked**: state ``blocked``, or an active account held by the login lockout (``accounts.login_protection``).
+* **Inactive**: state ``deactivated`` (kept under the retention obligation); only with the filter "archived".
+* **Invited** (D-087): state ``unverified`` of a person invited by staff; no customer number yet. Only in "All".
 
-The metering points of a person are the metering points that are not archived and have an assignment of this
-person that is valid now or starts later (``not_ended``: an assignment that ends in the future still counts).
-The word behind the count is "Aufnahme" if at least one of them is still *registered* (no notification to the
-grid operator; ``status.MeteringPointStatus.REGISTERED``), else "angemeldet" (every one is at least notified). The
-search reads the name, the customer number, the address, the town and the e-mail addresses, never a note, the
-customer number at the grid operator or the IBAN (``LISTEN-STANDARD.md``, section 4; L-6 of the security review of block 1).
-Pure query code, no request: the page passes the values it parsed.
+The metering points of a person are the non-archived ones with an assignment of this person that is valid now
+or starts later (``not_ended``). The word behind the count is "registered" if at least one is still registered
+(no notification to the grid operator), else "notified". The search never reads a note, the customer number at
+the grid operator or the IBAN (L-6).
 """
 
 from dataclasses import dataclass
@@ -54,7 +43,6 @@ POINTS_FILTERS = (POINTS_ALL, POINTS_WITH, POINTS_WITHOUT)
 SORT_KEYS = ("name", "number", "address", "points", "account")
 DEFAULT_SORT = "name"
 
-# The words of the column "Account" (``personen/VORGABEN.md``, section 5), and "Invited" (D-087).
 class AccountState(models.TextChoices):
     ACTIVE = "active", _("Active")
     BLOCKED = "blocked", _("Blocked")
@@ -68,14 +56,11 @@ ACCOUNT_RANK = {
 
 
 def locked_account_ids(now=None, only=None):
-    """The ids of the active persons that the lockout of the login protection holds at the moment.
+    """The ids of the active persons held by the login lockout now.
 
-    Axes stores only a keyed digest of the login address (``login_protection.axes_username``), never the
-    address itself, so the digests of the accounts are computed and compared. The rule is the one of Axes
-    (``AxesDatabaseHandler``): the failures of the cool-off period, at the limit of the project. Nothing is
-    computed while no lockout exists, which is the normal case. With ``only`` (account ids) just those
-    accounts are looked at: the page of a list needs the answer for its rows only (D-084, L-4); the filter and
-    the sorting by the account state need all of them."""
+    Axes stores only keyed digests of the login address, so the digests of the accounts are computed and
+    compared (the rule of ``AxesDatabaseHandler``). Nothing is computed while no lockout exists. ``only``
+    (account ids) restricts the check to the rows of a page (D-084, L-4)."""
     now = now or timezone.now()
     digests = set(
         AccessAttempt.objects.filter(attempt_time__gte=now - LOGIN_COOLOFF)
@@ -98,7 +83,7 @@ def locked_account_ids(now=None, only=None):
 
 
 def account_state(person, locked_ids=()):
-    """The state of the account as one of the three words."""
+    """The state of the account."""
     status = person.status
     if status == type(person).Status.UNVERIFIED:
         return AccountState.INVITED
@@ -110,9 +95,8 @@ def account_state(person, locked_ids=()):
 
 
 def display_names(person):
-    """``(name, contact)``: the bold text and the grey text below it. A company shows the company name
-    and, below it, the contact person (the first and the last name of the account stay "optional" with a
-    company name, D-032); any other person shows first and last name and no second line."""
+    """``(name, contact)``: a company shows the company name and the contact person below it (D-032); any
+    other person shows first and last name and no second line."""
     personal = f"{person.first_name} {person.last_name}".strip()
     if person.organisation_name:
         return person.organisation_name, personal
@@ -121,20 +105,20 @@ def display_names(person):
 
 def points_word(point_count, has_unregistered):
     """The state word behind the count: "" without a metering point, "registered" if one is still being
-    recorded, else "notified". The page gives the words ("Aufnahme", "angemeldet")."""
+    recorded, else "notified"."""
     if not point_count:
         return ""
     return "registered" if has_unregistered else "notified"
 
 
 def mine(today):
-    """The assignments of the person of the outer query that count for the person (see the module text)."""
+    """The assignments of the outer person that count (see the module text)."""
     return PersonAssignment.objects.not_ended(today).filter(person=OuterRef("pk"), metering_point__is_archived=False)
 
 
 def base_queryset(today=None, locked_ids=()):
-    """The persons with the columns of the list: ``sort_name``, ``postal_text``, ``point_count``,
-    ``has_unregistered`` and ``account_rank`` (0 active, 1 blocked, 2 inactive)."""
+    """The persons with the columns ``sort_name``, ``postal_text``, ``point_count``, ``has_unregistered`` and
+    ``account_rank``."""
     today = today or timezone.localdate()
     user_model = get_user_model()
     assignments = mine(today)
@@ -165,8 +149,7 @@ def base_queryset(today=None, locked_ids=()):
 
 
 def apply_status(queryset, status):
-    """"All" and the two states show the accounts that are not inactive; "archived" shows only the
-    inactive ones (``LISTEN-STANDARD.md``, section 4)."""
+    """"All" and the two states hide inactive accounts; "archived" shows only those."""
     user_model = get_user_model()
     if status == STATUS_ARCHIVED:
         return queryset.filter(status=user_model.Status.DEACTIVATED)
@@ -187,10 +170,8 @@ def apply_points(queryset, value):
 
 
 def apply_search(queryset, text):
-    """Every word must match something that the list or the detail page shows: a part of the name (also the
-    contact person of a company), the customer number, the street, the house number, the postal code, the
-    town or an e-mail address. Letters match without regard to case or accents (the collation of the
-    columns). Never a note, the customer number at the grid operator or the IBAN."""
+    """Every word must match the name (also a company contact), customer number, address, town or an e-mail
+    address; never a note, the grid operator customer number or the IBAN."""
     for word in (text or "").split():
         condition = (
             Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(organisation_name__icontains=word)
@@ -205,29 +186,22 @@ def apply_search(queryset, text):
 
 
 def apply_sort(queryset, key, descending=False):
-    """Sort by a column; the name and then the customer number are the tie breakers. The name is sorted
-    by its bold text (a company by the company name)."""
-    first = []
-    if key == "number":
-        first = [F("customer_number")]
-    elif key == "address":
-        first = [F("street"), Cast("house_number", IntegerField()), F("house_number")]
-    elif key == "points":
-        first = [F("point_count")]
-    elif key == "account":
-        first = [F("account_rank")]
-    elif key == "name":
-        first = [F("sort_name")]
+    """Sort by a column; the name, then the customer number break ties."""
+    first = {
+        "number": [F("customer_number")],
+        "address": [F("street"), Cast("house_number", IntegerField()), F("house_number")],
+        "points": [F("point_count")],
+        "account": [F("account_rank")],
+        "name": [F("sort_name")],
+    }.get(key, [])
     primary = [item.desc() if descending else item.asc() for item in first]
     return queryset.order_by(*primary, F("sort_name").asc(), F("customer_number").asc())
 
 
-# The metering points of one person ----------------------------------------------------------------
-
 POINT_SORT_KEYS = ("location", "number", "direction", "leg", "assigned", "registration")
 DEFAULT_POINT_SORT = "number"
 
-# The steps of the registration of a metering point at the grid operator (D-086); a terminated one is last.
+# Registration steps at the grid operator (D-086); a terminated one sorts last.
 REGISTRATION_REGISTERED = "registered"
 REGISTRATION_NOTIFIED = "notified"
 REGISTRATION_CONFIRMED = "confirmed"
@@ -239,10 +213,9 @@ _REGISTRATION_RANK = {
 
 @dataclass
 class PointRow:
-    """One assignment of the person with what the table shows. ``registration`` is ``registered``,
-    ``notified`` (the date is the day of the notification), ``confirmed`` (the day on which the confirmation
-    was recorded) or ``terminated`` (the day on which the termination took effect). ``termination_date`` is a
-    recorded termination that lies in the future (the step stays until then)."""
+    """One assignment of the person as the table shows it. ``registration`` is ``registered``, ``notified``,
+    ``confirmed`` or ``terminated`` (``registration_date`` is that step's day); ``termination_date`` is a
+    recorded termination in the future (the step stays until then)."""
 
     assignment: object
     point: object
@@ -261,10 +234,8 @@ class PointRow:
 
 
 def registration_state(point, today):
-    """What the column "Registration at the grid operator" says: the words of the metering point status
-    ("registriert", "angemeldet am", "bestätigt am", "gekündigt"): once the termination date is reached
-    "terminated"; else the confirmation date if there is one, else the date of the notification, else
-    registered."""
+    """The registration step at the grid operator: terminated once the termination date is reached, else
+    confirmed, else notified, else registered (with its date)."""
     if point.terminated_on is not None and point.terminated_on <= today:
         return REGISTRATION_TERMINATED, point.terminated_on
     if point.confirmed_on is not None:
@@ -275,8 +246,8 @@ def registration_state(point, today):
 
 
 def point_rows(person, today=None):
-    """The assignments of the person to metering points that are not archived and not ended (valid now or
-    later), with the LEG that is valid now (else the next one) of each metering point. Three queries."""
+    """The person's assignments to non-archived, not ended metering points, with the current (else next) LEG of
+    each. Three queries."""
     today = today or timezone.localdate()
     current_leg = LegAssignment.objects.not_ended(today).filter(metering_point=OuterRef("metering_point")).order_by("valid_from")
     found = (
@@ -314,7 +285,7 @@ def _house_key(text):
 
 
 def _point_key(row, key):
-    """The sort value of a row, or None if the row has no value in this column (those come last)."""
+    """The sort value of a row, or None if it has none in this column (those come last)."""
     if key == "location":
         return (row.street.casefold(), _house_key(row.house_number)) if row.location_id else None
     if key == "number":
@@ -331,8 +302,7 @@ def _point_key(row, key):
 
 
 def sort_point_rows(rows, key, descending=False):
-    """Sort by a column; the number is the tie breaker. Rows without a value come last, also when
-    descending."""
+    """Sort by a column; the number breaks ties. Rows without a value come last, also when descending."""
     if key not in POINT_SORT_KEYS:
         key = DEFAULT_POINT_SORT
     ordered = sorted(rows, key=lambda row: (row.point.number or "", row.assignment.valid_from))

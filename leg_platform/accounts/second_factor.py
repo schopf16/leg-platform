@@ -1,13 +1,9 @@
 """The second factor: the central check, the login step and re-authentication (D-040).
 
-Whether the second factor of a session is complete is decided in one place, independent of the
-method (docs/PROJECT.md, "AGOV and Passkeys"). Protected functions, the mandatory second factor
-of staff users and system administrators and re-authentication rely only on the functions of this
-module. The parts that are specific to TOTP and recovery codes are in ``totp.py``.
-
-The login of an account with a second factor is two steps (D-017): the password is checked first
-and remembered in the session as a pending login; Django's ``login()`` is called only when the
-second factor has been verified as well.
+Whether a session completed the second factor is decided here, independent of the method.
+TOTP and recovery codes are in ``totp.py``. The login of an account with a second factor is two
+steps (D-017): the password is remembered as a pending login; ``login()`` runs only after the
+second factor was verified.
 """
 
 import secrets
@@ -41,48 +37,36 @@ from leg_platform.accounts.models import (
     User,
 )
 
-# The password step and the code step must follow each other closely; a longer pause starts
-# again at the login page. A proposal awaiting the project owner's confirmation (D-040).
+# The password step and the code step must follow closely; a longer pause starts again (D-040).
 PENDING_LIFETIME = timedelta(minutes=5)
 PENDING_SESSION_KEY = "second_factor_pending"
-# The attribute of the request object that carries the wish "stay signed in" to the receiver of
-# the session start (``session_timeout.start_session``); never a session value (D-056).
+# Request attribute that carries "stay signed in" to ``session_timeout.start_session``; never a session value (D-056).
 STAY_WISH_ATTRIBUTE = "_stay_signed_in_wish"
 LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
 
-# Setting up two-factor authentication does not ask for the password again if this session
-# authenticated, by the password or by completing the registration, at most this long ago
-# (owner decision of 2026-10-14, D-055). The time is written by the server when the session logs in
-# and is never taken from the client; removing the second factor, new recovery codes, an email
-# address change and deleting the account always ask for the password.
+# Setting up 2FA skips the password if this session authenticated at most this long ago (D-055); the
+# time is written by the server. Removing 2FA, new recovery codes, email change and deletion always ask.
 RECENT_AUTHENTICATION_WINDOW = timedelta(minutes=5)
 AUTHENTICATED_AT_KEY = "authenticated_at"
 
-# The confirmations in the profile ask for the code of the app, or for the password where there is
-# no second factor (D-062). A wrong entry there is counted for the session and for the account, and
-# never as a failed login (so it can neither burn the budget of the codes nor lock the login):
-# the session ends with this many wrong entries, all sessions of the account with
-# ``ACCOUNT_FAILURE_LIMIT`` in ``ACCOUNT_FAILURE_WINDOW``.
+# Wrong entries in profile confirmations (D-062) count per session and per account, never as a failed
+# login: the session ends after ``SESSION_CODE_LIMIT``, all sessions after ``ACCOUNT_FAILURE_LIMIT`` per window.
 SESSION_CODE_LIMIT = 5
 ACCOUNT_FAILURE_LIMIT = 15
 ACCOUNT_FAILURE_WINDOW = timedelta(hours=24)
 SESSION_CODE_FAILURE_PURPOSE = b"LEG-Platform session code failures v1"
-# The count per session hangs on a random identifier that the server writes into the session once
-# and that stays when Django renews the key of the session (``cycle_key``): a session that renews
-# its key, for example by posting the login form, keeps its count (security review, block 10, M-1).
+# The per-session count hangs on a random id that survives ``cycle_key`` (so renewing the key keeps the count).
 SESSION_COUNTER_KEY = "confirmation_counter_id"
-# Counts of sessions that ended without a success or a logout are removed by the clean-up after
-# this time (``cleanup_confirmation_failures``).
+# Counts of sessions that ended without success or logout are removed after this time.
 SESSION_CODE_FAILURE_RETENTION = timedelta(days=30)
-# The attribute of the request that says "end this session": set by the check, read by the view.
+# Request attribute that says "end this session": set by the check, read by the view.
 SESSION_ENDED_ATTRIBUTE = "_session_ended_wrong_codes"
 SESSION_ENDED_MESSAGE = gettext_lazy(
     "For your safety you were logged out: wrong codes or passwords were entered several times. "
     "Please log in again."
 )
 
-# Views that an account without a completed second factor may use although it must have one:
-# logging out and setting the second factor up.
+# Views an account without a completed second factor may use although it must have one.
 UNRESTRICTED_VIEWS = frozenset(
     {
         "accounts:logout",
@@ -95,21 +79,17 @@ UNRESTRICTED_VIEWS = frozenset(
         "addresses:lookup",
     }
 )
-# The same for an account that must replace its password first (D-005, D-041). The branding
-# stylesheet and the logos are presentation only, so that the page is rendered correctly.
+# The same for an account that must replace its password first (D-005, D-041).
 PASSWORD_CHANGE_VIEWS = frozenset(
     {"accounts:logout", "accounts:password_change", "instance_stylesheet", "instance_logo"}
 )
-# Views whose response must not depend on the session: neither the second-factor nor the timeout
-# middleware reads ``request.user`` for them, so the response has no ``Set-Cookie`` and no
-# ``Vary: Cookie`` and nothing from the session reaches a cache (security review of D-073, L-2).
-# Only for public presentation files that need no account.
+# Public presentation files: the middlewares do not read ``request.user`` for them, so no
+# ``Set-Cookie``/``Vary: Cookie`` and nothing from the session reaches a cache (D-073).
 SESSION_FREE_VIEWS = frozenset({"instance_logo"})
 
 
 def is_session_free(request):
-    """Whether the request is for a view of ``SESSION_FREE_VIEWS``. The path is resolved here
-    because the timeout middleware runs before the URL is resolved; an unknown path is not free."""
+    """Whether the request is for a ``SESSION_FREE_VIEWS`` view (resolved here: the timeout middleware runs before URL resolution)."""
     try:
         return resolve(request.path_info).view_name in SESSION_FREE_VIEWS
     except Resolver404:
@@ -127,33 +107,23 @@ def has_second_factor(user):
 
 
 def is_second_factor_complete(user):
-    """Whether this session completed the second factor (django-otp's ``is_verified()``).
-
-    False if the middleware is missing: the check fails closed.
-    """
+    """Whether this session completed the second factor (django-otp ``is_verified()``); fails closed if the middleware is missing."""
     is_verified = getattr(user, "is_verified", None)
     return bool(user.is_authenticated and is_verified is not None and is_verified())
 
 
 @receiver(user_logged_in)
 def remember_authentication(sender, request, user, **kwargs):
-    """Remember when this session logged in (after Django renewed its ID).
-
-    ``user_logged_in`` is sent by ``login()``: after the password (and the second factor, if
-    there is one) and when the registration is completed. A password change or reset, activity
-    and the session cycling of Django do not write this value again.
-    """
+    """Remember when this session logged in (``login()`` also runs after registration); other session changes do not rewrite it."""
     request.session[AUTHENTICATED_AT_KEY] = time.time()
-    # The identifier of the count of wrong entries in the confirmations of this session; kept if
-    # the session already has one. A completed login proved the password and the code.
+    # Kept if the session already has one.
     request.session.setdefault(SESSION_COUNTER_KEY, secrets.token_urlsafe(32))
     forget_confirmation_failures(request, user)
 
 
 @receiver(user_logged_out)
 def forget_confirmation_failures_at_logout(sender, request, user, **kwargs):
-    """A normal logout ends the count of this session; the end by wrong entries keeps it (it
-    refuses a request of the session that was already running)."""
+    """A normal logout ends this session's count; the end by wrong entries keeps it."""
     if request is None or user is None or getattr(request, SESSION_ENDED_ATTRIBUTE, False):
         return
     forget_confirmation_failures(request, user)
@@ -171,12 +141,10 @@ def recently_authenticated(request, max_age=RECENT_AUTHENTICATION_WINDOW):
 class SecondFactorMiddleware:
     """Gives a session of an account that must use a second factor no privileges without it.
 
-    Must come after ``AuthenticationMiddleware``, ``OTPMiddleware`` and ``MessageMiddleware``.
-    A session without a completed second factor can only log out and set the factor up. If the
-    account has a factor, the session is ended and the person logs in again, which asks for it.
-    An account that must replace its password (the initial system administrator) can only log
-    out and change the password, before anything else, also before the second factor is set up
-    (D-005).
+    Must come after ``AuthenticationMiddleware``, ``OTPMiddleware`` and ``MessageMiddleware``. Such a
+    session can only log out and set the factor up; if the account has one, the session is ended
+    and the person logs in again. An account that must replace its password can only log out and
+    change it, before anything else (D-005).
     """
 
     def __init__(self, get_response):
@@ -193,7 +161,6 @@ class SecondFactorMiddleware:
         if user.is_authenticated and user.password_change_required:
             if request.resolver_match.view_name in PASSWORD_CHANGE_VIEWS:
                 return None
-            # The password change page itself explains why it is shown.
             return redirect("accounts:password_change")
         if not requires_second_factor(user) or is_second_factor_complete(user):
             return None
@@ -238,11 +205,9 @@ def pending_login(request):
 
 
 def begin_pending_login(request, user, next_url, stay=False):
-    """Remember that the password of the account was checked; the code is asked next.
+    """Remember that the password was checked; the code is asked next.
 
-    The session ID is renewed, so that a session ID that someone else planted in the browser
-    before the password was entered cannot be used to complete the second step. ``stay`` is the
-    wish "stay signed in" of the login form; it lives and dies with the pending login (D-056).
+    The session ID is renewed so a planted ID cannot complete the second step. ``stay`` lives and dies with the pending login (D-056).
     """
     request.session.cycle_key()
     request.session[PENDING_SESSION_KEY] = {
@@ -252,29 +217,24 @@ def begin_pending_login(request, user, next_url, stay=False):
         "auth_hash": user.get_session_auth_hash(),
         "stay": bool(stay),
     }
-    # The password was right: the IP slot of this attempt is released. The code step reserves
-    # its own slot and keeps it if the code is wrong (D-017).
+    # The password was right: release this attempt's IP slot; the code step reserves its own (D-017).
     settle_client_ip_attempt(request, succeeded=True)
 
 
 def verify_second_factor(request, user, code, *, app=True, recovery=True, per_session=False):
     """Check the code under the abuse protection; return the device that accepted it, or None.
 
-    Every code attempt counts like a login attempt: it is refused while the account or the IP
-    address is locked out, and a wrong code is a failed attempt of the account and the IP
-    address (D-017). The Axes backend is used for the lockout check only, as
-    ``django.contrib.auth.authenticate()`` does with every backend. ``app`` and ``recovery`` say
-    which kinds of code are accepted (``totp.verify_code``).
+    Every attempt counts like a login attempt: refused while the account or IP is locked out, and a
+    wrong code is a failed attempt (D-017). Axes is used for the lockout check only. ``app`` and
+    ``recovery`` say which kinds of code are accepted (``totp.verify_code``).
 
-    ``per_session`` is for the confirmations in the profile (D-062): a wrong code is counted for
-    this session and for the account's cap (``record_confirmation_failure``), not against the
-    budget of the account and not as a failed login, so that whoever only holds a session cannot
-    pause or lock the login of the account. The limit ends the session; the request is marked and
-    the view answers with the logout. An existing pause or lockout still refuses the code.
+    ``per_session`` (profile confirmations, D-062): a wrong code is counted for this session and the
+    account's cap (``record_confirmation_failure``), not as a failed login, so a session holder
+    cannot pause or lock the login. The limit ends the session (the request is marked, the view
+    logs out). An existing pause or lockout still refuses the code.
     """
     credentials = {"username": user.email}
-    # One attempt at a time per account: the lockout check, the verification and the record of
-    # a failure form one step, so that parallel requests cannot exceed the limit (D-040).
+    # One attempt at a time per account: lockout check, verification and failure record are one step (D-040).
     with transaction.atomic():
         locked = User._base_manager.select_for_update().filter(pk=user.pk).first()
         try:
@@ -283,8 +243,7 @@ def verify_second_factor(request, user, code, *, app=True, recovery=True, per_se
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
             return None
         if totp.code_attempts_paused(user):
-            # The budget of wrong codes is used up: even a correct code is refused. Like a
-            # lockout of Axes, so that nothing is recorded and no lockout is extended.
+            # Budget used up: even a correct code is refused, as with an Axes lockout (nothing recorded).
             request.axes_locked_out = True
             request.second_factor_paused = True
             user_login_failed.send(sender=__name__, credentials=credentials, request=request)
@@ -309,16 +268,12 @@ def verify_second_factor(request, user, code, *, app=True, recovery=True, per_se
 
 
 def verify_password(request, user, password, *, reset_on_success=True):
-    """Check the password of the logged-in account in a confirmation of the profile.
+    """Check the password of the logged-in account in a profile confirmation.
 
-    A wrong password is counted for the session and for the account's cap
-    (``record_confirmation_failure``), **not** as a failed login: it does not reach Axes or the IP
-    counter, so whoever only holds a session cannot lock the login of the account (security
-    review, block 10, M-2). A lockout that the failed logins caused still refuses the check. The
-    login itself does not use this function and stays under Axes (D-017). The account row is
-    locked while the password is verified and a failure is recorded, so that parallel requests
-    cannot exceed the limit (D-040). ``reset_on_success=False`` is for a form where the password is
-    not the last proof (a second proof follows and decides the reset).
+    A wrong password is counted for the session and the account's cap (``record_confirmation_failure``),
+    **not** as a failed login (no Axes, no IP counter), so a session holder cannot lock the login.
+    A lockout caused by failed logins still refuses. The row is locked while verifying and recording
+    a failure (D-040). ``reset_on_success=False``: the password is not the last proof (a second follows).
     """
     credentials = {"username": user.email}
     with transaction.atomic():
@@ -344,12 +299,10 @@ def verify_password(request, user, password, *, reset_on_success=True):
 
 
 def _counter_identifier(request):
-    """The identifier that the count of this session hangs on, or None.
+    """The identifier that this session's count hangs on, or None.
 
-    Chosen by the server, written into the session once (at the login, or here at the first use
-    with the current key of the session, which is the same for parallel requests) and kept when
-    Django renews the key of the session. The browser cannot choose it: the session data is on
-    the server.
+    Chosen by the server, written into the session once (at login, or at first use) and kept when
+    Django renews the session key. The browser cannot choose it.
     """
     session = getattr(request, "session", None)
     if session is None:
@@ -365,8 +318,7 @@ def _counter_identifier(request):
 
 
 def _session_digests(request):
-    """The keyed digests of the identifier under the current key and the fallback keys of
-    ``SECRET_KEY_FALLBACKS`` (current first), or an empty list."""
+    """Keyed digests of the identifier under the current key and ``SECRET_KEY_FALLBACKS`` (current first), or []."""
     identifier = _counter_identifier(request)
     if identifier is None:
         return []
@@ -376,8 +328,7 @@ def _session_digests(request):
 def _counter_row(request, user):
     """The row of this session and its current digest (None, None without an identifier).
 
-    A row found under the digest of a fallback key is moved to the current key. Call it under the
-    lock of the account.
+    A row found under a fallback key's digest is moved to the current key. Call under the account lock.
     """
     digests = _session_digests(request)
     if not digests:
@@ -396,10 +347,11 @@ def _counter_row(request, user):
 
 
 def confirmation_refused(request, user, locked):
-    """Whether a confirmation is refused unseen, and the session ends: it is out of tries (a
-    parallel request used the last one) or it is no longer valid (the sessions of the account
-    ended or the password changed after this request started, so a flood of requests that were
-    already running cannot go on). Call it under the lock of the account (``locked``)."""
+    """Whether a confirmation is refused unseen (and the session ends): out of tries, or no longer valid.
+
+    No longer valid = the account's sessions ended or the password changed after this request started
+    (stops a flood of already-running requests). Call under the account lock (``locked``).
+    """
     refused = (
         locked is None
         or not constant_time_compare(locked.get_session_auth_hash(), user.get_session_auth_hash())
@@ -413,13 +365,11 @@ def confirmation_refused(request, user, locked):
 
 
 def record_confirmation_failure(request, user):
-    """Count a wrong code or password of a confirmation, for the session and for the account.
+    """Count a wrong code or password of a confirmation, for the session and the account.
 
-    At ``SESSION_CODE_LIMIT`` wrong entries this session ends (one event and one notice); at
-    ``ACCOUNT_FAILURE_LIMIT`` in ``ACCOUNT_FAILURE_WINDOW`` over all sessions, all sessions of the
-    account end (one event and one notice) and the count starts again. Neither pauses the login.
-    The request is marked so that the view logs this session out. Call it under the lock of the
-    account, in the transaction of the check.
+    At ``SESSION_CODE_LIMIT`` this session ends (one event, one notice); at ``ACCOUNT_FAILURE_LIMIT``
+    in ``ACCOUNT_FAILURE_WINDOW`` all sessions of the account end and the count restarts. The login
+    is not paused. The request is marked so the view logs out. Call under the account lock, in the check's transaction.
     """
     row, digest = _counter_row(request, user)
     if digest is None:
@@ -437,8 +387,7 @@ def record_confirmation_failure(request, user):
     ConfirmationFailure.objects.create(account=user, occurred_at=now)
     if ConfirmationFailure.objects.filter(account=user).count() >= ACCOUNT_FAILURE_LIMIT:
         ConfirmationFailure.objects.filter(account=user).delete()
-        # Every session ends, also the ones that are running a request (they find the session
-        # hash changed, ``confirmation_refused``). The login is not paused.
+        # Also sessions that are running a request (they find the session hash changed).
         user.end_all_sessions()
         security_log.record(SecurityEvent.Event.ALL_SESSIONS_ENDED, account=user)
         enqueue_for_account(MailJob.Kind.ALL_SESSIONS_ENDED, user)
@@ -457,14 +406,10 @@ def reset_confirmation_failures(request, user):
 
 
 def forget_confirmation_failures(request, user):
-    """Delete the count of this session (all digests that it can have).
+    """Delete the count of this session (all digests it can have).
 
-    Every statement on the counter rows (``SessionCodeFailure``, ``ConfirmationFailure``) runs
-    under the lock of the account row, so the order is always account row, then counter rows
-    (D-072). At the login and the logout this is a short transaction of its own; inside the
-    transaction of a check (``reset_confirmation_failures``) the account row is already locked by
-    the same transaction and the lock is no wait. The account may be gone already (deleted
-    account): then there is nothing to lock and the rows go with the cascade.
+    Lock order: account row, then counter rows (D-072). A short transaction of its own at login and
+    logout; inside a check's transaction the lock is already held. A deleted account needs no lock (cascade).
     """
     digests = _session_digests(request)
     if digests:

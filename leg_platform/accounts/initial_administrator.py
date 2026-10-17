@@ -1,13 +1,9 @@
-"""Creation of the initial system administrator, shared by the management commands.
+"""Creation of the initial system administrator, shared by ``setup_initial_administrator`` (D-005) and ``setup_instance`` (D-076).
 
-Used by ``setup_initial_administrator`` (interactive password, D-005) and ``setup_instance``
-(password from the environment of the first start, D-076). Both go through
-``User.objects.create_superuser()``, which refuses while any system administrator exists
-(including a blocked or deactivated one), validates the password with the project's validators
-and serialises concurrent calls with a MariaDB named lock. The account must change the password
-at the first login and set up two-factor authentication before anything else is possible (D-041).
-
-The messages of the errors raised here never contain the password.
+Both go through ``User.objects.create_superuser()``, which refuses while any system administrator
+exists, validates the password and serialises concurrent calls with a MariaDB named lock. The
+account must change the password and set up 2FA at first login (D-041). Error messages never
+contain the password.
 """
 
 from django.core.exceptions import ValidationError
@@ -43,8 +39,7 @@ def create_initial_administrator(email, password):
     """
     try:
         with translation.override("en"):
-            # English: the text is for the operator's terminal and logs, like all command output
-            # (Django's validators translate when they raise).
+            # English: for the operator's terminal and logs (Django's validators translate when they raise).
             user = User.objects.create_superuser(email, password, password_change_required=True)
     except ValidationError as error:
         # The validators of Django do not repeat the password; a message that did is dropped.

@@ -1,41 +1,33 @@
 # Design Language – LEG-Platform
 
-This document defines the visual design and interaction principles of the application interface. It is binding for every page of every phase, so that later pages look and behave like the existing ones (D-024).
-
-The design language was developed with the project owner on 2026-10-11 from mockups in three directions and confirmed in its third version. The mockups are not part of the repository; this document is the binding description.
-
-**Update of 2026-10-14 (D-056).** The project owner delivered a design package (`LEG-Design-Vorgaben/`: images, `VORGABEN.md` and reference pages for the login, the registration, the navigation, the profile, the legal pages and the logo) and ordered that the homepage is built according to it. **Where this document and the package differ, the package wins.** Sections 3 (colours), 4 (typography), 5 (shapes and fonts sizes), 6 (navigation and layout) and 7 (colour modes) are changed accordingly; the decisions of the team lead K1 to K22 (`docs/DECISIONS.md`, D-056) fill the points that the package leaves open. The package is a design prototype; the implementation details (Django templates, translations, the Content Security Policy) are decided in the project.
+Binding for every page, so that later pages look and behave like the existing ones (D-024). Where this document and the owner's design package (`LEG-Design-Vorgaben/`, `VORGABEN.md`, reference pages; D-056) differ, the package wins; the decisions K1 to K22 of D-056 fill the points the package leaves open. Implementation details (templates, translations, Content Security Policy) are decided in the project.
 
 ## 1. Scope
 
-* Applies to all application views built with Tabler (D-003): login, registration, profile, later member views and any later administration views built as application views.
-* The Django admin keeps its own appearance. Whether later administrative functions are built in the Django admin or as application views is decided per function (`docs/ARCHITECTURE.md`, "Deliberately Open"). If they are built as application views, this document applies. The administration has one small stylesheet of its own, `static/css/admin-portal.css` (field widths, the box "Erste Schritte" and the help about the rights); it uses the colour variables of Django's admin and changes nothing else (D-061).
-* User-facing texts follow `AGENTS.md`, section 2 (Swiss German, no "ß", translatable).
+* All application views built with Tabler (D-003): login, registration, profile, member and management views.
+* The Django admin keeps its own appearance, plus one small stylesheet (`static/css/admin-portal.css`: field widths, the box "Erste Schritte", help about the rights) that uses the admin's colour variables and changes nothing else (D-061). Whether later functions are admin or application views: `docs/ARCHITECTURE.md`, "Deliberately Open".
+* User-facing texts follow `AGENTS.md`, section 2.
 
 ## 2. Principle: One Foundation, Two Registers
 
-All pages share one foundation: colours, text typeface, icons, controls (buttons, form fields, status indicators), spacing and navigation. On top of it, each page or page area uses one of two registers.
+All pages share colours, text typeface, icons, controls (buttons, fields, status indicators), spacing and navigation. On top of it each page or area uses one of two registers.
 
 | Register | Used for | Character |
 | -------- | -------- | --------- |
-| **Clear** | Entering, confirming and managing data: login, registration, password and two-factor functions, profile editing, onboarding, all forms, administration views | Plain and unambiguous. No illustrations or decoration, lines instead of shadows, small corner radius, headings in the text typeface, identifiers (customer number, metering point) in a monospace typeface. |
-| **Warm** | Informing and exploring: overview pages, energy data, messages, information about the LEG | Friendly and inviting. Display typeface for headings, soft cards with a light shadow, a light tint of the accent colour, restrained illustrations are allowed. |
+| **Clear** | Entering, confirming and managing data: login, registration, password and two-factor functions, profile, onboarding, all forms, administration views | Plain and unambiguous. No illustrations or decoration, lines instead of shadows, small radius, headings in the text typeface, identifiers (metering point) in a monospace typeface. |
+| **Warm** | Informing and exploring: overview pages, energy data, messages, information about the LEG | Friendly. Display typeface for headings, soft cards with a light shadow, light tint of the accent, restrained illustrations allowed. |
 
-**Rule for new pages:** If the person has to enter, confirm or manage something, the register is Clear. Otherwise it is Warm. On mixed pages, the area in which data is entered uses Clear (example: the login page has a small Warm welcome area and a Clear form).
-
-Controls never change between registers: a button, a form field or a status indicator looks the same everywhere.
+**Rule for new pages:** if the person has to enter, confirm or manage something, the register is Clear; otherwise Warm. On mixed pages the area in which data is entered is Clear (the login page: a small Warm welcome area and a Clear form). Controls never change between registers.
 
 ### Density
 
-* Clear for members and the public: base font size 16 px, interactive controls at least 48 px high.
-* Clear for administration views (staff users and system administrators): compact, base font size 14 px.
-* Warm: base font size 16 px.
+Clear for members and the public: base font size 16 px, controls at least 48 px high. Clear for administration views (staff, system administrators): compact, 14 px. Warm: 16 px.
 
 ## 3. Colours
 
 ### 3.1 Neutral Colours and Tokens
 
-The tokens of the design package (`login/VORGABEN.md`, section 6). They are defined in `portal.css`: the light values on `:root`, the dark values in `:root[data-theme="dark"]`. The variables of Tabler (`--tblr-*`) are mapped onto them. Dark applies only when the person chooses it with the button (section 7).
+Tokens of the design package, defined in `portal.css` (light on `:root`, dark in `:root[data-theme="dark"]`); Tabler's `--tblr-*` variables are mapped onto them. Dark applies only when the person chooses it with the button (section 7).
 
 | Token | Light | Dark | Use |
 | ----- | ----- | ---- | --- |
@@ -48,72 +40,30 @@ The tokens of the design package (`login/VORGABEN.md`, section 6). They are defi
 | `--on-accent` | `#FFFFFF` | `#0B1520` | Text on the accent |
 | `--yellow` | `#DDDD22` | `#DDDD22` | The dots of the benefit list only; never text (R9) |
 | `--bad` | `#B42318` | `#F0948A` | Errors and status "problem" |
-| `--ok` | `#2F8F5B` | `#5DBB86` | Status "done" and success (always with a word; as text it is 4.04:1 on white in light mode, so it is used as a dot and an icon) |
+| `--ok` | `#2F8F5B` | `#5DBB86` | Status "done", success (always with a word; 4.04:1 on white, so a dot or icon, not text) |
 | `--warn` | `#8A5A00` | `#E8B34A` | Status "open" and "not set up", warning alerts (K16) |
-| `--warm` | accent 9 % over `--bg` | accent 9 % over `--bg` | Left panel of the entry pages, hover of menu entries |
+| `--warm` | accent 9 % over `--bg` | same | Left panel of the entry pages, hover of menu entries |
 | `--logo-plate` | transparent | foreground 8 % over `--warm` | Plate behind the logo in dark mode (radius 6 px, padding 4 px 8 px) |
-
-The sidebar of the administration views (Django admin) keeps its own appearance and is not covered by the tokens.
 
 ### 3.2 Instance Branding
 
-The platform itself is neutral. Each instance configures its own branding; these values are part of the instance configuration and are never hard-coded (`AGENTS.md`, section 6):
+The platform is neutral; each instance configures its own branding, never hard-coded (`AGENTS.md`, section 6): logo (positive for light, negative for dark backgrounds), accent colour for light and dark mode each with its text colour, and an optional highlight colour (`--yellow`, only the dot of the benefit list, never with text on it, R9). Platform defaults are the values of the design package (D-056): accent `#005BA2` / `#6AA9E0`, text on it `#FFFFFF` / `#0B1520`, highlight `#DDDD22`. Without a logo the instance name is shown as text.
 
-* logo, positive version (for light backgrounds) and negative version (for dark backgrounds)
-* accent colour for light mode and for dark mode, each with the text colour used on it
-* optional highlight colour (the token `--yellow`), used only as the dot of the benefit list, never with text on it (rule R9)
-
-Without instance values, the platform defaults apply. They are the values of the design package (D-056): accent `#005BA2` (light) and `#6AA9E0` (dark), text on it `#FFFFFF` and `#0B1520`, highlight `#DDDD22` (the token `--yellow`). Without a logo, the instance name is shown as text.
-
-**Where the administrator or the operator changes the branding (D-073, owner decision of 2026-10-16; this replaces the rule of WL-24 / D-060 that branding stays with the deployment).** The administrator maintains the name, the website, the two logos and the colours in the administration, "Inhalte", "Portal-Einstellungen" (the right to see and to change it is an ordinary right of a role). The environment values are the fallback of every field that is left empty there, and the platform defaults come last (precedence per field: administration, environment, default). Everything that is a security setting of the server stays in the environment and is only shown, read only, to system administrators (D-073).
-
-| What | Where | Variable or place |
-| ---- | ----- | ----------------- |
-| Name of the instance (header, titles, mails, administration) | administration; fallback environment | "Name des Portals"; `INSTANCE_NAME` |
-| Website of the instance (third item of the footer row, contact address in emails) | administration; fallback environment | "Adresse der Website"; `INSTANCE_WEBSITE_URL` (`https://`) |
-| Logos (positive and negative) | administration (upload, stored in the database); fallback static files | "Logo für den hellen / dunklen Modus" (PNG or SVG, both or none); files in `INSTANCE_STATIC_DIRECTORY`, referenced by `INSTANCE_LOGO_LIGHT` and `INSTANCE_LOGO_DARK` (`.svg` or `.png`, relative paths) |
-| Accent colours and the text on them | administration; fallback environment | four colour fields; `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK` (contrast of 4.5:1 is checked at the start, when saving and again when reading) |
-| Highlight colour | administration; fallback environment | "Hervorhebungsfarbe"; `INSTANCE_HIGHLIGHT` |
-| Privacy notice | administration; fallback environment | "Adresse der Datenschutzerklärung"; `INSTANCE_PRIVACY_URL` |
-| Imprint (the address) | administration | "Adresse des Impressums" (no environment variable) |
-| Texts of the emails | administration, "Inhalte" | "Mailtexte" (D-039) |
-| Host name, base address, allowed hosts, mail mode and sender, Graph credentials, database, secrets, retention, proxy settings | environment only; shown read only to system administrators | "Serverkonfiguration (nur lesen)" in the portal settings; the Graph credentials are in their own module |
-| Texts of the pages (login, registration, errors) | catalogue | `locale/de_CH/LC_MESSAGES/django.po` (deployment, with the translator) |
-
-The names and the exact steps are in `docs/INSTALLATION.md` and `docs/STARTUP.md`, section 4.
-
-The page "Portal-Einstellungen" (D-073): the groups "Name und Website", "Datenschutz und Impressum", "Logo", "Farben", "Vorschau" and, for system administrators only, "Serverkonfiguration (nur lesen)" (collapsed). Under every field with a server value the page shows "Serverkonfiguration: <value>" so that an empty field is understood. The colour fields are short text fields (the hex text is always visible) with a swatch and the text "Kontrast 6.96:1 – ausreichend" or "– zu schwach" next to them (advisory, from the script `static/js/portal-preview.js`; the server decides). The preview shows the saved logos on the light surface and on the plate of the dark mode, and the colours change while the administrator types (CSS variables set through the CSSOM by the external script; the policy is not widened, so there is **no preview of a file that is chosen but not saved**: the logo shows after saving, and "remove the uploaded logos" is the way back). Removal and reset are checkboxes: the logos ("The files are deleted and cannot be restored") and the colours ("Use the server colours again"); an empty text field is the reset of that field. On 375 px the fields have the full width, the preview panels are in one column and the controls are at least 40 px high. Contrast, colour-only meaning and focus follow the rules below.
+**Where branding is changed (D-073).** Name, website, the two logos (PNG or SVG, both or none), accent and text colours, highlight colour, privacy and imprint addresses are maintained in the administration, "Inhalte", "Portal-Einstellungen" (an ordinary right of a role). Precedence per field: administration, then environment (`INSTANCE_*` variables: `docs/INSTALLATION.md`; the imprint address has none), then platform default. Email texts: "Mailtexte" (D-039); page texts: `locale/de_CH/LC_MESSAGES/django.po`; server settings are environment only (`docs/OPERATIONS.md`, section 5a). Under every field with a server value the page shows "Serverkonfiguration: <value>". The preview changes colours while typing (CSS variables through the CSSOM by an external script; the policy is not widened, so an unsaved logo has no preview). Removal and reset are checkboxes; an empty text field resets that field.
 
 Rules for instance values:
 
-* Text on the accent colour, and the accent colour used as text on the panel and the page background, reach at least 4.5:1 (WCAG 2.2, success criterion 1.4.3). The application checks this at the start against the surfaces `#FFFFFF`, `#F6F7F8` (light) and `#191C1F`, `#111315` (dark), and the form of the administration checks the same when saving. An empty text colour next to an accent colour of the administration is chosen automatically (white or `#0B1520`, whichever has the higher contrast).
-* The accent colour must not be confusable with the error colour or the energy colours (section 3.4). Red tones are not permitted as accent. This rule is not checked automatically; it is a manual check by the operator, and the installation guide describes it.
-* The highlight colour is never used as text colour or as a chart colour on a light background.
-* The accent is used for buttons, links, active navigation and the focus indicator. It is never used in charts.
-
-Validation of instance values (`docs/SECURITY.md`, section 6):
-
-* Colour values must match `^#[0-9A-Fa-f]{6}$`.
-* Configured URLs (privacy notice, the instance's website) must be absolute `https://` URLs.
-* A logo of the environment must point to a file inside the instance's static files with an allowlisted extension (`.svg`, `.png`); absolute paths, path traversal and external URLs are rejected. An uploaded logo is a PNG (checked chunk by chunk) or an SVG (checked against an allow-list); everything else is rejected (D-073).
-* Values are validated when the application starts (values from the configuration), when they are saved (values from the database) and again when they are read. Invalid values are rejected; they are never used.
-* Branding values are passed into CSS variables in a way that the Content Security Policy allows without `'unsafe-inline'` (a stylesheet generated from the validated values and served as a file, `instance.css`, with an ETag and `no-cache`, so that a change is visible at once).
+* Text on the accent colour, and the accent as text on panel and page background, reach at least 4.5:1 (WCAG 2.2, 1.4.3). Checked at start against `#FFFFFF`, `#F6F7F8` (light) and `#191C1F`, `#111315` (dark), and again when saving; an empty text colour next to an administration accent is chosen automatically (white or `#0B1520`).
+* The accent must not be confusable with the error or energy colours (section 3.4); red tones are not permitted (manual check by the operator, installation guide). The highlight colour is never text or chart colour on a light background; the accent is for buttons, links, active navigation and focus, never charts.
+* Validation (`docs/SECURITY.md`, section 6): colours `^#[0-9A-Fa-f]{6}$`; configured URLs absolute `https://`; environment logos inside the instance static files with an allowlisted extension; uploaded logos PNG or SVG checked as described there (D-073); validated at start, on save and on read; invalid values are never used. Values reach CSS variables without `'unsafe-inline'`: a stylesheet generated from the validated values, served as a file (`instance.css`, ETag, `no-cache`).
 
 ### 3.3 Initiating Instance: LEG Ittigen
 
-The values below are derived from the logo of the LEG Ittigen (provided by the project owner; file names `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`). **Since D-056 they are also the platform defaults** (the owner ordered them; this replaces the earlier rule that they are not defaults in code). The logo files are instance data and are not stored in this repository: they are public static files in the instance static directory and are used unchanged.
-
-| Value | Light | Dark |
-| ----- | ----- | ---- |
-| Accent | `#005BA2` (logo blue), text on it `#FFFFFF` | `#6AA9E0`, text on it `#0B1520` |
-| Highlight | `#DDDD22` (logo yellow) | same |
-| Logo | positive version | negative version (white), on the plate |
-
-No further logo guidelines (clear space, minimum size) are known to the project owner. The logo is shown unchanged and never recoloured, redrawn, cropped or stretched. Sizes: 360 px wide on the entry pages, 40 px high in the top bar of the phone, 48 px high in the header after the login, 32 px high in the phone menu.
+The accent, highlight and logo values of the LEG Ittigen (logo files `LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg`, provided by the owner) are the platform defaults since D-056. The logo files are instance data, not stored in the repository, and are used unchanged: never recoloured, redrawn, cropped or stretched. Sizes: 360 px wide on the entry pages, 40 px high in the phone top bar, 48 px in the header after the login, 32 px in the phone menu. No further logo guidelines are known.
 
 ### 3.4 Energy Colours
 
-The meaning of these colours is fixed and independent of the instance accent. They are used by the later energy pages; their contrast on the surfaces of the new tokens (`--panel`) was not recalculated in phase 1 and is verified when they are first used (open point).
+Fixed meaning, independent of the instance accent; used by the later energy pages. Their contrast on `--panel` was not recalculated and is verified when first used (open).
 
 | Meaning | Light | Dark |
 | ------- | ----- | ---- |
@@ -124,116 +74,85 @@ The meaning of these colours is fixed and independent of the instance accent. Th
 
 ### 3.5 Status Indicators
 
-A status is always shown as a dot plus a word, never by colour alone (WCAG 2.2, success criterion 1.4.1). Dot colours: active or completed uses `--ok`, open, pending or not set up uses `--warn` (K16), problem uses `--bad`, inactive uses `--muted`, new uses the accent.
+A status is always a dot plus a word, never colour alone (WCAG 2.2, 1.4.1). Dots: active or completed `--ok`, open, pending or not set up `--warn` (K16), problem `--bad`, inactive `--muted`, new the accent.
 
 ### 3.6 Verified Contrast Ratios
 
-Calculated on 2026-10-14 with the contrast ratio formula of WCAG 2.2 (`leg_platform.branding.contrast`); the tests of `test_design_assets.py` check them against the tokens in `portal.css`. Required: 4.5:1 for text, 3:1 for graphical objects and the borders of fields and buttons (success criteria 1.4.3 and 1.4.11).
-
-| Pair | Light | Dark |
-| ---- | ----- | ---- |
-| Text on panel | 16.89 | 14.04 |
-| Text on page background | 15.75 | 15.28 |
-| Muted text and field borders on panel | 6.35 | 6.62 |
-| Muted text on page background | 5.92 | 7.21 |
-| Muted text on the warm panel | 5.16 | 6.37 |
-| Text on the warm panel | 13.74 | 13.49 |
-| Error colour on panel | 6.57 | 7.58 |
-| "Open" colour (`--warn`) on panel | 5.93 | 8.95 |
-| "Done" colour (`--ok`) on panel | 4.04 (graphic and icon, not as text) | 7.27 |
-| Text on accent | 6.96 | 7.32 |
-| Accent as link on page background / panel | 6.49 / 6.96 | 7.42 / 6.82 |
-| Yellow dot on the warm panel | 1.18 (decoration, carries no information and no text) | 11.31 |
-
-Contrast alone does not make a page conformant. Keyboard operation, screen reader support and zoom are verified during implementation.
+Required (WCAG 2.2): 4.5:1 for text, 3:1 for graphical objects and borders of fields and buttons (1.4.3, 1.4.11), computed by `leg_platform.branding.contrast`; `test_design_assets.py` checks the token pairs against `portal.css`. Known low pairs, never to be used for text: `--ok` on white 4.04 (dot or icon only) and the yellow dot on the warm panel 1.18 (decoration only). Contrast alone does not make a page conformant; keyboard operation, screen reader support and zoom are verified during implementation.
 
 ## 4. Typography
 
 | Role | Typeface | Licence |
 | ---- | -------- | ------- |
-| All text, all controls, all headings, customer number | Source Sans 3 (weights 400, 600 and 700) | SIL Open Font License 1.1, Reserved Font Name "Source" |
-| The title in the warm panel of the entry pages only | Bricolage Grotesque (weight 700) | SIL Open Font License 1.1, no Reserved Font Name |
-| Recovery codes and the manual key of the authenticator app only | IBM Plex Mono | SIL Open Font License 1.1, Reserved Font Name "Plex" |
+| All text, controls, headings, customer number | Source Sans 3 (400, 600, 700) | SIL OFL 1.1, Reserved Font Name "Source" |
+| Title in the warm panel of the entry pages only | Bricolage Grotesque (700) | SIL OFL 1.1, no Reserved Font Name |
+| Recovery codes and the manual key of the authenticator app only | IBM Plex Mono | SIL OFL 1.1, Reserved Font Name "Plex" |
 
-* Fonts are served by the instance itself in fixed versions, never from Google Fonts or another CDN (`docs/SECURITY.md`, section 6; `docs/SERVICES.md`). The design previews of the owner load Google Fonts; the product does not.
-* The unmodified font files are used. Each font is shipped with its copyright notice and licence text (OFL 1.1, condition 2). A modified version (e.g. a subset) must not use the Reserved Font Name (condition 3).
-* The customer number is set in Source Sans 3, not in the monospace typeface (package; changes the earlier rule).
-* **Font sizes (K6):** 11, 12 and 13 px (micro labels only: menu group names, the label "später", the bottom bar), 14 px (hints, the footer row), 16 px (text, labels, controls), 18, 20, 22, 24, 26 (heading "Anmelden"), 32 and 40 px (title of the warm panel; 30 px on a phone). Controls are at least 44 px high on a desktop and 48 px on a phone (R5, K5).
+* Fonts are served by the instance itself in fixed versions, never from a CDN (`docs/SECURITY.md`, section 6; `docs/SERVICES.md`), unmodified, each with copyright notice and licence text (OFL 1.1, condition 2); a modified version (e.g. a subset) must not use the Reserved Font Name (condition 3).
+* **Font sizes (K6):** 11, 12, 13 px (micro labels only: menu group names, "später", the bottom bar), 14 px (hints, footer row), 16 px (text, labels, controls), 18, 20, 22, 24, 26 (heading "Anmelden"), 32 and 40 px (title of the warm panel; 30 px on a phone). Controls are at least 44 px high on a desktop and 48 px on a phone (R5, K5).
 
 ## 5. Shapes, Spacing and Icons
 
-* Corner radius: buttons and fields 8 px, cards and tiles 12 px, the logo plate 6 px.
-* No shadows and no gradients (R7). The one exception is the soft shadow of the floating language menu, as in the reference of the owner. Lines (1 px `--line`, 1.5 px `--muted` for fields and buttons) separate surfaces.
+* Corner radius: buttons and fields 8 px, cards and tiles 12 px, logo plate 6 px.
+* No shadows and no gradients (R7); the one exception is the soft shadow of the floating language menu. Lines (1 px `--line`, 1.5 px `--muted` for fields and buttons) separate surfaces.
 * Spacing only from 4, 8, 12, 16, 24, 32 and 48 px (R3).
-* Focus is always visible: a 2 px accent outline with a 2 px offset. A field in focus has a 1.5 px accent border and a 3 px ring of 30 % accent.
-* Icons: line style, stroke 1.8 px, round ends, 20 px (Tabler Icons, MIT licence, or own SVG), served by the instance itself. Icons accompany text; an icon without visible text has an accessible name. No emoji (R15).
+* Focus is always visible: 2 px accent outline with 2 px offset; a field in focus has a 1.5 px accent border and a 3 px ring of 30 % accent.
+* Icons: line style, stroke 1.8 px, round ends, 20 px (Tabler Icons, MIT, or own SVG), served by the instance. Icons accompany text; an icon without visible text has an accessible name. No emoji (R15).
 
 ## 6. Navigation and Layout
 
-* **Pages without a session (the entry shell, `entry_base.html`):** login, registration, password reset, the second step of the login, the lockout and result pages. Two equal columns above 760 px: the warm panel (`--warm`, padding 48 px, the logo 360 px wide, the title in Bricolage Grotesque 40 px, the lead 18 px, two points with a yellow dot) and the form with a width of at most 400 px on the page background, separated by a 1 px line. On a phone (760 px and below) the panel shrinks to a top bar of at least 64 px with the logo (40 px high), the text is hidden and the page fits one screen without scrolling (the login). The footer row "Datenschutz | Impressum | host of the website" sits under the form. The panel texts depend on the page type (D-056).
-* **Corner buttons on every page:** the language menu (DE, FR, IT, EN) and the light/dark button, round, 40 px, fixed in the top right corner (in the header after the login, next to the name). They are the same on every page, also on the error pages.
-* **After the login (team lead decision K1, D-057):** a fixed header of 64 px (the logo 48 px high, the name as text, the corner buttons), on a desktop a fixed left menu of 232 px (MEIN BEREICH: Start, Profil, for staff users Verwaltung; DEMNÄCHST: Standorte, Rechnungen, Energie, Mitteilungen with the mark "später", which are no links; below a line Abmelden as a POST form, Datenschutz and Impressum), on a phone a bottom bar of 72 px (Start, Energie, Rechnungen, Standorte) and the same menu in a drawer of 290 px from the left with an overlay (Escape and the close button close it, the focus is held inside and returns to the menu button). Content: at most 960 px wide, padding 32/24 px on a desktop and 20/16 px on a phone, the page title first. The start page `/` has the greeting, the customer number with the address and the task tiles (hiding is final and stored on the server) or the empty state (a panel with a 1 px line and 12 px radius, at least 360 px high). The measures of the images (D-057): the menu starts 32 px below the header and ends 24 px above the bottom, the entries are 44 px high with 4 px between them, the icon starts 24 px and the text 56 px from the left edge; the header has 16 px at the left, the corner buttons are 24 px from the right edge with 12 px between them; the tiles start 64 px below the subtitle (y = 231 px). An account that must change its password, and an account whose mandatory second factor is not complete, get the header and "Abmelden" only.
-* **Registration (D-058):** three steps with a 4 px step bar (the classes `step-fill-1` to `-3` fill 1/3, 2/3 and all, because of the Content Security Policy) and the muted label "Schritt N von 3" (14 px) above the heading; step 1 "E-Mail-Adresse bestätigen" and the screens "Prüfen Sie Ihre E-Mails" and "Link nicht mehr gültig" share the first third. The password step shows the address as text (a real read-only `username` field without border, background and ring) and the rules as a list; the details step shows the address as plain text with the status "Bestätigt" beside it (K7: no box), first and last name, street (minmax(0, 1fr)) and house number (96 px), postal code (128 px) and town side by side also on the phone, and the checkbox for the privacy notice. Hints under a field are 14 px (the micro labels of 13 px stay the only exception); a field with an error has a red 2 px border and one message; the error summary uses short field names and is focused; the button "E-Mail erneut senden" keeps its look while it waits and the note below it names the pause.
-* **Profile (D-059, `navigation/VORGABEN.md` section 3.3):** "MEIN KONTO / Profil" with five cards on the page background (1 px line, 12 px radius, no shadow): Persönliche Angaben, E-Mail-Adressen, Passwort, Zwei-Faktor-Anmeldung (2FA) and the red start card Konto löschen. A card shows its values with a button "Ändern"; the button opens the form **in place** (server-rendered state `?edit=<card>`, working without a script; only one card is open at a time; a form with errors shows the same card again with one message per field). The extra fields (salutation, company, address addition, post office box, phone) are under "Weitere Angaben (optional)". Statuses are a dot plus a word (Bestätigt, Ausstehend with the deadline and "Anfrage abbrechen", Aktiv, Nicht eingerichtet). The recovery codes are shown once in a two-column list with "Kopieren", a checkbox and "Fertig". The deletion has a red outlined button first, then the confirmation with the notice, the password, a box that is never ticked in advance and a red button. Controls are at least 44 px high (48 px on a phone); the mono font is used for the recovery codes and the manual key only.
-* **Links from emails (D-058, D-067):** a link from a mail never renders its "Link no longer valid" page under the token URL. An invalid, expired, used or replaced link redirects (302, the same answer for every cause) to a fixed page of its flow, and the confirmation page of a link does the same when its state in the session is gone: `/register/expired/` (registration), `/password-reset/expired/`, `/email-change/expired/`, `/email-change/stop-expired/` and `/two-factor-reset/expired/`. The fixed page carries the message and the next step of its flow (the registration and the password reset ask for the address again, with a lead text that also points a person who has already finished to the login; the email change says "log in with the new address if you just confirmed", the stop link says "log in and check your profile", the removal of the second factor names the operator) and is identical for everybody. No flash message is used for it: a message disappears on reload and is easy to miss, and a page with a heading and a next-step button is stable. The fixed pages are normal pages (no token in the URL, not stored by the browser, the project default referrer policy); the entry shell has no header or logout form, so none appears on them.
-* **Address suggestions and address notice (R-04, R-05, R-21; D-065, D-066).** Suggestions appear directly under the field the person types in (the street), as a bordered list of buttons without shadow, with a title ("Matching addresses", or "Did you mean this address?" for an approximate match) and a note; they are never inserted by a blur, and the list is replaced or hidden only when an answer arrives, not while the person types. They are offered wherever an address is edited: the profile edit form and the registration step "Your details" (the country there is fixed to Switzerland), and nowhere else; in the profile overview and in every other read-only view nothing is shown and no lookup is made. One non-blocking notice appears after the last address field (the postal code and town row) with the alert pattern, kind warning: "not found" (the notice says "This address was not found. Please check street, house number, postal code and town. You can still save it as entered."; it names no directory), only for a complete address while it is edited and only when the directory is available. Nothing else is ever said about the directory: no source or attribution (it belongs to the privacy notice and the imprint), no text for an unavailable, old or limited directory, a failed request or a browser without JavaScript, neither while typing nor at load nor after saving. The notice hides at once on any input, never takes the focus and never blocks saving. Choosing a suggestion is the only way that the script changes fields. Saving shows "Saved." and nothing about the address.
-* **Administration views:** dark vertical sidebar (Tabler vertical navbar with `data-bs-navbar-theme="dark"`), breadcrumb, page title with one primary action. The Django admin keeps its own appearance.
-* **Multi-step processes:** one step per page, a 4 px step bar with the label "Schritt 1 von 3", back and continue buttons.
-* **One proof per confirmation (D-062, owner decision of 2026-10-15).** A confirmation asks for the second-factor code if one is active, otherwise the password, never both. The proof field takes the place and the style of the password field (48 px high, radius 8 px, semibold 16 px label, 8 px between label and field). With the code, a lead hint of 16 px (the style of `.profile-text`) stands between the label "2FA-Authentifizierungscode" and the field: "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein. Ihr Passwort wird hier nicht benötigt." Below the field come the error and, in the e-mail form, the note about the confirmation link; **no hint about recovery codes** (they are no proof here, block 8). No symbol, no extra box, no extra colour (R15). The field is a **plain text field** like every other text field (visible text, `autocomplete=one-time-code`, the placeholder `000000`, no `inputmode`, `maxlength` or `pattern`) and never shows a value again after an error; it has the focus only where it is the first field. The description order for screen readers is lead, error, note (with the password: error, note). **The way "phone lost"** is a text link "Handy verloren?" under the code field of the card "2FA deaktivieren" that opens a state of the same card (also without a script) with two fields, the password (with the eye button, hidden by default) and the recovery code (plain text), a short text for people with neither the app nor a code (they go through the operator) and the red outlined button "2FA deaktivieren". All password fields are hidden by default with the eye button next to them. The way back in this form is the secondary button "Abbrechen", as in every other card (block 9). The first code of the 2FA setup (label "Code aus der App", as in the owner's image) is a plain text field too: no `inputmode`, `maxlength` or `pattern`. After five wrong codes or passwords in the confirmations the session ends and the login page shows the message "Aus Sicherheitsgründen wurden Sie abgemeldet: Es wurde mehrmals ein falscher Code oder ein falsches Passwort eingegeben. Bitte melden Sie sich erneut an." (D-062, blocks 9 and 10). **Images of the owner's package that this decision outdates (they cannot be redrawn here):** `profil-2fa-deaktivieren-*`, `profil-2fa-neue-codes-*`, `profil-loeschen-bestaetigen-*`, `profil-loeschen-bereit-*`, `profil-email-formular-*`, `profil-mail-bearbeiten-*`, `handy-profil-mail-bearbeiten-*` and `handy-profil-loeschen-bestaetigen-*` show "Aktuelles Passwort" and are valid only for an account **without** a second factor (state B); `profil-email-passwort-falsch-*` and `profil-mail-passwort-falsch-*` are valid for state B ("wrong password"). The state with a second factor (A, with the code and the lead hint, and "wrong code") has no image and is described here.
+* **Pages without a session (`entry_base.html`):** login, registration, password reset, second step of the login, lockout and result pages. Two equal columns above 760 px: the warm panel (`--warm`, padding 48 px, logo 360 px wide, title in Bricolage Grotesque 40 px, lead 18 px, two points with a yellow dot) and the form (at most 400 px wide) separated by a 1 px line. At 760 px and below the panel shrinks to a top bar of at least 64 px with the logo (40 px high), the text is hidden and the login fits one screen. The footer row "Datenschutz | Impressum | host of the website" sits under the form (D-056).
+* **Corner buttons on every page** (also error pages): language menu (DE, FR, IT, EN) and light/dark button, round, 40 px, fixed top right (in the header after the login, next to the name).
+* **After the login (K1, D-057):** fixed header 64 px (logo 48 px high, name as text, corner buttons); on a desktop a fixed left menu 232 px wide (MEIN BEREICH: Start, Profil, for staff Verwaltung; DEMNÄCHST: Standorte, Rechnungen, Energie, Mitteilungen with the mark "später", no links; below a line "Abmelden" as a POST form, Datenschutz, Impressum); on a phone a bottom bar 72 px (Start, Energie, Rechnungen, Standorte) and the same menu in a drawer 290 px from the left with an overlay (Escape and the close button close it, focus held inside and returned to the menu button). Content at most 960 px wide, padding 32/24 px desktop and 20/16 px phone, page title first. Menu and header measures: the image measures of D-057. The start page has the greeting, the customer number with the address and the task tiles (hiding is final and stored on the server) or an empty state (panel with 1 px line, 12 px radius, at least 360 px high). An account that must change its password, or whose mandatory second factor is incomplete, gets the header and "Abmelden" only.
+* **Registration (D-058):** three steps with a 4 px step bar (classes `step-fill-1` to `-3` because of the CSP) and the muted label "Schritt N von 3" (14 px) above the heading. The details step shows the address as plain text with the status "Bestätigt" (K7: no box); street and house number (96 px), postal code (128 px) and town side by side also on the phone. Hints under a field are 14 px; a field with an error has a red 2 px border and one message; the error summary uses short field names and is focused.
+* **Profile (D-059, `navigation/VORGABEN.md` section 3.3):** "MEIN KONTO / Profil" with five cards on the page background (1 px line, 12 px radius, no shadow): Persönliche Angaben, E-Mail-Adressen, Passwort, Zwei-Faktor-Anmeldung (2FA), and the red start card Konto löschen. A card shows its values with a button "Ändern" that opens the form **in place** (server-rendered state `?edit=<card>`, works without a script, one card open at a time, errors re-render the same card with one message per field); extra fields are under "Weitere Angaben (optional)". Recovery codes are shown once with "Kopieren", a checkbox and "Fertig". Deletion: a red outlined button, then the confirmation with the proof, a box never ticked in advance and a red button.
+* **One proof per confirmation (D-062).** A confirmation asks for the second-factor code if one is active, otherwise the password, never both (rules: `docs/SECURITY.md`, section 3). The proof field takes the place and style of the password field (48 px high, radius 8 px, semibold 16 px label, 8 px between label and field). With the code, a 16 px lead hint (`.profile-text`) stands between the label "2FA-Authentifizierungscode" and the field; the code field is a plain text field (no `inputmode`, `maxlength` or `pattern`); screen reader description order: lead, error, note. "Handy verloren?" is a text link under the code field of "2FA deaktivieren" that opens a state of the same card (also without a script) with the password and the recovery code, a text for people with neither (they go through the operator) and the red outlined button "2FA deaktivieren". All password fields are hidden by default with the eye button. The way back is the secondary button "Abbrechen" in every card. After five wrong entries the session ends and the login page says so (D-062). Images of the owner's package with "Aktuelles Passwort" are valid only for an account **without** a second factor; the state with a second factor has no image and is described here.
+* **Links from emails (D-058, D-067):** an invalid, expired, used or replaced link redirects (302, same answer for every cause) to a fixed page of its flow, as does a confirmation page whose session state is gone. The fixed page carries the message and the next step, is identical for everybody, uses no flash message and is an entry-shell page without header or logout form.
+* **Address suggestions and notice (R-04, R-05, R-21; D-065, D-066):** suggestions appear directly under the street field as a bordered list of buttons without shadow, titled "Matching addresses" (or "Did you mean this address?" for an approximate match); never inserted by a blur; replaced or hidden only when an answer arrives. Only where an address is edited (profile edit form, registration details; country fixed to Switzerland), never in read-only views. One non-blocking warning notice after the postal code and town row: "This address was not found. Please check street, house number, postal code and town. You can still save it as entered." Only for a complete address while editing and only when the directory is available; it hides on any input, never takes the focus and never blocks saving. Nothing else is ever said about the directory (no source, no text for an unavailable, old or limited directory). Choosing a suggestion is the only way the script changes fields.
+* **Administration views:** dark vertical sidebar (Tabler vertical navbar with `data-bs-navbar-theme="dark"`), breadcrumb, page title with one primary action.
+* **Multi-step processes:** one step per page, a 4 px step bar with "Schritt 1 von 3", back and continue buttons.
 * One primary button per page (R1). Destructive actions use the outlined error style and require confirmation.
 
 ## 7. Colour Modes and Print
 
-* **Light and dark only by the button (R13 changed by the package, D-056).** There is no automatic mode and no `prefers-color-scheme` rule. The server always renders light; the person switches with the sun/moon button in the top right corner. The mode is set on the `<html>` element as `data-theme` (own tokens) and as `data-bs-theme` (Tabler); both always have the same value.
-* **Persistence (K3, the one deviation from the package).** The package starts every page load light and German and stores nothing. In an application of several pages that would reset the choice at every click, so the choice is kept in the `sessionStorage` of the tab: no cookie, nothing is sent to the server, a new tab starts light and German. The scripts are external files (`theme-init.js` in the `<head>`, `corner-controls.js`); they read only the allowlisted values `light`, `dark`, `de`, `fr`, `it` and `en`, evaluate no URL parameters and never set branding attributes (primary colour, base colours, font, radius). Without JavaScript the buttons are hidden and the page stays light and German.
-* **Languages.** The menu offers Deutsch, Français, Italiano and English. Translations of the page texts exist for the login page only (a static dictionary). Every other page stays German until the translations are delivered; there the language button remembers the choice only.
-* Tabler's theme script (`tabler-theme.js`) is not used. According to Tabler's `color-modes.mdx` and `core/js/tabler-theme.ts` (branch `main`), it reads URL parameters for all theme keys (including `theme-primary`, `theme-base`, `theme-font`, `theme-radius`, `layout`, `navbar-position`, `navbar-theme`) and persists them in `localStorage`. A crafted link could thereby override the instance branding persistently in the visitor's browser. Whether release 1.6.1 behaves the same way was not verified; the decision does not depend on it.
-* In dark mode, the negative logo is used, on the plate of section 3.1.
-* Print: a print stylesheet hides navigation, the corner buttons and interactive controls, prints black text on white, and shows the instance name and the print date.
+* **Light and dark only by the button (R13 changed by the package, D-056).** No automatic mode, no `prefers-color-scheme`. The server always renders light; the person switches with the sun/moon button. The mode is set on `<html>` as `data-theme` (own tokens) and `data-bs-theme` (Tabler), always the same value.
+* **Persistence (K3).** The choice is kept in the tab's `sessionStorage` (no cookie, nothing sent to the server; a new tab starts light and German). The scripts are external files (`theme-init.js` in `<head>`, `corner-controls.js`); they read only the allowlisted values `light`, `dark`, `de`, `fr`, `it`, `en`, evaluate no URL parameters and never set branding attributes. Without JavaScript the buttons are hidden and the page stays light and German.
+* **Languages.** The menu offers Deutsch, Français, Italiano, English; page-text translations exist for the login page only (static dictionary); every other page stays German and the language button only remembers the choice.
+* Tabler's `tabler-theme.js` is not used: it reads URL parameters for all theme keys and persists them in `localStorage`, so a crafted link could override the instance branding persistently (Tabler `core/js/tabler-theme.ts`).
+* In dark mode the negative logo is used, on the plate of section 3.1.
+* Print: a print stylesheet hides navigation, corner buttons and controls, prints black text on white, and shows the instance name and the print date.
 
 ## 8. Formats and Tone
 
-* Numbers with the Swiss thousands separator (`112’400 kWh`), amounts as `CHF 61.40`, tariffs in `Rp./kWh`, dates as `11.10.2026`, customer number in two blocks of three digits (`482 915`, D-021).
-* The Swiss German texts use the formal form of address, short and plain sentences. Buttons name the action (e.g. "Save", "Log in" as English source texts). Error messages state what is wrong and how to fix it.
-* Security notifications (D-068): plain text with the link alone on its line. The first line greets "Guten Tag Vorname Nachname" when the account belongs to a person with a first and a last name, otherwise the neutral "Guten Tag"; no comma, no Herr/Frau/Familie, no title. A company-only account, a name with a character that a name does not have, a name that looks like an address and an address that does not currently belong to the account (the former login address, a removed second address, the deleted account) get the neutral greeting. The start page keeps "Guten Tag, Name".
+* Numbers with the Swiss thousands separator (`112’400 kWh`), amounts `CHF 61.40`, tariffs `Rp./kWh`, dates `11.10.2026`, customer number in two blocks of three digits (`482 915`, D-021).
+* Swiss German texts use the formal address, short and plain sentences. Buttons name the action. Error messages state what is wrong and how to fix it.
+* Security notifications (D-068): plain text with the link alone on its line. The first line is "Guten Tag Vorname Nachname" for an account of a person with a first and last name, otherwise the neutral "Guten Tag"; no comma, no Herr/Frau/Familie, no title. Neutral also for a company-only account, a name with a character a name does not have, a name that looks like an address and an address that does not currently belong to the account (former login address, removed second address, deleted account). The start page keeps "Guten Tag, Name".
 
 ## 9. Implementation in Tabler
 
-Verified against Tabler's documentation in the official repository `tabler/tabler` (branch `main`; pages "Customize Tabler", "Color modes", "Theme base colors"; checked on 2026-10-11; latest release at that time: `@tabler/core` 1.6.1 of 2026-09-28). The mechanisms are re-checked against the version chosen under D-015.
+Verified against Tabler's documentation ("Customize Tabler", "Color modes", "Theme base colors"); re-check against the version chosen under D-015. Changing primary colour, base or radius can change contrast and must be re-checked (section 3.2).
 
 | Design element | Tabler mechanism |
 | -------------- | ---------------- |
-| Accent | The token `--accent` (and `--on-accent`), mapped to `--tblr-primary` and `--tblr-primary-fg`; the instance values come from the stylesheet `instance.css` |
-| Neutral colours | The tokens of section 3.1, mapped to `--tblr-body-bg`, `--tblr-body-color`, `--tblr-bg-surface`, `--tblr-secondary-color`, `--tblr-border-color` and `--tblr-danger` |
+| Accent | `--accent` / `--on-accent` mapped to `--tblr-primary` and `--tblr-primary-fg`; instance values from `instance.css` |
+| Neutral colours | tokens of section 3.1 mapped to `--tblr-body-bg`, `--tblr-body-color`, `--tblr-bg-surface`, `--tblr-secondary-color`, `--tblr-border-color`, `--tblr-danger` |
 | Text typeface | `--tblr-font-sans-serif` |
-| Base font size per register | `--tblr-body-font-size`, which the documentation allows to override on any container |
-| Light and dark mode | `data-theme` (own tokens) and `data-bs-theme` (Tabler) on `<html>`, set together; never `prefers-color-scheme` |
+| Base font size per register | `--tblr-body-font-size` (may be overridden on any container) |
+| Light and dark mode | `data-theme` and `data-bs-theme` on `<html>`, set together; never `prefers-color-scheme` |
 | Dark sidebar | `data-bs-navbar-theme="dark"` |
 | Registers | one CSS class per register on the page or area container, setting radius, heading typeface, shadow and font size through CSS variables |
 
-Tabler's documentation notes that changing the primary colour, base or radius can change contrast and must be re-checked; section 3.2 makes this a rule for instance values.
-
 ## 10. Security Notes
 
-* Logo files are either static files of the instance (the fallback of the environment) or uploads of the administrator (D-073, which replaces "in phase 1 there is no web upload for logos"). An uploaded logo is a PNG or an SVG that the form accepted exactly as it is or rejected; it is stored in the database and served by the portal itself. SVG logos are embedded only as images (`<img>`), never inlined into the HTML, so that content of the file cannot execute in the page. According to W3C SVG Integration, an SVG document referenced through `<img>` is processed without running scripts, while an SVG file opened directly as a document can run scripts.
-* Because a logo file can be opened directly through its URL, the view of the uploaded logos serves every file with a fixed content type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox; default-src 'none'` and `Cross-Origin-Resource-Policy: same-origin`, and static SVG logo files of the environment are checked for scripts and external references before deployment and served with a restrictive Content Security Policy by the web server. Whether an SVG with `style` attributes still renders in `<img>` under this policy was **not** checked in a browser (open, D-073).
-* Branding values are validated before use (section 3.2), and the colour mode cannot be changed through URL parameters (section 7).
-* The legal addresses in the footer come from the portal settings of the administrator, are validated (`https` only, no credentials) and open in a new tab with `rel="noopener noreferrer"` (D-056).
-* No fonts, icons or stylesheets are loaded from third parties (`docs/SECURITY.md`, section 6).
+* Logo files are static files of the instance (fallback) or uploads of the administrator (D-073, database, served by the portal). SVG logos are embedded only as images (`<img>`), never inlined, so file content cannot execute in the page (W3C SVG Integration: an SVG referenced through `<img>` runs no scripts, one opened directly can).
+* Because a logo file can be opened directly, the logo view serves every file with a fixed content type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox; default-src 'none'` and `Cross-Origin-Resource-Policy: same-origin`; static SVG logo files are checked for scripts and external references before deployment and served with a restrictive CSP by the web server. Whether an SVG with `style` attributes renders in `<img>` under this policy was **not** checked in a browser (open, D-073).
+* Footer legal addresses come from the portal settings or the instance configuration and are checked again before printing (`docs/SECURITY.md`, section 6). No third-party fonts, icons or stylesheets; the colour mode cannot be changed through URL parameters (section 7).
 
 ## 11. Open Points
 
-* Instance branding values are kept in the database (the administration) with the environment as the fallback (D-073; this settles the open point of `docs/ARCHITECTURE.md`, "Deliberately Open"). The two legal addresses are in the same portal settings (D-056).
 * Final page structure of later member and administration views; this document defines how they look, not which functions they have.
-* The contrast of the energy colours on the new surfaces is verified when they are first used (section 3.4).
+* The contrast of the energy colours on the new surfaces is verified when first used (section 3.4).
 
 ## Sources
 
-* WCAG 2.2, contrast ratio and success criteria 1.4.1, 1.4.3, 1.4.11: https://www.w3.org/TR/WCAG22/ (checked on 2026-10-11)
-* Tabler documentation in the official repository: https://github.com/tabler/tabler, files `docs/content/ui/getting-started/customize.mdx`, `docs/content/ui/getting-started/color-modes.mdx`, `docs/content/ui/plugins/theme-base-colors.mdx` (branch `main`, checked on 2026-10-11)
-* Tabler theme script: https://github.com/tabler/tabler, files `docs/content/ui/getting-started/color-modes.mdx` and `core/js/tabler-theme.ts` (branch `main`, checked on 2026-10-11 in the security review; behaviour of release 1.6.1 not verified)
-* W3C SVG Integration: https://www.w3.org/TR/svg-integration/ (First Public Working Draft, 2014; cited in the security review of 2026-10-11)
-* Font licences: https://github.com/google/fonts, `ofl/sourcesans3/OFL.txt`, `ofl/bricolagegrotesque/OFL.txt`, `ofl/ibmplexmono/OFL.txt` (checked on 2026-10-11)
-* Tabler and Tabler Icons licences (MIT): https://github.com/tabler/tabler, https://github.com/tabler/tabler-icons (checked on 2026-10-11)
-* Logo files and colours: provided by the project owner (2026-10-11)
-* Design package of the project owner: `LEG-Design-Vorgaben/` (2026-10-14), see D-056
+WCAG 2.2 (1.4.1, 1.4.3, 1.4.11); Tabler documentation and theme script (`tabler/tabler`); W3C SVG Integration; font licences (`google/fonts`); Tabler and Tabler Icons licences (MIT); owner-provided logos, colours and design package `LEG-Design-Vorgaben/` (2026-10-14, D-056).

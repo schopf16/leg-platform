@@ -689,7 +689,7 @@ class PreviewAndVersionTests(TestCase):
     def test_the_number_of_versions_is_limited_and_the_oldest_go(self):
         self.client.force_login(self.editor)
 
-        with patch("leg_platform.accounts.admin.MAX_EMAIL_TEXT_VERSIONS", 3):
+        with patch("leg_platform.accounts.admin.email_texts.MAX_EMAIL_TEXT_VERSIONS", 3):
             for number in range(5):
                 self.save(f"Betreff {number}", "Link: {reset_url}")
 

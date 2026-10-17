@@ -155,7 +155,7 @@ class PlanTests(SimpleTestCase):
             "leg_platform/settings.py",
             "leg_platform/middleware.py",
             "leg_platform/urls.py",
-            "leg_platform/accounts/models.py",
+            "leg_platform/accounts/models/user.py",
             "leg_platform/environment.py",
             "pyproject.toml",
             "leg_platform/new_module_nobody_mapped.py",

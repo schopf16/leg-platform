@@ -19,10 +19,7 @@ def _digest(secret, value, purpose):
 
 
 def keyed_digest(value, purpose):
-    """Return the HMAC-SHA256 of a value with a key derived for one purpose via HKDF.
-
-    A distinct purpose label gives a distinct key, so digests of different uses never match.
-    """
+    """Return the HMAC-SHA256 of a value with a key derived for one purpose via HKDF (distinct purposes never match)."""
     return _digest(settings.SECRET_KEY, value, purpose)
 
 

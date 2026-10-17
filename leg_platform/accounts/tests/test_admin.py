@@ -468,7 +468,7 @@ class AdminPresentationTests(TestCase):
         with translation.override("de-ch"):
             quiet = self.client.get(url).content.decode()
             with mock.patch(
-                "leg_platform.accounts.admin.customer_numbers_nearly_exhausted", return_value=True
+                "leg_platform.accounts.admin.users.customer_numbers_nearly_exhausted", return_value=True
             ):
                 warned = self.client.get(url).content.decode()
 
@@ -485,7 +485,7 @@ class AdminPresentationTests(TestCase):
         self.client.force_login(staff_user)
         with translation.override("de-ch"):
             with mock.patch(
-                "leg_platform.accounts.admin.customer_numbers_nearly_exhausted", return_value=True
+                "leg_platform.accounts.admin.users.customer_numbers_nearly_exhausted", return_value=True
             ):
                 content = self.client.get(reverse("admin:accounts_user_changelist")).content.decode()
 

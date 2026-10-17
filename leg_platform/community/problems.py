@@ -1,15 +1,7 @@
-"""Problem detection per list (D-077; ``LISTEN-STANDARD.md`` sections 9 to 12).
+"""Problem detection per list (D-077): location with open address correction; metering point without
+location, LEG or person; LEG problems (``legs``); persons have none. Archived objects have none.
 
-Only the problems that the specification names are detected; no page adds its own:
-
-* location: address correction open.
-* metering point: no location, no LEG, no person.
-* LEG: quota below the legal minimum, below the warning threshold, stale quota, no producer,
-  no consumer (``community.legs``).
-* person: none yet (no triangle).
-
-Archived objects have no problem (they are out of sight). A metering point "has" a person or a
-LEG while an assignment is valid now or starts later; once the last one has ended it has none.
+A metering point "has" a person or LEG while an assignment is valid now or starts later.
 """
 
 from django.db import models
@@ -33,7 +25,7 @@ class LocationProblem(models.TextChoices):
 
 
 class MeteringPointProblem(models.TextChoices):
-    # The sentences of the banner of the detail page; the hint of the triangle is the same text.
+    # Banner sentences of the detail page; also the hint of the triangle.
     NO_LOCATION = "no_location", _("This metering point is not assigned to a location.")
     NO_LEG = "no_leg", _("This metering point is not assigned to a LEG.")
     NO_PERSON = "no_person", _("This metering point is not assigned to a person.")
@@ -49,7 +41,7 @@ def location_problems(location):
 
 
 def annotate_metering_points(queryset, today=None):
-    """Adds ``has_person`` and ``has_leg`` to each metering point (one query for the list)."""
+    """Adds ``has_person`` and ``has_leg`` to each metering point."""
     today = today or timezone.localdate()
     return queryset.annotate(
         has_person=Exists(
@@ -70,9 +62,7 @@ def metering_points_with_problem(today=None, queryset=None):
 
 
 def metering_point_problems(metering_point, today=None):
-    """The problems of one metering point, in the order of the banner; empty if there are none or
-    the metering point is archived. Uses ``has_person`` and ``has_leg`` if the object was loaded
-    through ``annotate_metering_points``."""
+    """Problems of one metering point in banner order; empty if archived. Uses annotated ``has_person``/``has_leg`` if present."""
     if metering_point.is_archived:
         return []
     today = today or timezone.localdate()
@@ -100,9 +90,8 @@ def legs_with_problem(today=None, threshold_percent=None):
 
 
 def problem_counts(today=None, threshold_percent=None, only=None):
-    """The number of entries with a problem per list, for the overview and the button "Filter
-    problems": ``{"locations": n, "metering_points": n, "legs": n}`` (persons have none yet).
-    ``only`` names the lists to count (a list that is not named is not computed and is left out of the result)."""
+    """Entries with a problem per list: ``{"locations": n, "metering_points": n, "legs": n}``;
+    ``only`` limits which lists are computed (others are left out)."""
     wanted = {"locations", "metering_points", "legs"} if only is None else set(only)
     counts = {}
     if "locations" in wanted:
@@ -115,7 +104,7 @@ def problem_counts(today=None, threshold_percent=None, only=None):
 
 
 def describe(problem, threshold_percent=None):
-    """The text of any problem of the three kinds (the hint of the triangle, the line of a banner)."""
+    """The text of any problem (triangle hint, banner line)."""
     if problem in legs.LegProblem.values:
         if threshold_percent is None:
             threshold_percent = ManagementSettings.load().warning_threshold_percent

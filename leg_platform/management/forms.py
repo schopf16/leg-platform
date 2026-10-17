@@ -10,12 +10,7 @@ ADDRESS_FIELDS = ("sender_street", "sender_house_number", "sender_postal_code", 
 
 
 class ManagementSettingsForm(forms.ModelForm):
-    """The settings page (``einstellungen/UMSETZUNG.md``): sender address, metering points, quota.
-
-    The sender address needs everything but the address addition; the country and the identifier
-    are required here (the model allows an empty identifier so that the row can exist before the
-    staff enter it). The country and the identifier are upper-cased as typed (the rule is capital
-    letters and digits; a lower-case entry is a typing habit, not an error)."""
+    """Settings page form. The address addition is optional; country and identifier are required and upper-cased."""
 
     class Meta:
         model = ManagementSettings
@@ -66,7 +61,7 @@ class ManagementSettingsForm(forms.ModelForm):
         return self.cleaned_data["identifier"].strip().upper()
 
     def sender_fields_are_valid(self):
-        """Whether the four fields that the directory check reads have no error."""
+        """Whether the four fields read by the directory check have no error."""
         return not any(name in self.errors for name in ADDRESS_FIELDS)
 
     def settings_values(self):

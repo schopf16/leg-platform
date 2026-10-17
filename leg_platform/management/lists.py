@@ -1,23 +1,11 @@
-"""The list framework of the management pages (D-078; ``LISTEN-STANDARD.md``).
+"""The list framework of the management pages (D-078).
 
-Not a big abstraction: a few small classes and helpers that every list (locations, metering points,
-LEGs, persons) uses the same way.
+Usage: describe columns with ``Column``; ``state = parse(request.GET, ...)`` validates the address (unknown
+values fall back to defaults); build the queryset yourself and ``paginate(queryset, state)``;
+``list_context(...)`` gives the template context (headers with sort links and saved widths, footer, widths URL).
 
-1. Describe the columns with ``Column``.
-2. ``state = parse(request.GET, columns=..., default_sort=..., filters={...})`` reads and validates
-   the address: search text, filters, sort column and direction, page size and page, "problems".
-   Nothing from the address is trusted: an unknown value falls back to the default.
-3. Build the queryset yourself (search, filters, sort are your queries) and call
-   ``page = paginate(queryset, state)``.
-4. ``list_context(request, key, columns, state, page, count_text=...)`` gives the template context:
-   the headers (with sort link, arrow and the saved width), the footer, the address of the endpoint
-   that saves column widths. The templates ``management/_list_head.html``, ``_list_form_start.html`` and
-   ``_list_foot.html`` render it; ``management/js/list.js`` adds the resizing of the columns,
-   the submit on change and the rows that open.
-
-The address of a list is its state: ``q``, the names of the filters, ``sort``, ``dir`` (``asc`` or
-``desc``), ``per`` (30, 50, 100 or ``all``), ``page`` and ``problems=1``. A value that is the default
-is left out of the addresses that the framework builds.
+The address of a list is its state: ``q``, the filter names, ``sort``, ``dir``, ``per`` (30, 50, 100, ``all``),
+``page`` and ``problems=1``; default values are left out of built addresses.
 """
 
 import math
@@ -31,16 +19,15 @@ from leg_platform.community import preferences
 PAGE_SIZES = (30, 50, 100)
 ALL = "all"
 DEFAULT_PER = 50
-# The most rows that "All" shows at once; a longer list shows pages and says so (D-084, L-1).
+# The most rows "All" shows at once (D-084).
 MAX_ALL_ROWS = 5000
 MAX_QUERY_LENGTH = 200
-MIN_COLUMN_WIDTH = preferences.MIN_COLUMN_WIDTH
 
 
 @dataclass(frozen=True)
 class Column:
-    """A column of a list. ``width`` is the start width in pixels (None: the column takes what is
-    left); ``resizable`` is False for the column that sits next to the fixed link column."""
+    """A list column. ``width`` is the start width in pixels (None: takes the rest); ``resizable`` is False
+    for the column next to the fixed link column; ``keep`` never narrows it on a medium screen."""
 
     key: str
     label: object
@@ -50,7 +37,7 @@ class Column:
     width: int | None = None
     resizable: bool = True
     info_template: str = ""
-    keep: bool = False  # the column is never narrowed to fit a medium screen (a number that is never cut)
+    keep: bool = False
 
 
 @dataclass
@@ -68,8 +55,8 @@ class ListState:
     focus: str = ""
 
     def params(self, **changes):
-        """The query parameters of this state with ``changes`` applied; defaults are left out. A
-        change of anything but the page goes back to page 1."""
+        """Query parameters of this state with ``changes`` applied, defaults left out; a change of
+        anything but the page goes back to page 1."""
         state = {
             "q": self.query, "sort": self.sort, "dir": "desc" if self.descending else "asc",
             "per": self.per, "page": self.page, "problems": "1" if self.problems else "",
@@ -101,22 +88,20 @@ class ListState:
         return f"{self.path}?{urlencode(params)}" if params else self.path
 
     def url_to(self, path, **changes):
-        """The address of another page of the list (the print dialog) with this state; never a page number."""
+        """The address of another page of the list (the print dialog) with this state, never a page number."""
         params = self.params(page=1, **changes)
         return f"{path}?{urlencode(params)}" if params else path
 
     def hidden(self):
-        """The state that a form of the list must carry along (the sort and the "problems" filter);
-        the form's own fields are the search, the filters and the page size."""
+        """Hidden form fields carrying sort and "problems" (the form's own fields are search, filters, page size)."""
         params = self.params()
         return [(name, params[name]) for name in ("sort", "dir", "problems") if name in params]
 
 
 def parse(params, *, path, columns, default_sort, filters=None):
-    """Read the state of a list from ``request.GET`` (or any mapping with ``get``).
+    """Read the state of a list from ``request.GET`` (any mapping with ``get``).
 
-    ``filters`` maps the name of a filter to ``(allowed values, default)``; a value that is not
-    allowed becomes the default."""
+    ``filters`` maps a filter name to ``(allowed values, default)``."""
     filters = filters or {}
     sortable = [column.key for column in columns if column.sortable]
     sort = params.get("sort")
@@ -161,17 +146,15 @@ class Page:
 
 
 class ListRows(list):
-    """Rows that were built and sorted in Python (a list whose figures are not database columns, the
-    LEGs): ``paginate`` takes it like a queryset."""
+    """Rows built and sorted in Python (figures that are no database columns); ``paginate`` takes it like a queryset."""
 
     def count(self):
         return len(self)
 
 
 def paginate(queryset, state):
-    """The rows of the page that the state asks for (a request for a page beyond the end shows the
-    last page). "All" is bounded by ``MAX_ALL_ROWS``: a longer list shows the pages of the default size and a
-    notice (D-084, L-1)."""
+    """The rows of the requested page (beyond the end: the last page). "All" is bounded by ``MAX_ALL_ROWS``:
+    a longer list shows default-size pages and a notice (D-084)."""
     total = queryset.count()
     notice = ""
     per = state.per
@@ -198,7 +181,7 @@ def paginate(queryset, state):
 
 
 def header_cells(columns, state, saved_widths, key):
-    """The cells of the table head: label, sort link, arrow, accessible sort state, width."""
+    """The table head cells: label, sort link, arrow, aria sort state, width."""
     cells = []
     for column in columns:
         active = column.sortable and column.key == state.sort
@@ -226,7 +209,7 @@ def header_cells(columns, state, saved_widths, key):
 
 
 def list_context(request, key, columns, state, page, *, count_text, widths_url):
-    """What the list templates need. ``key`` is the key of the list (``preferences.LIST_KEYS``)."""
+    """The list templates' context; ``key`` is in ``preferences.LIST_KEYS``."""
     saved = preferences.get_preference(request.user, key).column_widths
     return {
         "list_key": key,

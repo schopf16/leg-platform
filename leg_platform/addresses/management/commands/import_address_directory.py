@@ -8,7 +8,6 @@ class Command(BaseCommand):
     help = "Import the fixed official Swiss address directory (operator command; the worker normally does this)."
 
     def handle(self, **options):
-        # The importer writes the directory file; every other process opens it read-only (D-075).
         mark_writer()
         try:
             count = import_directory()

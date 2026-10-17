@@ -1,9 +1,4 @@
-"""Views of the portal accounts (docs/PROJECT.md, "User Functions").
-
-Every view that shows account data or handles a token is marked as not cacheable. Views of
-logged-in persons only ever use ``request.user``; no view takes an account identifier from the
-URL or the request (docs/SECURITY.md, section 4).
-"""
+"""Views of the portal accounts. Logged-in views use only ``request.user``; no account id comes from the request."""
 
 from django.conf import settings
 from django.contrib import messages
@@ -61,15 +56,11 @@ from leg_platform.accounts.models import (
     VerificationToken,
 )
 
-# The verification token's digest is kept in the session between the link and the form, so that
-# the token itself is not in the URL of the page that is shown (docs/SECURITY.md, section 6;
-# the approach of Django's password reset view).
+# The token digest is kept in the session between the link and the form, so the token is not in the page URL.
 REGISTRATION_SESSION_KEY = "registration_token_digest"
-# The password chosen on the second step, as a hash and bound to the verification link, until the
-# last step creates the account (D-058). Never the password itself.
+# The password hash chosen on step 2, bound to the link, until the last step creates the account (D-058).
 REGISTRATION_PASSWORD_SESSION_KEY = "registration_password_hash"
-# The address of the privacy notice that the details page showed, bound to the link: the consent
-# is stored with this address, not with the one that is current when the form is posted (B6).
+# The privacy notice address shown on the details page: the consent is stored with it, not the current one.
 REGISTRATION_PRIVACY_SESSION_KEY = "registration_privacy_url"
 PASSWORD_RESET_SESSION_KEY = "password_reset_token_digest"
 TWO_FACTOR_RESET_SESSION_KEY = "two_factor_reset_token_digest"
@@ -79,18 +70,11 @@ ENROLMENT_SESSION_KEY = "two_factor_enrolment_device"
 
 
 def no_referrer(view):
-    """Pages whose URL contains a token send no referrer (OWASP Forgot Password Cheat Sheet,
-    "URL Tokens"); the header of the view wins over the project default.
+    """Pages whose URL contains a token send no referrer (OWASP "URL Tokens"); D-054.
 
-    Only for the views that are opened through the link of an email (``TokenPageMixin``). It must
-    not be set on a page that contains a form: for a form POST the browser takes the Referrer
-    Policy of the page that contains the form, and with ``no-referrer`` it sends ``Origin: null``,
-    which Django's CSRF check refuses (Fetch standard, "append a request Origin header"; Django
-    ``CsrfViewMiddleware._origin_verified``). The pages after the redirect have no token in
-    their URL and use the project default ``same-origin`` (docs/DECISIONS.md, D-054).
-
-    Every response of such a view is a redirect (D-067): no page is ever rendered under a token
-    URL, so no template has to leave out its forms for this policy.
+    Only for views opened through an email link, which always redirect (D-067). Not for pages
+    with a form: ``no-referrer`` makes the browser send ``Origin: null`` on a POST, which Django's
+    CSRF check refuses.
     """
 
     def wrapped(request, *args, **kwargs):
@@ -114,11 +98,7 @@ class TokenPageMixin(NeverCacheMixin):
 
 
 class HomeView(NeverCacheMixin, TemplateView):
-    """The start page (D-057): a greeting, the open tasks as tiles, or the empty state.
-
-    A person without a login is sent to the login page. Everything shown belongs to
-    ``request.user``; nothing is taken from the request.
-    """
+    """The start page (D-057): greeting and open tasks of ``request.user``; others go to the login page."""
 
     template_name = "accounts/home.html"
 
@@ -138,17 +118,12 @@ class HomeView(NeverCacheMixin, TemplateView):
 
 
 class HideTaskView(NeverCacheMixin, LoginRequiredMixin, View):
-    """"Hide" on a task tile: the task is gone for good for this account (D-057).
-
-    POST only, with the CSRF check of Django. The account is always ``request.user``; the key
-    must be one of the known tasks, every other key is a 404.
-    """
+    """"Hide" on a task tile (D-057): POST only; the account is ``request.user``, an unknown key is a 404."""
 
     http_method_names = ["post"]
 
     def handle_no_permission(self):
-        # Without a login the person goes to the login page, without "?next": a POST target is
-        # no page to return to (security review of phase 2, N-1).
+        # No "?next": a POST target is no page to return to.
         return redirect(settings.LOGIN_URL)
 
     def post(self, request, key):
@@ -161,20 +136,17 @@ class HideTaskView(NeverCacheMixin, LoginRequiredMixin, View):
 class PortalLoginView(NeverCacheMixin, LoginView):
     template_name = "accounts/login.html"
     authentication_form = LoginForm
-    # Django warns that redirecting logged-in persons away from the login page can allow
-    # social media fingerprinting (docs/ARCHITECTURE.md, "Deliberately Open").
+    # Redirecting logged-in persons away would allow fingerprinting (docs/ARCHITECTURE.md, "Deliberately Open").
     redirect_authenticated_user = False
 
     def form_valid(self, form):
         user = form.get_user()
-        # The wish of the form goes on the request object, not into the session: nothing about
-        # it stays behind if the login is not completed (D-056).
+        # The wish goes on the request, not into the session, so nothing stays behind if the login is not completed (D-056).
         wish = form.cleaned_data.get("remember_me") is True
         if not second_factor.has_second_factor(user):
             setattr(self.request, session_timeout.STAY_WISH_ATTRIBUTE, wish)
             return super().form_valid(form)
-        # No login() yet: that follows the second factor (D-017). The wish waits in the pending
-        # login.
+        # No login() yet: that follows the second factor (D-017).
         second_factor.begin_pending_login(
             self.request, user, self.get_redirect_url(), stay=wish
         )
@@ -202,14 +174,11 @@ class SecondFactorLoginView(FormView):
             self.request, self.pending.user, form.cleaned_data["otp_token"]
         )
         if device is None:
-            # One message for a wrong code, a used recovery code and a throttled device. A
-            # lockout is answered by the middleware of the abuse protection instead.
+            # One message for a wrong code, a used recovery code and a throttled device; a lockout is answered by the middleware.
             form.add_error("otp_token", CodeForm.invalid_code_message)
             return self.form_invalid(form)
         second_factor.complete_login(self.request, self.pending.user, device, stay=self.pending.stay)
         if totp.is_recovery_code_device(device):
-            # The person has just proved to own the code, so the number of the codes that are left
-            # is theirs to know. Nothing about the check changes.
             self._tell_about_the_emergency_code(self.pending.user)
         target = self.pending.next_url
         if not url_has_allowed_host_and_scheme(
@@ -238,22 +207,16 @@ class PortalLogoutView(NeverCacheMixin, LogoutView):
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
-        # The message is stored for the next page; the session of the person has ended.
         messages.info(request, _("You have been logged out."))
         return response
 
 
 class MailRequestView(NeverCacheMixin, FormView):
-    """A form that asks for an address and has a link sent to it: registration step 1 and the
-    request of a new password (D-058).
+    """Asks for an address and has a link sent: registration step 1 and password reset (D-058).
 
-    The answer is the same for every address and for a script (security review of phase 3):
-
-    * a request for the address that this browser entered less than a pause ago stores no new job
-      and leads to the same page (the page offers "send again" after the pause);
-    * a hit of the bot check (``bot_check``) leads to the same page without a job;
-    * only the limit of the client address and of the instance is shown, as HTTP 429, and then
-      nothing is stored, not even the session of the client.
+    The answer is the same for every address and for a script: a repeat within the pause, or a
+    bot check hit, stores no job and leads to the same page; only the client/instance limit is
+    shown (HTTP 429), and then nothing is stored, not even the session.
     """
 
     kind = None
@@ -269,9 +232,7 @@ class MailRequestView(NeverCacheMixin, FormView):
             and normalize_email_address(pending.address) == normalize_email_address(address)
         )
         if form.automated or within_pause:
-            # Nothing is stored for the mail, but the answer writes the session: the requests of
-            # this kind are counted per client address, and above the limit the person (or the
-            # script) gets the refusal without a session (security review of phase 4, M4).
+            # The answer writes the session, so count per client address: above the limit, refuse without a session.
             if not rate_limits.consume(
                 rate_limits.SCOPE_MAIL_SILENT,
                 rate_limits.ip_key(axes_client_ip(self.request)),
@@ -306,11 +267,9 @@ class RegistrationView(MailRequestView):
 
 
 class RegistrationInvalidView(NeverCacheMixin, FormView):
-    """"Link no longer valid": asks for the address again, with a form that posts to step 1.
+    """"Link no longer valid": asks for the address again, posting to step 1.
 
-    A page of its own, not the response of the link: the response of a link with a token has
-    ``Referrer-Policy: no-referrer``, and a form on such a page would be refused by the CSRF
-    check (D-054). The link redirects here, so the token is not in this URL.
+    A page of its own: a form on a ``no-referrer`` token response would fail the CSRF check (D-054).
     """
 
     template_name = "accounts/registration_invalid.html"
@@ -318,13 +277,10 @@ class RegistrationInvalidView(NeverCacheMixin, FormView):
 
 
 class EmailSentView(NeverCacheMixin, TemplateView):
-    """The same page for every address (docs/PROJECT.md, "Registration").
+    """The same page for every address (registration and password reset); reveals nothing about the account.
 
-    One page for the registration and the password reset: it says what a person needs to know
-    whatever happened, and states nothing that depends on whether the address belongs to an
-    account. It shows the address that this browser entered and offers "send again" after a
-    pause (``leg_platform.accounts.resend``). ``purpose`` and ``lifetime`` are set in the URL
-    configuration.
+    Shows the address this browser entered and offers "send again" after a pause (``resend``).
+    ``purpose`` and ``lifetime`` are set in the URL configuration.
     """
 
     template_name = "accounts/email_sent.html"
@@ -348,11 +304,7 @@ class EmailSentView(NeverCacheMixin, TemplateView):
 
 
 class ResendView(NeverCacheMixin, View):
-    """"Send the email again": only after the pause, and only to the address of this browser.
-
-    Nothing is sent before the pause is over (the server decides, not the countdown of the page);
-    the limits of every request apply as well (D-038).
-    """
+    """"Send the email again": only after the pause (decided by the server) and only to this browser's address (D-038)."""
 
     http_method_names = ["post"]
     purpose = None
@@ -372,11 +324,10 @@ class ResendView(NeverCacheMixin, View):
 
 
 class RegistrationVerifyView(TokenPageMixin, View):
-    """Opening the link changes nothing; it only remembers the token and leaves the URL.
+    """Opening the link changes nothing: it remembers the token and leaves the URL (D-058).
 
-    Mail scanners and link previews open links without any person acting; the registration is
-    completed only when the last form is submitted. The link stays valid until then (D-058): a
-    scanner, the "back" button or a lost session must not use it up.
+    Mail scanners open links; the registration completes only with the last form, and the link
+    stays valid until then.
     """
 
     def get(self, request, token):
@@ -384,19 +335,17 @@ class RegistrationVerifyView(TokenPageMixin, View):
         if found is None or found.user.status != User.Status.UNVERIFIED:
             clear_registration_session(request)
             return redirect("accounts:registration_invalid")
-        # A new session ID for the person who opens the link; the data of the session stays
-        # (security review of phase 3, B1).
+        # New session ID, the session data stays.
         request.session.cycle_key()
         request.session[REGISTRATION_SESSION_KEY] = found.digest
-        # A new link starts the steps again: a password held for an earlier link is dropped.
+        # A new link starts the steps again.
         request.session.pop(REGISTRATION_PASSWORD_SESSION_KEY, None)
         request.session.pop(REGISTRATION_PRIVACY_SESSION_KEY, None)
         return redirect("accounts:registration_password")
 
 
 def clear_registration_session(request):
-    """Remove everything of a registration from the session: the link, the held password hash, the
-    notice shown, and the address of the request (security review of phase 3, B2)."""
+    """Remove everything of a registration from the session."""
     for key in (
         REGISTRATION_SESSION_KEY,
         REGISTRATION_PASSWORD_SESSION_KEY,
@@ -407,11 +356,9 @@ def clear_registration_session(request):
 
 
 class RegistrationStepMixin(NeverCacheMixin):
-    """Steps 2 and 3: they belong to the verified link that is in the session.
+    """Steps 2 and 3: they belong to the verified link in the session.
 
-    The form belongs to the registration it was rendered for. Opening another link in the same
-    browser replaces the token in the session; a form rendered for the earlier link must then not
-    be saved into the account of the later one.
+    A form rendered for an earlier link must not be saved into the account of a later link opened in the same browser.
     """
 
     @method_decorator(never_cache)
@@ -426,8 +373,7 @@ class RegistrationStepMixin(NeverCacheMixin):
 
     @staticmethod
     def invalid(request):
-        """A person who is logged in (the account was just created, the page was reloaded or "back"
-        was used) goes to the start page; anybody else to the page "link no longer valid"."""
+        """A logged-in person (account just created, reload, "back") goes home; anybody else to "link no longer valid"."""
         if request.user.is_authenticated:
             return redirect("home")
         clear_registration_session(request)
@@ -446,18 +392,13 @@ class RegistrationStepMixin(NeverCacheMixin):
         return found
 
     def get_context_data(self, **kwargs):
-        # The address is shown but cannot be changed here: it is the one that was verified.
         return super().get_context_data(
             account_email=self.token.user.email, registration_ref=self.token.pk, **kwargs
         )
 
 
 class RegistrationPasswordView(RegistrationStepMixin, FormView):
-    """Step 2 of the registration: the password (D-058).
-
-    The password is checked here and kept as a hash in the session, bound to the verification
-    link, until the last step creates the account. The account is not activated before.
-    """
+    """Step 2 of the registration: the password, kept as a hash in the session until step 3 (D-058)."""
 
     template_name = "accounts/registration_password.html"
     form_class = RegistrationPasswordForm
@@ -487,8 +428,7 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
     def get(self, request, *args, **kwargs):
         if self.held_password_hash() is None:
             return redirect("accounts:registration_password")
-        # The address of the privacy notice that this page shows is the one the consent is stored
-        # with (B6): it is kept with the link until the form is posted.
+        # The consent is stored with the privacy notice address shown here; keep it with the link.
         request.session[REGISTRATION_PRIVACY_SESSION_KEY] = {
             "digest": self.token.digest,
             "url": legal_links(request).privacy_url,
@@ -533,9 +473,8 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
         password_hash = self.held_password_hash()
         privacy_url = self.shown_privacy_url()
         with transaction.atomic():
-            # The account is locked before its token, as when a pending registration is replaced,
-            # so that the two cannot deadlock. The token is consumed only now, by the successful
-            # submission, and the locks let only one of two concurrent submissions succeed.
+            # Lock order: account before token (as when a pending registration is replaced), so no deadlock;
+            # the token is consumed only here, and the locks let only one of two concurrent submissions succeed.
             user = (
                 User._base_manager.select_for_update()
                 .filter(pk=self.token.user_id, status=User.Status.UNVERIFIED)
@@ -548,10 +487,8 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             )
             if user is None or token is None:
                 return self.invalid(self.request)
-            # The consent: the time and the address of the privacy notice that was shown.
-            # Only the fields of the form are written, from the account that was read under the lock (L-2):
-            # the instance of the form was loaded when the page was opened and must not write back any other
-            # column (a password, a status or a mark changed in the meantime).
+            # Write only the form's fields (plus consent) onto the account read under the lock: the
+            # form's instance is stale and must not write back a column changed in the meantime.
             form.instance.privacy_accepted_at = timezone.now()
             form.instance.privacy_accepted_url = privacy_url
             written = (
@@ -565,11 +502,7 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             token.delete()
             security_log.record(SecurityEvent.Event.REGISTRATION_COMPLETED, account=user)
         clear_registration_session(self.request)
-        # The person has just proved control of the mailbox and chosen the password, so the session
-        # logs in as after a successful login (owner decision of 2026-10-14, D-055): the session ID
-        # is renewed, the session times and the time of the authentication are written by the login
-        # signal, no failed attempt is recorded, and the account has no privileges. The link was
-        # consumed above, so it cannot log in again.
+        # Logged in as after a login (D-055): the session ID is renewed; the link is consumed, so it cannot log in again.
         login(self.request, user, backend=second_factor.LOGIN_BACKEND)
         return redirect(self.get_success_url())
 
@@ -590,15 +523,14 @@ class PasswordResetRequestView(MailRequestView):
 
 
 class PasswordResetInvalidView(NeverCacheMixin, FormView):
-    """"Link no longer valid": asks for the address again (a page of its own, see
-    ``RegistrationInvalidView``)."""
+    """"Link no longer valid": asks for the address again (see ``RegistrationInvalidView``)."""
 
     template_name = "accounts/password_reset_invalid.html"
     form_class = PasswordResetRequestForm
 
 
 class PasswordResetVerifyView(TokenPageMixin, View):
-    """Opening the link changes nothing; it only remembers the token and leaves the URL."""
+    """Opening the link changes nothing: it remembers the token and leaves the URL."""
 
     def get(self, request, token):
         found = VerificationToken.objects.find_valid(
@@ -608,8 +540,6 @@ class PasswordResetVerifyView(TokenPageMixin, View):
             request.session.pop(PASSWORD_RESET_SESSION_KEY, None)
             resend.forget(request, resend.PASSWORD_RESET)
             return redirect("accounts:password_reset_invalid")
-        # A new session ID for the person who opens the link; the data of the session stays
-        # (security review of phase 3, B1).
         request.session.cycle_key()
         request.session[PASSWORD_RESET_SESSION_KEY] = found.digest
         return redirect("accounts:password_reset_set")
@@ -669,11 +599,8 @@ def find_confirmation_token(raw_token=None, digest=None):
 class LinkNoLongerValidView(NeverCacheMixin, TemplateView):
     """The fixed page "Link no longer valid" of a confirmation flow (D-067).
 
-    Every link of an email that is invalid, expired, used or replaced redirects here, so the
-    page is the same for everyone and for every cause: it is not an oracle for tokens, and it
-    reads nothing from the request, the session or the database. The page is a normal page
-    (no token in its URL, project default ``same-origin``). ``template_name`` is set in the URL
-    configuration.
+    The same for everyone and every cause (no token oracle); it reads nothing from the request,
+    session or database. ``template_name`` is set in the URL configuration.
     """
 
     http_method_names = ["get", "head"]
@@ -686,7 +613,6 @@ class EmailChangeVerifyView(TokenPageMixin, View):
         found = find_confirmation_token(raw_token=token)
         if found is None or found.user.status != User.Status.ACTIVE:
             return redirect("accounts:email_change_invalid")
-        # A new session ID for the person who opens the link; the data of the session stays.
         request.session.cycle_key()
         request.session[EMAIL_CHANGE_SESSION_KEY] = found.digest
         return redirect("accounts:email_change_confirm")
@@ -701,7 +627,7 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
         digest = request.session.get(EMAIL_CHANGE_SESSION_KEY)
         self.token = find_confirmation_token(digest=digest) if digest else None
         if self.token is None or self.token.user.status != User.Status.ACTIVE:
-            # A state that is no longer valid is not kept (it is re-validated on every use anyway).
+            # Re-validated on every use anyway; do not keep a stale state.
             request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
             return redirect("accounts:email_change_invalid")
         return super().dispatch(request, *args, **kwargs)
@@ -720,29 +646,19 @@ class EmailChangeConfirmView(NeverCacheMixin, FormView):
         self.request.session.pop(EMAIL_CHANGE_SESSION_KEY, None)
         if user is None:
             return redirect("accounts:email_change_invalid")
-        # The result page (WL-18). A login address ends every session of the account, so the
-        # person logs in; a second address changes nothing about the sessions.
         if secondary:
             return render(self.request, "accounts/email_second_confirmed.html", {"new_email": address})
-        return render(
-            self.request,
-            "accounts/email_change_done.html",
-            {"new_email": user.email},
-        )
+        return render(self.request, "accounts/email_change_done.html", {"new_email": user.email})
 
 
 class EmailChangeStopVerifyView(TokenPageMixin, View):
-    """The link of the notice about a requested change: it only remembers the token (D-059).
-
-    As with every link of a mail, opening it changes nothing (link scanners open links); the
-    change is stopped by the button of the next page.
-    """
+    """The link of the notice about a requested change: opening it only remembers the token (D-059)."""
 
     def get(self, request, token):
         found = VerificationToken.objects.find_valid(
             token, VerificationToken.Purpose.EMAIL_CHANGE_STOP
         )
-        # The link only has a meaning while a request is open (security review of phase 4, H1).
+        # The link only has a meaning while a request is open.
         if (
             found is None
             or found.user.status != User.Status.ACTIVE
@@ -783,8 +699,7 @@ class EmailChangeStopConfirmView(NeverCacheMixin, FormView):
         stopped = email_change.stop_all(self.token.user)
         self.request.session.pop(EMAIL_CHANGE_STOP_SESSION_KEY, None)
         if stopped is None:
-            # The request ended between the page and the button: nothing was stopped, and no
-            # session ended.
+            # The request ended between the page and the button.
             return redirect("accounts:email_change_stop_invalid")
         return render(self.request, "accounts/email_change_stopped.html")
 
@@ -798,7 +713,7 @@ class TwoFactorMixin(NeverCacheMixin, LoginRequiredMixin):
 
 
 class TwoFactorResetVerifyView(TokenPageMixin, View):
-    """Opening the link changes nothing; it only remembers the token and leaves the URL."""
+    """Opening the link changes nothing: it remembers the token and leaves the URL."""
 
     def get(self, request, token):
         found = second_factor_reset.find_link(token)

@@ -1,13 +1,9 @@
-"""Create the initial system administrator of an instance with an interactive password.
+"""Create the initial system administrator with an interactive password (D-005).
 
-Run in a terminal on the server (docs/DECISIONS.md, D-005). Since D-076 the first start can also
-create the account without a prompt: ``manage.py setup_instance`` does it from the environment
-variables of the first start. This command stays for operators who prefer to type the password.
-The email address comes from the environment variable ``BOOTSTRAP_SYSTEM_ADMIN_EMAIL``; the
-password is asked for interactively with hidden input and is never stored in a file or logged. The
-command refuses while any system administrator exists (also a blocked or deactivated one) and never
-changes an existing account. At the first login the password must be replaced and two-factor
-authentication must be set up before anything else is possible.
+Run in a terminal on the server. (``setup_instance`` can also create it from the first start's
+environment, D-076.) The email comes from ``BOOTSTRAP_SYSTEM_ADMIN_EMAIL``; the password is read with
+hidden input and never stored or logged. Refuses while any system administrator exists (also a
+blocked or deactivated one) and never changes an existing account.
 """
 
 import getpass

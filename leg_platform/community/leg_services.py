@@ -1,14 +1,8 @@
-"""Creating, changing, archiving and deleting a LEG (D-080; ``legs/VORGABEN.md``, ``legs/DETAIL-ENTWURF.md``).
+"""Creating, changing, archiving and deleting a LEG (D-080).
 
-The rules are here, not in the views; every change is one transaction with its entry in the history
-(actor and time; the entries hold the old and the new quota and the names of the fields that changed,
-never the text of a remark).
-
-* The name is unique (the comparison ignores case and accents, as the column does) and is stored with
-  its white space collapsed.
-* A quota needs its date "checked on"; without a quota the date stays empty.
-* A LEG is deleted only without a history, which means: no metering point was ever assigned to it.
-  Otherwise it is archived.
+Every change is one transaction with its history entry (old/new quota and changed field names, never remark
+text). The name is unique ignoring case and accents, stored with collapsed white space; a quota needs its
+date; a LEG is deleted only if no metering point was ever assigned to it, otherwise archived.
 """
 
 from decimal import Decimal
@@ -35,7 +29,7 @@ def normalise_name(name):
 
 
 def name_in_use(name, exclude_pk=None):
-    """Whether another LEG has this name (case and accents ignored, as the unique column compares)."""
+    """Whether another LEG has this name (case and accents ignored)."""
     queryset = Leg.objects.filter(name__iexact=normalise_name(name))
     if exclude_pk is not None:
         queryset = queryset.exclude(pk=exclude_pk)
@@ -52,7 +46,7 @@ def _quota_pair(quota_percent, checked_on):
 
 
 def _text(value):
-    """A value of the history detail: the quota without trailing zeros ("8.2"), a day as ISO text."""
+    """A history detail value: quota without trailing zeros, a day as ISO text."""
     if value is None:
         return None
     return legs.quota_number(value) if isinstance(value, Decimal) else str(value)
@@ -71,7 +65,7 @@ def create_leg(name, quota_percent=None, checked_on=None, remark="", actor=None)
             )
             history.record(leg, HistoryEvent.CREATED, actor)
     except IntegrityError as error:
-        # Two requests with the same name at the same moment: the unique column decides.
+        # Concurrent requests with the same name: the unique column decides.
         if name_in_use(name):
             raise DuplicateName from error
         raise
@@ -79,7 +73,7 @@ def create_leg(name, quota_percent=None, checked_on=None, remark="", actor=None)
 
 
 def update_quota(leg, quota_percent, checked_on, actor=None):
-    """Quota and date are saved together. Nothing is written (and no entry made) if both are as they were."""
+    """Quota and date are saved together; nothing is written if both are unchanged."""
     quota_percent, checked_on = _quota_pair(quota_percent, checked_on)
     with transaction.atomic():
         fresh = Leg.objects.select_for_update().get(pk=leg.pk)
@@ -97,7 +91,7 @@ def update_quota(leg, quota_percent, checked_on, actor=None):
 
 
 def update_master_data(leg, name, remark, actor=None):
-    """Name and remark. The entry names the fields that changed, not their text."""
+    """Name and remark; the history entry names the changed fields, not their text."""
     name = normalise_name(name)
     remark = (remark or "").strip()
     if name_in_use(name, exclude_pk=leg.pk):
@@ -130,13 +124,12 @@ def set_archived(leg, archived, actor=None):
 
 
 def can_delete(leg):
-    """Without a history: no metering point was ever assigned to the LEG (also none that moved on)."""
+    """No metering point was ever assigned to the LEG (also none that moved on)."""
     return not LegAssignment.objects.filter(leg=leg).exists()
 
 
 def delete(leg):
-    """Delete a LEG that has no history. Raises ``NotDeletable``, or ``Archived`` for an archived LEG: the
-    only action on an archived LEG is the restore (D-085, D-086)."""
+    """Delete a LEG without a history. Raises ``NotDeletable`` or ``Archived`` (D-085, D-086)."""
     with transaction.atomic():
         fresh = Leg.objects.select_for_update().get(pk=leg.pk)
         archived.ensure_open(fresh, archived.LEG)

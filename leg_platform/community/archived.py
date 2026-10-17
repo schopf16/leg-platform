@@ -1,9 +1,4 @@
-"""The rule of D-085: an archived location or LEG is read-only, like an archived metering point (D-079).
-
-Every change of it is refused on the server (a direct POST included); the only action that is allowed on
-it is "restore" (``set_archived`` with ``archived=False``). The services raise ``Archived`` under the row
-lock, so that a stale page cannot change an object that was archived in the meantime.
-"""
+"""An archived location or LEG is read-only except "restore" (D-085); services raise ``Archived`` under the row lock."""
 
 LOCATION = "location"
 LEG = "leg"

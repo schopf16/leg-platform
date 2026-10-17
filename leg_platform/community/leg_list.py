@@ -1,14 +1,9 @@
-"""Queries of the list and of the detail page of the LEGs (D-080; ``legs/VORGABEN.md``, ``legs/DETAIL-ENTWURF.md``).
+"""Queries of the LEG list and detail page (D-080).
 
-The figures of a LEG (members, ratio, tier, problems) come from ``community.legs`` in one query for all
-LEGs of a page, so the list works on the rows ``(leg, summary)`` and sorts them in Python: a community has
-a few dozen LEGs, and the derived columns are not columns of the database. Search and display filter are
-queries. The search finds what the list and the detail page show: the name and the grid numbers of the
-transformer circuits of the metering points; never the remark (``LISTEN-STANDARD.md``, section 4).
-
-The detail page lists the members of the LEG with the state of the last column: the metering point is
-already in the own LEG of its transformer circuit ("eigenes"), a LEG that covers only that circuit
-exists and the move is recommended, or there is none ("kein eigenes").
+Figures come from ``community.legs`` in one query, so the list works on ``(leg, summary)`` rows sorted in Python.
+Search (name, grid numbers of the members' transformer circuits; never the remark) and display filter are queries.
+The detail page lists the members with the state of the last column: already in the own LEG of the circuit,
+a dedicated LEG exists (move recommended), or none.
 """
 
 from dataclasses import dataclass
@@ -25,11 +20,9 @@ DISPLAY_ALL = "all"
 DISPLAY_ARCHIVED = "archived"
 DISPLAYS = (DISPLAY_ALL, DISPLAY_ARCHIVED)
 
-SORT_KEYS = ("name", "quota", "participants", "tier", "points")
 DEFAULT_SORT = "name"
 
-# The order of the tiers when sorting: "price optimised" first; a LEG without metering points has no
-# tier and comes last in both directions.
+# "Price optimised" first; a LEG without metering points has no tier and comes last in both directions.
 _TIER_ORDER = {legs.DiscountTier.OPTIMISED: 0, legs.DiscountTier.BASIC: 1}
 
 
@@ -44,14 +37,12 @@ class LegRow:
 
 
 def base_queryset(display=DISPLAY_ALL):
-    """The LEGs of a view: "all" shows the live ones, "archived" only the archived ones (the standard has
-    no archive switch; archived entries appear only with this entry of the filter)."""
+    """"all" shows the live LEGs, "archived" only the archived ones."""
     return Leg.objects.filter(is_archived=(display == DISPLAY_ARCHIVED))
 
 
 def apply_search(queryset, text, today=None):
-    """Every word must match the name of the LEG or the grid number of a transformer circuit of its
-    members (letters without regard to case or accents; the numbers are compared in capitals)."""
+    """Every word must match the LEG name or a member's transformer circuit grid number (case/accent-insensitive)."""
     today = today or timezone.localdate()
     for word in (text or "").split():
         in_circuit = Exists(
@@ -65,7 +56,7 @@ def apply_search(queryset, text, today=None):
 
 
 def rows_for(queryset, threshold_percent=None, today=None):
-    """``[LegRow]`` for the LEGs of the queryset (the figures from one query for all of them)."""
+    """``[LegRow]`` for the queryset's LEGs."""
     found = list(queryset)
     figures = legs.summaries(found, threshold_percent, today)
     return [LegRow(leg, figures[leg.pk]) for leg in found]
@@ -76,8 +67,7 @@ def apply_problems(rows):
 
 
 def _nulls_last(items, key, descending):
-    """Sorted by ``key``; items whose key is None come last in both directions. The sort is stable, so
-    the order that the caller prepared (the name) breaks ties."""
+    """Sorted by ``key``; None keys come last in both directions. Stable, so the caller's order breaks ties."""
     present = [item for item in items if key(item) is not None]
     missing = [item for item in items if key(item) is None]
     present.sort(key=key, reverse=descending)
@@ -85,8 +75,7 @@ def _nulls_last(items, key, descending):
 
 
 def sort_rows(rows, key, descending=False):
-    """Sort by a column; the name breaks ties. A LEG without a value comes last (no quota, no metering
-    points: "–"). Participants sort by consumers, then producers."""
+    """Sort by a column; the name breaks ties, a LEG without a value comes last. Participants sort by consumers, then producers."""
     ordered = sorted(rows, key=lambda row: row.leg.name.casefold())
     if key == "quota":
         return _nulls_last(ordered, lambda row: row.leg.production_quota_percent, descending)
@@ -103,13 +92,10 @@ def sort_rows(rows, key, descending=False):
     return sorted(ordered, key=lambda row: row.leg.name.casefold(), reverse=descending)
 
 
-# The detail page -------------------------------------------------------------------------------
-
 ACTION_OWN = "own"
 ACTION_RECOMMEND = "recommend"
 ACTION_NONE = "none"
 
-MEMBER_SORT_KEYS = ("number", "address", "circuit", "status", "occupant")
 DEFAULT_MEMBER_SORT = "number"
 
 _STATUS_ORDER = {
@@ -125,9 +111,8 @@ _STATUS_ORDER = {
 
 @dataclass
 class Member:
-    """A metering point of the LEG as the detail page shows it. ``action`` is the state of the last
-    column (``ACTION_OWN``, ``ACTION_RECOMMEND`` with ``other_leg``, ``ACTION_NONE``) or None for a
-    metering point whose circuit is unknown (nothing can be said about it)."""
+    """A metering point of the LEG on the detail page. ``action``: ``ACTION_OWN``, ``ACTION_RECOMMEND`` (with
+    ``other_leg``), ``ACTION_NONE``, or None if its circuit is unknown."""
 
     point: MeteringPoint
     status: str
@@ -148,8 +133,7 @@ def members_of(leg, today=None):
 
 
 def dedicated_legs(exclude_leg, threshold_percent=None, today=None):
-    """``{circuit_id: Leg}``: for each transformer circuit the LEG (not archived, not ``exclude_leg``)
-    that covers only that circuit (the first by name if there are several)."""
+    """``{circuit_id: Leg}``: the first LEG by name (not archived, not ``exclude_leg``) that covers only that circuit."""
     candidates = list(Leg.objects.filter(is_archived=False).exclude(pk=exclude_leg.pk).order_by("name"))
     found = legs.summaries(candidates, threshold_percent, today)
     dedicated = {}
@@ -161,13 +145,9 @@ def dedicated_legs(exclude_leg, threshold_percent=None, today=None):
 
 
 def members(leg, summary, threshold_percent=None, today=None):
-    """The ``Member`` rows of the detail page with the state of the last column.
-
-    * The LEG covers one circuit only (price optimised): every metering point is in the own LEG of
-      its circuit: "eigenes".
-    * Otherwise (several circuits): a metering point whose circuit has a LEG of its own gets the
-      recommendation of that LEG, else "kein eigenes". A metering point without a known circuit gets
-      no state."""
+    """The ``Member`` rows with the last-column state: a price-optimised LEG (one circuit) is "own" for every
+    point; otherwise a point gets the dedicated LEG of its circuit as a recommendation, else "none"; a point
+    without a known circuit gets no state."""
     today = today or timezone.localdate()
     points = members_of(leg, today)
     rows = []
@@ -193,8 +173,7 @@ def members(leg, summary, threshold_percent=None, today=None):
 
 
 def occupants(points, today=None):
-    """``{metering point id: name}`` for the metering points that have a person: the one valid now, else
-    the next one. One query."""
+    """``{metering point id: name}`` of the person valid now, else the next one. One query."""
     today = today or timezone.localdate()
     found = {}
     queryset = PersonAssignment.objects.not_ended(today).filter(
@@ -215,9 +194,8 @@ def _house_key(house_number):
 
 
 def sort_members(rows, key, descending=False, occupants=None):
-    """Sort the rows of the table "Metering points of this LEG" by a column; the number breaks ties and
-    a row without a value comes last. ``occupants`` maps the id of a metering point to the name of
-    its person."""
+    """Sort the members table by a column; the id breaks ties, a row without a value comes last.
+    ``occupants`` maps metering point id to person name."""
     occupants = occupants or {}
     ordered = sorted(rows, key=lambda row: row.point.pk)
     if key == "address":

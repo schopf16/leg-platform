@@ -1,23 +1,14 @@
-"""Emails that are sent in the background (outbox; docs/SECURITY.md, section 3; D-037).
+"""Emails sent in the background (outbox; D-037).
 
-The request path of registration and password reset does the same work for every address: it
-counts the request against the limits and stores one job. It makes no lookup and sends nothing,
-so neither the response nor its time depends on whether an account exists. A worker
-(``manage.py process_mail_queue``) then looks up the address, decides and sends. Raw tokens are
-created by the worker and sent at once; they are never stored in a job.
+The request path does the same work for every address (count against the limits, store one job; no
+lookup, nothing sent), so neither response nor timing depends on whether an account exists. A worker
+(``manage.py process_mail_queue``) looks up the address, decides and sends; raw tokens are created by
+the worker and sent at once, never stored.
 
-The worker takes a job in four steps, so that no database lock is held while an email is sent
-and a failing step needs no further database write:
-
-1. claim: under a lock the job's attempt counter is raised and its next due time is moved
-   forward (a lease, at the same time the delay of a retry); other workers skip it meanwhile;
-2. decide: the handler looks the address up and stores what it needs (a pending account and its
-   token) in one transaction, and returns the function that sends the email, or nothing;
-3. send, outside any transaction;
-4. delete the job.
-
-A crash or error before step 4 leaves the job, which is repeated after the delay; delivery is
-at least once. After ``MAX_ATTEMPTS`` the job is given up.
+Worker steps (no lock is held while sending): 1. claim under a lock (attempt counter raised, next
+due time moved forward: a lease and the retry delay); 2. decide: the handler stores what it needs
+in one transaction and returns the send function or nothing; 3. send, outside any transaction;
+4. delete the job. A crash before 4 repeats the job (at least once); after ``MAX_ATTEMPTS`` it is given up.
 """
 
 import logging
@@ -43,19 +34,17 @@ from leg_platform.accounts.normalization import normalize_email_address
 logger = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 3
-# The delay before an attempt is repeated is this value times the number of attempts so far; it
-# also keeps the job away from other workers while it is processed.
+# The retry delay is this value times the attempts so far; it also keeps the job from other workers meanwhile.
 RETRY_DELAY = timedelta(minutes=2)
-# Jobs that were never processed are deleted after this time; they hold addresses.
+# Jobs never processed are deleted after this time; they hold addresses.
 STALE_AFTER = timedelta(hours=1)
 NOTIFICATION_STALE_AFTER = timedelta(hours=24)
 
 
 def _notification(sender, greets=True):
-    """A handler for an email that tells the owner of an account about a change.
+    """A handler for an email that tells an account's owner about a change (gets the stored cleaned name, D-068).
 
-    The handler gets the cleaned name that was stored in the job (D-068). The notice about a
-    deleted account passes no name on: it is always neutral.
+    The notice about a deleted account passes no name on.
     """
     if greets:
         return lambda address, greeting_name="": lambda: sender(address, greeting_name)
@@ -79,16 +68,14 @@ HANDLERS = {
     MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted, greets=False),
 }
 
-# Handlers of jobs about an account get the account key and the address of the request (D-044).
+# Handlers of jobs about an account get the account key and the address (D-044).
 ACCOUNT_HANDLERS = {
     MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
-    # D-087: the link for a person that staff created; the account is found by its key.
     MailJob.Kind.INVITATION: invitations.process_invitation,
 }
 
 DONE = "done"
 FAILED = "failed"
-
 
 _REJECTION_LOG_INTERVAL = 60.0
 _last_rejection_log = float("-inf")
@@ -104,11 +91,10 @@ def _log_rejection():
 
 
 def requests_refused(request, kind):
-    """Whether the client IP address or the instance has used up its limit for this kind of request.
+    """Whether the client IP or the instance has used up its limit for this kind of request.
 
-    Read only and before anything is stored (security review of phase 3, A1). Only these two
-    limits are ever shown to the person (HTTP 429): they do not depend on an account, so no answer
-    tells whether an address has an account; the limit of an address stays silent (D-038).
+    Read only, before anything is stored. Only these two limits are shown (HTTP 429): they do not
+    depend on an account, so no answer tells whether an address has one; the address limit stays silent (D-038).
     """
     client_ip = axes_client_ip(request)
     refused = rate_limits.exhausted(
@@ -125,12 +111,10 @@ def requests_refused(request, kind):
 def submit_mail_request(request, kind, email, *, account=None):
     """Count a request for an email and store the job; the same work for every address.
 
-    Returns False without storing anything if the limit of the client IP address or of the
-    instance is used up: the caller shows the refusal. Otherwise the request is counted at the
-    address, the client IP address and the whole instance only if all three limits have room, so
-    that a client that is refused cannot use up the budget of someone else's address. A request
-    above the limit of the address is stored as a suppressed job without the address, so that the
-    answer and its time stay the same (D-038).
+    Returns False without storing anything if the client IP or instance limit is used up (the caller
+    shows the refusal). Otherwise the request is counted at address, IP and instance only if all
+    three have room (a refused client cannot use up someone else's address budget). Above the
+    address limit the job is stored suppressed, without the address, so answer and timing stay the same (D-038).
     """
     if requests_refused(request, kind):
         return False
@@ -142,7 +126,7 @@ def submit_mail_request(request, kind, email, *, account=None):
         [
             (rate_limits.SCOPE_MAIL_ADDRESS, address, rate_limits.MAIL_ADDRESS_LIMITS),
             (rate_limits.SCOPE_MAIL_IP, rate_limits.ip_key(client_ip), rate_limits.MAIL_IP_LIMITS),
-            # One budget per kind, so that requests of one kind cannot use up the other's.
+            # One budget per kind.
             (rate_limits.SCOPE_MAIL_GLOBAL, str(kind), rate_limits.MAIL_GLOBAL_LIMITS),
         ]
     )
@@ -162,10 +146,8 @@ def submit_mail_request(request, kind, email, *, account=None):
 def enqueue(kind, address, account=None, greeting_name=""):
     """Queue an email that no request limit applies to (e.g. a notification).
 
-    ``greeting_name`` is the cleaned name for the greeting of a notification (D-068); callers
-    other than ``enqueue_for_account`` leave it empty, which means the neutral greeting. A name
-    for any other kind (a request, which has no account) or for the notice about a deleted
-    account is dropped here, so that no caller can store a name that is never used.
+    ``greeting_name`` is the cleaned name for a notification (D-068); empty means the neutral
+    greeting. A name for any other kind, or for the deleted-account notice, is dropped here.
     """
     if kind not in MailJob.NOTIFICATION_KINDS or kind == MailJob.Kind.ACCOUNT_DELETED:
         greeting_name = ""
@@ -183,17 +165,14 @@ ACCOUNT_KEY_KINDS = (MailJob.Kind.EMAIL_CHANGE_NOTICE, MailJob.Kind.TWO_FACTOR_R
 
 
 def enqueue_for_account(kind, user, addresses=None):
-    """Queue the same notification for every address of the account (D-059).
+    """Queue the same notification for every address of the account (D-059), one job per address.
 
-    The login address and the confirmed second address by default, or the addresses that the
-    caller names (e.g. the addresses before a change). One job per address: a failing delivery to
-    one address does not hold back the other. A notice about a requested change and the link to
-    remove the second factor keep the account key, because the worker makes a personal link.
+    Default: the login address and the confirmed second address, or the addresses the caller names
+    (e.g. those before a change). The email-change notice and the 2FA reset link keep the account
+    key (the worker makes a personal link).
 
-    This is the single place that captures the name for the greeting (D-068): the cleaned name
-    of the account at this time, stored in the job, and only for an address that belongs to the
-    account now (so not for the former login address, a removed second address, or any address
-    after the account was deleted). The notice about a deleted account never gets a name.
+    The single place that captures the greeting name (D-068): the account's cleaned name now, only
+    for an address that belongs to the account now; the deleted-account notice never gets one.
     """
     with_account = user if kind in ACCOUNT_KEY_KINDS else None
     name = ""
@@ -232,8 +211,8 @@ def process_pending(limit=50):
 
 
 def _claim():
-    """Take the next due job; return (id, kind, address, account id, greeting name), or
-    DONE/FAILED if a job was discarded. The name is personal data and is never logged."""
+    """Take the next due job: (id, kind, address, account id, greeting name), or DONE/FAILED if one was
+    discarded. The name is personal data and is never logged."""
     now = timezone.now()
     with transaction.atomic():
         job = (
@@ -262,21 +241,16 @@ def _process_next():
     if claimed is None or isinstance(claimed, str):
         return claimed
     job_id, kind, address, account_id, greeting_name = claimed
+    # Imported here to avoid a module cycle: email_change enqueues notifications through this module.
+    from leg_platform.accounts import email_change
+
     try:
         with transaction.atomic():
             if kind == MailJob.Kind.EMAIL_CHANGE_REQUEST:
-                # Imported only while processing to avoid a module cycle: email_change enqueues
-                # the notification through this module after it commits the address change.
-                from leg_platform.accounts import email_change
-
                 send = email_change.process_request(account_id, address)
             elif kind == MailJob.Kind.SECONDARY_EMAIL_REQUEST:
-                from leg_platform.accounts import email_change
-
                 send = email_change.process_secondary_request(account_id, address)
             elif kind == MailJob.Kind.EMAIL_CHANGE_NOTICE:
-                from leg_platform.accounts import email_change
-
                 send = email_change.process_notice(account_id, address, greeting_name)
             elif kind in ACCOUNT_HANDLERS:
                 send = ACCOUNT_HANDLERS[kind](account_id, address, greeting_name)

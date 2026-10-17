@@ -1,10 +1,7 @@
-"""Locations: the directory check and the decision about its suggestion (D-077).
+"""Locations: the directory check, the decision about its suggestion (D-077), and create/change/merge/delete.
 
-The check runs when the address is created or changed (``refresh_suggestion``); the result is
-stored on the location, so that the list can show and filter the problem "address correction open"
-without asking the directory per row. A person with the right accepts the suggestion or does not;
-"not accept" is remembered for the address as it is, and the warning returns only if the address
-changes (``standorte/adresskorrektur/VORGABEN.md``).
+The check result is stored on the location so the list can filter "address correction open" without
+asking the directory per row. "Not accept" is remembered for the address as it is.
 """
 
 from django.db import transaction
@@ -17,8 +14,7 @@ Archived = archived.Archived
 
 
 class SuggestionError(Exception):
-    """``code``: ``no_open_suggestion`` or ``address_in_use`` (the suggested address is the address
-    of another location)."""
+    """``code``: ``no_open_suggestion`` or ``address_in_use``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -26,8 +22,7 @@ class SuggestionError(Exception):
 
 
 class MergeNeeded(Exception):
-    """The new address is the address of another location: saving needs the explicit merge, which
-    moves the metering points to ``target`` and deletes the changed location (irreversible)."""
+    """The new address belongs to another location: saving needs the explicit (irreversible) merge into ``target``."""
 
     def __init__(self, target, metering_points):
         super().__init__("merge_needed")
@@ -40,12 +35,18 @@ class NotDeletable(Exception):
 
 
 class MergeRefused(Exception):
-    """The address belongs to an archived location: nothing is moved to a location that is out of sight."""
+    """The address belongs to an archived location: nothing is moved to it."""
+
+
+def _lock_open(location):
+    """The location row locked for update; raises ``Archived`` if it is archived."""
+    fresh = Location.objects.select_for_update().get(pk=location.pk)
+    archived.ensure_open(fresh, archived.LOCATION)
+    return fresh
 
 
 def refresh_suggestion(location):
-    """Ask the directory about the address of the location and store the answer. Saves only the
-    suggestion columns. Call it after an address was created or changed."""
+    """Ask the directory about the address and store the answer (suggestion columns only)."""
     suggestion = addressing.suggest_correction(*location.current_address())
     location.apply_suggestion(suggestion)
     if location.pk:
@@ -59,12 +60,10 @@ def refresh_suggestion(location):
 
 
 def accept_suggestion(location, actor):
-    """Replace the address by the suggestion; the entry goes to the history with the actor and the
-    time. Refused if there is no open suggestion or if another location has that address (the
-    merge of two locations is a separate, confirmed action)."""
+    """Replace the address by the suggestion (history entry). Refused without an open suggestion or if
+    another location has that address."""
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
-        archived.ensure_open(fresh, archived.LOCATION)
+        fresh = _lock_open(location)
         suggestion = fresh.suggestion
         if suggestion is None or not fresh.address_correction_open:
             raise SuggestionError("no_open_suggestion")
@@ -81,8 +80,7 @@ def accept_suggestion(location, actor):
 def dismiss_suggestion(location, actor):
     """"Do not accept": the address stays, the warning is gone until the address changes."""
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
-        archived.ensure_open(fresh, archived.LOCATION)
+        fresh = _lock_open(location)
         if fresh.suggestion is None or not fresh.address_correction_open:
             raise SuggestionError("no_open_suggestion")
         fresh.dismiss_suggestion()
@@ -91,8 +89,6 @@ def dismiss_suggestion(location, actor):
     return fresh
 
 
-# Creating, changing, confirming, archiving, deleting, merging -------------------------------------
-
 ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town")
 
 
@@ -100,10 +96,7 @@ def create_location(
     *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None,
     remark="", needs_confirmation=False, actor=None,
 ):
-    """A new location. Raises ``ValidationError`` (also for an address that exists; the caller asks
-    ``Location.find_by_address`` first to offer "go to the existing location"). The directory check
-    runs once; a customer's new location (``needs_confirmation``) is marked "new" until a staff
-    user confirms it."""
+    """A new location; raises ``ValidationError`` (also for an existing address). The directory check runs once."""
     location = Location(
         street=street, house_number=house_number, postal_code=postal_code, town=town,
         address_addition=address_addition, transformer_circuit=transformer_circuit,
@@ -121,16 +114,13 @@ def update_address(
     location, *, street, house_number, postal_code, town, address_addition="", actor=None, merge=False,
     merge_target_id=None,
 ):
-    """Change the address (``standorte/VORGABEN.md``: only the address can be changed).
+    """Change the address (only the address can be changed).
 
-    If the new address is the address of another location, ``MergeNeeded`` is raised unless
-    ``merge`` is true **and** ``merge_target_id`` is the id of that location (the confirmation is
-    bound to the target that was shown; a different one, found under the lock, asks again); then the
-    metering points move to the other location (each move is a history entry of the metering point),
-    this one is deleted, the other one is returned and the merge is logged (irreversible). An archived
-    target is refused (``MergeRefused``). Otherwise the address is saved, a change of street, house
-    number, postal code or town is logged and the directory is asked again (the dismissal of an
-    earlier suggestion holds only for the same address). The rows are locked in ascending id order."""
+    If the new address belongs to another location, ``MergeNeeded`` is raised unless ``merge`` is true
+    and ``merge_target_id`` is that location's id; then its metering points move to the other
+    location, this one is deleted and the other returned. An archived target raises ``MergeRefused``.
+    Otherwise the address is saved, a change is logged and the directory asked again. Rows are
+    locked in ascending id order."""
     new = addressing.normalise_address(street, house_number, postal_code, town)
     with transaction.atomic():
         probe = Location.find_by_address(*new)
@@ -159,8 +149,7 @@ def update_address(
 
 
 def _merge(source, target, actor):
-    """Move the metering points of ``source`` to ``target`` (locked in ascending id order, one history entry
-    of each), log the merge at the target and delete ``source``."""
+    """Move the metering points of ``source`` to ``target`` (history entry each), log the merge, delete ``source``."""
     points = list(MeteringPoint.objects.select_for_update().filter(location=source).order_by("pk"))
     for point in points:
         point.location = target
@@ -178,7 +167,7 @@ def _merge(source, target, actor):
 
 
 def set_circuit(location, circuit, actor=None):
-    """Assign the transformer circuit (None removes it); a change is logged with the numbers."""
+    """Assign the transformer circuit (None removes it); a change is logged."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().select_related("transformer_circuit").get(pk=location.pk)
         archived.ensure_open(fresh, archived.LOCATION)
@@ -195,20 +184,18 @@ def set_circuit(location, circuit, actor=None):
 
 
 def update_remark(location, remark, actor=None):
-    """Save the remark of the location (no entry in the history: the text is internal, never logged)."""
+    """Save the remark (not logged: the text is internal)."""
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
-        archived.ensure_open(fresh, archived.LOCATION)
+        fresh = _lock_open(location)
         fresh.remark = (remark or "").strip()
         fresh.save(update_fields=["remark", "updated_at"])
     return fresh
 
 
 def confirm(location, actor=None):
-    """"Confirm the address" of a location that a customer created: the mark "new" goes."""
+    """Confirm a customer-created location: the mark "new" goes."""
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
-        archived.ensure_open(fresh, archived.LOCATION)
+        fresh = _lock_open(location)
         if fresh.needs_confirmation:
             fresh.needs_confirmation = False
             fresh.save(update_fields=["needs_confirmation", "updated_at"])
@@ -227,20 +214,17 @@ def set_archived(location, archived, actor=None):
 
 
 def can_delete(location):
-    """A location is deleted only without a history (``standorte/VORGABEN.md``, "Löschen nur ohne
-    Historie"); one that still has metering points is archived, because they would lose their place."""
+    """Deletable only without a history and metering points (those archive instead)."""
     return not history.has_history(location) and not location.metering_points.exists()
 
 
 def delete(location):
-    """Delete a location that has no history and no metering points. Raises ``NotDeletable``, or ``Archived``
-    for an archived location: the only action on an archived location is the restore (D-085, D-086)."""
+    """Delete a location without history or metering points; raises ``NotDeletable`` (``Archived`` if archived; D-085, D-086)."""
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
-        archived.ensure_open(fresh, archived.LOCATION)
+        fresh = _lock_open(location)
         if not can_delete(fresh):
             raise NotDeletable
-        # Only the entry "Created" exists; it goes with the location.
+        # Only the entry "Created" can exist; it goes with the location.
         HistoryEntry.objects.filter(subject_type=history.LOCATION, subject_id=fresh.pk).delete()
         fresh.delete()
 
