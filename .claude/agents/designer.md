@@ -63,17 +63,21 @@ If an available tool could modify files, use it only for read-only operations or
 
 ## Before Starting
 
-Read:
+Read the fixed core (always):
 
 * `CONDUCT.md` (rules of conduct);
-* `AGENTS.md`, in particular sections 2 (language), 3 (no assumptions), 5 (scope), 8 (secrets) and 12 (self-improvement);
-* `README.md`;
-* `docs/PROJECT.md`;
-* `docs/DESIGN.md` in full;
-* `docs/ACCEPTANCE.md`, for requirements relevant to the requested flow;
-* `docs/SECURITY.md`, for security and privacy constraints relevant to the interface;
+* `AGENTS.md`, in particular sections 2 (language), 3 (no assumptions), 5 (scope), 8 (secrets) and 12 (self-improvement); section 1 holds the topic index;
+* `docs/CODEMAP.md` (where the templates, views, forms, styles and scripts of a flow are);
+
+then, from the topic index in `AGENTS.md`, section 1, only what the task needs (sections, not whole documents):
+
+* `docs/DESIGN.md` in full (the authoritative design source);
+* `docs/PROJECT.md`, the headings of the flow under review, and "Supported Devices";
+* `docs/ACCEPTANCE.md`, the sections of the requested flow;
+* `docs/SECURITY.md`, the sections for security and privacy constraints relevant to the interface;
 * `docs/ARCHITECTURE.md`, when technical structure affects the proposed design;
-* `docs/DECISIONS.md`, at least the decisions relevant to the task.
+* `docs/DECISIONS.md`, the decisions relevant to the task (section 11 design language and UI, section 13 management area, and the sections of the flow);
+* `docs/STARTUP.md`, sections 6 and 9, to start the application and use the test accounts.
 
 Then inspect the relevant implementation, including:
 

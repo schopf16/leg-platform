@@ -34,8 +34,9 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 6. `docs/ACCEPTANCE.md` defines the acceptance criteria.
 7. `docs/DECISIONS.md` records all decisions with their sources.
 8. `docs/DESIGN.md` defines the binding design language of the user interface (D-024).
+9. `docs/CODEMAP.md` maps the code base (what is where, where to change what, conventions, test map); with `CONDUCT.md` and `AGENTS.md` it is the fixed reading core of every agent.
 
-Read the relevant rules before every larger change.
+Read the relevant rules before every larger change; `AGENTS.md`, section 1, has the topic index that tells which documents a task needs.
 
 ## Operation Documents
 

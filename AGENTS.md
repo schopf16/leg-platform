@@ -2,18 +2,30 @@
 
 ## 1. Way of Working
 
-Read before starting work:
+Read before starting work (the fixed core, always, and nothing more by default):
 
-* `CONDUCT.md`
-* `README.md`
-* `docs/PROJECT.md`
-* `docs/SECURITY.md`
-* `docs/ARCHITECTURE.md`
-* `docs/DECISIONS.md`
-* `docs/ACCEPTANCE.md`
-* `docs/DESIGN.md` (for changes to the user interface)
+* `CONDUCT.md` (rules of conduct)
+* this file (sections 2 and 3 apply to all work; section 12 to every self-improvement)
+* `docs/CODEMAP.md` (where things are, where to change what, conventions, test map)
 
-When making changes, also read all directly affected files and tests.
+Then read only the documents and sections the task needs, chosen from this topic index. Open the section, not the whole document (the headings tell where); do not read the rest "to be safe".
+
+| Topic | Where |
+|---|---|
+| Scope, terms, what is not included, registration, account states, access levels, phase 2 (management area) | `docs/PROJECT.md` (by heading) |
+| Security policy: 3 authentication, 4 authorization, 5 data protection, 6 web security, 7 secrets, 8 Microsoft Graph, 9 database and operations, 10 security logging, 11 required tests | `docs/SECURITY.md` (by section) |
+| Architecture: stack, users and roles, login identifiers, account lifecycle, email, management area and community domain, data storage, environments | `docs/ARCHITECTURE.md` (by heading) |
+| Binding decisions by topic: 1 stack, 2 language and translation, 3 instances, configuration, hosting, 4 roles and access, 5 accounts and lifecycle, 6 authentication, second factor, links, 7 security log and sessions, 8 mail, 9 web security baseline, 10 address directory, 11 design language and UI, 12 portal settings, 13 management area, 14 operations, local setup, tests, 15 open points, 16 agent workflow and conduct, 17 superseded IDs | `docs/DECISIONS.md` (the sections of the task; an ID such as D-086 in a code comment is found by searching for it) |
+| User interface: colours, typography, navigation, layout, print, Tabler | `docs/DESIGN.md` (only for UI changes) |
+| Acceptance criteria (1 setup, 2 login, 3 two-factor, 4 profile, 6 roles, 8 email, 9 security log, 12 design, 13 language) | `docs/ACCEPTANCE.md` (the sections of the task) |
+| Local environment, start and stop, test accounts, test runner and areas (section 13), troubleshooting | `docs/STARTUP.md` (by section) |
+| Deployment, installation, configuration variables, operation of an instance | `docs/DEPLOYMENT.md`, `docs/INSTALLATION.md`, `docs/OPERATIONS.md` (operations tasks only) |
+| Third-party services that receive personal data; licences | `docs/SERVICES.md`, `docs/THIRD_PARTY_LICENSES.md` (only when adding or changing a service or dependency) |
+| Current status and next steps | `README.md` |
+
+A task that touches authentication, authorization, accounts, sessions, email, logging, secrets or web security reads the matching sections of `docs/SECURITY.md` and the decisions of the matching sections of `docs/DECISIONS.md` in any case; this reduction of the reading never lowers a security rule.
+
+When making changes, also read all directly affected files and tests (find them through `docs/CODEMAP.md`, not by searching the whole code). A change that adds, moves, renames or removes a module, class or entry point named in `docs/CODEMAP.md` updates the map in the same change.
 
 Implement in small, verifiable steps. Do not build extensive functionality in advance that is not part of the agreed scope.
 

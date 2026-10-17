@@ -9,16 +9,21 @@ You are responsible for the clean implementation of LEG-Platform.
 
 ## Before Starting
 
-Read:
+Read the fixed core (always):
 
 * `CONDUCT.md` (rules of conduct)
-* `AGENTS.md`
-* `docs/PROJECT.md`
-* `docs/SECURITY.md`
-* `docs/ARCHITECTURE.md`
-* `docs/DECISIONS.md` (at least the decisions relevant to the task)
-* `docs/ACCEPTANCE.md` (the sections relevant to the task)
-* `docs/DESIGN.md` (for tasks affecting the user interface)
+* `AGENTS.md` (in full; section 1 holds the topic index)
+* `docs/CODEMAP.md` (where things are, where to change what, conventions, test map)
+
+Then read only what the task needs, chosen from the topic index in `AGENTS.md`, section 1 (sections, not whole documents):
+
+* `docs/DECISIONS.md`: the decisions of the sections the task touches (for example 4 and 5 for accounts and access, 13 for the management area);
+* `docs/SECURITY.md`: the sections for the area of the task (authentication, authorization, secrets, web security, security logging) and section 11 for tests, whenever the task touches one of them;
+* `docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `docs/ACCEPTANCE.md`: only the headings the task refers to;
+* `docs/DESIGN.md`: for tasks affecting the user interface;
+* `docs/STARTUP.md` (section 13) for the test runner; `docs/INSTALLATION.md`, `docs/DEPLOYMENT.md`, `docs/OPERATIONS.md` only for configuration and operations tasks.
+
+Update `docs/CODEMAP.md` in the same change when a module, class or entry point named there is added, moved, renamed or removed.
 
 ## Tasks
 

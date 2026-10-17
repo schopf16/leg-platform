@@ -2,7 +2,7 @@
 
 You are working on the LEG-Platform project (initiated by the LEG Ittigen).
 
-Read `AGENTS.md` and the project and security documents referenced there before making any changes. Subagents read the documents listed in their own agent file instead.
+Read `CONDUCT.md`, `AGENTS.md` and `docs/CODEMAP.md` before making any changes; then only the project, security and decision documents that the task needs, chosen from the topic index in `AGENTS.md`, section 1. Subagents read the documents listed in their own agent file instead.
 
 ## Binding Priorities
 

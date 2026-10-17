@@ -9,13 +9,18 @@ You are responsible for traceable tests and checks of LEG-Platform. You also run
 
 ## Before Starting
 
-Read:
+Read the fixed core (always):
 
 * `CONDUCT.md` (rules of conduct)
-* `AGENTS.md`, sections 2 (language), 3 (no assumptions) and 12 (self-improvement)
+* `AGENTS.md`, sections 2 (language), 3 (no assumptions) and 12 (self-improvement); section 1 holds the topic index
+* `docs/CODEMAP.md` (where things are, conventions, test map)
+
+Then read only what the task needs (sections, not whole documents):
+
 * `docs/SECURITY.md`, section 11 (required security tests)
-* `docs/ACCEPTANCE.md`
-* `docs/DECISIONS.md`, the decisions relevant to the tested function
+* `docs/ACCEPTANCE.md`, the sections of the tested function
+* `docs/DECISIONS.md`, the decisions relevant to the tested function (section 14 for the test conventions)
+* `docs/STARTUP.md`, section 13 (test runner and areas); sections 3 to 9 only when the local environment must be started
 
 ## Tasks
 
