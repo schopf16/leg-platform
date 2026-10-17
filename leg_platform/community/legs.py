@@ -36,8 +36,56 @@ class LegProblem(models.TextChoices):
     QUOTA_BELOW_LEGAL = "quota_below_legal", _("Production quota below 5 % (required by law)")
     QUOTA_BELOW_WARNING = "quota_below_warning", _("Production quota below the warning threshold")
     QUOTA_STALE = "quota_stale", _("Metering points added since the value was read, read the value again")
-    NO_PRODUCER = "no_producer", _("No producer")
-    NO_CONSUMER = "no_consumer", _("No consumer")
+    # The banner of the one-circuit reference says "Problem: kein Produzent in der LEG" (D-080).
+    NO_PRODUCER = "no_producer", _("No producer in the LEG")
+    NO_CONSUMER = "no_consumer", _("No consumer in the LEG")
+
+
+class QuotaLevel:
+    """How the production quota stands, for the colour of the line on the card of the LEG
+    (``legs/DETAIL-ENTWURF.md``: green sufficient, yellow tight = below the warning value, red below
+    the legal 5 %)."""
+
+    OK = "ok"
+    WARNING = "warning"
+    LEGAL = "legal"
+
+
+def quota_level_text(level, threshold_percent=DEFAULT_WARNING_THRESHOLD_PERCENT):
+    """The line on the card of the quota: "Ausreichend", "Unter 10 %" or "Unter 5 %" (the reference)."""
+    from django.utils.translation import gettext
+
+    if level == QuotaLevel.OK:
+        return gettext("Sufficient")
+    if level == QuotaLevel.WARNING:
+        return gettext("Below %(threshold)s %%") % {"threshold": threshold_percent}
+    return gettext("Below %(threshold)s %%") % {"threshold": LEGAL_MINIMUM_QUOTA_PERCENT}
+
+
+def quota_level(quota_percent, threshold_percent):
+    """The ``QuotaLevel`` of a quota, or None without a quota."""
+    if quota_percent is None:
+        return None
+    quota = Decimal(quota_percent)
+    if quota < LEGAL_MINIMUM_QUOTA_PERCENT:
+        return QuotaLevel.LEGAL
+    if quota < threshold_percent:
+        return QuotaLevel.WARNING
+    return QuotaLevel.OK
+
+
+def quota_number(quota_percent):
+    """"37.6" for a field or a text; the stored two decimals lose their trailing zeros ("40", "8.2")."""
+    if quota_percent is None:
+        return ""
+    return format(Decimal(quota_percent).normalize(), "f")
+
+
+def format_quota(quota_percent):
+    """"37.6 %" as the specification writes it; None (no quota) gives None."""
+    if quota_percent is None:
+        return None
+    return f"{quota_number(quota_percent)} %"
 
 
 def discount_tier(circuit_ids):
@@ -74,10 +122,10 @@ def quota_problems(quota_percent, checked_on, member_created_on, threshold_perce
     if quota_percent is None:
         return []
     problems = []
-    quota = Decimal(quota_percent)
-    if quota < LEGAL_MINIMUM_QUOTA_PERCENT:
+    level = quota_level(quota_percent, threshold_percent)
+    if level == QuotaLevel.LEGAL:
         problems.append(LegProblem.QUOTA_BELOW_LEGAL)
-    elif quota < threshold_percent:
+    elif level == QuotaLevel.WARNING:
         problems.append(LegProblem.QUOTA_BELOW_WARNING)
     if checked_on is not None and any(created > checked_on for created in member_created_on):
         problems.append(LegProblem.QUOTA_STALE)
@@ -101,19 +149,22 @@ class LegSummary:
 
 
 def build_summary(leg, rows, threshold_percent):
-    """The summary of one LEG from its member rows ``(direction, circuit_id, created_on)``."""
+    """The summary of one LEG from its member rows ``(direction, circuit_id, created_on)``. An archived
+    LEG has no problems (it is out of sight, like every archived object: ``problems``)."""
     consumers = sum(1 for direction, _circuit, _created in rows if direction == Direction.CONSUMPTION)
     producers = sum(1 for direction, _circuit, _created in rows if direction == Direction.FEED_IN)
-    problems = quota_problems(
-        leg.production_quota_percent,
-        leg.quota_checked_on,
-        [created for _direction, _circuit, created in rows],
-        threshold_percent,
-    )
-    if rows and not producers:
-        problems.append(LegProblem.NO_PRODUCER)
-    if rows and not consumers:
-        problems.append(LegProblem.NO_CONSUMER)
+    problems = []
+    if not leg.is_archived:
+        problems = quota_problems(
+            leg.production_quota_percent,
+            leg.quota_checked_on,
+            [created for _direction, _circuit, created in rows],
+            threshold_percent,
+        )
+        if rows and not producers:
+            problems.append(LegProblem.NO_PRODUCER)
+        if rows and not consumers:
+            problems.append(LegProblem.NO_CONSUMER)
     circuits = [circuit for _direction, circuit, _created in rows]
     return LegSummary(
         leg_id=leg.pk,

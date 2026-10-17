@@ -1,0 +1,69 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list of LEGs (LEG-Design-Vorgaben/verwaltung/legs/referenz/leg-liste-desktop and leg-liste-handy; D-080). On a
+desktop a table, on a phone one card per LEG. The name is plain text (the link icon at the right opens the detail
+page); the quota is only the value; a warning triangle stands behind a problem with its text as the hint; the
+discount tier is a dot and a word. No button "Print" yet (the printing block adds it; no print on a phone). The page
+works without a script: the filters are a GET form.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-legs{% endblock %}
+{% block header_actions %}
+  {% if problem_count %}<a class="btn btn-warning-outline" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create LEG" %}</a>{% endif %}
+{% endblock %}
+{% block page_content %}
+  {% translate "Name of the LEG or transformer circuit" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Display" %}</span>
+      <select name="display" class="form-select" data-autosubmit>
+        {% for value, text in display_options %}<option value="{{ value }}"{% if value == list_state.values.display %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            <tr>
+              <td><div class="mgmt-leg-name mgmt-cut" title="{{ entry.leg.name }}">{{ entry.leg.name }}</div></td>
+              <td>{% if entry.quota_text %}<span class="tnum mgmt-quota">{{ entry.quota_text }}</span>{% if entry.quota_problem %}{% include "management/_warning.html" with text=entry.quota_problem %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>{% if entry.summary.ratio %}<span class="tnum">{{ entry.summary.ratio }}</span>{% if entry.ratio_problem %}{% include "management/_warning.html" with text=entry.ratio_problem %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td>{% if entry.has_tier %}{% include "management/_status.html" with tone=entry.tier_tone label=entry.tier_label %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              <td class="tnum">{{ entry.summary.metering_points }}</td>
+              <td class="mgmt-link-col">{% translate "Go to the LEG page" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+            </tr>
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=6 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        <article class="mgmt-place">
+          <div class="mgmt-place-addr">{{ entry.leg.name }}{% if entry.all_problems %}{% include "management/_warning.html" with text=entry.all_problems %}{% endif %}{% translate "Go to the LEG page" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Production quota" %}</dt><dd class="tnum">{% if entry.quota_text %}{{ entry.quota_text }}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Consumers : producers" %}</dt><dd class="tnum">{% if entry.summary.ratio %}{{ entry.summary.ratio }}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Discount tier" %}</dt><dd>{% if entry.has_tier %}{% include "management/_status.html" with tone=entry.tier_tone label=entry.tier_label %}{% else %}–{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Metering points" %}</dt><dd class="tnum">{{ entry.summary.metering_points }}</dd></div>
+          </dl>
+        </article>
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% load i18n %}{% comment %}
+The one button at the top right of the detail page of a LEG (D-080): "Delete LEG" (red outline, only without a
+history = no metering point was ever assigned, and with the right to delete), else "Archive LEG" (neutral); an archived
+LEG offers "Restore LEG". Context: ``leg``, ``show_delete``, ``show_archive``, ``current_url``.
+{% endcomment %}{% if show_delete %}
+  <a class="btn btn-danger-outline" href="{% url 'management:legs_delete' leg.pk %}">{% translate "Delete LEG" %}</a>
+{% elif show_archive %}
+  <form method="post" action="{% url 'management:legs_archive' leg.pk %}" class="mgmt-inline-form">{% csrf_token %}<input type="hidden" name="next" value="{{ current_url }}">{% if leg.is_archived %}<input type="hidden" name="archive" value="0"><button type="submit" class="btn btn-secondary-action">{% translate "Restore LEG" %}</button>{% else %}<button type="submit" class="btn btn-secondary-action">{% translate "Archive LEG" %}</button>{% endif %}</form>
+{% endif %}

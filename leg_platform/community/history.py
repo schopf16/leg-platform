@@ -30,6 +30,8 @@ class HistoryEvent(models.TextChoices):
     LOCATION_CONFIRMED = "location_confirmed", _("Address confirmed")
     ARCHIVED = "archived", _("Archived")
     UNARCHIVED = "unarchived", _("Restored from the archive")
+    QUOTA_CHANGED = "quota_changed", _("Production quota changed")
+    MASTER_DATA_CHANGED = "master_data_changed", _("Master data changed")
     LOCATIONS_MERGED = "locations_merged", _("Locations merged")
     ADDRESS_CORRECTION_ACCEPTED = "address_correction_accepted", _("Address correction accepted")
     ADDRESS_CORRECTION_DISMISSED = "address_correction_dismissed", _("Address correction not accepted")

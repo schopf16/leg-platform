@@ -7,7 +7,7 @@ key (``navigation.MENU``), so that the menu marks the entry as active.
 
 from django.urls import path
 
-from leg_platform.management import location_views, views
+from leg_platform.management import leg_views, location_views, views
 from leg_platform.management import metering_point_views as mp_views
 
 app_name = "management"
@@ -74,4 +74,12 @@ urlpatterns = [
     ),
     path("metering-points/<int:pk>/archive/", mp_views.ArchiveView.as_view(), name="metering_points_archive"),
     path("metering-points/<int:pk>/delete/", mp_views.DeleteView.as_view(), name="metering_points_delete"),
+    # LEGs
+    path("legs/", leg_views.LegListView.as_view(), name="legs"),
+    path("legs/new/", leg_views.LegCreateView.as_view(), name="legs_new"),
+    path("legs/<int:pk>/", leg_views.LegDetailView.as_view(), name="legs_detail"),
+    path("legs/<int:pk>/quota/", leg_views.LegQuotaView.as_view(), name="legs_quota"),
+    path("legs/<int:pk>/edit/", leg_views.LegMasterDataView.as_view(), name="legs_edit"),
+    path("legs/<int:pk>/archive/", leg_views.LegArchiveView.as_view(), name="legs_archive"),
+    path("legs/<int:pk>/delete/", leg_views.LegDeleteView.as_view(), name="legs_delete"),
 ]

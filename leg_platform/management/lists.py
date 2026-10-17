@@ -149,6 +149,14 @@ class Page:
     next_url: str = ""
 
 
+class ListRows(list):
+    """Rows that were built and sorted in Python (a list whose figures are not database columns, the
+    LEGs): ``paginate`` takes it like a queryset."""
+
+    def count(self):
+        return len(self)
+
+
 def paginate(queryset, state):
     """The rows of the page that the state asks for (a request for a page beyond the end shows the
     last page)."""

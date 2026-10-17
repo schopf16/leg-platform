@@ -181,7 +181,8 @@ class StyleAndScriptTests(SimpleTestCase):
     def test_a_link_to_a_page_that_does_not_exist_yet_is_empty(self):
         from leg_platform.management.templatetags import management_ui as ui
 
-        self.assertEqual(ui.optional_url("management:legs_detail", 1), "")
+        self.assertEqual(ui.optional_url("management:persons_detail", 1), "")
+        self.assertEqual(ui.optional_url("management:legs_detail", 7), "/management/legs/7/")
         self.assertEqual(ui.optional_url("management:locations_detail", 5), "/management/locations/5/")
 
 
@@ -274,7 +275,7 @@ class TextsOfTheSpecificationTests(SimpleTestCase):
     def test_the_discount_tiers_and_the_problems(self):
         self.assertEqual(str(DiscountTier.OPTIMISED.label), "Preisoptimiert")
         self.assertEqual(str(DiscountTier.BASIC.label), "Basis-Rabatt")
-        self.assertEqual(str(LegProblem.NO_PRODUCER.label), "Kein Produzent")
+        self.assertEqual(str(LegProblem.NO_PRODUCER.label), "kein Produzent in der LEG")
 
     def test_the_history_events(self):
         self.assertEqual(str(HistoryEvent.CREATED.label), "Angelegt")

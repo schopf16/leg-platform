@@ -200,6 +200,10 @@ Block 3 (D-079) adds the metering points. Domain modules: `metering_points` (now
 
 Sources: D-077, D-078, D-079 and their sources.
 
+Block 4 (D-080) adds the LEGs. Domain modules: `leg_services` (create, change the quota and the master data, archive, delete; every change one transaction with its history entry; the unique name), `leg_list` (search by name or circuit, the display filter, the rows of the list sorted in Python, the members of the detail page with the state of the last column: "eigenes", the recommended LEG, "kein eigenes", and the sorting of that table) and the additions to `legs` (the quota level, the format of the quota; an archived LEG has no problems). In `management`: `leg_views.py`, `leg_forms.py`, the templates `legs/*.html` and `static/management/js/leg-quota.js` (today's date when the quota changes; only an enhancement), `lists.ListRows` (rows built in Python for `paginate`). The swap icon of a row opens the shared dialog `management:metering_points_leg` of block 3.
+
+Sources: D-077, D-078, D-079, D-080 and their sources.
+
 ## Data Storage
 
 MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.

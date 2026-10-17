@@ -1,0 +1,11 @@
+{% extends "management/dialog_form.html" %}
+{% load static %}{% comment %}
+The dialogs with the production quota (LEG-Design-Vorgaben/verwaltung/legs/referenz/leg-anlegen-desktop and
+leg-quote-bearbeiten-desktop; D-080): the quota with "%" in the field and "Checked on" next to it. The small
+script fills in today's date as soon as the quota changes and leaves the date alone once the person has changed it
+(it only helps: the server requires the date when a quota is entered).
+{% endcomment %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/leg-quota.js' %}"></script>
+{% endblock %}

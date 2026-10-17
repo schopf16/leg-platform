@@ -259,7 +259,7 @@ class MenuRuleTests(SimpleTestCase):
     def test_entries_follow_the_permissions_of_their_pages(self):
         self.assertEqual(self.keys(self.User()), [])
         self.assertEqual(self.keys(self.User(["community.view_managementsettings"])), ["overview", "settings"])
-        self.assertEqual(self.keys(self.User(["community.view_leg"])), ["overview"])
+        self.assertEqual(self.keys(self.User(["community.view_leg"])), ["overview", "legs"])
         self.assertEqual(self.keys(self.User(["community.change_managementsettings"])), [])
 
     def test_nobody_but_an_active_staff_user_sees_an_entry(self):

@@ -1545,3 +1545,217 @@ a.mgmt-sort:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ======================================================================================
+   LEGs (D-080). Ported from the templates of the owner in verwaltung/legs/referenz; colours
+   only through the tokens.
+   ====================================================================================== */
+
+.mgmt-leg-name {
+  font-weight: 700;
+}
+
+.mgmt-quota {
+  font-weight: 600;
+}
+
+.mgmt-strong {
+  font-weight: 600;
+}
+
+/* The values of the cards: the label is 170 px wide on a desktop. */
+.mgmt-legs .mgmt-fact {
+  grid-template-columns: 170px minmax(0, 1fr);
+}
+
+.mgmt-card-hint {
+  margin: 4px 0 0;
+}
+
+.mgmt-quota-state {
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+
+.mgmt-quota-state.is-ok {
+  color: var(--ok);
+}
+
+.mgmt-quota-state.is-warning {
+  color: var(--warn);
+}
+
+.mgmt-quota-state.is-legal {
+  color: var(--bad);
+}
+
+.mgmt-count {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* A transformer circuit as a tag. */
+.mgmt-tag {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.mgmt-phone-only-row {
+  display: none;
+}
+
+.mgmt-fact .mgmt-span {
+  grid-column: 1 / -1;
+}
+
+/* The table of the metering points of a LEG: the last column holds the state and the icon "swap". */
+.mgmt-members th.mgmt-action-col,
+.mgmt-members td.mgmt-action-col {
+  width: 170px;
+  padding-right: 12px;
+  text-align: right;
+}
+
+.mgmt-members td.mgmt-action-col {
+  white-space: nowrap;
+}
+
+.mgmt-action-state {
+  display: inline-block;
+  max-width: calc(100% - 48px);
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--fg);
+  vertical-align: middle;
+}
+
+.mgmt-action-state.is-own::before,
+.mgmt-action-state.is-recommend::before {
+  content: "●";
+  margin-right: 4px;
+}
+
+.mgmt-action-state.is-own::before {
+  color: var(--ok);
+}
+
+.mgmt-action-state.is-recommend {
+  font-weight: 600;
+}
+
+.mgmt-action-state.is-recommend::before {
+  color: var(--accent);
+}
+
+.mgmt-action-state.is-none {
+  color: var(--muted);
+}
+
+.mgmt-swap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  vertical-align: middle;
+}
+
+.mgmt-swap:hover {
+  background: var(--warm);
+  color: var(--fg);
+}
+
+.mgmt-swap:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-swap-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mgmt-legend {
+  margin: 0;
+  padding: 10px 20px 16px;
+}
+
+.mgmt-mp-address {
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.mgmt-mp-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mgmt-mp-action .mgmt-action-state {
+  max-width: none;
+  margin-right: 0;
+}
+
+/* The dialogs: the quota with "%" inside the field, the date next to it. */
+.mgmt-dialog-row.is-quota {
+  grid-template-columns: minmax(0, 1fr) 180px;
+}
+
+.mgmt-input-unit {
+  position: relative;
+}
+
+.mgmt-input-unit .form-control {
+  padding-right: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mgmt-input-unit-sign {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  /* The label left, the value in a fixed column of 150 px: all values start at the same edge. */
+  .mgmt-legs .mgmt-fact {
+    grid-template-columns: minmax(0, 1fr) 150px;
+    gap: 8px;
+  }
+
+  .mgmt-phone-only-row {
+    display: grid;
+  }
+
+  .mgmt-members-cards {
+    padding: 0 16px 8px;
+  }
+
+  .mgmt-members-cards .mgmt-mp:first-child {
+    border-top: 0;
+  }
+
+  .mgmt-dialog-row.is-quota {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

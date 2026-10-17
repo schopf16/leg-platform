@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load i18n static management_ui %}{% comment %}
+The detail page of a LEG (LEG-Design-Vorgaben/verwaltung/legs/referenz/leg-detail-desktop,
+leg-detail-ein-trafokreis-desktop, leg-detail-handy and leg-detail-ein-trafokreis-handy; D-080). Cards left and right on a
+desktop, one under the other on a phone. The banner names every problem with its full sentence. The cards "Production
+quota" and "Master data" have their button "Edit"; the card "Composition" has the discount tier with its info button
+(on a phone the hint is written out). The table "Metering points of this LEG" is read only: the columns can be
+sorted and resized, the icon "swap" of a row opens the shared dialog "Change LEG", the last column says whether the
+metering point already is in the own LEG of its transformer circuit, whether the move to another LEG is
+recommended or whether there is none. The one button at the top right is "Delete LEG" (red outline, only without a
+history) or "Archive LEG"; on a phone it stands at the end of the page.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-legs{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to LEGs" %}</a>
+
+  <div class="mgmt-header mgmt-detail-header">
+    <div>
+      <h1 class="start-title">{{ page_title }}{% if leg.is_archived %} <span class="mgmt-new">{% translate "archived" %}</span>{% endif %}</h1>
+      <p class="mgmt-subtitle">{{ count_text }}</p>
+    </div>
+    <div class="mgmt-header-actions mgmt-desktop-only">{% include "management/legs/_leg_buttons.html" %}</div>
+  </div>
+
+  {% if problems %}
+    <div class="mgmt-banner mgmt-banner-lines" role="status">{% for text in problems %}<p>{{ text }}</p>{% endfor %}</div>
+  {% endif %}
+
+  <div class="mgmt-two-cols">
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Production quota" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:legs_quota' leg.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Share" %}</dt><dd class="tnum mgmt-strong">{% if quota_text %}{{ quota_text }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Checked on" %}</dt><dd class="tnum">{% if checked_on %}{{ checked_on }}{% else %}–{% endif %}</dd></div>
+        </dl>
+        {% if quota_level %}<p class="mgmt-quota-state is-{{ quota_level }}">{% if quota_level == "ok" %}<span class="mgmt-desktop-only" aria-hidden="true">✓ </span>{% endif %}{{ quota_level_text }}</p>{% endif %}
+        <p class="mgmt-hint mgmt-card-hint">{% blocktranslate with minimum=legal_minimum %}The quota comes from the BKW LEG portal. At least {{ minimum }} are required by law.{% endblocktranslate %}</p>
+      </section>
+
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Master data" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:legs_edit' leg.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Name" %}</dt><dd>{{ leg.name }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Remark" %}</dt><dd>{% if leg.remark %}{{ leg.remark|linebreaksbr }}{% else %}<span class="mgmt-muted">{% translate "None" %}</span>{% endif %}</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <div class="mgmt-col">
+      <section class="mgmt-card">
+        <div class="mgmt-card-head"><h2>{% translate "Composition" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Consumers : producers" %}</dt><dd class="tnum">{% if summary.ratio %}{{ summary.ratio }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Discount tier" %}{% translate "Discount tier" as tier_name %}{% blocktranslate asvar tier_info with name=tier_name %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info mgmt-desktop-only"><button type="button" class="mgmt-info-btn" aria-label="{{ tier_info }}" aria-describedby="tip-leg-tier">i</button><span class="mgmt-tip" role="tooltip" id="tip-leg-tier">{% include "management/legs/_tip_tier.html" %}</span></span></dt>
+            <dd>{% if has_tier %}{% include "management/_status.html" with tone=tier_tone label=tier_label %}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact mgmt-phone-only-row"><dd class="mgmt-hint mgmt-span">{% translate "Derived from the transformer circuits of the metering points." %} {% translate "The BKW determines the actual discount." %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Transformer circuits" %}</dt><dd class="tnum">{% if circuits %}<span class="mgmt-desktop-only">{% for circuit in circuits %}<span class="mgmt-tag">{{ circuit }}</span>{% endfor %}</span><span class="mgmt-phone-only">{{ circuits|join:", " }}</span>{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  {% if member_columns %}
+    <section class="mgmt-card mgmt-card-flush">
+      <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points of this LEG" %}</h2><span class="mgmt-count mgmt-desktop-only">{{ count_text }}</span></div>
+      <div class="mgmt-list" data-list data-list-key="leg_metering_points" data-widths-url="{{ member_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+        <div class="mgmt-table-view">
+          <table class="mgmt-table mgmt-table-fixed mgmt-members">
+            <colgroup>
+              {% for column in member_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}>
+              {% endfor %}{% if show_actions %}<col class="mgmt-action-col" width="170">{% endif %}
+            </colgroup>
+            <thead>
+              <tr>
+                {% for column in member_columns %}
+                  <th data-col="{{ column.key }}"{% if column.aria_sort %} aria-sort="{{ column.aria_sort }}"{% endif %}>
+                    <a class="mgmt-sort{% if column.active %} is-active{% endif %}" href="{{ column.url }}">{{ column.label }} <span aria-hidden="true">{{ column.arrow }}</span></a>
+                    <span class="mgmt-grip" role="separator" aria-orientation="vertical" tabindex="0" aria-label="{% translate 'Change the width of the column' %}"></span>
+                  </th>
+                {% endfor %}
+                {% if show_actions %}<th class="mgmt-action-col"><span class="visually-hidden">{% translate "Action" %}</span></th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in member_rows %}
+                {% with point=row.point member=row.member %}
+                <tr>
+                  <td><div class="mgmt-nr-row">{% if point.number %}<span class="mgmt-nr">{{ point.number|slice:":13" }}<wbr>{{ point.number|slice:"13:" }}</span>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% include "management/_direction.html" with direction=point.direction %}</div></td>
+                  <td>{% if row.address %}<span class="mgmt-cut-inline" title="{{ row.address }}">{{ row.address }}</span>{% if row.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=row.location_url label=location_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                  <td class="tnum">{% if member.circuit %}{{ member.circuit }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                  <td>{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}</td>
+                  <td>{% if row.has_person %}{% if row.occupant %}<div class="mgmt-cut" title="{{ row.occupant }}">{{ row.occupant }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
+                  {% if show_actions %}<td class="mgmt-action-col">{% include "management/legs/_member_action.html" %}</td>{% endif %}
+                </tr>
+                {% endwith %}
+              {% empty %}
+                {% include "management/_empty_row.html" with colspan=6 text=empty_members_text %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mgmt-cards-view mgmt-members-cards">
+          {% for row in member_rows %}
+            {% with point=row.point member=row.member %}
+            <div class="mgmt-mp">
+              <div class="mgmt-mp-nr">{% if point.number %}{{ point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=point.direction %}</div>
+              <div class="mgmt-mp-address">{% if row.address %}{{ row.address }}{% if row.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=row.location_url label=location_label %}{% endif %}{% else %}–{% endif %}</div>
+              <div class="mgmt-mp-person">{% if member.circuit %}{{ member.circuit }}{% else %}–{% endif %} · {% if row.has_person %}{% if row.occupant %}{{ row.occupant }}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
+              <div class="mgmt-mp-line">{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}<span class="mgmt-mp-action">{% include "management/legs/_member_action.html" %}</span></div>
+            </div>
+            {% endwith %}
+          {% empty %}
+            <p class="mgmt-empty-text">{{ empty_members_text }}</p>
+          {% endfor %}
+        </div>
+      </div>
+      {% if show_legend %}<p class="mgmt-note mgmt-legend">{% translate "Green: already in the own LEG." %} {% translate "Blue: change recommended." %} {% translate "Grey: no own LEG." %}</p>{% endif %}
+    </section>
+  {% endif %}
+
+  <div class="mgmt-phone-end mgmt-phone-only">{% include "management/legs/_leg_buttons.html" %}</div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  {% if member_columns %}<script defer src="{% static 'management/js/list.js' %}"></script>{% endif %}
+{% endblock %}

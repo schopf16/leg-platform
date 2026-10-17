@@ -159,7 +159,7 @@ class LegRuleTests(SimpleTestCase):
             pk = 7
             production_quota_percent = Decimal("30")
             quota_checked_on = date(2026, 6, 1)
-
+            is_archived = False
         rows = [
             (Direction.CONSUMPTION, 1, date(2026, 5, 1)),
             (Direction.CONSUMPTION, 1, date(2026, 5, 2)),

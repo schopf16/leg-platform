@@ -3,7 +3,7 @@ One field of a dialog (D-078): the label (with "(optional)" for a field named in
 field, the message under it and a hint. Context: ``field`` and ``form``.
 {% endcomment %}<div class="mgmt-dialog-field">
   <label class="mgmt-dialog-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.name in form.optional %} <span class="mgmt-optional">({% translate "optional" context "management" %})</span>{% endif %}</label>
-  {{ field }}
+  {% if field.field.unit %}<div class="mgmt-input-unit">{{ field }}<span class="mgmt-input-unit-sign" aria-hidden="true">{{ field.field.unit }}</span></div>{% else %}{{ field }}{% endif %}
   {% if field.errors %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
   {% if field.help_text %}<div class="mgmt-hint">{{ field.help_text }}</div>{% endif %}
 </div>

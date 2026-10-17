@@ -2892,11 +2892,11 @@ msgstr "Produktionsquote unter der Warnschwelle"
 msgid "Metering points added since the value was read, read the value again"
 msgstr "Messpunkte seit dem Stand hinzugefügt, Wert neu ablesen"
 
-msgid "No producer"
-msgstr "Kein Produzent"
+msgid "No producer in the LEG"
+msgstr "kein Produzent in der LEG"
 
-msgid "No consumer"
-msgstr "Kein Verbraucher"
+msgid "No consumer in the LEG"
+msgstr "kein Konsument in der LEG"
 
 #, python-format
 msgid "Problem: Production quota below %(threshold)s %%"
@@ -3672,3 +3672,171 @@ msgstr "Messpunkt wiederherstellen"
 
 msgid "These metering points belong to the same person at the same location. They only change along if you select them here."
 msgstr "Diese Messpunkte gehören zur gleichen Person am gleichen Standort. Sie werden nur mitgewechselt, wenn Sie sie hier auswählen."
+
+# Block 4: the LEGs (D-080). The texts are the owner's (verwaltung/legs/referenz); the ones the specification does
+# not give are listed in D-080.
+msgid "Participants"
+msgstr "Teilnehmer"
+
+msgid "Discount tier"
+msgstr "Rabattstufe"
+
+msgid "Name of the LEG. A LEG is a virtual grid association."
+msgstr "Name der LEG. Eine LEG ist ein virtueller Netzzusammenschluss."
+
+#, python-format
+msgid "Value from the BKW LEG portal. At least %(minimum)s are required by law. Below %(threshold)s a warning triangle is shown."
+msgstr "Wert aus dem BKW-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig. Unter %(threshold)s steht ein Warndreieck."
+
+msgid "Ratio of consumers to producers."
+msgstr "Verhältnis von Konsumenten zu Produzenten."
+
+msgid "Number of metering points that currently belong to the LEG."
+msgstr "Anzahl der Messpunkte, die aktuell zur LEG gehören."
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d LEGs"
+msgstr "%(first)d–%(last)d von %(total)d LEGs"
+
+msgid "The local electricity communities."
+msgstr "Die lokalen Elektrizitätsgemeinschaften."
+
+msgid "No LEGs yet. Create the first LEG."
+msgstr "Noch keine LEGs. Legen Sie die erste LEG an."
+
+msgid "Name of the LEG or transformer circuit"
+msgstr "Name der LEG oder Trafokreis"
+
+msgid "Display"
+msgstr "Anzeige"
+
+msgid "Create LEG"
+msgstr "LEG anlegen"
+
+msgid "Consumers : producers"
+msgstr "Konsumenten : Produzenten"
+
+msgid "Back to LEGs"
+msgstr "Zurück zu LEGs"
+
+msgid "Share"
+msgstr "Anteil"
+
+msgid "Checked on"
+msgstr "Geprüft am"
+
+msgid "Sufficient"
+msgstr "Ausreichend"
+
+#, python-format
+msgid "Below %(threshold)s %%"
+msgstr "Unter %(threshold)s %%"
+
+#, python-format
+msgid "The quota comes from the BKW LEG portal. At least %(minimum)s are required by law."
+msgstr "Die Quote kommt aus dem BKW-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig."
+
+msgid "Master data"
+msgstr "Stammdaten"
+
+msgid "None"
+msgstr "Keine"
+
+msgid "Composition"
+msgstr "Zusammensetzung"
+
+msgid "Transformer circuits"
+msgstr "Trafokreise"
+
+msgid "Derived from the transformer circuits of the metering points."
+msgstr "Abgeleitet aus den Trafokreisen der Messpunkte."
+
+msgid "Price optimised:"
+msgstr "Preisoptimiert:"
+
+msgid "all metering points of the LEG lie in the same transformer circuit."
+msgstr "alle Messpunkte der LEG liegen im selben Trafokreis."
+
+msgid "Basic discount:"
+msgstr "Basis-Rabatt:"
+
+msgid "at least one metering point lies in another transformer circuit."
+msgstr "mindestens ein Messpunkt liegt in einem anderen Trafokreis."
+
+msgid "The BKW determines the actual discount."
+msgstr "Die BKW bestimmt den tatsächlichen Rabatt."
+
+msgid "Metering points of this LEG"
+msgstr "Messpunkte dieser LEG"
+
+msgid "Action"
+msgstr "Aktion"
+
+msgid "No metering points belong to this LEG yet."
+msgstr "Dieser LEG gehören noch keine Messpunkte zu."
+
+msgctxt "LEG action"
+msgid "own"
+msgstr "eigenes"
+
+msgctxt "LEG action"
+msgid "no own"
+msgstr "kein eigenes"
+
+msgid "Green: already in the own LEG."
+msgstr "Grün: schon im eigenen LEG."
+
+msgid "Blue: change recommended."
+msgstr "Blau: Wechsel empfohlen."
+
+msgid "Grey: no own LEG."
+msgstr "Grau: kein eigenes LEG."
+
+msgid "Change the LEG of this metering point"
+msgstr "LEG für diesen Messpunkt wechseln"
+
+msgid "Delete LEG"
+msgstr "LEG löschen"
+
+msgid "Archive LEG"
+msgstr "LEG archivieren"
+
+msgid "Restore LEG"
+msgstr "LEG wiederherstellen"
+
+#, python-format
+msgid "The LEG %(name)s is deleted for good."
+msgstr "Die LEG %(name)s wird endgültig gelöscht."
+
+msgid "This LEG has a history and cannot be deleted. Archive it instead."
+msgstr "Diese LEG hat einen Verlauf und kann nicht gelöscht werden. Archivieren Sie sie stattdessen."
+
+msgid "A LEG is a virtual grid association. You assign metering points to the LEG afterwards."
+msgstr "Eine LEG ist ein virtueller Netzzusammenschluss. Messpunkte ordnen Sie der LEG danach zu."
+
+msgid "Edit production quota"
+msgstr "Produktionsquote bearbeiten"
+
+msgid "The quota is in the BKW LEG portal. Enter the value and the date on which you checked it there."
+msgstr "Die Quote steht im BKW-LEG-Portal. Geben Sie den Wert und das Datum ein, an dem Sie ihn dort geprüft haben."
+
+msgid "Edit master data"
+msgstr "Stammdaten bearbeiten"
+
+msgid "Name and remark of the LEG. The remark is internal only."
+msgstr "Name und Bemerkung der LEG. Die Bemerkung ist nur intern."
+
+msgid "e.g. 37.6"
+msgstr "z. B. 37.6"
+
+msgid "e.g. LEG Musterquartier"
+msgstr "z. B. LEG Musterquartier"
+
+msgid "This name is already in use."
+msgstr "Dieser Name wird bereits verwendet."
+
+msgid "Production quota changed"
+msgstr "Produktionsquote geändert"
+
+msgid "Master data changed"
+msgstr "Stammdaten geändert"
