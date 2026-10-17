@@ -42,6 +42,9 @@ dependencies = [
     # PDF printing of the lists of the management area (D-082): the newest release at the decision; the
     # known advisories (CVE-2019-17626, CVE-2019-19450, CVE-2020-28463, CVE-2023-33733) are fixed in 3.6.13.
     "reportlab>=5.0.1",
+    # Checksum and structure of the IBAN of a person (D-087): the established package, pure Python, no
+    # dependencies, no network access; the newest release at the decision.
+    "python-stdnum>=2.2",
 ]
 
 [tool.setuptools.packages.find]

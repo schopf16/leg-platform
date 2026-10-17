@@ -1,0 +1,12 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+
+An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for {{ lifetime_days }} days.
+
+Continue:
+
+{{ verification_url }}
+
+If you do not expect this email, you can ignore it.{% endblocktranslate %}{% if contact_url %}
+
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% endautoescape %}

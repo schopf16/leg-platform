@@ -326,6 +326,26 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
             "user_permissions",
             "password",
             "last_login",
+            "invited_at",
+        }
+    )
+    # The profile data that staff enter when they create a person (D-087): the fields of the
+    # registration and of the profile, nothing else.
+    INVITATION_PROFILE_FIELDS = frozenset(
+        {
+            "salutation",
+            "first_name",
+            "last_name",
+            "organisation_name",
+            "address_line_1",
+            "street",
+            "house_number",
+            "post_office_box_number",
+            "town",
+            "swiss_postal_code",
+            "foreign_postal_code",
+            "country",
+            "phone_number",
         }
     )
 
@@ -352,6 +372,27 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
             raise ValueError("Unverified accounts receive their password after verification.")
         user = self.model(email=email, **extra_fields)
         user.set_unusable_password()
+        user.save(using=self._db)
+        return user
+
+    def create_invited_user(self, email, **profile):
+        """Create an unverified account for a person whom staff invite (D-087).
+
+        The account has the profile data that the staff entered, no usable password, no customer number
+        (it is issued when the person completes the registration, D-021), no privileges and no groups.
+        ``invited_at`` marks it: the person gets a link by email (``accounts.invitations``), proves the
+        address with it, chooses the password and confirms the data in the steps of the registration.
+        Only the profile fields of ``INVITATION_PROFILE_FIELDS`` are accepted. The data is validated here
+        with the rules of the model (names, address, postal code, lengths); a ``ValidationError`` is
+        raised for data that does not pass, nothing is stored then.
+        """
+        email = self._prepare(email, profile)
+        unknown = set(profile) - self.INVITATION_PROFILE_FIELDS
+        if unknown:
+            raise ValueError(f"These fields cannot be set here: {', '.join(sorted(unknown))}.")
+        user = self.model(email=email, invited_at=timezone.now(), **profile)
+        user.set_unusable_password()
+        user.full_clean(exclude=["password", "last_login"], validate_unique=False)
         user.save(using=self._db)
         return user
 
@@ -479,6 +520,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     password_change_required = models.BooleanField(
         _("password change required"), default=False, editable=False
     )
+    # Set when staff created the account and invited the person (D-087): an unverified account with
+    # this mark and the data of the staff is kept until the invitation link expires and is shown in
+    # the person list of the management area as "Invited". Written only by
+    # ``UserManager.create_invited_user``; it stays after the person completed the registration.
+    invited_at = models.DateTimeField(_("invited at"), null=True, blank=True, editable=False)
     # Part of the session hash, so that raising it ends every session of the account (D-041).
     session_version = models.PositiveIntegerField(
         _("session version"), default=0, editable=False
@@ -826,12 +872,29 @@ class User(AbstractBaseUser, PermissionsMixin):
         if len(self.normalized_email or "") > EMAIL_MAX_LENGTH:
             errors["email"] = _("Enter an email address of at most 254 characters.")
 
+        errors.update(self.name_errors())
+        errors.update(self.address_errors())
+
+        if errors:
+            raise ValidationError(errors)
+
+    def name_errors(self):
+        """Return {field name: message} for the rule of the names: a first and a last name, or a
+        company name. Separate from ``clean()`` so that a form that edits only the names (the
+        management area, D-087) checks only this rule."""
+        errors = {}
         if not self.organisation_name.strip():
             if not self.first_name.strip():
                 errors["first_name"] = _("Enter a first name or a company name.")
             if not self.last_name.strip():
                 errors["last_name"] = _("Enter a last name or a company name.")
+        return errors
 
+    def address_errors(self):
+        """Return {field name: message} for the rules of the address (street or post office box,
+        town, country); the postal code is checked by ``postal_code_errors()``. Separate from
+        ``clean()`` like ``name_errors()``."""
+        errors = {}
         # Hidden fields are never required (D-036): a post office box number needs no text.
         has_post_office_box = (
             self.post_office_box_number is not None or bool(self.post_office_box_text.strip())
@@ -844,9 +907,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         country = self.country.code if self.country else ""
         if not country:
             errors["country"] = _("This field is required.")
-
-        if errors:
-            raise ValidationError(errors)
+        return errors
 
     def postal_code_errors(self):
         """Return {field name: message} for the two postal code fields (D-032, D-036).
@@ -1417,6 +1478,8 @@ class MailJob(models.Model):
         # D-062, block 9: the session of a confirmation was ended after wrong codes.
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", "Session ended after wrong codes"
         ALL_SESSIONS_ENDED = "all_sessions_ended", "All sessions ended after wrong entries"
+        # D-087: the link that staff send to a person they created.
+        INVITATION = "invitation", "Invitation"
 
     # The notifications about a change of the account, as opposed to the requests of a person
     # who may have no account (D-038, D-040).
@@ -1530,6 +1593,8 @@ class EmailText(models.Model):
         ALL_SESSIONS_ENDED = "all_sessions_ended", _(
             "Notification: all sessions ended after wrong entries"
         )
+        # D-087: the link that staff send to a person they created.
+        INVITATION = "invitation", _("Invitation: link to confirm the address and choose a password")
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False
@@ -2218,6 +2283,12 @@ class SecurityEvent(models.Model):
         # D-084 (security review, M-2): every PDF of a list of the management area. The entry names the actor
         # (an internal number); the area, the scope and the number of entries go to the log line only.
         LIST_PRINTED = "list_printed", _("List printed")
+        # D-087: staff create a person and invite them, send the invitation again, and change the data of
+        # a customer's account. The entries name the actor and the account (internal numbers); the names of
+        # the changed fields go to the log line only, never a value.
+        PERSON_INVITED = "person_invited", _("Person created and invited by staff")
+        INVITATION_RESENT = "invitation_resent", _("Invitation sent again by staff")
+        ACCOUNT_DATA_CHANGED_BY_STAFF = "account_data_changed_by_staff", _("Account data changed by staff")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
@@ -2237,6 +2308,8 @@ class SecurityEvent(models.Model):
             Event.TWO_FACTOR_REMOVED_PHONE_LOST,
             # A printout is an export of personal data: noticed late, kept long (D-084).
             Event.LIST_PRINTED,
+            # Staff changing the data of a customer: misuse is noticed late (D-087).
+            Event.ACCOUNT_DATA_CHANGED_BY_STAFF,
         }
     )
 

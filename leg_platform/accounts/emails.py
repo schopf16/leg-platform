@@ -83,6 +83,8 @@ def _sample_values(key, greeting_name=""):
     for placeholder in email_texts.DEFINITIONS[key].placeholders:
         if placeholder is email_texts.LIFETIME_HOURS:
             specific[placeholder.name] = "24"
+        elif placeholder is email_texts.LIFETIME_DAYS:
+            specific[placeholder.name] = "7"
         elif placeholder is email_texts.VERIFICATION_URL:
             specific[placeholder.name] = absolute_url(
                 reverse("accounts:registration_verify", kwargs={"token": EXAMPLE_TOKEN})
@@ -152,6 +154,21 @@ def send_registration_verification(address, raw_token, lifetime: timedelta):
                 reverse("accounts:registration_verify", kwargs={"token": raw_token})
             ),
             "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
+        },
+    )
+
+
+def send_invitation(address, raw_token, lifetime: timedelta):
+    """Send the link that a person invited by staff uses to confirm the address and choose a password
+    (D-087). It is the link of the registration; the text has no name and no data of the account."""
+    _send(
+        address,
+        Key.INVITATION,
+        {
+            "verification_url": absolute_url(
+                reverse("accounts:registration_verify", kwargs={"token": raw_token})
+            ),
+            "lifetime_days": str(math.ceil(lifetime.total_seconds() / 86400)),
         },
     )
 

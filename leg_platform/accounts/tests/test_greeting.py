@@ -398,6 +398,7 @@ class PlaceholderOfferTests(SimpleTestCase):
             sorted(
                 [
                     "A new password was requested f",
+                    "An account was created for you",
                     "Please confirm your email addr",
                     "Someone asked at %(instance_na",
                     "Someone requested a change to ",

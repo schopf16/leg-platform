@@ -61,6 +61,10 @@ class HistoryEvent(models.TextChoices):
         _("Customer number at the %(operator)s changed")
     )
     PERSON_SHARES_CHANGED = "person_shares_changed", _("Shares changed")
+    # D-087: a person is created by staff and invited, the invitation is sent again, and staff change the data
+    # of a customer. The last one names the changed fields in ``detail["fields"]`` (field names, never a value).
+    PERSON_INVITATION_SENT = "person_invitation_sent", _("Invitation sent")
+    PERSON_DATA_CHANGED = "person_data_changed", _("Customer data changed")
 
 
 def subject_of(obj):

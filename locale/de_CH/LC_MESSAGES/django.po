@@ -3860,8 +3860,8 @@ msgstr "Strasse und Hausnummer der Rechnungsadresse."
 msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the %(operator)s. Recording, if at least one is still being recorded."
 msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei der %(operator)s angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
 
-msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive."
-msgstr "Ob sich die Person im Portal anmelden kann. Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen. Inaktiv: Das Konto ist deaktiviert und steht im Archiv."
+msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive. Invited: the person has not completed the registration yet."
+msgstr "Ob sich die Person im Portal anmelden kann. Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen. Inaktiv: Das Konto ist deaktiviert und steht im Archiv. Eingeladen: Die Person hat die Registrierung noch nicht abgeschlossen."
 
 msgctxt "person metering points"
 msgid "recording"
@@ -4157,3 +4157,96 @@ msgstr "Dieser Standort ist archiviert."
 
 msgid "The location or the LEG is archived."
 msgstr "Der Standort oder die LEG ist archiviert."
+
+# D-087: creating a person, the invitation and the changes of the customer's data by the staff. The texts of the
+# specification stay as they are ("Person anlegen", "Einladung erneut senden", "Bearbeiten", the names of the cards
+# and fields); the others are listed in D-087 as invented.
+msgid "Invited"
+msgstr "Eingeladen"
+
+msgid "invited at"
+msgstr "eingeladen am"
+
+msgid "Create person"
+msgstr "Person anlegen"
+
+msgid "Resend invitation"
+msgstr "Einladung erneut senden"
+
+msgid "The invitation link is valid until %(deadline)s."
+msgstr "Der Einladungslink ist bis %(deadline)s gültig."
+
+msgid "The invitation link has expired."
+msgstr "Der Einladungslink ist abgelaufen."
+
+msgid "Edit details"
+msgstr "Angaben bearbeiten"
+
+msgid "Edit contact"
+msgstr "Kontakt bearbeiten"
+
+msgid "Edit billing address"
+msgstr "Rechnungsadresse bearbeiten"
+
+msgid "Edit payment and customer numbers"
+msgstr "Zahlung und Kundennummern bearbeiten"
+
+msgid "The person receives an email with a link to confirm the email address and to choose a password."
+msgstr "Die Person erhält eine E-Mail mit einem Link, um die E-Mail-Adresse zu bestätigen und ein Passwort zu wählen."
+
+msgid "The person was created and the invitation was sent."
+msgstr "Die Person wurde angelegt und die Einladung wurde gesendet."
+
+msgid "The invitation was sent."
+msgstr "Die Einladung wurde gesendet."
+
+msgid "There is no invitation to send."
+msgstr "Es gibt keine Einladung, die gesendet werden könnte."
+
+msgid "The data could not be saved."
+msgstr "Die Angaben konnten nicht gespeichert werden."
+
+msgid "Enter a valid IBAN."
+msgstr "Geben Sie eine gültige IBAN ein."
+
+msgid "Invitation sent"
+msgstr "Einladung gesendet"
+
+msgid "Customer data changed"
+msgstr "Kundendaten geändert"
+
+msgid "Person created and invited by staff"
+msgstr "Person von der Verwaltung angelegt und eingeladen"
+
+msgid "Invitation sent again by staff"
+msgstr "Einladung von der Verwaltung erneut gesendet"
+
+msgid "Account data changed by staff"
+msgstr "Kontodaten von der Verwaltung geändert"
+
+msgid "Invitation: link to confirm the address and choose a password"
+msgstr "Einladung: Link zur Bestätigung der Adresse und zur Wahl eines Passworts"
+
+msgid "Number of days for which the personal link can be used."
+msgstr "Anzahl der Tage, für die der persönliche Link verwendet werden kann."
+
+msgid ""
+"Hello\n"
+"\n"
+"An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for %(lifetime_days)s days.\n"
+"\n"
+"Continue:\n"
+"\n"
+"%(verification_url)s\n"
+"\n"
+"If you do not expect this email, you can ignore it."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Für Sie wurde ein Konto angelegt. Bitte bestätigen Sie Ihre E-Mail-Adresse mit diesem Link und wählen Sie ein Passwort. Der Link ist %(lifetime_days)s Tage gültig.\n"
+"\n"
+"Weiter:\n"
+"\n"
+"%(verification_url)s\n"
+"\n"
+"Wenn Sie diese E-Mail nicht erwarten, können Sie sie ignorieren."

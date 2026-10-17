@@ -1,20 +1,22 @@
 """The pages of the persons (D-081; LEG-Design-Vorgaben/verwaltung/personen).
 
 The list (a table on a desktop, cards on a phone), the detail page with its table of the metering points, and
-the small dialogs: the note, the customer number at the grid operator and the shares of the cooperative, plus
-the buttons of the banner for the correction of the address. Every view uses the access check of
+the dialogs: creating a person (D-087), the cards of the customer's data (details, contact, billing address, payment and
+customer numbers; D-087), the note and the shares of the cooperative, plus the buttons of the banner for the correction
+of the address and the button that sends an invitation again. Every view uses the access check of
 ``management.access`` (every staff account, D-086); objects are looked up by the id in the address, and the
-rules are in ``leg_platform.community`` (``person_list``, ``persons``). A dialog is a normal page: it works
-without JavaScript and returns to the place it was opened from.
+rules are in ``leg_platform.community`` (``person_list``, ``persons``): the dialogs of the customer's data are refused
+(403) for an account whose data the actor may not change (``persons.may_change_customer_data``), and the service checks it
+again. A dialog is a normal page: it works without JavaScript and returns to the place it was opened from.
 
-"Person anlegen" and "Anmeldung starten" have no specified effect and are not built (D-081, open points).
+"Anmeldung starten" has no specified effect and is not built (D-081, open point).
 """
 
 from dataclasses import dataclass
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
-from django.core.exceptions import SuspiciousOperation
+from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,19 +24,30 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy, pgettext
 from django.views import View
 
+from leg_platform.accounts.models import PendingEmailChange
 from leg_platform.community import addressing, grid_operator, history, numbers, person_list, persons
+from leg_platform.community import iban as iban_module
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_views import DialogView, event_label
 from leg_platform.management.metering_point_views import format_date
-from leg_platform.management.person_forms import NoteForm, OperatorCustomerNumberForm, SharesForm
-from leg_platform.management.returns import return_url
+from leg_platform.management.person_forms import (
+    BillingAddressForm,
+    ContactForm,
+    DetailsForm,
+    NoteForm,
+    PaymentForm,
+    PersonCreateForm,
+    SharesForm,
+)
+from leg_platform.management.returns import return_url, with_next
 
 STATE_TONES = {
     person_list.AccountState.ACTIVE: "ok",
     person_list.AccountState.BLOCKED: "bad",
     person_list.AccountState.INACTIVE: "muted",
+    person_list.AccountState.INVITED: "warn",
 }
 
 
@@ -65,7 +78,8 @@ def list_columns():
             "account", gettext_lazy("Account"), info_placement="left",
             info=_(
                 "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after "
-                "failed attempts. Inactive: the account is deactivated and is in the archive."
+                "failed attempts. Inactive: the account is deactivated and is in the archive. Invited: the person "
+                "has not completed the registration yet."
             ),
         ),
     )
@@ -179,6 +193,7 @@ class PersonListView(ManagementAccessMixin, View):
             page_subtitle=_("All customers of the LEG."),
             entries=entries,
             print_url=state.url_to(reverse("management:persons_print")),
+            create_url=with_next(reverse("management:persons_new"), request),
             status_options=status_options(),
             points_options=points_options(),
             empty_text=_("No persons found."),
@@ -191,8 +206,7 @@ class PersonListView(ManagementAccessMixin, View):
 
 def format_iban(value):
     """The IBAN in blocks of four characters ("CH93 0076 2011 6238 5295 7"); empty stays empty."""
-    value = "".join((value or "").split())
-    return " ".join(value[i : i + 4] for i in range(0, len(value), 4))
+    return iban_module.display(value)
 
 
 def point_columns():
@@ -258,10 +272,41 @@ def registration_text(row):
 class PersonObjectMixin:
     def person(self, pk=None):
         if not hasattr(self, "_person"):
-            self._person = get_object_or_404(
-                get_user_model().objects.filter(customer_number__isnull=False), pk=pk or self.kwargs["pk"]
-            )
+            self._person = get_object_or_404(persons.person_queryset(), pk=pk or self.kwargs["pk"])
         return self._person
+
+
+def history_label(entry):
+    """The text of a history entry: the event and, for a change of the customer's data, the names of the changed
+    fields as the page calls them (never a value, D-087)."""
+    label = event_label(entry.event)
+    fields = entry.detail.get("fields") if isinstance(entry.detail, dict) else None
+    if entry.event == history.HistoryEvent.PERSON_DATA_CHANGED and isinstance(fields, list):
+        names = [str(FIELD_LABELS[name]) for name in fields if name in FIELD_LABELS]
+        if names:
+            return f"{label}: {', '.join(names)}"
+    return label
+
+
+# The names of the fields of the customer's data as the cards call them (the words of the specification).
+FIELD_LABELS = {
+    "salutation": gettext_lazy("Salutation"),
+    "organisation_name": gettext_lazy("Company"),
+    "first_name": gettext_lazy("First name"),
+    "last_name": gettext_lazy("Last name"),
+    "address_line_1": gettext_lazy("Second person"),
+    "phone_number": gettext_lazy("Phone"),
+    "secondary_email": gettext_lazy("Second email"),
+    "street": gettext_lazy("Street"),
+    "house_number": gettext_lazy("House number"),
+    "post_office_box_number": gettext_lazy("Post office box"),
+    "swiss_postal_code": gettext_lazy("Postal code"),
+    "foreign_postal_code": gettext_lazy("Postal code"),
+    "town": gettext_lazy("Town"),
+    "country": gettext_lazy("Country"),
+    "iban": gettext_lazy("IBAN"),
+    "paper_invoice": gettext_lazy("Paper invoice"),
+}
 
 
 class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
@@ -284,12 +329,17 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
             "number": person.customer_number_display,
             "account_label": account.label,
             "account_tone": STATE_TONES[account],
+            "can_edit": persons.may_change_customer_data(request.user, person),
+            "invitation": persons.invitation_state(person),
+            "second_pending": PendingEmailChange.objects.filter(
+                user=person, kind=PendingEmailChange.Kind.SECONDARY, expires_at__gt=timezone.now()
+            ).exists(),
             "salutation": person.get_salutation_display() if person.salutation else "",
             "phone": person.phone_number_display,
             "street": person.street_address_display,
             "postal_town": f"{person.postal_code_display} {person.town}".strip(),
             "country": str(person.country.name) if person.country else "",
-            "iban": format_iban(record.iban) if record else "",
+            "iban": format_iban(iban_module.readable(record)) if record else "",
             "paper_invoice": bool(record and record.paper_invoice),
             "operator_number": record.operator_customer_number if record else "",
             "note": record.staff_note if record else "",
@@ -300,7 +350,7 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
             "suggestion_text": addressing.suggestion_banner_text(suggestion) if suggestion else "",
             "suggestion_token": persons.suggestion_token(suggestion) if suggestion else "",
             "history": [
-                {"time": entry.created_at, "label": event_label(entry.event), "actor": entry.actor.display_name if entry.actor_id else ""}
+                {"time": entry.created_at, "label": history_label(entry), "actor": entry.actor.display_name if entry.actor_id else ""}
                 for entry in history.entries_for(person).order_by("-created_at", "-pk")
             ],
             "back_url": return_url(request, reverse("management:persons")),
@@ -377,23 +427,179 @@ class PersonNoteView(PersonDialog):
         return self.finish(request)
 
 
-class PersonOperatorNumberView(PersonDialog):
-    """The optional customer number at the grid operator (the card "Zahlung und Kundennummern")."""
+class PersonPaymentView(PersonDialog):
+    """The card "Zahlung und Kundennummern": the IBAN and the paper invoice (data of the customer, only for an
+    account whose data the actor may change) and the optional customer number at the grid operator (D-087)."""
 
-    title = grid_operator.text(gettext_lazy("Edit %(operator)s customer number"))
-    form_class = OperatorCustomerNumberForm
+    title = gettext_lazy("Edit payment and customer numbers")
+    form_class = PaymentForm
 
     def get_form(self, data=None):
-        record = persons.record_of(self.person())
-        return OperatorCustomerNumberForm(
-            data, initial={"operator_customer_number": record.operator_customer_number if record else ""}
+        person = self.person()
+        record = persons.record_of(person)
+        initial = {
+            "iban": format_iban(iban_module.readable(record)) if record else "",
+            "paper_invoice": "1" if record and record.paper_invoice else "0",
+            "operator_customer_number": record.operator_customer_number if record else "",
+        }
+        return PaymentForm(
+            data, initial=initial, customer_data=persons.may_change_customer_data(self.request.user, person)
         )
 
     def save(self, request, form):
-        persons.set_operator_customer_number(
-            self.person(), form.cleaned_data["operator_customer_number"], request.user
-        )
+        data = form.cleaned_data
+        values = {"operator_customer_number": data["operator_customer_number"]}
+        if form.customer_data:
+            values.update(iban=data["iban"], paper_invoice=data["paper_invoice"])
+        try:
+            persons.update_payment_data(self.person(), request.user, **values)
+        except ValidationError as error:
+            add_validation_errors(form, error)
+            return None
+        except persons.PersonError as error:
+            return refused(form, error)
         return self.finish(request)
+
+
+def add_validation_errors(form, error):
+    """Show the messages of a ``ValidationError`` of the service at the fields of the form, or at the form."""
+    for name, messages_ in error.message_dict.items():
+        if name in ("swiss_postal_code", "foreign_postal_code"):
+            name = "postal_code"
+        form.add_error(name if name in form.fields else None, messages_)
+
+
+def refused(form, error):
+    """The answer to a ``PersonError`` of a dialog: an account that is no person (any more) is not found, an account
+    that the actor may not change is refused, anything else is shown at the form."""
+    if error.code == "not_a_person":
+        raise Http404
+    if error.code == "not_allowed":
+        raise PermissionDenied
+    if error.code == "rate_limited":
+        form.add_error(None, _("Too many requests, please try again later."))
+    elif error.code == "email_in_use":
+        form.add_error("email", _("This email address is already in use."))
+    elif error.code == "email_invalid":
+        form.add_error("email" if "email" in form.fields else "secondary_email", _("Enter a valid email address."))
+    else:
+        form.add_error(None, _("The data could not be saved."))
+    return None
+
+
+class CustomerDataDialog(PersonDialog):
+    """A dialog for data of the customer: refused (403) before anything is shown or saved for an account whose data the
+    actor may not change (D-087, D-012). The buttons are not shown then either; this is the check that counts."""
+
+    template_name = "management/persons/dialog_data.html"
+    group = None
+
+    def refusal(self, request, *args, **kwargs):
+        if not persons.may_change_customer_data(request.user, get_object_or_404(persons.person_queryset(), pk=kwargs["pk"])):
+            raise PermissionDenied
+        return None
+
+    def get_form(self, data=None):
+        return self.form_class(data, person=self.person())
+
+    def save(self, request, form):
+        try:
+            persons.update_customer_data(self.person(), self.group, form.values(), request.user)
+        except ValidationError as error:
+            add_validation_errors(form, error)
+            return None
+        except persons.PersonError as error:
+            return refused(form, error)
+        return self.finish(request)
+
+
+class PersonDetailsView(CustomerDataDialog):
+    """The card "Angaben": salutation, company, first and last name, second person."""
+
+    title = gettext_lazy("Edit details")
+    form_class = DetailsForm
+    group = persons.GROUP_DETAILS
+
+
+class PersonAddressView(CustomerDataDialog):
+    """The card "Rechnungsadresse", with the suggestions of the address directory."""
+
+    title = gettext_lazy("Edit billing address")
+    form_class = BillingAddressForm
+    group = persons.GROUP_ADDRESS
+
+
+class PersonContactView(CustomerDataDialog):
+    """The card "Kontakt": the phone and the second email address. The second address is requested with the
+    existing confirmation mechanism (the link goes to the new address only); the login address is not editable."""
+
+    title = gettext_lazy("Edit contact")
+    form_class = ContactForm
+    group = persons.GROUP_CONTACT
+
+    def save(self, request, form):
+        person = self.person()
+        second_requested = False
+        try:
+            if "secondary_email" in form.fields:
+                second_requested = persons.change_second_email(
+                    request, person, form.cleaned_data["secondary_email"], request.user
+                )
+            persons.update_customer_data(person, self.group, form.values(), request.user)
+        except ValidationError as error:
+            add_validation_errors(form, error)
+            return None
+        except persons.PersonError as error:
+            return refused(form, error)
+        if second_requested and form.cleaned_data["secondary_email"]:
+            messages.success(request, _("We sent a confirmation link to the new address. It is valid for 24 hours."))
+            return redirect(self.back(request))
+        return self.finish(request)
+
+
+class PersonCreateView(DialogView):
+    """"Person anlegen" (D-087): the data of the registration; the person gets an email with a link to confirm the
+    address and choose a password, and appears in the list as "Invited"."""
+
+    title = gettext_lazy("Create person")
+    lead = gettext_lazy(
+        "The person receives an email with a link to confirm the email address and to choose a password."
+    )
+    form_class = PersonCreateForm
+    template_name = "management/persons/dialog_data.html"
+
+    def back(self, request):
+        return return_url(request, reverse("management:persons"))
+
+    def save(self, request, form):
+        try:
+            persons.create_person(request.user, form.cleaned_data["email"], form.values())
+        except ValidationError as error:
+            add_validation_errors(form, error)
+            return None
+        except persons.PersonError as error:
+            return refused(form, error)
+        messages.success(request, _("The person was created and the invitation was sent."))
+        return redirect(self.back(request))
+
+
+class PersonInvitationView(PersonObjectMixin, ManagementAccessMixin, View):
+    """"Einladung erneut senden": a new link for a person who has not completed the registration (D-087)."""
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        person = self.person(pk)
+        try:
+            persons.resend_invitation(person, request.user)
+        except persons.PersonError as error:
+            if error.code == "rate_limited":
+                messages.error(request, _("Too many requests, please try again later."))
+            else:
+                messages.error(request, _("There is no invitation to send."))
+        else:
+            messages.success(request, _("The invitation was sent."))
+        return redirect(return_url(request, reverse("management:persons_detail", args=[pk])))
 
 
 class PersonSharesView(PersonDialog):

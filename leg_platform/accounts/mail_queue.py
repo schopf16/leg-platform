@@ -30,6 +30,7 @@ from django.utils import timezone
 from leg_platform.accounts import (
     emails,
     greeting,
+    invitations,
     password_reset,
     rate_limits,
     registration,
@@ -81,6 +82,8 @@ HANDLERS = {
 # Handlers of jobs about an account get the account key and the address of the request (D-044).
 ACCOUNT_HANDLERS = {
     MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
+    # D-087: the link for a person that staff created; the account is found by its key.
+    MailJob.Kind.INVITATION: invitations.process_invitation,
 }
 
 DONE = "done"

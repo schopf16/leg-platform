@@ -316,9 +316,9 @@ class PersonArea(Area):
             payment = Section(
                 _("Payment and customer numbers"),
                 [
-                    (_("IBAN"), or_dash(person_views.format_iban(record.iban) if record else "")),
+                    (_("IBAN"), or_dash(person_views.format_iban(person_views.iban_module.readable(record)) if record else "")),
                     (_("Paper invoice"), _("Yes") if record and record.paper_invoice else _("No")),
-                    (_("Customer number"), number),
+                    (_("Customer number"), or_dash(number)),
                     (
                         _("%(operator)s customer number") % {"operator": operator},
                         or_dash(record.operator_customer_number if record else ""),
@@ -341,7 +341,7 @@ class PersonArea(Area):
             note = Section(_("Note"), [(_("Note"), or_dash(record.staff_note if record else ""))])
             sections = [details, contact, address, payment, cooperative, note, self.points_section(person, today)]
             pages.append(
-                DetailPage(name, f"{_('Customer number')} {number} · {account.label}", [], sections)
+                DetailPage(name, f"{_('Customer number')} {number or DASH} · {account.label}", [], sections)
             )
         return pages
 

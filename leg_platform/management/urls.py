@@ -22,11 +22,15 @@ urlpatterns = [
     # Persons (an account with a customer number; the id is the id of the account)
     path("persons/", person_views.PersonListView.as_view(), name="persons"),
     path("persons/print/", print_views.PersonPrintView.as_view(), name="persons_print"),
+    path("persons/new/", person_views.PersonCreateView.as_view(), name="persons_new"),
     path("persons/<int:pk>/", person_views.PersonDetailView.as_view(), name="persons_detail"),
     path("persons/<int:pk>/note/", person_views.PersonNoteView.as_view(), name="persons_note"),
+    path("persons/<int:pk>/details/", person_views.PersonDetailsView.as_view(), name="persons_details"),
+    path("persons/<int:pk>/contact/", person_views.PersonContactView.as_view(), name="persons_contact"),
+    path("persons/<int:pk>/billing-address/", person_views.PersonAddressView.as_view(), name="persons_address"),
+    path("persons/<int:pk>/payment/", person_views.PersonPaymentView.as_view(), name="persons_payment"),
     path(
-        "persons/<int:pk>/operator-customer-number/", person_views.PersonOperatorNumberView.as_view(),
-        name="persons_operator_number",
+        "persons/<int:pk>/invitation/", person_views.PersonInvitationView.as_view(), name="persons_invitation"
     ),
     path("persons/<int:pk>/shares/", person_views.PersonSharesView.as_view(), name="persons_shares"),
     path(

@@ -46,6 +46,14 @@ SCOPE_MAIL_ADDRESS = "mail-address"
 SCOPE_MAIL_IP = "mail-ip"
 SCOPE_MAIL_GLOBAL = "mail-global"
 SCOPE_EXISTING_ACCOUNT_NOTICE = "existing-account-notice"
+# Invitations that staff send (D-087): no limit of the client IP address (an office behind one address
+# creates many persons in a day; the staff account is known), but one per staff account, and a pause per
+# invited account so that a double click sends one email. The limits of the address and of the instance
+# apply as for every email.
+SCOPE_INVITATION_ACTOR = "invitation-actor"
+SCOPE_INVITATION_ACCOUNT = "invitation-account"
+INVITATION_ACTOR_LIMITS = ((60, timedelta(hours=1)),)
+INVITATION_ACCOUNT_LIMITS = ((1, timedelta(seconds=60)),)
 
 # Buckets that were not used for longer than the longest window are deleted by the cleanup.
 LONGEST_WINDOW = timedelta(hours=24)

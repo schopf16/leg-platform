@@ -57,6 +57,9 @@ MESSAGES = {
     Event.ADDRESS_IMPORT_REQUESTED: "An address directory import was requested",
     Event.RETENTION_OBLIGATION_SET: "The retention obligation of an account was set",
     Event.LIST_PRINTED: "A list of the management area was printed as PDF",
+    Event.PERSON_INVITED: "A person was created and invited by staff",
+    Event.INVITATION_RESENT: "An invitation was sent again by staff",
+    Event.ACCOUNT_DATA_CHANGED_BY_STAFF: "The data of an account was changed by staff",
 }
 
 

@@ -407,7 +407,10 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
 
     Only the fields of the design package (team lead decision K15). The country is Switzerland;
     the other fields of the profile (salutation, company, address addition, post office box,
-    phone number) stay in the model and are entered in the profile later.
+    phone number) stay in the model and are entered in the profile later. A person whom staff
+    invited (D-087) finds the data that the staff entered in these fields and confirms or corrects
+    it; the other fields of the profile that the staff entered stay as they are, and an invitation
+    with another country keeps that country (``country_of_instance``).
     """
 
     postal_code = postal_code_field()
@@ -427,6 +430,10 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # A person whom staff invited (D-087) finds the data of the staff here, with the postal code
+        # (a field of the form, not of the model), and confirms or corrects it.
+        self.initial.setdefault("postal_code", self.instance.postal_code_display)
+        self.country = self.country_of_instance()
         for name, label, message in (
             ("first_name", _("First name"), _("Enter your first name.")),
             ("last_name", _("Last name"), _("Enter your last name.")),
@@ -446,11 +453,21 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
         self.fields["postal_code"].widget.attrs.update(
             {"inputmode": "numeric", "autocomplete": "postal-code", "maxlength": "4"}
         )
+        if self.country != SWITZERLAND:
+            # The postal code of a foreign address (an invitation of staff with a foreign country).
+            self.fields["postal_code"].widget.attrs.update({"inputmode": "text", "maxlength": "15"})
         # A house number has no standard autocomplete value, so that no password manager fills it.
         self.fields["house_number"].widget.attrs["autocomplete"] = "off"
         self.fields["privacy"].widget.attrs["class"] = "entry-check-input"
         # The error summary names the box by a short word, not by the whole sentence.
         self.fields["privacy"].summary_label = _("Privacy policy")
+
+    def country_of_instance(self):
+        """The country of this step: Switzerland (K15), except for an account that staff created with
+        another country (D-087): the person confirms the address as the staff entered it."""
+        if self.instance.invited_at is not None and self.instance.country:
+            return self.instance.country.code
+        return SWITZERLAND
 
     def _post_clean(self):
         super()._post_clean()
@@ -463,7 +480,7 @@ class RegistrationDetailsForm(PortalFormMixin, forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         # The country of a registration is Switzerland (K15); the model default is the same.
-        cleaned_data["country"] = SWITZERLAND
+        cleaned_data["country"] = self.country
         clean_postal_code(self, cleaned_data)
         return cleaned_data
 

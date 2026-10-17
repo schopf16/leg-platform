@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% load i18n static management_ui %}{% comment %}
 The detail page of a person (LEG-Design-Vorgaben/verwaltung/personen/detail/referenz/person-detail-desktop and
--handy; D-081). On a desktop two columns of cards (details, contact, billing address, payment and customer numbers on
+-handy; D-081, D-087). On a desktop two columns of cards (details, contact, billing address, payment and customer numbers on
 the left; cooperative and note on the right) and the metering points over the full width; on a phone all cards one
-under the other, the metering points after the payment card. The master data of the customer is read only (the
-customer changes it through the own login); the staff edit only the note, the customer number at the grid operator and the shares,
-and accept or do not accept the address suggestion in the banner. No "Edit" on the cards of the customer's data, no
-button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate" (not decided).
+under the other, the metering points after the payment card. Every card of the customer's data has the button "Edit"
+(a dialog, specification section 4) for an account whose data the actor may change (``can_edit``, D-087: not the data of
+a staff user or a system administrator, unless the actor is a system administrator; never the archive). The login address,
+the password, the second factor, the status, the rights and the customer number are shown only. A person whom staff
+invited and who has not completed the registration has no customer number yet; the head shows "Invited" and the button
+"Resend invitation". No button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate"
+(not decided).
 {% endcomment %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
@@ -19,8 +22,20 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
   <div class="mgmt-header mgmt-detail-header">
     <div>
       <h1 class="start-title">{{ name }}</h1>
-      <p class="mgmt-subtitle mgmt-person-line">{% translate "Customer number" %} <span class="tnum mgmt-person-fg">{{ number }}</span> · {% include "management/_status.html" with tone=account_tone label=account_label %}</p>
+      <p class="mgmt-subtitle mgmt-person-line">{% translate "Customer number" %} <span class="tnum mgmt-person-fg">{% if number %}{{ number }}{% else %}–{% endif %}</span> · {% include "management/_status.html" with tone=account_tone label=account_label %}</p>
+      {% if invitation %}
+        <p class="mgmt-subtitle mgmt-person-line">{% if invitation.expires_at %}{% blocktranslate with deadline=invitation.expires_at|date:"d.m.Y H:i" %}The invitation link is valid until {{ deadline }}.{% endblocktranslate %}{% elif not invitation.sending %}{% translate "The invitation link has expired." %}{% endif %}</p>
+      {% endif %}
     </div>
+    {% if invitation %}
+      <div class="mgmt-header-actions">
+        <form method="post" action="{% url 'management:persons_invitation' person.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ current_url }}">
+          <button type="submit" class="btn btn-primary">{% translate "Resend invitation" %}</button>
+        </form>
+      </div>
+    {% endif %}
   </div>
 
   {% if suggestion_text %}
@@ -30,7 +45,7 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
   <div class="mgmt-person-grid">
     <div class="mgmt-col">
       <section class="mgmt-card" data-order="1">
-        <div class="mgmt-card-head"><h2>{% translate "Details" context "person card" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Details" context "person card" %}</h2>{% if can_edit %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_details' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Salutation" %}</dt><dd>{% if salutation %}{{ salutation }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Company" %}</dt><dd>{% if person.organisation_name %}{{ person.organisation_name }}{% else %}–{% endif %}</dd></div>
@@ -41,16 +56,16 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
       </section>
 
       <section class="mgmt-card" data-order="2">
-        <div class="mgmt-card-head"><h2>{% translate "Contact" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Contact" %}</h2>{% if can_edit %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_contact' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Email" %}</dt><dd>{{ person.email }}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd>{% if person.secondary_email %}{{ person.secondary_email }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd>{% if person.secondary_email %}{{ person.secondary_email }}{% elif second_pending %}{% translate "Pending" %}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Phone" %}</dt><dd>{% if phone %}{{ phone }}{% else %}–{% endif %}</dd></div>
         </dl>
       </section>
 
       <section class="mgmt-card" data-order="3">
-        <div class="mgmt-card-head"><h2>{% translate "Billing address" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Billing address" %}</h2>{% if can_edit %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_address' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Street" %}</dt><dd>{% if street %}{{ street }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Postal code, town" %}</dt><dd>{% if postal_town %}{{ postal_town }}{% else %}–{% endif %}</dd></div>
@@ -59,11 +74,11 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
       </section>
 
       <section class="mgmt-card" data-order="4">
-        <div class="mgmt-card-head"><h2>{% translate "Payment and customer numbers" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_operator_number' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a></div>
+        <div class="mgmt-card-head"><h2>{% translate "Payment and customer numbers" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_payment' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a></div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "IBAN" %}</dt><dd class="tnum">{% if iban %}{{ iban }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Paper invoice" %}</dt><dd>{% if paper_invoice %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{{ number }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{% if number %}{{ number }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% blocktranslate %}{{ operator }} customer number{% endblocktranslate %}</dt><dd>{% if operator_number %}{{ operator_number }}{% else %}–{% endif %}</dd></div>
         </dl>
       </section>

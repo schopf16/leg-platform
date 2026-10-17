@@ -174,7 +174,22 @@ class MatrixBase(TestCase):
             Case("persons_print", data={"scope": "list"}),
             Case("persons_detail", pk(self.anna)),
             Case("persons_note", pk(self.anna), {"note": "a note"}, True),
-            Case("persons_operator_number", pk(self.anna), {"operator_customer_number": "B-1"}, True),
+            # The dialogs of the customer's data and the creation of a person (D-087).
+            Case("persons_new", (), {
+                "email": "new.person@example.org", "first_name": "Neu", "last_name": "Person", **address,
+                "country": "CH",
+            }, True),
+            Case("persons_details", pk(self.anna), {
+                "salutation": "mrs", "organisation_name": "", "first_name": "Anna", "last_name": "Neumann",
+                "address_line_1": "",
+            }, True),
+            Case("persons_contact", pk(self.anna), {"phone_number": "031 311 11 11", "secondary_email": ""}, True),
+            Case("persons_address", pk(self.anna), {**address, "post_office_box_number": "", "country": "CH"}, True),
+            Case("persons_payment", pk(self.anna), {
+                "iban": "CH93 0076 2011 6238 5295 7", "paper_invoice": "1", "operator_customer_number": "B-1",
+            }, True),
+            # Nobody to invite (an account that completed the registration): nothing is sent, nothing changes.
+            Case("persons_invitation", pk(self.anna), {"next": "/management/persons/"}),
             Case("persons_shares", pk(self.anna), {"quantity": "5", "valid_from": date(-1)}, True),
             # A token of a suggestion that does not exist: nothing to decide on, so nothing changes (no control).
             Case("persons_address_suggestion", pk(self.anna), {"action": "dismiss", "token": "x"}),
@@ -454,7 +469,11 @@ class NegativeAuthorizationTests(MatrixBase):
         before = snapshot()
         for name, data in (
             ("persons_detail", None), ("persons_note", {"note": "x"}),
-            ("persons_operator_number", {"operator_customer_number": "B"}),
+            ("persons_details", {"first_name": "X", "last_name": "Y"}),
+            ("persons_contact", {"phone_number": ""}),
+            ("persons_address", {"street": "S", "town": "Bern", "postal_code": "3000", "country": "CH"}),
+            ("persons_payment", {"operator_customer_number": "B", "paper_invoice": "0"}),
+            ("persons_invitation", {"next": "/management/persons/"}),
             ("persons_shares", {"quantity": "1", "valid_from": TODAY.isoformat()}),
             ("persons_address_suggestion", {"action": "dismiss", "token": "x"}),
         ):

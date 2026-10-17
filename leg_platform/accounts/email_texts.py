@@ -64,6 +64,9 @@ TWO_FACTOR_RESET_URL = Placeholder(
 LIFETIME_HOURS = Placeholder(
     "lifetime_hours", _("Number of hours for which the personal link can be used.")
 )
+LIFETIME_DAYS = Placeholder(
+    "lifetime_days", _("Number of days for which the personal link can be used.")
+)
 STOP_URL = Placeholder(
     "stop_url", _("Personal link that stops the requested change of an email address.")
 )
@@ -103,6 +106,12 @@ DEFINITIONS = {
         "accounts/email/registration_verification.txt",
         lambda: gettext("Your registration at %(instance_name)s"),
         (VERIFICATION_URL, LIFETIME_HOURS),
+        (VERIFICATION_URL,),
+    ),
+    Key.INVITATION: Definition(
+        "accounts/email/invitation.txt",
+        lambda: gettext("Your account at %(instance_name)s"),
+        (VERIFICATION_URL, LIFETIME_DAYS),
         (VERIFICATION_URL,),
     ),
     Key.REGISTRATION_EXISTING_ACCOUNT: Definition(

@@ -63,13 +63,17 @@ class RequestRefused(Exception):
     """The limit of the client address or of the instance is used up (D-038): nothing was stored."""
 
 
-def request_changes(request, user, *, login=None, secondary=None, remove_secondary=False):
+def request_changes(request, user, *, login=None, secondary=None, remove_secondary=False, actor=None):
     """Make the requests of one submission of the profile form (D-059).
 
     ``login`` and ``secondary`` are the new addresses (already normalised and checked); the
     caller has asked for the password and, where set up, the code. A removed second address is
     removed at once (nothing needs confirming). Every request counts against the limits of the
     mail requests (D-038), and the old addresses get the notice with the stop link.
+
+    ``actor`` is the staff account that makes the request for the customer's account (D-087, only for
+    the second address): the security log names it. The link always goes to the new address only, the
+    old addresses are told with the stop link, nothing changes before the confirmation.
 
     The notice is queued before the links and, if delivery works, sent first (security review of
     phase 4; the queue works in order, but a failed delivery of the notice is repeated later while
@@ -104,7 +108,9 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
             PendingEmailChange.objects.filter(user=locked, kind=Kind.SECONDARY).delete()
             VerificationToken.objects.filter(user=locked, purpose=Purpose.SECONDARY_EMAIL).delete()
             enqueue_for_account(MailJob.Kind.SECONDARY_EMAIL_CHANGED, locked, addresses=recipients)
-            security_log.record(SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=locked)
+            security_log.record(
+                SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=locked, actor=actor
+            )
         if submissions:
             # An older notice must not stop or report a newer request: its links end here.
             VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE_STOP).delete()
@@ -113,7 +119,7 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
             for kind, address in submissions:
                 if not submit_mail_request(request, kind, address, account=locked):
                     raise RequestRefused
-            security_log.record(SecurityEvent.Event.EMAIL_CHANGE_REQUESTED, account=locked)
+            security_log.record(SecurityEvent.Event.EMAIL_CHANGE_REQUESTED, account=locked, actor=actor)
             requested = True
     return requested
 

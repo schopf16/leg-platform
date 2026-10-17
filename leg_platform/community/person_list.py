@@ -1,8 +1,9 @@
 """Queries and rules of the person list and of the metering points of one person (D-081;
 ``personen/VORGABEN.md``, ``personen/detail/VORGABEN.md``, ``LISTEN-STANDARD.md``).
 
-A person is an account of ``accounts.User`` that has a customer number (D-077, point 5): the unverified
-accounts (registration not completed) have none and are not persons. The account states give three words:
+A person is an account of ``accounts.User`` that has a customer number (D-077, point 5), or an invited person who
+has not completed the registration yet (D-087, ``persons.person_filter``): the other unverified accounts (a
+registration that nobody completed) have no number and are not persons. The account states give four words:
 
 * **Active** (``Aktiv``): the account state ``active`` and not temporarily locked.
 * **Blocked** (``Gesperrt``): the account state ``blocked``, or an active account that the lockout of the
@@ -10,6 +11,10 @@ accounts (registration not completed) have none and are not persons. The account
   the specification says: "vorübergehend gesperrt, zum Beispiel nach Fehlversuchen".
 * **Inactive** (``Inaktiv``): the account state ``deactivated`` (the account was deleted and is kept under the
   retention obligation); these accounts are the archive and appear only with the filter "archived".
+* **Invited** (``Eingeladen``, D-087): the account state ``unverified`` of a person whom staff invited and who
+  has not completed the registration: no customer number yet, cannot sign in. The specification has three words
+  ("Aktiv", "Gesperrt", "Inaktiv"); none of them is true for such a person, so the fourth is added (D-087). It
+  appears in "All" and is no filter of its own.
 
 The metering points of a person are the metering points that are not archived and have an assignment of this
 person that is valid now or starts later (``not_ended``: an assignment that ends in the future still counts).
@@ -31,6 +36,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.login_protection import LOGIN_COOLOFF, LOGIN_FAILURE_LIMIT, axes_username
+from leg_platform.community import persons
 from leg_platform.community.models import LegAssignment, MeteringPoint, PersonAssignment
 from leg_platform.community.status import MeteringPointStatus
 
@@ -48,14 +54,17 @@ POINTS_FILTERS = (POINTS_ALL, POINTS_WITH, POINTS_WITHOUT)
 SORT_KEYS = ("name", "number", "address", "points", "account")
 DEFAULT_SORT = "name"
 
-# The three words of the column "Account" (``personen/VORGABEN.md``, section 5).
+# The words of the column "Account" (``personen/VORGABEN.md``, section 5), and "Invited" (D-087).
 class AccountState(models.TextChoices):
     ACTIVE = "active", _("Active")
     BLOCKED = "blocked", _("Blocked")
     INACTIVE = "inactive", _("Inactive")
+    INVITED = "invited", _("Invited")
 
 
-ACCOUNT_RANK = {AccountState.ACTIVE: 0, AccountState.BLOCKED: 1, AccountState.INACTIVE: 2}
+ACCOUNT_RANK = {
+    AccountState.ACTIVE: 0, AccountState.BLOCKED: 1, AccountState.INACTIVE: 2, AccountState.INVITED: 3,
+}
 
 
 def locked_account_ids(now=None, only=None):
@@ -91,6 +100,8 @@ def locked_account_ids(now=None, only=None):
 def account_state(person, locked_ids=()):
     """The state of the account as one of the three words."""
     status = person.status
+    if status == type(person).Status.UNVERIFIED:
+        return AccountState.INVITED
     if status == type(person).Status.DEACTIVATED:
         return AccountState.INACTIVE
     if status == type(person).Status.BLOCKED or person.pk in locked_ids:
@@ -131,7 +142,7 @@ def base_queryset(today=None, locked_ids=()):
     unregistered = assignments.filter(
         metering_point__in=MeteringPoint.objects.with_status(MeteringPointStatus.REGISTERED, today).values("pk")
     )
-    return user_model.objects.filter(customer_number__isnull=False).annotate(
+    return user_model.objects.filter(persons.person_filter()).annotate(
         sort_name=Case(
             When(~Q(organisation_name=""), then=F("organisation_name")),
             default=Trim(Concat("first_name", Value(" "), "last_name")),
@@ -141,6 +152,7 @@ def base_queryset(today=None, locked_ids=()):
         point_count=Coalesce(Subquery(count, output_field=IntegerField()), 0),
         has_unregistered=Exists(unregistered),
         account_rank=Case(
+            When(status=user_model.Status.UNVERIFIED, then=Value(ACCOUNT_RANK[AccountState.INVITED])),
             When(status=user_model.Status.DEACTIVATED, then=Value(ACCOUNT_RANK[AccountState.INACTIVE])),
             When(
                 Q(status=user_model.Status.BLOCKED) | Q(pk__in=list(locked_ids)),

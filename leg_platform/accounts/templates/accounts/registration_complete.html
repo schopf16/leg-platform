@@ -20,7 +20,7 @@
     </div>
     <div class="field-pair field-pair-street">
       {# Address suggestions (D-066): the country of a registration is Switzerland (the form fixes it). #}
-      {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" address_country_value="CH" %}
+      {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" address_country_value=form.country %}
       {% include "accounts/_field.html" with field=form.house_number %}
     </div>
     <div class="field-pair field-pair-locality">

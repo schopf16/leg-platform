@@ -133,14 +133,17 @@ class PersonPageTests(TestCase):
         self.assertContains(page, 'mgmt-person-contact" title="Lea Probe"')
         self.assertContains(page, f'href="{self.detail(self.anna)}"')
         self.assertContains(page, 'class="mgmt-grip"')
-        # Nothing that has no specified effect: no buttons "Create person" or "Start registration", no
-        # triangle; no inactive account, no unverified one, no note, no customer number at the grid operator and
-        # no shares (the shares are on the page of the person only). The button "Print" is there (a desktop only,
-        # D-082).
-        for text in ("Person anlegen", "Anmeldung starten", "mgmt-warning", "Max Inaktiv", "Emil Probe " + "x",
+        # Nothing that has no specified effect: no button "Start registration", no triangle; no inactive account,
+        # no unverified one, no note, no customer number at the grid operator and no shares (the shares are on the
+        # page of the person only). The button "Print" is there (a desktop only, D-082), and left of it nothing: the
+        # button "Create person" (D-087) is the one on its right.
+        for text in ("Anmeldung starten", "mgmt-warning", "Max Inaktiv", "Emil Probe " + "x",
                      "unverified", "Telefonat", "OP-4711", "CH93 0076", "Anteile", "BKW"):
             self.assertNotContains(page, text)
         self.assertContains(page, ">Drucken</a>")
+        self.assertContains(page, ">Person anlegen</a>")
+        content = page.content.decode()
+        self.assertLess(content.index(">Drucken</a>"), content.index(">Person anlegen</a>"))
         # On a phone one card per person, the dot has the word as its accessible name.
         self.assertContains(page, 'role="img" aria-label="Gesperrt"')
         self.assertContains(page, 'class="mgmt-cards-view"')
@@ -213,13 +216,13 @@ class PersonPageTests(TestCase):
             self.assertContains(page, text)
         self.assertNotContains(page, "30 Tage")
         self.assertNotContains(page, "BKW")
-        # No button without an effect and nothing for the customer's own data. The three dialogs of the staff are
-        # offered: the customer number at the grid operator, the note (both "Edit") and the shares ("Add change").
+        # No button without an effect and nothing for the customer's own login data. The dialogs of the staff are
+        # offered: the four cards of the customer's data and the note (all "Edit", D-087) and the shares ("Add change").
         for text in ("Anmeldung starten", "Person anlegen", "Konto sperren"):
             self.assertNotContains(page, text)
-        self.assertEqual(page.content.decode().count("Bearbeiten"), 2)
+        self.assertEqual(page.content.decode().count("Bearbeiten"), 5)
         self.assertContains(page, "Änderung hinzufügen")
-        for name in ("operator_number", "shares", "note"):
+        for name in ("details", "contact", "address", "payment", "shares", "note"):
             self.assertContains(page, self.detail(self.anna, name))
         # Links: the location, the metering point and the LEG.
         self.assertContains(page, f'href="/management/locations/{self.place.pk}/"')
@@ -325,13 +328,13 @@ class PersonPageTests(TestCase):
         client = self.login(self.staff)
         url = self.detail(self.fixable)
         # Nothing is created by opening a dialog.
-        for name, title in (("note", "Notiz bearbeiten"), ("operator_number", "Netzbetreiber Beispiel-Kundennummer bearbeiten")):
+        for name, title in (("note", "Notiz bearbeiten"), ("payment", "Zahlung und Kundennummern bearbeiten")):
             self.assertContains(client.get(self.detail(self.fixable, name)), title)
         self.assertFalse(PersonRecord.objects.filter(person=self.fixable).exists())
 
         for name, data in (
             ("note", {"note": "Rückruf vereinbart."}),
-            ("operator_number", {"operator_customer_number": "OP 99"}),
+            ("payment", {"operator_customer_number": "OP 99", "paper_invoice": "0", "iban": ""}),
         ):
             response = client.post(self.detail(self.fixable, name), {**data, "next": url})
             self.assertRedirects(response, url, fetch_redirect_response=False)
@@ -345,7 +348,7 @@ class PersonPageTests(TestCase):
         for entry in history.entries_for(self.fixable):
             self.assertEqual((entry.actor, entry.detail), (self.staff, {}))
         # The form is filled with what is saved.
-        self.assertContains(client.get(self.detail(self.fixable, "operator_number")), 'value="OP 99"')
+        self.assertContains(client.get(self.detail(self.fixable, "payment")), 'value="OP 99"')
 
     def test_a_change_of_the_shares_is_added_to_the_history_and_the_latest_date_is_the_current_number(self):
         client = self.login(self.staff)
@@ -391,7 +394,9 @@ class PersonPageTests(TestCase):
             self.assertContains(page, "mgmt-field-error", msg_prefix=str(data))
         self.assertFalse(ShareChange.objects.filter(record__person=self.fixable).exists())
         self.assertFalse(PersonRecord.objects.filter(person=self.fixable).exists())
-        page = client.post(self.detail(self.fixable, "operator_number"), {"operator_customer_number": "1" * 31})
+        page = client.post(
+            self.detail(self.fixable, "payment"), {"operator_customer_number": "1" * 31, "paper_invoice": "0"}
+        )
         self.assertEqual(page.status_code, 200)
         self.assertFalse(PersonRecord.objects.filter(person=self.fixable).exists())
         for hostile in HOSTILE:

@@ -19,6 +19,7 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.models import EXACT_COLLATION, SWISS_POSTAL_CODE, SWISS_POSTAL_CODE_MESSAGE
 from leg_platform.community import addressing, numbers
+from leg_platform.community import iban as iban_module
 from leg_platform.community.status import MeteringPointStatus, derive_status, status_filter
 
 # The legal minimum of the production quota (Art. 19e para. 1 StromVV, ``legs/VORGABEN.md``): a
@@ -568,8 +569,8 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     """What the staff keep about a person (an account) besides the account itself.
 
     The account is the customer's own data and not editable by the staff; this side record holds
-    the staff-only note, the optional customer number at the grid operator, the IBAN and the paper invoice
-    wish (read-only for the staff; the customer maintains them later) and the state of the address
+    the staff-only note, the optional customer number at the grid operator, the IBAN (encrypted) and the paper
+    invoice wish (the staff may change them for support, D-087; the customer maintains them later) and the state of the address
     suggestion; the shares of the cooperative are the entries of ``ShareChange``. Created when needed."""
 
     person = models.OneToOneField(
@@ -577,7 +578,9 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     )
     staff_note = models.TextField(_("note"), blank=True, validators=REMARK_VALIDATORS)
     operator_customer_number = models.CharField(_("customer number at the grid operator"), max_length=30, blank=True)
-    iban = models.CharField(_("IBAN"), max_length=34, blank=True)
+    # The IBAN is stored encrypted (D-087, ``community.iban``); the attribute ``iban`` reads and writes it as
+    # text. Nothing queries it: it is no search field and has no lookup.
+    iban_encrypted = models.TextField(_("IBAN"), blank=True, editable=False)
     paper_invoice = models.BooleanField(_("paper invoice"), default=False)
 
     class Meta:
@@ -587,6 +590,16 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
 
     def __str__(self):
         return f"{self.person}"
+
+    @property
+    def iban(self):
+        """The IBAN in its normal form, or "". Raises ``DecryptionError`` if no key of the instance decrypts it
+        (``iban.readable`` gives "" and logs the account number for display)."""
+        return iban_module.decrypt_iban(self.iban_encrypted)
+
+    @iban.setter
+    def iban(self, value):
+        self.iban_encrypted = iban_module.encrypt_iban(value)
 
     def current_address(self):
         person = self.person

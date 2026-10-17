@@ -1,0 +1,12 @@
+{% extends "management/dialog_form.html" %}
+{% load static %}{% comment %}
+A dialog with the data of a customer (D-087): creating a person and the cards "Angaben", "Kontakt" and
+"Rechnungsadresse". Where the form has the address (a street field), the suggestions of the address directory work as in the
+registration and the profile (``addresses/widget.html`` under the street, the notice ``addresses/widget_notice.html`` under
+the town; set by the form as ``after_template``, ``static/js/address-directory.js``). Without JavaScript everything still
+works: the server checks the data.
+{% endcomment %}
+{% block scripts %}
+  {{ block.super }}
+  {% if "street" in form.fields %}<script defer src="{% static 'js/address-directory.js' %}"></script>{% endif %}
+{% endblock %}

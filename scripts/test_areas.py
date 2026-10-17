@@ -220,13 +220,15 @@ AREAS: dict[str, Area] = {
         "Registration, verification links, entry pages and the abuse protection of the forms.",
         paths=(
             "leg_platform/accounts/registration.py", "leg_platform/accounts/resend.py",
+            "leg_platform/accounts/invitations.py",
             "leg_platform/accounts/bot_check.py", "leg_platform/accounts/normalization.py",
             "leg_platform/accounts/views.py", "leg_platform/accounts/forms.py",
             "leg_platform/accounts/management/commands/delete_expired_registrations.py",
         ),
         tests=(
             _labels(A, "test_registration", "test_registration_hardening", "test_entry_pages",
-                    "test_invalid_link_redirect", "test_token_page_forms", "test_browser_origin")
+                    "test_invalid_link_redirect", "test_token_page_forms", "test_browser_origin",
+                    "test_invitations")
             + _FLOW_REVIEWS
         ),
     ),
@@ -305,6 +307,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/mail.py", "leg_platform/accounts/mail_queue.py",
             "leg_platform/accounts/emails.py", "leg_platform/accounts/email_texts.py",
             "leg_platform/accounts/greeting.py", "leg_platform/accounts/rate_limits.py",
+            "leg_platform/accounts/invitations.py",
             "leg_platform/accounts/tasks.py",
             "leg_platform/accounts/templates/accounts/email/",
             "leg_platform/accounts/management/commands/process_mail_queue.py",
@@ -313,7 +316,7 @@ AREAS: dict[str, Area] = {
         ),
         tests=(
             _labels(A, "test_mail_queue", "test_email_texts", "test_greeting", "test_scheduled_tasks",
-                    "test_graph_test_email_limits", "test_invalid_link_redirect")
+                    "test_graph_test_email_limits", "test_invalid_link_redirect", "test_invitations")
             + _labels(T, "test_mail_graph", "test_instance_configuration")
         ),
     ),
@@ -324,7 +327,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue")
             + _labels(T, "test_database")
-            + _labels(C, "test_models", "test_migration_0004")
+            + _labels(C, "test_models", "test_migration_0004", "test_iban")
             + ("leg_platform.addresses.tests",)
         ),
         fresh_db=True,

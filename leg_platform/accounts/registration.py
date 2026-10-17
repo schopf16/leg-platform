@@ -11,8 +11,8 @@ from django.db import DatabaseError, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
-from leg_platform.accounts import emails, rate_limits
-from leg_platform.accounts.models import AccountIntegrityError, User, VerificationToken
+from leg_platform.accounts import emails, invitations, rate_limits
+from leg_platform.accounts.models import AccountIntegrityError, MailJob, User, VerificationToken
 from leg_platform.accounts.normalization import normalize_email_address
 
 logger = logging.getLogger(__name__)
@@ -55,14 +55,12 @@ def process_registration(address):
         ):
             return None
         return lambda: emails.send_registration_existing_account(address)
-    raw_token = outcome
-    return lambda: emails.send_registration_verification(
-        address, raw_token, REGISTRATION_LINK_LIFETIME
-    )
+    raw_token, lifetime = outcome
+    return lambda: emails.send_registration_verification(address, raw_token, lifetime)
 
 
 def _register_once(email, normalized):
-    """Store the registration; return the raw token, or ADDRESS_HAS_ACCOUNT."""
+    """Store the registration; return the raw token and its lifetime, or ADDRESS_HAS_ACCOUNT."""
     with transaction.atomic():
         # Read without a lock: an address of an account that is not pending is never locked, so
         # requests for it cannot delay that person's own requests. A pending registration is
@@ -79,11 +77,17 @@ def _register_once(email, normalized):
             )
             if pending is None:
                 raise RegistrationConflict
+            if pending.invited_at is not None:
+                # A person whom staff invited asks for a link themselves (D-087): the account and the
+                # data of the staff stay, nobody can delete an invitation by registering the address; the
+                # link goes to the mailbox as always, and the earlier link ends.
+                return invitations.reissue_link(pending), invitations.INVITATION_LIFETIME
             pending.delete()
         user = User.objects.create_user(email)
-        return VerificationToken.objects.issue(
+        token = VerificationToken.objects.issue(
             user, VerificationToken.Purpose.REGISTRATION, REGISTRATION_LINK_LIFETIME
         )
+        return token, REGISTRATION_LINK_LIFETIME
 
 
 def delete_expired_registrations():
@@ -97,10 +101,12 @@ def delete_expired_registrations():
         purpose=VerificationToken.Purpose.REGISTRATION,
         expires_at__gt=timezone.now(),
     )
+    # An invitation of staff (D-087) whose email is queued but not sent yet has no link so far.
+    queued_invitation = MailJob.objects.filter(account=OuterRef("pk"), kind=MailJob.Kind.INVITATION)
     expired_user_ids = list(
         User._base_manager.filter(status=User.Status.UNVERIFIED)
-        .annotate(has_valid_link=Exists(valid_link))
-        .filter(has_valid_link=False)
+        .annotate(has_valid_link=Exists(valid_link), has_queued_invitation=Exists(queued_invitation))
+        .filter(has_valid_link=False, has_queued_invitation=False)
         .values_list("pk", flat=True)
     )
     deleted = failed = 0
