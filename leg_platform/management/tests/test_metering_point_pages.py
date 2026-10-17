@@ -135,8 +135,17 @@ class MeteringPointPageTests(TestCase):
     def test_search_filters_and_sort_come_from_the_address_and_wrong_values_do_no_harm(self):
         client = self.login(self.viewer)
         self.assertNotContains(client.get(LIST, {"q": "hidden note"}), number(1)[13:])  # never the remark
-        self.assertContains(client.get(LIST, {"q": "musterweg"}), "Alle (5)")
-        self.assertContains(client.get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (1)")
+        # The address is searched only with the right to see locations, a LEG name only with the right to see LEGs
+        # (D-084, M-4): the account that sees metering points only finds them by number.
+        self.assertContains(client.get(LIST, {"q": "musterweg"}), "Alle (0)")
+        self.assertContains(self.login(self.adder).get(LIST, {"q": "musterweg"}), "Alle (5)")
+        self.assertContains(client.get(LIST, {"q": "bahnhof"}), "Alle (0)")
+        self.assertContains(client.get(LIST, {"q": number(1)[20:]}), "Alle (1)")
+        self.assertContains(self.login(self.full).get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (1)")
+        # Without the right to see LEGs a posted LEG is no filter (and no LEG name is a column, sort key or option).
+        self.assertContains(client.get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (6)")
+        self.assertNotContains(client.get(LIST), 'name="leg"')
+        self.assertNotContains(client.get(LIST, {"sort": "leg"}), "sort=leg")
         self.assertContains(client.get(LIST, {"step": "archived"}), "archiviert (0)")
         # A name is searched only with the right to see persons.
         self.assertContains(self.login(self.changer).get(LIST, {"q": "anna muster"}), "Alle (1)")
@@ -355,11 +364,17 @@ class MeteringPointPageTests(TestCase):
             list(PersonAssignment.objects.filter(metering_point=self.active).values_list("valid_to", flat=True)),
             [d(9), None],
         )
-        # Ending: the open (new) assignment gets its end; ending before its start is refused.
+        # Ending: the open (new) assignment gets its end; ending before its start is refused. The dialog names the
+        # assignment that it showed; another id (a page that was open for a while) ends nothing (D-084, L-6).
         end = self.url("person_end", self.active)
+        ruth_id = PersonAssignment.objects.get(person=self.ruth).pk
         self.assertContains(client.get(end), "Die Zuordnung zu Ruth Beispiel endet.")
-        self.assertContains(client.post(end, {"valid_to": d(5).isoformat()}), "mgmt-field-error")
-        client.post(end, {"valid_to": d(60).isoformat()})
+        self.assertContains(client.get(end), f'name="assignment" value="{ruth_id}"')
+        self.assertContains(client.post(end, {"valid_to": d(5).isoformat(), "assignment": ruth_id}), "mgmt-field-error")
+        for stale in ("", "999999", str(ruth_id + 1)):
+            client.post(end, {"valid_to": d(60).isoformat(), "assignment": stale})
+            self.assertIsNone(PersonAssignment.objects.get(person=self.ruth).valid_to)
+        client.post(end, {"valid_to": d(60).isoformat(), "assignment": ruth_id})
         self.assertEqual(PersonAssignment.objects.get(person=self.ruth).valid_to, d(60))
         self.assertEqual(client.get(end).status_code, 302)  # nothing left to end
         # Deleting is only for an assignment that never took effect and was not ended.
@@ -367,11 +382,17 @@ class MeteringPointPageTests(TestCase):
         self.assertEqual(client.get(delete).status_code, 404)  # ended: no longer deletable
         PersonAssignment.objects.filter(person=self.ruth).update(valid_to=None)
         self.assertContains(client.get(delete), "Zuordnung löschen")
-        client.post(delete, {"next": self.detail(self.active)})
+        self.assertContains(client.get(delete), f'name="assignment" value="{ruth_id}"')
+        # Without the id of the assignment that the page showed (or with another one) nothing is deleted.
+        for stale in ({}, {"assignment": "999999"}, {"assignment": str(ruth_id + 1)}):
+            client.post(delete, {"next": self.detail(self.active), **stale})
+            self.assertTrue(PersonAssignment.objects.filter(person=self.ruth).exists())
+        client.post(delete, {"next": self.detail(self.active), "assignment": ruth_id})
         self.assertFalse(PersonAssignment.objects.filter(person=self.ruth).exists())
         self.assertIsNone(PersonAssignment.objects.get(person=self.anna, metering_point=self.active).valid_to)  # undone
         # An assignment that is in force cannot be deleted, also not with a forged post.
-        client.post(delete)
+        anna_id = PersonAssignment.objects.get(person=self.anna, metering_point=self.active).pk
+        client.post(delete, {"assignment": anna_id})
         self.assertTrue(PersonAssignment.objects.filter(person=self.anna, metering_point=self.active).exists())
 
     def test_the_person_dialogs_need_the_right_to_see_persons_and_the_search_is_bounded(self):

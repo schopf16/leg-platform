@@ -293,8 +293,8 @@ class LocationPageTests(TestCase):
         self.assertContains(warning, "Übertragen und speichern")
         self.assertContains(warning, "Zielweg 3, 3063 Ittigen")
         self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
-        # The second step is the explicit confirmation.
-        done = client.post(url, {**merge, "confirm_merge": "1"})
+        # The second step is the explicit confirmation, bound to the location that was shown.
+        done = client.post(url, {**merge, "confirm_merge": "1", "merge_target": str(self.other.pk)})
         self.assertRedirects(done, self.detail(self.other), fetch_redirect_response=False)
         self.assertFalse(Location.objects.filter(pk=self.fresh.pk).exists())
         self.assertTrue(history.entries_for(self.other).filter(event=HistoryEvent.LOCATIONS_MERGED).exists())
@@ -304,8 +304,16 @@ class LocationPageTests(TestCase):
         merge = {"street": "Zielweg", "house_number": "3", "address_addition": "", "postal_code": "3063", "town": "Ittigen"}
         changer = self.login(self.changer)
         self.assertContains(changer.post(url, merge), "Diese Adresse gibt es schon.")
-        self.assertEqual(changer.post(url, {**merge, "confirm_merge": "1"}).status_code, 403)
+        # Without the right to delete the confirmation is no confirmation: the address is "in use", nothing moves.
+        forged = changer.post(url, {**merge, "confirm_merge": "1", "merge_target": str(self.other.pk)})
+        self.assertContains(forged, "Diese Adresse gibt es schon.")
         self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
+        # With the right, but for another target than the one that was shown (or none), the page asks again.
+        full = self.login(self.full)
+        for target in ("", "999999", "abc", str(self.fresh.pk)):
+            again = full.post(url, {**merge, "confirm_merge": "1", "merge_target": target})
+            self.assertContains(again, "Übertragen und speichern")
+            self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
 
     def test_the_remark_is_changed(self):
         url = reverse("management:locations_remark", args=[self.fresh.pk])

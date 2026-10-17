@@ -62,6 +62,9 @@ def switch_leg(metering_point, leg, valid_from, also=(), actor=None, today=None)
         allowed = {point.pk for point in related_points(metering_point, today)}
         if any(point.pk not in allowed for point in also):
             raise assignments.AssignmentError("not_related")
+        # Lock the metering points in ascending id order: two switches that share points cannot wait for each other.
+        ids = sorted({metering_point.pk, *(point.pk for point in also)})
+        list(MeteringPoint.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
         made = []
         for point in (metering_point, *also):
             current = current_assignment(assignments.LEG, point, today)

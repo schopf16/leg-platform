@@ -19,6 +19,7 @@ The form posts to the same address with the CSRF token and the ``next`` value.
       <form method="post" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ back_url }}">
+        {% for name, value in hidden_values %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
         {% include "accounts/_error_summary.html" %}
         {% block dialog_notice %}{% endblock %}
         {% block dialog_fields %}{% endblock %}

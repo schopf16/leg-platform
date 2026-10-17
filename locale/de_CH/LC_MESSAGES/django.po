@@ -4148,3 +4148,26 @@ msgstr "Bestätigung ausstehend"
 
 msgid "Start date pending"
 msgstr "Startdatum ausstehend"
+
+# Review round of D-082 (D-084)
+msgid "Skip to content"
+msgstr "Zum Inhalt springen"
+
+msgid "No entries yet."
+msgstr "Noch keine Einträge."
+
+msgid "There are too many entries to select from. Narrow the list with the search or the filters."
+msgstr "Es gibt zu viele Einträge für eine Auswahl. Grenzen Sie die Liste mit der Suche oder den Filtern ein."
+
+msgid "The list has more than %(max)d entries; all of them cannot be shown at once. Narrow it with the search or the filters."
+msgstr "Die Liste hat mehr als %(max)d Einträge; sie können nicht alle auf einmal angezeigt werden. Grenzen Sie sie mit der Suche oder den Filtern ein."
+
+msgctxt "person card"
+msgid "Details"
+msgstr "Angaben"
+
+msgid "List printed"
+msgstr "Liste gedruckt"
+
+msgid "Location changed"
+msgstr "Standort geändert"

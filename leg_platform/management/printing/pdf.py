@@ -28,10 +28,12 @@ FONT_DIRECTORY = Path(__file__).resolve().parent / "fonts"
 REGULAR = "LegSans"
 BOLD = "LegSans-Bold"
 
-# A person can type a very long text (a remark). A table cell that is higher than the page cannot be drawn,
-# so a text is cut: short in a table, longer in the lines of a detail page.
+# A person can type a very long text (a remark, a note). A table cell that is higher than the page cannot be
+# drawn, so a text in a table is cut at 300 characters; a line of a detail page is printed in full up to the
+# stored maximum of a remark or note (``community.models.REMARK_MAX_LENGTH`` = 5000; a test keeps them equal), as a
+# paragraph that may run over a page.
 MAX_CELL_CHARS = 300
-MAX_FACT_CHARS = 1000
+MAX_FACT_CHARS = 5000
 MAX_TITLE_CHARS = 200
 
 MARGIN = 15 * mm
@@ -145,30 +147,49 @@ def _table(table, styles, width=CONTENT_WIDTH, limit=MAX_CELL_CHARS):
     return flowable
 
 
+LONG_FACT_CHARS = 400
+
+
 def _facts(facts, styles):
-    data = [
-        [Paragraph(markup(label, MAX_TITLE_CHARS), styles["label"]), Paragraph(markup(value, MAX_FACT_CHARS), styles["value"])]
-        for label, value in facts
-    ]
-    flowable = Table(data, colWidths=[CONTENT_WIDTH * 0.34, CONTENT_WIDTH * 0.66])
-    flowable.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LINEBELOW", (0, 0), (-1, -1), 0.3, LINE),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
-            ]
+    """The lines of label and value as flowables. A short value is a row of a table; a long one (a remark, a note:
+    up to the stored maximum) is a label and a paragraph of its own, which can run over a page break; a table row
+    that is higher than the page cannot be drawn."""
+    flowables, group = [], []
+
+    def flush():
+        if not group:
+            return
+        table = Table(group[:], colWidths=[CONTENT_WIDTH * 0.34, CONTENT_WIDTH * 0.66])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.3, LINE),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ]
+            )
         )
-    )
-    return flowable
+        flowables.append(table)
+        group.clear()
+
+    for label, value in facts:
+        text = markup(value, MAX_FACT_CHARS)
+        label_paragraph = Paragraph(markup(label, MAX_TITLE_CHARS), styles["label"])
+        if len(plain(value, MAX_FACT_CHARS)) > LONG_FACT_CHARS:
+            flush()
+            flowables.extend([label_paragraph, Paragraph(text, styles["value"]), Spacer(1, 4)])
+        else:
+            group.append([label_paragraph, Paragraph(text, styles["value"])])
+    flush()
+    return flowables
 
 
 def _header(document, styles):
     story = [Paragraph(markup(document.title, MAX_TITLE_CHARS), styles["title"])]
-    story.append(_facts(document.info, styles))
+    story.extend(_facts(document.info, styles))
     story.append(Spacer(1, 8))
     return story
 
@@ -197,7 +218,7 @@ def _detail(page, styles):
     for section in page.sections:
         story.append(Paragraph(markup(section.title, MAX_TITLE_CHARS), styles["heading"]))
         if section.facts:
-            story.append(_facts(section.facts, styles))
+            story.extend(_facts(section.facts, styles))
         if section.table is not None:
             story.append(_table(section.table, styles))
         if section.note:

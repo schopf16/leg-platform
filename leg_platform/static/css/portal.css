@@ -45,8 +45,14 @@
   --bad: #b42318;
   --bad-rgb: 180, 35, 24;
   --ok: #2f8f5b;
+  /* Green as text: 6.5:1 on --panel and 5.4:1 on the 16 % tint of the chips (--ok itself is 4.0:1 and 3.3:1, fine for
+     a dot or a ring, too light for text; D-084). */
+  --ok-text: #1d6b40;
   /* Status "open" and "not set up". Text on --panel: 5.9:1 (light), 8.9:1 (dark). */
   --warn: #8a5a00;
+  /* The warning triangle only (the colours of the reference templates, 5.0:1 on --panel light, 8.4:1 dark); text
+     in the warning colour keeps --warn. */
+  --warn-icon: #b45309;
   --warm: color-mix(in srgb, var(--accent) 9%, var(--bg));
   --logo-plate: transparent;
 }
@@ -64,7 +70,9 @@
   --bad: #f0948a;
   --bad-rgb: 240, 148, 138;
   --ok: #5dbb86;
+  --ok-text: #5dbb86;
   --warn: #e8b34a;
+  --warn-icon: #f5a623;
   --logo-plate: color-mix(in srgb, var(--fg) 8%, var(--warm));
 }
 

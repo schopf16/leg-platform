@@ -37,6 +37,10 @@ class NotDeletable(Exception):
     """The location has a history or metering points: it is archived, not deleted."""
 
 
+class MergeRefused(Exception):
+    """The address belongs to an archived location: nothing is moved to a location that is out of sight."""
+
+
 def refresh_suggestion(location):
     """Ask the directory about the address of the location and store the answer. Saves only the
     suggestion columns. Call it after an address was created or changed."""
@@ -110,24 +114,34 @@ def create_location(
 
 
 def update_address(
-    location, *, street, house_number, postal_code, town, address_addition="", actor=None, merge=False
+    location, *, street, house_number, postal_code, town, address_addition="", actor=None, merge=False,
+    merge_target_id=None,
 ):
     """Change the address (``standorte/VORGABEN.md``: only the address can be changed).
 
     If the new address is the address of another location, ``MergeNeeded`` is raised unless
-    ``merge`` is true; then the metering points move to the other location, this one is deleted,
-    the other one is returned and the merge is logged (irreversible). Otherwise the address is
-    saved, a change of street, house number, postal code or town is logged and the directory is
-    asked again (the dismissal of an earlier suggestion holds only for the same address)."""
+    ``merge`` is true **and** ``merge_target_id`` is the id of that location (the confirmation is
+    bound to the target that was shown; a different one, found under the lock, asks again); then the
+    metering points move to the other location (each move is a history entry of the metering point),
+    this one is deleted, the other one is returned and the merge is logged (irreversible). An archived
+    target is refused (``MergeRefused``). Otherwise the address is saved, a change of street, house
+    number, postal code or town is logged and the directory is asked again (the dismissal of an
+    earlier suggestion holds only for the same address). The rows are locked in ascending id order."""
     new = addressing.normalise_address(street, house_number, postal_code, town)
     with transaction.atomic():
-        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        probe = Location.find_by_address(*new)
+        ids = sorted({location.pk, probe.pk} if probe is not None else {location.pk})
+        locked = {row.pk: row for row in Location.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
+        fresh = locked[location.pk]
         other = Location.find_by_address(*new)
         if other is not None and other.pk != fresh.pk:
+            if other.is_archived:
+                raise MergeRefused()
+            other = locked.get(other.pk) or Location.objects.select_for_update().get(pk=other.pk)
             count = MeteringPoint.objects.filter(location=fresh).count()
-            if not merge:
+            if not merge or merge_target_id != other.pk:
                 raise MergeNeeded(other, count)
-            return _merge(fresh, other, actor, count)
+            return _merge(fresh, other, actor)
         changed = new != fresh.current_address()
         fresh.street, fresh.house_number, fresh.postal_code, fresh.town = new
         fresh.address_addition = address_addition
@@ -139,12 +153,20 @@ def update_address(
     return fresh
 
 
-def _merge(source, target, actor, count):
-    target = Location.objects.select_for_update().get(pk=target.pk)
-    MeteringPoint.objects.filter(location=source).update(location=target)
+def _merge(source, target, actor):
+    """Move the metering points of ``source`` to ``target`` (locked in ascending id order, one history entry
+    of each), log the merge at the target and delete ``source``."""
+    points = list(MeteringPoint.objects.select_for_update().filter(location=source).order_by("pk"))
+    for point in points:
+        point.location = target
+        point.save(update_fields=["location", "updated_at"])
+        history.record(
+            point, HistoryEvent.METERING_POINT_LOCATION_CHANGED, actor,
+            {"old_location_id": source.pk, "new_location_id": target.pk},
+        )
     history.record(
         target, HistoryEvent.LOCATIONS_MERGED, actor,
-        {"merged_location_id": source.pk, "metering_points": count},
+        {"merged_location_id": source.pk, "metering_points": len(points)},
     )
     source.delete()
     return target
@@ -205,7 +227,7 @@ def delete(location):
 
 
 __all__ = [
-    "ADDRESS_FIELDS", "MergeNeeded", "NotDeletable", "SuggestionError", "accept_suggestion",
+    "ADDRESS_FIELDS", "MergeNeeded", "MergeRefused", "NotDeletable", "SuggestionError", "accept_suggestion",
     "can_delete", "confirm", "create_location", "delete", "dismiss_suggestion", "refresh_suggestion",
     "set_archived", "set_circuit", "update_address",
 ]

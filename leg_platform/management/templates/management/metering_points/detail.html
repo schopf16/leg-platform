@@ -110,6 +110,9 @@ on a phone it stands at the end of the page.
         <tbody>
           {% for entry in history %}
             <tr><td>{{ entry.time|date:"d.m.Y" }}</td><td>{{ entry.label }}</td><td>{{ entry.actor|default:"–" }}</td></tr>
+          {% empty %}
+            {% translate "No entries yet." as empty_history %}
+            {% include "management/_empty_row.html" with colspan=3 text=empty_history %}
           {% endfor %}
         </tbody>
       </table>
@@ -117,6 +120,8 @@ on a phone it stands at the end of the page.
     <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
       {% for entry in history %}
         <div class="mgmt-fact"><dt>{{ entry.time|date:"d.m.Y" }}</dt><dd>{{ entry.label }}{% if entry.actor %}, {{ entry.actor }}{% endif %}</dd></div>
+      {% empty %}
+        <p class="mgmt-empty-text">{% translate "No entries yet." %}</p>
       {% endfor %}
     </dl>
   </section>
@@ -126,4 +131,5 @@ on a phone it stands at the end of the page.
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  <script defer src="{% static 'management/js/table-fit.js' %}"></script>
 {% endblock %}

@@ -12,7 +12,7 @@ of the guarded account model.
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxLengthValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -28,6 +28,10 @@ DEFAULT_WARNING_THRESHOLD_PERCENT = 10
 
 SUBJECT_MAX_LENGTH = 20
 ADDRESS_SIGNATURE_LENGTH = 400
+# The longest remark or note (a text column has no limit of its own; the validator and the forms cut it, and
+# the PDF prints a remark in full: ``management.printing.pdf.MAX_FACT_CHARS`` is not smaller, D-084).
+REMARK_MAX_LENGTH = 5000
+REMARK_VALIDATORS = [MaxLengthValidator(REMARK_MAX_LENGTH)]
 
 
 def validate_postal_code(value):
@@ -169,7 +173,7 @@ class Location(AddressSuggestionMixin, TimestampedModel):
         verbose_name=_("transformer circuit"),
     )
     # Internal; never searched (``LISTEN-STANDARD.md``, section 4).
-    remark = models.TextField(_("remark"), blank=True)
+    remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
     is_archived = models.BooleanField(_("archived"), default=False)
     # Created by a customer and not yet confirmed by the staff ("neu").
     needs_confirmation = models.BooleanField(_("not yet confirmed"), default=False)
@@ -264,7 +268,7 @@ class MeteringPoint(TimestampedModel):
         _("wallbox (kW)"), max_digits=8, decimal_places=2, null=True, blank=True,
         validators=[MinValueValidator(0)],
     )
-    remark = models.TextField(_("remark"), blank=True)
+    remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
     is_archived = models.BooleanField(_("archived"), default=False)
     # The dates that drive the status (``community.status``).
     registered_with_bkw_on = models.DateField(_("notified to the BKW on"), null=True, blank=True)
@@ -316,7 +320,7 @@ class Leg(TimestampedModel):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
     quota_checked_on = models.DateField(_("checked on"), null=True, blank=True)
-    remark = models.TextField(_("remark"), blank=True)
+    remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
     is_archived = models.BooleanField(_("archived"), default=False)
 
     class Meta:
@@ -532,7 +536,7 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     person = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="person_record"
     )
-    staff_note = models.TextField(_("note"), blank=True)
+    staff_note = models.TextField(_("note"), blank=True, validators=REMARK_VALIDATORS)
     bkw_customer_number = models.CharField(_("BKW customer number"), max_length=30, blank=True)
     shares = models.PositiveIntegerField(_("shares"), null=True, blank=True)
     shares_from = models.DateField(_("shares from"), null=True, blank=True)

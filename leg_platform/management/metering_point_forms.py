@@ -11,7 +11,7 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import leg_switch, person_search
 from leg_platform.community.metering_points import is_month_end
-from leg_platform.community.models import Leg, MeteringPoint
+from leg_platform.community.models import REMARK_MAX_LENGTH, Leg, MeteringPoint
 from leg_platform.management.location_forms import MeteringPointForm
 
 NUMBER_ATTRS = {"class": "form-control tnum", "autocomplete": "off", "inputmode": "numeric"}
@@ -85,7 +85,8 @@ class MeteringPointCreateForm(MeteringPointForm):
         widget=forms.TextInput(attrs={"class": "form-control tnum", "placeholder": "kW", "inputmode": "decimal"}),
     )
     remark = forms.CharField(
-        label=_("Remark"), required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2})
+        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
     optional = ("location", "leg", "pv_power_kwp", "battery_kwh", "wallbox_kw", "remark")
     field_order = ("number_digits", "direction", "location", "leg", "pv_power_kwp", "battery_kwh", "wallbox_kw", "remark")
@@ -176,6 +177,8 @@ class PersonAssignForm(DialogForm):
 
 class AssignmentEndForm(DialogForm):
     valid_to = date_field(_("Ends on"), initial="today")
+    # The id of the assignment that the dialog showed: the server ends only that one (D-084, L-6).
+    assignment = forms.CharField(widget=forms.HiddenInput, max_length=12)
     layout = [("single", ["valid_to"])]
     hint = _("Afterwards the metering point has no person. The person stays visible in the history.")
 

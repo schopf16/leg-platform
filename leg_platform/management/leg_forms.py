@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import leg_services
+from leg_platform.community.models import REMARK_MAX_LENGTH
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 
@@ -69,7 +70,8 @@ def _name_field():
 
 def _remark_field():
     return forms.CharField(
-        label=_("Remark"), required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2})
+        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
 
 

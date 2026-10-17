@@ -9,6 +9,12 @@
   max-width: 1200px;
 }
 
+/* The settings page is left aligned with the other pages, at most 900 px wide (D-084). */
+.frame-content:has(> .mgmt-settings) {
+  max-width: 900px;
+  margin-left: 0;
+}
+
 /* ---- Page header: "VERWALTUNG", the title and the buttons ---- */
 .mgmt-header {
   display: flex;
@@ -199,7 +205,7 @@
 }
 
 .mgmt-info-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -331,7 +337,7 @@
 
 .mgmt-direction.is-feed-in {
   background: color-mix(in srgb, var(--ok) 16%, var(--panel));
-  color: var(--ok);
+  color: var(--ok-text);
 }
 
 /* ---- Warning triangle (a problem in a list) ---- */
@@ -344,7 +350,7 @@
 .mgmt-warning-icon {
   width: 18px;
   height: 18px;
-  fill: var(--warn);
+  fill: var(--warn-icon);
   /* The exclamation mark and its dot take the colour of the surface. */
   color: var(--panel);
 }
@@ -626,7 +632,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 44px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 600;
@@ -642,8 +648,17 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-sort:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Every button of the area shows the same focus ring: 3 px in the accent colour (D-084). */
+.mgmt-page .btn:focus-visible,
+.mgmt-dialog .btn:focus-visible,
+.mgmt-icon-btn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* The handle at the right edge of a heading: a fine line, in the accent colour when touched. */
@@ -677,7 +692,8 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-grip:focus-visible {
-  outline: none;
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
 }
 
 .mgmt-link-col {
@@ -730,7 +746,7 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-caret:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1261,22 +1277,26 @@ a.mgmt-sort:hover {
 
   .mgmt-wide .mgmt-header-actions {
     flex-direction: row;
+    flex-wrap: wrap;
   }
 
+  /* Three buttons do not fit in a row of 358 px: they wrap to the next line instead of overflowing (D-084). */
   .mgmt-wide .mgmt-header-actions > .btn,
   .mgmt-wide .mgmt-header-actions > .mgmt-inline-form {
-    flex: 1 1 0;
+    flex: 1 1 140px;
     min-width: 0;
   }
 
   .mgmt-wide .mgmt-header-actions > .btn {
     width: auto;
     padding-inline: 8px;
+    white-space: normal;
   }
 
   .mgmt-wide .mgmt-header-actions .mgmt-inline-form .btn {
     width: 100%;
     padding-inline: 8px;
+    white-space: normal;
   }
 
   .mgmt-two-cols {
@@ -1432,6 +1452,23 @@ a.mgmt-sort:hover {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+/* The field in which a location is found by typing is wider than the field of the LEG and its hint is set a little
+   smaller, so that "Strasse oder Messpunkt-Nummer suchen" is read to the end (D-084). */
+.mgmt-dialog-row.is-pair:has([list="location-options"]) {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.mgmt-dialog [list="location-options"]::placeholder {
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .mgmt-dialog-row.is-pair:has([list="location-options"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .mgmt-dialog-row.is-triple {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1578,7 +1615,7 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-quota-state.is-ok {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 
 .mgmt-quota-state.is-warning {
@@ -1806,7 +1843,7 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-person-bkw.is-ok {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 
 .mgmt-person-bkw.is-warn {
@@ -1861,6 +1898,29 @@ a.mgmt-sort:hover {
   min-height: 36px;
   padding: 4px 12px;
   font-size: 14px;
+}
+
+/* ---- Medium screens (761 to 1279 px): a table that does not fit scrolls inside its card, never the page (D-084).
+   With the script (class mgmt-js, table-fit.js) the columns are narrowed first and the card scrolls only if the
+   table is still too wide (is-overflowing); without it the card scrolls. The info bubbles of the right columns
+   open to the left. ---- */
+@media (min-width: 761px) and (max-width: 1279px) {
+  :root:not(.mgmt-js) .mgmt-table-view,
+  .mgmt-table-view.is-overflowing {
+    overflow-x: auto;
+  }
+
+  .mgmt-table th:nth-last-child(-n + 4) .mgmt-info .mgmt-tip {
+    left: auto;
+    right: 0;
+  }
+}
+
+/* The two columns of the cards of a detail page need about 900 px; below that they stand one under the other. */
+@media (min-width: 761px) and (max-width: 1099px) {
+  .mgmt-two-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---- The overview (D-082; uebersicht/referenz) ---- */

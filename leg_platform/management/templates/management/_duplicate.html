@@ -5,6 +5,6 @@ LEG, status) and the link to its page. Context: ``duplicate`` (``management.summ
 The script of the dialog (``management/js/lookup.js``) builds the same structure when the number is
 checked on leaving the field.
 {% endcomment %}<div class="mgmt-banner mgmt-duplicate" role="status">
-  <p><b>{% translate "This metering point number already exists." %}</b> {{ duplicate.number }}, {{ duplicate.direction }}{% if duplicate.location %}, {{ duplicate.location }}{% endif %}{% if duplicate.leg %}, {{ duplicate.leg }}{% endif %}, {{ duplicate.status }}.</p>
-  <p><a href="{{ duplicate.url }}">{% translate "Go to the existing metering point" %}</a></p>
+  <p><b>{% translate "This metering point number already exists." %}</b> {{ duplicate.number }}{% if duplicate.direction %}, {{ duplicate.direction }}{% endif %}{% if duplicate.location %}, {{ duplicate.location }}{% endif %}{% if duplicate.leg %}, {{ duplicate.leg }}{% endif %}{% if duplicate.status %}, {{ duplicate.status }}{% endif %}.</p>
+  {% if duplicate.url %}<p><a href="{{ duplicate.url }}">{% translate "Go to the existing metering point" %}</a></p>{% endif %}
 </div>

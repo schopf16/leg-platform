@@ -3,7 +3,7 @@ The foot of a list (D-078; LISTEN-STANDARD.md, section 3): "Rows per page" (30, 
 belongs to the form ``list-form`` of the page and sends it when changed), the count ("1–50 of 1000 ...")
 and the buttons "Previous" and "Next" (disabled at the ends). Context: ``list_state``, ``list_page``,
 ``list_count_text``, ``list_page_sizes``.
-{% endcomment %}<div class="mgmt-list-foot">
+{% endcomment %}{% if list_page.notice %}<p class="mgmt-hint mgmt-list-notice" role="status">{{ list_page.notice }}</p>{% endif %}<div class="mgmt-list-foot">
   <label class="mgmt-per-page">{% translate "Rows per page" %}
     <select name="per" form="list-form" class="form-select" data-autosubmit>
       {% for size in list_page_sizes %}<option value="{{ size }}"{% if size == list_state.per %} selected{% endif %}>{% if size == "all" %}{% translate "All" %}{% else %}{{ size }}{% endif %}</option>{% endfor %}

@@ -70,7 +70,7 @@ class SettingsPageTests(TestCase):
         self.assertLess(html.index("Absender der Rechnungen"), html.index(">Messpunkte</h2>"))
         self.assertLess(html.index(">Messpunkte</h2>"), html.index(">Produktionsquote</h2>"))
         # One button saves everything; the first button of the form is that one (key Enter).
-        form = html[html.index('<form method="post" novalidate>'):]
+        form = html[html.index('<form method="post" novalidate'):]
         self.assertIn('value="save"', re.search(r"<button[^>]*>", form).group(0))
         self.assertEqual(html.count(">Speichern</button>"), 1)
 

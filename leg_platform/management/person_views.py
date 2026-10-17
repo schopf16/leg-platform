@@ -79,7 +79,7 @@ def list_columns(see_points):
         )
     columns.append(
         lists.Column(
-            "account", gettext_lazy("Account"), resizable=False, info_placement="left",
+            "account", gettext_lazy("Account"), info_placement="left",
             info=_(
                 "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after "
                 "failed attempts. Inactive: the account is deactivated and is in the archive."
@@ -120,13 +120,20 @@ def points_options():
 @dataclass
 class PersonList:
     """The list of persons as the address asks for it: the state and the queryset of every row of the view
-    (search and filters applied, sorted), not only one page. The page and the printing use it."""
+    (search and filters applied, sorted), not only one page. The page and the printing use it. ``locked`` is the
+    set of all locked accounts if the filter or the sorting needs it, else None and ``locked_for`` asks for the
+    rows that are shown (D-084, L-4)."""
 
     state: lists.ListState
     columns: tuple
     see_points: bool
     queryset: object
-    locked: set
+    locked: object
+
+    def locked_for(self, persons):
+        if self.locked is not None:
+            return self.locked
+        return person_list.locked_account_ids(only=[person.pk for person in persons])
 
 
 def build_list(params, user):
@@ -140,8 +147,11 @@ def build_list(params, user):
         params, path=reverse("management:persons"), columns=columns, default_sort=person_list.DEFAULT_SORT,
         filters=filters,
     )
-    locked = person_list.locked_account_ids()
-    queryset = person_list.base_queryset(today, locked)
+    # The lockout of the login protection is looked up for all accounts only when the filter or the sorting
+    # needs the state of every account; otherwise for the rows that are shown.
+    needs_all = state.values["status"] in (person_list.STATUS_ACTIVE, person_list.STATUS_BLOCKED) or state.sort == "account"
+    locked = person_list.locked_account_ids() if needs_all else None
+    queryset = person_list.base_queryset(today, locked or ())
     queryset = person_list.apply_search(queryset, state.query)
     queryset = person_list.apply_status(queryset, state.values["status"])
     if see_points:
@@ -176,7 +186,9 @@ class PersonListView(ManagementAccessMixin, View):
         found = build_list(request.GET, request.user)
         state, columns, see_points = found.state, found.columns, found.see_points
         page = lists.paginate(found.queryset, state)
-        entries = [list_entry(person, found.locked) for person in page.items]
+        persons_on_page = page.items
+        locked = found.locked_for(persons_on_page)
+        entries = [list_entry(person, locked) for person in persons_on_page]
         context = lists.list_context(
             request, "persons", columns, state, page,
             count_text=_("%(first)d–%(last)d of %(total)d persons") % {
@@ -277,7 +289,7 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
         today = timezone.localdate()
         record = persons.record_of(person)
         name, contact = person_list.display_names(person)
-        locked = person_list.locked_account_ids() if person.is_active else set()
+        locked = person_list.locked_account_ids(only=[person.pk]) if person.is_active else set()
         account = person_list.AccountState(person_list.account_state(person, locked))
         can_correct = user.has_perm(CORRECT)
         suggestion = persons.address_suggestion(person) if can_correct else None

@@ -56,6 +56,7 @@ MESSAGES = {
     ),
     Event.ADDRESS_IMPORT_REQUESTED: "An address directory import was requested",
     Event.RETENTION_OBLIGATION_SET: "The retention obligation of an account was set",
+    Event.LIST_PRINTED: "A list of the management area was printed as PDF",
 }
 
 

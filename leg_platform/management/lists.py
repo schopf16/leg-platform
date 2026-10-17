@@ -24,11 +24,15 @@ import math
 from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
+from django.utils.translation import gettext
+
 from leg_platform.community import preferences
 
 PAGE_SIZES = (30, 50, 100)
 ALL = "all"
 DEFAULT_PER = 50
+# The most rows that "All" shows at once; a longer list shows pages and says so (D-084, L-1).
+MAX_ALL_ROWS = 5000
 MAX_QUERY_LENGTH = 200
 MIN_COLUMN_WIDTH = preferences.MIN_COLUMN_WIDTH
 
@@ -46,6 +50,7 @@ class Column:
     width: int | None = None
     resizable: bool = True
     info_template: str = ""
+    keep: bool = False  # the column is never narrowed to fit a medium screen (a number that is never cut)
 
 
 @dataclass
@@ -152,6 +157,7 @@ class Page:
     pages: int
     prev_url: str = ""
     next_url: str = ""
+    notice: str = ""
 
 
 class ListRows(list):
@@ -164,12 +170,21 @@ class ListRows(list):
 
 def paginate(queryset, state):
     """The rows of the page that the state asks for (a request for a page beyond the end shows the
-    last page)."""
+    last page). "All" is bounded by ``MAX_ALL_ROWS``: a longer list shows the pages of the default size and a
+    notice (D-084, L-1)."""
     total = queryset.count()
-    if state.per == ALL:
+    notice = ""
+    per = state.per
+    if per == ALL and total > MAX_ALL_ROWS:
+        per = str(DEFAULT_PER)
+        notice = gettext(
+            "The list has more than %(max)d entries; all of them cannot be shown at once. "
+            "Narrow it with the search or the filters."
+        ) % {"max": MAX_ALL_ROWS}
+    if per == ALL:
         items = list(queryset)
         return Page(items, total, 1 if total else 0, total, 1, 1)
-    size = int(state.per)
+    size = int(per)
     pages = max(1, math.ceil(total / size))
     page = min(state.page, pages)
     items = list(queryset[(page - 1) * size : page * size])
@@ -178,6 +193,7 @@ def paginate(queryset, state):
         items, total, first, first + len(items) - 1 if items else 0, page, pages,
         prev_url=state.url(page=page - 1) if page > 1 else "",
         next_url=state.url(page=page + 1) if page < pages else "",
+        notice=notice,
     )
 
 
@@ -199,6 +215,7 @@ def header_cells(columns, state, saved_widths, key):
                 "aria_sort": {"asc": "ascending", "desc": "descending"}.get(direction, ""),
                 "width": saved_widths.get(column.key) or column.width,
                 "resizable": column.resizable,
+                "keep": column.keep,
                 "info": column.info,
                 "info_template": column.info_template,
                 "info_placement": column.info_placement,

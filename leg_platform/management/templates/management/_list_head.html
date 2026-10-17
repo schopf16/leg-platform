@@ -8,7 +8,7 @@ account). The last column is the narrow link column: 56 px, no title, no handle.
 set with the ``width`` attribute of ``col`` (an inline style would be refused by the Content
 Security Policy).
 {% endcomment %}<colgroup>
-  {% for column in list_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}>
+  {% for column in list_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}{% if column.keep %} data-keep{% endif %}>
   {% endfor %}<col class="mgmt-link-col" width="56">
 </colgroup>
 <thead>

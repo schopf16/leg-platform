@@ -2215,6 +2215,9 @@ class SecurityEvent(models.Model):
         # obligation of the account, which can never be unset. The entry names the account and the
         # actor (internal numbers) and nothing else.
         RETENTION_OBLIGATION_SET = "retention_obligation_set", _("Retention obligation set")
+        # D-084 (security review, M-2): every PDF of a list of the management area. The entry names the actor
+        # (an internal number); the area, the scope and the number of entries go to the log line only.
+        LIST_PRINTED = "list_printed", _("List printed")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
@@ -2232,6 +2235,8 @@ class SecurityEvent(models.Model):
             Event.GRAPH_CERTIFICATE_UPLOADED,
             Event.PORTAL_SETTINGS_CHANGED,
             Event.TWO_FACTOR_REMOVED_PHONE_LOST,
+            # A printout is an export of personal data: noticed late, kept long (D-084).
+            Event.LIST_PRINTED,
         }
     )
 

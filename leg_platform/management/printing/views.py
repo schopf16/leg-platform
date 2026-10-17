@@ -23,6 +23,7 @@ from django.utils.translation import ngettext
 
 from django.views import View
 
+from leg_platform.accounts import security_log
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.printing import areas, pdf
 
@@ -32,7 +33,7 @@ SCOPE_LIST = "list"
 SCOPE_ALL = "all"
 SCOPE_SELECTED = "selected"
 SCOPES = (SCOPE_LIST, SCOPE_ALL, SCOPE_SELECTED)
-MAX_POSTED_IDS = 2 * areas.MAX_LIST_ENTRIES
+MAX_POSTED_IDS = areas.MAX_SELECTABLE
 
 
 class PrintView(ManagementAccessMixin, View):
@@ -85,6 +86,11 @@ class PrintView(ManagementAccessMixin, View):
             logger.error("The PDF of a list could not be created (%s).", error)
             return self.show(request, prepared, selected_ids, scope, _("The PDF could not be created."))
         response = HttpResponse(data, content_type="application/pdf")
+        # The security log (M-2 of the review of D-082): who printed which list; no content.
+        security_log.record(
+            security_log.Event.LIST_PRINTED, actor=request.user,
+            detail=f"list {self.area.key}, scope {scope}, {len(items)} entries, {len(chosen)} detail pages",
+        )
         response["Content-Disposition"] = f'attachment; filename="{self.area.filename}"'
         patch_cache_control(response, no_store=True, private=True)
         return response
@@ -101,7 +107,13 @@ class PrintView(ManagementAccessMixin, View):
             return self.too_long()
         if scope == SCOPE_ALL and prepared.total > areas.MAX_DETAIL_PAGES:
             return self.too_many_details()
+        if scope == SCOPE_SELECTED and prepared.total > areas.MAX_SELECTABLE:
+            return self.too_many_to_select()
         return ""
+
+    @staticmethod
+    def too_many_to_select():
+        return _("There are too many entries to select from. Narrow the list with the search or the filters.")
 
     @staticmethod
     def too_long():
@@ -111,7 +123,8 @@ class PrintView(ManagementAccessMixin, View):
 
     def show(self, request, prepared, selected_ids, scope, error=""):
         too_long = prepared.total > areas.MAX_LIST_ENTRIES
-        items = [] if too_long else prepared.load()
+        selectable = prepared.total <= areas.MAX_SELECTABLE
+        items = [] if too_long or not selectable else prepared.load()
         notice = error or (self.too_long() if too_long else "")
         context = {
             "page_title": _("Print list"),
@@ -123,6 +136,8 @@ class PrintView(ManagementAccessMixin, View):
             "scope_all": SCOPE_ALL,
             "scope_selected": SCOPE_SELECTED,
             "all_allowed": prepared.total <= areas.MAX_DETAIL_PAGES,
+            "selectable": selectable,
+            "select_hint": "" if selectable else self.too_many_to_select(),
             "can_print": not too_long,
             "no_submit": too_long,
             "notice": notice,

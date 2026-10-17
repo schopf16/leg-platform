@@ -7,7 +7,7 @@ without JavaScript and returns to the place it was opened from (``management.ret
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
@@ -48,15 +48,25 @@ ADD = "community.add_location"
 CHANGE = "community.change_location"
 DELETE = "community.delete_location"
 VIEW_PERSONS = "community.view_personrecord"
+VIEW_POINTS = "community.view_meteringpoint"
+VIEW_LEG = "community.view_leg"
 
 COLUMNS = (
     lists.Column("address", gettext_lazy("Location"), width=380, info_template="management/locations/_tip_location.html"),
     lists.Column("circuit", gettext_lazy("Transformer circuit"), width=150, info_template="management/locations/_tip_circuit.html"),
     lists.Column("metering_points", gettext_lazy("Metering points"), width=260, info_template="management/locations/_tip_points.html"),
     lists.Column(
-        "occupancy", gettext_lazy("Occupancy"), resizable=False, info_placement="left",
+        "occupancy", gettext_lazy("Occupancy"), info_placement="left",
         info_template="management/locations/_tip_occupancy.html",
     ),
+)
+
+
+POINT_COLUMNS = (
+    lists.Column("number", gettext_lazy("Metering point"), sortable=False, width=440, keep=True),
+    lists.Column("leg", gettext_lazy("LEG"), sortable=False, width=200),
+    lists.Column("status", gettext_lazy("Status"), sortable=False, width=180),
+    lists.Column("occupant", gettext_lazy("Occupied by"), sortable=False),
 )
 
 
@@ -66,9 +76,13 @@ def count_phrase(count):
     return _("1 metering point") if count == 1 else _("%(count)d metering points") % {"count": count}
 
 
-def occupancy_phrase(metering_point_count, persons):
+def occupancy_phrase(metering_point_count, persons, see_persons=True):
+    """"empty", "free" or the number of persons; the number of persons (and the word "free") needs the right to
+    see persons, otherwise a dash (D-084, M-4)."""
     if metering_point_count == 0:
         return _("empty")
+    if not see_persons:
+        return "–"
     if persons == 0:
         return _("free")
     return _("1 person") if persons == 1 else _("%(count)d persons") % {"count": persons}
@@ -106,14 +120,27 @@ class ListWidthsView(ManagementAccessMixin, View):
         return JsonResponse({"saved": True})
 
 
-def occupancy_options():
-    return [
+def occupancy_options(see_persons=True):
+    """The options of the filter "Occupancy"; "occupied" and "free" tell whether persons use the metering points
+    and need the right to see persons (D-084, M-4)."""
+    options = [
         (location_list.OCCUPANCY_ALL, _("All")),
         (location_list.OCCUPANCY_OCCUPIED, _("occupied")),
         (location_list.OCCUPANCY_FREE, _("free")),
         (location_list.OCCUPANCY_EMPTY, _("empty")),
         (location_list.OCCUPANCY_ARCHIVED, _("archived")),
     ]
+    if see_persons:
+        return options
+    return [option for option in options if option[0] not in (location_list.OCCUPANCY_OCCUPIED, location_list.OCCUPANCY_FREE)]
+
+
+def list_columns(see_persons):
+    """The columns; without the right to see persons the column "Occupancy" cannot be sorted (its order is the
+    number of persons)."""
+    if see_persons:
+        return COLUMNS
+    return tuple(replace(column, sortable=False) if column.key == "occupancy" else column for column in COLUMNS)
 
 
 @dataclass
@@ -122,8 +149,10 @@ class LocationList:
     (search and filters applied, sorted), not only one page. The page and the printing use it."""
 
     state: lists.ListState
+    columns: tuple
     circuits: list
     see_persons: bool
+    see_legs: bool
     today: object
     problem_count: int
     queryset: object
@@ -132,16 +161,22 @@ class LocationList:
 def build_list(params, user):
     today = timezone.localdate()
     see_persons = user.has_perm(VIEW_PERSONS)
+    see_points = user.has_perm(VIEW_POINTS)
+    see_legs = user.has_perm(VIEW_LEG)
     circuits = transformer_circuits.choices()
+    columns = list_columns(see_persons)
     state = lists.parse(
-        params, path=reverse("management:locations"), columns=COLUMNS, default_sort=location_list.DEFAULT_SORT,
+        params, path=reverse("management:locations"), columns=columns, default_sort=location_list.DEFAULT_SORT,
         filters={
             "circuit": ([c.bkw_number for c in circuits], ""),
-            "occupancy": (location_list.OCCUPANCIES, location_list.OCCUPANCY_ALL),
+            "occupancy": (
+                [value for value, _text in occupancy_options(see_persons)], location_list.OCCUPANCY_ALL
+            ),
         },
     )
     queryset = location_list.apply_search(
-        location_list.base_queryset(today), state.query, see_persons=see_persons, today=today
+        location_list.base_queryset(today), state.query, see_persons=see_persons, see_points=see_points,
+        see_legs=see_legs, today=today,
     )
     queryset = location_list.apply_circuit(queryset, state.values["circuit"])
     queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
@@ -150,7 +185,7 @@ def build_list(params, user):
     if state.problems:
         queryset = location_list.apply_problems(queryset)
     queryset = location_list.apply_sort(queryset, state.sort, state.descending)
-    return LocationList(state, circuits, see_persons, today, problem_count, queryset)
+    return LocationList(state, columns, circuits, see_persons, see_legs, today, problem_count, queryset)
 
 
 class LocationListView(ManagementAccessMixin, View):
@@ -163,7 +198,7 @@ class LocationListView(ManagementAccessMixin, View):
         state, circuits, see_persons, today = found.state, found.circuits, found.see_persons, found.today
         problem_count = found.problem_count
         page = lists.paginate(found.queryset, state)
-        rows, persons = location_list.details(page.items, today, see_persons=see_persons)
+        rows, persons = location_list.details(page.items, today, see_persons=see_persons, see_legs=found.see_legs)
         expanded = set(preferences.get_preference(request.user, "locations").expanded_locations)
 
         entries = []
@@ -177,7 +212,7 @@ class LocationListView(ManagementAccessMixin, View):
                     "can_open": bool(points),
                     "circuit": circuit_phrase(location),
                     "count_phrase": count_phrase(location.mp_count),
-                    "occupancy": occupancy_phrase(location.mp_count, persons[location.pk]),
+                    "occupancy": occupancy_phrase(location.mp_count, persons[location.pk], see_persons),
                     "persons": persons[location.pk],
                     "detail_url": reverse("management:locations_detail", args=[location.pk]),
                 }
@@ -188,7 +223,7 @@ class LocationListView(ManagementAccessMixin, View):
             "first": page.first, "last": page.last, "total": page.total,
         }
         context = lists.list_context(
-            request, "locations", COLUMNS, state, page, count_text=count_text,
+            request, "locations", found.columns, state, page, count_text=count_text,
             widths_url=reverse("management:list_widths", args=["locations"]),
         )
         context.update(
@@ -204,7 +239,8 @@ class LocationListView(ManagementAccessMixin, View):
             can_add=request.user.has_perm(ADD),
             create_url=with_next(reverse("management:locations_new"), request),
             circuit_options=[(c.bkw_number, c.bkw_number) for c in circuits],
-            occupancy_options=occupancy_options(),
+            occupancy_options=occupancy_options(see_persons),
+            see_legs=found.see_legs,
             see_persons=see_persons,
             current_url=request.get_full_path(),
             all_label_open=_("Collapse all"),
@@ -263,9 +299,12 @@ class LocationDetailView(ManagementAccessMixin, View):
         user = request.user
         today = timezone.localdate()
         see_persons = user.has_perm(VIEW_PERSONS)
-        rows, persons = location_list.details([location], today, see_persons=see_persons)
+        see_legs = user.has_perm(VIEW_LEG)
+        rows, persons = location_list.details([location], today, see_persons=see_persons, see_legs=see_legs)
         points = rows[location.pk]
         can_change = user.has_perm(CHANGE)
+        deletable = locations.can_delete(location)
+        assignments = []
         deletable = locations.can_delete(location)
         assignments = []
         if see_persons:
@@ -280,7 +319,7 @@ class LocationDetailView(ManagementAccessMixin, View):
             "location": location,
             "points": points,
             "subtitle": " · ".join(
-                [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk])]
+                [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk], see_persons)]
             ),
             "circuit": circuit,
             "circuit_text": transformer_circuits.label(circuit),
@@ -308,12 +347,23 @@ class LocationDetailView(ManagementAccessMixin, View):
             "show_archive": can_change and not (deletable and user.has_perm(DELETE)),
             "suggestion_text": "",
             "see_persons": see_persons,
+            "see_legs": see_legs,
             "current_url": request.get_full_path(),
         }
         if can_change and location.address_correction_open and location.suggestion is not None:
             from leg_platform.community import addressing
 
             context["suggestion_text"] = addressing.suggestion_banner_text(location.suggestion)
+        # The table of the metering points: the handles and the link column of the standard (LISTEN-STANDARD, 8).
+        columns = POINT_COLUMNS
+        state = lists.parse({}, path=request.path, columns=columns, default_sort="number")
+        saved = preferences.get_preference(user, "location_metering_points").column_widths
+        context.update(
+            list_key="location_metering_points",
+            list_columns=lists.header_cells(columns, state, saved, "location_metering_points"),
+            list_widths_url=reverse("management:list_widths", args=["location_metering_points"]),
+            can_view_point=user.has_perm(VIEW_POINTS),
+        )
         return render(request, "management/locations/detail.html", context)
 
 
@@ -378,7 +428,7 @@ class LocationCreateView(DialogView):
     def get_form(self, data=None):
         initial = {}
         circuit_id = self.request.GET.get("circuit", "")
-        if circuit_id.isdigit():
+        if circuit_id.isascii() and circuit_id.isdigit() and len(circuit_id) < 12:
             circuit = TransformerCircuit.objects.filter(pk=int(circuit_id)).first()
             if circuit is not None:
                 initial["transformer_circuit"] = transformer_circuits.label(circuit)
@@ -450,15 +500,17 @@ class LocationAddressView(LocationObjectDialog):
         if not form.is_valid():
             return self.render_dialog(request, form)
         location = self.location()
-        confirmed = request.POST.get("confirm_merge") == "1"
-        if form.duplicate is not None and confirmed and not request.user.has_perm(DELETE):
-            # A merge deletes this location: it needs the right to delete.
-            raise PermissionDenied
+        # A merge deletes this location: it needs the right to delete; without it the confirmation is no
+        # confirmation (the address is "in use").
+        confirmed = request.POST.get("confirm_merge") == "1" and request.user.has_perm(DELETE)
         try:
             saved = locations.update_address(
                 location, **form.address(), address_addition=form.cleaned_data["address_addition"],
-                actor=request.user, merge=confirmed,
+                actor=request.user, merge=confirmed, merge_target_id=form.target_id(),
             )
+        except locations.MergeRefused:
+            form.add_error(None, _("This address already exists."))
+            return self.render_dialog(request, form)
         except locations.MergeNeeded as needed:
             if not request.user.has_perm(DELETE):
                 form.add_error(None, _("This address already exists."))
@@ -466,6 +518,8 @@ class LocationAddressView(LocationObjectDialog):
             data = request.POST.copy()
             data["confirm_merge"] = "1"
             target = needed.target
+            # The confirmation is bound to the location that is shown now.
+            data["merge_target"] = str(target.pk)
             return self.render_dialog(
                 request, self.form_class(data, location=location),
                 submit_label=_("Transfer and save"),
@@ -623,7 +677,7 @@ class LocationMeteringPointNewView(LocationObjectDialog):
 
     def render_dialog(self, request, form, **extra):
         duplicate = getattr(form, "duplicate", None)
-        summary = duplicate_summary(duplicate) if duplicate is not None else None
+        summary = duplicate_summary(duplicate, request.user) if duplicate is not None else None
         return super().render_dialog(request, form, duplicate=summary, **extra)
 
 

@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.utils.translation import pgettext
 
 from leg_platform.community import (
     assignments,
@@ -41,6 +42,10 @@ DASH = "–"
 # The bounds of a printout (D-082): a print builds the whole document in memory.
 MAX_LIST_ENTRIES = 1000
 MAX_DETAIL_PAGES = 100
+# The entries that the dialog offers as checkboxes: a form with a thousand boxes would end at Django's limit of
+# 1000 form fields (``DATA_UPLOAD_MAX_NUMBER_FIELDS``, which is no per-view setting) with a bare 400; a list with
+# more entries cannot be selected from, it is narrowed first (D-084, L-8).
+MAX_SELECTABLE = 300
 MAX_ROWS = 20000
 
 
@@ -266,8 +271,10 @@ class PersonArea(Area):
 
         def load():
             items = []
-            for person in found.queryset[:MAX_LIST_ENTRIES]:
-                entry = person_views.list_entry(person, found.locked)
+            people = list(found.queryset[:MAX_LIST_ENTRIES])
+            locked = found.locked_for(people)
+            for person in people:
+                entry = person_views.list_entry(person, locked)
                 name = f"{entry['name']}\n{entry['contact']}" if entry["contact"] else entry["name"]
                 cells = [name, entry["number"], or_dash(entry["address"])]
                 if found.see_points:
@@ -288,7 +295,7 @@ class PersonArea(Area):
 
     def details(self, user, items, today):
         see_points = user.has_perm(person_views.VIEW_POINTS)
-        locked = person_list.locked_account_ids()
+        locked = person_list.locked_account_ids(only=[item.pk for item in items])
         pages = []
         for item in items:
             person = item.source
@@ -297,7 +304,7 @@ class PersonArea(Area):
             account = person_list.AccountState(person_list.account_state(person, locked if person.is_active else set()))
             number = person.customer_number_display
             details = Section(
-                _("Details"),
+                pgettext("person card", "Details"),
                 [
                     (_("Salutation"), or_dash(person.get_salutation_display() if person.salutation else "")),
                     (_("Company"), or_dash(person.organisation_name)),
@@ -393,7 +400,9 @@ class LocationArea(Area):
 
         def load():
             locations = list(found.queryset[:MAX_LIST_ENTRIES])
-            _rows, occupants = location_list.details(locations, found.today, see_persons=found.see_persons)
+            _rows, occupants = location_list.details(
+                locations, found.today, see_persons=found.see_persons, see_legs=found.see_legs
+            )
             items = []
             for location in locations:
                 address = f"{location.street} {location.house_number}"
@@ -404,7 +413,7 @@ class LocationArea(Area):
                     with_problem(address, " ".join(problem)),
                     location_views.circuit_phrase(location),
                     location_views.count_phrase(location.mp_count),
-                    location_views.occupancy_phrase(location.mp_count, occupants[location.pk]),
+                    location_views.occupancy_phrase(location.mp_count, occupants[location.pk], found.see_persons),
                 ]
                 items.append(Item(location.pk, f"{location.street} {location.house_number}", cells, location))
             return items
@@ -412,16 +421,19 @@ class LocationArea(Area):
         filters = self.option_line(
             _("Transformer circuit"), found.state, "circuit", [(c.bkw_number, c.bkw_number) for c in found.circuits]
         )
-        filters += self.option_line(_("Occupancy"), found.state, "occupancy", location_views.occupancy_options())
+        filters += self.option_line(
+            _("Occupancy"), found.state, "occupancy", location_views.occupancy_options(found.see_persons)
+        )
         return Prepared(
-            self, found.state, total, [self.column(column) for column in location_views.COLUMNS],
-            self.info(found.state, location_views.COLUMNS, filters, found.today), load,
+            self, found.state, total, [self.column(column) for column in found.columns],
+            self.info(found.state, found.columns, filters, found.today), load,
         )
 
     def details(self, user, items, today):
         see_persons = user.has_perm(location_views.VIEW_PERSONS)
+        see_legs = user.has_perm(location_views.VIEW_LEG)
         locations = [item.source for item in items]
-        rows, occupants = location_list.details(locations, today, see_persons=see_persons)
+        rows, occupants = location_list.details(locations, today, see_persons=see_persons, see_legs=see_legs)
         pages = []
         for location in locations:
             points = rows[location.pk]
@@ -457,7 +469,7 @@ class LocationArea(Area):
                 point_rows.append(
                     [
                         f"{row.metering_point.number or DASH}\n{Direction(row.metering_point.direction).label}",
-                        row.leg_name if row.leg_id else _("no LEG"),
+                        (row.leg_name if see_legs else DASH) if row.leg_id else _("no LEG"),
                         str(MeteringPointStatus(row.status).label),
                         occupant,
                     ]
@@ -562,8 +574,11 @@ class MeteringPointArea(Area):
                         f"{point.number or DASH} · {Direction(point.direction).label}",
                         " ".join(str(problems.describe(problem)) for problem in found_problems),
                     ),
-                    f"{point.location.street} {point.location.house_number}" if point.location_id else DASH,
-                    or_dash(point.current_leg_name if point.current_leg_id else ""),
+                    or_dash(
+                        f"{point.location.street} {point.location.house_number}"
+                        if point.location_id and found.see_locations else ""
+                    ),
+                    or_dash(point.current_leg_name if point.current_leg_id and found.see_legs else ""),
                     last,
                 ]
                 items.append(Item(point.pk, point.number or DASH, cells, point))

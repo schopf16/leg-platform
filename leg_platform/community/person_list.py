@@ -58,13 +58,15 @@ class AccountState(models.TextChoices):
 ACCOUNT_RANK = {AccountState.ACTIVE: 0, AccountState.BLOCKED: 1, AccountState.INACTIVE: 2}
 
 
-def locked_account_ids(now=None):
+def locked_account_ids(now=None, only=None):
     """The ids of the active persons that the lockout of the login protection holds at the moment.
 
     Axes stores only a keyed digest of the login address (``login_protection.axes_username``), never the
     address itself, so the digests of the accounts are computed and compared. The rule is the one of Axes
     (``AxesDatabaseHandler``): the failures of the cool-off period, at the limit of the project. Nothing is
-    computed while no lockout exists, which is the normal case."""
+    computed while no lockout exists, which is the normal case. With ``only`` (account ids) just those
+    accounts are looked at: the page of a list needs the answer for its rows only (D-084, L-4); the filter and
+    the sorting by the account state need all of them."""
     now = now or timezone.now()
     digests = set(
         AccessAttempt.objects.filter(attempt_time__gte=now - LOGIN_COOLOFF)
@@ -79,7 +81,10 @@ def locked_account_ids(now=None):
     user_model = get_user_model()
     candidates = user_model.objects.filter(
         customer_number__isnull=False, status=user_model.Status.ACTIVE, normalized_email__isnull=False
-    ).values_list("pk", "normalized_email")
+    )
+    if only is not None:
+        candidates = candidates.filter(pk__in=list(only))
+    candidates = candidates.values_list("pk", "normalized_email")
     return {pk for pk, address in candidates if axes_username(None, {"username": address}) in digests}
 
 
@@ -278,7 +283,7 @@ def _house_key(text):
     """A house number sorted as a number first, then as text ("2" before "12", "12" before "12a")."""
     digits = ""
     for character in text:
-        if not character.isdigit():
+        if not (character.isascii() and character.isdigit()):
             break
         digits += character
     return (int(digits) if digits else 0, text.casefold())

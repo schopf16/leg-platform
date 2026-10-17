@@ -16,6 +16,7 @@ app_name = "management"
 urlpatterns = [
     path("", views.OverviewView.as_view(), name="overview"),
     path("settings/", views.SettingsView.as_view(), name="settings"),
+    path("settings/check/", views.SettingsFieldCheckView.as_view(), name="settings_check"),
     # The saved column widths of the lists (any list).
     path("lists/<slug:list_key>/widths/", location_views.ListWidthsView.as_view(), name="list_widths"),
     # Persons (an account with a customer number; the id is the id of the account)

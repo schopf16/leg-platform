@@ -211,7 +211,7 @@ def occupants(points, today=None, *, see_persons=False):
 def _house_key(house_number):
     digits = ""
     for char in house_number:
-        if not char.isdigit():
+        if not (char.isascii() and char.isdigit()):
             break
         digits += char
     return (int(digits) if digits else 0, house_number.casefold())

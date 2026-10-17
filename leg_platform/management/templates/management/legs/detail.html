@@ -71,8 +71,8 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
         <div class="mgmt-table-view">
           <table class="mgmt-table mgmt-table-fixed mgmt-members">
             <colgroup>
-              {% for column in member_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}>
-              {% endfor %}{% if show_actions %}<col class="mgmt-action-col" width="170">{% endif %}
+              {% for column in member_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}{% if column.keep %} data-keep{% endif %}>
+              {% endfor %}{% if show_actions %}<col class="mgmt-action-col" width="170">{% endif %}<col class="mgmt-link-col" width="56">
             </colgroup>
             <thead>
               <tr>
@@ -83,6 +83,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
                   </th>
                 {% endfor %}
                 {% if show_actions %}<th class="mgmt-action-col"><span class="visually-hidden">{% translate "Action" %}</span></th>{% endif %}
+                <th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -95,10 +96,11 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
                   <td>{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}</td>
                   <td>{% if row.has_person %}{% if row.occupant %}<div class="mgmt-cut" title="{{ row.occupant }}">{{ row.occupant }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
                   {% if show_actions %}<td class="mgmt-action-col">{% include "management/legs/_member_action.html" %}</td>{% endif %}
+                  <td class="mgmt-link-col">{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=row.point_url label=point_label subject=point.number %}</td>
                 </tr>
                 {% endwith %}
               {% empty %}
-                {% include "management/_empty_row.html" with colspan=6 text=empty_members_text %}
+                {% include "management/_empty_row.html" with colspan=7 text=empty_members_text %}
               {% endfor %}
             </tbody>
           </table>
@@ -108,7 +110,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
           {% for row in member_rows %}
             {% with point=row.point member=row.member %}
             <div class="mgmt-mp">
-              <div class="mgmt-mp-nr">{% if point.number %}{{ point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=point.direction %}</div>
+              <div class="mgmt-mp-nr">{% if point.number %}{{ point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=point.direction %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=row.point_url label=point_label subject=point.number %}</div>
               <div class="mgmt-mp-address">{% if row.address %}{{ row.address }}{% if row.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=row.location_url label=location_label %}{% endif %}{% else %}–{% endif %}</div>
               <div class="mgmt-mp-person">{% if member.circuit %}{{ member.circuit }}{% else %}–{% endif %} · {% if row.has_person %}{% if row.occupant %}{{ row.occupant }}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
               <div class="mgmt-mp-line">{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}<span class="mgmt-mp-action">{% include "management/legs/_member_action.html" %}</span></div>
@@ -128,5 +130,6 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  <script defer src="{% static 'management/js/table-fit.js' %}"></script>
   {% if member_columns %}<script defer src="{% static 'management/js/list.js' %}"></script>{% endif %}
 {% endblock %}

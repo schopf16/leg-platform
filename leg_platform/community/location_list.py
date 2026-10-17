@@ -75,10 +75,11 @@ def apply_problems(queryset):
     return queryset.filter(address_correction_open=True)
 
 
-def apply_search(queryset, text, *, see_persons=False, today=None):
+def apply_search(queryset, text, *, see_persons=False, see_points=True, see_legs=True, today=None):
     """Every word of the text must match something visible: the parts of the address, the circuit
-    (number and name), a metering point number, the name of a LEG of a metering point and, with
-    ``see_persons``, the name of a person who uses one. Letters match without regard to case or
+    (number and name), a metering point number (only with ``see_points``), the name of a LEG of a metering
+    point (only with ``see_legs``) and, with ``see_persons``, the name of a person who uses one. A branch that
+    the account may not see is not searched (D-084, M-4). Letters match without regard to case or
     accents (the collation of the columns); the identifiers of the exact collation are compared
     in capitals."""
     today = today or timezone.localdate()
@@ -88,13 +89,15 @@ def apply_search(queryset, text, *, see_persons=False, today=None):
             Q(street__icontains=word) | Q(house_number__icontains=word) | Q(postal_code__icontains=word)
             | Q(town__icontains=word) | Q(address_addition__icontains=word)
             | Q(transformer_circuit__bkw_number__contains=upper) | Q(transformer_circuit__name__icontains=word)
-            | Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=upper))
-            | Exists(
+        )
+        if see_points:
+            condition |= Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=upper))
+        if see_legs:
+            condition |= Exists(
                 LegAssignment.objects.filter(
                     metering_point__location=OuterRef("pk"), leg__name__icontains=word
                 )
             )
-        )
         if see_persons:
             condition |= Exists(
                 PersonAssignment.objects.not_ended(today).filter(
@@ -157,12 +160,13 @@ def person_name(person):
     return f"{person.first_name} {person.last_name}".strip() or person.organisation_name
 
 
-def details(locations, today=None, *, see_persons=False):
+def details(locations, today=None, *, see_persons=False, see_legs=True):
     """For the locations of one page: ``(rows, persons)`` with ``rows[location_id]`` the list of
     ``MeteringPointRow`` (metering points that are not archived, by number) and
     ``persons[location_id]`` the number of different persons with an assignment that is valid now
     or later (the figure that "Occupancy" shows). The name of a person is given only with
-    ``see_persons``; the id always, so that "no person" can be told from a person. Three queries."""
+    ``see_persons``, the name of a LEG only with ``see_legs`` (D-084, M-4); the ids always, so that "no
+    person" and "no LEG" can be told from a name that the account may not see. Three queries."""
     today = today or timezone.localdate()
     ids = [location.pk for location in locations]
     points = list(
@@ -188,7 +192,7 @@ def details(locations, today=None, *, see_persons=False):
                 metering_point=point,
                 status=point.status(today),
                 leg_id=leg.leg_id if leg else None,
-                leg_name=leg.leg.name if leg else "",
+                leg_name=leg.leg.name if leg and see_legs else "",
                 person_id=person.person_id if person else None,
                 person_name=person_name(person.person) if person and see_persons else "",
             )
@@ -209,8 +213,9 @@ _LOCATION_TEXT = re.compile(r"(?P<street>.+) (?P<number>\S+), (?P<postal>\d{4}) 
 
 def location_suggestions(text, limit=LOCATION_CHOICE_LIMIT):
     """At most ``limit`` locations (not archived) that match the text: the parts of the address or the
-    number of one of their metering points. For the suggestions of the field; never the remarks."""
-    return list(apply_search(locations_for_choice(), text)[:limit])
+    number of one of their metering points. For the suggestions of the field; never the remarks and never the
+    name of a LEG (the account that picks a location needs no right to see LEGs)."""
+    return list(apply_search(locations_for_choice(), text, see_legs=False)[:limit])
 
 
 @dataclass(frozen=True)

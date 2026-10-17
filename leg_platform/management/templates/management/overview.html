@@ -7,6 +7,7 @@ problem", the count behind the warning triangle, the link to the list with the p
 problem do not appear. Only the lists that the account may view are counted (the view). On a phone the button is
 as wide as the page and the rows are the same card; there is no button "Print" on this page.
 {% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide{% endblock %}
 {% block header_actions %}
   {% if problem_count %}<a class="btn btn-warning-outline" href="{{ filter_url }}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
 {% endblock %}

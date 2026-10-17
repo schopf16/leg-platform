@@ -1,12 +1,13 @@
 {% extends "management/page.html" %}
-{% load i18n %}{% comment %}
+{% load i18n static %}{% comment %}
 The settings page (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077): three cards, one button
 "Save". With only the right to view the fields are shown disabled and there is no button. The
 banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
 (the directory does not know the address) is at the top of the first card; it is made on the server.
 {% endcomment %}
+{% block inner_class %}mgmt-page mgmt-settings{% endblock %}
 {% block page_content %}
-  <form method="post" novalidate>
+  <form method="post" novalidate{% if can_change %} data-validate-url="{% url 'management:settings_check' %}"{% endif %}>
     {% csrf_token %}
     {% if can_change %}{% include "management/_default_submit.html" %}{% endif %}
     {% include "accounts/_error_summary.html" %}
@@ -42,4 +43,8 @@ banner (the suggestion of the address directory with "Accept" and "Do not accept
       <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
     {% endif %}
   </form>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {% if can_change %}<script defer src="{% static 'management/js/settings-validate.js' %}"></script>{% endif %}
 {% endblock %}

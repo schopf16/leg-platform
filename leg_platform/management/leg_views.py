@@ -72,7 +72,7 @@ def list_columns(threshold):
             "tier", gettext_lazy("Discount tier"), width=170, info_template="management/legs/_tip_tier.html",
         ),
         lists.Column(
-            "points", gettext_lazy("Metering points"), resizable=False, info_placement="left",
+            "points", gettext_lazy("Metering points"), info_placement="left",
             info=_("Number of metering points that currently belong to the LEG."),
         ),
     )
@@ -82,7 +82,7 @@ def member_columns():
     """The columns of the table "Metering points of this LEG" (the widths of the reference). The column of
     the action is fixed (170 px) and has no heading."""
     return (
-        lists.Column("number", gettext_lazy("Metering point"), width=400),
+        lists.Column("number", gettext_lazy("Metering point"), width=400, keep=True),
         lists.Column("address", gettext_lazy("Address"), width=150),
         lists.Column("circuit", gettext_lazy("Transformer circuit"), width=100),
         lists.Column("status", gettext_lazy("Status"), width=130),
@@ -249,6 +249,7 @@ class LegDetailView(ManagementAccessMixin, View):
                     if point.location_id and can_view_location else "",
                     "occupant": occupants.get(point.pk, ""),
                     "has_person": point.pk in occupants,
+                    "point_url": reverse("management:metering_points_detail", args=[point.pk]),
                     "switch_url": with_next(reverse("management:metering_points_leg", args=[point.pk]), request)
                     if can_switch else "",
                 }

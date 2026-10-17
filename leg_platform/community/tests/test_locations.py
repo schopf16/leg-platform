@@ -100,7 +100,8 @@ class LocationServiceTests(TestCase):
         # Nothing happened without the confirmation.
         self.assertTrue(Location.objects.filter(pk=source.pk).exists())
         merged = locations.update_address(
-            source, street="neuweg", house_number="6", postal_code="3000", town="Bern", actor=self.actor, merge=True
+            source, street="neuweg", house_number="6", postal_code="3000", town="Bern", actor=self.actor, merge=True,
+            merge_target_id=target.pk,
         )
         self.assertEqual(merged, target)
         point.refresh_from_db()
@@ -110,6 +111,28 @@ class LocationServiceTests(TestCase):
         entry = history.entries_for(target).get(event=HistoryEvent.LOCATIONS_MERGED)
         self.assertEqual(entry.actor, self.actor)
         self.assertEqual(entry.detail["metering_points"], 1)
+        # Every metering point that moved has its own entry (D-084, M-3).
+        moved = history.entries_for(point).get(event=HistoryEvent.METERING_POINT_LOCATION_CHANGED)
+        self.assertEqual(moved.actor, self.actor)
+        self.assertEqual(moved.detail, {"old_location_id": source.pk, "new_location_id": target.pk})
+
+    def test_a_merge_needs_the_confirmed_target_and_never_goes_to_an_archived_location(self):
+        source = make_location("Neuweg", "14", "3000", "Bern")
+        target = make_location("Neuweg", "16", "3000", "Bern")
+        make_metering_point(2, location=source)
+        new = {"street": "Neuweg", "house_number": "16", "postal_code": "3000", "town": "Bern"}
+        # The confirmation names the target that was shown; another id (or none) asks again.
+        for target_id in (None, source.pk, 999999):
+            with self.assertRaises(locations.MergeNeeded):
+                locations.update_address(source, **new, merge=True, merge_target_id=target_id)
+        self.assertTrue(Location.objects.filter(pk=source.pk).exists())
+        # An archived location is no target, with or without the confirmation.
+        target.is_archived = True
+        target.save()
+        for confirmed in (False, True):
+            with self.assertRaises(locations.MergeRefused):
+                locations.update_address(source, **new, merge=confirmed, merge_target_id=target.pk)
+        self.assertTrue(Location.objects.filter(pk=source.pk).exists())
 
     def test_the_circuit_is_set_logged_and_removed(self):
         location = make_location()

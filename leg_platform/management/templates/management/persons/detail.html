@@ -29,7 +29,7 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
   <div class="mgmt-person-grid">
     <div class="mgmt-col">
       <section class="mgmt-card" data-order="1">
-        <div class="mgmt-card-head"><h2>{% translate "Details" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Details" context "person card" %}</h2></div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Salutation" %}</dt><dd>{% if salutation %}{{ salutation }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Company" %}</dt><dd>{% if person.organisation_name %}{{ person.organisation_name }}{% else %}–{% endif %}</dd></div>
@@ -155,4 +155,5 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  <script defer src="{% static 'management/js/table-fit.js' %}"></script>
 {% endblock %}

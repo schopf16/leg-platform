@@ -1,7 +1,8 @@
 {% comment %}
 The link to the detail page (D-077): two linked chain links, 16 px, in an area of 24 px, in the
 accent colour, without a circle. Context: ``url`` and ``label`` (the accessible name and the hint, a
-translated text such as "Open LEG Bahnhof"). It stands in the narrow column on the right, never in
-a row that opens and closes. Only an address of this site is linked (starts with one "/"); anything
-else renders nothing (L-7 of the security review).
-{% endcomment %}{% if url|first == "/" and url|slice:":2" != "//" %}<a class="mgmt-goto" href="{{ url }}" aria-label="{{ label }}" title="{{ label }}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-goto"/></svg></a>{% endif %}
+translated text such as "Go to the LEG page") and optionally ``subject`` (the name of the entry, plain text;
+the accessible name is then "label: subject", so that a list of identical links can be told apart, D-084).
+It stands in the narrow column on the right, never in a row that opens and closes. Only an address of this
+site is linked (starts with one "/"); anything else renders nothing (L-7 of the security review).
+{% endcomment %}{% if url|first == "/" and url|slice:":2" != "//" %}<a class="mgmt-goto" href="{{ url }}" aria-label="{{ label }}{% if subject %}: {{ subject }}{% endif %}" title="{{ label }}{% if subject %}: {{ subject }}{% endif %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-goto"/></svg></a>{% endif %}

@@ -6,7 +6,14 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import numbers, transformer_circuits
-from leg_platform.community.models import Direction, Leg, Location, ManagementSettings, validate_postal_code
+from leg_platform.community.models import (
+    REMARK_MAX_LENGTH,
+    Direction,
+    Leg,
+    Location,
+    ManagementSettings,
+    validate_postal_code,
+)
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 SHORT = {"class": "form-control", "autocomplete": "off"}
@@ -87,7 +94,7 @@ class AddressForm(forms.Form):
 class LocationCreateForm(AddressForm):
     transformer_circuit = CircuitChoiceField()
     remark = forms.CharField(
-        label=_("Remark"), required=False,
+        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
     )
 
@@ -108,14 +115,20 @@ class LocationCreateForm(AddressForm):
 
 class AddressEditForm(AddressForm):
     """Change the address of a location. The page asks for a confirmation when the new address is the
-    address of another location (the merge); ``confirm_merge`` carries the answer."""
+    address of another location (the merge); ``confirm_merge`` carries the answer and ``merge_target`` the id of
+    the location that was shown (the server compares it again under the lock)."""
 
     confirm_merge = forms.BooleanField(required=False, widget=forms.HiddenInput)
+    merge_target = forms.CharField(required=False, max_length=12, widget=forms.HiddenInput)
+
+    def target_id(self):
+        value = self.cleaned_data.get("merge_target", "")
+        return int(value) if value.isascii() and value.isdigit() else None
 
 
 class RemarkForm(forms.Form):
     remark = forms.CharField(
-        label=_("Remark"), required=False,
+        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 4}),
     )
     layout = [("single", ["remark"])]

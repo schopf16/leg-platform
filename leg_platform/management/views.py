@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from django.contrib import messages
 from django.core.exceptions import SuspiciousOperation
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext as _
@@ -13,6 +14,7 @@ from django.views.generic import TemplateView
 
 from leg_platform.community import addressing, problems, settings_service
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, ManagementSettings
+from leg_platform.community.settings_service import EDITABLE_FIELDS
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
 from leg_platform.management.navigation import AREA_VIEW_PERMISSIONS
@@ -90,6 +92,25 @@ class OverviewView(ManagementAccessMixin, TemplateView):
             filter_url=rows[0]["url"] if rows else "",
             **kwargs,
         )
+
+
+class SettingsFieldCheckView(ManagementAccessMixin, View):
+    """The check of one field of the settings page on leaving the field (the script
+    ``settings-validate.js`` asks; without a script the server checks everything when saving): the answer is
+    the message of the form itself, so the text is the one of the server (D-084). Nothing is saved."""
+
+    permission_required = (VIEW_SETTINGS,)
+    http_method_names = ["get"]
+
+    def get(self, request):
+        name = request.GET.get("field", "")
+        if name not in EDITABLE_FIELDS:
+            raise Http404
+        value = request.GET.get("value", "")[:200]
+        form = ManagementSettingsForm({name: value})
+        form.full_clean()
+        errors = form.errors.get(name)
+        return JsonResponse({"message": str(errors[0]) if errors else ""})
 
 
 class SettingsView(ManagementAccessMixin, View):

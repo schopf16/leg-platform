@@ -46,3 +46,9 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 include = ["leg_platform*"]
+
+# Data files that the code reads from its own package directory and that must be in a built wheel: the bundled
+# fonts of the PDF printing (D-083, D-084 L-9; a test builds the list from the directory). Templates and static
+# files are served from the source tree, as before.
+[tool.setuptools.package-data]
+"leg_platform.management.printing" = ["fonts/*.ttf", "fonts/*.txt"]

@@ -104,13 +104,13 @@
           const parts = [found.number, found.direction, found.location, found.leg, found.status].filter(Boolean);
           line.appendChild(document.createTextNode(" " + parts.join(", ") + "."));
           const linkLine = document.createElement("p");
-          const link = text("a", data.link);
-          if (typeof found.url === "string" && found.url.startsWith("/") && !found.url.startsWith("//")) {
-            link.href = found.url;
-          }
-          linkLine.appendChild(link);
           box.appendChild(line);
-          box.appendChild(linkLine);
+          if (typeof found.url === "string" && found.url.startsWith("/") && !found.url.startsWith("//")) {
+            const link = text("a", data.link);
+            link.href = found.url;
+            linkLine.appendChild(link);
+            box.appendChild(linkLine);
+          }
           feedback.appendChild(box);
           block();
         }
