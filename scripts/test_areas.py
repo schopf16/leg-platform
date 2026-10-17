@@ -324,7 +324,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue")
             + _labels(T, "test_database")
-            + _labels(C, "test_models")
+            + _labels(C, "test_models", "test_migration_0004")
             + ("leg_platform.addresses.tests",)
         ),
         fresh_db=True,

@@ -152,6 +152,7 @@ The role model is defined in `docs/DECISIONS.md` (D-012). In short:
 * All further roles are created, renamed and linked to permissions at runtime in the admin as Django groups. They are data, not code.
 * No role is hard-coded. No code, migration or fixture creates, names or checks specific roles.
 * Authorization checks use permissions only, never group names.
+* **One approved exception (D-086, owner decision of 2026-10-17): the management area (`/management/`) is open to every active staff user with a completed second factor; it has no permissions of its own.** Every staff account can therefore see and change all customer data there (accepted risk, mitigations in D-086). The Django admin and everything outside the management area keep the permission rules above.
 
 New users are authenticated users without group memberships, without additional permissions, without `is_staff` and without `is_superuser`. Any promotion beyond the authenticated user always requires an explicit action by an authorized superior. Nobody can promote their own account.
 

@@ -1,10 +1,11 @@
 """The persons (D-081): the list queries (states, count and word of the metering points, search, filters, sort), the
-metering points of one person, and the few things that the staff change (note, BKW customer number, shares, the
-address correction). Service level, no client: the pages are in ``management/tests/test_person_pages.py``."""
+metering points of one person, and the few things that the staff change (note, customer number at the grid operator, the
+history of the shares, the address correction). Service level, no client: the pages are in
+``management/tests/test_person_pages.py``."""
 
 import uuid
 from datetime import date, timedelta
-
+from types import SimpleNamespace
 from axes.models import AccessAttempt
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, tag
@@ -15,7 +16,7 @@ from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses.models import Address, Directory
 from leg_platform.community import history, numbers, person_list, persons
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import PersonRecord
+from leg_platform.community.models import PersonRecord, ShareChange
 from leg_platform.community.tests.helpers import (
     assign_leg,
     assign_person,
@@ -60,12 +61,12 @@ class PersonListTests(TestCase):
         # assignment ended and one of somebody else do not count; one that starts later does.
         cls.registered = make_metering_point(1, location=cls.place)
         cls.confirmed = make_metering_point(
-            2, location=cls.place, registered_with_bkw_on=EARLIER, confirmed_on=EARLIER, start_date=EARLIER
+            2, location=cls.place, registered_with_operator_on=EARLIER, confirmed_on=EARLIER, start_date=EARLIER
         )
-        cls.future = make_metering_point(3, location=cls.place, registered_with_bkw_on=EARLIER)
+        cls.future = make_metering_point(3, location=cls.place, registered_with_operator_on=EARLIER)
         archived = make_metering_point(4, location=cls.place, is_archived=True)
         ended = make_metering_point(5, location=cls.place)
-        foreign = make_metering_point(6, location=cls.place, registered_with_bkw_on=EARLIER)
+        foreign = make_metering_point(6, location=cls.place, registered_with_operator_on=EARLIER)
         for point in (cls.registered, cls.confirmed):
             assign_person(point, cls.anna, EARLIER)
         assign_person(cls.future, cls.anna, LATER)
@@ -74,12 +75,11 @@ class PersonListTests(TestCase):
         assign_person(foreign, cls.mueller, EARLIER, valid_to=TODAY + timedelta(days=5))
         # The company: two notified points (angemeldet).
         for index in (7, 8):
-            assign_person(make_metering_point(index, registered_with_bkw_on=EARLIER), cls.company, EARLIER)
+            assign_person(make_metering_point(index, registered_with_operator_on=EARLIER), cls.company, EARLIER)
         assign_leg(cls.registered, cls.leg, EARLIER)
         # The staff-only data of Anna: never searched.
         PersonRecord.objects.create(
-            person=cls.anna, staff_note="geheimnotiz", bkw_customer_number="BKW-9999", iban="CH9300762011623852957",
-            shares=5, shares_from=EARLIER,
+            person=cls.anna, staff_note="geheimnotiz", operator_customer_number="OPR-9999", iban="CH9300762011623852957",
         )
         # The login protection locks Lena for the moment (five wrong logins within the cool-off period).
         cls.attempt = AccessAttempt.objects.create(
@@ -161,8 +161,8 @@ class PersonListTests(TestCase):
         self.assertEqual(found("thun"), {self.mueller.pk})
         self.assertEqual(found("anna.person@example"), {self.anna.pk})
 
-    def test_the_search_never_reads_the_note_the_bkw_customer_number_or_the_iban(self):
-        for text in ("geheimnotiz", "BKW-9999", "CH9300762011623852957", "9300762011623852957"):
+    def test_the_search_never_reads_the_note_the_operator_customer_number_or_the_iban(self):
+        for text in ("geheimnotiz", "OPR-9999", "CH9300762011623852957", "9300762011623852957"):
             with self.subTest(text=text):
                 self.assertEqual(self.rows(q=text).count(), 0)
 
@@ -188,17 +188,17 @@ class PersonListTests(TestCase):
         self.assertEqual(person_list.display_names(self.company), ("Beispiel Verwaltung AG", "Lea Probe"))
         self.assertEqual(person_list.display_names(self.anna), ("Anna Muster", ""))
 
-    def test_the_metering_points_of_a_person_with_their_leg_assignment_and_bkw_state(self):
+    def test_the_metering_points_of_a_person_with_their_leg_assignment_and_registration_state(self):
         rows = person_list.point_rows(self.anna, TODAY)
         by_number = {row.point.number: row for row in rows}
         self.assertEqual(len(rows), 3)  # not the archived point and not the ended assignment
         registered = by_number[self.registered.number]
-        self.assertEqual((registered.bkw, registered.bkw_date), ("registered", None))
+        self.assertEqual((registered.registration, registered.registration_date), ("registered", None))
         self.assertEqual((registered.leg_name, registered.address), ("LEG Musterquartier", "Musterweg 12"))
         confirmed = by_number[self.confirmed.number]
-        self.assertEqual((confirmed.bkw, confirmed.bkw_date), ("confirmed", EARLIER))
+        self.assertEqual((confirmed.registration, confirmed.registration_date), ("confirmed", EARLIER))
         self.assertEqual((confirmed.leg_id, confirmed.leg_name), (None, ""))
-        self.assertEqual(by_number[self.future.number].bkw, "notified")
+        self.assertEqual(by_number[self.future.number].registration, "notified")
         self.assertEqual(by_number[self.future.number].assignment.valid_from, LATER)
 
     def test_the_rows_sort_by_every_column_and_rows_without_a_value_come_last(self):
@@ -209,7 +209,7 @@ class PersonListTests(TestCase):
 
         self.assertEqual(order("number"), ["1", "2", "3"])
         self.assertEqual(order("number", True), ["3", "2", "1"])
-        self.assertEqual(order("bkw"), ["1", "3", "2"])  # registered, notified, confirmed
+        self.assertEqual(order("registration"), ["1", "3", "2"])  # registered, notified, confirmed
         self.assertEqual(order("assigned", True)[0], "3")  # starts latest
         # Only point 1 has a LEG: it is first when ascending and, as the only one with a value, also when
         # descending; the others (no value) always follow.
@@ -224,6 +224,23 @@ class PointNumberTests(SimpleTestCase):
         self.assertEqual(numbers.format_metering_point_number(number), "CH 1A2B 3C4D 5E60 0000 0000 0000 0000 001")
         self.assertEqual(numbers.format_metering_point_number(None), "")
         self.assertEqual(numbers.format_metering_point_number("short"), "short")
+
+
+class RegistrationStateTests(SimpleTestCase):
+    def state(self, **dates):
+        values = {"terminated_on": None, "confirmed_on": None, "registered_with_operator_on": None, **dates}
+        return person_list.registration_state(SimpleNamespace(**values), TODAY)
+
+    def test_a_termination_counts_once_its_day_is_reached_else_the_step_stays(self):
+        self.assertEqual(self.state(), (person_list.REGISTRATION_REGISTERED, None))
+        self.assertEqual(self.state(registered_with_operator_on=EARLIER), (person_list.REGISTRATION_NOTIFIED, EARLIER))
+        self.assertEqual(
+            self.state(registered_with_operator_on=EARLIER, confirmed_on=EARLIER),
+            (person_list.REGISTRATION_CONFIRMED, EARLIER),
+        )
+        confirmed = {"registered_with_operator_on": EARLIER, "confirmed_on": EARLIER}
+        self.assertEqual(self.state(**confirmed, terminated_on=LATER), (person_list.REGISTRATION_CONFIRMED, EARLIER))
+        self.assertEqual(self.state(**confirmed, terminated_on=TODAY), (person_list.REGISTRATION_TERMINATED, TODAY))
 
 
 @tag("mariadb")
@@ -241,54 +258,129 @@ class PersonChangeTests(TestCase):
         self.assertIsNone(persons.record_of(self.person))
         # Nothing to save: no record, no history.
         persons.set_note(self.person, "  ", self.actor)
-        persons.set_bkw_customer_number(self.person, "", self.actor)
-        persons.set_shares(self.person, None, None, None, self.actor)
+        persons.set_operator_customer_number(self.person, "", self.actor)
         self.assertIsNone(persons.record_of(self.person))
         self.assertEqual(self.events(), [])
 
         persons.set_note(self.person, "  Rückruf vereinbart.  ", self.actor)
-        persons.set_bkw_customer_number(self.person, " BKW   4711 ", self.actor)
-        persons.set_shares(self.person, 5, date(2026, 3, 1), None, self.actor)
+        persons.set_operator_customer_number(self.person, " OPR   4711 ", self.actor)
         record = persons.record_of(self.person)
-        self.assertEqual(
-            (record.staff_note, record.bkw_customer_number, record.shares, record.shares_from, record.shares_to),
-            ("Rückruf vereinbart.", "BKW 4711", 5, date(2026, 3, 1), None),
-        )
+        self.assertEqual((record.staff_note, record.operator_customer_number), ("Rückruf vereinbart.", "OPR 4711"))
         # The entries name the event, the actor and the time, never the note, the number or an address (L-6).
         self.assertEqual(
             self.events(),
-            [(HistoryEvent.PERSON_NOTE_CHANGED, {}), (HistoryEvent.PERSON_BKW_NUMBER_CHANGED, {}),
-             (HistoryEvent.PERSON_SHARES_CHANGED, {})],
+            [(HistoryEvent.PERSON_NOTE_CHANGED, {}), (HistoryEvent.PERSON_OPERATOR_NUMBER_CHANGED, {})],
         )
         self.assertEqual(history.entries_for(self.person).first().actor, self.actor)
 
     def test_a_change_that_changes_nothing_writes_no_history_and_an_empty_value_clears(self):
         persons.set_note(self.person, "Eine Notiz", self.actor)
         persons.set_note(self.person, "Eine Notiz", self.actor)
-        persons.set_shares(self.person, 2, date(2026, 1, 1), date(2026, 12, 31), self.actor)
-        persons.set_shares(self.person, 2, date(2026, 1, 1), date(2026, 12, 31), self.actor)
+        persons.set_operator_customer_number(self.person, "OPR 1", self.actor)
+        persons.set_operator_customer_number(self.person, "OPR 1", self.actor)
         self.assertEqual(len(self.events()), 2)
         persons.set_note(self.person, "", self.actor)
-        persons.set_shares(self.person, None, date(2026, 1, 1), None, self.actor)  # no shares: the period goes too
+        persons.set_operator_customer_number(self.person, "", self.actor)
         record = persons.record_of(self.person)
-        self.assertEqual((record.staff_note, record.shares, record.shares_from, record.shares_to), ("", None, None, None))
+        self.assertEqual((record.staff_note, record.operator_customer_number), ("", ""))
         self.assertEqual(len(self.events()), 4)
 
     def test_the_rules_refuse_what_does_not_fit(self):
         for call, code in (
             (lambda: persons.set_note(self.person, "x" * (persons.NOTE_MAX_LENGTH + 1)), "note_too_long"),
-            (lambda: persons.set_bkw_customer_number(self.person, "1" * 31), "number_invalid"),
-            (lambda: persons.set_bkw_customer_number(self.person, "12\x0034"), "number_invalid"),
-            (lambda: persons.set_shares(self.person, 0, date(2026, 1, 1), None), "shares_invalid"),
-            (lambda: persons.set_shares(self.person, True, date(2026, 1, 1), None), "shares_invalid"),
-            (lambda: persons.set_shares(self.person, 3, None, None), "period_invalid"),
-            (lambda: persons.set_shares(self.person, 3, date(2026, 2, 1), date(2026, 1, 1)), "period_invalid"),
+            (lambda: persons.set_operator_customer_number(self.person, "1" * 31), "number_invalid"),
+            (lambda: persons.set_operator_customer_number(self.person, "12\x0034"), "number_invalid"),
             (lambda: persons.set_note(self.unverified, "Notiz"), "not_a_person"),
+            (lambda: persons.add_share_change(self.unverified, 1, TODAY), "not_a_person"),
         ):
             with self.subTest(code=code), self.assertRaises(persons.PersonError) as raised:
                 call()
             self.assertEqual(raised.exception.code, code)
         self.assertIsNone(persons.record_of(self.person))
+
+
+@tag("mariadb")
+class ShareHistoryTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.person = create_active_user("person.shares@example.org", first_name="Anna", last_name="Muster")
+        cls.other = create_active_user("other.shares@example.org", first_name="Bruno", last_name="Probe")
+        cls.actor = create_active_user("actor.shares@example.org")
+        cls.unverified = User.objects.create_user("unverified.shares@example.org")
+
+    def test_an_entry_is_added_with_the_record_the_history_event_and_the_actor(self):
+        self.assertIsNone(persons.record_of(self.person))
+
+        entry = persons.add_share_change(self.person, 5, date(2026, 3, 1), self.actor)
+
+        self.assertEqual(
+            (entry.record, entry.quantity, entry.valid_from, entry.actor),
+            (persons.record_of(self.person), 5, date(2026, 3, 1), self.actor),
+        )
+        self.assertEqual(ShareChange.objects.count(), 1)
+        # The history names the event only, never the number of shares (L-6); the actor is kept.
+        logged = history.entries_for(self.person).get()
+        self.assertEqual((logged.event, logged.detail, logged.actor), (HistoryEvent.PERSON_SHARES_CHANGED, {}, self.actor))
+        # The actor is optional.
+        self.assertIsNone(persons.add_share_change(self.person, 6, date(2026, 4, 1)).actor)
+
+    def test_zero_and_the_maximum_are_valid_numbers(self):
+        for quantity in (0, persons.SHARES_MAX):
+            with self.subTest(quantity=quantity):
+                self.assertEqual(persons.add_share_change(self.person, quantity, TODAY, self.actor).quantity, quantity)
+
+    def test_the_rules_refuse_a_wrong_number_and_a_missing_date_and_store_nothing(self):
+        for quantity, valid_from, code in (
+            (-1, TODAY, "shares_invalid"),
+            (persons.SHARES_MAX + 1, TODAY, "shares_invalid"),
+            (True, TODAY, "shares_invalid"),
+            ("3", TODAY, "shares_invalid"),
+            (2.5, TODAY, "shares_invalid"),
+            (None, TODAY, "shares_invalid"),
+            (3, None, "date_invalid"),
+        ):
+            with self.subTest(quantity=quantity, valid_from=valid_from), self.assertRaises(persons.PersonError) as raised:
+                persons.add_share_change(self.person, quantity, valid_from, self.actor)
+            self.assertEqual(raised.exception.code, code)
+        self.assertIsNone(persons.record_of(self.person))
+        self.assertEqual(ShareChange.objects.count(), 0)
+        self.assertEqual(history.entries_for(self.person).count(), 0)
+
+    def test_the_history_lists_the_latest_date_first_and_only_the_entries_of_the_person(self):
+        persons.add_share_change(self.person, 2, date(2026, 1, 1), self.actor)
+        persons.add_share_change(self.person, 4, date(2026, 6, 1), self.actor)
+        persons.add_share_change(self.person, 3, date(2026, 3, 1), self.actor)
+        persons.add_share_change(self.other, 9, date(2026, 7, 1), self.actor)
+
+        entries = persons.share_history(self.person)
+
+        self.assertEqual([(e.valid_from, e.quantity) for e in entries],
+                         [(date(2026, 6, 1), 4), (date(2026, 3, 1), 3), (date(2026, 1, 1), 2)])
+        self.assertEqual(persons.share_history(self.unverified), [])
+
+    def test_the_current_number_is_the_latest_entry_by_date_that_holds_today(self):
+        self.assertIsNone(persons.current_shares(persons.share_history(self.person), TODAY))
+
+        # Entered out of order: the date counts, not the time of the entry.
+        persons.add_share_change(self.person, 8, EARLIER, self.actor)
+        persons.add_share_change(self.person, 3, EARLIER - timedelta(days=10), self.actor)
+        self.assertEqual(persons.current_shares(persons.share_history(self.person), TODAY), 8)
+        # An entry for a later day does not hold yet; it does from its day on.
+        persons.add_share_change(self.person, 0, LATER, self.actor)
+        entries = persons.share_history(self.person)
+        self.assertEqual(persons.current_shares(entries, TODAY), 8)
+        self.assertEqual(persons.current_shares(entries, LATER), 0)
+        # Before the first entry no number holds.
+        self.assertIsNone(persons.current_shares(entries, EARLIER - timedelta(days=11)))
+
+    def test_on_the_same_date_the_newest_entry_wins(self):
+        persons.add_share_change(self.person, 3, EARLIER, self.actor)
+        persons.add_share_change(self.person, 7, EARLIER, self.actor)
+
+        entries = persons.share_history(self.person)
+
+        self.assertEqual([e.quantity for e in entries], [7, 3])
+        self.assertEqual(persons.current_shares(entries, TODAY), 7)
 
 
 STREETS = (

@@ -2,16 +2,12 @@
 
 The list (a table on a desktop, cards on a phone), the detail page with its table of the metering points,
 and the dialogs: create, edit the production quota, edit the master data, archive and delete. Every view
-uses the access check of ``management.access``; objects are looked up by the id in the address only after
-the permission is checked, and the rules are in ``leg_platform.community`` (``legs``, ``leg_list``,
+uses the access check of ``management.access``; objects are looked up by the id in the address, and the rules are in ``leg_platform.community`` (``legs``, ``leg_list``,
 ``leg_services``). A dialog is a normal page: it works without JavaScript and returns to the place it was
 opened from.
 
-Rights: list and detail = ``view_leg``; create = ``add_leg``; edit, archive and restore = ``change_leg``;
-delete = ``delete_leg``. On the detail page the table of the metering points needs ``view_meteringpoint``,
-the link to a location ``view_location``, the name of the person ``view_personrecord`` and the icon that
-changes the LEG ``change_meteringpoint`` (it opens the shared dialog of the metering points,
-``management:metering_points_leg``, which needs ``view_leg`` too, which every page here has).
+Access (D-086): every staff account may use every page; what is shown depends on the state of the data only
+(an archived LEG is read-only, D-085), never on a permission.
 """
 
 from dataclasses import dataclass
@@ -25,7 +21,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views import View
 
-from leg_platform.community import leg_list, leg_services, legs, preferences, problems
+from leg_platform.community import grid_operator, leg_list, leg_services, legs, preferences, problems
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, Leg, ManagementSettings, TransformerCircuit
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
@@ -33,15 +29,6 @@ from leg_platform.management.leg_forms import LegCreateForm, MasterDataForm, Quo
 from leg_platform.management.location_views import DialogView, count_phrase
 from leg_platform.management.metering_point_views import format_date
 from leg_platform.management.returns import return_url, with_next
-
-VIEW = "community.view_leg"
-ADD = "community.add_leg"
-CHANGE = "community.change_leg"
-DELETE = "community.delete_leg"
-VIEW_POINTS = "community.view_meteringpoint"
-CHANGE_POINTS = "community.change_meteringpoint"
-VIEW_LOCATION = "community.view_location"
-VIEW_PERSONS = "community.view_personrecord"
 
 QUOTA_PROBLEMS = (legs.LegProblem.QUOTA_BELOW_LEGAL, legs.LegProblem.QUOTA_BELOW_WARNING, legs.LegProblem.QUOTA_STALE)
 RATIO_PROBLEMS = (legs.LegProblem.NO_PRODUCER, legs.LegProblem.NO_CONSUMER)
@@ -60,9 +47,12 @@ def list_columns(threshold):
         lists.Column(
             "quota", gettext_lazy("Production quota"), width=200,
             info=_(
-                "Value from the BKW LEG portal. At least %(minimum)s are required by law. "
+                "Value from the %(operator)s LEG portal. At least %(minimum)s are required by law. "
                 "Below %(threshold)s a warning triangle is shown."
-            ) % {"minimum": f"{LEGAL_MINIMUM_QUOTA_PERCENT} %", "threshold": f"{threshold} %"},
+            ) % {
+                "operator": grid_operator.name(), "minimum": f"{LEGAL_MINIMUM_QUOTA_PERCENT} %",
+                "threshold": f"{threshold} %",
+            },
         ),
         lists.Column(
             "participants", gettext_lazy("Participants"), width=150,
@@ -152,8 +142,6 @@ def list_entry(row, threshold):
 class LegListView(ManagementAccessMixin, View):
     """The list (``leg-liste-desktop`` and ``leg-liste-handy``)."""
 
-    permission_required = (VIEW,)
-
     def get(self, request):
         found = build_list(request.GET)
         state, columns, threshold, problem_count = found.state, found.columns, found.threshold, found.problem_count
@@ -173,7 +161,6 @@ class LegListView(ManagementAccessMixin, View):
             print_url=state.url_to(reverse("management:legs_print")),
             problem_count=problem_count,
             problem_url=state.url(problems="" if state.problems else "1"),
-            can_add=request.user.has_perm(ADD),
             create_url=with_next(reverse("management:legs_new"), request),
             display_options=display_options(),
             empty_text=_("No LEGs yet. Create the first LEG."),
@@ -184,23 +171,19 @@ class LegListView(ManagementAccessMixin, View):
 class LegDetailView(ManagementAccessMixin, View):
     """The detail page (``leg-detail-desktop``, ``leg-detail-ein-trafokreis-desktop`` and the two phone views)."""
 
-    permission_required = (VIEW,)
-
     def get(self, request, pk):
         leg = get_object_or_404(Leg, pk=pk)
-        user = request.user
         today = timezone.localdate()
         threshold = ManagementSettings.load().warning_threshold_percent
         summary = legs.summaries([leg], threshold, today)[leg.pk]
-        may_change = user.has_perm(CHANGE)
-        # An archived LEG is read-only (D-085): no edit buttons, only "Restore LEG".
-        can_change = may_change and not leg.is_archived
-        # An archived LEG offers "Restore" and nothing else (D-085), also when it could be deleted.
-        show_delete = leg_services.can_delete(leg) and user.has_perm(DELETE) and not leg.is_archived
+        # An archived LEG is read-only (D-085): no edit buttons, only "Restore LEG", also when it could be
+        # deleted.
+        can_change = not leg.is_archived
+        show_delete = leg_services.can_delete(leg) and can_change
         level = legs.quota_level(leg.production_quota_percent, threshold)
         circuits = list(
-            TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("bkw_number")
-            .values_list("bkw_number", flat=True)
+            TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("grid_number")
+            .values_list("grid_number", flat=True)
         )
         context = {
             "page_title": leg.name,
@@ -220,26 +203,22 @@ class LegDetailView(ManagementAccessMixin, View):
             "back_url": return_url(request, reverse("management:legs")),
             "can_change": can_change,
             "show_delete": show_delete,
-            "show_archive": may_change and (leg.is_archived or not show_delete),
+            "show_archive": leg.is_archived or not show_delete,
             "current_url": request.get_full_path(),
         }
-        if user.has_perm(VIEW_POINTS):
-            context.update(self.members_context(request, leg, summary, threshold, today))
+        context.update(self.members_context(request, leg, summary, threshold, today))
         return render(request, "management/legs/detail.html", context)
 
     def members_context(self, request, leg, summary, threshold, today):
         user = request.user
-        see_persons = user.has_perm(VIEW_PERSONS)
         columns = member_columns()
         state = lists.parse(
             request.GET, path=reverse("management:legs_detail", args=[leg.pk]), columns=columns,
             default_sort=leg_list.DEFAULT_MEMBER_SORT,
         )
         members = leg_list.members(leg, summary, threshold, today)
-        occupants = leg_list.occupants([m.point for m in members], today, see_persons=see_persons)
+        occupants = leg_list.occupants([m.point for m in members], today)
         members = leg_list.sort_members(members, state.sort, state.descending, occupants)
-        can_switch = user.has_perm(CHANGE_POINTS)
-        can_view_location = user.has_perm(VIEW_LOCATION)
         rows = []
         for member in members:
             point = member.point
@@ -249,12 +228,11 @@ class LegDetailView(ManagementAccessMixin, View):
                     "point": point,
                     "address": f"{point.location.street} {point.location.house_number}" if point.location_id else "",
                     "location_url": reverse("management:locations_detail", args=[point.location_id])
-                    if point.location_id and can_view_location else "",
+                    if point.location_id else "",
                     "occupant": occupants.get(point.pk, ""),
                     "has_person": point.pk in occupants,
                     "point_url": reverse("management:metering_points_detail", args=[point.pk]),
-                    "switch_url": with_next(reverse("management:metering_points_leg", args=[point.pk]), request)
-                    if can_switch else "",
+                    "switch_url": with_next(reverse("management:metering_points_leg", args=[point.pk]), request),
                 }
             )
         saved = preferences.get_preference(user, "leg_metering_points").column_widths
@@ -262,7 +240,6 @@ class LegDetailView(ManagementAccessMixin, View):
             "member_rows": rows,
             "member_columns": lists.header_cells(columns, state, saved, "leg_metering_points"),
             "member_widths_url": reverse("management:list_widths", args=["leg_metering_points"]),
-            "show_actions": can_switch or any(row["member"].action for row in rows),
             "show_legend": any(row["member"].action for row in rows),
             "empty_members_text": _("No metering points belong to this LEG yet."),
         }
@@ -274,7 +251,6 @@ class LegDetailView(ManagementAccessMixin, View):
 class LegCreateView(DialogView):
     """"LEG anlegen" (``leg-anlegen-desktop``): after saving back to the list."""
 
-    permission_required = (VIEW, ADD)
     title = gettext_lazy("Create LEG")
     lead = gettext_lazy("A LEG is a virtual grid association. You assign metering points to the LEG afterwards.")
     form_class = LegCreateForm
@@ -301,7 +277,6 @@ class LegObjectDialog(DialogView):
     """A dialog about one LEG. An archived LEG is read-only (D-085): the dialog is refused, with a message in
     the style of D-079, for a GET and for a direct POST alike."""
 
-    permission_required = (VIEW, CHANGE)
     template_name = "management/legs/dialog_quota.html"
 
     def refusal(self, request, *args, **kwargs):
@@ -324,9 +299,9 @@ class LegQuotaView(LegObjectDialog):
     """"Produktionsquote bearbeiten" (``leg-quote-bearbeiten-desktop``): the quota and its date together."""
 
     title = gettext_lazy("Edit production quota")
-    lead = gettext_lazy(
-        "The quota is in the BKW LEG portal. Enter the value and the date on which you checked it there."
-    )
+    lead = grid_operator.text(gettext_lazy(
+        "The quota is in the %(operator)s LEG portal. Enter the value and the date on which you checked it there."
+    ))
 
     def get_form(self, data=None):
         leg = self.leg()
@@ -374,7 +349,6 @@ class LegMasterDataView(LegObjectDialog):
 class LegArchiveView(ManagementAccessMixin, View):
     """The button "LEG archivieren" (and "Restore LEG" for an archived one): POST only."""
 
-    permission_required = (VIEW, CHANGE)
     http_method_names = ["post"]
 
     def post(self, request, pk):
@@ -385,9 +359,14 @@ class LegArchiveView(ManagementAccessMixin, View):
 
 
 class LegDeleteView(ManagementAccessMixin, View):
-    """"LEG löschen": a question first, then the deletion; only possible without a history."""
+    """"LEG löschen": a question first, then the deletion; only possible without a history, never for an
+    archived LEG (D-085, D-086: the restore is the only action on it)."""
 
-    permission_required = (VIEW, DELETE)
+    def refusal(self, request, *args, **kwargs):
+        if get_object_or_404(Leg, pk=kwargs["pk"]).is_archived:
+            messages.error(request, _("This LEG is archived."))
+            return redirect(return_url(request, reverse("management:legs_detail", args=[kwargs["pk"]])))
+        return None
 
     def get(self, request, pk):
         leg = get_object_or_404(Leg, pk=pk)
@@ -410,6 +389,9 @@ class LegDeleteView(ManagementAccessMixin, View):
         leg = get_object_or_404(Leg, pk=pk)
         try:
             leg_services.delete(leg)
+        except leg_services.Archived:
+            messages.error(request, _("This LEG is archived."))
+            return redirect(reverse("management:legs_detail", args=[pk]))
         except leg_services.NotDeletable:
             messages.error(request, _("This LEG has a history and cannot be deleted. Archive it instead."))
             return redirect(reverse("management:legs_detail", args=[pk]))

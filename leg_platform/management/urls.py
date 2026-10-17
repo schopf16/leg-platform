@@ -25,8 +25,8 @@ urlpatterns = [
     path("persons/<int:pk>/", person_views.PersonDetailView.as_view(), name="persons_detail"),
     path("persons/<int:pk>/note/", person_views.PersonNoteView.as_view(), name="persons_note"),
     path(
-        "persons/<int:pk>/bkw-customer-number/", person_views.PersonBkwNumberView.as_view(),
-        name="persons_bkw_number",
+        "persons/<int:pk>/operator-customer-number/", person_views.PersonOperatorNumberView.as_view(),
+        name="persons_operator_number",
     ),
     path("persons/<int:pk>/shares/", person_views.PersonSharesView.as_view(), name="persons_shares"),
     path(

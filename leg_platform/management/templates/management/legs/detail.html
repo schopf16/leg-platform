@@ -14,6 +14,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
 {% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
 {% block inner_class %}mgmt-page mgmt-wide mgmt-legs{% endblock %}
 {% block content %}
+  {% operator_name as operator %}
   {% include "management/_icons.html" %}
   <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to LEGs" %}</a>
 
@@ -38,7 +39,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
           <div class="mgmt-fact"><dt>{% translate "Checked on" %}</dt><dd class="tnum">{% if checked_on %}{{ checked_on }}{% else %}–{% endif %}</dd></div>
         </dl>
         {% if quota_level %}<p class="mgmt-quota-state is-{{ quota_level }}">{% if quota_level == "ok" %}<span class="mgmt-desktop-only" aria-hidden="true">✓ </span>{% endif %}{{ quota_level_text }}</p>{% endif %}
-        <p class="mgmt-hint mgmt-card-hint">{% blocktranslate with minimum=legal_minimum %}The quota comes from the BKW LEG portal. At least {{ minimum }} are required by law.{% endblocktranslate %}</p>
+        <p class="mgmt-hint mgmt-card-hint">{% blocktranslate with minimum=legal_minimum %}The quota comes from the {{ operator }} LEG portal. At least {{ minimum }} are required by law.{% endblocktranslate %}</p>
       </section>
 
       <section class="mgmt-card">
@@ -57,22 +58,21 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
           <div class="mgmt-fact"><dt>{% translate "Consumers : producers" %}</dt><dd class="tnum">{% if summary.ratio %}{{ summary.ratio }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Discount tier" %}{% translate "Discount tier" as tier_name %}{% blocktranslate asvar tier_info with name=tier_name %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info mgmt-desktop-only"><button type="button" class="mgmt-info-btn" aria-label="{{ tier_info }}" aria-describedby="tip-leg-tier">i</button><span class="mgmt-tip" role="tooltip" id="tip-leg-tier">{% include "management/legs/_tip_tier.html" %}</span></span></dt>
             <dd>{% if has_tier %}{% include "management/_status.html" with tone=tier_tone label=tier_label %}{% else %}–{% endif %}</dd></div>
-          <div class="mgmt-fact mgmt-phone-only-row"><dd class="mgmt-hint mgmt-span">{% translate "Derived from the transformer circuits of the metering points." %} {% translate "The BKW determines the actual discount." %}</dd></div>
+          <div class="mgmt-fact mgmt-phone-only-row"><dd class="mgmt-hint mgmt-span">{% translate "Derived from the transformer circuits of the metering points." %} {% blocktranslate %}The {{ operator }} determines the actual discount.{% endblocktranslate %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Transformer circuits" %}</dt><dd class="tnum">{% if circuits %}<span class="mgmt-desktop-only">{% for circuit in circuits %}<span class="mgmt-tag">{{ circuit }}</span>{% endfor %}</span><span class="mgmt-phone-only">{{ circuits|join:", " }}</span>{% else %}–{% endif %}</dd></div>
         </dl>
       </section>
     </div>
   </div>
 
-  {% if member_columns %}
-    <section class="mgmt-card mgmt-card-flush">
+  <section class="mgmt-card mgmt-card-flush">
       <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points of this LEG" %}</h2><span class="mgmt-count mgmt-desktop-only">{{ count_text }}</span></div>
       <div class="mgmt-list" data-list data-list-key="leg_metering_points" data-widths-url="{{ member_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
         <div class="mgmt-table-view">
           <table class="mgmt-table mgmt-table-fixed mgmt-members">
             <colgroup>
               {% for column in member_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}{% if column.keep %} data-keep{% endif %}>
-              {% endfor %}{% if show_actions %}<col class="mgmt-action-col" width="170">{% endif %}<col class="mgmt-link-col" width="56">
+              {% endfor %}<col class="mgmt-action-col" width="170"><col class="mgmt-link-col" width="56">
             </colgroup>
             <thead>
               <tr>
@@ -82,7 +82,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
                     <span class="mgmt-grip" role="separator" aria-orientation="vertical" tabindex="0" aria-label="{% translate 'Change the width of the column' %}"></span>
                   </th>
                 {% endfor %}
-                {% if show_actions %}<th class="mgmt-action-col"><span class="visually-hidden">{% translate "Action" %}</span></th>{% endif %}
+                <th class="mgmt-action-col"><span class="visually-hidden">{% translate "Action" %}</span></th>
                 <th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th>
               </tr>
             </thead>
@@ -95,7 +95,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
                   <td class="tnum">{% if member.circuit %}{{ member.circuit }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
                   <td>{% include "management/_status.html" with tone=member.status|status_tone label=member.status|status_label %}</td>
                   <td>{% if row.has_person %}{% if row.occupant %}<div class="mgmt-cut" title="{{ row.occupant }}">{{ row.occupant }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
-                  {% if show_actions %}<td class="mgmt-action-col">{% include "management/legs/_member_action.html" %}</td>{% endif %}
+                  <td class="mgmt-action-col">{% include "management/legs/_member_action.html" %}</td>
                   <td class="mgmt-link-col">{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=row.point_url label=point_label subject=point.number %}</td>
                 </tr>
                 {% endwith %}
@@ -123,7 +123,6 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
       </div>
       {% if show_legend %}<p class="mgmt-note mgmt-legend">{% translate "Green: already in the own LEG." %} {% translate "Blue: change recommended." %} {% translate "Grey: no own LEG." %}</p>{% endif %}
     </section>
-  {% endif %}
 
   <div class="mgmt-phone-end mgmt-phone-only">{% include "management/legs/_leg_buttons.html" %}</div>
 {% endblock %}
@@ -131,5 +130,5 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
   {{ block.super }}
   <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
   <script defer src="{% static 'management/js/table-fit.js' %}"></script>
-  {% if member_columns %}<script defer src="{% static 'management/js/list.js' %}"></script>{% endif %}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
 {% endblock %}

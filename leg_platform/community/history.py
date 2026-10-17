@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from leg_platform.community import grid_operator
 from leg_platform.community.models import HistoryEntry
 
 LOCATION = "location"
@@ -42,9 +43,9 @@ class HistoryEvent(models.TextChoices):
     LEG_ASSIGNED = "leg_assigned", _("LEG assigned")
     LEG_ASSIGNMENT_ENDED = "leg_assignment_ended", _("LEG assignment ended")
     LEG_ASSIGNMENT_DELETED = "leg_assignment_deleted", _("LEG assignment deleted")
-    # The steps of a metering point towards the BKW (D-079): the labels follow the history of the
+    # The steps of a metering point towards the grid operator (D-079): the labels follow the history of the
     # specification ("Als angemeldet gesetzt", "Bestätigung erfasst, Startdatum ...").
-    REGISTERED_WITH_BKW = "registered_with_bkw", _("Marked as notified")
+    REGISTERED_WITH_OPERATOR = "registered_with_operator", _("Marked as notified")
     CONFIRMATION_RECORDED = "confirmation_recorded", _("Confirmation recorded")
     START_DATE_RECORDED = "start_date_recorded", _("Start date recorded")
     TERMINATION_RECORDED = "termination_recorded", _("Termination recorded")
@@ -53,10 +54,12 @@ class HistoryEvent(models.TextChoices):
     SENDER_SUGGESTION_DISMISSED = "sender_suggestion_dismissed", _("Sender address correction not accepted")
     COUNTRY_CHANGED = "country_changed", _("Country changed")
     IDENTIFIER_CHANGED = "identifier_changed", _("Identifier changed")
-    # The events of a person (D-081). They name no value: the note, the BKW customer number and the
-    # address of a customer never go into the history (L-6 of the security review of block 1).
+    # The events of a person (D-081). They name no value: the note, the customer number at the grid operator
+    # and the address of a customer never go into the history (L-6 of the security review of block 1).
     PERSON_NOTE_CHANGED = "person_note_changed", _("Note changed")
-    PERSON_BKW_NUMBER_CHANGED = "person_bkw_number_changed", _("BKW customer number changed")
+    PERSON_OPERATOR_NUMBER_CHANGED = "person_operator_number_changed", grid_operator.text(
+        _("Customer number at the %(operator)s changed")
+    )
     PERSON_SHARES_CHANGED = "person_shares_changed", _("Shares changed")
 
 
@@ -80,12 +83,12 @@ def subject_of(obj):
     raise TypeError(f"No history for {type(obj).__name__}.")
 
 
-PROTECTED_DETAIL_KEYS = frozenset({"iban", "staff_note", "note", "bkw_customer_number", "password", "email"})
+PROTECTED_DETAIL_KEYS = frozenset({"iban", "staff_note", "note", "operator_customer_number", "password", "email"})
 
 
 def _check_detail(detail, path=""):
-    """The history is read by every staff user with the right to see an object: it never holds the
-    IBAN, the staff note or the BKW customer number of a person record, nor credentials (security
+    """The history is read by every staff user: it never holds the
+    IBAN, the staff note or the customer number at the grid operator of a person record, nor credentials (security
     review L-6). Checked on every key, also nested ones."""
     if isinstance(detail, dict):
         for key, value in detail.items():

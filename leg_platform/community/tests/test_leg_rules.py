@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.community import history, leg_list, leg_services, legs
+from leg_platform.community.archived import Archived
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Direction, HistoryEntry, Leg
 from leg_platform.community.tests.helpers import (
@@ -155,6 +156,18 @@ class LegServiceTests(TestCase):
         self.assertFalse(HistoryEntry.objects.filter(subject_type=history.LEG, subject_id=fresh.pk).exists())
         self.assertTrue(Leg.objects.filter(pk=used.pk).exists())
 
+    def test_an_archived_leg_is_not_deleted(self):
+        archived_leg = make_leg("LEG Archived", is_archived=True)  # no history: deletable otherwise
+        self.assertTrue(leg_services.can_delete(archived_leg))
+
+        with self.assertRaises(Archived):
+            leg_services.delete(archived_leg)
+
+        self.assertTrue(Leg.objects.filter(pk=archived_leg.pk).exists())
+        # A LEG that is not archived is still deleted.
+        plain = make_leg("LEG Plain")
+        leg_services.delete(plain)
+        self.assertFalse(Leg.objects.filter(pk=plain.pk).exists())
 
 @tag("mariadb")
 class LegListQueryTests(TestCase):
@@ -310,16 +323,15 @@ class LegDetailQueryTests(TestCase):
         numbers = {point.number[-2:] for point in leg_list.members_of(self.mixed, TODAY)}
         self.assertEqual(numbers, {"01", "02", "03", "04", "05"})
 
-    def test_the_occupant_names_only_for_an_account_that_may_see_persons(self):
+    def test_the_occupant_names_are_the_names_of_the_persons(self):
         points = [row.point for row in self.members(self.mixed)[1]]
-        with_names = leg_list.occupants(points, TODAY, see_persons=True)
-        self.assertEqual(with_names, {self.points[1].pk: "Ann Zeta", self.points[2].pk: "Bob Alpha"})
-        hidden = leg_list.occupants(points, TODAY, see_persons=False)
-        self.assertEqual(hidden, {self.points[1].pk: "", self.points[2].pk: ""})  # there is a person, no name
+        self.assertEqual(
+            leg_list.occupants(points, TODAY), {self.points[1].pk: "Ann Zeta", self.points[2].pk: "Bob Alpha"}
+        )
 
     def test_sorting_the_table_by_each_column(self):
         _summary, rows = self.members(self.mixed)
-        occupants = leg_list.occupants([row.point for row in rows], TODAY, see_persons=True)
+        occupants = leg_list.occupants([row.point for row in rows], TODAY)
 
         def order(key, descending=False):
             return [row.point.number[-2:] for row in leg_list.sort_members(rows, key, descending, occupants)]

@@ -2653,8 +2653,8 @@ msgstr "Messpunkte"
 msgid "Production quota"
 msgstr "Produktionsquote"
 
-msgid "Applies to all metering points. The BKW assigns the identifier."
-msgstr "Gilt für alle Messpunkte. Die BKW vergibt den Identifikator."
+msgid "Applies to all metering points. The %(operator)s assigns the identifier."
+msgstr "Gilt für alle Messpunkte. Die %(operator)s vergibt den Identifikator."
 
 #, python-format
 msgid "Applies to all LEGs. The law requires at least %(minimum)d %%."
@@ -2694,8 +2694,8 @@ msgstr "Geben Sie eine Nummer mit 33 Zeichen ein: Grossbuchstaben und Ziffern."
 msgid "Enter up to 20 digits."
 msgstr "Geben Sie bis zu 20 Ziffern ein."
 
-msgid "Enter the BKW number: TRA followed by digits."
-msgstr "Geben Sie die BKW-Nummer ein: TRA und Ziffern."
+msgid "Enter the %(operator)s number: TRA followed by digits."
+msgstr "Geben Sie die %(operator)s-Nummer ein: TRA und Ziffern."
 
 msgid "This address already exists."
 msgstr "Diese Adresse gibt es schon."
@@ -2710,8 +2710,8 @@ msgstr "geändert"
 msgid "name"
 msgstr "Name"
 
-msgid "BKW number"
-msgstr "BKW-Nummer"
+msgid "grid number"
+msgstr "Netznummer"
 
 msgid "transformer circuit"
 msgstr "Trafokreis"
@@ -2749,8 +2749,8 @@ msgstr "Batterie (kWh)"
 msgid "wallbox (kW)"
 msgstr "Wallbox (kW)"
 
-msgid "notified to the BKW on"
-msgstr "Bei der BKW angemeldet am"
+msgid "notified on"
+msgstr "Angemeldet am"
 
 msgid "confirmed on"
 msgstr "Bestätigt am"
@@ -2815,17 +2815,23 @@ msgstr "Einstellungen der Verwaltung"
 msgid "note"
 msgstr "Notiz"
 
-msgid "BKW customer number"
-msgstr "BKW-Kundennummer"
+msgid "customer number at the grid operator"
+msgstr "Kundennummer beim Netzbetreiber"
 
-msgid "shares"
-msgstr "Anteile"
+msgid "number of shares"
+msgstr "Anzahl Anteile"
 
-msgid "shares from"
-msgstr "Anteile ab"
+msgid "share change"
+msgstr "Änderung der Anteile"
 
-msgid "shares to"
-msgstr "Anteile bis"
+msgid "share changes"
+msgstr "Änderungen der Anteile"
+
+msgid "grid operator"
+msgstr "Netzbetreiber"
+
+msgid "grid operators"
+msgstr "Netzbetreiber"
 
 msgid "IBAN"
 msgstr "IBAN"
@@ -2954,32 +2960,6 @@ msgstr "Land geändert"
 
 msgid "Identifier changed"
 msgstr "Identifikator geändert"
-
-# The rights of the management area (the lists of rights and the help "Which rights do I need for what?")
-msgctxt "right"
-msgid "correct the address"
-msgstr "Adresse korrigieren"
-
-msgid "See persons, locations, LEGs and metering points"
-msgstr "Personen, Standorte, LEGs und Messpunkte ansehen"
-
-msgid "Change persons, locations, LEGs and metering points, and assign them"
-msgstr "Personen, Standorte, LEGs und Messpunkte ändern und zuordnen"
-
-msgid "Create locations, LEGs, metering points and transformer circuits"
-msgstr "Standorte, LEGs, Messpunkte und Trafokreise anlegen"
-
-msgid "Delete locations, LEGs and metering points"
-msgstr "Standorte, LEGs und Messpunkte löschen"
-
-msgid "Correct the address of a person"
-msgstr "Die Adresse einer Person korrigieren"
-
-msgid "See the settings of the management area"
-msgstr "Die Einstellungen der Verwaltung ansehen"
-
-msgid "Change the settings of the management area"
-msgstr "Die Einstellungen der Verwaltung ändern"
 
 # Management area, block 2: locations (verwaltung/standorte; texts 1:1 from the owner specification)
 msgid "Address changed"
@@ -3157,11 +3137,11 @@ msgstr "Details"
 msgid "Status of the metering point"
 msgstr "Status des Messpunkts"
 
-msgid "Recorded, not yet announced to the BKW."
-msgstr "Erfasst, noch nicht bei der BKW angemeldet."
+msgid "Recorded, not yet announced to the %(operator)s."
+msgstr "Erfasst, noch nicht bei der %(operator)s angemeldet."
 
-msgid "Announced to the BKW. The person has to confirm."
-msgstr "Bei der BKW angemeldet. Die Person muss bestätigen."
+msgid "Announced to the %(operator)s. The person has to confirm."
+msgstr "Bei der %(operator)s angemeldet. Die Person muss bestätigen."
 
 msgid "The person has confirmed. The start date is not reached yet."
 msgstr "Die Person hat bestätigt. Startdatum noch nicht erreicht."
@@ -3172,8 +3152,8 @@ msgstr "Bestätigt, die Zuordnung ist wirksam."
 msgid "The assignment has ended."
 msgstr "Die Zuordnung ist beendet."
 
-msgid "The transformer circuit of the BKW that the location belongs to. The number is the reference for questions to the BKW."
-msgstr "Der Trafokreis der BKW, zu dem der Standort gehört. Die Nummer ist die Referenz für Rückfragen bei der BKW."
+msgid "The transformer circuit of the %(operator)s that the location belongs to. The number is the reference for questions to the %(operator)s."
+msgstr "Der Trafokreis der %(operator)s, zu dem der Standort gehört. Die Nummer ist die Referenz für Rückfragen bei der %(operator)s."
 
 msgid "Street and house number. A location is an address. A click on the row opens or closes the metering points."
 msgstr "Strasse und Hausnummer. Ein Standort ist eine Adresse. Ein Klick auf die Zeile klappt die Messpunkte auf oder zu."
@@ -3467,14 +3447,14 @@ msgstr "Wallbox"
 msgid "Optional"
 msgstr "Optional"
 
-msgid "Number of the smart meter at the BKW, followed by the direction. Blue is consumption, green is feed-in."
-msgstr "Nummer des Smart Meters bei der BKW, dahinter die Richtung. Blau ist Bezug, grün Einspeisung."
+msgid "Number of the smart meter at the %(operator)s, followed by the direction. Blue is consumption, green is feed-in."
+msgstr "Nummer des Smart Meters bei der %(operator)s, dahinter die Richtung. Blau ist Bezug, grün Einspeisung."
 
 msgid "The address where the metering point is installed."
 msgstr "Adresse, an der der Messpunkt liegt."
 
-msgid "The billing group the metering point belongs to. Required before the registration at the BKW."
-msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört. Vor der BKW-Anmeldung Pflicht."
+msgid "The billing group the metering point belongs to. Required before the registration at the %(operator)s."
+msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört. Vor der %(operator)s-Anmeldung Pflicht."
 
 msgid "Next step"
 msgstr "Nächster Schritt"
@@ -3497,8 +3477,8 @@ msgid "All (%(count)d)"
 msgstr "Alle (%(count)d)"
 
 #, python-format
-msgid "Notify the BKW (%(count)d)"
-msgstr "Bei der BKW anmelden (%(count)d)"
+msgid "Notify the %(operator)s (%(count)d)"
+msgstr "Bei der %(operator)s anmelden (%(count)d)"
 
 #, python-format
 msgid "Confirmation pending (%(count)d)"
@@ -3512,8 +3492,8 @@ msgstr "Startdatum ausstehend (%(count)d)"
 msgid "archived (%(count)d)"
 msgstr "archiviert (%(count)d)"
 
-msgid "All metering points with their state. Here you see what is still to do at the BKW."
-msgstr "Alle Messpunkte mit ihrem Stand. Hier sieht man, was bei der BKW noch ansteht."
+msgid "All metering points with their state. Here you see what is still to do at the %(operator)s."
+msgstr "Alle Messpunkte mit ihrem Stand. Hier sieht man, was bei der %(operator)s noch ansteht."
 
 msgid "No metering points yet. Create the first metering point."
 msgstr "Noch keine Messpunkte. Legen Sie den ersten Messpunkt an."
@@ -3537,15 +3517,15 @@ msgid "%(label)s, start date %(date)s"
 msgstr "%(label)s, Startdatum %(date)s"
 
 #, python-format
-msgid "Metering point %(number)s (%(direction)s). The registration at the BKW has taken place."
-msgstr "Messpunkt %(number)s (%(direction)s). Die Anmeldung bei der BKW ist erfolgt."
+msgid "Metering point %(number)s (%(direction)s). The registration at the %(operator)s has taken place."
+msgstr "Messpunkt %(number)s (%(direction)s). Die Anmeldung bei der %(operator)s ist erfolgt."
 
-msgid "Mark as notified to the BKW"
-msgstr "Als bei der BKW angemeldet setzen"
+msgid "Mark as notified to the %(operator)s"
+msgstr "Als bei der %(operator)s angemeldet setzen"
 
 #, python-format
-msgid "Metering point %(number)s (%(direction)s). The BKW has confirmed the registration."
-msgstr "Messpunkt %(number)s (%(direction)s). Die BKW hat die Anmeldung bestätigt."
+msgid "Metering point %(number)s (%(direction)s). The %(operator)s has confirmed the registration."
+msgstr "Messpunkt %(number)s (%(direction)s). Die %(operator)s hat die Anmeldung bestätigt."
 
 msgid "Save confirmation"
 msgstr "Bestätigung speichern"
@@ -3557,8 +3537,8 @@ msgid "Save termination"
 msgstr "Kündigung speichern"
 
 #, python-format
-msgid "Metering point %(number)s (%(direction)s). Enter the date that the BKW gives."
-msgstr "Messpunkt %(number)s (%(direction)s). Tragen Sie das Datum ein, das die BKW angibt."
+msgid "Metering point %(number)s (%(direction)s). Enter the date that the %(operator)s gives."
+msgstr "Messpunkt %(number)s (%(direction)s). Tragen Sie das Datum ein, das die %(operator)s angibt."
 
 msgid "Change person"
 msgstr "Person wechseln"
@@ -3655,8 +3635,8 @@ msgstr "fehlt"
 msgid "Registration on standby, start date missing."
 msgstr "Anmeldung auf Standby, Startdatum fehlt."
 
-msgid "Recorded, not yet notified to the BKW."
-msgstr "Erfasst, noch nicht bei der BKW angemeldet."
+msgid "Recorded, not yet notified to the %(operator)s."
+msgstr "Erfasst, noch nicht bei der %(operator)s angemeldet."
 
 msgid "Terminate"
 msgstr "Kündigen"
@@ -3685,8 +3665,8 @@ msgid "Name of the LEG. A LEG is a virtual grid association."
 msgstr "Name der LEG. Eine LEG ist ein virtueller Netzzusammenschluss."
 
 #, python-format
-msgid "Value from the BKW LEG portal. At least %(minimum)s are required by law. Below %(threshold)s a warning triangle is shown."
-msgstr "Wert aus dem BKW-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig. Unter %(threshold)s steht ein Warndreieck."
+msgid "Value from the %(operator)s LEG portal. At least %(minimum)s are required by law. Below %(threshold)s a warning triangle is shown."
+msgstr "Wert aus dem %(operator)s-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig. Unter %(threshold)s steht ein Warndreieck."
 
 msgid "Ratio of consumers to producers."
 msgstr "Verhältnis von Konsumenten zu Produzenten."
@@ -3733,8 +3713,8 @@ msgid "Below %(threshold)s %%"
 msgstr "Unter %(threshold)s %%"
 
 #, python-format
-msgid "The quota comes from the BKW LEG portal. At least %(minimum)s are required by law."
-msgstr "Die Quote kommt aus dem BKW-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig."
+msgid "The quota comes from the %(operator)s LEG portal. At least %(minimum)s are required by law."
+msgstr "Die Quote kommt aus dem %(operator)s-LEG-Portal. Mindestens %(minimum)s sind gesetzlich nötig."
 
 msgid "Master data"
 msgstr "Stammdaten"
@@ -3763,8 +3743,8 @@ msgstr "Basis-Rabatt:"
 msgid "at least one metering point lies in another transformer circuit."
 msgstr "mindestens ein Messpunkt liegt in einem anderen Trafokreis."
 
-msgid "The BKW determines the actual discount."
-msgstr "Die BKW bestimmt den tatsächlichen Rabatt."
+msgid "The %(operator)s determines the actual discount."
+msgstr "Die %(operator)s bestimmt den tatsächlichen Rabatt."
 
 msgid "Metering points of this LEG"
 msgstr "Messpunkte dieser LEG"
@@ -3817,8 +3797,8 @@ msgstr "Eine LEG ist ein virtueller Netzzusammenschluss. Messpunkte ordnen Sie d
 msgid "Edit production quota"
 msgstr "Produktionsquote bearbeiten"
 
-msgid "The quota is in the BKW LEG portal. Enter the value and the date on which you checked it there."
-msgstr "Die Quote steht im BKW-LEG-Portal. Geben Sie den Wert und das Datum ein, an dem Sie ihn dort geprüft haben."
+msgid "The quota is in the %(operator)s LEG portal. Enter the value and the date on which you checked it there."
+msgstr "Die Quote steht im %(operator)s-LEG-Portal. Geben Sie den Wert und das Datum ein, an dem Sie ihn dort geprüft haben."
 
 msgid "Edit master data"
 msgstr "Stammdaten bearbeiten"
@@ -3877,8 +3857,8 @@ msgstr "Die sechsstellige Nummer, unter der die Person im Portal geführt wird."
 msgid "Street and house number of the billing address."
 msgstr "Strasse und Hausnummer der Rechnungsadresse."
 
-msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the BKW. Recording, if at least one is still being recorded."
-msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei der BKW angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
+msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the %(operator)s. Recording, if at least one is still being recorded."
+msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei der %(operator)s angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
 
 msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive."
 msgstr "Ob sich die Person im Portal anmelden kann. Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen. Inaktiv: Das Konto ist deaktiviert und steht im Archiv."
@@ -3930,8 +3910,21 @@ msgstr "Genossenschaft"
 msgid "Shares"
 msgstr "Anteile"
 
-msgid "Period"
-msgstr "Zeitraum"
+#, python-format
+msgid "Termination on %(date)s"
+msgstr "Kündigung zum %(date)s"
+
+msgid "Grid operator"
+msgstr "Netzbetreiber"
+
+msgid "Add change"
+msgstr "Änderung hinzufügen"
+
+msgid "%(operator)s number"
+msgstr "%(operator)s-Nummer"
+
+msgid "%(operator)s customer number"
+msgstr "%(operator)s-Kundennummer"
 
 msgid "No shares recorded."
 msgstr "Keine Anteile erfasst."
@@ -3951,14 +3944,14 @@ msgstr "Keine Messpunkte zugeordnet."
 msgid "The location is the address where the metering point is installed. A metering point belongs to its location for good."
 msgstr "Der Standort ist die Adresse, an der der Messpunkt liegt. Ein Messpunkt gehört fest zu seinem Standort."
 
-msgid "Number of the smart meter at the BKW. If it is missing, the metering point is recorded but not yet known at the BKW."
-msgstr "Nummer des Smart Meters bei der BKW. Fehlt sie, ist der Messpunkt angelegt, aber bei der BKW noch nicht bekannt."
+msgid "Number of the smart meter at the %(operator)s. If it is missing, the metering point is recorded but not yet known at the %(operator)s."
+msgstr "Nummer des Smart Meters bei der %(operator)s. Fehlt sie, ist der Messpunkt angelegt, aber bei der %(operator)s noch nicht bekannt."
 
 msgid "The billing group the metering point belongs to."
 msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört."
 
-msgid "BKW registration"
-msgstr "BKW-Anmeldung"
+msgid "Registration at the %(operator)s"
+msgstr "%(operator)s-Anmeldung"
 
 msgid "Consumption:"
 msgstr "Bezug:"
@@ -3990,20 +3983,20 @@ msgstr "Die Zuordnung endet an diesem Datum."
 msgid "registered:"
 msgstr "registriert:"
 
-msgid "The metering point is recorded, the notification to the BKW is not yet submitted."
-msgstr "Der Messpunkt ist angelegt, die Anmeldung bei der BKW ist noch nicht eingereicht."
+msgid "The metering point is recorded, the notification to the %(operator)s is not yet submitted."
+msgstr "Der Messpunkt ist angelegt, die Anmeldung bei der %(operator)s ist noch nicht eingereicht."
 
 msgid "notified on …:"
 msgstr "angemeldet am …:"
 
-msgid "The notification is submitted to the BKW."
-msgstr "Die Anmeldung ist bei der BKW eingereicht."
+msgid "The notification is submitted to the %(operator)s."
+msgstr "Die Anmeldung ist bei der %(operator)s eingereicht."
 
 msgid "confirmed on …:"
 msgstr "bestätigt am …:"
 
-msgid "The person has confirmed the notification at the BKW. The date is the day on which the LEG recorded the confirmation."
-msgstr "Die Person hat die Anmeldung bei der BKW bestätigt. Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat."
+msgid "The person has confirmed the notification at the %(operator)s. The date is the day on which the LEG recorded the confirmation."
+msgstr "Die Person hat die Anmeldung bei der %(operator)s bestätigt. Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat."
 
 #, python-format
 msgid "notified on %(date)s"
@@ -4013,27 +4006,14 @@ msgstr "angemeldet am %(date)s"
 msgid "confirmed on %(date)s"
 msgstr "bestätigt am %(date)s"
 
-#, python-format
-msgid "from %(from)s to %(to)s"
-msgstr "ab %(from)s bis %(to)s"
-
 msgid "Edit note"
 msgstr "Notiz bearbeiten"
 
-msgid "Edit BKW customer number"
-msgstr "BKW-Kundennummer bearbeiten"
-
-msgid "Edit shares"
-msgstr "Anteile bearbeiten"
+msgid "Edit %(operator)s customer number"
+msgstr "%(operator)s-Kundennummer bearbeiten"
 
 msgid "Number of shares"
 msgstr "Anzahl Anteile"
-
-msgid "Without a number of shares the shares are removed."
-msgstr "Ohne Anzahl werden die Anteile entfernt."
-
-msgid "The end must not be before the start."
-msgstr "Das Ende darf nicht vor dem Beginn liegen."
 
 msgid "This value is not valid."
 msgstr "Dieser Wert ist ungültig."
@@ -4044,8 +4024,8 @@ msgstr "Die Anteile konnten nicht gespeichert werden."
 msgid "Note changed"
 msgstr "Notiz geändert"
 
-msgid "BKW customer number changed"
-msgstr "BKW-Kundennummer geändert"
+msgid "Customer number at the %(operator)s changed"
+msgstr "%(operator)s-Kundennummer geändert"
 
 msgid "Shares changed"
 msgstr "Anteile geändert"
@@ -4140,8 +4120,8 @@ msgstr "Nur Probleme"
 msgid "Quick filter"
 msgstr "Schnellfilter"
 
-msgid "Notify the BKW"
-msgstr "Bei der BKW anmelden"
+msgid "Notify the %(operator)s"
+msgstr "Bei der %(operator)s anmelden"
 
 msgid "Confirmation pending"
 msgstr "Bestätigung ausstehend"

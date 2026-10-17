@@ -3,7 +3,7 @@
 The figures of a LEG (members, ratio, tier, problems) come from ``community.legs`` in one query for all
 LEGs of a page, so the list works on the rows ``(leg, summary)`` and sorts them in Python: a community has
 a few dozen LEGs, and the derived columns are not columns of the database. Search and display filter are
-queries. The search finds what the list and the detail page show: the name and the BKW numbers of the
+queries. The search finds what the list and the detail page show: the name and the grid numbers of the
 transformer circuits of the metering points; never the remark (``LISTEN-STANDARD.md``, section 4).
 
 The detail page lists the members of the LEG with the state of the last column: the metering point is
@@ -50,14 +50,14 @@ def base_queryset(display=DISPLAY_ALL):
 
 
 def apply_search(queryset, text, today=None):
-    """Every word must match the name of the LEG or the BKW number of a transformer circuit of its
+    """Every word must match the name of the LEG or the grid number of a transformer circuit of its
     members (letters without regard to case or accents; the numbers are compared in capitals)."""
     today = today or timezone.localdate()
     for word in (text or "").split():
         in_circuit = Exists(
             LegAssignment.objects.in_force(today).filter(
                 leg=OuterRef("pk"), metering_point__is_archived=False,
-                metering_point__location__transformer_circuit__bkw_number__contains=word.upper(),
+                metering_point__location__transformer_circuit__grid_number__contains=word.upper(),
             )
         )
         queryset = queryset.filter(Q(name__icontains=word) | in_circuit)
@@ -175,7 +175,7 @@ def members(leg, summary, threshold_percent=None, today=None):
         circuit = point.location.transformer_circuit if point.location_id else None
         rows.append(
             Member(
-                point=point, status=point.status(today), circuit=circuit.bkw_number if circuit else "",
+                point=point, status=point.status(today), circuit=circuit.grid_number if circuit else "",
             )
         )
     if summary.tier == legs.DiscountTier.OPTIMISED:
@@ -192,19 +192,16 @@ def members(leg, summary, threshold_percent=None, today=None):
     return rows
 
 
-def occupants(points, today=None, *, see_persons=False):
+def occupants(points, today=None):
     """``{metering point id: name}`` for the metering points that have a person: the one valid now, else
-    the next one. The name is given only with ``see_persons`` (else ""): the id is there, so
-    that "no person" can be told from a person that the account may not see. One query."""
+    the next one. One query."""
     today = today or timezone.localdate()
     found = {}
-    queryset = PersonAssignment.objects.not_ended(today).filter(metering_point__in=[p.pk for p in points])
-    if see_persons:
-        queryset = queryset.select_related("person")
+    queryset = PersonAssignment.objects.not_ended(today).filter(
+        metering_point__in=[p.pk for p in points]
+    ).select_related("person")
     for assignment in queryset.order_by("valid_from"):
-        found.setdefault(
-            assignment.metering_point_id, person_name(assignment.person) if see_persons else ""
-        )
+        found.setdefault(assignment.metering_point_id, person_name(assignment.person))
     return found
 
 
@@ -220,7 +217,7 @@ def _house_key(house_number):
 def sort_members(rows, key, descending=False, occupants=None):
     """Sort the rows of the table "Metering points of this LEG" by a column; the number breaks ties and
     a row without a value comes last. ``occupants`` maps the id of a metering point to the name of
-    its person (the page gives only what the account may see)."""
+    its person."""
     occupants = occupants or {}
     ordered = sorted(rows, key=lambda row: row.point.pk)
     if key == "address":

@@ -1,14 +1,16 @@
-"""Access to the management area (D-077): every URL denies the anonymous visitor, a person without
-staff status, a staff user without the permission and a session without the second factor; the
-menu offers only what the account may use. The URL configuration is walked, not a hand-picked list,
+"""Access to the management area (D-077, D-086): every URL denies the anonymous visitor, a person without
+staff status, a blocked account and a session without the second factor; every other staff account may use
+every page (there is no permission of the area). The URL configuration is walked, not a hand-picked list,
 so that a later route without the access check is noticed (the equivalent of the walk of the
 administration URLs, ``accounts/tests/test_admin_exposure.py``)."""
 
 import re
 from pathlib import Path
+
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, Permission
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import URLResolver, get_resolver, resolve, reverse
@@ -19,6 +21,7 @@ from leg_platform.community.tests.helpers import staff_user
 from leg_platform.management import access, navigation
 from leg_platform.management.templatetags import management_ui
 
+User = get_user_model()
 CONVERTER = re.compile(r"<(?:\w+:)?\w+>")
 LOGIN = reverse("accounts:login")
 
@@ -47,6 +50,20 @@ ROUTES = management_routes()
 PATHS = [path for path, _callback in ROUTES]
 
 
+class FakeUser:
+    """An account as the access check and the menu see it (no database)."""
+
+    def __init__(self, staff=True, active=True, authenticated=True, verified=True, perms=()):
+        self.is_staff, self.is_active, self.is_authenticated = staff, active, authenticated
+        self.verified, self.perms = verified, set(perms)
+
+    def is_verified(self):
+        return self.verified
+
+    def has_perm(self, name):
+        return name in self.perms
+
+
 class RouteWalkTests(SimpleTestCase):
     def test_the_walk_finds_the_routes_of_the_area(self):
         self.assertIn("/management/", PATHS)
@@ -63,7 +80,7 @@ class RouteWalkTests(SimpleTestCase):
     def test_a_view_without_the_check_is_recognised(self):
         self.assertFalse(access.is_protected(lambda request: HttpResponse("open")))
 
-        @access.management_view("community.view_leg")
+        @access.management_view
         def protected(request):
             return HttpResponse("ok")
 
@@ -80,39 +97,36 @@ class CheckAccessTests(SimpleTestCase):
         request.user = user
         return request
 
-    def test_a_view_without_permissions_fails_closed(self):
-        with self.assertRaises(ImproperlyConfigured):
-            access.check_access(self.request(AnonymousUser()))
-
-        class Open(access.ManagementAccessMixin):
-            pass
-
-        with self.assertRaises(ImproperlyConfigured):
-            access.check_access(self.request(AnonymousUser()), Open().get_required_permissions(), Open().get_any_permissions())
-
     def test_the_anonymous_visitor_goes_to_the_login_with_the_way_back_only_for_a_page(self):
-        get = access.check_access(self.request(AnonymousUser()), ("community.view_leg",))
+        get = access.check_access(self.request(AnonymousUser()))
         self.assertEqual(get.status_code, 302)
         self.assertEqual(get["Location"], f"{LOGIN}?next=/management/x/")
-        post = access.check_access(self.request(AnonymousUser(), "post"), ("community.view_leg",))
+        post = access.check_access(self.request(AnonymousUser(), "post"))
         self.assertEqual(post["Location"], LOGIN)
+
+    def test_an_account_that_is_not_an_active_staff_account_gets_a_404(self):
+        for user in (FakeUser(staff=False), FakeUser(active=False)):
+            with self.assertRaises(Http404):
+                access.check_access(self.request(user))
+
+    def test_a_missing_second_factor_is_refused_and_every_other_staff_account_passes(self):
+        with self.assertRaises(PermissionDenied):
+            access.check_access(self.request(FakeUser(verified=False)))
+        # No permission is held or asked for: a staff account with the second factor passes.
+        self.assertIsNone(access.check_access(self.request(FakeUser())))
+        self.assertIsNone(access.check_access(self.request(FakeUser(), "post")))
 
 
 @tag("mariadb")
 class AccessTests(TestCase):
     # The page of a person asks the address directory for the correction of the address (D-081); the walk
-    # opens it with the rights of the correction.
+    # opens it as the accounts would.
     databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):
         cls.plain = create_active_user("plain.person@example.org")
-        cls.staff_none = staff_user("staff.none@example.org")
-        cls.staff_view = staff_user("staff.view@example.org", "view_managementsettings")
-        cls.staff_change = staff_user("staff.change@example.org", "change_managementsettings")
-        cls.staff_location = staff_user("staff.location@example.org", "view_location")
-        cls.staff_all = staff_user("staff.all@example.org")
-        cls.staff_all.user_permissions.set(Permission.objects.filter(content_type__app_label="community"))
+        cls.staff = staff_user("staff.person@example.org")  # no group, no permission
         cls.administrator = staff_user("administrator.person@example.org", superuser=True)
 
     def login(self, user, **kwargs):
@@ -139,25 +153,33 @@ class AccessTests(TestCase):
                     self.assertEqual(response.status_code, 404)
                     self.assertNotContains(response, "Einstellungen", status_code=404)
 
-    def test_a_staff_account_without_the_permission_gets_the_page_without_access_on_every_route(self):
-        client = self.login(self.staff_none)
-        for path in PATHS:
-            for method in ("get", "post"):
-                with self.subTest(path=path, method=method):
-                    response = getattr(client, method)(path)
-                    self.assertContains(response, "Hier haben Sie keinen Zugriff.", status_code=403)
-
     def test_a_staff_account_without_a_completed_second_factor_can_only_set_it_up(self):
         client = Client()
-        client.force_login(self.staff_all)
+        client.force_login(self.staff)
         for path in PATHS:
             for method in ("get", "post"):
                 with self.subTest(path=path, method=method):
                     response = getattr(client, method)(path)
                     self.assertRedirects(response, reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
 
-    def test_an_account_with_all_rights_and_the_administrator_are_not_refused_on_any_route(self):
-        for user in (self.staff_all, self.administrator):
+    def test_a_staff_account_that_was_blocked_after_the_login_is_refused_on_every_route(self):
+        user = staff_user("late.blocked@example.org")
+        client = self.login(user)
+        self.assertEqual(client.get(reverse("management:overview")).status_code, 200)
+        user.set_status(User.Status.BLOCKED)
+        for path in PATHS:
+            for method in ("get", "post"):
+                with self.subTest(path=path, method=method):
+                    response = getattr(client, method)(path)
+                    # The session no longer yields the account (a visitor: the login) or the access check
+                    # answers 404; never a page.
+                    self.assertIn(response.status_code, (302, 404))
+                    if response.status_code == 302:
+                        self.assertTrue(response["Location"].startswith(LOGIN), response["Location"])
+
+    def test_every_staff_account_is_not_refused_on_any_route(self):
+        # One staff account without a group and without a permission, and the administrator: the same.
+        for user in (self.staff, self.administrator):
             client = self.login(user)
             for path in PATHS:
                 with self.subTest(user=user.email, path=path):
@@ -168,114 +190,89 @@ class AccessTests(TestCase):
                     if response.status_code == 302:
                         self.assertFalse(response["Location"].startswith(LOGIN))
 
-    def test_the_right_to_view_opens_a_page_and_the_right_to_change_saves_it(self):
-        settings_url = reverse("management:settings")
-        viewer = self.login(self.staff_view)
-        self.assertEqual(viewer.get(settings_url).status_code, 200)
-        self.assertEqual(viewer.post(settings_url, {}).status_code, 403)
-
-        changer = self.login(self.staff_change)
-        # Changing without viewing: the page is not shown, saving is allowed (the form is
-        # checked, so a wrong post is an error page, not a refusal).
-        self.assertEqual(changer.get(settings_url).status_code, 403)
-        self.assertNotEqual(changer.post(settings_url, {}).status_code, 403)
-
-    def test_the_overview_needs_one_right_of_an_area(self):
-        overview = reverse("management:overview")
-        self.assertEqual(self.login(self.staff_location).get(overview).status_code, 200)
-        self.assertEqual(self.login(self.staff_change).get(overview).status_code, 403)
-        self.assertEqual(self.login(self.staff_none).get(overview).status_code, 403)
+    def test_the_overview_and_the_settings_open_for_a_staff_account_and_a_post_needs_the_token(self):
+        client = self.login(self.staff)
+        self.assertEqual(client.get(reverse("management:overview")).status_code, 200)
+        self.assertEqual(client.get(reverse("management:settings")).status_code, 200)
+        # No token: the CSRF refusal (the only 403 a staff account meets on the settings page).
+        csrf_client = self.login(self.staff, enforce_csrf_checks=True)
+        self.assertEqual(csrf_client.post(reverse("management:settings"), {}).status_code, 403)
 
     def test_a_response_of_the_area_is_not_cached(self):
-        response = self.login(self.staff_all).get(reverse("management:overview"))
+        response = self.login(self.staff).get(reverse("management:overview"))
         self.assertIn("no-store", response["Cache-Control"])
 
     def test_the_refusals_and_redirects_of_the_area_are_not_cached_either(self):
-        # L-3: the 403 and 404 pages, the redirect to the login and the CSRF refusal.
+        # L-3: the 404 page, the redirect to the login and the CSRF refusal.
         overview = reverse("management:overview")
-        csrf_client = self.login(self.staff_all, enforce_csrf_checks=True)
+        csrf_client = self.login(self.staff, enforce_csrf_checks=True)
         responses = {
             "login redirect": Client().get(overview),
             "404 for a non-staff account": self.login(self.plain).get(overview),
-            "403 without the permission": self.login(self.staff_none).get(overview),
-            "404 of an unknown page": self.login(self.staff_all).get("/management/does-not-exist/"),
+            "404 of an unknown page": self.login(self.staff).get("/management/does-not-exist/"),
             "CSRF refusal": csrf_client.post(reverse("management:settings"), {}),
         }
         for name, response in responses.items():
             with self.subTest(name):
                 self.assertIn("no-store", response["Cache-Control"])
         self.assertEqual(responses["CSRF refusal"].status_code, 403)
-        self.assertEqual(responses["403 without the permission"].status_code, 403)
 
-    def test_the_menu_offers_only_what_the_account_may_use(self):
-        home = reverse("home")
-        expectations = (
-            (self.plain, (), ("/management/", "/management/settings/", "/management/locations/")),
-            (self.staff_none, (), ("/management/", "/management/settings/", "/management/locations/")),
-            (self.staff_view, ("/management/", "/management/settings/"), ("/management/locations/",)),
-            (self.staff_location, ("/management/", "/management/locations/"), ("/management/settings/",)),
-            (self.administrator, ("/management/", "/management/settings/", "/management/locations/"), ()),
-        )
-        for user, present, absent in expectations:
-            with self.subTest(user=user.email):
-                html = self.login(user).get(home).content.decode()
-                menu = html[html.index('<nav class="frame-menu'): html.index("</nav>", html.index('<nav class="frame-menu'))]
-                drawer = html[html.index('class="frame-drawer-nav"'):]
-                for part in (menu, drawer[: drawer.index("</nav>")]):
-                    for link in present:
+    def menu_parts(self, user):
+        """The menu of the frame and the drawer on the home page for the account."""
+        html = self.login(user).get(reverse("home")).content.decode()
+        menu = html[html.index('<nav class="frame-menu'): html.index("</nav>", html.index('<nav class="frame-menu'))]
+        drawer = html[html.index('class="frame-drawer-nav"'):]
+        return menu, drawer[: drawer.index("</nav>")]
+
+    def test_the_menu_of_a_staff_account_has_every_entry_and_a_plain_account_has_none(self):
+        links = [reverse(entry.url_name) for entry in navigation.MENU]
+        self.assertEqual(len(links), 6)  # overview, persons, locations, LEGs, metering points, settings
+        for user in (self.staff, self.administrator):
+            for part in self.menu_parts(user):
+                with self.subTest(user=user.email):
+                    for link in links:
                         self.assertIn(f'href="{link}"', part)
-                    for link in absent:
-                        self.assertNotIn(f'href="{link}"', part)
-                    if present:
-                        self.assertIn('<p class="frame-group">Verwaltung</p>', part)
-                    else:
-                        self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
+                    self.assertIn('<p class="frame-group">Verwaltung</p>', part)
+        for part in self.menu_parts(self.plain):
+            for link in links:
+                self.assertNotIn(f'href="{link}"', part)
+            self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
 
     def test_the_active_entry_is_marked_in_the_menu(self):
-        html = self.login(self.staff_all).get(reverse("management:settings")).content.decode()
+        html = self.login(self.staff).get(reverse("management:settings")).content.decode()
         menu = html[html.index('<nav class="frame-menu'):]
         menu = menu[: menu.index("</nav>")]
         self.assertRegex(menu, r'<a class="frame-item is-active" href="/management/settings/" aria-current="page">')
         self.assertRegex(menu, r'<a class="frame-item" href="/management/">')
         # The other pages of the frame do not mark it.
-        home = self.login(self.staff_all).get(reverse("home")).content.decode()
+        home = self.login(self.staff).get(reverse("home")).content.decode()
         self.assertNotIn('href="/management/settings/" aria-current', home)
 
     def test_the_system_administration_link_has_its_own_name(self):
-        html = self.login(self.staff_none).get(reverse("home")).content.decode()
+        html = self.login(self.staff).get(reverse("home")).content.decode()
         self.assertIn("Systemverwaltung", html)
 
 
 class MenuRuleTests(SimpleTestCase):
-    class User:
-        def __init__(self, perms=(), staff=True, active=True, authenticated=True):
-            self.perms, self.is_staff, self.is_active, self.is_authenticated = set(perms), staff, active, authenticated
-
-        def has_perm(self, name):
-            return name in self.perms
-
-        def has_perms(self, names):
-            return all(self.has_perm(n) for n in names)
-
     def keys(self, user, view_name=""):
         return [entry["key"] for entry in navigation.menu_entries(user, view_name)]
 
-    def test_entries_follow_the_permissions_of_their_pages(self):
-        self.assertEqual(self.keys(self.User()), [])
-        self.assertEqual(self.keys(self.User(["community.view_managementsettings"])), ["overview", "settings"])
-        self.assertEqual(self.keys(self.User(["community.view_leg"])), ["overview", "legs"])
-        self.assertEqual(self.keys(self.User(["community.change_managementsettings"])), [])
+    def test_an_active_staff_account_sees_every_entry_in_the_order_of_the_menu(self):
+        self.assertEqual(
+            self.keys(FakeUser()), ["overview", "persons", "locations", "legs", "metering_points", "settings"]
+        )
+        self.assertEqual(self.keys(FakeUser()), [entry.key for entry in navigation.MENU])
 
     def test_nobody_but_an_active_staff_user_sees_an_entry(self):
-        everything = navigation.AREA_VIEW_PERMISSIONS
-        for user in (
-            self.User(everything, staff=False), self.User(everything, active=False),
-            self.User(everything, authenticated=False),
-        ):
+        for user in (FakeUser(staff=False), FakeUser(active=False), FakeUser(authenticated=False), AnonymousUser()):
             self.assertEqual(self.keys(user), [])
 
+    def test_the_link_to_the_mail_texts_of_the_administration_needs_its_own_right(self):
+        self.assertNotIn("email_texts", self.keys(FakeUser()))
+        self.assertEqual(self.keys(FakeUser(perms=["accounts.view_emailtext"]))[-1], "email_texts")
+
     def test_the_area_of_an_url_name_is_active(self):
-        entry = navigation.MenuEntry("metering_points", "x", "i-x", ("a.b",))
+        entry = navigation.MenuEntry("metering_points", "x", "i-x")
         for name, active in (
             ("management:metering_points", True), ("management:metering_points_detail", True),
             ("management:metering_pointsx", False), ("management:legs", False), ("", False),
@@ -288,85 +285,6 @@ class MenuRuleTests(SimpleTestCase):
         self.assertEqual(management_ui.management_menu({"request": object()}), [])
 
     def test_every_entry_names_a_symbol_of_the_frame(self):
-        from pathlib import Path
-
         sprite = (Path(settings.BASE_DIR) / "leg_platform" / "templates" / "_frame_icons.html").read_text(encoding="utf-8")
         for entry in navigation.MENU:
             self.assertIn(f'id="{entry.icon}"', sprite)
-
-    def test_an_account_that_is_not_staff_gets_a_404(self):
-        request = RequestFactory().get("/management/")
-        request.user = self.User(["a.b"], staff=False)
-        with self.assertRaises(Http404):
-            access.check_access(request, ("a.b",))
-        request.user = self.User(["a.b"], active=False)
-        with self.assertRaises(Http404):
-            access.check_access(request, ("a.b",))
-    def test_a_permission_denied_is_raised_for_a_staff_user_without_the_permission(self):
-        request = RequestFactory().get("/management/")
-        request.user = self.User([], staff=True)
-        request.user.is_verified = lambda: True
-        with self.assertRaises(PermissionDenied):
-            access.check_access(request, ("a.b",))
-        request.user = self.User(["a.b"], staff=True)
-        request.user.is_verified = lambda: True
-        self.assertIsNone(access.check_access(request, ("a.b",)))
-        # No completed second factor: refused even with the permission.
-        request.user.is_verified = lambda: False
-        with self.assertRaises(PermissionDenied):
-            access.check_access(request, ("a.b",))
-
-    def test_a_single_permission_string_is_one_permission_not_its_letters(self):
-        # L-2: tuple("community.view_leg") would be a tuple of characters.
-        class One(access.ManagementAccessMixin):
-            permission_required = "community.view_leg"
-            any_permission_required = "community.view_location"
-
-        self.assertEqual(One().get_required_permissions(), ("community.view_leg",))
-        self.assertEqual(One().get_any_permissions(), ("community.view_location",))
-        request = RequestFactory().get("/management/")
-        request.user = self.User(["community.view_leg"], staff=True)
-        request.user.is_verified = lambda: True
-        self.assertIsNone(access.check_access(request, "community.view_leg"))
-        with self.assertRaises(PermissionDenied):
-            access.check_access(request, "community.view_location")
-
-
-@tag("mariadb")
-class PermissionNamesExistTests(TestCase):
-    """L-2: a permission string that is misspelled would silently deny everyone (or, in a template,
-    nobody could use the page); every one used by the views, the menu and the templates must be a
-    row of the permission table."""
-
-    NAME = re.compile(r"\b(community\.(?:view|add|change|delete|correct)_\w+)")
-    TEMPLATE_NAME = re.compile(r"perms\.(community)\.((?:view|add|change|delete|correct)_\w+)")
-
-    def used_names(self):
-        base = Path(settings.BASE_DIR) / "leg_platform" / "management"
-        names = set()
-        for path in base.rglob("*.py"):
-            if "tests" in path.parts:
-                continue
-            names.update(self.NAME.findall(path.read_text(encoding="utf-8")))
-        for path in base.rglob("*.html"):
-            names.update(f"{app}.{codename}" for app, codename in self.TEMPLATE_NAME.findall(path.read_text(encoding="utf-8")))
-        return names
-
-    def test_every_permission_of_the_views_the_menu_and_the_templates_exists(self):
-        names = self.used_names()
-        self.assertGreater(len(names), 10)  # the scan finds them
-        names.update(navigation.AREA_VIEW_PERMISSIONS)
-        for entry in navigation.MENU:
-            names.update(entry.permissions)
-        for _path, callback in ROUTES:
-            view_class = getattr(callback, "view_class", None)
-            for attribute in ("permission_required", "any_permission_required"):
-                value = getattr(view_class, attribute, ())
-                names.update((value,) if isinstance(value, str) else value)
-        for name in sorted(names):
-            with self.subTest(name):
-                app_label, codename = name.split(".")
-                self.assertTrue(
-                    Permission.objects.filter(content_type__app_label=app_label, codename=codename).exists(),
-                    f"{name} is not a permission",
-                )

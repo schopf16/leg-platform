@@ -1,11 +1,11 @@
-"""Metering points: creating, the steps towards the BKW, archiving and deleting (D-078, D-079).
+"""Metering points: creating, the steps towards the grid operator, archiving and deleting (D-078, D-079).
 
 Creating (``standorte/VORGABEN.md``, ``messpunkte/VORGABEN.md``): the direction is required, the
 number, the location and the LEG are optional, no person and no date. A metering point without a
-number is known here but not yet at the BKW. The LEG is assigned from the day of the entry (the
+number is known here but not yet at the grid operator. The LEG is assigned from the day of the entry (the
 dialog asks for no date).
 
-The steps (``messpunkte/detail/VORGABEN.md``): registered -> "notified" (announced to the BKW) ->
+The steps (``messpunkte/detail/VORGABEN.md``): registered -> "notified" (announced to the grid operator) ->
 confirmation (with or without a start date) -> a start date -> active (automatic, when the date is
 reached; no scheduler) -> termination to a month end. Each step is one transaction that locks the
 metering point, checks the status again on the server (a stale page cannot do a step twice or out of
@@ -86,7 +86,7 @@ class StatusError(Exception):
 
 def next_step(metering_point, has_leg, today=None):
     """The next step of a metering point: ``NOTIFY``, ``CONFIRM``, ``START``, ``LEG_MISSING`` (a
-    metering point needs a LEG before it is announced to the BKW, so there is no step yet) or None.
+    metering point needs a LEG before it is announced to the grid operator, so there is no step yet) or None.
     The list shows it for the quick filters (``messpunkte/VORGABEN.md``)."""
     if metering_point.is_archived:
         return None
@@ -116,27 +116,27 @@ def _not_after_today(day, today):
 
 
 def mark_notified(metering_point, registered_on, actor=None, today=None):
-    """"Als angemeldet setzen": the registration at the BKW has happened on ``registered_on``
+    """"Als angemeldet setzen": the registration at the grid operator has happened on ``registered_on``
     (not in the future)."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.REGISTERED, today)
         _not_after_today(registered_on, today)
-        fresh.registered_with_bkw_on = registered_on
-        fresh.save(update_fields=["registered_with_bkw_on", "updated_at"])
-        history.record(fresh, HistoryEvent.REGISTERED_WITH_BKW, actor, {"registered_on": registered_on.isoformat()})
+        fresh.registered_with_operator_on = registered_on
+        fresh.save(update_fields=["registered_with_operator_on", "updated_at"])
+        history.record(fresh, HistoryEvent.REGISTERED_WITH_OPERATOR, actor, {"registered_on": registered_on.isoformat()})
     return fresh
 
 
 def record_confirmation(metering_point, confirmed_on, start_date=None, actor=None, today=None):
-    """"Bestätigung erfassen": the BKW confirmed on ``confirmed_on`` (not before the registration and
+    """"Bestätigung erfassen": the grid operator confirmed on ``confirmed_on`` (not before the registration and
     not in the future). Without a start date the registration stays on standby; with one the status
     stays "confirmed" until the date is reached."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = _step(metering_point, MeteringPointStatus.NOTIFIED, today)
         _not_after_today(confirmed_on, today)
-        if confirmed_on < fresh.registered_with_bkw_on:
+        if confirmed_on < fresh.registered_with_operator_on:
             raise StatusError("date_before_previous")
         fresh.confirmed_on = confirmed_on
         fresh.start_date = start_date
@@ -166,7 +166,7 @@ def is_month_end(day):
 
 
 def terminate(metering_point, terminated_on, actor=None, today=None):
-    """"Kündigung erfassen": the date that the BKW gives, always the end of a month and not before the
+    """"Kündigung erfassen": the date that the grid operator gives, always the end of a month and not before the
     start. A date in the future keeps the status "active" until it is reached."""
     today = today or timezone.localdate()
     with transaction.atomic():

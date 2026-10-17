@@ -38,6 +38,8 @@ The platform defaults of the colours are the values of the design package of the
 
 **Hint for the administrator of an instance:** the texts of the login and registration pages (title, lead sentence, benefit points, field labels) are not editable in the administration. They can only be changed in the translation files `locale/<language>/LC_MESSAGES/django.po` (compile with `msgfmt`, then deploy). Logo, colours, name and website are maintained in "Portal-Einstellungen" (D-073; the environment values are the fallback). The start page of the administration shows what still has to be set (box "Erste Schritte"); see `docs/OPERATIONS.md`, section 5a.
 
+**Grid operator (D-086):** the management area names the grid operator of the instance in its texts ("Bei der <Name> angemeldet", "<Name>-Anmeldung", the PDF). A system administrator enters the name once in the administration (group "Inhalte", "Netzbetreiber"); until then the texts say "Netzbetreiber". The name is instance data and is never part of the code, a migration or the environment file. The format of the numbers of the transformer circuits (`TRA` and digits) is the one of the operator named in the owner's specification; another operator needs the rule `numbers.TRANSFORMER_CIRCUIT_NUMBER` adapted.
+
 Supported browsers (D-003): Chrome and Edge 123 or newer, Firefox 128 or newer, Safari 17.5
 or newer, and Opera 109 or newer. Devices that cannot update to these versions are not
 supported. Responsive checks do not establish full WCAG 2.2 AA conformity.

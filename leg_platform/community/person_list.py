@@ -14,9 +14,9 @@ accounts (registration not completed) have none and are not persons. The account
 The metering points of a person are the metering points that are not archived and have an assignment of this
 person that is valid now or starts later (``not_ended``: an assignment that ends in the future still counts).
 The word behind the count is "Aufnahme" if at least one of them is still *registered* (no notification to the
-BKW; ``status.MeteringPointStatus.REGISTERED``), else "angemeldet" (every one is at least notified). The
+grid operator; ``status.MeteringPointStatus.REGISTERED``), else "angemeldet" (every one is at least notified). The
 search reads the name, the customer number, the address, the town and the e-mail addresses, never a note, the
-BKW customer number or the IBAN (``LISTEN-STANDARD.md``, section 4; L-6 of the security review of block 1).
+customer number at the grid operator or the IBAN (``LISTEN-STANDARD.md``, section 4; L-6 of the security review of block 1).
 Pure query code, no request: the page passes the values it parsed.
 """
 
@@ -178,7 +178,7 @@ def apply_search(queryset, text):
     """Every word must match something that the list or the detail page shows: a part of the name (also the
     contact person of a company), the customer number, the street, the house number, the postal code, the
     town or an e-mail address. Letters match without regard to case or accents (the collation of the
-    columns). Never a note, the BKW customer number or the IBAN."""
+    columns). Never a note, the customer number at the grid operator or the IBAN."""
     for word in (text or "").split():
         condition = (
             Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(organisation_name__icontains=word)
@@ -212,19 +212,25 @@ def apply_sort(queryset, key, descending=False):
 
 # The metering points of one person ----------------------------------------------------------------
 
-POINT_SORT_KEYS = ("location", "number", "direction", "leg", "assigned", "bkw")
+POINT_SORT_KEYS = ("location", "number", "direction", "leg", "assigned", "registration")
 DEFAULT_POINT_SORT = "number"
 
-BKW_REGISTERED = "registered"
-BKW_NOTIFIED = "notified"
-BKW_CONFIRMED = "confirmed"
-_BKW_RANK = {BKW_REGISTERED: 0, BKW_NOTIFIED: 1, BKW_CONFIRMED: 2}
+# The steps of the registration of a metering point at the grid operator (D-086); a terminated one is last.
+REGISTRATION_REGISTERED = "registered"
+REGISTRATION_NOTIFIED = "notified"
+REGISTRATION_CONFIRMED = "confirmed"
+REGISTRATION_TERMINATED = "terminated"
+_REGISTRATION_RANK = {
+    REGISTRATION_REGISTERED: 0, REGISTRATION_NOTIFIED: 1, REGISTRATION_CONFIRMED: 2, REGISTRATION_TERMINATED: 3,
+}
 
 
 @dataclass
 class PointRow:
-    """One assignment of the person with what the table shows. ``bkw`` is ``registered``, ``notified`` (the
-    date is the day of the notification) or ``confirmed`` (the day on which the confirmation was recorded)."""
+    """One assignment of the person with what the table shows. ``registration`` is ``registered``,
+    ``notified`` (the date is the day of the notification), ``confirmed`` (the day on which the confirmation
+    was recorded) or ``terminated`` (the day on which the termination took effect). ``termination_date`` is a
+    recorded termination that lies in the future (the step stays until then)."""
 
     assignment: object
     point: object
@@ -233,23 +239,27 @@ class PointRow:
     house_number: str
     leg_id: int | None
     leg_name: str
-    bkw: str
-    bkw_date: object
+    registration: str
+    registration_date: object
+    termination_date: object = None
 
     @property
     def address(self):
         return f"{self.street} {self.house_number}".strip()
 
 
-def bkw_state(point):
-    """What the column "BKW-Anmeldung" says: the words of the metering point status ("registriert",
-    "angemeldet am", "bestätigt am"): the confirmation date if there is one, else the date of the
-    notification, else registered. A terminated metering point shows the last step it reached."""
+def registration_state(point, today):
+    """What the column "Registration at the grid operator" says: the words of the metering point status
+    ("registriert", "angemeldet am", "bestätigt am", "gekündigt"): once the termination date is reached
+    "terminated"; else the confirmation date if there is one, else the date of the notification, else
+    registered."""
+    if point.terminated_on is not None and point.terminated_on <= today:
+        return REGISTRATION_TERMINATED, point.terminated_on
     if point.confirmed_on is not None:
-        return BKW_CONFIRMED, point.confirmed_on
-    if point.registered_with_bkw_on is not None:
-        return BKW_NOTIFIED, point.registered_with_bkw_on
-    return BKW_REGISTERED, None
+        return REGISTRATION_CONFIRMED, point.confirmed_on
+    if point.registered_with_operator_on is not None:
+        return REGISTRATION_NOTIFIED, point.registered_with_operator_on
+    return REGISTRATION_REGISTERED, None
 
 
 def point_rows(person, today=None):
@@ -267,13 +277,15 @@ def point_rows(person, today=None):
     for assignment in found:
         point = assignment.metering_point
         location = point.location
-        bkw, bkw_date = bkw_state(point)
+        registration, registration_date = registration_state(point, today)
         rows.append(
             PointRow(
                 assignment=assignment, point=point,
                 location_id=point.location_id,
                 street=location.street if location else "", house_number=location.house_number if location else "",
-                leg_id=assignment.leg_id, leg_name=assignment.leg_name or "", bkw=bkw, bkw_date=bkw_date,
+                leg_id=assignment.leg_id, leg_name=assignment.leg_name or "", registration=registration,
+                registration_date=registration_date,
+                termination_date=point.terminated_on if point.terminated_on and point.terminated_on > today else None,
             )
         )
     return rows
@@ -301,8 +313,8 @@ def _point_key(row, key):
         return row.leg_name.casefold() if row.leg_id else None
     if key == "assigned":
         return row.assignment.valid_from
-    if key == "bkw":
-        return (_BKW_RANK[row.bkw], row.bkw_date or "")
+    if key == "registration":
+        return (_REGISTRATION_RANK[row.registration], row.registration_date or "")
     raise ValueError(f"Unknown column: {key!r}")
 
 

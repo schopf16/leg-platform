@@ -1,6 +1,6 @@
 {% load i18n %}{% comment %}
 The one button at the top right of the detail page of a LEG (D-080): "Delete LEG" (red outline, only without a
-history = no metering point was ever assigned, and with the right to delete), else "Archive LEG" (neutral); an archived
+history = no metering point was ever assigned), else "Archive LEG" (neutral); an archived
 LEG offers "Restore LEG". Context: ``leg``, ``show_delete``, ``show_archive``, ``current_url``.
 {% endcomment %}{% if show_delete %}
   <a class="btn btn-danger-outline" href="{% url 'management:legs_delete' leg.pk %}">{% translate "Delete LEG" %}</a>

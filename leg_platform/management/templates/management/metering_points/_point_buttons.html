@@ -1,6 +1,6 @@
 {% load i18n %}{% comment %}
 The one button at the top right of the detail page (D-079): "Delete metering point" (red outline, only
-without a history, with the right to delete), else "Archive metering point" (neutral); an archived metering
+without a history), else "Archive metering point" (neutral); an archived metering
 point offers "Restore metering point". Context: ``point``, ``show_delete``, ``show_archive``, ``show_restore``.
 {% endcomment %}{% if show_delete %}
   <a class="btn btn-danger-outline" href="{% url 'management:metering_points_delete' point.pk %}">{% translate "Delete metering point" %}</a>

@@ -57,13 +57,13 @@ class Direction(models.TextChoices):
 
 
 class TransformerCircuit(TimestampedModel):
-    """A circuit of the grid, identified by the number that the BKW assigns.
+    """A circuit of the grid, identified by the number that the grid operator assigns.
 
     The number is unique after conversion to capital letters and removal of surrounding white
     space; the name is free and not unique (``standorte/VORGABEN.md``, "Nachtrag: Trafokreis")."""
 
-    bkw_number = models.CharField(
-        _("BKW number"),
+    grid_number = models.CharField(
+        _("grid number"),
         max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
         unique=True,
         db_collation=EXACT_COLLATION,
@@ -72,16 +72,17 @@ class TransformerCircuit(TimestampedModel):
     name = models.CharField(_("name"), max_length=120, blank=True)
 
     class Meta:
-        default_permissions = ("view", "add", "change")
+        # No rights of the Django permission system: every staff account may use the management area (D-086).
+        default_permissions = ()
         verbose_name = _("transformer circuit")
         verbose_name_plural = _("transformer circuits")
-        ordering = ("bkw_number",)
+        ordering = ("grid_number",)
 
     def __str__(self):
-        return self.bkw_number
+        return self.grid_number
 
     def save(self, *args, **kwargs):
-        self.bkw_number = numbers.normalise_transformer_circuit_number(self.bkw_number)
+        self.grid_number = numbers.normalise_transformer_circuit_number(self.grid_number)
         self.name = addressing.collapse(self.name)
         super().save(*args, **kwargs)
 
@@ -179,6 +180,7 @@ class Location(AddressSuggestionMixin, TimestampedModel):
     needs_confirmation = models.BooleanField(_("not yet confirmed"), default=False)
 
     class Meta:
+        default_permissions = ()
         verbose_name = _("location")
         verbose_name_plural = _("locations")
         ordering = ("street", "house_number")
@@ -236,7 +238,7 @@ class MeteringPointQuerySet(models.QuerySet):
 
 
 class MeteringPoint(TimestampedModel):
-    # Empty until the BKW has assigned it ("Fehlt sie, ist der Messpunkt angelegt, aber bei der BKW
+    # Empty until the grid operator has assigned it ("Fehlt sie, ist der Messpunkt angelegt, aber beim Netzbetreiber
     # noch nicht bekannt", personen/detail/VORGABEN.md); several rows may have none.
     number = models.CharField(
         _("metering point number"),
@@ -271,7 +273,7 @@ class MeteringPoint(TimestampedModel):
     remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
     is_archived = models.BooleanField(_("archived"), default=False)
     # The dates that drive the status (``community.status``).
-    registered_with_bkw_on = models.DateField(_("notified to the BKW on"), null=True, blank=True)
+    registered_with_operator_on = models.DateField(_("notified on"), null=True, blank=True)
     confirmed_on = models.DateField(_("confirmed on"), null=True, blank=True)
     start_date = models.DateField(_("start date"), null=True, blank=True)
     terminated_on = models.DateField(_("terminated on"), null=True, blank=True)
@@ -279,6 +281,7 @@ class MeteringPoint(TimestampedModel):
     objects = MeteringPointQuerySet.as_manager()
 
     class Meta:
+        default_permissions = ()
         verbose_name = _("metering point")
         verbose_name_plural = _("metering points")
         ordering = ("number",)
@@ -294,7 +297,7 @@ class MeteringPoint(TimestampedModel):
 
     def status(self, today=None):
         return derive_status(
-            registered_with_bkw_on=self.registered_with_bkw_on,
+            registered_with_operator_on=self.registered_with_operator_on,
             confirmed_on=self.confirmed_on,
             start_date=self.start_date,
             terminated_on=self.terminated_on,
@@ -311,7 +314,7 @@ class MeteringPoint(TimestampedModel):
 class Leg(TimestampedModel):
     """A virtual grid association (a local electricity community in the sense of the law).
 
-    The production quota is read from the BKW portal on ``quota_checked_on``; the date belongs to
+    The production quota is read from the grid operator's LEG portal on ``quota_checked_on``; the date belongs to
     the value and does not change by itself (``legs/VORGABEN.md``, "Geprüft am")."""
 
     name = models.CharField(_("name"), max_length=120, unique=True)
@@ -324,6 +327,7 @@ class Leg(TimestampedModel):
     is_archived = models.BooleanField(_("archived"), default=False)
 
     class Meta:
+        default_permissions = ()
         verbose_name = _("LEG")
         verbose_name_plural = _("LEGs")
         ordering = ("name",)
@@ -386,8 +390,7 @@ class AssignmentBase(TimestampedModel):
 
     class Meta:
         abstract = True
-        # No permissions of its own: every assignment action needs the right to change the
-        # metering point (D-077).
+        # No permissions of its own (D-077, D-086).
         default_permissions = ()
         constraints = [
             models.CheckConstraint(
@@ -499,9 +502,8 @@ class ManagementSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
     class Meta:
-        # View and change are assignable to a role at runtime (D-012); no add, no delete: the
-        # table has the one row.
-        default_permissions = ("view", "change")
+        # The table has the one row. No Django rights: every staff account uses the management area (D-086).
+        default_permissions = ()
         verbose_name = _("management settings")
         verbose_name_plural = _("management settings")
         constraints = [
@@ -525,40 +527,63 @@ class ManagementSettings(models.Model):
         return (self.sender_street, self.sender_house_number, self.sender_postal_code, self.sender_town)
 
 
+class GridOperator(models.Model):
+    """The grid operator of this instance (D-086): the company whose portal the LEG is registered in and whose
+    name the texts of the management area use ("bei der %(operator)s angemeldet").
+
+    The table holds exactly one row (id 1), the current operator of the instance; a system administrator
+    maintains it in the Django administration. Nothing is hard-coded: the name is empty until it is entered, and
+    the texts then say "grid operator" (``leg_platform.community.grid_operator``). Meant to become a catalogue of
+    operators later (the owner's plan); only the name exists now. Read through ``GridOperator.load()``."""
+
+    NAME_MAX_LENGTH = 120
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    class Meta:
+        # Maintained in the Django administration by system administrators only (``community.admin``).
+        default_permissions = ()
+        verbose_name = _("grid operator")
+        verbose_name_plural = _("grid operators")
+        constraints = [
+            models.CheckConstraint(condition=models.Q(id=1), name="community_grid_operator_singleton")
+        ]
+
+    def __str__(self):
+        return self.name or str(self._meta.verbose_name)
+
+    @classmethod
+    def load(cls):
+        row, _created = cls.objects.get_or_create(id=1)
+        return row
+
+    def save(self, *args, **kwargs):
+        self.name = addressing.collapse(self.name)
+        super().save(*args, **kwargs)
+
+
 class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     """What the staff keep about a person (an account) besides the account itself.
 
     The account is the customer's own data and not editable by the staff; this side record holds
-    the staff-only note, the optional BKW customer number, the cooperative shares with their
-    period, the IBAN and the paper invoice wish (read-only for the staff; the customer maintains
-    them later) and the state of the address suggestion. Created when needed."""
+    the staff-only note, the optional customer number at the grid operator, the IBAN and the paper invoice
+    wish (read-only for the staff; the customer maintains them later) and the state of the address
+    suggestion; the shares of the cooperative are the entries of ``ShareChange``. Created when needed."""
 
     person = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="person_record"
     )
     staff_note = models.TextField(_("note"), blank=True, validators=REMARK_VALIDATORS)
-    bkw_customer_number = models.CharField(_("BKW customer number"), max_length=30, blank=True)
-    shares = models.PositiveIntegerField(_("shares"), null=True, blank=True)
-    shares_from = models.DateField(_("shares from"), null=True, blank=True)
-    shares_to = models.DateField(_("shares to"), null=True, blank=True)
+    operator_customer_number = models.CharField(_("customer number at the grid operator"), max_length=30, blank=True)
     iban = models.CharField(_("IBAN"), max_length=34, blank=True)
     paper_invoice = models.BooleanField(_("paper invoice"), default=False)
 
     class Meta:
-        # "view" opens the person pages, "change" edits the side record; the address correction is
-        # its own right (``personen/VORGABEN.md``: an exception to "the customer changes the data").
-        default_permissions = ("view", "change")
-        permissions = [("correct_person_address", "Can correct the address of a person")]
+        default_permissions = ()
         verbose_name = _("person")
         verbose_name_plural = _("persons")
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(shares_to__isnull=True)
-                | models.Q(shares_from__isnull=True)
-                | models.Q(shares_to__gte=models.F("shares_from")),
-                name="community_personrecord_shares_period",
-            )
-        ]
 
     def __str__(self):
         return f"{self.person}"
@@ -569,6 +594,31 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
             person.street, person.house_number,
             str(person.swiss_postal_code or ""), person.town,
         )
+
+
+class ShareChange(models.Model):
+    """One entry in the history of the cooperative shares of a person (D-086): the number of shares that holds
+    from a day on. There is no period: the number in force on a day is the one of the latest entry whose
+    ``valid_from`` is not after that day (``leg_platform.community.persons.current_shares``). The services only add entries (a
+    correction is a new entry); the actor and the time of the entry are kept."""
+
+    record = models.ForeignKey(PersonRecord, on_delete=models.CASCADE, related_name="share_changes")
+    quantity = models.PositiveIntegerField(_("number of shares"))
+    valid_from = models.DateField(_("valid from"))
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(_("time"), default=timezone.now, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        verbose_name = _("share change")
+        verbose_name_plural = _("share changes")
+        ordering = ("-valid_from", "-pk")
+        indexes = [models.Index(fields=["record", "valid_from"], name="community_sharechange_record")]
+
+    def __str__(self):
+        return f"{self.quantity} from {self.valid_from}"
 
 
 class ListPreference(models.Model):

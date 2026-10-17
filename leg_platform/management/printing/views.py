@@ -4,7 +4,7 @@ One view per list, all the same: GET shows the dialog (a normal page that works 
 link back to the list), POST answers with the PDF. The address of the dialog carries the state of the list
 (``q``, the filters, ``sort``, ``dir``, ``problems``); it is parsed again here with the list framework and
 queried with the same function as the page, so the printout is what the page shows, never what a browser says
-it shows. The right is the right to view the list (``management.access``), the same as for the page.
+it shows. Every staff account may print every list (``management.access``, D-086), the same as for the page.
 
 The bounds (``areas.MAX_*``) keep a printout from using up the server: a list with more entries than the bound is
 refused with a message, so are more detail pages than the bound and a printout with too many rows. The PDF is made
@@ -46,11 +46,8 @@ class PrintView(ManagementAccessMixin, View):
     def area(self):
         return areas.AREAS[self.area_key]
 
-    def get_required_permissions(self):
-        return (self.area.permission,)
-
     def get(self, request):
-        prepared = self.area.prepare(request.user, request.GET)
+        prepared = self.area.prepare(request.GET)
         return self.show(request, prepared, selected_ids=set(), scope=SCOPE_LIST)
 
     def post(self, request):
@@ -58,7 +55,7 @@ class PrintView(ManagementAccessMixin, View):
         ids = request.POST.getlist("ids")
         if scope not in SCOPES or len(ids) > MAX_POSTED_IDS:
             raise SuspiciousOperation("Invalid print request.")
-        prepared = self.area.prepare(request.user, request.GET)
+        prepared = self.area.prepare(request.GET)
         selected_ids = {value for value in ids if value.isascii() and value.isdigit() and len(value) < 12}
         error = self.check(prepared, scope)
         if error:
@@ -76,7 +73,7 @@ class PrintView(ManagementAccessMixin, View):
                 return self.show(request, prepared, selected_ids, scope, _("Select at least one entry."))
             if len(chosen) > areas.MAX_DETAIL_PAGES:
                 return self.show(request, prepared, selected_ids, scope, self.too_many_details())
-        document = self.area.document(request.user, prepared, items, chosen, today)
+        document = self.area.document(prepared, items, chosen, today)
         if document.row_count() > areas.MAX_ROWS:
             return self.show(request, prepared, selected_ids, scope, _("The printout is too large. Choose fewer entries."))
         try:

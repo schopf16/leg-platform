@@ -5,7 +5,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.community import numbers, transformer_circuits
+from leg_platform.community import grid_operator, numbers, transformer_circuits
 from leg_platform.community.models import (
     REMARK_MAX_LENGTH,
     Direction,
@@ -136,23 +136,25 @@ class RemarkForm(forms.Form):
 
 
 class CircuitForm(forms.Form):
-    """Create or change a transformer circuit: the BKW number (TRA and digits) and a free name."""
+    """Create or change a transformer circuit: the grid number (TRA and digits) and a free name."""
 
-    bkw_number = forms.CharField(
-        label=_("BKW number"), max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
+    grid_number = forms.CharField(
+        max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
         widget=forms.TextInput(attrs={**CONTROL, "class": "form-control tnum"}),
     )
     name = forms.CharField(label=_("Name"), max_length=120, required=False, widget=forms.TextInput(attrs=CONTROL))
-    layout = [("single", ["bkw_number"]), ("single", ["name"])]
+    layout = [("single", ["grid_number"]), ("single", ["name"])]
     optional = ()
 
     def __init__(self, *args, circuit=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.circuit = circuit
         self.existing = None
+        # The label names the grid operator of the instance (D-086).
+        self.fields["grid_number"].label = grid_operator.text(_("%(operator)s number"))
 
-    def clean_bkw_number(self):
-        value = numbers.normalise_transformer_circuit_number(self.cleaned_data["bkw_number"])
+    def clean_grid_number(self):
+        value = numbers.normalise_transformer_circuit_number(self.cleaned_data["grid_number"])
         numbers.validate_transformer_circuit_number(value)
         found = transformer_circuits.find(value)
         if found is not None and (self.circuit is None or found.pk != self.circuit.pk):
@@ -178,14 +180,11 @@ class MeteringPointForm(forms.Form):
     )
     optional = ("number_digits", "leg")
 
-    def __init__(self, *args, may_choose_leg=False, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.prefix_text = ManagementSettings.load().metering_point_prefix
         self.number = None
-        if may_choose_leg:
-            self.fields["leg"].queryset = Leg.objects.filter(is_archived=False).order_by("name")
-        else:
-            del self.fields["leg"]
+        self.fields["leg"].queryset = Leg.objects.filter(is_archived=False).order_by("name")
 
     def clean_number_digits(self):
         digits = self.cleaned_data["number_digits"].strip()

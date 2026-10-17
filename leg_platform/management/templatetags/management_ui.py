@@ -3,6 +3,7 @@
 from django import template
 from django.urls import NoReverseMatch, reverse
 
+from leg_platform.community import grid_operator
 from leg_platform.community.models import Direction
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import navigation
@@ -13,13 +14,19 @@ register = template.Library()
 
 @register.simple_tag(takes_context=True)
 def management_menu(context):
-    """The entries of the menu group "Management" that the account may use (empty for most
-    accounts); see ``leg_platform.management.navigation``."""
+    """The entries of the menu group "Management" (empty for an account that is no active staff account); see ``leg_platform.management.navigation``."""
     request = context.get("request")
     if request is None or not hasattr(request, "user"):
         return []
     view_name = getattr(getattr(request, "resolver_match", None), "view_name", "") or ""
     return navigation.menu_entries(request.user, view_name)
+
+
+@register.simple_tag
+def operator_name():
+    """The name of the grid operator of the instance, for the texts that name it: ``{% operator_name as operator %}``
+    and then ``{% blocktranslate %}... {{ operator }} ...{% endblocktranslate %}`` (D-086)."""
+    return grid_operator.name()
 
 
 @register.simple_tag

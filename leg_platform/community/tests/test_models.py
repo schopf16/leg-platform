@@ -1,10 +1,10 @@
 """The community models (D-077): constraints, normalisation, status filter, the singleton and the
-permissions. Shared data is created once per class."""
+absence of rights (D-086). Shared data is created once per class."""
 
 from datetime import date
 
+from django.apps import apps
 from django.contrib import admin
-from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase, tag
@@ -16,12 +16,9 @@ from leg_platform.community.models import (
     HistoryEntry,
     Leg,
     LegAssignment,
-    ListPreference,
     Location,
     ManagementSettings,
     MeteringPoint,
-    PersonAssignment,
-    PersonRecord,
     TransformerCircuit,
 )
 from leg_platform.community.status import MeteringPointStatus, derive_status
@@ -81,14 +78,14 @@ class LocationAndCircuitTests(TestCase):
         self.assertEqual(Location.find_by_address("Beta", "1", "3000", "Bern"), location)
 
     def test_the_circuit_number_is_unique_after_capitals_and_trimming(self):
-        circuit = TransformerCircuit.objects.create(bkw_number=" tra99 ", name="  free   name ")
-        self.assertEqual((circuit.bkw_number, circuit.name), ("TRA99", "free name"))
+        circuit = TransformerCircuit.objects.create(grid_number=" tra99 ", name="  free   name ")
+        self.assertEqual((circuit.grid_number, circuit.name), ("TRA99", "free name"))
         with self.assertRaises(IntegrityError), transaction.atomic():
-            TransformerCircuit.objects.create(bkw_number="TRA21359")
+            TransformerCircuit.objects.create(grid_number="TRA21359")
         # The name is not unique.
-        TransformerCircuit.objects.create(bkw_number="TRA100", name="Ittigen Nord")
+        TransformerCircuit.objects.create(grid_number="TRA100", name="Ittigen Nord")
         with self.assertRaises(ValidationError):
-            TransformerCircuit(bkw_number="XYZ1").full_clean()
+            TransformerCircuit(grid_number="XYZ1").full_clean()
 
     def test_the_suggestion_is_remembered_until_the_address_changes(self):
         from leg_platform.community.addressing import AddressSuggestion
@@ -132,13 +129,13 @@ class MeteringPointTests(TestCase):
     def test_the_status_of_the_object_and_the_database_filter_agree(self):
         cases = [
             {},
-            {"registered_with_bkw_on": date(2026, 6, 1)},
-            {"registered_with_bkw_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2)},
-            {"registered_with_bkw_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 16)},
-            {"registered_with_bkw_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": TODAY},
-            {"registered_with_bkw_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 3),
+            {"registered_with_operator_on": date(2026, 6, 1)},
+            {"registered_with_operator_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2)},
+            {"registered_with_operator_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 16)},
+            {"registered_with_operator_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": TODAY},
+            {"registered_with_operator_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 3),
              "terminated_on": TODAY},
-            {"registered_with_bkw_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 3),
+            {"registered_with_operator_on": date(2026, 6, 1), "confirmed_on": date(2026, 6, 2), "start_date": date(2026, 6, 3),
              "terminated_on": date(2026, 6, 30)},
         ]
         created = [
@@ -148,7 +145,7 @@ class MeteringPointTests(TestCase):
             expected = mp.status(TODAY)
             with self.subTest(number=mp.number, status=expected):
                 self.assertEqual(expected, derive_status(
-                    registered_with_bkw_on=mp.registered_with_bkw_on, confirmed_on=mp.confirmed_on,
+                    registered_with_operator_on=mp.registered_with_operator_on, confirmed_on=mp.confirmed_on,
                     start_date=mp.start_date, terminated_on=mp.terminated_on, today=TODAY))
                 for status in MeteringPointStatus:
                     matches = MeteringPoint.objects.with_status(status, TODAY).filter(pk=mp.pk).exists()
@@ -207,7 +204,7 @@ class LegAndAssignmentConstraintTests(TestCase):
 
 
 @tag("mariadb")
-class SingletonHistoryAndPermissionTests(TestCase):
+class SingletonAndHistoryTests(TestCase):
     def test_the_settings_row_exists_once_with_defaults(self):
         row = ManagementSettings.load()
         self.assertEqual(row.pk, 1)
@@ -227,42 +224,26 @@ class SingletonHistoryAndPermissionTests(TestCase):
 
     def test_identifier_columns_use_the_binary_collation(self):
         for model, name in (
-            (MeteringPoint, "number"), (TransformerCircuit, "bkw_number"), (Location, "address_digest"),
+            (MeteringPoint, "number"), (TransformerCircuit, "grid_number"), (Location, "address_digest"),
         ):
             with self.subTest(model=model.__name__):
                 self.assertEqual(model._meta.get_field(name).db_collation, EXACT_COLLATION)
                 self.assertTrue(model._meta.get_field(name).unique)
 
-    def test_the_rights_of_the_models_have_english_codenames(self):
-        def codenames(model):
-            return set(
-                Permission.objects.filter(
-                    content_type__app_label="community", content_type__model=model._meta.model_name
-                ).values_list("codename", flat=True)
-            )
-
-        self.assertEqual(codenames(Location), {"view_location", "add_location", "change_location", "delete_location"})
-        self.assertEqual(
-            codenames(MeteringPoint),
-            {"view_meteringpoint", "add_meteringpoint", "change_meteringpoint", "delete_meteringpoint"},
-        )
-        self.assertEqual(codenames(Leg), {"view_leg", "add_leg", "change_leg", "delete_leg"})
-        self.assertEqual(codenames(TransformerCircuit), {"view_transformercircuit", "add_transformercircuit", "change_transformercircuit"})
-        self.assertEqual(codenames(ManagementSettings), {"view_managementsettings", "change_managementsettings"})
-        self.assertEqual(
-            codenames(PersonRecord), {"view_personrecord", "change_personrecord", "correct_person_address"}
-        )
-        # Assignments, history and preferences have no rights of their own.
-        for model in (PersonAssignment, LegAssignment, HistoryEntry, ListPreference):
-            self.assertEqual(codenames(model), set(), model.__name__)
+    def test_the_community_models_have_no_rights_of_their_own(self):
+        # D-086: every staff account may use the management area; no model creates a permission.
+        for model in apps.get_app_config("community").get_models():
+            with self.subTest(model=model.__name__):
+                self.assertEqual(model._meta.default_permissions, ())
+                self.assertEqual(list(model._meta.permissions), [])
 
     def test_no_group_holds_a_right_of_the_community_after_the_migrations(self):
         from django.contrib.auth.models import Group
 
         self.assertEqual(Group.objects.count(), 0)
 
-    def test_the_community_models_are_not_in_the_django_administration(self):
-        # The pages of the management area are the interface (D-077); the model registry test of
-        # the accounts app (D-047) stays an exact set.
-        registered = {model._meta.app_label for model in admin.site._registry}
-        self.assertNotIn("community", registered)
+    def test_only_the_grid_operator_of_the_community_is_in_the_django_administration(self):
+        # The pages of the management area are the interface (D-077); the grid operator of the instance
+        # is the one model that system administrators maintain in the administration (D-086).
+        registered = {model._meta.label for model in admin.site._registry if model._meta.app_label == "community"}
+        self.assertEqual(registered, {"community.GridOperator"})

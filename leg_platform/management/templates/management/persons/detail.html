@@ -4,7 +4,7 @@ The detail page of a person (LEG-Design-Vorgaben/verwaltung/personen/detail/refe
 -handy; D-081). On a desktop two columns of cards (details, contact, billing address, payment and customer numbers on
 the left; cooperative and note on the right) and the metering points over the full width; on a phone all cards one
 under the other, the metering points after the payment card. The master data of the customer is read only (the
-customer changes it through the own login); the staff edit only the note, the BKW customer number and the shares,
+customer changes it through the own login); the staff edit only the note, the customer number at the grid operator and the shares,
 and accept or do not accept the address suggestion in the banner. No "Edit" on the cards of the customer's data, no
 button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate" (not decided).
 {% endcomment %}
@@ -12,6 +12,7 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
 {% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
 {% block inner_class %}mgmt-page mgmt-wide mgmt-person{% endblock %}
 {% block content %}
+  {% operator_name as operator %}
   {% include "management/_icons.html" %}
   <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to persons" %}</a>
 
@@ -58,36 +59,42 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
       </section>
 
       <section class="mgmt-card" data-order="4">
-        <div class="mgmt-card-head"><h2>{% translate "Payment and customer numbers" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_bkw_number' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <div class="mgmt-card-head"><h2>{% translate "Payment and customer numbers" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_operator_number' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a></div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "IBAN" %}</dt><dd class="tnum">{% if iban %}{{ iban }}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Paper invoice" %}</dt><dd>{% if paper_invoice %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{{ number }}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "BKW customer number" %}</dt><dd>{% if bkw_number %}{{ bkw_number }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% blocktranslate %}{{ operator }} customer number{% endblocktranslate %}</dt><dd>{% if operator_number %}{{ operator_number }}{% else %}–{% endif %}</dd></div>
         </dl>
       </section>
     </div>
 
     <div class="mgmt-col">
       <section class="mgmt-card" data-order="6">
-        <div class="mgmt-card-head"><h2>{% translate "Cooperative" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_shares' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
-        {% if shares %}
+        <div class="mgmt-card-head"><h2>{% translate "Cooperative" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_shares' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Add change" %}</a></div>
+        {% if share_entries %}
           <dl class="mgmt-facts">
-            <div class="mgmt-fact"><dt>{% translate "Shares" %}</dt><dd class="tnum">{{ shares }}</dd></div>
-            <div class="mgmt-fact"><dt>{% translate "Period" %}</dt><dd>{{ shares_period }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Shares" %}</dt><dd class="tnum">{% if shares is not None %}{{ shares }}{% else %}–{% endif %}</dd></div>
           </dl>
+          <table class="mgmt-table mgmt-history">
+            <thead><tr><th>{% translate "Applies from" %}</th><th>{% translate "Number of shares" %}</th></tr></thead>
+            <tbody>
+              {% for entry in share_entries %}
+                <tr><td>{{ entry.date|date:"d.m.Y" }}</td><td class="tnum">{{ entry.quantity }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
         {% else %}
           <p class="mgmt-muted mgmt-person-empty">{% translate "No shares recorded." %}</p>
         {% endif %}
       </section>
 
       <section class="mgmt-card" data-order="7">
-        <div class="mgmt-card-head"><h2>{% translate "Note" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_note' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <div class="mgmt-card-head"><h2>{% translate "Note" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_note' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a></div>
         <div class="mgmt-remark">{% if note %}{{ note|linebreaksbr }}{% else %}–{% endif %}</div>
       </section>
     </div>
 
-    {% if show_points %}
     <section class="mgmt-card mgmt-card-flush mgmt-person-points" data-order="5">
       <div class="mgmt-card-head mgmt-card-pad"><h2><span class="mgmt-desktop-only">{% translate "Metering points and assignments" %}</span><span class="mgmt-phone-only">{% translate "Metering points" %}</span></h2></div>
       <div class="mgmt-table-view">
@@ -111,7 +118,7 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
                 <td>{% include "management/_direction.html" with direction=row.point.direction %}</td>
                 <td>{% if row.leg_name %}{{ row.leg_name }}{% if entry.leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=entry.leg_url label=leg_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
                 <td>{% for line in entry.assigned %}<div>{{ line }}</div>{% endfor %}</td>
-                <td><span class="mgmt-person-bkw is-{{ entry.bkw_tone }}">{{ entry.bkw_text }}</span></td>
+                <td>{% for line in entry.registration_lines %}<div><span class="mgmt-person-registration is-{{ entry.registration_tone }}">{{ line }}</span></div>{% endfor %}</td>
               </tr>
               {% endwith %}
             {% empty %}
@@ -126,7 +133,7 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
           <div class="mgmt-mp">
             <div class="mgmt-mp-nr mgmt-point-nr"><strong>{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</strong>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}</div>
             <div class="mgmt-mp-person">{% if row.address %}{{ row.address }}{% else %}–{% endif %} · {{ row.point.direction|direction_label }}{% if row.leg_name %} · {{ row.leg_name }}{% endif %}</div>
-            <div class="mgmt-mp-person mgmt-person-lines">{{ entry.assigned|join:" · " }} · <span class="mgmt-person-bkw is-{{ entry.bkw_tone }}">{{ entry.bkw_text }}</span></div>
+            <div class="mgmt-mp-person mgmt-person-lines">{{ entry.assigned|join:" · " }} · {% for line in entry.registration_lines %}<span class="mgmt-person-registration is-{{ entry.registration_tone }}">{{ line }}</span>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
           </div>
           {% endwith %}
         {% empty %}
@@ -135,7 +142,6 @@ button "Start registration" (no specified effect; never a dead button), no "bloc
       </div>
       <p class="mgmt-note mgmt-card-pad">{% translate "You change assignments on the page of the metering point." %}</p>
     </section>
-    {% endif %}
 
     {% if history %}
     <section class="mgmt-card mgmt-card-flush mgmt-person-history" data-order="8">

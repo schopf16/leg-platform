@@ -10,7 +10,7 @@ discount tier is a dot and a word. The button "Print" (a desktop only) is in the
 {% block header_actions %}
   {% if problem_count %}<a class="btn btn-warning-outline" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
   {% include "management/_print_button.html" %}
-  {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create LEG" %}</a>{% endif %}
+  <a class="btn btn-primary" href="{{ create_url }}">{% translate "Create LEG" %}</a>
 {% endblock %}
 {% block page_content %}
   {% translate "Name of the LEG or transformer circuit" as search_placeholder %}

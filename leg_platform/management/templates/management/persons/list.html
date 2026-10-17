@@ -18,14 +18,12 @@ are a GET form.
         {% for value, text in status_options %}<option value="{{ value }}"{% if value == list_state.values.status %} selected{% endif %}>{{ text }}</option>{% endfor %}
       </select>
     </label>
-    {% if see_points %}
     <label class="mgmt-filter mgmt-filter-select">
       <span class="mgmt-filter-label">{% translate "Metering points" %}</span>
       <select name="points" class="form-select" data-autosubmit>
         {% for value, text in points_options %}<option value="{{ value }}"{% if value == list_state.values.points %} selected{% endif %}>{{ text }}</option>{% endfor %}
       </select>
     </label>
-    {% endif %}
     <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
   </form>
 
@@ -39,7 +37,7 @@ are a GET form.
               <td><div class="mgmt-cut mgmt-person-name" title="{{ entry.name }}">{{ entry.name }}</div>{% if entry.contact %}<div class="mgmt-cut mgmt-person-contact" title="{{ entry.contact }}">{{ entry.contact }}</div>{% endif %}</td>
               <td class="tnum">{{ entry.number }}</td>
               <td>{% if entry.address %}<div class="mgmt-cut" title="{{ entry.address }}">{{ entry.address }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
-              {% if see_points %}<td>{{ entry.points }}</td>{% endif %}
+              <td>{{ entry.points }}</td>
               <td>{% include "management/_status.html" with tone=entry.account_tone label=entry.account_label %}</td>
               <td class="mgmt-link-col">{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.name %}</td>
             </tr>

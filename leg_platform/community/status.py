@@ -3,11 +3,12 @@
 
 Nothing is set by hand and no scheduler runs: the status follows from four dates and the day.
 
-* registered: created, not yet announced to the BKW (no date of announcement).
-* notified ("angemeldet"): announced to the BKW; the person has to confirm.
-* confirmed: the BKW confirmed; there is no start date yet or it is not reached.
+* registered: created, not yet announced to the grid operator (no date of announcement).
+* notified ("angemeldet"): announced to the grid operator; the person has to confirm.
+* confirmed: the grid operator confirmed; there is no start date yet or it is not reached.
 * active: confirmed and the start date is reached (automatic).
-* terminated: the date of the termination is reached.
+* terminated: the date of the termination is reached. A termination that is recorded but lies in the future
+  does not change the status until that day (D-086: the page says "Kündigung zum DD.MM.YYYY" meanwhile).
 """
 
 from django.db import models
@@ -25,7 +26,7 @@ class MeteringPointStatus(models.TextChoices):
     TERMINATED = "terminated", pgettext_lazy("metering point status", "terminated")
 
 
-def derive_status(*, registered_with_bkw_on, confirmed_on, start_date, terminated_on, today):
+def derive_status(*, registered_with_operator_on, confirmed_on, start_date, terminated_on, today):
     """The status on ``today``. Every date may be None."""
     if terminated_on is not None and terminated_on <= today:
         return MeteringPointStatus.TERMINATED
@@ -33,7 +34,7 @@ def derive_status(*, registered_with_bkw_on, confirmed_on, start_date, terminate
         if start_date is not None and start_date <= today:
             return MeteringPointStatus.ACTIVE
         return MeteringPointStatus.CONFIRMED
-    if registered_with_bkw_on is not None:
+    if registered_with_operator_on is not None:
         return MeteringPointStatus.NOTIFIED
     return MeteringPointStatus.REGISTERED
 
@@ -52,7 +53,7 @@ def status_filter(status, today):
     if status == MeteringPointStatus.CONFIRMED:
         return running & confirmed & ~started
     if status == MeteringPointStatus.NOTIFIED:
-        return running & Q(confirmed_on__isnull=True, registered_with_bkw_on__isnull=False)
+        return running & Q(confirmed_on__isnull=True, registered_with_operator_on__isnull=False)
     if status == MeteringPointStatus.REGISTERED:
-        return running & Q(confirmed_on__isnull=True, registered_with_bkw_on__isnull=True)
+        return running & Q(confirmed_on__isnull=True, registered_with_operator_on__isnull=True)
     raise ValueError(f"Unknown status: {status!r}")

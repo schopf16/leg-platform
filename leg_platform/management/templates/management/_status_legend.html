@@ -1,10 +1,10 @@
-{% load i18n management_ui %}{% comment %}
+{% load i18n management_ui %}{% operator_name as operator %}{% comment %}
 The help of the column "Status" of the metering points (standorte/VORGABEN.md, section 8): one line
 per status with its dot, its word and what it means. It goes into the bubble of the info button.
 {% endcomment %}<b>{% translate "Status of the metering point" %}</b>
 <span class="mgmt-st-list">
-  <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="warn" label="registered"|status_label %}</span><span class="mgmt-st-text">{% translate "Recorded, not yet announced to the BKW." %}</span></span>
-  <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="accent" label="notified"|status_label %}</span><span class="mgmt-st-text">{% translate "Announced to the BKW. The person has to confirm." %}</span></span>
+  <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="warn" label="registered"|status_label %}</span><span class="mgmt-st-text">{% blocktranslate %}Recorded, not yet announced to the {{ operator }}.{% endblocktranslate %}</span></span>
+  <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="accent" label="notified"|status_label %}</span><span class="mgmt-st-text">{% blocktranslate %}Announced to the {{ operator }}. The person has to confirm.{% endblocktranslate %}</span></span>
   <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="ring" label="confirmed"|status_label %}</span><span class="mgmt-st-text">{% translate "The person has confirmed. The start date is not reached yet." %}</span></span>
   <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="ok" label="active"|status_label %}</span><span class="mgmt-st-text">{% translate "Confirmed, the assignment is in effect." %}</span></span>
   <span class="mgmt-st-row"><span class="mgmt-st-word">{% include "management/_status.html" with tone="muted" label="terminated"|status_label %}</span><span class="mgmt-st-text">{% translate "The assignment has ended." %}</span></span>

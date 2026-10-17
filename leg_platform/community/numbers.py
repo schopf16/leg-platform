@@ -1,6 +1,7 @@
 """Numbers and codes of the community domain: metering points, transformer circuits, settings.
 
-Pure functions, no database (D-077). The rules come from the owner's design specification
+Pure functions (D-077); the database is asked in one place only, for the name of the grid operator in an error
+message. The rules come from the owner's design specification
 (``messpunkte/VORGABEN.md``, ``einstellungen/VORGABEN.md``, ``standorte/VORGABEN.md``).
 """
 
@@ -8,6 +9,8 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+
+from leg_platform.community import grid_operator
 
 COUNTRY_LENGTH = 2
 IDENTIFIER_LENGTH = 11
@@ -26,7 +29,9 @@ COUNTRY_MESSAGE = _("Enter two capital letters, for example CH.")
 IDENTIFIER_MESSAGE = _("Enter 11 characters: capital letters and digits.")
 METERING_POINT_MESSAGE = _("Enter a number of 33 characters: capital letters and digits.")
 ENTERED_DIGITS_MESSAGE = _("Enter up to 20 digits.")
-TRANSFORMER_CIRCUIT_MESSAGE = _("Enter the BKW number: TRA followed by digits.")
+# The format "TRA" and digits is the one of the grid operator that the specification names; another operator may
+# number its circuits differently, then this rule is the one place to change (D-086).
+TRANSFORMER_CIRCUIT_MESSAGE = _("Enter the %(operator)s number: TRA followed by digits.")
 
 
 def validate_country(value):
@@ -36,7 +41,7 @@ def validate_country(value):
 
 
 def validate_identifier(value):
-    """The identifier that the BKW assigns: 11 capital letters and digits."""
+    """The identifier that the grid operator assigns: 11 capital letters and digits."""
     if IDENTIFIER.fullmatch(value or "") is None:
         raise ValidationError(IDENTIFIER_MESSAGE, code="invalid_identifier")
 
@@ -96,7 +101,7 @@ def format_metering_point_number(number):
 
 
 def normalise_transformer_circuit_number(value):
-    """The BKW number as it is stored and compared: surrounding white space removed and converted
+    """The grid number as it is stored and compared: surrounding white space removed and converted
     to capital letters before the comparison (``standorte/VORGABEN.md``, "Nachtrag: Trafokreis")."""
     return (value or "").strip().upper()
 
@@ -106,4 +111,8 @@ def validate_transformer_circuit_number(value):
         TRANSFORMER_CIRCUIT_NUMBER.fullmatch(value or "") is None
         or len(value) > TRANSFORMER_CIRCUIT_MAX_LENGTH
     ):
-        raise ValidationError(TRANSFORMER_CIRCUIT_MESSAGE, code="invalid_transformer_circuit")
+        # Only here the database is asked, for the name of the grid operator in the message.
+        raise ValidationError(
+            TRANSFORMER_CIRCUIT_MESSAGE, code="invalid_transformer_circuit",
+            params={"operator": grid_operator.name()},
+        )

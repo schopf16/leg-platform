@@ -1,21 +1,27 @@
-"""The pages of the metering points (D-079): the list with its quick filters, the detail page in each state,
-the dialogs (steps, LEG, person, create, archive, delete) with their rights, the refusals of steps that are out
-of order, the returns to the place a dialog was opened from and the flows without JavaScript. The rules
-themselves are tested at service level (``community/tests/test_metering_point_rules.py``); here only what the
-views add. The negative authorization of every URL for anonymous, non-staff, rights-less and second-factor-less
-accounts is in ``test_access.py`` (the route walk)."""
+"""The pages of the metering points (D-079): the list with its quick filters, the detail page in each state (also
+the display of a termination, D-086), the dialogs (steps, LEG, person, create, archive, delete), the refusals of steps
+that are out of order, the returns to the place a dialog was opened from and the flows without JavaScript. The rules
+themselves are tested at service level (``community/tests/test_metering_point_rules.py``); here only what the views
+add. Every staff account has every action (D-086); the negative authorization of every URL for anonymous, non-staff
+and second-factor-less accounts is in ``test_access.py`` (the route walk)."""
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Permission
 from django.test import TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import assignments, history
+from leg_platform.community import assignments, history, metering_points
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, LegAssignment, ManagementSettings, MeteringPoint, PersonAssignment
+from leg_platform.community.models import (
+    Direction,
+    GridOperator,
+    LegAssignment,
+    ManagementSettings,
+    MeteringPoint,
+    PersonAssignment,
+)
 from leg_platform.community.tests.helpers import (
     assign_leg,
     assign_person,
@@ -34,6 +40,12 @@ def d(offset=0):
     return TODAY + timedelta(days=offset)
 
 
+def month_end_after(days):
+    """The last day of the month that contains the day ``days`` from now."""
+    day = d(days)
+    return (day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+
+
 LIST = reverse("management:metering_points")
 HOSTILE = ("https://evil.example/x", "//evil.example/x", "/\\evil.example", "javascript:alert(1)")
 
@@ -42,23 +54,11 @@ HOSTILE = ("https://evil.example/x", "//evil.example/x", "/\\evil.example", "jav
 class MeteringPointPageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.plain = create_active_user("plain.person@example.org")
-        cls.none = staff_user("staff.none@example.org")
-        cls.viewer = staff_user("staff.view@example.org", "view_meteringpoint")
-        cls.adder = staff_user(
-            "staff.add@example.org", "view_meteringpoint", "add_meteringpoint", "view_location", "view_leg"
-        )
-        cls.adder_bare = staff_user("staff.bare@example.org", "view_meteringpoint", "add_meteringpoint")
-        cls.changer = staff_user(
-            "staff.change@example.org", "view_meteringpoint", "change_meteringpoint", "view_leg",
-            "view_personrecord", "view_location",
-        )
-        cls.no_persons = staff_user("staff.nopersons@example.org", "view_meteringpoint", "change_meteringpoint", "view_leg")
-        cls.no_leg = staff_user("staff.noleg@example.org", "view_meteringpoint", "change_meteringpoint")
-        cls.deleter = staff_user("staff.delete@example.org", "view_meteringpoint", "delete_meteringpoint")
-        cls.full = staff_user("staff.all@example.org")
-        cls.full.user_permissions.set(Permission.objects.filter(content_type__app_label="community"))
+        cls.staff = staff_user("staff.point@example.org")
 
+        operator = GridOperator.load()
+        operator.name = "Netzbetreiber Beispiel"
+        operator.save()
         settings_row = ManagementSettings.load()
         settings_row.country_code, settings_row.identifier = "CH", "1A2B3C4D5E6"
         settings_row.save()
@@ -71,10 +71,10 @@ class MeteringPointPageTests(TestCase):
 
         cls.registered = make_metering_point(1, location=cls.place, remark="hidden note", pv_power_kwp="5.50")
         cls.no_leg_point = make_metering_point(2, location=cls.place)
-        cls.notified = make_metering_point(3, location=cls.place, registered_with_bkw_on=d(-9))
-        cls.standby = make_metering_point(4, location=cls.place, registered_with_bkw_on=d(-9), confirmed_on=d(-8))
+        cls.notified = make_metering_point(3, location=cls.place, registered_with_operator_on=d(-9))
+        cls.standby = make_metering_point(4, location=cls.place, registered_with_operator_on=d(-9), confirmed_on=d(-8))
         cls.active = make_metering_point(
-            5, location=cls.place, registered_with_bkw_on=d(-40), confirmed_on=d(-39), start_date=d(-30)
+            5, location=cls.place, registered_with_operator_on=d(-40), confirmed_on=d(-39), start_date=d(-30)
         )
         cls.loose = make_metering_point(6)
         for point in (cls.registered, cls.notified, cls.standby):
@@ -96,36 +96,38 @@ class MeteringPointPageTests(TestCase):
     # The list -----------------------------------------------------------------------------------
 
     def test_the_list_shows_the_status_and_counts_the_points_in_the_quick_filters(self):
-        page = self.login(self.viewer).get(LIST)
+        page = self.login(self.staff).get(LIST)
         for text in (
-            "Alle (6)", "Bei der BKW anmelden (3)", "Bestätigung ausstehend (1)", "Startdatum ausstehend (1)",
-            "archiviert (0)", number(5), "aktiv", "registriert", "Probleme filtern (5)",
+            "Alle (6)", "Bei der Netzbetreiber Beispiel anmelden (3)", "Bestätigung ausstehend (1)",
+            "Startdatum ausstehend (1)", "archiviert (0)", number(5), "aktiv", "registriert", "Probleme filtern (5)",
+            "Messpunkt anlegen",
         ):
             self.assertContains(page, text)
         # In the view "all" the last column is the status; no button of a step; the button "Print" is in the head.
-        for text in ("Als angemeldet setzen", "Messpunkt anlegen"):
-            self.assertNotContains(page, text)
+        self.assertNotContains(page, "Als angemeldet setzen")
         self.assertContains(page, ">Drucken</a>")
+        # The grid operator is named by its name from the instance, never by a fixed name.
+        self.assertNotContains(page, "BKW")
         # The warning triangle names the problem in text.
         self.assertContains(page, "Dieser Messpunkt ist keiner LEG zugeordnet.")
         # The full number with the direction, never cut; the column widths have their handle.
         self.assertContains(page, f'{number(5)[:13]}<wbr>{number(5)[13:]}')
         self.assertContains(page, 'class="mgmt-grip"')
+        self.assertContains(page, 'name="leg"')  # the filter by LEG
 
     def test_a_quick_filter_with_a_step_shows_the_next_step_instead_of_the_status(self):
-        page = self.login(self.changer).get(LIST, {"step": "notify"})
+        client = self.login(self.staff)
+        page = client.get(LIST, {"step": "notify"})
         self.assertContains(page, f'href="{self.url("notify", self.registered)}?next=')
         self.assertContains(page, "Als angemeldet setzen")
         self.assertContains(page, "LEG fehlt")  # a metering point without a LEG has no button yet
         self.assertNotContains(page, number(3)[13:] + "</span>")  # not in this view (point 3 is notified)
         self.assertNotContains(page, "registriert</span>")  # no status column here
-        self.assertContains(self.login(self.changer).get(LIST, {"step": "confirm"}), "Bestätigung erfassen")
-        self.assertContains(self.login(self.changer).get(LIST, {"step": "start"}), "Startdatum erfassen")
-        # Without the right to change there is no button, only the text.
-        self.assertNotContains(self.login(self.viewer).get(LIST, {"step": "notify"}), "Als angemeldet setzen")
+        self.assertContains(client.get(LIST, {"step": "confirm"}), "Bestätigung erfassen")
+        self.assertContains(client.get(LIST, {"step": "start"}), "Startdatum erfassen")
 
     def test_the_problem_filter_counts_the_current_view_and_shows_only_those_points(self):
-        client = self.login(self.viewer)
+        client = self.login(self.staff)
         self.assertContains(client.get(LIST, {"step": "notify"}), "Probleme filtern (3)")
         self.assertNotContains(client.get(LIST, {"q": "000005"}), "Probleme filtern")  # point 5 has none
         page = client.get(LIST, {"problems": "1"})
@@ -133,23 +135,16 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(page, "Alle (5)")  # the counts follow the view
 
     def test_search_filters_and_sort_come_from_the_address_and_wrong_values_do_no_harm(self):
-        client = self.login(self.viewer)
+        client = self.login(self.staff)
         self.assertNotContains(client.get(LIST, {"q": "hidden note"}), number(1)[13:])  # never the remark
-        # The address is searched only with the right to see locations, a LEG name only with the right to see LEGs
-        # (D-084, M-4): the account that sees metering points only finds them by number.
-        self.assertContains(client.get(LIST, {"q": "musterweg"}), "Alle (0)")
-        self.assertContains(self.login(self.adder).get(LIST, {"q": "musterweg"}), "Alle (5)")
-        self.assertContains(client.get(LIST, {"q": "bahnhof"}), "Alle (0)")
+        # The address, the LEG name and the name of the person are searched (every staff account, D-086).
+        self.assertContains(client.get(LIST, {"q": "musterweg"}), "Alle (5)")
+        self.assertContains(client.get(LIST, {"q": "bahnhof"}), "Alle (3)")
+        self.assertContains(client.get(LIST, {"q": "anna muster"}), "Alle (1)")
         self.assertContains(client.get(LIST, {"q": number(1)[20:]}), "Alle (1)")
-        self.assertContains(self.login(self.full).get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (1)")
-        # Without the right to see LEGs a posted LEG is no filter (and no LEG name is a column, sort key or option).
-        self.assertContains(client.get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (6)")
-        self.assertNotContains(client.get(LIST), 'name="leg"')
-        self.assertNotContains(client.get(LIST, {"sort": "leg"}), "sort=leg")
+        self.assertContains(client.get(LIST, {"leg": str(self.leg_b.pk)}), "Alle (1)")
+        self.assertContains(client.get(LIST, {"sort": "leg"}), "sort=leg")
         self.assertContains(client.get(LIST, {"step": "archived"}), "archiviert (0)")
-        # A name is searched only with the right to see persons.
-        self.assertContains(self.login(self.changer).get(LIST, {"q": "anna muster"}), "Alle (1)")
-        self.assertContains(client.get(LIST, {"q": "anna muster"}), "Alle (0)")
         for params in (
             {"sort": "x; DROP", "dir": "up", "per": "-1", "page": "zz", "step": "?", "leg": "<b>", "q": "%" * 300},
             {"sort": "status", "dir": "desc", "per": "all", "page": "99"},
@@ -157,36 +152,28 @@ class MeteringPointPageTests(TestCase):
         ):
             self.assertEqual(client.get(LIST, params).status_code, 200)
 
-    def test_the_create_button_is_there_only_with_the_right_to_add_and_the_menu_has_the_entry(self):
-        self.assertContains(self.login(self.adder).get(LIST), "Messpunkt anlegen")
-        home = self.login(self.viewer).get(reverse("home")).content.decode()
-        self.assertIn(LIST, home)
-        self.assertNotIn(LIST, self.login(self.none).get(reverse("home")).content.decode())
+    def test_the_menu_has_the_entry(self):
+        self.assertIn(LIST, self.login(self.staff).get(reverse("home")).content.decode())
 
     # The detail page ----------------------------------------------------------------------------
 
-    def test_the_detail_page_of_a_point_without_leg_and_person_has_the_banner_and_the_buttons_by_right(self):
-        page = self.login(self.changer).get(self.detail(self.no_leg_point)).content.decode()
+    def test_the_detail_page_of_a_point_without_leg_and_person_has_the_banner_and_the_buttons(self):
+        page = self.login(self.staff).get(self.detail(self.no_leg_point)).content.decode()
         for text in (
             "Dieser Messpunkt ist keiner LEG zugeordnet.", "Dieser Messpunkt ist keiner Person zugeordnet.",
-            "Als angemeldet setzen", "LEG zuweisen", "Person zuweisen", "Messpunkt archivieren",
-            "Erfasst, noch nicht bei der BKW angemeldet.", "TRA21359", number(2),
+            "Als angemeldet setzen", "LEG zuweisen", "Person zuweisen",
+            "Messpunkt löschen",  # without a history the one button is "delete"
+            "Erfasst, noch nicht bei der Netzbetreiber Beispiel angemeldet.", "TRA21359", number(2),
         ):
             self.assertIn(text, page)
-        self.assertNotIn("Messpunkt löschen", page)  # the right to delete is missing
-        viewer = self.login(self.viewer).get(self.detail(self.no_leg_point)).content.decode()
-        for text in ("Als angemeldet setzen", "LEG zuweisen", "Person zuweisen", "Messpunkt archivieren", "Messpunkt löschen"):
-            self.assertNotIn(text, viewer)
-        self.assertIn("Dieser Messpunkt ist keiner LEG zugeordnet.", viewer)
-        # Without a history the one button is "delete", with the right to delete.
-        self.assertIn("Messpunkt löschen", self.login(self.full).get(self.detail(self.no_leg_point)).content.decode())
-        # The remarks and the figures are shown to those who see the point.
-        shown = self.login(self.viewer).get(self.detail(self.registered)).content.decode()
+        self.assertNotIn("BKW", page)
+        # The remarks and the figures are shown.
+        shown = self.login(self.staff).get(self.detail(self.registered)).content.decode()
         self.assertIn("hidden note", shown)
         self.assertIn("5.50 kWp", shown)
 
     def test_the_states_show_their_step_and_the_start_date(self):
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         notified = client.get(self.detail(self.notified)).content.decode()
         self.assertIn("Bestätigung erfassen", notified)
         standby = client.get(self.detail(self.standby)).content.decode()
@@ -197,15 +184,33 @@ class MeteringPointPageTests(TestCase):
             self.assertIn(text, active)
         self.assertNotIn("Dieser Messpunkt ist keiner", active)  # no problem, no banner
         self.assertNotIn("Anmeldung auf Standby", active)
-        terminated = MeteringPoint.objects.get(pk=self.active.pk)
-        terminated.terminated_on = d(-1)
-        terminated.save()
+
+    def test_the_status_card_shows_a_recorded_termination_as_a_note_until_the_day_is_reached(self):
+        client = self.login(self.staff)
+        # (c) A point without a termination shows neither text.
         page = client.get(self.detail(self.active)).content.decode()
-        self.assertIn("gekündigt", page)
-        self.assertNotIn("Kündigen", page)
+        self.assertIn(">aktiv</span>", page)
+        for text in ("Kündigung zum", "Die Zuordnung ist beendet.", "Gekündigt zum"):
+            self.assertNotIn(text, page)
+        # (a) A termination in the future: the point is still active and the note names the day.
+        end = month_end_after(40)
+        metering_points.terminate(self.active, end, self.staff, today=TODAY)
+        page = client.get(self.detail(self.active)).content.decode()
+        self.assertIn(">aktiv</span>", page)
+        self.assertIn(f"Kündigung zum {end.strftime('%d.%m.%Y')}", page)
+        for text in ("Die Zuordnung ist beendet.", "Gekündigt zum", ">gekündigt</span>"):
+            self.assertNotIn(text, page)
+        # (b) Once the day is reached (the day itself or earlier) the point is terminated and the assignment ended.
+        for day in (d(-1), TODAY):
+            MeteringPoint.objects.filter(pk=self.active.pk).update(terminated_on=day)
+            page = client.get(self.detail(self.active)).content.decode()
+            self.assertIn(">gekündigt</span>", page, day)
+            self.assertIn("Die Zuordnung ist beendet.", page, day)
+            for text in ("Kündigung zum", "Gekündigt zum", ">aktiv</span>", "Kündigen"):
+                self.assertNotIn(text, page, day)
 
     def test_a_flying_change_shows_the_former_and_the_new_person_and_an_ended_assignment_is_gone(self):
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         assignments.assign("person", self.active, self.ruth, d(10))
         page = client.get(self.detail(self.active)).content.decode()
         for text in ("bisher", "neu", "bis ", "ab ", "Ruth Beispiel", "Zuordnung löschen"):
@@ -215,19 +220,12 @@ class MeteringPointPageTests(TestCase):
         page = client.get(self.detail(self.active)).content.decode()
         self.assertIn("keine Person", page)
         self.assertNotIn("Zuordnung beenden", page)
-        # The ended person stays visible in the history (with the right to see persons).
+        # The ended person stays visible in the history.
         self.assertIn("Anna Muster", page)
-
-    def test_the_person_is_shown_and_assigned_only_with_the_right_to_see_persons(self):
-        page = self.login(self.no_persons).get(self.detail(self.active)).content.decode()
-        self.assertNotIn("Anna Muster", page)
-        for text in ("Person wechseln", "Zuordnung beenden", "Person zuweisen"):
-            self.assertNotIn(text, page)
-        self.assertNotIn(reverse("management:metering_points_person", args=[self.active.pk]), page)
 
     def test_an_archived_point_offers_only_to_restore_it(self):
         point = make_metering_point(7, location=self.place)
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         client.post(self.url("archive", point), {"next": self.detail(point)})
         page = client.get(self.detail(point)).content.decode()
         self.assertIn("Messpunkt wiederherstellen", page)
@@ -244,12 +242,13 @@ class MeteringPointPageTests(TestCase):
 
     # The steps ----------------------------------------------------------------------------------
 
-    def test_the_steps_towards_the_bkw_through_their_dialogs(self):
-        client = self.login(self.changer)
+    def test_the_steps_towards_the_grid_operator_through_their_dialogs(self):
+        client = self.login(self.staff)
         point = self.no_leg_point
         notify = self.url("notify", point)
         page = client.get(notify, {"next": LIST})
-        self.assertContains(page, "Als bei der BKW angemeldet setzen")
+        self.assertContains(page, "Als bei der Netzbetreiber Beispiel angemeldet setzen")
+        self.assertNotContains(page, "BKW")
         self.assertContains(page, f'value="{TODAY.isoformat()}"')  # "Angemeldet am" is today
         self.assertContains(page, f'href="{LIST}"')
         self.assertRedirects(
@@ -257,8 +256,8 @@ class MeteringPointPageTests(TestCase):
             self.detail(point), fetch_redirect_response=False,
         )
         point.refresh_from_db()
-        self.assertEqual(point.registered_with_bkw_on, d(-1))
-        self.assertEqual(history.entries_for(point).get().actor, self.changer)
+        self.assertEqual(point.registered_with_operator_on, d(-1))
+        self.assertEqual(history.entries_for(point).get().actor, self.staff)
         # The step cannot be done twice: the page goes back with a message, a forged post shows the refusal.
         self.assertRedirects(client.get(notify), self.detail(point), fetch_redirect_response=False)
         again = client.post(notify, {"registered_on": d(0).isoformat()})
@@ -283,14 +282,14 @@ class MeteringPointPageTests(TestCase):
             self.assertIn(text, history_page)
 
     def test_the_termination_needs_the_end_of_a_month_and_an_active_point(self):
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         url = self.url("terminate", self.active)
         self.assertContains(client.get(url), "Das Datum ist ein Monatsende.")
         wrong = client.post(url, {"terminated_on": d(40).replace(day=15).isoformat()})
         self.assertContains(wrong, "Geben Sie den letzten Tag eines Monats ein.")
         self.active.refresh_from_db()
         self.assertIsNone(self.active.terminated_on)
-        month_end = (d(40).replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        month_end = month_end_after(40)
         client.post(url, {"terminated_on": month_end.isoformat()})
         self.active.refresh_from_db()
         self.assertEqual(self.active.terminated_on, month_end)
@@ -298,30 +297,26 @@ class MeteringPointPageTests(TestCase):
         # A point that is not active has no such dialog.
         self.assertEqual(client.get(self.url("terminate", self.registered)).status_code, 302)
 
-    def test_a_step_needs_the_right_to_change_and_cannot_be_forged_in_the_wrong_state(self):
-        for user in (self.viewer, self.adder, self.deleter):
-            self.assertEqual(self.login(user).post(self.url("notify", self.registered), {"registered_on": d(0).isoformat()}).status_code, 403)
-        self.registered.refresh_from_db()
-        self.assertIsNone(self.registered.registered_with_bkw_on)
-        client = self.login(self.changer)
+    def test_a_step_cannot_be_forged_in_the_wrong_state(self):
+        client = self.login(self.staff)
         # Confirming a point that was never announced, and a date in the future, change nothing.
         client.post(self.url("confirm", self.registered), {"confirmed_on": d(0).isoformat()})
         client.post(self.url("notify", self.registered), {"registered_on": d(3).isoformat()})
         self.registered.refresh_from_db()
-        self.assertEqual((self.registered.registered_with_bkw_on, self.registered.confirmed_on), (None, None))
+        self.assertEqual((self.registered.registered_with_operator_on, self.registered.confirmed_on), (None, None))
         # An archived point is not changed.
         self.registered.is_archived = True
         self.registered.save()
         client.post(self.url("notify", self.registered), {"registered_on": d(0).isoformat()})
         self.registered.refresh_from_db()
-        self.assertIsNone(self.registered.registered_with_bkw_on)
+        self.assertIsNone(self.registered.registered_with_operator_on)
 
     def test_a_post_without_the_csrf_token_is_refused_and_a_hostile_way_back_is_not_followed(self):
-        csrf = self.login(self.changer, enforce_csrf_checks=True)
+        csrf = self.login(self.staff, enforce_csrf_checks=True)
         self.assertEqual(csrf.post(self.url("notify", self.registered), {"registered_on": d(0).isoformat()}).status_code, 403)
         self.registered.refresh_from_db()
-        self.assertIsNone(self.registered.registered_with_bkw_on)
-        client = self.login(self.changer)
+        self.assertIsNone(self.registered.registered_with_operator_on)
+        client = self.login(self.staff)
         for hostile in HOSTILE:
             response = client.post(self.url("archive", self.loose), {"archive": "0", "next": hostile})
             self.assertRedirects(response, self.detail(self.loose), fetch_redirect_response=False)
@@ -332,7 +327,7 @@ class MeteringPointPageTests(TestCase):
     # The person ---------------------------------------------------------------------------------
 
     def test_assigning_changing_ending_and_deleting_a_person(self):
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         url = self.url("person", self.no_leg_point)
         page = client.get(url)
         self.assertContains(page, 'list="person-options"')
@@ -395,15 +390,9 @@ class MeteringPointPageTests(TestCase):
         client.post(delete, {"assignment": anna_id})
         self.assertTrue(PersonAssignment.objects.filter(person=self.anna, metering_point=self.active).exists())
 
-    def test_the_person_dialogs_need_the_right_to_see_persons_and_the_search_is_bounded(self):
-        for name in ("person", "person_end", "person_delete"):
-            for user in (self.no_persons, self.viewer):
-                response = self.login(user).post(self.url(name, self.active), {"person": "anna", "valid_from": d(1).isoformat()})
-                self.assertEqual(response.status_code, 403)
-        self.assertEqual(PersonAssignment.objects.filter(metering_point=self.active).count(), 1)
+    def test_the_person_search_is_bounded(self):
         search = reverse("management:metering_points_person_search")
-        self.assertEqual(self.login(self.no_persons).get(search, {"q": "anna"}).status_code, 403)
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         results = client.get(search, {"q": "muster"}).json()["results"]
         self.assertEqual(sorted(text.split(" · ")[0] for text in results), ["Anna Muster", "Max Muster"])
         self.assertNotIn("@", "".join(results))  # the e-mail address is searched, never shown
@@ -415,7 +404,7 @@ class MeteringPointPageTests(TestCase):
     # The LEG ------------------------------------------------------------------------------------
 
     def test_assigning_a_leg_and_the_switch_with_the_move_mask(self):
-        client = self.login(self.changer)
+        client = self.login(self.staff)
         url = self.url("leg", self.no_leg_point)
         self.assertContains(client.get(url), "LEG zuweisen")
         client.post(url, {"leg": self.leg_a.pk, "valid_from": d(0).isoformat()})
@@ -435,8 +424,6 @@ class MeteringPointPageTests(TestCase):
         self.assertNotContains(page, number(9))  # another location
         self.assertNotContains(page, " checked")  # none is preselected
         self.assertNotContains(page, 'value="%d"' % self.leg_b.pk)  # the LEG it has is not offered
-        # Without the right to see persons the mask names no person.
-        self.assertNotContains(self.login(self.no_persons).get(switch), "Anna Muster")
 
         # A point that does not belong is refused and nothing moves.
         forged = client.post(switch, {"leg": self.leg_a.pk, "valid_from": d(10).isoformat(), "also": [other_place.pk]})
@@ -457,23 +444,16 @@ class MeteringPointPageTests(TestCase):
         self.assertEqual(LegAssignment.objects.get(metering_point=feed_in, leg=self.leg_c).valid_from, d(30))
         self.assertEqual(LegAssignment.objects.filter(metering_point=other_place).count(), 1)
 
-    def test_the_leg_dialog_needs_the_rights_to_change_the_point_and_to_see_the_legs(self):
-        url = self.url("leg", self.no_leg_point)
-        for user in (self.viewer, self.adder, self.no_leg):
-            self.assertEqual(self.login(user).post(url, {"leg": self.leg_a.pk, "valid_from": d(0).isoformat()}).status_code, 403)
-        self.assertFalse(LegAssignment.objects.filter(metering_point=self.no_leg_point).exists())
-        # The button is not offered without the right to see the LEGs.
-        self.assertNotIn(url, self.login(self.no_leg).get(self.detail(self.no_leg_point)).content.decode())
-
     # Create, archive, delete --------------------------------------------------------------------
 
     def test_creating_a_metering_point_from_the_list(self):
-        client = self.login(self.adder)
+        client = self.login(self.staff)
         url = reverse("management:metering_points_new")
         page = client.get(url, {"next": LIST})
         for text in (
             "CH1A2B3C4D5E6", "Messpunkt anlegen", "Nur die letzten Stellen. Land und Identifikator kommen aus den Einstellungen.",
             "Strasse oder Messpunkt-Nummer suchen", "Optional", "Bemerkung", "data-number-check-url",
+            'name="location"', 'name="leg"',
         ):
             self.assertContains(page, text)
         data = {
@@ -503,44 +483,30 @@ class MeteringPointPageTests(TestCase):
             self.assertEqual(response.status_code, 200, bad)
             self.assertEqual(MeteringPoint.objects.count(), before, bad)
 
-    def test_the_location_and_the_leg_are_chosen_only_with_the_rights_to_see_them(self):
-        client = self.login(self.adder_bare)
-        url = reverse("management:metering_points_new")
-        page = client.get(url)
-        self.assertNotContains(page, 'name="location"')
-        self.assertNotContains(page, 'name="leg"')
-        client.post(url, {"number_digits": "10", "direction": "consumption", "location": str(self.place), "leg": self.leg_a.pk})
-        created = MeteringPoint.objects.get(number=number(10))
-        self.assertIsNone(created.location)  # forged fields are ignored
-        self.assertFalse(LegAssignment.objects.filter(metering_point=created).exists())
-        # Neither is the location offered to search for.
+    def test_the_location_search_of_the_create_dialog_finds_a_location(self):
         search = reverse("management:metering_points_location_search")
-        self.assertEqual(client.get(search, {"q": "muster"}).status_code, 403)
-        self.assertEqual(self.login(self.adder).get(search, {"q": "muster"}).json()["results"], [str(self.place)])
+        self.assertEqual(self.login(self.staff).get(search, {"q": "muster"}).json()["results"], [str(self.place)])
 
     def test_the_number_is_checked_on_leaving_the_field(self):
         check = reverse("management:metering_points_check_number")
-        client = self.login(self.adder)
+        client = self.login(self.staff)
         ok = client.get(check, {"digits": "77"}).json()
         self.assertEqual((ok["message"], ok["duplicate"]), ("", None))
         self.assertTrue(client.get(check, {"digits": "x"}).json()["message"])
         duplicate = client.get(check, {"digits": "2"}).json()
         self.assertEqual(duplicate["duplicate"]["number"], number(2))
         self.assertEqual(duplicate["duplicate"]["url"], self.detail(self.no_leg_point))
-        self.assertEqual(self.login(self.viewer).get(check, {"digits": "2"}).status_code, 403)
 
-    def test_deleting_is_a_question_and_only_possible_without_a_history_and_archiving_needs_the_right_to_change(self):
+    def test_deleting_is_a_question_and_only_possible_without_a_history(self):
         fresh = make_metering_point(11, location=self.place)
-        history.record(fresh, HistoryEvent.CREATED, self.full)
-        question = self.login(self.deleter).get(self.url("delete", fresh))
+        history.record(fresh, HistoryEvent.CREATED, self.staff)
+        client = self.login(self.staff)
+        question = client.get(self.url("delete", fresh))
         self.assertContains(question, "Der Messpunkt " + number(11) + " wird endgültig gelöscht.")
-        self.assertEqual(self.login(self.changer).get(self.url("delete", fresh)).status_code, 403)
-        self.assertEqual(self.login(self.deleter).post(self.url("archive", fresh)).status_code, 403)
-        client = self.login(self.deleter)
         self.assertRedirects(client.post(self.url("delete", fresh)), LIST, fetch_redirect_response=False)
         self.assertFalse(MeteringPoint.objects.filter(pk=fresh.pk).exists())
         # With a history: no question, and a forged post is refused with a message.
-        history.record(self.notified, HistoryEvent.REGISTERED_WITH_BKW, self.full)
+        history.record(self.notified, HistoryEvent.REGISTERED_WITH_OPERATOR, self.staff)
         self.assertEqual(client.get(self.url("delete", self.notified)).status_code, 404)
         response = client.post(self.url("delete", self.notified))
         self.assertRedirects(response, self.detail(self.notified), fetch_redirect_response=False)

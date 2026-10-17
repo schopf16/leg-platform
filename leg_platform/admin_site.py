@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 # for, not where the code lives. A model that is not named here goes to "System".
 ADMIN_GROUPS = (
     ("users", _("Users"), ("User", "Group")),
-    ("content", _("Content"), ("PortalSettings", "EmailText")),
+    ("content", _("Content"), ("PortalSettings", "EmailText", "GridOperator")),
     (
         "system",
         _("System"),

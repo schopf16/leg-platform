@@ -135,9 +135,11 @@ def can_delete(leg):
 
 
 def delete(leg):
-    """Delete a LEG that has no history. Raises ``NotDeletable``. Its entries in the history go with it."""
+    """Delete a LEG that has no history. Raises ``NotDeletable``, or ``Archived`` for an archived LEG: the
+    only action on an archived LEG is the restore (D-085, D-086)."""
     with transaction.atomic():
         fresh = Leg.objects.select_for_update().get(pk=leg.pk)
+        archived.ensure_open(fresh, archived.LEG)
         if not can_delete(fresh):
             raise NotDeletable
         HistoryEntry.objects.filter(subject_type=history.LEG, subject_id=fresh.pk).delete()

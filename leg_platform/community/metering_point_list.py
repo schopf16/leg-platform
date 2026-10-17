@@ -2,8 +2,8 @@
 
 Search, quick filters with their counts, the filter by LEG, the problems, sorting. Pure query code,
 no request: the page passes the values it parsed. The search finds what the list and the detail page
-show: the number, the parts of the address, the name of the LEG and, only for an account that may
-see persons, the name of the person; never the remarks (``LISTEN-STANDARD.md``, section 4).
+show: the number, the parts of the address, the name of the LEG and the name of the person; never the remarks
+(``LISTEN-STANDARD.md``, section 4).
 """
 
 from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, Subquery, Value, When
@@ -51,35 +51,30 @@ def apply_leg(queryset, leg_id):
     return queryset.filter(current_leg_id=leg_id) if leg_id else queryset
 
 
-def apply_search(queryset, text, *, see_persons=False, see_locations=True, see_legs=True, today=None):
-    """Every word of the text must match something visible: a number, a part of the address (only with
-    ``see_locations``), the name of the LEG (only with ``see_legs``) and, with ``see_persons``, the name of the
-    person. A branch that the account may not see is not searched: a word must not find a metering point
-    through data that the account cannot see (D-084, M-4). Letters match without regard to case or accents (the
+def apply_search(queryset, text, *, today=None):
+    """Every word of the text must match something that the list or the page shows: a number, a part of the
+    address, the name of the LEG or the name of the person. Letters match without regard to case or accents (the
     collation of the columns); the numbers of the exact collation are compared in capitals."""
     today = today or timezone.localdate()
     for word in (text or "").split():
         upper = word.upper()
-        condition = Q(number__contains=upper)
-        if see_locations:
-            condition |= (
-                Q(location__street__icontains=word) | Q(location__house_number__icontains=word)
-                | Q(location__postal_code__icontains=word) | Q(location__town__icontains=word)
-                | Q(location__address_addition__icontains=word)
-            )
-        if see_legs:
-            condition |= Exists(
+        condition = (
+            Q(number__contains=upper)
+            | Q(location__street__icontains=word) | Q(location__house_number__icontains=word)
+            | Q(location__postal_code__icontains=word) | Q(location__town__icontains=word)
+            | Q(location__address_addition__icontains=word)
+            | Exists(
                 LegAssignment.objects.not_ended(today).filter(
                     metering_point=OuterRef("pk"), leg__name__icontains=word
                 )
             )
-        if see_persons:
-            condition |= Exists(
+            | Exists(
                 PersonAssignment.objects.not_ended(today).filter(metering_point=OuterRef("pk")).filter(
                     Q(person__first_name__icontains=word) | Q(person__last_name__icontains=word)
                     | Q(person__organisation_name__icontains=word)
                 )
             )
+        )
         queryset = queryset.filter(condition)
     return queryset
 

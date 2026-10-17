@@ -109,8 +109,7 @@ class PaginateTests(TestCase):
 class WidthsEndpointTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.staff = staff_user("staff.view@example.org", "view_location")
-        cls.nobody = staff_user("staff.none@example.org")
+        cls.staff = staff_user("staff.person@example.org")
         cls.url = reverse("management:list_widths", args=["locations"])
 
     def post(self, client, body, url=None):
@@ -149,11 +148,9 @@ class WidthsEndpointTests(TestCase):
         self.assertEqual(self.post(client, "{}", reverse("management:list_widths", args=["nothing"])).status_code, 404)
         self.assertEqual(client.get(self.url).status_code, 405)
 
-    def test_an_account_without_a_right_of_the_area_is_refused(self):
-        self.assertEqual(self.post(self.login(self.nobody), json.dumps({"widths": {"address": 300}})).status_code, 403)
-        self.assertEqual(
-            self.post(self.login(create_active_user("plain.person@example.org")), "{}").status_code, 404
-        )
+    def test_an_account_without_staff_status_is_told_nothing(self):
+        plain = self.login(create_active_user("plain.person@example.org"))
+        self.assertEqual(self.post(plain, json.dumps({"widths": {"address": 300}})).status_code, 404)
 
     def test_a_post_without_the_csrf_token_is_refused(self):
         client = self.login(self.staff, enforce_csrf_checks=True)

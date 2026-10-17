@@ -2,8 +2,6 @@
 
 from datetime import date, timedelta
 
-from django.contrib.auth.models import Permission
-
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.community.models import (
     Direction,
@@ -23,14 +21,11 @@ def number(last_digits):
     return f"{NUMBER_PREFIX}{str(last_digits).zfill(20)}"
 
 
-def staff_user(email, *codenames, superuser=False):
-    """An account with staff status and the given rights of the community app (by codename)."""
+def staff_user(email, superuser=False):
+    """An active account with staff status (D-086: every staff account may use the management area; the
+    ``superuser`` flag makes it a system administrator, who also passes the rules of the Django administration)."""
     user = create_active_user(email)
     user.set_privileges(is_staff=True, is_superuser=superuser)
-    if codenames:
-        user.user_permissions.set(
-            Permission.objects.filter(content_type__app_label="community", codename__in=codenames)
-        )
     return user
 
 
@@ -46,8 +41,8 @@ def make_metering_point(last_digits=1, direction=Direction.CONSUMPTION, location
     )
 
 
-def make_circuit(bkw_number="TRA1000", name=""):
-    return TransformerCircuit.objects.create(bkw_number=bkw_number, name=name)
+def make_circuit(grid_number="TRA1000", name=""):
+    return TransformerCircuit.objects.create(grid_number=grid_number, name=name)
 
 
 def make_leg(name="LEG Example", **extra):

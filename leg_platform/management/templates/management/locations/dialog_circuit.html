@@ -6,11 +6,11 @@ created, and its name is shown (not editable).
 {% endcomment %}
 {% block dialog_notice %}
   {% if existing %}
-    <div class="mgmt-banner" role="status"><p><b>{% translate "This transformer circuit already exists:" %}</b> {{ existing.bkw_number }}{% if existing.name %} · {{ existing.name }}{% endif %}. {% translate "It is assigned to the location, a second one is not created." %}</p></div>
+    <div class="mgmt-banner" role="status"><p><b>{% translate "This transformer circuit already exists:" %}</b> {{ existing.grid_number }}{% if existing.name %} · {{ existing.name }}{% endif %}. {% translate "It is assigned to the location, a second one is not created." %}</p></div>
   {% endif %}
 {% endblock %}
 {% block dialog_fields %}
-  <div class="mgmt-dialog-row is-single">{% include "management/_dialog_field.html" with field=form.bkw_number %}</div>
+  <div class="mgmt-dialog-row is-single">{% include "management/_dialog_field.html" with field=form.grid_number %}</div>
   <div class="mgmt-dialog-row is-single">
     {% if existing %}
       <input type="hidden" name="use_existing" value="1">

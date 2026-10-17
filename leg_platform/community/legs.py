@@ -24,7 +24,7 @@ from leg_platform.community.models import (
 
 
 class DiscountTier(models.TextChoices):
-    """Derived from the data, never entered (``legs/VORGABEN.md``, "Rabattstufe"); the BKW decides
+    """Derived from the data, never entered (``legs/VORGABEN.md``, "Rabattstufe"); the grid operator decides
     the real discount."""
 
     NONE = "none", _("none")

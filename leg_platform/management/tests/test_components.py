@@ -27,14 +27,14 @@ def render(template, **context):
 
 class IncludeTests(SimpleTestCase):
     def test_the_info_button_is_a_14_px_i_with_a_bubble_that_names_what_it_explains(self):
-        html = render("_info.html", name="Produktionsquote", tip_id="tip-quota", text="Wert aus dem <BKW> Portal")
+        html = render("_info.html", name="Produktionsquote", tip_id="tip-quota", text="Wert aus dem <Netzbetreiber> Portal")
 
         self.assertIn('<button type="button" class="mgmt-info-btn" aria-label="Information: Produktionsquote"', html)
         self.assertIn('aria-describedby="tip-quota"', html)
         self.assertIn('id="tip-quota"', html)
         self.assertIn('role="tooltip"', html)
         self.assertIn(">i</button>", html)
-        self.assertIn("Wert aus dem &lt;BKW&gt; Portal", html)  # the text is escaped
+        self.assertIn("Wert aus dem &lt;Netzbetreiber&gt; Portal", html)  # the text is escaped
         self.assertNotIn("is-left", html)
         self.assertIn("is-left-up", render("_info.html", name="x", tip_id="t", text="y", placement="left-up"))
         left = render("_info.html", name="x", tip_id="t", text="y", placement="left")

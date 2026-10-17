@@ -1,15 +1,17 @@
 {% extends "management/page.html" %}
-{% load i18n static %}{% comment %}
+{% load i18n static management_ui %}{% comment %}
 The settings page (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077): three cards, one button
-"Save". With only the right to view the fields are shown disabled and there is no button. The
-banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
-(the directory does not know the address) is at the top of the first card; it is made on the server.
+"Save". The banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
+(the directory does not know the address) is at the top of the first card; it is made on the server. The card
+"Metering points" starts with a read-only line that names the grid operator of the instance; for a system
+administrator the name is a link to its form in the administration (D-086).
 {% endcomment %}
 {% block inner_class %}mgmt-page mgmt-settings{% endblock %}
 {% block page_content %}
-  <form method="post" novalidate{% if can_change %} data-validate-url="{% url 'management:settings_check' %}"{% endif %}>
+  {% operator_name as operator %}
+  <form method="post" novalidate data-validate-url="{% url 'management:settings_check' %}">
     {% csrf_token %}
-    {% if can_change %}{% include "management/_default_submit.html" %}{% endif %}
+    {% include "management/_default_submit.html" %}
     {% include "accounts/_error_summary.html" %}
 
     <section class="mgmt-card" aria-labelledby="sender-title">
@@ -28,9 +30,10 @@ banner (the suggestion of the address directory with "Accept" and "Do not accept
 
     <section class="mgmt-card" aria-labelledby="metering-title">
       <h2 id="metering-title">{% translate "Metering points" %}</h2>
+      <div class="mgmt-row"><span class="mgmt-row-label">{% translate "Grid operator" %}</span><span class="mgmt-operator">{% if operator_url %}<a href="{{ operator_url }}">{{ operator_name }}</a>{% else %}{{ operator_name }}{% endif %}</span></div>
       {% include "management/_field_row.html" with field=form.country_code %}
       {% include "management/_field_row.html" with field=form.identifier %}
-      <div class="mgmt-row"><span class="mgmt-row-label"></span><span class="mgmt-hint">{% translate "Applies to all metering points. The BKW assigns the identifier." %}</span></div>
+      <div class="mgmt-row"><span class="mgmt-row-label"></span><span class="mgmt-hint">{% blocktranslate %}Applies to all metering points. The {{ operator }} assigns the identifier.{% endblocktranslate %}</span></div>
     </section>
 
     <section class="mgmt-card" aria-labelledby="quota-title">
@@ -39,12 +42,10 @@ banner (the suggestion of the address directory with "Accept" and "Do not accept
       <div class="mgmt-row"><span class="mgmt-row-label"></span><span class="mgmt-hint">{{ quota_hint }}</span></div>
     </section>
 
-    {% if can_change %}
-      <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
-    {% endif %}
+    <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
   </form>
 {% endblock %}
 {% block scripts %}
   {{ block.super }}
-  {% if can_change %}<script defer src="{% static 'management/js/settings-validate.js' %}"></script>{% endif %}
+  <script defer src="{% static 'management/js/settings-validate.js' %}"></script>
 {% endblock %}

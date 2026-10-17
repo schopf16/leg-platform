@@ -6,6 +6,6 @@
   {% endif %}
 {% endblock %}
 {% block dialog_after_fields %}
-  <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.bkw_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
+  <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.grid_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
   {% if new_circuit_url %}<p class="mgmt-circuit-links"><a href="{{ new_circuit_url }}">+ {% translate "Create new transformer circuit" %}</a></p>{% endif %}
 {% endblock %}

@@ -1,11 +1,12 @@
 """The rules of the community domain that need no database (D-077): numbers, status, quota,
-discount tier, address normalisation and the checks of the list preferences."""
+discount tier, address normalisation and the checks of the list preferences (only the refusal of a
+circuit number asks the database, for the name of the grid operator, D-086)."""
 
 from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, tag
 
 from leg_platform.community import addressing, legs, numbers, preferences
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, Direction
@@ -71,6 +72,10 @@ class TransformerCircuitNumberTests(SimpleTestCase):
     def test_the_number_is_stripped_and_capitalised_before_it_is_compared(self):
         self.assertEqual(numbers.normalise_transformer_circuit_number("  tra21359 "), "TRA21359")
 
+
+@tag("mariadb")
+class TransformerCircuitFormatTests(TestCase):
+    # A refused number asks the database for the name of the grid operator (D-086).
     def test_the_format_is_tra_and_digits(self):
         numbers.validate_transformer_circuit_number("TRA21359")
         for bad in ("", "TRA", "TRA12A", "tra1", "XRA1", "TRA" + "1" * 18):
@@ -81,7 +86,7 @@ class TransformerCircuitNumberTests(SimpleTestCase):
 class StatusTests(SimpleTestCase):
     def status(self, registered=None, confirmed=None, start=None, terminated=None):
         return derive_status(
-            registered_with_bkw_on=registered, confirmed_on=confirmed, start_date=start,
+            registered_with_operator_on=registered, confirmed_on=confirmed, start_date=start,
             terminated_on=terminated, today=TODAY,
         )
 

@@ -1,6 +1,6 @@
 """Circuits of the grid: creating and changing them, and the figures of the card "Netz" (D-078).
 
-A transformer circuit is identified by the number the BKW assigns (``TRA`` and digits, unique after
+A transformer circuit is identified by the number the grid operator assigns (``TRA`` and digits, unique after
 conversion to capital letters and trimming); the name is free and not unique
 (``standorte/VORGABEN.md``, "Nachtrag: Trafokreis"). A circuit has no page of its own: it is chosen
 or created in the card "Netz" of a location.
@@ -18,11 +18,11 @@ def label(circuit):
     """"TRA21359 · Ittigen Nord", or the number alone for a circuit without a name."""
     if circuit is None:
         return ""
-    return f"{circuit.bkw_number}{SEPARATOR}{circuit.name}" if circuit.name else circuit.bkw_number
+    return f"{circuit.grid_number}{SEPARATOR}{circuit.name}" if circuit.name else circuit.grid_number
 
 
 def number_of_choice(text):
-    """The BKW number in what a person typed or chose in the field ("TRA21359 · Ittigen Nord" or just
+    """The grid number in what a person typed or chose in the field ("TRA21359 · Ittigen Nord" or just
     "tra21359"): the part before the separator, converted as the numbers are stored; "" if empty."""
     return numbers.normalise_transformer_circuit_number((text or "").split(SEPARATOR.strip())[0])
 
@@ -30,13 +30,13 @@ def number_of_choice(text):
 def find(number):
     """The circuit with this number (normalised comparison), or None."""
     number = numbers.normalise_transformer_circuit_number(number)
-    return TransformerCircuit.objects.filter(bkw_number=number).first() if number else None
+    return TransformerCircuit.objects.filter(grid_number=number).first() if number else None
 
 
 def create(number, name=""):
     """A new circuit. Raises ``ValidationError`` for a wrong number or a number that exists."""
     circuit = TransformerCircuit(
-        bkw_number=numbers.normalise_transformer_circuit_number(number), name=name
+        grid_number=numbers.normalise_transformer_circuit_number(number), name=name
     )
     circuit.full_clean()
     circuit.save()
@@ -53,7 +53,7 @@ def update(circuit, number, name):
     ``ValidationError`` (wrong number, or another circuit has it)."""
     with transaction.atomic():
         fresh = TransformerCircuit.objects.select_for_update().get(pk=circuit.pk)
-        fresh.bkw_number = numbers.normalise_transformer_circuit_number(number)
+        fresh.grid_number = numbers.normalise_transformer_circuit_number(number)
         fresh.name = name
         fresh.full_clean()
         fresh.save()
@@ -74,4 +74,4 @@ def stats(circuit):
 
 def choices():
     """All circuits for a field with suggestions, each number once."""
-    return list(TransformerCircuit.objects.order_by("bkw_number"))
+    return list(TransformerCircuit.objects.order_by("grid_number"))

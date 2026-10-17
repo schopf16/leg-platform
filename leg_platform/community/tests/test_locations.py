@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.community import (
+    archived,
     history,
     location_list,
     locations,
@@ -180,6 +181,20 @@ class LocationServiceTests(TestCase):
         with self.assertRaises(locations.NotDeletable):
             locations.delete(changed)
 
+    def test_an_archived_location_is_not_deleted(self):
+        archived_location = make_location("Neuweg", "8", "3000", "Bern", is_archived=True)  # no history: deletable otherwise
+        self.assertTrue(locations.can_delete(archived_location))
+
+        with self.assertRaises(archived.Archived):
+            locations.delete(archived_location)
+
+        self.assertTrue(Location.objects.filter(pk=archived_location.pk).exists())
+        # A location that is not archived (and has no history) is still deleted.
+        plain = locations.create_location(
+            street="Neuweg", house_number="9", postal_code="3000", town="Bern", actor=self.actor
+        )
+        locations.delete(plain)
+        self.assertFalse(Location.objects.filter(pk=plain.pk).exists())
 
 @tag("mariadb")
 class SuggestionServiceTests(TestCase):
@@ -260,15 +275,15 @@ class TransformerCircuitServiceTests(TestCase):
         with self.assertRaises(ValidationError):
             transformer_circuits.create("21359")
         created = transformer_circuits.create(" tra555 ", "Neu")
-        self.assertEqual((created.bkw_number, created.name), ("TRA555", "Neu"))
+        self.assertEqual((created.grid_number, created.name), ("TRA555", "Neu"))
 
     def test_a_change_reaches_every_location_and_may_not_take_another_number(self):
         self.assertEqual(transformer_circuits.affected_locations(self.circuit), 3)
         with self.assertRaises(ValidationError):
             transformer_circuits.update(self.circuit, "tra21361", "x")
         changed = transformer_circuits.update(self.circuit, "tra21360", "Renamed")
-        self.assertEqual((changed.bkw_number, changed.name), ("TRA21360", "Renamed"))
-        self.assertEqual(Location.objects.get(pk=self.first.pk).transformer_circuit.bkw_number, "TRA21360")
+        self.assertEqual((changed.grid_number, changed.name), ("TRA21360", "Renamed"))
+        self.assertEqual(Location.objects.get(pk=self.first.pk).transformer_circuit.grid_number, "TRA21360")
 
     def test_the_figures_of_the_card_do_not_count_what_is_archived(self):
         self.assertEqual(
@@ -277,7 +292,7 @@ class TransformerCircuitServiceTests(TestCase):
         self.assertEqual(
             transformer_circuits.stats(self.other), {"locations": 0, "consumption": 0, "feed_in": 0}
         )
-        self.assertEqual([c.bkw_number for c in transformer_circuits.choices()], ["TRA21359", "TRA21361"])
+        self.assertEqual([c.grid_number for c in transformer_circuits.choices()], ["TRA21359", "TRA21361"])
 
 
 @tag("mariadb")
@@ -377,8 +392,8 @@ class LocationListQueryTests(TestCase):
         self.assertEqual(location_list.apply_circuit(self.base(), "").count(), 5)
 
     def test_the_search_finds_address_circuit_numbers_and_legs_but_never_the_remark(self):
-        def run(text, **kwargs):
-            return sorted(self.names(location_list.apply_search(self.base(), text, today=self.TODAY, **kwargs)))
+        def run(text):
+            return sorted(self.names(location_list.apply_search(self.base(), text, today=self.TODAY)))
 
         self.assertEqual(run("bahnhof 9"), ["Bahnhofstrasse 9", "Bahnhofstrasse 9a"])
         self.assertEqual(run("ZURICH"), ["Aarestrasse 1"])  # umlaut-insensitive
@@ -390,15 +405,26 @@ class LocationListQueryTests(TestCase):
         self.assertEqual(run("secretword"), [])
         self.assertEqual(len(run("")), 5)
 
-    def test_persons_are_found_only_with_the_right_to_see_them(self):
-        def run(text, see):
-            return self.names(location_list.apply_search(self.base(), text, see_persons=see, today=self.TODAY))
+    def test_persons_are_found_by_name_while_their_assignment_is_not_ended(self):
+        def run(text):
+            return self.names(location_list.apply_search(self.base(), text, today=self.TODAY))
 
-        self.assertEqual(run("muller", True), ["Bahnhofstrasse 10"])
-        self.assertEqual(run("muller", False), [])
+        self.assertEqual(run("muller"), ["Bahnhofstrasse 10"])
         # An assignment that has ended no longer places the person at the location.
-        self.assertEqual(run("meier", True), [])
+        self.assertEqual(run("meier"), [])
 
+    def test_the_suggestions_of_a_location_field_never_search_leg_and_person_names(self):
+        def suggested(text):
+            return self.names(location_list.location_suggestions(text))
+
+        self.assertEqual(suggested("bahnhof 10"), ["Bahnhofstrasse 10"])
+        self.assertEqual(suggested("TRA1"), ["Bahnhofstrasse 10", "Bahnhofstrasse 9"])
+        self.assertEqual(suggested("quartier"), [])  # the name of a LEG
+        self.assertEqual(suggested("muller"), [])  # the name of a person
+        # ... and not archived locations.
+        self.assertEqual(suggested("zeile"), [])
+        # The same search with the assignments finds them (the list of the locations).
+        self.assertEqual(self.names(location_list.apply_search(self.base(), "quartier", today=self.TODAY)), ["Bahnhofstrasse 10"])
     def test_sorting_by_house_number_as_a_number_and_by_the_other_columns(self):
         def run(key, descending=False):
             return self.names(location_list.apply_sort(location_list.apply_occupancy(self.base(), "all"), key, descending))
@@ -416,8 +442,8 @@ class LocationListQueryTests(TestCase):
         # Ascending: the locations with a circuit first (by number), those without last.
         self.assertEqual(run("circuit")[-1], "Bahnhofstrasse 9a")
 
-    def test_the_details_give_the_rows_and_the_persons_and_hide_names_without_the_right(self):
-        rows, persons = location_list.details([self.l10, self.l9, self.empty], self.TODAY, see_persons=True)
+    def test_the_details_give_the_rows_and_the_persons_with_their_names(self):
+        rows, persons = location_list.details([self.l10, self.l9, self.empty], self.TODAY)
         self.assertEqual(persons, {self.l10.pk: 1, self.l9.pk: 0, self.empty.pk: 0})
         first, second = rows[self.l10.pk]
         self.assertEqual((first.leg_name, first.person_name), ("LEG Quartier", "Ada Müller"))
@@ -426,13 +452,11 @@ class LocationListQueryTests(TestCase):
         (only,) = rows[self.l9.pk]
         self.assertEqual((only.leg_id, only.person_id), (None, None))
         self.assertEqual(rows[self.empty.pk], [])
-        hidden, _persons = location_list.details([self.l10], self.TODAY, see_persons=False)
-        self.assertEqual((hidden[self.l10.pk][0].person_name, hidden[self.l10.pk][0].person_id), ("", self.ada.pk))
 
     def test_a_planned_assignment_is_shown_when_none_is_in_force(self):
         point = make_metering_point(20, location=self.l9a)
         assign_person(point, self.ben, valid_from=date(2026, 9, 1))
-        rows, persons = location_list.details([self.l9a], self.TODAY, see_persons=True)
+        rows, persons = location_list.details([self.l9a], self.TODAY)
         self.assertEqual(rows[self.l9a.pk][0].person_name, "Ben Meier")
         self.assertEqual(persons[self.l9a.pk], 1)
 
@@ -441,18 +465,20 @@ class LocationListQueryTests(TestCase):
         self.assertEqual(self.names(location_list.apply_problems(self.base())), ["Bahnhofstrasse 9"])
 
     def test_what_the_staff_keep_about_a_person_is_never_searched(self):
-        # L-6: the IBAN, the note and the BKW customer number of a person record are no search field.
+        # L-6: the IBAN, the note and the customer number at the grid operator of a person record are no search field.
         PersonRecord.objects.create(
-            person=self.ada, iban="CH9300762011623852957", staff_note="zahlt immer spaet", bkw_customer_number="BKW-4711"
+            person=self.ada, iban="CH9300762011623852957", staff_note="zahlt immer spaet",
+            operator_customer_number="OPR-4711",
         )
-        for text in ("CH9300762011623852957", "spaet", "BKW-4711", "4711"):
-            found = location_list.apply_search(self.base(), text, see_persons=True, today=self.TODAY)
+        for text in ("CH9300762011623852957", "spaet", "OPR-4711", "4711"):
+            found = location_list.apply_search(self.base(), text, today=self.TODAY)
             self.assertEqual(self.names(found), [], text)
 
     def test_the_history_refuses_data_that_must_not_be_in_it(self):
         # L-6: nothing of a person record, no credentials, also nested.
         for detail in (
-            {"iban": "CH93"}, {"old": {"staff_note": "x"}}, {"list": [{"bkw_customer_number": "1"}]}, {"Email": "a@b"},
+            {"iban": "CH93"}, {"old": {"staff_note": "x"}}, {"list": [{"operator_customer_number": "1"}]},
+            {"Email": "a@b"},
         ):
             with self.subTest(detail=detail), self.assertRaises(ValueError):
                 history.record(self.l9, HistoryEvent.ARCHIVED, None, detail)

@@ -66,7 +66,7 @@ class LocationChoiceField(forms.CharField):
 class MeteringPointCreateForm(MeteringPointForm):
     """"Messpunkt anlegen" from the overview: the number first (required), then the direction; under
     "Optional" the location, the LEG, PV power, battery, wallbox and remark. No person (it is assigned on
-    the detail page). The location and the LEG are fields only for an account that may see them."""
+    the detail page)."""
 
     number_digits = forms.CharField(
         label=_("Metering point number"), max_length=20, widget=forms.TextInput(attrs=NUMBER_ATTRS)
@@ -91,13 +91,10 @@ class MeteringPointCreateForm(MeteringPointForm):
     optional = ("location", "leg", "pv_power_kwp", "battery_kwh", "wallbox_kw", "remark")
     field_order = ("number_digits", "direction", "location", "leg", "pv_power_kwp", "battery_kwh", "wallbox_kw", "remark")
 
-    def __init__(self, *args, may_choose_leg=False, may_choose_location=False, **kwargs):
-        super().__init__(*args, may_choose_leg=may_choose_leg, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.duplicate = None
-        if "leg" in self.fields:
-            self.fields["leg"].empty_label = "–"
-        if not may_choose_location:
-            del self.fields["location"]
+        self.fields["leg"].empty_label = "–"
         self.order_fields(self.field_order)
 
     def metering_point_details(self):

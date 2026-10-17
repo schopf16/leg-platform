@@ -189,7 +189,7 @@ def set_circuit(location, circuit, actor=None):
         fresh.save(update_fields=["transformer_circuit", "updated_at"])
         history.record(
             fresh, HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED, actor,
-            {"old": before.bkw_number if before else "", "new": circuit.bkw_number if circuit else ""},
+            {"old": before.grid_number if before else "", "new": circuit.grid_number if circuit else ""},
         )
     return fresh
 
@@ -233,9 +233,11 @@ def can_delete(location):
 
 
 def delete(location):
-    """Delete a location that has no history and no metering points. Raises ``NotDeletable``."""
+    """Delete a location that has no history and no metering points. Raises ``NotDeletable``, or ``Archived``
+    for an archived location: the only action on an archived location is the restore (D-085, D-086)."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
         if not can_delete(fresh):
             raise NotDeletable
         # Only the entry "Created" exists; it goes with the location.

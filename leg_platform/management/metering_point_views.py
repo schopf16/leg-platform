@@ -1,20 +1,15 @@
 """The pages of the metering points (D-079; LEG-Design-Vorgaben/verwaltung/messpunkte).
 
 The list (with the quick filters, the problems and the dialog "Create metering point"), the detail
-page and its dialogs: the steps towards the BKW, the LEG (assign, change with the move mask) and the
+page and its dialogs: the steps towards the grid operator, the LEG (assign, change with the move mask) and the
 person (assign, change, end, delete), archive and delete. Every view uses the access check of
-``management.access``; objects are looked up by the id in the address only after the permission is
-checked, the status and every assignment are validated again on the server (a page that was
+``management.access`` (every staff account, D-086); objects are looked up by the id in the address, the status
+and every assignment are validated again on the server (a page that was
 open for a while cannot do a step twice or out of order), and the rules are in ``leg_platform.community``.
 A dialog is a normal page: it works without JavaScript and returns to the place it was opened from.
-
-Rights (D-079): list and detail = ``view_meteringpoint``; create = ``add_meteringpoint``; every step,
-assignment, archive = ``change_meteringpoint``; delete = ``delete_meteringpoint``. On top of that: choosing or
-showing a person needs ``view_personrecord``, choosing a LEG ``view_leg``, choosing a location and the link to
-it ``view_location``.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -28,6 +23,7 @@ from django.views import View
 
 from leg_platform.community import (
     assignments,
+    grid_operator,
     history,
     leg_switch,
     location_list,
@@ -58,26 +54,21 @@ from leg_platform.management.metering_point_forms import (
 )
 from leg_platform.management.returns import return_url, with_next
 from leg_platform.management.summaries import duplicate_summary
-from leg_platform.management.templatetags.management_ui import optional_url
-
-VIEW = "community.view_meteringpoint"
-ADD = "community.add_meteringpoint"
-CHANGE = "community.change_meteringpoint"
-DELETE = "community.delete_meteringpoint"
-VIEW_PERSONS = "community.view_personrecord"
-VIEW_LEG = "community.view_leg"
-VIEW_LOCATION = "community.view_location"
 
 COLUMN_NUMBER = lists.Column(
     "number", gettext_lazy("Metering point"), width=480, keep=True,
-    info=gettext_lazy("Number of the smart meter at the BKW, followed by the direction. Blue is consumption, green is feed-in."),
+    info=grid_operator.text(gettext_lazy(
+        "Number of the smart meter at the %(operator)s, followed by the direction. Blue is consumption, green is feed-in."
+    )),
 )
 COLUMN_LOCATION = lists.Column(
     "location", gettext_lazy("Location"), width=200, info=gettext_lazy("The address where the metering point is installed."),
 )
 COLUMN_LEG = lists.Column(
     "leg", gettext_lazy("LEG"), width=200,
-    info=gettext_lazy("The billing group the metering point belongs to. Required before the registration at the BKW."),
+    info=grid_operator.text(gettext_lazy(
+        "The billing group the metering point belongs to. Required before the registration at the %(operator)s."
+    )),
 )
 COLUMN_STATUS = lists.Column("status", gettext_lazy("Status"), info_placement="left")
 COLUMN_NEXT = lists.Column("next_step", gettext_lazy("Next step"), sortable=False)
@@ -99,7 +90,8 @@ def direction_label(point):
 
 
 def number_lead(point):
-    return {"number": point_title(point), "direction": direction_label(point)}
+    """The values of the leads of the dialogs; ``operator`` is the name of the grid operator (D-086)."""
+    return {"number": point_title(point), "direction": direction_label(point), "operator": grid_operator.name()}
 
 
 @dataclass
@@ -116,28 +108,13 @@ class MeteringPointList:
     counts: dict
     problem_count: int
     today: object
-    see_persons: bool
-    see_locations: bool
-    see_legs: bool
     queryset: object
 
 
-def build_list(params, user):
-    """The list for an account. What belongs to another area is used only with the right to see it (D-084, M-4):
-    the address (search, column, sorting) with ``view_location``; the name of the LEG (search, column, sorting,
-    the filter by LEG) with ``view_leg``; the name of a person with ``view_personrecord``."""
+def build_list(params):
     today = timezone.localdate()
-    see_persons = user.has_perm(VIEW_PERSONS)
-    see_locations = user.has_perm(VIEW_LOCATION)
-    see_legs = user.has_perm(VIEW_LEG)
-    legs = list(Leg.objects.filter(is_archived=False).order_by("name")) if see_legs else []
-    all_columns = (
-        COLUMN_NUMBER,
-        COLUMN_LOCATION if see_locations else replace(COLUMN_LOCATION, sortable=False),
-        COLUMN_LEG if see_legs else replace(COLUMN_LEG, sortable=False),
-        COLUMN_STATUS,
-        COLUMN_NEXT,
-    )
+    legs = list(Leg.objects.filter(is_archived=False).order_by("name"))
+    all_columns = ALL_COLUMNS
     state = lists.parse(
         params, path=reverse("management:metering_points"), columns=all_columns,
         default_sort=metering_point_list.DEFAULT_SORT,
@@ -149,9 +126,7 @@ def build_list(params, user):
     step = state.values["step"]
     leg_id = int(state.values["leg"]) if state.values["leg"] else None
     view = metering_point_list.apply_leg(metering_point_list.base_queryset(today), leg_id)
-    view = metering_point_list.apply_search(
-        view, state.query, see_persons=see_persons, see_locations=see_locations, see_legs=see_legs, today=today
-    )
+    view = metering_point_list.apply_search(view, state.query, today=today)
     # The numbers of the quick filters and of the button "Filter problems" count the metering points
     # of this view (the search, the LEG); the rows that the list shows are always the same count.
     counted = metering_point_list.apply_problems(view) if state.problems else view
@@ -163,27 +138,18 @@ def build_list(params, user):
     queryset = metering_point_list.apply_sort(queryset, state.sort, state.descending, today)
     show_steps = step in (metering_point_list.STEP_NOTIFY, metering_point_list.STEP_CONFIRM, metering_point_list.STEP_START)
     columns = (*all_columns[:3], COLUMN_NEXT if show_steps else COLUMN_STATUS)
-    return MeteringPointList(
-        state, legs, step, show_steps, columns, counts, problem_count, today, see_persons, see_locations, see_legs,
-        queryset,
-    )
+    return MeteringPointList(state, legs, step, show_steps, columns, counts, problem_count, today, queryset)
 
 
 class MeteringPointListView(ManagementAccessMixin, View):
     """The list (``messpunkte-liste-desktop`` and ``-handy``): a table on a desktop, cards on a phone."""
 
-    permission_required = (VIEW,)
-
     def get(self, request):
-        user = request.user
-        found = build_list(request.GET, user)
+        found = build_list(request.GET)
         state, legs, step, show_steps = found.state, found.legs, found.step, found.show_steps
         columns, counts, problem_count, today = found.columns, found.counts, found.problem_count, found.today
-        see_persons, see_locations, see_legs = found.see_persons, found.see_locations, found.see_legs
         page = lists.paginate(found.queryset, state)
 
-        can_change = user.has_perm(CHANGE)
-        can_view_location = see_locations
         entries = []
         for point in page.items:
             status = point.status(today)
@@ -197,10 +163,10 @@ class MeteringPointListView(ManagementAccessMixin, View):
                     "problem_text": " ".join(str(problems.describe(problem)) for problem in found_problems),
                     "action": action,
                     "action_label": route[1] if route else "",
-                    "action_url": with_next(reverse(route[0], args=[point.pk]), request) if route and can_change else "",
+                    "action_url": with_next(reverse(route[0], args=[point.pk]), request) if route else "",
                     "leg_missing": action == metering_points.LEG_MISSING,
                     "location_url": reverse("management:locations_detail", args=[point.location_id])
-                    if point.location_id and can_view_location else "",
+                    if point.location_id else "",
                     "detail_url": reverse("management:metering_points_detail", args=[point.pk]),
                 }
             )
@@ -211,16 +177,17 @@ class MeteringPointListView(ManagementAccessMixin, View):
             },
             widths_url=reverse("management:list_widths", args=["metering_points"]),
         )
+        operator = {"operator": grid_operator.name()}
         quick_filters = [
             (metering_point_list.STEP_ALL, _("All (%(count)d)") % {"count": counts["all"]}),
-            (metering_point_list.STEP_NOTIFY, _("Notify the BKW (%(count)d)") % {"count": counts["notify"]}),
+            (metering_point_list.STEP_NOTIFY, _("Notify the %(operator)s (%(count)d)") % {**operator, "count": counts["notify"]}),
             (metering_point_list.STEP_CONFIRM, _("Confirmation pending (%(count)d)") % {"count": counts["confirm"]}),
             (metering_point_list.STEP_START, _("Start date pending (%(count)d)") % {"count": counts["start"]}),
             (metering_point_list.STEP_ARCHIVED, _("archived (%(count)d)") % {"count": counts["archived"]}),
         ]
         context.update(
             page_title=_("Metering points"),
-            page_subtitle=_("All metering points with their state. Here you see what is still to do at the BKW."),
+            page_subtitle=_("All metering points with their state. Here you see what is still to do at the %(operator)s.") % operator,
             entries=entries,
             print_url=state.url_to(reverse("management:metering_points_print")),
             show_steps=show_steps,
@@ -230,12 +197,8 @@ class MeteringPointListView(ManagementAccessMixin, View):
             ],
             problem_count=problem_count,
             problem_url=state.url(problems="" if state.problems else "1"),
-            can_add=user.has_perm(ADD),
             create_url=with_next(reverse("management:metering_points_new"), request),
             leg_options=[(str(leg.pk), leg.name) for leg in legs],
-            see_persons=see_persons,
-            see_locations=see_locations,
-            see_legs=see_legs,
             current_url=request.get_full_path(),
             empty_text=_("No metering points yet. Create the first metering point."),
         )
@@ -275,33 +238,28 @@ def assignment_rows(chain, *, single_label, name_of, url_of):
 class MeteringPointDetailView(ManagementAccessMixin, View):
     """The detail page (``messpunkt-detail-desktop``, ``-aktiv``, ``-handy`` and the states of the steps)."""
 
-    permission_required = (VIEW,)
-
     def get(self, request, pk):
         point = get_object_or_404(MeteringPoint.objects.select_related("location__transformer_circuit"), pk=pk)
-        user = request.user
         today = timezone.localdate()
-        see_persons = user.has_perm(VIEW_PERSONS)
-        can_change = user.has_perm(CHANGE) and not point.is_archived
+        can_change = not point.is_archived
         status = point.status(today)
         found = problems.metering_point_problems(point, today)
         leg_chain = metering_points.chain(assignments.LEG, point, today)
         person_chain = metering_points.chain(assignments.PERSON, point, today)
-        deletable = metering_points.can_delete(point)
-        show_delete = deletable and user.has_perm(DELETE)
+        show_delete = metering_points.can_delete(point)
 
         def leg_url(item):
-            return optional_url("management:legs_detail", item.leg_id) if user.has_perm(VIEW_LEG) else ""
+            return reverse("management:legs_detail", args=[item.leg_id])
 
         def person_url(item):
-            return optional_url("management:persons_detail", item.person_id) if see_persons else ""
+            return reverse("management:persons_detail", args=[item.person_id])
 
         leg_rows = assignment_rows(
             leg_chain, single_label=_("Assigned"), name_of=lambda item: item.leg.name, url_of=leg_url
         )
         person_rows = assignment_rows(
-            person_chain, single_label=_("Occupied by"),
-            name_of=lambda item: person_name(item.person) if see_persons else "–", url_of=person_url,
+            person_chain, single_label=_("Occupied by"), name_of=lambda item: person_name(item.person),
+            url_of=person_url,
         )
         last_person = person_chain[-1].assignment if person_chain else None
         status_action = None
@@ -317,11 +275,11 @@ class MeteringPointDetailView(ManagementAccessMixin, View):
             "point": point,
             "direction": point.direction,
             "status": status,
+            "status_note": status_note(point, status, today),
             "problems": [str(problems.describe(problem)) for problem in found],
             "location": location,
-            "location_url": reverse("management:locations_detail", args=[location.pk])
-            if location and user.has_perm(VIEW_LOCATION) else "",
-            "circuit": circuit.bkw_number if circuit else "",
+            "location_url": reverse("management:locations_detail", args=[location.pk]) if location else "",
+            "circuit": circuit.grid_number if circuit else "",
             "leg_rows": leg_rows,
             "person_rows": person_rows,
             "has_leg": bool(leg_chain),
@@ -330,35 +288,44 @@ class MeteringPointDetailView(ManagementAccessMixin, View):
             "status_action_label": STEP_ROUTES[status_action][1] if status_action else "",
             "status_action_url": with_next(reverse(STEP_ROUTES[status_action][0], args=[pk]), request) if status_action else "",
             "start_missing": status == MeteringPointStatus.CONFIRMED and point.start_date is None,
+            "can_change": can_change,
             "can_start": can_change and status == MeteringPointStatus.CONFIRMED and point.start_date is None,
             "can_terminate": can_change and status == MeteringPointStatus.ACTIVE and point.terminated_on is None,
-            "can_leg": can_change and user.has_perm(VIEW_LEG),
-            "can_person": can_change and see_persons,
-            "can_end_person": can_change and see_persons and last_person is not None and last_person.valid_to is None,
-            "can_delete_person": can_change and see_persons and last_person is not None
+            "can_end_person": can_change and last_person is not None and last_person.valid_to is None,
+            "can_delete_person": can_change and last_person is not None
             and assignments.is_deletable(last_person, today),
             "show_delete": show_delete,
             "show_archive": can_change and not show_delete,
-            "show_restore": user.has_perm(CHANGE) and point.is_archived,
-            "history": history_rows(point, see_persons),
+            "show_restore": point.is_archived,
+            "history": history_rows(point),
             "back_url": return_url(request, reverse("management:metering_points")),
-            "see_persons": see_persons,
             "current_url": request.get_full_path(),
         }
         return render(request, "management/metering_points/detail.html", context)
+
+
+def status_note(point, status, today):
+    """The line under the state of the status card: "The assignment has ended." once the termination date
+    is reached, "Termination on DD.MM.YYYY" while a recorded termination lies in the future (the status stays
+    until the day, D-077; the words are D-086), else empty."""
+    if status == MeteringPointStatus.TERMINATED:
+        return _("The assignment has ended.")
+    if point.terminated_on is not None and point.terminated_on > today:
+        return _("Termination on %(date)s") % {"date": format_date(point.terminated_on)}
+    return ""
 
 
 def person_name(person):
     return location_list.person_name(person)
 
 
-def history_rows(point, see_persons):
+def history_rows(point):
     """The history, oldest first (the first entry is "Created"). The text of the event names the start
-    date where there is one, and the LEG or, with the right to see persons, the person that an event is
-    about (the entries hold only ids, never a name: ``history``)."""
+    date where there is one, and the LEG or the person that an event is about (the entries hold only ids,
+    never a name: ``history``)."""
     entries = list(history.entries_for(point))
     leg_ids = {e.detail.get("leg_id") for e in entries if e.detail.get("leg_id")}
-    person_ids = {e.detail.get("person_id") for e in entries if e.detail.get("person_id")} if see_persons else set()
+    person_ids = {e.detail.get("person_id") for e in entries if e.detail.get("person_id")}
     legs = dict(Leg.objects.filter(pk__in=leg_ids).values_list("pk", "name")) if leg_ids else {}
     persons = {}
     if person_ids:
@@ -395,7 +362,6 @@ class PointDialog(DialogView):
     """A dialog about one metering point. ``status`` names the status that the dialog needs (a GET in
     another status goes back with a message, a POST is refused by the service)."""
 
-    permission_required = (VIEW, CHANGE)
     status = None
 
     def point(self):
@@ -454,12 +420,12 @@ class NotifyView(StepDialog):
     """"Als bei der BKW angemeldet setzen" (``messpunkt-angemeldet``)."""
 
     status = MeteringPointStatus.REGISTERED
-    title = gettext_lazy("Mark as notified to the BKW")
+    title = grid_operator.text(gettext_lazy("Mark as notified to the %(operator)s"))
     submit_label = gettext_lazy("Mark as notified")
     form_class = NotifiedForm
 
     def get_lead(self):
-        return _("Metering point %(number)s (%(direction)s). The registration at the BKW has taken place.") % number_lead(self.point())
+        return _("Metering point %(number)s (%(direction)s). The registration at the %(operator)s has taken place.") % number_lead(self.point())
 
     def run(self, point, data, actor):
         metering_points.mark_notified(point, data["registered_on"], actor)
@@ -475,7 +441,7 @@ class ConfirmView(StepDialog):
     form_class = ConfirmationForm
 
     def get_lead(self):
-        return _("Metering point %(number)s (%(direction)s). The BKW has confirmed the registration.") % number_lead(self.point())
+        return _("Metering point %(number)s (%(direction)s). The %(operator)s has confirmed the registration.") % number_lead(self.point())
 
     def run(self, point, data, actor):
         metering_points.record_confirmation(point, data["confirmed_on"], data["start_date"], actor)
@@ -494,7 +460,7 @@ class StartDateView(StepDialog):
         return super().applicable() and self.point().start_date is None
 
     def get_lead(self):
-        return _("Metering point %(number)s (%(direction)s). The BKW has confirmed the registration.") % number_lead(self.point())
+        return _("Metering point %(number)s (%(direction)s). The %(operator)s has confirmed the registration.") % number_lead(self.point())
 
     def run(self, point, data, actor):
         metering_points.record_start_date(point, data["start_date"], actor)
@@ -512,7 +478,7 @@ class TerminateView(StepDialog):
         return super().applicable() and self.point().terminated_on is None
 
     def get_lead(self):
-        return _("Metering point %(number)s (%(direction)s). Enter the date that the BKW gives.") % number_lead(self.point())
+        return _("Metering point %(number)s (%(direction)s). Enter the date that the %(operator)s gives.") % number_lead(self.point())
 
     def run(self, point, data, actor):
         metering_points.terminate(point, data["terminated_on"], actor)
@@ -534,7 +500,6 @@ class PersonView(AssignmentDialog):
     """"Person zuweisen" and, with a person, "Person wechseln" (the flying change: the former person
     ends the day before "Gilt ab")."""
 
-    permission_required = (VIEW, CHANGE, VIEW_PERSONS)
     form_class = PersonAssignForm
     template_name = "management/metering_points/dialog_person.html"
     submit_label = gettext_lazy("Save")
@@ -574,7 +539,6 @@ class PersonEndView(AssignmentDialog):
     """"Zuordnung beenden" (``messpunkt-zuordnung-beenden``): the open assignment ends on a date and stays
     in the history."""
 
-    permission_required = (VIEW, CHANGE, VIEW_PERSONS)
     title = gettext_lazy("End assignment")
     submit_label = gettext_lazy("End assignment")
     form_class = AssignmentEndForm
@@ -614,8 +578,6 @@ class PersonEndView(AssignmentDialog):
 class PersonDeleteView(ManagementAccessMixin, View):
     """"Zuordnung löschen": a question first, then the deletion; only for an assignment that never took
     effect and was never ended (an entry made by mistake)."""
-
-    permission_required = (VIEW, CHANGE, VIEW_PERSONS)
 
     def target(self, pk):
         point = get_object_or_404(MeteringPoint, pk=pk)
@@ -664,7 +626,6 @@ class LegView(AssignmentDialog):
     """"LEG zuweisen" and, with a LEG, "LEG wechseln" with the move mask. The same dialog is used by the
     pages of the LEGs (the icon of a metering point there opens this address with its ``next``)."""
 
-    permission_required = (VIEW, CHANGE, VIEW_LEG)
     template_name = "management/metering_points/dialog_leg.html"
     submit_label = gettext_lazy("Save")
 
@@ -701,8 +662,7 @@ class LegView(AssignmentDialog):
     def render_dialog(self, request, form, **extra):
         related = []
         if isinstance(form, LegSwitchForm):
-            see_persons = request.user.has_perm(VIEW_PERSONS)
-            names = person_names(form.related) if see_persons else {}
+            names = person_names(form.related)
             for point in form.related:
                 parts = [direction_label(point)]
                 if point.location_id:
@@ -753,7 +713,6 @@ class MeteringPointNewView(DialogView):
     number is checked on leaving the field (``metering-points/check-number/``) and again on saving; a
     number that exists shows the notice with the link and blocks saving."""
 
-    permission_required = (VIEW, ADD)
     title = gettext_lazy("Create metering point")
     lead = gettext_lazy("A metering point belongs to a location. Choose the location before you enter the other details.")
     template_name = "management/metering_points/dialog_create.html"
@@ -763,17 +722,14 @@ class MeteringPointNewView(DialogView):
         return return_url(request, reverse("management:metering_points"))
 
     def get_form(self, data=None):
-        user = self.request.user
-        return MeteringPointCreateForm(
-            data, may_choose_leg=user.has_perm(VIEW_LEG), may_choose_location=user.has_perm(VIEW_LOCATION)
-        )
+        return MeteringPointCreateForm(data)
 
     def render_dialog(self, request, form, **extra):
         duplicate = getattr(form, "duplicate", None)
         return super().render_dialog(
-            request, form, duplicate=duplicate_summary(duplicate, request.user) if duplicate is not None else None,
+            request, form, duplicate=duplicate_summary(duplicate) if duplicate is not None else None,
             check_url=reverse("management:metering_points_check_number"),
-            location_url=reverse("management:metering_points_location_search") if "location" in form.fields else "",
+            location_url=reverse("management:metering_points_location_search"),
             **extra,
         )
 
@@ -800,19 +756,18 @@ class CheckNumberView(ManagementAccessMixin, View):
     is made when saving): ``{"message": "", "duplicate": null}`` or the message and, for a number that
     exists, its summary."""
 
-    permission_required = (VIEW, ADD)
     http_method_names = ["get"]
 
     def get(self, request):
         digits = request.GET.get("digits", "")[:40]
-        form = MeteringPointCreateForm({"number_digits": digits}, may_choose_leg=False, may_choose_location=False)
+        form = MeteringPointCreateForm({"number_digits": digits})
         form.full_clean()
         errors = form.errors.get("number_digits")
         if errors:
             return JsonResponse({"message": str(errors[0]), "duplicate": None})
         existing = metering_points.find_by_number(form.number)
         return JsonResponse(
-            {"message": "", "duplicate": duplicate_summary(existing, request.user) if existing is not None else None,
+            {"message": "", "duplicate": duplicate_summary(existing) if existing is not None else None,
              "title": str(_("This metering point number already exists.")),
              "link": str(_("Go to the existing metering point"))}
         )
@@ -833,17 +788,13 @@ class SuggestView(ManagementAccessMixin, View):
 
 
 class LocationSearchView(SuggestView):
-    permission_required = (VIEW, VIEW_LOCATION)
-
     def texts(self, text):
         return [str(location) for location in location_list.location_suggestions(text)]
 
 
 class PersonSearchView(SuggestView):
-    """The persons for "Person zuweisen": only with the right to see persons and to change metering points,
-    at most ten, active accounts with a customer number; the text holds the name and the customer number."""
-
-    permission_required = (VIEW, CHANGE, VIEW_PERSONS)
+    """The persons for "Person zuweisen": at most ten, active accounts with a customer number; the text holds
+    the name and the customer number."""
 
     def texts(self, text):
         return [person_search.label(person) for person in person_search.search(text)]
@@ -866,8 +817,6 @@ class PointPostView(ManagementAccessMixin, View):
 class ArchiveView(PointPostView):
     """"Messpunkt archivieren" and "Restore metering point"."""
 
-    permission_required = (VIEW, CHANGE)
-
     def act(self, request, point):
         metering_points.set_archived(point, request.POST.get("archive") != "0", request.user)
         messages.success(request, _("Saved."))
@@ -875,8 +824,6 @@ class ArchiveView(PointPostView):
 
 class DeleteView(ManagementAccessMixin, View):
     """"Messpunkt löschen": a question first, then the deletion; only possible without a history."""
-
-    permission_required = (VIEW, DELETE)
 
     def get(self, request, pk):
         point = get_object_or_404(MeteringPoint, pk=pk)

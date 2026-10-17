@@ -3,7 +3,7 @@
 Search, filters, sorting and the rows of the metering point tables under the locations. Pure query
 code, no request: the page passes the values it parsed. The search finds what the list and the
 detail page show: the address, the circuit, the numbers of the metering points, the names of their
-LEGs and, only for an account that may see persons, the names of the persons; never the remarks
+LEGs and the names of the persons; never the remarks
 (``LISTEN-STANDARD.md``, section 4).
 """
 
@@ -67,19 +67,18 @@ def apply_occupancy(queryset, value):
     return queryset
 
 
-def apply_circuit(queryset, bkw_number):
-    return queryset.filter(transformer_circuit__bkw_number=bkw_number) if bkw_number else queryset
+def apply_circuit(queryset, grid_number):
+    return queryset.filter(transformer_circuit__grid_number=grid_number) if grid_number else queryset
 
 
 def apply_problems(queryset):
     return queryset.filter(address_correction_open=True)
 
 
-def apply_search(queryset, text, *, see_persons=False, see_points=True, see_legs=True, today=None):
-    """Every word of the text must match something visible: the parts of the address, the circuit
-    (number and name), a metering point number (only with ``see_points``), the name of a LEG of a metering
-    point (only with ``see_legs``) and, with ``see_persons``, the name of a person who uses one. A branch that
-    the account may not see is not searched (D-084, M-4). Letters match without regard to case or
+def apply_search(queryset, text, *, include_assignments=True, today=None):
+    """Every word of the text must match something that the list or the page shows: the parts of the address, the
+    circuit (number and name), a metering point number and, with ``include_assignments``, the name of a LEG of
+    a metering point and the name of a person who uses one. Letters match without regard to case or
     accents (the collation of the columns); the identifiers of the exact collation are compared
     in capitals."""
     today = today or timezone.localdate()
@@ -88,17 +87,15 @@ def apply_search(queryset, text, *, see_persons=False, see_points=True, see_legs
         condition = (
             Q(street__icontains=word) | Q(house_number__icontains=word) | Q(postal_code__icontains=word)
             | Q(town__icontains=word) | Q(address_addition__icontains=word)
-            | Q(transformer_circuit__bkw_number__contains=upper) | Q(transformer_circuit__name__icontains=word)
+            | Q(transformer_circuit__grid_number__contains=upper) | Q(transformer_circuit__name__icontains=word)
+            | Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=upper))
         )
-        if see_points:
-            condition |= Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=upper))
-        if see_legs:
+        if include_assignments:
             condition |= Exists(
                 LegAssignment.objects.filter(
                     metering_point__location=OuterRef("pk"), leg__name__icontains=word
                 )
             )
-        if see_persons:
             condition |= Exists(
                 PersonAssignment.objects.not_ended(today).filter(
                     metering_point__location=OuterRef("pk")
@@ -118,7 +115,7 @@ def apply_sort(queryset, key, descending=False):
     address = [F("street"), Cast("house_number", IntegerField()), F("house_number"), F("pk")]
     first = []
     if key == "circuit":
-        first = [F("transformer_circuit__bkw_number")]
+        first = [F("transformer_circuit__grid_number")]
     elif key == "metering_points":
         first = [F("mp_count")]
     elif key == "occupancy":
@@ -160,13 +157,11 @@ def person_name(person):
     return f"{person.first_name} {person.last_name}".strip() or person.organisation_name
 
 
-def details(locations, today=None, *, see_persons=False, see_legs=True):
+def details(locations, today=None):
     """For the locations of one page: ``(rows, persons)`` with ``rows[location_id]`` the list of
     ``MeteringPointRow`` (metering points that are not archived, by number) and
     ``persons[location_id]`` the number of different persons with an assignment that is valid now
-    or later (the figure that "Occupancy" shows). The name of a person is given only with
-    ``see_persons``, the name of a LEG only with ``see_legs`` (D-084, M-4); the ids always, so that "no
-    person" and "no LEG" can be told from a name that the account may not see. Three queries."""
+    or later (the figure that "Occupancy" shows). Three queries."""
     today = today or timezone.localdate()
     ids = [location.pk for location in locations]
     points = list(
@@ -192,9 +187,9 @@ def details(locations, today=None, *, see_persons=False, see_legs=True):
                 metering_point=point,
                 status=point.status(today),
                 leg_id=leg.leg_id if leg else None,
-                leg_name=leg.leg.name if leg and see_legs else "",
+                leg_name=leg.leg.name if leg else "",
                 person_id=person.person_id if person else None,
-                person_name=person_name(person.person) if person and see_persons else "",
+                person_name=person_name(person.person) if person else "",
             )
         )
     return rows, {location_id: len(found) for location_id, found in persons.items()}
@@ -214,8 +209,8 @@ _LOCATION_TEXT = re.compile(r"(?P<street>.+) (?P<number>\S+), (?P<postal>\d{4}) 
 def location_suggestions(text, limit=LOCATION_CHOICE_LIMIT):
     """At most ``limit`` locations (not archived) that match the text: the parts of the address or the
     number of one of their metering points. For the suggestions of the field; never the remarks and never the
-    name of a LEG (the account that picks a location needs no right to see LEGs)."""
-    return list(apply_search(locations_for_choice(), text, see_legs=False)[:limit])
+    name of a LEG or of a person (the field finds a place by its address or a number)."""
+    return list(apply_search(locations_for_choice(), text, include_assignments=False)[:limit])
 
 
 @dataclass(frozen=True)

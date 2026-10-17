@@ -173,6 +173,7 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "axes.AccessFailureLog",
                 "addresses.ImportRequest",
                 "auth.Group",
+                "community.GridOperator",
             },
         )
 

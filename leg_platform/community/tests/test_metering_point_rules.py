@@ -1,4 +1,4 @@
-"""The rules of the metering point pages (D-079) at service level: the steps towards the BKW, archiving and
+"""The rules of the metering point pages (D-079) at service level: the steps towards the grid operator, archiving and
 deleting, the LEG switch with the move mask, the search for a person and the queries of the list. The pages
 only call these; their own tests are in ``management/tests/test_metering_point_pages.py``."""
 
@@ -60,7 +60,10 @@ class StepTests(TestCase):
         self.assertEqual(status(date(2026, 7, 1)), MeteringPointStatus.TERMINATED)
         self.assertEqual(
             self.events(),
-            [HistoryEvent.REGISTERED_WITH_BKW, HistoryEvent.CONFIRMATION_RECORDED, HistoryEvent.TERMINATION_RECORDED],
+            [
+                HistoryEvent.REGISTERED_WITH_OPERATOR, HistoryEvent.CONFIRMATION_RECORDED,
+                HistoryEvent.TERMINATION_RECORDED,
+            ],
         )
         confirmation = history.entries_for(self.mp).get(event=HistoryEvent.CONFIRMATION_RECORDED)
         self.assertEqual(confirmation.detail, {"confirmed_on": day(-2).isoformat(), "start_date": day(5).isoformat()})
@@ -106,7 +109,7 @@ class StepTests(TestCase):
         step = lambda has_leg: metering_points.next_step(self.mp, has_leg, TODAY)  # noqa: E731
         self.assertEqual(step(True), metering_points.NOTIFY)
         self.assertEqual(step(False), metering_points.LEG_MISSING)
-        self.mp.registered_with_bkw_on = day(-1)
+        self.mp.registered_with_operator_on = day(-1)
         self.assertEqual(step(False), metering_points.CONFIRM)
         self.mp.is_archived = True
         self.assertIsNone(step(True))
@@ -265,12 +268,12 @@ class ListQueryTests(TestCase):
         cls.leg_a, cls.leg_b = make_leg("LEG Bahnhof"), make_leg("LEG Quartier")
         cls.musterweg = make_location("Musterweg", "12", "3063", "Ittigen", remark="secret remark")
         cls.registered = make_metering_point(1, location=cls.musterweg, remark="hidden note")
-        cls.notified = make_metering_point(2, location=cls.musterweg, registered_with_bkw_on=day(-9))
+        cls.notified = make_metering_point(2, location=cls.musterweg, registered_with_operator_on=day(-9))
         cls.standby = make_metering_point(
-            3, location=cls.musterweg, registered_with_bkw_on=day(-9), confirmed_on=day(-8)
+            3, location=cls.musterweg, registered_with_operator_on=day(-9), confirmed_on=day(-8)
         )
         cls.active = make_metering_point(
-            4, location=cls.musterweg, registered_with_bkw_on=day(-9), confirmed_on=day(-8), start_date=day(-1)
+            4, location=cls.musterweg, registered_with_operator_on=day(-9), confirmed_on=day(-8), start_date=day(-1)
         )
         cls.loose = make_metering_point(5)
         cls.archived = make_metering_point(6, location=cls.musterweg, is_archived=True)
@@ -317,18 +320,17 @@ class ListQueryTests(TestCase):
         self.assertEqual(len(problem_texts["1"]), 1)
 
     def test_the_search_finds_what_is_shown_and_never_the_remarks(self):
-        def search(text, see_persons=False):
-            return sorted(self.numbers(metering_point_list.apply_search(self.view(), text, see_persons=see_persons, today=TODAY)))
+        def search(text):
+            return sorted(self.numbers(metering_point_list.apply_search(self.view(), text, today=TODAY)))
 
         self.assertEqual(search("000002"), ["2"])
         self.assertEqual(search("musterweg 12"), ["1", "2", "3", "4", "6"])
         self.assertEqual(search("quartier"), ["4"])  # the name of the LEG
         self.assertEqual(search("hidden note"), [])
         self.assertEqual(search("secret remark"), [])
-        # A name is found only with the right to see persons.
-        self.assertEqual(search("muster", see_persons=False), ["1", "2", "3", "4", "6"])  # "Musterweg"
-        self.assertEqual(search("anna", see_persons=False), [])
-        self.assertEqual(search("anna", see_persons=True), ["4"])
+        # The name of a person is found as well (every staff account sees the names).
+        self.assertEqual(search("muster"), ["1", "2", "3", "4", "6"])  # "Musterweg" and the person "Muster"
+        self.assertEqual(search("anna"), ["4"])
 
     def test_the_sort_by_status_leg_and_location_puts_missing_values_last(self):
         def ordered(key, descending=False):

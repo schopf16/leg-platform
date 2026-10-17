@@ -1,15 +1,14 @@
 """What each list prints (D-082): the table like the list and the detail pages of its entries.
 
-Every area takes the address of the list (``request.GET``) and the account. The list is parsed again on the
+Every area takes the address of the list (``request.GET``). The list is parsed again on the
 server with the list framework (``lists.parse``) and queried with the same function as the page
 (``build_list`` of the views), so the search, the filters and the sorting are the ones of the page, whatever a
 browser renders. The entries come from that queryset only: the posted ids of a selection are matched against
 it and anything else is ignored.
 
-The rights are those of the page: the account needs the right to view the area (the view checks it), and a
-detail page prints only what the page shows that account: the names of persons need ``view_personrecord``, the
-metering points of a LEG or a person ``view_meteringpoint``. Remarks and notes are printed where the page shows
-them, nowhere else. The change history ("Verlauf") of the pages is not printed.
+Every staff account may print every list (D-086), and a detail page prints what the page shows. Remarks and
+notes are printed where the page shows them, nowhere else. The change history ("Verlauf") of the pages is not
+printed.
 """
 
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from django.utils.translation import pgettext
 
 from leg_platform.community import (
     assignments,
+    grid_operator,
     leg_list,
     legs,
     location_list,
@@ -92,7 +92,6 @@ class Prepared:
 
 class Area:
     key = ""
-    permission = ""
     filename = ""
     widths = {}
 
@@ -127,16 +126,16 @@ class Area:
         text = dict(options).get(value, value)
         return [(label, str(text))]
 
-    def prepare(self, user, params):
+    def prepare(self, params):
         raise NotImplementedError
 
-    def details(self, user, items, today):
+    def details(self, items, today):
         raise NotImplementedError
 
-    def document(self, user, prepared, items, chosen, today):
+    def document(self, prepared, items, chosen, today):
         """The document: the list with all ``items`` and the detail pages of the ``chosen`` ones."""
         table = Table(prepared.columns, [item.cells for item in items])
-        pages = self.details(user, chosen, today) if chosen else []
+        pages = self.details(chosen, today) if chosen else []
         return PrintDocument(self.title(), prepared.info, table, pages)
 
 
@@ -145,14 +144,13 @@ class Area:
 
 class LegArea(Area):
     key = "legs"
-    permission = leg_views.VIEW
     filename = "legs.pdf"
     widths = {"name": 3.2, "quota": 2.6, "participants": 1.9, "tier": 2.2, "points": 1.3}
 
     def name(self):
         return _("LEGs")
 
-    def prepare(self, user, params):
+    def prepare(self, params):
         found = leg_views.build_list(params)
         today, threshold = found.today, found.threshold
 
@@ -176,17 +174,15 @@ class LegArea(Area):
             self.info(found.state, found.columns, filters, today), load,
         )
 
-    def details(self, user, items, today):
+    def details(self, items, today):
         threshold = ManagementSettings.load().warning_threshold_percent
-        see_points = user.has_perm(leg_views.VIEW_POINTS)
-        see_persons = user.has_perm(leg_views.VIEW_PERSONS)
         pages = []
         for item in items:
             leg, summary = item.source.leg, item.source.summary
             level = legs.quota_level(leg.production_quota_percent, threshold)
             circuits = list(
-                TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("bkw_number")
-                .values_list("bkw_number", flat=True)
+                TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("grid_number")
+                .values_list("grid_number", flat=True)
             )
             quota = Section(
                 _("Production quota"),
@@ -210,9 +206,7 @@ class LegArea(Area):
                     (_("Transformer circuits"), ", ".join(circuits) or DASH),
                 ],
             )
-            sections = [quota, master, composition]
-            if see_points:
-                sections.append(self.members_section(leg, today, see_persons))
+            sections = [quota, master, composition, self.members_section(leg, today)]
             title = leg.name + (f" ({_('archived')})" if leg.is_archived else "")
             pages.append(
                 DetailPage(
@@ -223,22 +217,19 @@ class LegArea(Area):
         return pages
 
     @staticmethod
-    def members_section(leg, today, see_persons):
+    def members_section(leg, today):
         points = leg_list.members_of(leg, today)
-        occupants = leg_list.occupants(points, today, see_persons=see_persons)
+        occupants = leg_list.occupants(points, today)
         rows = []
         for point in points:
             location = point.location
             circuit = location.transformer_circuit if location else None
-            if point.pk in occupants:
-                occupant = occupants[point.pk] if see_persons and occupants[point.pk] else DASH
-            else:
-                occupant = _("no person")
+            occupant = occupants.get(point.pk) or (DASH if point.pk in occupants else _("no person"))
             rows.append(
                 [
                     f"{point.number or DASH}\n{Direction(point.direction).label}",
                     f"{location.street} {location.house_number}" if location else DASH,
-                    circuit.bkw_number if circuit else DASH,
+                    circuit.grid_number if circuit else DASH,
                     str(MeteringPointStatus(point.status(today)).label),
                     occupant,
                 ]
@@ -257,15 +248,14 @@ class LegArea(Area):
 
 class PersonArea(Area):
     key = "persons"
-    permission = person_views.VIEW
     filename = "persons.pdf"
     widths = {"name": 3.2, "number": 1.5, "address": 3.0, "points": 1.9, "account": 1.4}
 
     def name(self):
         return _("Persons")
 
-    def prepare(self, user, params):
-        found = person_views.build_list(params, user)
+    def prepare(self, params):
+        found = person_views.build_list(params)
         today = timezone.localdate()
         total = found.queryset.count()
 
@@ -276,26 +266,20 @@ class PersonArea(Area):
             for person in people:
                 entry = person_views.list_entry(person, locked)
                 name = f"{entry['name']}\n{entry['contact']}" if entry["contact"] else entry["name"]
-                cells = [name, entry["number"], or_dash(entry["address"])]
-                if found.see_points:
-                    cells.append(entry["points"])
-                cells.append(str(entry["account_label"]))
+                cells = [name, entry["number"], or_dash(entry["address"]), entry["points"], str(entry["account_label"])]
                 items.append(Item(person.pk, entry["name"], cells, person))
             return items
 
         filters = self.option_line(_("Status"), found.state, "status", person_views.status_options())
-        if found.see_points:
-            filters += self.option_line(
-                _("Metering points"), found.state, "points", person_views.points_options()
-            )
+        filters += self.option_line(_("Metering points"), found.state, "points", person_views.points_options())
         return Prepared(
             self, found.state, total, [self.column(column) for column in found.columns],
             self.info(found.state, found.columns, filters, today), load,
         )
 
-    def details(self, user, items, today):
-        see_points = user.has_perm(person_views.VIEW_POINTS)
+    def details(self, items, today):
         locked = person_list.locked_account_ids(only=[item.pk for item in items])
+        operator = grid_operator.name()
         pages = []
         for item in items:
             person = item.source
@@ -335,23 +319,27 @@ class PersonArea(Area):
                     (_("IBAN"), or_dash(person_views.format_iban(record.iban) if record else "")),
                     (_("Paper invoice"), _("Yes") if record and record.paper_invoice else _("No")),
                     (_("Customer number"), number),
-                    (_("BKW customer number"), or_dash(record.bkw_customer_number if record else "")),
+                    (
+                        _("%(operator)s customer number") % {"operator": operator},
+                        or_dash(record.operator_customer_number if record else ""),
+                    ),
                 ],
             )
-            if record and record.shares:
+            share_entries = persons.share_history(person)
+            current = persons.current_shares(share_entries, today)
+            if share_entries:
                 cooperative = Section(
                     _("Cooperative"),
-                    [
-                        (_("Shares"), str(record.shares)),
-                        (_("Period"), person_views.PersonDetailView.shares_period(record)),
-                    ],
+                    [(_("Shares"), str(current) if current is not None else DASH)],
+                    table=Table(
+                        [Column(_("Applies from"), 1.5), Column(_("Number of shares"), 1.5)],
+                        [[format_date(entry.valid_from), str(entry.quantity)] for entry in share_entries],
+                    ),
                 )
             else:
                 cooperative = Section(_("Cooperative"), note=_("No shares recorded."))
             note = Section(_("Note"), [(_("Note"), or_dash(record.staff_note if record else ""))])
-            sections = [details, contact, address, payment, cooperative, note]
-            if see_points:
-                sections.append(self.points_section(person, today))
+            sections = [details, contact, address, payment, cooperative, note, self.points_section(person, today)]
             pages.append(
                 DetailPage(name, f"{_('Customer number')} {number} · {account.label}", [], sections)
             )
@@ -362,7 +350,7 @@ class PersonArea(Area):
         rows = person_list.sort_point_rows(person_list.point_rows(person, today), person_list.DEFAULT_POINT_SORT)
         table_rows = []
         for row in rows:
-            text, _tone = person_views.bkw_text(row)
+            lines, _tone = person_views.registration_text(row)
             table_rows.append(
                 [
                     or_dash(row.address),
@@ -370,12 +358,13 @@ class PersonArea(Area):
                     str(Direction(row.point.direction).label),
                     or_dash(row.leg_name if row.leg_id else ""),
                     "\n".join(person_views.assignment_lines(row.assignment)),
-                    str(text),
+                    "\n".join(str(line) for line in lines),
                 ]
             )
         columns = [
             Column(_("Location"), 1.8), Column(_("Metering point"), 3.2), Column(_("Direction"), 1.3),
-            Column(_("LEG"), 1.6), Column(_("Assigned"), 1.5), Column(_("BKW registration"), 1.8),
+            Column(_("LEG"), 1.6), Column(_("Assigned"), 1.5),
+            Column(_("Registration at the %(operator)s") % {"operator": grid_operator.name()}, 1.8),
         ]
         return Section(
             _("Metering points and assignments"), table=Table(columns, table_rows, _("No metering points assigned."))
@@ -387,22 +376,19 @@ class PersonArea(Area):
 
 class LocationArea(Area):
     key = "locations"
-    permission = location_views.VIEW
     filename = "locations.pdf"
     widths = {"address": 3.6, "circuit": 1.8, "metering_points": 2.4, "occupancy": 1.6}
 
     def name(self):
         return _("Locations")
 
-    def prepare(self, user, params):
-        found = location_views.build_list(params, user)
+    def prepare(self, params):
+        found = location_views.build_list(params)
         total = found.queryset.count()
 
         def load():
             locations = list(found.queryset[:MAX_LIST_ENTRIES])
-            _rows, occupants = location_list.details(
-                locations, found.today, see_persons=found.see_persons, see_legs=found.see_legs
-            )
+            _rows, occupants = location_list.details(locations, found.today)
             items = []
             for location in locations:
                 address = f"{location.street} {location.house_number}"
@@ -413,27 +399,25 @@ class LocationArea(Area):
                     with_problem(address, " ".join(problem)),
                     location_views.circuit_phrase(location),
                     location_views.count_phrase(location.mp_count),
-                    location_views.occupancy_phrase(location.mp_count, occupants[location.pk], found.see_persons),
+                    location_views.occupancy_phrase(location.mp_count, occupants[location.pk]),
                 ]
                 items.append(Item(location.pk, f"{location.street} {location.house_number}", cells, location))
             return items
 
         filters = self.option_line(
-            _("Transformer circuit"), found.state, "circuit", [(c.bkw_number, c.bkw_number) for c in found.circuits]
+            _("Transformer circuit"), found.state, "circuit", [(c.grid_number, c.grid_number) for c in found.circuits]
         )
         filters += self.option_line(
-            _("Occupancy"), found.state, "occupancy", location_views.occupancy_options(found.see_persons)
+            _("Occupancy"), found.state, "occupancy", location_views.occupancy_options()
         )
         return Prepared(
             self, found.state, total, [self.column(column) for column in found.columns],
             self.info(found.state, found.columns, filters, found.today), load,
         )
 
-    def details(self, user, items, today):
-        see_persons = user.has_perm(location_views.VIEW_PERSONS)
-        see_legs = user.has_perm(location_views.VIEW_LEG)
+    def details(self, items, today):
         locations = [item.source for item in items]
-        rows, occupants = location_list.details(locations, today, see_persons=see_persons, see_legs=see_legs)
+        rows, occupants = location_list.details(locations, today)
         pages = []
         for location in locations:
             points = rows[location.pk]
@@ -462,14 +446,11 @@ class LocationArea(Area):
             remark = Section(_("Remark"), [(_("Remark"), or_dash(location.remark))])
             point_rows = []
             for row in points:
-                if row.person_id:
-                    occupant = or_dash(row.person_name) if see_persons else DASH
-                else:
-                    occupant = _("no person")
+                occupant = or_dash(row.person_name) if row.person_id else _("no person")
                 point_rows.append(
                     [
                         f"{row.metering_point.number or DASH}\n{Direction(row.metering_point.direction).label}",
-                        (row.leg_name if see_legs else DASH) if row.leg_id else _("no LEG"),
+                        row.leg_name if row.leg_id else _("no LEG"),
                         str(MeteringPointStatus(row.status).label),
                         occupant,
                     ]
@@ -485,9 +466,8 @@ class LocationArea(Area):
                     table=Table(point_columns, point_rows, _("No metering points at this location.")),
                     note=_("The assignment to a person is changed at the person or at the metering point."),
                 ),
+                self.assignments_section(location),
             ]
-            if see_persons:
-                sections.append(self.assignments_section(location))
             subtitle = " · ".join(
                 [
                     location_views.circuit_phrase(location), location_views.count_phrase(len(points)),
@@ -533,7 +513,7 @@ def step_options():
     """The quick filters without their counts."""
     return [
         (metering_point_list.STEP_ALL, _("All")),
-        (metering_point_list.STEP_NOTIFY, _("Notify the BKW")),
+        (metering_point_list.STEP_NOTIFY, _("Notify the %(operator)s") % {"operator": grid_operator.name()}),
         (metering_point_list.STEP_CONFIRM, _("Confirmation pending")),
         (metering_point_list.STEP_START, _("Start date pending")),
         (metering_point_list.STEP_ARCHIVED, _("archived")),
@@ -542,15 +522,14 @@ def step_options():
 
 class MeteringPointArea(Area):
     key = "metering_points"
-    permission = metering_point_views.VIEW
     filename = "metering-points.pdf"
     widths = {"number": 5.2, "location": 2.2, "leg": 2.4, "status": 1.6, "next_step": 1.8}
 
     def name(self):
         return _("Metering points")
 
-    def prepare(self, user, params):
-        found = metering_point_views.build_list(params, user)
+    def prepare(self, params):
+        found = metering_point_views.build_list(params)
         total = found.queryset.count()
 
         def load():
@@ -574,11 +553,8 @@ class MeteringPointArea(Area):
                         f"{point.number or DASH} · {Direction(point.direction).label}",
                         " ".join(str(problems.describe(problem)) for problem in found_problems),
                     ),
-                    or_dash(
-                        f"{point.location.street} {point.location.house_number}"
-                        if point.location_id and found.see_locations else ""
-                    ),
-                    or_dash(point.current_leg_name if point.current_leg_id and found.see_legs else ""),
+                    or_dash(f"{point.location.street} {point.location.house_number}" if point.location_id else ""),
+                    or_dash(point.current_leg_name if point.current_leg_id else ""),
                     last,
                 ]
                 items.append(Item(point.pk, point.number or DASH, cells, point))
@@ -593,8 +569,7 @@ class MeteringPointArea(Area):
             self.info(state, metering_point_views.ALL_COLUMNS, filters, found.today), load,
         )
 
-    def details(self, user, items, today):
-        see_persons = user.has_perm(metering_point_views.VIEW_PERSONS)
+    def details(self, items, today):
         pages = []
         for item in items:
             point = item.source
@@ -605,7 +580,7 @@ class MeteringPointArea(Area):
             facts = [
                 (_("Direction"), str(Direction(point.direction).label)),
                 (_("Location"), f"{location.street} {location.house_number}" if location else DASH),
-                (_("Transformer circuit"), circuit.bkw_number if circuit else DASH),
+                (_("Transformer circuit"), circuit.grid_number if circuit else DASH),
             ]
             for label, value, unit in (
                 (_("PV power"), point.pv_power_kwp, "kWp"),
@@ -616,13 +591,13 @@ class MeteringPointArea(Area):
                     facts.append((label, f"{Decimal(value):.2f} {unit}"))
             if point.remark:
                 facts.append((_("Remark"), point.remark))
-            status_facts = [(_("State"), str(MeteringPointStatus(status).label))]
+            status_facts = [
+                (_("State"), with_problem(str(MeteringPointStatus(status).label), metering_point_views.status_note(point, status, today)))
+            ]
             if status == MeteringPointStatus.CONFIRMED and point.start_date is None:
                 status_facts.append((_("Start date"), _("missing")))
             elif point.start_date:
                 status_facts.append((_("Start date"), format_date(point.start_date)))
-            if point.terminated_on:
-                status_facts.append((_("Terminated to"), format_date(point.terminated_on)))
             leg_rows = metering_point_views.assignment_rows(
                 metering_points.chain(assignments.LEG, point, today),
                 single_label=_("Assigned"), name_of=lambda assigned: assigned.leg.name, url_of=lambda assigned: "",
@@ -630,7 +605,7 @@ class MeteringPointArea(Area):
             person_rows = metering_point_views.assignment_rows(
                 metering_points.chain(assignments.PERSON, point, today),
                 single_label=_("Occupied by"),
-                name_of=lambda assigned: metering_point_views.person_name(assigned.person) if see_persons else DASH,
+                name_of=lambda assigned: metering_point_views.person_name(assigned.person),
                 url_of=lambda assigned: "",
             )
             sections = [

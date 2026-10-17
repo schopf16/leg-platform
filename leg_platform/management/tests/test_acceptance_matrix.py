@@ -1,14 +1,15 @@
-"""Independent acceptance pass of the management area (phase 2, D-077 to D-084): the negative authorization of
+"""Independent acceptance pass of the management area (phase 2, D-077 to D-086): the negative authorization of
 EVERY management route with real requests, and what a request may and may not change.
 
 The route walk of ``test_access.py`` asks every route with an empty request. This module goes further:
 
-* every route is asked with a payload that really works for an account with all rights (a control proves
-  that the payload changes the state), so that a refusal means the access check and not an invalid form;
+* every route is asked with a payload that really works for a staff account (a control proves that the
+  payload changes the state), so that a refusal means the access check and not an invalid form;
 * a snapshot of the whole domain (every row of every table of the community, the state of the accounts) is
   compared before and after, so that "no state change" is checked, not only the status code;
-* the accounts are the five kinds of D-077: anonymous, an account without staff status, staff without any right,
-  staff with only the view right of one area (and of all areas) and staff without the second factor.
+* the accounts are the kinds of D-086: anonymous, an account without staff status, a blocked staff account, a
+  staff account without the second factor, and one plain staff account (no group, no permission), which may use
+  every page and sees all its data.
 
 A new route without an entry in ``cases`` fails ``test_every_route_has_a_case``; the table has to be kept up to
 date with the URL configuration (that is the point: nobody adds a route without thinking about its refusals).
@@ -35,6 +36,7 @@ from leg_platform.community.models import (
     MeteringPoint,
     PersonAssignment,
     PersonRecord,
+    ShareChange,
     TransformerCircuit,
 )
 from leg_platform.community.tests.helpers import (
@@ -53,28 +55,10 @@ TODAY = timezone.localdate()
 LOGIN = reverse("accounts:login")
 SETUP = reverse("accounts:two_factor_setup")
 
-# One route: its name, the arguments of the address, the data of a POST that works for an account with every
-# right, whether that POST changes the domain (the control proves it), JSON instead of a form, and the query of
+# One route: its name, the arguments of the address, the data of a POST that works for a staff account,
+# whether that POST changes the domain (the control proves it), JSON instead of a form, and the query of
 # a GET.
 Case = namedtuple("Case", "name args data changes json query", defaults=((), {}, False, False, {}))
-
-# What the account of an area may open with the view right alone (D-077, section 4: read access = view). The
-# overview and the saved widths need the view right of any area.
-READ = {
-    "locations": {"locations", "locations_print", "locations_expanded", "locations_detail"},
-    "metering_points": {"metering_points", "metering_points_print", "metering_points_detail"},
-    "legs": {"legs", "legs_print", "legs_detail"},
-    "persons": {"persons", "persons_print", "persons_detail"},
-    "settings": {"settings", "settings_check"},
-}
-ANY_AREA = {"overview", "list_widths"}
-VIEWERS = {
-    "locations": "view_location",
-    "metering_points": "view_meteringpoint",
-    "legs": "view_leg",
-    "persons": "view_personrecord",
-    "settings": "view_managementsettings",
-}
 
 
 def month_end(day):
@@ -83,7 +67,7 @@ def month_end(day):
 
 SNAPSHOT_MODELS = (
     Location, TransformerCircuit, MeteringPoint, Leg, LegAssignment, PersonAssignment, HistoryEntry,
-    ManagementSettings, PersonRecord,
+    ManagementSettings, PersonRecord, ShareChange,
 )
 
 
@@ -105,21 +89,17 @@ def preferences():
     return list(ListPreference.objects.order_by("pk").values_list())
 
 
-# The cases that the per-kind tests below ask (anonymous, no staff status, no right, no second factor, a blocked
+# The cases that the per-kind tests below ask (anonymous, no staff status, no second factor, a blocked
 # account, a missing token, other methods). ``test_access.RouteWalkTests/AccessTests`` already ask EVERY route for
 # those kinds, so here one case of each kind of view is enough: a list, a detail, a dialog, a button that posts,
 # a JSON endpoint and a print, each of every area. What is asked of every route is checked without a request
 # (``test_no_route_is_exempt_from_the_csrf_check``, ``test_every_view_answers_only_the_methods_it_knows``). The
-# viewer matrix and the forged ids below still ask every route.
+# control payloads and the forged ids below still ask every route.
 SAMPLE = frozenset({
     "overview", "settings", "list_widths", "persons_note",
     "locations", "locations_detail", "locations_address", "locations_circuit_new", "circuits_new",
     "metering_points_detail", "metering_points_notify",
     "legs", "legs_quota", "legs_delete",
-})
-VIEWER_SAMPLE = frozenset({
-    "overview", "list_widths", "settings", "persons_note", "locations_detail", "locations_address",
-    "metering_points_notify", "legs_detail", "legs_quota", "circuits_new",
 })
 
 
@@ -130,11 +110,9 @@ class MatrixBase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.plain = create_active_user("plain.person@example.org")
-        cls.none = staff_user("staff.none@example.org")
-        cls.viewers = {area: staff_user(f"viewer.{area}@example.org", code) for area, code in VIEWERS.items()}
-        cls.viewer_all = staff_user("viewer.all@example.org", *VIEWERS.values())
-        cls.second_factor_missing = staff_user("staff.nosecond@example.org", superuser=True)
-        cls.administrator = staff_user("administrator.person@example.org", superuser=True)
+        cls.staff = staff_user("staff.person@example.org")  # no group, no permission
+        cls.administrator = staff_user("administrator.person@example.org", superuser=True)  # used by test_acceptance_flows
+        cls.second_factor_missing = staff_user("staff.nosecond@example.org")
 
         row = ManagementSettings.load()
         row.country_code, row.identifier = "CH", "1A2B3C4D5E6"
@@ -157,12 +135,12 @@ class MatrixBase(TestCase):
 
         d = TODAY
         cls.point_registered = make_metering_point(1, location=cls.place)
-        cls.point_notified = make_metering_point(2, location=cls.place, registered_with_bkw_on=d - timedelta(days=5))
+        cls.point_notified = make_metering_point(2, location=cls.place,         registered_with_operator_on=d - timedelta(days=5))
         cls.point_standby = make_metering_point(
-            3, location=cls.place, registered_with_bkw_on=d - timedelta(days=9), confirmed_on=d - timedelta(days=8)
+                    3, location=cls.place, registered_with_operator_on=d - timedelta(days=9), confirmed_on=d - timedelta(days=8)
         )
         cls.point_active = make_metering_point(
-            4, location=cls.place, registered_with_bkw_on=d - timedelta(days=40),
+                    4, location=cls.place, registered_with_operator_on=d - timedelta(days=40),
             confirmed_on=d - timedelta(days=39), start_date=d - timedelta(days=30),
         )
         cls.point_future = make_metering_point(5, location=cls.place)
@@ -196,8 +174,8 @@ class MatrixBase(TestCase):
             Case("persons_print", data={"scope": "list"}),
             Case("persons_detail", pk(self.anna)),
             Case("persons_note", pk(self.anna), {"note": "a note"}, True),
-            Case("persons_bkw_number", pk(self.anna), {"bkw_customer_number": "B-1"}, True),
-            Case("persons_shares", pk(self.anna), {"shares": "5", "shares_from": date(-1)}, True),
+            Case("persons_operator_number", pk(self.anna), {"operator_customer_number": "B-1"}, True),
+            Case("persons_shares", pk(self.anna), {"quantity": "5", "valid_from": date(-1)}, True),
             # A token of a suggestion that does not exist: nothing to decide on, so nothing changes (no control).
             Case("persons_address_suggestion", pk(self.anna), {"action": "dismiss", "token": "x"}),
             # Locations
@@ -209,14 +187,14 @@ class MatrixBase(TestCase):
             Case("locations_address", pk(self.place), address, True),
             Case("locations_remark", pk(self.place), {"remark": "a remark"}, True),
             Case("locations_circuit", pk(self.place), {"transformer_circuit": "TRA2000"}, True),
-            Case("locations_circuit_new", pk(self.place), {"bkw_number": "TRA3000", "name": "Drei"}, True),
+            Case("locations_circuit_new", pk(self.place), {"grid_number": "TRA3000", "name": "Drei"}, True),
             Case("locations_metering_point_new", pk(self.place), {"direction": "consumption", "number_digits": "123"}, True),
             Case("locations_archive", pk(self.place), {}, True),
             Case("locations_delete", pk(self.place_clean), {}, True),
             Case("locations_confirm", pk(self.place_new), {}, True),
             Case("locations_suggestion", pk(self.place_suggestion), {"action": "dismiss"}, True),
-            Case("circuits_new", data={"bkw_number": "TRA4000", "name": "Vier"}, changes=True),
-            Case("circuits_edit", pk(self.circuit_two), {"bkw_number": "TRA2001", "name": "Zwei b"}, True),
+            Case("circuits_new",             data={"grid_number": "TRA4000", "name": "Vier"}, changes=True),
+                        Case("circuits_edit", pk(self.circuit_two), {"grid_number": "TRA2001", "name": "Zwei b"}, True),
             # Metering points
             Case("metering_points"),
             Case("metering_points_print", data={"scope": "list"}),
@@ -264,20 +242,6 @@ class MatrixBase(TestCase):
             return client.post(url, data=case.data, content_type="application/json")
         return client.post(url, case.data)
 
-    @staticmethod
-    def allowed(key, case, method):
-        """Whether an account that has only the view right of the area ``key`` ("all": of every area) may pass the
-        access check of the case. Derived from D-077, not from the code: read = view, everything else needs more."""
-        keys = set(READ) if key == "all" else {key}
-        names = set(ANY_AREA)
-        for area in keys:
-            names |= READ[area]
-        if key == "all":
-            names.add("metering_points_location_search")  # the right to view metering points and locations
-        if case.name == "settings" and method == "post":
-            return False  # saving needs the right to change
-        return case.name in names
-
 
 class RouteTableTests(MatrixBase):
     def test_the_snapshot_sees_every_kind_of_change(self):
@@ -317,11 +281,9 @@ class RouteTableTests(MatrixBase):
         in_conf = {resolve(path).url_name for path in PATHS}
         self.assertEqual(in_conf, {case.name for case in self.cases()})
 
-    def test_the_viewer_sets_name_only_existing_routes(self):
+    def test_the_sample_names_only_existing_routes(self):
         names = {case.name for case in self.cases()}
-        for area_names in READ.values():
-            self.assertLessEqual(area_names, names)
-        self.assertLessEqual(SAMPLE | VIEWER_SAMPLE, names)
+        self.assertLessEqual(SAMPLE, names)
 
     def test_no_route_is_exempt_from_the_csrf_check(self):
         """What the per-kind tests ask only of a sample is asked of every route here, without a request: the
@@ -335,10 +297,11 @@ class RouteTableTests(MatrixBase):
                 if view_class is not None:
                     self.assertFalse([m for m in ("put", "patch", "delete") if hasattr(view_class, m)])
 
-    def test_the_control_payloads_really_work_for_an_account_with_every_right(self):
-        """Without this a refusal below could hide an invalid payload: with every right each payload changes the
-        domain (or, for a read case, answers); the change is rolled back, so each case starts from the same data."""
-        client = self.login(self.administrator)
+    def test_the_control_payloads_really_work_for_a_plain_staff_account(self):
+        """Without this a refusal below could hide an invalid payload: a staff account without any group or
+        permission changes the domain with each payload (or, for a read case, is answered); the change is rolled
+        back, so each case starts from the same data."""
+        client = self.login(self.staff)
         for case in self.cases():
             if not (case.changes or case.data):
                 continue
@@ -360,10 +323,6 @@ class RouteTableTests(MatrixBase):
 
 
 class NegativeAuthorizationTests(MatrixBase):
-    def assert_nothing_changed(self, case, method, response, before, before_preferences):
-        self.assertEqual(snapshot(), before, f"{case.name} {method}: the state changed")
-        self.assertEqual(preferences(), before_preferences, f"{case.name} {method}: the preferences changed")
-
     def test_the_anonymous_visitor_gets_the_login_and_nothing_changes(self):
         client = Client()
         before, before_preferences = snapshot(), preferences()
@@ -391,65 +350,37 @@ class NegativeAuthorizationTests(MatrixBase):
         self.assertEqual(snapshot(), before)
         self.assertEqual(preferences(), before_preferences)
 
-    def test_a_staff_account_without_any_right_is_refused_and_nothing_changes(self):
-        client = self.login(self.none)
+    def test_a_plain_staff_account_opens_every_page_and_sees_its_data(self):
+        """No group, no permission: no page of any area is refused, and a page shows the names that belong to it
+        (D-086: the person, the LEG and the location of a metering point are no longer hidden)."""
+        client = self.login(self.staff)
         before, before_preferences = snapshot(), preferences()
-        for case in self.sample():
-            for method in ("get", "post"):
-                with self.subTest(case=case.name, method=method):
-                    response = self.request(client, case, method)
-                    self.assertEqual(response.status_code, 403)
-                    self.assertNotIn(self.anna.email.encode(), response.content)
-                    self.assertNotIn(b"Muster", response.content)
+        for case in self.cases():
+            with self.subTest(case=case.name):
+                response = self.request(client, case, "get")
+                self.assertNotEqual(response.status_code, 403)
+                self.assertLess(response.status_code, 500)
+                if response.status_code == 302:
+                    self.assertFalse(response["Location"].startswith(LOGIN), response["Location"])
+        pages = {
+            "overview", "settings", "persons", "persons_detail", "locations", "locations_detail",
+            "metering_points", "metering_points_detail", "legs", "legs_detail",
+        }
+        for case in self.cases():
+            if case.name in pages:
+                with self.subTest(page=case.name):
+                    self.assertEqual(self.request(client, case, "get").status_code, 200)
         self.assertEqual(snapshot(), before)
         self.assertEqual(preferences(), before_preferences)
-
-    def test_staff_with_the_view_right_of_one_area_only_reads_that_area(self):
-        """The account with the view right of every area is asked the POST of every route (a view right opens no
-        writing route anywhere). Each account with the view right of one area is asked both methods of the routes of
-        its own area and one request (the POST of a writing route, the GET of a page) of ``VIEWER_SAMPLE``, which
-        has a page or a dialog of every other area; the refusal of a route is the same for a GET and a POST."""
-        for key, user in {**self.viewers, "all": self.viewer_all}.items():
-            client = self.login(user)
-            before, before_preferences = snapshot(), preferences()
-            for case in self.cases():
-                if key == "all":
-                    methods = ("post",) if (case.changes or case.data) else ()  # the pages: viewers of one area
-                elif case.name in READ[key]:
-                    methods = ("get", "post")
-                elif case.name in VIEWER_SAMPLE:
-                    methods = ("post",) if (case.changes or case.data) else ("get",)
-                else:
-                    continue
-                for method in methods:
-                    with self.subTest(viewer=key, case=case.name, method=method):
-                        response = self.request(client, case, method)
-                        if self.allowed(key, case, method):
-                            self.assertNotIn(response.status_code, (403, 404), response.status_code)
-                            self.assertLess(response.status_code, 500)
-                            if method == "post":
-                                # What a view right may post (the print dialog, the saved widths and open rows of
-                                # the own list) is no change of the domain.
-                                self.assertIn(response.status_code, (200, 204, 302, 400, 405))
-                        else:
-                            self.assertEqual(response.status_code, 403, f"{key} may not {method} {case.name}")
-            self.assertEqual(snapshot(), before, f"The viewer of {key} changed the domain")
-
-    def test_a_viewer_gets_no_data_of_another_area_on_a_page_it_may_open(self):
-        """The metering point page of an account that may only view metering points names no person, no LEG
-        link and no location link (D-079, section 2)."""
-        client = self.login(self.viewers["metering_points"])
         page = client.get(reverse("management:metering_points_detail", args=[self.point_active.pk]))
-        self.assertEqual(page.status_code, 200)
-        self.assertNotContains(page, "Anna Muster")
-        self.assertNotContains(page, self.anna.email)
-        self.assertNotContains(page, reverse("management:persons_detail", args=[self.anna.pk]))
-        self.assertNotContains(page, reverse("management:legs_detail", args=[self.leg.pk]))
-        self.assertNotContains(page, reverse("management:locations_detail", args=[self.place.pk]))
+        self.assertContains(page, "Muster")
+        self.assertContains(page, reverse("management:persons_detail", args=[self.anna.pk]))
+        self.assertContains(page, reverse("management:legs_detail", args=[self.leg.pk]))
+        self.assertContains(page, reverse("management:locations_detail", args=[self.place.pk]))
 
     def test_the_second_factor_is_required_for_every_route_and_nothing_changes(self):
         client = Client()
-        client.force_login(self.second_factor_missing)  # a superuser with every right, without the second factor
+        client.force_login(self.second_factor_missing)  # a staff account without the second factor
         before, before_preferences = snapshot(), preferences()
         for case in self.sample():
             for method in ("get", "post"):
@@ -462,7 +393,7 @@ class NegativeAuthorizationTests(MatrixBase):
 
     def test_a_deactivated_staff_account_with_a_live_session_is_refused(self):
         """An account that was blocked after the login must not keep the access (D-016, D-077: active only)."""
-        user = staff_user("late.blocked@example.org", superuser=True)
+        user = staff_user("late.blocked@example.org")
         client = self.login(user)
         self.assertEqual(client.get(reverse("management:overview")).status_code, 200)
         user.set_status(User.Status.BLOCKED)
@@ -470,12 +401,12 @@ class NegativeAuthorizationTests(MatrixBase):
         for case in self.sample():
             with self.subTest(case=case.name):
                 response = self.request(client, case, "post")
-                self.assertIn(response.status_code, (302, 403, 404))
+                self.assertIn(response.status_code, (302, 404))
                 self.assertNotEqual(response.status_code, 200)
         self.assertEqual(snapshot(), before)
 
     def test_the_methods_that_a_route_does_not_know_never_change_anything(self):
-        client = self.login(self.administrator)
+        client = self.login(self.staff)
         before, before_preferences = snapshot(), preferences()
         for case in self.sample():
             url = reverse(f"management:{case.name}", args=case.args)
@@ -487,7 +418,7 @@ class NegativeAuthorizationTests(MatrixBase):
         self.assertEqual(preferences(), before_preferences)
 
     def test_a_post_without_the_csrf_token_changes_nothing_on_any_state_changing_route(self):
-        client = self.login(self.administrator, enforce_csrf_checks=True)
+        client = self.login(self.staff, enforce_csrf_checks=True)
         before, before_preferences = snapshot(), preferences()
         for case in self.sample():
             with self.subTest(case=case.name):
@@ -497,7 +428,7 @@ class NegativeAuthorizationTests(MatrixBase):
         self.assertEqual(preferences(), before_preferences)
 
     def test_forged_and_missing_ids_are_a_404_and_change_nothing(self):
-        client = self.login(self.administrator)
+        client = self.login(self.staff)
         before, before_preferences = snapshot(), preferences()
         for case in self.cases():
             if not case.args or case.name == "list_widths":
@@ -519,11 +450,12 @@ class NegativeAuthorizationTests(MatrixBase):
         pending = User.objects.create_user("pending.person@example.org", first_name="P", last_name="P", street="S",
                                            house_number="1", town="Bern", swiss_postal_code=3000)
         self.assertIsNone(pending.customer_number_id)
-        client = self.login(self.administrator)
+        client = self.login(self.staff)
         before = snapshot()
         for name, data in (
-            ("persons_detail", None), ("persons_note", {"note": "x"}), ("persons_bkw_number", {"bkw_customer_number": "B"}),
-            ("persons_shares", {"shares": "1", "shares_from": TODAY.isoformat()}),
+            ("persons_detail", None), ("persons_note", {"note": "x"}),
+            ("persons_operator_number", {"operator_customer_number": "B"}),
+            ("persons_shares", {"quantity": "1", "valid_from": TODAY.isoformat()}),
             ("persons_address_suggestion", {"action": "dismiss", "token": "x"}),
         ):
             with self.subTest(name=name):

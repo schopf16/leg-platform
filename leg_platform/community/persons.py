@@ -2,17 +2,18 @@
 
 The master data of a customer is the customer's own: the staff do not edit it. The exceptions are
 
-* the staff-only data in the side record ``PersonRecord`` (the note, the optional BKW customer number and
-  the shares of the cooperative with their period), created when it is first needed, and
+* the staff-only data in the side record ``PersonRecord`` (the note and the optional customer number at the grid
+  operator), created when it is first needed, and the history of the cooperative shares (``ShareChange``: a
+  number of shares and the day it holds from, D-086), and
 * the correction of the address with the suggestion of the address directory, which the staff accept or do
   not accept ("wie beim Standort", ``personen/VORGABEN.md``, "Adresskorrektur bei Personen").
 
 Every change is one transaction that locks the account and the record, and is written to the history of the
-person with the actor and the time. The history never holds the note, the BKW customer number, the IBAN or
-an address (``history.record`` refuses these keys); an entry names the event only. The address is written
+person with the actor and the time. The history never holds the note, the customer number at the grid operator, the
+IBAN or an address (``history.record`` refuses these keys); an entry names the event only. The address is written
 through the same save of the account as the profile of the customer (``update_fields``: only the address
-fields; the controlled fields of the model, D-034, are never touched). Whoever calls these functions has
-checked the right of the account (``community.change_personrecord``, ``community.correct_person_address``).
+fields; the controlled fields of the model, D-034, are never touched). Every staff account may call these
+functions (D-086).
 """
 
 from django.contrib.auth import get_user_model
@@ -22,10 +23,10 @@ from django.db import transaction
 from leg_platform.accounts.models import SWITZERLAND, parse_swiss_postal_code
 from leg_platform.community import addressing, history
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import PersonRecord
+from leg_platform.community.models import PersonRecord, ShareChange
 
 NOTE_MAX_LENGTH = 5000
-BKW_NUMBER_MAX_LENGTH = PersonRecord._meta.get_field("bkw_customer_number").max_length
+OPERATOR_NUMBER_MAX_LENGTH = PersonRecord._meta.get_field("operator_customer_number").max_length
 SHARES_MAX = 100_000
 
 ADDRESS_FIELDS = ("street", "house_number", "town", "swiss_postal_code", "foreign_postal_code", "country")
@@ -33,7 +34,7 @@ ADDRESS_FIELDS = ("street", "house_number", "town", "swiss_postal_code", "foreig
 
 class PersonError(Exception):
     """A change that the rules refuse. ``code``: ``not_a_person``, ``note_too_long``, ``number_invalid``,
-    ``shares_invalid``, ``period_invalid``, ``no_open_suggestion``."""
+    ``shares_invalid``, ``date_invalid``, ``no_open_suggestion``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -78,45 +79,53 @@ def set_note(person, note, actor=None):
     return record
 
 
-def set_bkw_customer_number(person, number, actor=None):
-    """Save the optional BKW customer number (empty clears it)."""
+def set_operator_customer_number(person, number, actor=None):
+    """Save the optional customer number at the grid operator (empty clears it)."""
     number = " ".join((number or "").split())
-    if len(number) > BKW_NUMBER_MAX_LENGTH or not number.isprintable():
+    if len(number) > OPERATOR_NUMBER_MAX_LENGTH or not number.isprintable():
         raise PersonError("number_invalid")
     with transaction.atomic():
         fresh = _lock_person(person)
         record = _locked_record(fresh, create=bool(number))
-        if record is None or record.bkw_customer_number == number:
+        if record is None or record.operator_customer_number == number:
             return record
-        record.bkw_customer_number = number
-        record.save(update_fields=["bkw_customer_number", "updated_at"])
-        history.record(fresh, HistoryEvent.PERSON_BKW_NUMBER_CHANGED, actor)
+        record.operator_customer_number = number
+        record.save(update_fields=["operator_customer_number", "updated_at"])
+        history.record(fresh, HistoryEvent.PERSON_OPERATOR_NUMBER_CHANGED, actor)
     return record
 
 
-def set_shares(person, shares, shares_from, shares_to, actor=None):
-    """Save the shares of the cooperative with their period; no number of shares clears all three values.
-
-    Shares are a whole number from 1; the period starts on ``shares_from`` (required with shares) and ends on
-    ``shares_to`` (empty: open); the end is not before the start. "Ending" shares is setting the end date."""
-    if shares is None:
-        shares_from = shares_to = None
-    else:
-        if isinstance(shares, bool) or not isinstance(shares, int) or not 1 <= shares <= SHARES_MAX:
-            raise PersonError("shares_invalid")
-        if shares_from is None or (shares_to is not None and shares_to < shares_from):
-            raise PersonError("period_invalid")
+def add_share_change(person, quantity, valid_from, actor=None):
+    """Add an entry to the history of the shares: ``quantity`` shares (a whole number from 0, 0 for "no
+    shares any more") hold from ``valid_from`` on. The entry is only added, never changed; a correction is a
+    new entry. The current number is the one of the latest entry by date (``current_shares``)."""
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or not 0 <= quantity <= SHARES_MAX:
+        raise PersonError("shares_invalid")
+    if valid_from is None:
+        raise PersonError("date_invalid")
     with transaction.atomic():
         fresh = _lock_person(person)
-        record = _locked_record(fresh, create=shares is not None)
-        if record is None:
-            return None
-        if (record.shares, record.shares_from, record.shares_to) == (shares, shares_from, shares_to):
-            return record
-        record.shares, record.shares_from, record.shares_to = shares, shares_from, shares_to
-        record.save(update_fields=["shares", "shares_from", "shares_to", "updated_at"])
+        record = _locked_record(fresh, create=True)
+        entry = ShareChange.objects.create(
+            record=record, quantity=quantity, valid_from=valid_from,
+            actor=actor if actor is not None and actor.pk else None,
+        )
         history.record(fresh, HistoryEvent.PERSON_SHARES_CHANGED, actor)
-    return record
+    return entry
+
+
+def share_history(person):
+    """The entries of the history of the shares, the latest date first (the order of the model)."""
+    return list(ShareChange.objects.filter(record__person=person))
+
+
+def current_shares(entries, today):
+    """The number of shares of the latest entry by date that holds on ``today`` (``entries`` as
+    ``share_history`` gives them), or None while no entry holds yet (D-086)."""
+    for entry in entries:
+        if entry.valid_from <= today:
+            return entry.quantity
+    return None
 
 
 # The address correction -----------------------------------------------------------------------------

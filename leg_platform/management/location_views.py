@@ -1,16 +1,16 @@
 """The pages of the locations (D-078; LEG-Design-Vorgaben/verwaltung/standorte).
 
-List, detail and the dialogs. Every view uses the access check of ``management.access``; objects are
-looked up by the id in the address only after the permission is checked, and every state change
+List, detail and the dialogs. Every view uses the access check of ``management.access`` (every staff
+account, D-086); objects are looked up by the id in the address, and every state change
 is validated on the server (never trusted from the browser). A dialog is a normal page: it works
 without JavaScript and returns to the place it was opened from (``management.returns``).
 """
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
+from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -40,17 +40,8 @@ from leg_platform.management.location_forms import (
     MeteringPointForm,
     RemarkForm,
 )
-from leg_platform.management.navigation import AREA_VIEW_PERMISSIONS
 from leg_platform.management.returns import return_url, with_next
 from leg_platform.management.summaries import duplicate_summary
-
-VIEW = "community.view_location"
-ADD = "community.add_location"
-CHANGE = "community.change_location"
-DELETE = "community.delete_location"
-VIEW_PERSONS = "community.view_personrecord"
-VIEW_POINTS = "community.view_meteringpoint"
-VIEW_LEG = "community.view_leg"
 
 COLUMNS = (
     lists.Column("address", gettext_lazy("Location"), width=380, info_template="management/locations/_tip_location.html"),
@@ -77,20 +68,17 @@ def count_phrase(count):
     return _("1 metering point") if count == 1 else _("%(count)d metering points") % {"count": count}
 
 
-def occupancy_phrase(metering_point_count, persons, see_persons=True):
-    """"empty", "free" or the number of persons; the number of persons (and the word "free") needs the right to
-    see persons, otherwise a dash (D-084, M-4)."""
+def occupancy_phrase(metering_point_count, persons):
+    """"empty", "free" or the number of persons."""
     if metering_point_count == 0:
         return _("empty")
-    if not see_persons:
-        return "–"
     if persons == 0:
         return _("free")
     return _("1 person") if persons == 1 else _("%(count)d persons") % {"count": persons}
 
 
 def circuit_phrase(location):
-    return location.transformer_circuit.bkw_number if location.transformer_circuit_id else _("no transformer circuit")
+    return location.transformer_circuit.grid_number if location.transformer_circuit_id else _("no transformer circuit")
 
 
 def event_label(event):
@@ -105,7 +93,6 @@ class ListWidthsView(ManagementAccessMixin, View):
     ``management/js/list.js`` posts them after a column was resized). The widths are checked
     (``community.preferences``); the account is always the one of the session."""
 
-    any_permission_required = AREA_VIEW_PERMISSIONS
     http_method_names = ["post"]
 
     def post(self, request, list_key):
@@ -121,27 +108,15 @@ class ListWidthsView(ManagementAccessMixin, View):
         return JsonResponse({"saved": True})
 
 
-def occupancy_options(see_persons=True):
-    """The options of the filter "Occupancy"; "occupied" and "free" tell whether persons use the metering points
-    and need the right to see persons (D-084, M-4)."""
-    options = [
+def occupancy_options():
+    """The options of the filter "Occupancy"."""
+    return [
         (location_list.OCCUPANCY_ALL, _("All")),
         (location_list.OCCUPANCY_OCCUPIED, _("occupied")),
         (location_list.OCCUPANCY_FREE, _("free")),
         (location_list.OCCUPANCY_EMPTY, _("empty")),
         (location_list.OCCUPANCY_ARCHIVED, _("archived")),
     ]
-    if see_persons:
-        return options
-    return [option for option in options if option[0] not in (location_list.OCCUPANCY_OCCUPIED, location_list.OCCUPANCY_FREE)]
-
-
-def list_columns(see_persons):
-    """The columns; without the right to see persons the column "Occupancy" cannot be sorted (its order is the
-    number of persons)."""
-    if see_persons:
-        return COLUMNS
-    return tuple(replace(column, sortable=False) if column.key == "occupancy" else column for column in COLUMNS)
 
 
 @dataclass
@@ -152,33 +127,22 @@ class LocationList:
     state: lists.ListState
     columns: tuple
     circuits: list
-    see_persons: bool
-    see_legs: bool
     today: object
     problem_count: int
     queryset: object
 
 
-def build_list(params, user):
+def build_list(params):
     today = timezone.localdate()
-    see_persons = user.has_perm(VIEW_PERSONS)
-    see_points = user.has_perm(VIEW_POINTS)
-    see_legs = user.has_perm(VIEW_LEG)
     circuits = transformer_circuits.choices()
-    columns = list_columns(see_persons)
     state = lists.parse(
-        params, path=reverse("management:locations"), columns=columns, default_sort=location_list.DEFAULT_SORT,
+        params, path=reverse("management:locations"), columns=COLUMNS, default_sort=location_list.DEFAULT_SORT,
         filters={
-            "circuit": ([c.bkw_number for c in circuits], ""),
-            "occupancy": (
-                [value for value, _text in occupancy_options(see_persons)], location_list.OCCUPANCY_ALL
-            ),
+            "circuit": ([c.grid_number for c in circuits], ""),
+            "occupancy": ([value for value, _text in occupancy_options()], location_list.OCCUPANCY_ALL),
         },
     )
-    queryset = location_list.apply_search(
-        location_list.base_queryset(today), state.query, see_persons=see_persons, see_points=see_points,
-        see_legs=see_legs, today=today,
-    )
+    queryset = location_list.apply_search(location_list.base_queryset(today), state.query, today=today)
     queryset = location_list.apply_circuit(queryset, state.values["circuit"])
     queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
     # The button counts the entries with a problem in the current view (search and filters).
@@ -186,20 +150,18 @@ def build_list(params, user):
     if state.problems:
         queryset = location_list.apply_problems(queryset)
     queryset = location_list.apply_sort(queryset, state.sort, state.descending)
-    return LocationList(state, columns, circuits, see_persons, see_legs, today, problem_count, queryset)
+    return LocationList(state, COLUMNS, circuits, today, problem_count, queryset)
 
 
 class LocationListView(ManagementAccessMixin, View):
     """The list of locations (``standorte-liste-desktop`` and ``-handy``)."""
 
-    permission_required = (VIEW,)
-
     def get(self, request):
-        found = build_list(request.GET, request.user)
-        state, circuits, see_persons, today = found.state, found.circuits, found.see_persons, found.today
+        found = build_list(request.GET)
+        state, circuits, today = found.state, found.circuits, found.today
         problem_count = found.problem_count
         page = lists.paginate(found.queryset, state)
-        rows, persons = location_list.details(page.items, today, see_persons=see_persons, see_legs=found.see_legs)
+        rows, persons = location_list.details(page.items, today)
         expanded = set(preferences.get_preference(request.user, "locations").expanded_locations)
 
         entries = []
@@ -213,7 +175,7 @@ class LocationListView(ManagementAccessMixin, View):
                     "can_open": bool(points),
                     "circuit": circuit_phrase(location),
                     "count_phrase": count_phrase(location.mp_count),
-                    "occupancy": occupancy_phrase(location.mp_count, persons[location.pk], see_persons),
+                    "occupancy": occupancy_phrase(location.mp_count, persons[location.pk]),
                     "persons": persons[location.pk],
                     "detail_url": reverse("management:locations_detail", args=[location.pk]),
                 }
@@ -237,12 +199,9 @@ class LocationListView(ManagementAccessMixin, View):
             expand_url=reverse("management:locations_expanded"),
             problem_count=problem_count,
             problem_url=state.url(problems="" if state.problems else "1"),
-            can_add=request.user.has_perm(ADD),
             create_url=with_next(reverse("management:locations_new"), request),
-            circuit_options=[(c.bkw_number, c.bkw_number) for c in circuits],
-            occupancy_options=occupancy_options(see_persons),
-            see_legs=found.see_legs,
-            see_persons=see_persons,
+            circuit_options=[(c.grid_number, c.grid_number) for c in circuits],
+            occupancy_options=occupancy_options(),
             current_url=request.get_full_path(),
             all_label_open=_("Collapse all"),
             all_label_closed=_("Expand all"),
@@ -255,7 +214,6 @@ class LocationExpandedView(ManagementAccessMixin, View):
     ``toggle`` (one id) or ``ids`` with ``open`` (all of a page); the script posts JSON with the
     same two keys. Only ids of existing locations are kept."""
 
-    permission_required = (VIEW,)
     http_method_names = ["post"]
 
     def post(self, request):
@@ -293,34 +251,27 @@ class LocationDetailView(ManagementAccessMixin, View):
     """The detail page of a location (``standort-detail-desktop``, ``-handy``, ``standort-neu``,
     ``standort-adresskorrektur``)."""
 
-    permission_required = (VIEW,)
-
     def get(self, request, pk):
         location = get_object_or_404(Location.objects.select_related("transformer_circuit"), pk=pk)
         user = request.user
         today = timezone.localdate()
-        see_persons = user.has_perm(VIEW_PERSONS)
-        see_legs = user.has_perm(VIEW_LEG)
-        rows, persons = location_list.details([location], today, see_persons=see_persons, see_legs=see_legs)
+        rows, persons = location_list.details([location], today)
         points = rows[location.pk]
-        may_change = user.has_perm(CHANGE)
         # An archived location is read-only (D-085): no edit buttons, only "Restore".
-        can_change = may_change and not location.is_archived
+        can_change = not location.is_archived
         deletable = locations.can_delete(location)
-        assignments = []
-        if see_persons:
-            assignments = list(
-                PersonAssignment.objects.filter(metering_point__location=location)
-                .select_related("metering_point", "person")
-                .order_by("-valid_from", "pk")
-            )
+        assignments = list(
+            PersonAssignment.objects.filter(metering_point__location=location)
+            .select_related("metering_point", "person")
+            .order_by("-valid_from", "pk")
+        )
         circuit = location.transformer_circuit
         context = {
             "page_title": f"{location.street} {location.house_number}",
             "location": location,
             "points": points,
             "subtitle": " · ".join(
-                [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk], see_persons)]
+                [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk])]
             ),
             "circuit": circuit,
             "circuit_text": transformer_circuits.label(circuit),
@@ -341,14 +292,9 @@ class LocationDetailView(ManagementAccessMixin, View):
             ],
             "back_url": return_url(request, reverse("management:locations")),
             "can_change": can_change,
-            "can_add_point": can_change and user.has_perm("community.add_meteringpoint"),
-            "can_edit_circuit": user.has_perm("community.change_transformercircuit"),
-            "can_add_circuit": can_change and user.has_perm("community.add_transformercircuit"),
-            "show_delete": deletable and user.has_perm(DELETE) and not location.is_archived,
-            "show_archive": may_change and (location.is_archived or not (deletable and user.has_perm(DELETE))),
+            "show_delete": deletable and can_change,
+            "show_archive": location.is_archived or not deletable,
             "suggestion_text": "",
-            "see_persons": see_persons,
-            "see_legs": see_legs,
             "current_url": request.get_full_path(),
         }
         if can_change and location.address_correction_open and location.suggestion is not None:
@@ -363,14 +309,13 @@ class LocationDetailView(ManagementAccessMixin, View):
             list_key="location_metering_points",
             list_columns=lists.header_cells(columns, state, saved, "location_metering_points"),
             list_widths_url=reverse("management:list_widths", args=["location_metering_points"]),
-            can_view_point=user.has_perm(VIEW_POINTS),
         )
         return render(request, "management/locations/detail.html", context)
 
 
 class DialogView(ManagementAccessMixin, View):
     """A dialog as a page: GET shows the form, POST saves and returns to where the person came from.
-    A subclass sets the permissions, the title and the form and implements ``save``."""
+    A subclass sets the title and the form and implements ``save``."""
 
     template_name = "management/dialog_form.html"
     form_class = None
@@ -420,7 +365,6 @@ class DialogView(ManagementAccessMixin, View):
 class LocationCreateView(DialogView):
     """"Standort anlegen" (``dialog-standort-anlegen``)."""
 
-    permission_required = (ADD,)
     title = gettext_lazy("Create location")
     lead = gettext_lazy("A location is an address. You create the metering points afterwards at the location.")
     form_class = LocationCreateForm
@@ -436,7 +380,7 @@ class LocationCreateView(DialogView):
         return LocationCreateForm(data, initial=initial)
 
     def render_dialog(self, request, form, **extra):
-        duplicate = form.duplicate if request.user.has_perm(VIEW) else None
+        duplicate = form.duplicate
         summary = None
         if duplicate is not None:
             summary = {
@@ -444,10 +388,9 @@ class LocationCreateView(DialogView):
                 "count": duplicate.metering_points.filter(is_archived=False).count(),
                 "url": reverse("management:locations_detail", args=[duplicate.pk]),
             }
-        can_add_circuit = request.user.has_perm("community.add_transformercircuit")
         return super().render_dialog(
             request, form, duplicate=summary, circuit_options=transformer_circuits.choices(),
-            new_circuit_url=with_next(reverse("management:circuits_new"), request) if can_add_circuit else "",
+            new_circuit_url=with_next(reverse("management:circuits_new"), request),
             **extra,
         )
 
@@ -497,7 +440,6 @@ class LocationAddressView(LocationObjectDialog):
     """"Adresse bearbeiten": only the address can be changed. If it becomes the address of another
     location the page warns and asks again (the merge)."""
 
-    permission_required = (CHANGE,)
     title = gettext_lazy("Edit address")
     form_class = AddressEditForm
     template_name = "management/locations/dialog_address.html"
@@ -518,9 +460,7 @@ class LocationAddressView(LocationObjectDialog):
         if not form.is_valid():
             return self.render_dialog(request, form)
         location = self.location()
-        # A merge deletes this location: it needs the right to delete; without it the confirmation is no
-        # confirmation (the address is "in use").
-        confirmed = request.POST.get("confirm_merge") == "1" and request.user.has_perm(DELETE)
+        confirmed = request.POST.get("confirm_merge") == "1"
         try:
             saved = locations.update_address(
                 location, **form.address(), address_addition=form.cleaned_data["address_addition"],
@@ -533,9 +473,6 @@ class LocationAddressView(LocationObjectDialog):
             form.add_error(None, _("This address already exists."))
             return self.render_dialog(request, form)
         except locations.MergeNeeded as needed:
-            if not request.user.has_perm(DELETE):
-                form.add_error(None, _("This address already exists."))
-                return self.render_dialog(request, form)
             data = request.POST.copy()
             data["confirm_merge"] = "1"
             target = needed.target
@@ -556,7 +493,6 @@ class LocationAddressView(LocationObjectDialog):
 
 
 class LocationRemarkView(LocationObjectDialog):
-    permission_required = (CHANGE,)
     title = gettext_lazy("Edit remark")
     form_class = RemarkForm
 
@@ -574,7 +510,7 @@ class LocationRemarkView(LocationObjectDialog):
 
 
 class CircuitDialog(DialogView):
-    """The dialog "Trafokreis anlegen": the BKW number and the name. If the number exists, the first
+    """The dialog "Trafokreis anlegen": the grid number and the name. If the number exists, the first
     answer is the hint "This transformer circuit exists already" with the button "Use this one"
     (the existing circuit is used; a second one is never created); the second answer (``use_existing``)
     uses it."""
@@ -596,7 +532,7 @@ class CircuitDialog(DialogView):
         form = self.get_form(request.POST)
         if form.is_valid():
             if form.existing is None:
-                circuit = transformer_circuits.create(form.cleaned_data["bkw_number"], form.cleaned_data["name"])
+                circuit = transformer_circuits.create(form.cleaned_data["grid_number"], form.cleaned_data["name"])
                 return self.use(request, circuit)
             if request.POST.get("use_existing") == "1":
                 return self.use(request, form.existing)
@@ -610,8 +546,6 @@ class CircuitDialog(DialogView):
 class LocationCircuitNewView(CircuitDialog, LocationObjectDialog):
     """"Trafokreis anlegen" at a location (``dialog-trafokreis-anlegen``): the location gets the
     circuit."""
-
-    permission_required = (CHANGE, "community.add_transformercircuit")
 
     def get_lead(self):
         location = self.location()
@@ -633,8 +567,6 @@ class CircuitCreateView(CircuitDialog):
     """"Trafokreis anlegen" from the dialog "Standort anlegen" (no location yet): the circuit is
     created and the person comes back with it chosen."""
 
-    permission_required = ("community.add_transformercircuit",)
-
     def use(self, request, circuit):
         back = self.back(request)
         return redirect(f"{back}{'&' if '?' in back else '?'}circuit={circuit.pk}")
@@ -644,7 +576,6 @@ class CircuitEditView(DialogView):
     """Change the name or the number of a circuit; it reaches every location with it, and the
     dialog says how many."""
 
-    permission_required = ("community.change_transformercircuit",)
     title = gettext_lazy("Change transformer circuit")
     form_class = CircuitForm
     template_name = "management/dialog_form.html"
@@ -654,7 +585,7 @@ class CircuitEditView(DialogView):
 
     def get_form(self, data=None):
         circuit = self.circuit()
-        return CircuitForm(data, circuit=circuit, initial={"bkw_number": circuit.bkw_number, "name": circuit.name})
+        return CircuitForm(data, circuit=circuit, initial={"grid_number": circuit.grid_number, "name": circuit.name})
 
     def get_lead(self):
         count = transformer_circuits.affected_locations(self.circuit())
@@ -664,9 +595,9 @@ class CircuitEditView(DialogView):
 
     def save(self, request, form):
         if form.existing is not None:
-            form.add_error("bkw_number", _("This transformer circuit already exists."))
+            form.add_error("grid_number", _("This transformer circuit already exists."))
             return None
-        transformer_circuits.update(self.circuit(), form.cleaned_data["bkw_number"], form.cleaned_data["name"])
+        transformer_circuits.update(self.circuit(), form.cleaned_data["grid_number"], form.cleaned_data["name"])
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
@@ -675,16 +606,15 @@ class LocationMeteringPointNewView(LocationObjectDialog):
     """"Messpunkt anlegen" at a location (``dialog-messpunkt-anlegen``): the location is given;
     direction required, number and LEG optional, no person and no date."""
 
-    permission_required = (VIEW, "community.add_meteringpoint")
     title = gettext_lazy("Create metering point")
     template_name = "management/locations/dialog_metering_point.html"
 
     def get_form(self, data=None):
-        return MeteringPointForm(data, may_choose_leg=self.request.user.has_perm("community.view_leg"))
+        return MeteringPointForm(data)
 
     def get_lead(self):
         location = self.location()
-        circuit = f", {location.transformer_circuit.bkw_number}" if location.transformer_circuit_id else ""
+        circuit = f", {location.transformer_circuit.grid_number}" if location.transformer_circuit_id else ""
         return _("At the location %(address)s%(circuit)s.") % {
             "address": f"{location.street} {location.house_number}", "circuit": circuit,
         }
@@ -710,7 +640,7 @@ class LocationMeteringPointNewView(LocationObjectDialog):
 
     def render_dialog(self, request, form, **extra):
         duplicate = getattr(form, "duplicate", None)
-        summary = duplicate_summary(duplicate, request.user) if duplicate is not None else None
+        summary = duplicate_summary(duplicate) if duplicate is not None else None
         return super().render_dialog(request, form, duplicate=summary, **extra)
 
 
@@ -735,8 +665,6 @@ class LocationCircuitView(LocationPostView):
     """The field with the pencil in the card "Netz": the typed or chosen circuit is assigned; an
     empty field removes it."""
 
-    permission_required = (CHANGE,)
-
     def act(self, request, location):
         try:
             circuit = CircuitChoiceField().clean(request.POST.get("transformer_circuit", ""))
@@ -750,7 +678,6 @@ class LocationCircuitView(LocationPostView):
 class LocationArchiveView(LocationPostView):
     """Archive and restore: the only change that an archived location accepts is the restore (D-085)."""
 
-    permission_required = (CHANGE,)
     allow_archived = True
 
     def act(self, request, location):
@@ -760,8 +687,6 @@ class LocationArchiveView(LocationPostView):
 
 
 class LocationConfirmView(LocationPostView):
-    permission_required = (CHANGE,)
-
     def act(self, request, location):
         locations.confirm(location, request.user)
         messages.success(request, _("Saved."))
@@ -769,8 +694,6 @@ class LocationConfirmView(LocationPostView):
 
 class LocationSuggestionView(LocationPostView):
     """"Accept" and "Do not accept" of the banner (``standorte/adresskorrektur``)."""
-
-    permission_required = (CHANGE,)
 
     def act(self, request, location):
         action = request.POST.get("action")
@@ -790,10 +713,9 @@ class LocationSuggestionView(LocationPostView):
         messages.success(request, _("Saved."))
 
 
-class LocationDeleteView(ManagementAccessMixin, View):
-    """"Standort löschen": a question first, then the deletion; only possible without a history."""
-
-    permission_required = (DELETE,)
+class LocationDeleteView(ArchivedLocationGuard, ManagementAccessMixin, View):
+    """"Standort löschen": a question first, then the deletion; only possible without a history and never for an
+    archived location (D-085, D-086: the restore is the only action on it)."""
 
     def location(self, pk):
         return get_object_or_404(Location, pk=pk)
@@ -822,6 +744,9 @@ class LocationDeleteView(ManagementAccessMixin, View):
         location = self.location(pk)
         try:
             locations.delete(location)
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(reverse("management:locations_detail", args=[pk]))
         except locations.NotDeletable:
             messages.error(request, _("This location has a history and cannot be deleted. Archive it instead."))
             return redirect(reverse("management:locations_detail", args=[pk]))

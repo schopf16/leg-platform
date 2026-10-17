@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.core.exceptions import SuspiciousOperation
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
@@ -12,24 +12,19 @@ from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
-from leg_platform.community import addressing, problems, settings_service
-from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, ManagementSettings
+from leg_platform.community import addressing, grid_operator, problems, settings_service
+from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, GridOperator, ManagementSettings
 from leg_platform.community.settings_service import EDITABLE_FIELDS
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
-from leg_platform.management.navigation import AREA_VIEW_PERMISSIONS
-
-VIEW_SETTINGS = "community.view_managementsettings"
-CHANGE_SETTINGS = "community.change_managementsettings"
 
 
 @dataclass(frozen=True)
 class ProblemList:
-    """A list that can have problems: the key of ``problems.problem_counts``, the right to view it, the URL
-    name and the two texts. The order of ``PROBLEM_LISTS`` is the order of the menu."""
+    """A list that can have problems: the key of ``problems.problem_counts``, the URL name and the two texts.
+    The order of ``PROBLEM_LISTS`` is the order of the menu."""
 
     key: str
-    permission: str
     url_name: str
     name: object
     text: object
@@ -37,18 +32,18 @@ class ProblemList:
 
 PROBLEM_LISTS = (
     ProblemList(
-        "locations", "community.view_location", "management:locations", lambda: _("Locations"),
+        "locations", "management:locations", lambda: _("Locations"),
         lambda count: ngettext(
             "%(count)d location with a problem", "%(count)d locations with a problem", count
         ) % {"count": count},
     ),
     ProblemList(
-        "legs", "community.view_leg", "management:legs", lambda: _("LEGs"),
+        "legs", "management:legs", lambda: _("LEGs"),
         lambda count: ngettext("%(count)d LEG with a problem", "%(count)d LEGs with a problem", count)
         % {"count": count},
     ),
     ProblemList(
-        "metering_points", "community.view_meteringpoint", "management:metering_points",
+        "metering_points", "management:metering_points",
         lambda: _("Metering points"),
         lambda count: ngettext(
             "%(count)d metering point with a problem", "%(count)d metering points with a problem", count
@@ -58,21 +53,16 @@ PROBLEM_LISTS = (
 
 
 class OverviewView(ManagementAccessMixin, TemplateView):
-    """The start page of the management area (``uebersicht/UMSETZUNG.md``). Whoever may open one of the areas
-    may open it; it shows only what the account may see: a row for each list with a problem, for the lists the
-    account may view only (the counts of another list are not even computed), and the button "Filter problems"
-    with the sum of those counts. The button opens the first of the affected lists (in the order of the menu)
-    with the problem filter on; from there each list has its own switch."""
+    """The start page of the management area (``uebersicht/UMSETZUNG.md``): a row for each list with a problem,
+    and the button "Filter problems" with the sum of those counts. The button opens the first of the affected
+    lists (in the order of the menu) with the problem filter on; from there each list has its own switch."""
 
     template_name = "management/overview.html"
-    any_permission_required = AREA_VIEW_PERMISSIONS
 
     def get_context_data(self, **kwargs):
-        user = self.request.user
-        allowed = [entry for entry in PROBLEM_LISTS if user.has_perm(entry.permission)]
-        counts = problems.problem_counts(only=[entry.key for entry in allowed])
+        counts = problems.problem_counts(only=[entry.key for entry in PROBLEM_LISTS])
         rows = []
-        for entry in allowed:
+        for entry in PROBLEM_LISTS:
             count = counts[entry.key]
             if count:
                 url = reverse(entry.url_name) + "?problems=1"
@@ -99,7 +89,6 @@ class SettingsFieldCheckView(ManagementAccessMixin, View):
     ``settings-validate.js`` asks; without a script the server checks everything when saving): the answer is
     the message of the form itself, so the text is the one of the server (D-084). Nothing is saved."""
 
-    permission_required = (VIEW_SETTINGS,)
     http_method_names = ["get"]
 
     def get(self, request):
@@ -114,17 +103,12 @@ class SettingsFieldCheckView(ManagementAccessMixin, View):
 
 
 class SettingsView(ManagementAccessMixin, View):
-    """The settings page (``einstellungen/``): showing needs the right to view, saving the right to
-    change. One button saves all sections. The directory check of the sender address is made on the
-    server (when the page is shown), not while typing."""
+    """The settings page (``einstellungen/``): every staff account may show and save it (D-086). One button
+    saves all sections. The directory check of the sender address is made on the server (when the page is
+    shown), not while typing. A read-only line names the grid operator of the instance (D-086)."""
 
     template_name = "management/settings.html"
     http_method_names = ["get", "head", "options", "post"]
-
-    def get_required_permissions(self):
-        if self.request.method in ("GET", "HEAD", "OPTIONS"):
-            return (VIEW_SETTINGS,)
-        return (CHANGE_SETTINGS,)
 
     def get(self, request):
         row = ManagementSettings.load()
@@ -183,22 +167,27 @@ class SettingsView(ManagementAccessMixin, View):
         return {}
 
     def show(self, request, form, check):
-        can_change = request.user.has_perm(CHANGE_SETTINGS)
-        if not can_change:
-            # The right to view only: the values are shown, nothing can be typed or saved.
-            for field in form.fields.values():
-                field.disabled = True
         return render(
             request,
             self.template_name,
             {
                 "page_title": _("Settings"),
                 "form": form,
-                "suggestion_text": check.get("suggestion", "") if can_change else "",
+                "suggestion_text": check.get("suggestion", ""),
                 "notice_text": check.get("notice", ""),
-                "can_change": can_change,
+                "operator_name": grid_operator.name(),
+                "operator_url": self.operator_admin_url(request),
                 # The legal minimum is a constant of the law, shown as a fixed note.
                 "quota_hint": _("Applies to all LEGs. The law requires at least %(minimum)d %%.")
                 % {"minimum": LEGAL_MINIMUM_QUOTA_PERCENT},
             },
         )
+
+    @staticmethod
+    def operator_admin_url(request):
+        """The address of the form of the grid operator in the Django administration if this account may open
+        it (the administration decides, D-086), else empty: the name is then plain text."""
+        model_admin = admin.site._registry.get(GridOperator)
+        if model_admin is None or not model_admin.has_view_permission(request):
+            return ""
+        return reverse("admin:community_gridoperator_change", args=(1,))

@@ -3,8 +3,7 @@
 A person is an account with a customer number. The search takes a name, a customer number or an
 e-mail address; every word must match. Only accounts that an assignment can use are found: active
 accounts with a customer number (``assignments.assign`` refuses all others). The result is always
-limited, so that the field cannot be used to list the accounts. The caller checks the right to see
-persons (``community.view_personrecord``) before it asks; the e-mail address is searched but never
+limited, so that the field cannot be used to list the accounts. The e-mail address is searched but never
 shown.
 """
 

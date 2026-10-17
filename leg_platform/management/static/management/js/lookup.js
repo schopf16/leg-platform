@@ -4,7 +4,7 @@
 
    - a field in an element with data-suggest-url asks that address for suggestions while typing (at least
      two characters, a short moment after the last key) and fills the list of the field with them. The server
-     answers with at most ten texts and only to an account that may see them;
+     answers with at most ten texts;
    - the number field in an element with data-number-check-url is checked on leaving the field: the message
      and the notice "this number exists already" (with the link to the existing metering point) appear under
      the field, and saving is blocked while one of them is shown.

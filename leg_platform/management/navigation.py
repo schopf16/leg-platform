@@ -1,8 +1,8 @@
-"""The menu group "Management" and the rule for what a person sees in it (D-077).
+"""The menu group "Management" (D-077, D-086).
 
-The group shows only the entries that the account may use: the same permissions as the pages
-themselves, so that the menu never offers a link that ends in "no access" (hiding an entry is no
-access control; every page checks again, ``leg_platform.management.access``).
+Every active staff account sees every entry (the pages are open to all staff, ``leg_platform.management.access``).
+The one exception is the link "Mail texts" at the end: it leads to the Django administration, which keeps its own
+permission model, so it is shown only to an account that holds a right on the email texts.
 
 To add an entry for a new page, add ONE line to ``MENU`` (in the order of the menu). The URL names
 of an area start with its ``key`` (``management:<key>``, ``management:<key>_detail``, ...): that is
@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from leg_platform.management.access import is_management_user
+
 NAMESPACE = "management"
 
 
@@ -22,22 +24,11 @@ class MenuEntry:
     key: str
     label: object  # a lazy translated text
     icon: str  # the id of a symbol of templates/_frame_icons.html, without "#"
-    permissions: tuple = ()  # all required
-    any_of: tuple = ()  # or: at least one
 
     @property
     def url_name(self):
         return f"{NAMESPACE}:{self.key}"
 
-
-# The view permissions of the areas: whoever holds one of them may open the overview.
-AREA_VIEW_PERMISSIONS = (
-    "community.view_personrecord",
-    "community.view_location",
-    "community.view_leg",
-    "community.view_meteringpoint",
-    "community.view_managementsettings",
-)
 
 # The rights on the email texts of the system administration (the link "Mail texts" at the end of the group).
 EMAIL_TEXT_PERMISSIONS = ("accounts.view_emailtext", "accounts.change_emailtext")
@@ -45,23 +36,13 @@ EMAIL_TEXT_PERMISSIONS = ("accounts.view_emailtext", "accounts.change_emailtext"
 # One line per entry, in the order of the menu: overview, persons, locations, LEGs, metering
 # points, settings.
 MENU = (
-    MenuEntry("overview", _("Overview"), "i-overview", any_of=AREA_VIEW_PERMISSIONS),
-    MenuEntry("persons", _("Persons"), "i-persons", ("community.view_personrecord",)),
-    MenuEntry("locations", _("Locations"), "i-building", ("community.view_location",)),
-    MenuEntry("legs", _("LEGs"), "i-network", ("community.view_leg",)),
-    MenuEntry("metering_points", _("Metering points"), "i-metering", ("community.view_meteringpoint",)),
-    MenuEntry("settings", _("Settings"), "i-settings", ("community.view_managementsettings",)),
+    MenuEntry("overview", _("Overview"), "i-overview"),
+    MenuEntry("persons", _("Persons"), "i-persons"),
+    MenuEntry("locations", _("Locations"), "i-building"),
+    MenuEntry("legs", _("LEGs"), "i-network"),
+    MenuEntry("metering_points", _("Metering points"), "i-metering"),
+    MenuEntry("settings", _("Settings"), "i-settings"),
 )
-
-
-def may_use(user, entry):
-    if not (user.is_authenticated and user.is_active and user.is_staff):
-        return False
-    if entry.permissions and not user.has_perms(entry.permissions):
-        return False
-    if entry.any_of and not any(user.has_perm(permission) for permission in entry.any_of):
-        return False
-    return bool(entry.permissions or entry.any_of)
 
 
 def is_active_entry(entry, view_name):
@@ -72,10 +53,10 @@ def is_active_entry(entry, view_name):
 
 def menu_entries(user, view_name=""):
     """The entries of the group for the account: a list of dicts with ``label``, ``url``,
-    ``icon``, ``active`` and ``key``; empty if the account may use none. The last entry is the link to the
-    email texts of the system administration (the page that exists; nothing new is built for it, D-082) for
-    an account that holds a right on them; the administration checks the right again."""
-    if not (user.is_authenticated and user.is_staff):
+    ``icon``, ``active`` and ``key``; empty for an account that is no active staff account. The last entry is
+    the link to the email texts of the system administration (the page that exists; nothing new is built for it,
+    D-082) for an account that holds a right on them; the administration checks the right again."""
+    if not is_management_user(user):
         return []
     entries = [
         {
@@ -86,9 +67,8 @@ def menu_entries(user, view_name=""):
             "active": is_active_entry(entry, view_name),
         }
         for entry in MENU
-        if may_use(user, entry)
     ]
-    if user.is_active and any(user.has_perm(permission) for permission in EMAIL_TEXT_PERMISSIONS):
+    if any(user.has_perm(permission) for permission in EMAIL_TEXT_PERMISSIONS):
         entries.append(
             {
                 "key": "email_texts",

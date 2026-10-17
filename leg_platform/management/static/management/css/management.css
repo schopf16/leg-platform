@@ -1842,12 +1842,16 @@ a.mgmt-sort:hover {
   overflow-wrap: anywhere;
 }
 
-.mgmt-person-bkw.is-ok {
+.mgmt-person-registration.is-ok {
   color: var(--ok-text);
 }
 
-.mgmt-person-bkw.is-warn {
+.mgmt-person-registration.is-warn {
   color: var(--warn);
+}
+
+.mgmt-person-registration.is-muted {
+  color: var(--muted);
 }
 
 .mgmt-person-lines {

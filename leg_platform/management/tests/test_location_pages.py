@@ -1,12 +1,11 @@
-"""The pages of the locations (D-078): list, detail and dialogs with their permissions, the state that is
-remembered, the returns to the place a dialog was opened from (also hostile ``next`` values) and the
-flows of the dialogs without JavaScript. The rules themselves are tested at service level
-(``community/tests/test_locations.py``); here only what the views add."""
+"""The pages of the locations (D-078, D-086): list, detail and dialogs, the state that is remembered, the returns to the
+place a dialog was opened from (also hostile ``next`` values) and the flows of the dialogs without JavaScript. Every
+staff account sees and may do everything (D-086); an archived location is read-only. The rules themselves are tested at
+service level (``community/tests/test_locations.py``); here only what the views add."""
 
 from datetime import date
 from unittest import mock
 
-from django.contrib.auth.models import Permission
 from django.test import TestCase, tag
 from django.urls import reverse
 
@@ -14,7 +13,13 @@ from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_us
 from leg_platform.community import history, locations, preferences
 from leg_platform.community.addressing import AddressSuggestion
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, Location, ManagementSettings, MeteringPoint, TransformerCircuit
+from leg_platform.community.models import (
+    Direction,
+    Location,
+    ManagementSettings,
+    MeteringPoint,
+    TransformerCircuit,
+)
 from leg_platform.community.tests.helpers import (
     assign_leg,
     assign_person,
@@ -35,15 +40,8 @@ class LocationPageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.plain = create_active_user("plain.person@example.org")
-        cls.none = staff_user("staff.none@example.org")
-        cls.viewer = staff_user("staff.view@example.org", "view_location")
-        cls.persons = staff_user("staff.persons@example.org", "view_location", "view_personrecord")
-        cls.changer = staff_user(
-            "staff.change@example.org", "view_location", "change_location", "add_transformercircuit",
-            "change_transformercircuit", "add_meteringpoint", "view_leg",
-        )
-        cls.full = staff_user("staff.all@example.org")
-        cls.full.user_permissions.set(Permission.objects.filter(content_type__app_label="community"))
+        cls.staff = staff_user("staff.person@example.org")
+        cls.administrator = staff_user("administrator.person@example.org", superuser=True)
         cls.circuit = make_circuit("TRA21359", "Ittigen Nord")
         cls.leg = make_leg("LEG Quartier")
         cls.musterweg = make_location(
@@ -56,6 +54,7 @@ class LocationPageTests(TestCase):
         cls.other = make_location("Zielweg", "3", "3063", "Ittigen")
         cls.fresh = make_location("Neuweg", "1", "3000", "Bern")
         cls.customer = make_location("Kundenweg", "5", "3000", "Bern", needs_confirmation=True)
+        cls.old = make_location("Altweg", "9", "3000", "Bern", is_archived=True)  # no history: deletable
         settings_row = ManagementSettings.load()
         settings_row.country_code, settings_row.identifier = "CH", "1A2B3C4D5E6"
         settings_row.save()
@@ -64,6 +63,7 @@ class LocationPageTests(TestCase):
         patcher = mock.patch("leg_platform.community.addressing.suggest_correction", return_value=None)
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.client = self.login(self.staff)
 
     def login(self, user, **kwargs):
         client = VerifiedClient(**kwargs)
@@ -75,25 +75,20 @@ class LocationPageTests(TestCase):
 
     # List ---------------------------------------------------------------------------------------
 
-    def test_the_list_shows_the_locations_and_offers_only_what_the_account_may_do(self):
+    def test_the_list_shows_the_locations_the_names_of_the_persons_and_the_buttons(self):
         url = reverse("management:locations")
-        for user, can_add in ((self.viewer, False), (self.full, True)):
-            page = self.login(user).get(url)
-            self.assertContains(page, "Musterweg 12")
-            self.assertContains(page, "TRA21359")
-            self.assertEqual("Standort anlegen" in page.content.decode(), can_add)
+        page = self.client.get(url)
+        self.assertContains(page, "Musterweg 12")
+        self.assertContains(page, "TRA21359")
+        self.assertContains(page, "Ada Mueller")
+        self.assertContains(page, "Standort anlegen")
         # The button "Drucken" (the printing block, D-082): a desktop only, left of the create button.
-        self.assertContains(self.login(self.full).get(url), "Drucken")
-
-    def test_the_names_of_persons_are_shown_and_searched_only_with_the_right_to_see_persons(self):
-        url = reverse("management:locations")
-        self.assertNotContains(self.login(self.viewer).get(url), "Ada Mueller")
-        self.assertContains(self.login(self.persons).get(url), "Ada Mueller")
-        self.assertContains(self.login(self.persons).get(url, {"q": "mueller"}), "Musterweg 12")
-        self.assertNotContains(self.login(self.viewer).get(url, {"q": "mueller"}), "Musterweg 12")
+        self.assertContains(page, "Drucken")
+        # The names of the persons are searched too.
+        self.assertContains(self.client.get(url, {"q": "mueller"}), "Musterweg 12")
 
     def test_search_filters_and_sort_come_from_the_address_and_wrong_values_do_no_harm(self):
-        client = self.login(self.viewer)
+        client = self.client
         url = reverse("management:locations")
         page = client.get(url, {"q": "zielweg"})
         self.assertContains(page, "Zielweg 3")
@@ -110,7 +105,7 @@ class LocationPageTests(TestCase):
 
     def test_the_problem_button_is_there_only_when_a_problem_exists(self):
         url = reverse("management:locations")
-        client = self.login(self.viewer)
+        client = self.client
         self.assertNotContains(client.get(url), "Probleme filtern")
         Location.objects.filter(pk=self.other.pk).update(address_correction_open=True)
         self.assertContains(client.get(url), "Probleme filtern (1)")
@@ -119,27 +114,26 @@ class LocationPageTests(TestCase):
         self.assertNotContains(page, "Musterweg 12")
 
     def test_the_new_mark_is_shown_in_the_list_and_the_detail(self):
-        self.assertContains(self.login(self.viewer).get(reverse("management:locations")), 'class="mgmt-new"')
-        page = self.login(self.changer).get(self.detail(self.customer))
+        self.assertContains(self.client.get(reverse("management:locations")), 'class="mgmt-new"')
+        page = self.client.get(self.detail(self.customer))
         self.assertContains(page, "Neu vom Kunden angelegt, noch nicht bestätigt.")
         self.assertContains(page, "Adresse bestätigen")
-        self.assertNotContains(self.login(self.viewer).get(self.detail(self.customer)), "Adresse bestätigen")
 
     def test_the_expanded_rows_are_remembered_per_account(self):
-        client = self.login(self.viewer)
+        client = self.client
         expanded = reverse("management:locations_expanded")
         response = client.post(expanded, {"toggle": self.musterweg.pk, "next": reverse("management:locations")})
         self.assertRedirects(response, reverse("management:locations"), fetch_redirect_response=False)
-        self.assertEqual(preferences.get_preference(self.viewer, "locations").expanded_locations, [self.musterweg.pk])
+        self.assertEqual(preferences.get_preference(self.staff, "locations").expanded_locations, [self.musterweg.pk])
         self.assertContains(client.get(reverse("management:locations")), 'aria-expanded="true"')
         client.post(expanded, {"toggle": self.musterweg.pk})
-        self.assertEqual(preferences.get_preference(self.viewer, "locations").expanded_locations, [])
+        self.assertEqual(preferences.get_preference(self.staff, "locations").expanded_locations, [])
         # The script posts JSON; unknown ids are forgotten, wrong input is refused.
         ok = client.post(
             expanded, '{"ids": [%d, 99999], "open": true}' % self.musterweg.pk, content_type="application/json"
         )
         self.assertEqual(ok.status_code, 200)
-        self.assertEqual(preferences.get_preference(self.viewer, "locations").expanded_locations, [self.musterweg.pk])
+        self.assertEqual(preferences.get_preference(self.staff, "locations").expanded_locations, [self.musterweg.pk])
         for body in (
             '{"ids": "x", "open": true}', '{"ids": [0], "open": true}', '{"ids": [true], "open": true}',
             '{"ids": [1], "open": true', "{}",
@@ -147,10 +141,10 @@ class LocationPageTests(TestCase):
             self.assertEqual(client.post(expanded, body, content_type="application/json").status_code, 400, body)
         self.assertEqual(client.post(expanded, {"toggle": "abc"}).status_code, 400)
         # What one account remembers is not remembered for another.
-        self.assertEqual(preferences.get_preference(self.persons, "locations").expanded_locations, [])
+        self.assertEqual(preferences.get_preference(self.administrator, "locations").expanded_locations, [])
 
     def test_a_hostile_next_value_never_leaves_the_site(self):
-        client = self.login(self.viewer)
+        client = self.client
         for value in HOSTILE:
             with self.subTest(next=value):
                 response = client.post(
@@ -158,81 +152,54 @@ class LocationPageTests(TestCase):
                 )
                 self.assertRedirects(response, reverse("management:locations"), fetch_redirect_response=False)
         # The same for a dialog and for the button of the detail page.
-        changer = self.login(self.changer)
         for value in HOSTILE:
             with self.subTest(next=value, view="remark"):
-                response = changer.post(
+                response = client.post(
                     reverse("management:locations_remark", args=[self.fresh.pk]), {"remark": "x", "next": value}
                 )
                 self.assertRedirects(response, self.detail(self.fresh), fetch_redirect_response=False)
             with self.subTest(next=value, view="confirm"):
-                response = changer.post(reverse("management:locations_confirm", args=[self.customer.pk]), {"next": value})
+                response = client.post(reverse("management:locations_confirm", args=[self.customer.pk]), {"next": value})
                 self.assertRedirects(response, self.detail(self.customer), fetch_redirect_response=False)
 
     def test_a_safe_next_value_is_followed(self):
-        response = self.login(self.changer).post(
+        response = self.client.post(
             reverse("management:locations_remark", args=[self.fresh.pk]),
             {"remark": "x", "next": "/management/locations/?q=a"},
         )
         self.assertRedirects(response, "/management/locations/?q=a", fetch_redirect_response=False)
 
-    # Permissions ---------------------------------------------------------------------------------
+    # The detail page ------------------------------------------------------------------------------
 
-    def test_every_page_and_action_is_closed_to_those_without_the_right(self):
-        pk = self.musterweg.pk
-        pages = [
-            ("management:locations_new", []),
-            ("management:locations_address", [pk]),
-            ("management:locations_remark", [pk]),
-            ("management:locations_circuit_new", [pk]),
-            ("management:locations_metering_point_new", [pk]),
-            ("management:locations_archive", [pk]),
-            ("management:locations_confirm", [pk]),
-            ("management:locations_suggestion", [pk]),
-            ("management:locations_circuit", [pk]),
-            ("management:locations_delete", [pk]),
-            ("management:circuits_new", []),
-            ("management:circuits_edit", [self.circuit.pk]),
-        ]
-        viewer, nobody = self.login(self.viewer), self.login(self.none)
-        for name, args in pages:
-            with self.subTest(name=name):
-                url = reverse(name, args=args)
-                # The viewer may see locations but change nothing; the one without any right sees nothing.
-                self.assertIn(viewer.get(url).status_code, (403, 405))
-                self.assertEqual(viewer.post(url, {"action": "accept"}).status_code, 403)
-                self.assertEqual(nobody.post(url).status_code, 403)
-        self.assertEqual(nobody.get(reverse("management:locations")).status_code, 403)
-        self.assertEqual(nobody.get(self.detail()).status_code, 403)
+    def test_a_normal_account_gets_nothing_and_an_unknown_location_is_not_found(self):
         self.assertEqual(self.login(self.plain).get(self.detail()).status_code, 404)
+        self.assertEqual(self.client.get(reverse("management:locations_detail", args=[999999])).status_code, 404)
 
-    def test_the_detail_page_offers_the_buttons_by_right(self):
-        texts = ("Bearbeiten", "Messpunkt anlegen", "Standort archivieren", "Trafokreis bearbeiten")
-        viewer = self.login(self.viewer).get(self.detail()).content.decode()
-        changer = self.login(self.changer).get(self.detail()).content.decode()
-        for text in texts:
-            self.assertNotIn(text, viewer)
-            self.assertIn(text, changer)
-        self.assertNotIn("Standort löschen", changer)
-        # Only without a history: the button "delete" instead of "archive" (and only with the right to delete).
-        full = self.login(self.full).get(self.detail(self.fresh)).content.decode()
-        self.assertIn("Standort löschen", full)
-        self.assertNotIn("Standort archivieren", full)
-        no_delete = self.login(self.changer).get(self.detail(self.fresh)).content.decode()
-        self.assertNotIn("Standort löschen", no_delete)
-        self.assertIn("Standort archivieren", no_delete)
+    def test_the_detail_page_offers_the_buttons_and_names_the_persons(self):
+        page = self.client.get(self.detail()).content.decode()
+        for text in ("Bearbeiten", "Messpunkt anlegen", "Standort archivieren", "Trafokreis bearbeiten", "Ada Mueller"):
+            self.assertIn(text, page)
+        self.assertNotIn("Standort löschen", page)  # it has metering points
+        # Only without a history: the button "delete" instead of "archive".
+        fresh = self.client.get(self.detail(self.fresh)).content.decode()
+        self.assertIn("Standort löschen", fresh)
+        self.assertNotIn("Standort archivieren", fresh)
 
-    def test_persons_appear_on_the_detail_page_only_with_the_right_to_see_them(self):
-        self.assertNotContains(self.login(self.viewer).get(self.detail()), "Ada Mueller")
-        self.assertContains(self.login(self.persons).get(self.detail()), "Ada Mueller")
+    def test_an_archived_location_offers_only_the_restore(self):
+        # "Altweg 9" is archived and has no history: by the history alone it would be deletable (D-086).
+        page = self.client.get(self.detail(self.old)).content.decode()
+        self.assertIn("Standort wiederherstellen", page)
+        for text in ("Standort löschen", "Standort archivieren", "Messpunkt anlegen"):
+            self.assertNotIn(text, page)
+        self.assertNotIn(reverse("management:locations_delete", args=[self.old.pk]), page)
 
     def test_the_responses_of_the_pages_are_not_cached(self):
-        self.assertIn("no-store", self.login(self.viewer).get(self.detail())["Cache-Control"])
+        self.assertIn("no-store", self.client.get(self.detail())["Cache-Control"])
 
     # Dialogs without JavaScript ------------------------------------------------------------------
 
     def test_a_dialog_is_a_page_with_a_form_and_a_way_back(self):
-        client = self.login(self.full)
+        client = self.client
         page = client.get(reverse("management:locations_new"), {"next": "/management/locations/?q=x"})
         self.assertContains(page, "<form")
         self.assertContains(page, 'href="/management/locations/?q=x"')
@@ -244,14 +211,14 @@ class LocationPageTests(TestCase):
         self.assertContains(page, f'href="{reverse("management:locations")}"')
 
     def test_the_post_of_a_dialog_without_the_csrf_token_is_refused(self):
-        client = self.login(self.full, enforce_csrf_checks=True)
+        client = self.login(self.staff, enforce_csrf_checks=True)
         response = client.post(reverse("management:locations_remark", args=[self.fresh.pk]), {"remark": "x"})
         self.assertEqual(response.status_code, 403)
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.remark, "")
 
     def test_creating_a_location(self):
-        client = self.login(self.full)
+        client = self.client
         url = reverse("management:locations_new")
         data = {
             "street": "Bachweg", "house_number": "7", "address_addition": "Hinterhaus", "postal_code": "3000",
@@ -264,7 +231,7 @@ class LocationPageTests(TestCase):
             (created.transformer_circuit, created.remark, created.address_addition),
             (self.circuit, "intern", "Hinterhaus"),
         )
-        self.assertEqual(history.entries_for(created).get().actor, self.full)
+        self.assertEqual(history.entries_for(created).get().actor, self.staff)
         # The same address again: the hint, with the way to the existing location, and nothing is created.
         again = client.post(url, data)
         self.assertContains(again, "Diese Adresse gibt es schon:")
@@ -274,16 +241,10 @@ class LocationPageTests(TestCase):
             self.assertEqual(client.post(url, {**data, "street": "Anderer Weg", **bad}).status_code, 200)
             self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
 
-    def test_the_hint_of_a_duplicate_is_shown_only_to_those_who_may_see_locations(self):
-        user = staff_user("staff.add@example.org", "add_location")
-        data = {"street": "Musterweg", "house_number": "12", "postal_code": "3063", "town": "Ittigen"}
-        page = self.login(user).post(reverse("management:locations_new"), data)
-        self.assertNotContains(page, reverse("management:locations_detail", args=[self.musterweg.pk]))
-
     def test_changing_the_address_and_the_merge_with_its_confirmation_step(self):
         url = reverse("management:locations_address", args=[self.fresh.pk])
         data = {"street": "Neuweg", "house_number": "2", "address_addition": "", "postal_code": "3000", "town": "Bern"}
-        client = self.login(self.full)
+        client = self.client
         self.assertRedirects(client.post(url, data), self.detail(self.fresh), fetch_redirect_response=False)
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.house_number, "2")
@@ -299,31 +260,30 @@ class LocationPageTests(TestCase):
         self.assertFalse(Location.objects.filter(pk=self.fresh.pk).exists())
         self.assertTrue(history.entries_for(self.other).filter(event=HistoryEvent.LOCATIONS_MERGED).exists())
 
-    def test_the_merge_needs_the_right_to_delete_and_a_confirmation_cannot_be_forged(self):
+    def test_a_merge_confirmation_cannot_be_forged_and_an_archived_target_is_refused(self):
         url = reverse("management:locations_address", args=[self.fresh.pk])
         merge = {"street": "Zielweg", "house_number": "3", "address_addition": "", "postal_code": "3063", "town": "Ittigen"}
-        changer = self.login(self.changer)
-        self.assertContains(changer.post(url, merge), "Diese Adresse gibt es schon.")
-        # Without the right to delete the confirmation is no confirmation: the address is "in use", nothing moves.
-        forged = changer.post(url, {**merge, "confirm_merge": "1", "merge_target": str(self.other.pk)})
-        self.assertContains(forged, "Diese Adresse gibt es schon.")
-        self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
-        # With the right, but for another target than the one that was shown (or none), the page asks again.
-        full = self.login(self.full)
+        client = self.client
+        # A confirmation for another target than the one that was shown (or none): the page asks again.
         for target in ("", "999999", "abc", str(self.fresh.pk)):
-            again = full.post(url, {**merge, "confirm_merge": "1", "merge_target": target})
+            again = client.post(url, {**merge, "confirm_merge": "1", "merge_target": target})
             self.assertContains(again, "Übertragen und speichern")
             self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
+        # The address of an archived location: nothing is moved to a location that is out of sight.
+        archived = {"street": "Altweg", "house_number": "9", "address_addition": "", "postal_code": "3000", "town": "Bern"}
+        refused = client.post(url, {**archived, "confirm_merge": "1", "merge_target": str(self.old.pk)})
+        self.assertContains(refused, "Diese Adresse gibt es schon.")
+        self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
 
     def test_the_remark_is_changed(self):
         url = reverse("management:locations_remark", args=[self.fresh.pk])
-        self.login(self.changer).post(url, {"remark": "  neu  "})
+        self.client.post(url, {"remark": "  neu  "})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.remark, "neu")
 
     def test_the_circuit_is_chosen_with_the_field_and_an_unknown_one_is_refused(self):
         url = reverse("management:locations_circuit", args=[self.fresh.pk])
-        client = self.login(self.changer)
+        client = self.client
         client.post(url, {"transformer_circuit": "tra21359"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
@@ -335,52 +295,53 @@ class LocationPageTests(TestCase):
         self.assertIsNone(self.fresh.transformer_circuit)
 
     def test_the_new_circuit_dialog_with_the_hint_for_a_number_that_exists(self):
-        client = self.login(self.changer)
+        client = self.client
         url = reverse("management:locations_circuit_new", args=[self.fresh.pk])
         # An existing number: first the hint with "Diesen verwenden"; nothing is created or assigned.
-        first = client.post(url, {"bkw_number": "tra21359", "name": "Anders"})
+        first = client.post(url, {"grid_number": "tra21359", "name": "Anders"})
         self.assertContains(first, "Diesen Trafokreis gibt es schon:")
         self.assertContains(first, "Diesen verwenden")
         self.assertEqual(TransformerCircuit.objects.count(), 1)
         self.fresh.refresh_from_db()
         self.assertIsNone(self.fresh.transformer_circuit)
-        client.post(url, {"bkw_number": "tra21359", "name": "Anders", "use_existing": "1"})
+        client.post(url, {"grid_number": "tra21359", "name": "Anders", "use_existing": "1"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
         self.circuit.refresh_from_db()
         self.assertEqual(self.circuit.name, "Ittigen Nord")  # the existing one is not changed
         # A new number is created and assigned.
-        client.post(url, {"bkw_number": "tra555", "name": "Neu"})
+        client.post(url, {"grid_number": "tra555", "name": "Neu"})
         self.fresh.refresh_from_db()
-        self.assertEqual(self.fresh.transformer_circuit.bkw_number, "TRA555")
-        self.assertEqual(client.post(url, {"bkw_number": "555", "name": ""}).status_code, 200)
+        self.assertEqual(self.fresh.transformer_circuit.grid_number, "TRA555")
+        self.assertEqual(client.post(url, {"grid_number": "555", "name": ""}).status_code, 200)
 
     def test_the_circuit_dialog_of_the_create_dialog_returns_with_the_new_circuit(self):
-        client = self.login(self.full)
+        client = self.client
         response = client.post(
-            reverse("management:circuits_new"), {"bkw_number": "tra777", "name": "", "next": "/management/locations/new/"}
+            reverse("management:circuits_new"), {"grid_number": "tra777", "name": "", "next": "/management/locations/new/"}
         )
-        created = TransformerCircuit.objects.get(bkw_number="TRA777")
+        created = TransformerCircuit.objects.get(grid_number="TRA777")
         self.assertRedirects(response, f"/management/locations/new/?circuit={created.pk}", fetch_redirect_response=False)
         page = client.get(reverse("management:locations_new"), {"circuit": created.pk})
         self.assertContains(page, 'value="TRA777"')
 
     def test_changing_a_circuit_says_how_many_locations_it_reaches(self):
         url = reverse("management:circuits_edit", args=[self.circuit.pk])
-        client = self.login(self.changer)
+        client = self.client
         self.assertContains(client.get(url), "Die Änderung betrifft 1 Standort.")
-        client.post(url, {"bkw_number": "tra21359", "name": "Ittigen Süd"})
+        client.post(url, {"grid_number": "tra21359", "name": "Ittigen Süd"})
         self.circuit.refresh_from_db()
         self.assertEqual(self.circuit.name, "Ittigen Süd")
         other = make_circuit("TRA5")
-        taken = client.post(reverse("management:circuits_edit", args=[other.pk]), {"bkw_number": "TRA21359", "name": ""})
+        taken = client.post(reverse("management:circuits_edit", args=[other.pk]), {"grid_number": "TRA21359", "name": ""})
         self.assertContains(taken, "Diesen Trafokreis gibt es schon.")
 
     def test_creating_a_metering_point_at_the_location(self):
-        client = self.login(self.changer)
+        client = self.client
         url = reverse("management:locations_metering_point_new", args=[self.fresh.pk])
         # The location is preset by the address; direction is required, number and LEG are optional.
         self.assertEqual(client.post(url, {"number_digits": "5"}).status_code, 200)
+        self.assertContains(client.get(url), 'name="leg"')
         self.assertRedirects(
             client.post(url, {"direction": Direction.FEED_IN, "number_digits": "77", "leg": self.leg.pk}),
             self.detail(self.fresh), fetch_redirect_response=False,
@@ -399,24 +360,16 @@ class LocationPageTests(TestCase):
 
     def test_a_metering_point_needs_the_identifier_from_the_settings_for_a_number(self):
         ManagementSettings.objects.update(identifier="")
-        response = self.login(self.changer).post(
+        response = self.client.post(
             reverse("management:locations_metering_point_new", args=[self.fresh.pk]),
             {"direction": Direction.CONSUMPTION, "number_digits": "5"},
         )
         self.assertContains(response, "Erfassen Sie zuerst das Land und die Kennung in den Einstellungen.")
 
-    def test_the_leg_cannot_be_chosen_without_the_right_to_see_legs(self):
-        user = staff_user("staff.points@example.org", "view_location", "add_meteringpoint")
-        url = reverse("management:locations_metering_point_new", args=[self.fresh.pk])
-        client = self.login(user)
-        self.assertNotContains(client.get(url), 'name="leg"')
-        client.post(url, {"direction": Direction.CONSUMPTION, "leg": self.leg.pk})
-        self.assertFalse(MeteringPoint.objects.get(location=self.fresh).leg_assignments.exists())
-
     # Buttons of the detail page -------------------------------------------------------------------
 
     def test_archiving_and_confirming(self):
-        client = self.login(self.changer)
+        client = self.client
         client.post(reverse("management:locations_archive", args=[self.fresh.pk]))
         self.fresh.refresh_from_db()
         self.assertTrue(self.fresh.is_archived)
@@ -434,9 +387,10 @@ class LocationPageTests(TestCase):
         with mock.patch("leg_platform.community.addressing.suggest_correction", return_value=suggestion):
             locations.refresh_suggestion(wrong)
         url = reverse("management:locations_suggestion", args=[wrong.pk])
-        client = self.login(self.changer)
-        self.assertContains(client.get(self.detail(wrong)), "Musterweg 12, 3063 Ittigen")
-        self.assertNotContains(self.login(self.viewer).get(self.detail(wrong)), "Nicht übernehmen")
+        client = self.client
+        page = client.get(self.detail(wrong))
+        self.assertContains(page, "Musterweg 12, 3063 Ittigen")
+        self.assertContains(page, "Nicht übernehmen")
         # An unknown action is refused; the correct ones decide.
         self.assertEqual(client.post(url, {"action": "other"}).status_code, 400)
         # The suggestion is the address of another location: refused with a message, address unchanged.
@@ -448,10 +402,10 @@ class LocationPageTests(TestCase):
         wrong.refresh_from_db()
         self.assertFalse(wrong.address_correction_open)
         entry = history.entries_for(wrong).get(event=HistoryEvent.ADDRESS_CORRECTION_DISMISSED)
-        self.assertEqual(entry.actor, self.changer)
+        self.assertEqual(entry.actor, self.staff)
 
     def test_deleting_a_location_asks_first_and_only_works_without_a_history(self):
-        client = self.login(self.full)
+        client = self.client
         url = reverse("management:locations_delete", args=[self.fresh.pk])
         self.assertContains(client.get(url), "Standort löschen")
         self.assertTrue(Location.objects.filter(pk=self.fresh.pk).exists())
@@ -461,3 +415,12 @@ class LocationPageTests(TestCase):
         self.assertEqual(client.get(reverse("management:locations_delete", args=[self.musterweg.pk])).status_code, 404)
         client.post(reverse("management:locations_delete", args=[self.musterweg.pk]))
         self.assertTrue(Location.objects.filter(pk=self.musterweg.pk).exists())
+
+    def test_an_archived_location_is_never_deleted_not_even_without_a_history(self):
+        # "Altweg 9" is archived and has no history, so by the history alone it would be deletable (D-086).
+        url = reverse("management:locations_delete", args=[self.old.pk])
+        for method in (self.client.get, self.client.post):
+            response = method(url, follow=True)
+            self.assertEqual(response.redirect_chain, [(self.detail(self.old), 302)])
+            self.assertContains(response, "Dieser Standort ist archiviert.")
+            self.assertTrue(Location.objects.filter(pk=self.old.pk).exists())

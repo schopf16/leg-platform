@@ -102,8 +102,7 @@ def legs_with_problem(today=None, threshold_percent=None):
 def problem_counts(today=None, threshold_percent=None, only=None):
     """The number of entries with a problem per list, for the overview and the button "Filter
     problems": ``{"locations": n, "metering_points": n, "legs": n}`` (persons have none yet).
-    ``only`` names the lists to count (the overview counts only the lists the account may see: it must
-    not learn the figure of another list); the others are left out of the result."""
+    ``only`` names the lists to count (a list that is not named is not computed and is left out of the result)."""
     wanted = {"locations", "metering_points", "legs"} if only is None else set(only)
     counts = {}
     if "locations" in wanted:

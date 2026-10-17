@@ -64,11 +64,11 @@ notice and "Confirm address" first.
                 <input type="search" name="transformer_circuit" value="{{ circuit_text }}" list="circuit-options" class="form-control tnum" autocomplete="off" aria-label="{% translate 'Search transformer circuit' %}"{% if not can_change %} disabled{% endif %}>
                 {% if can_change %}<button type="submit" class="mgmt-icon-btn" aria-label="{% translate 'Change transformer circuit' %}" title="{% translate 'Change transformer circuit' %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-pencil"/></svg></button>{% endif %}
               </form>
-              <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.bkw_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
-              {% if can_add_circuit or can_edit_circuit and circuit %}
+              <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.grid_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
+              {% if can_change or circuit %}
                 <p class="mgmt-circuit-links">
-                  {% if can_add_circuit %}<a href="{% url 'management:locations_circuit_new' location.pk %}">+ {% translate "Create new transformer circuit" %}</a>{% endif %}
-                  {% if can_edit_circuit and circuit %}<a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a>{% endif %}
+                  {% if can_change %}<a href="{% url 'management:locations_circuit_new' location.pk %}">+ {% translate "Create new transformer circuit" %}</a>{% endif %}
+                  {% if circuit %}<a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a>{% endif %}
                 </p>
               {% endif %}
             </dd>
@@ -88,7 +88,7 @@ notice and "Confirm address" first.
   </div>
 
   <section class="mgmt-card mgmt-card-flush">
-    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points" %}</h2>{% if can_add_point %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a>{% endif %}</div>
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a>{% endif %}</div>
     <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view">
       <table class="mgmt-table mgmt-table-fixed">
@@ -97,10 +97,10 @@ notice and "Confirm address" first.
           {% for row in points %}
             <tr>
               <td><span class="mgmt-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}</span>{% include "management/_direction.html" with direction=row.metering_point.direction %}</td>
-              <td>{% if row.leg_id %}<span class="mgmt-leg mgmt-cut-inline">{% if see_legs %}{{ row.leg_name }}{% else %}–{% endif %}</span>{% if see_legs %}{% optional_url "management:legs_detail" row.leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% endif %}{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
+              <td>{% if row.leg_id %}<span class="mgmt-leg mgmt-cut-inline">{{ row.leg_name }}</span>{% url "management:legs_detail" row.leg_id as leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
               <td>{% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}</td>
-              <td>{% if row.person_id %}{% if see_persons %}<span class="mgmt-cut-inline">{{ row.person_name }}</span>{% optional_url "management:persons_detail" row.person_id as person_url %}{% if person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label subject=row.person_name %}{% endif %}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
-              <td class="mgmt-link-col">{% if can_view_point %}{% optional_url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}{% endif %}</td>
+              <td>{% if row.person_id %}<span class="mgmt-cut-inline">{{ row.person_name }}</span>{% url "management:persons_detail" row.person_id as person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label subject=row.person_name %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
+              <td class="mgmt-link-col">{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}</td>
             </tr>
           {% empty %}
             {% translate "No metering points at this location." as empty_text %}
@@ -113,12 +113,12 @@ notice and "Confirm address" first.
     <div class="mgmt-cards-view mgmt-card-pad">
       {% for row in points %}
         <div class="mgmt-mp">
-          <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}{% if can_view_point %}{% optional_url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}{% endif %}</div>
+          <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}</div>
           <div class="mgmt-mp-line">
-            <span>{% if row.leg_id %}{% if see_legs %}{{ row.leg_name }}{% optional_url "management:legs_detail" row.leg_id as leg_url %}{% if leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% endif %}{% else %}–{% endif %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</span>
+            <span>{% if row.leg_id %}{{ row.leg_name }}{% url "management:legs_detail" row.leg_id as leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</span>
             {% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}
           </div>
-          <div class="mgmt-mp-person">{% if row.person_id %}{% if see_persons %}{{ row.person_name }}{% optional_url "management:persons_detail" row.person_id as person_url %}{% if person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label subject=row.person_name %}{% endif %}{% else %}–{% endif %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
+          <div class="mgmt-mp-person">{% if row.person_id %}{{ row.person_name }}{% url "management:persons_detail" row.person_id as person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label subject=row.person_name %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</div>
         </div>
       {% empty %}
         <p class="mgmt-empty-text">{% translate "No metering points at this location." %}</p>
@@ -127,7 +127,6 @@ notice and "Confirm address" first.
     <p class="mgmt-note mgmt-card-pad">{% translate "The assignment to a person is changed at the person or at the metering point." %}</p>
   </section>
 
-  {% if see_persons %}
   <section class="mgmt-card mgmt-card-flush">
     <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History of the assignments" %}</h2></div>
     <div class="mgmt-table-view">
@@ -149,7 +148,6 @@ notice and "Confirm address" first.
       {% endfor %}
     </dl>
   </section>
-  {% endif %}
 
   <section class="mgmt-card mgmt-card-flush">
     <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History" %}</h2></div>

@@ -1,6 +1,7 @@
-"""The settings page of the management area (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077):
-the texts of the template, validation, saving with the history, the directory banner and the
-rights. Users and the settings row are created once per class."""
+"""The settings page of the management area (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077, D-086):
+the texts of the template, validation, saving with the history, the directory banner and the line of the
+grid operator. Every staff account may show and save the page. Users and the settings row are created once
+per class."""
 
 import re
 import uuid
@@ -14,10 +15,11 @@ from leg_platform.accounts.tests.helpers import VerifiedClient
 from leg_platform.addresses.models import Address, Directory
 from leg_platform.community.addressing import AddressSuggestion
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import HistoryEntry, ManagementSettings
+from leg_platform.community.models import GridOperator, HistoryEntry, ManagementSettings
 from leg_platform.community.tests.helpers import staff_user
 
 URL = reverse("management:settings")
+OPERATOR = "Netzbetreiber Beispiel"
 VALID = {
     "sender_street": "Musterstrasse", "sender_house_number": "1", "sender_address_addition": "",
     "sender_postal_code": "3063", "sender_town": "Ittigen",
@@ -39,8 +41,11 @@ class SettingsPageTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.editor = staff_user("editor.person@example.org", "view_managementsettings", "change_managementsettings")
-        cls.viewer = staff_user("viewer.person@example.org", "view_managementsettings")
+        cls.staff = staff_user("staff.person@example.org")  # no group, no permission
+        cls.administrator = staff_user("administrator.person@example.org", superuser=True)
+        operator = GridOperator.load()
+        operator.name = OPERATOR
+        operator.save()
 
     def login(self, user):
         client = VerifiedClient()
@@ -48,7 +53,7 @@ class SettingsPageTests(TestCase):
         return client
 
     def page(self, client=None, **data):
-        client = client or self.login(self.editor)
+        client = client or self.login(self.staff)
         return client.get(URL, data).content.decode()
 
     def test_the_page_has_the_texts_of_the_template(self):
@@ -60,12 +65,13 @@ class SettingsPageTests(TestCase):
             ">Absender der Rechnungen</h2>", ">Messpunkte</h2>", ">Produktionsquote</h2>",
             ">Strasse</label>", ">Hausnummer</label>", "Adresszusatz", "(optional)", ">PLZ</label>", ">Ort</label>",
             ">Land</label>", ">Identifikator</label>", "Warnschwelle",
-            "Gilt für alle Messpunkte. Die BKW vergibt den Identifikator.",
+            f"Gilt für alle Messpunkte. Die {OPERATOR} vergibt den Identifikator.",
             "Gilt für alle LEGs. Gesetzlich nötig sind mindestens 5 %.",
             ">Speichern</button>",
         ):
             with self.subTest(text=text):
                 self.assertIn(text, html)
+        self.assertNotIn("BKW", html)
         # The sections are in the order of the specification.
         self.assertLess(html.index("Absender der Rechnungen"), html.index(">Messpunkte</h2>"))
         self.assertLess(html.index(">Messpunkte</h2>"), html.index(">Produktionsquote</h2>"))
@@ -73,6 +79,29 @@ class SettingsPageTests(TestCase):
         form = html[html.index('<form method="post" novalidate'):]
         self.assertIn('value="save"', re.search(r"<button[^>]*>", form).group(0))
         self.assertEqual(html.count(">Speichern</button>"), 1)
+        # Every field can be typed in (no account sees a disabled form).
+        self.assertEqual(len(re.findall(r"<input[^>]* disabled", html)), 0)
+
+    def test_the_operator_is_a_line_of_plain_text_for_a_staff_account(self):
+        html = self.page()
+
+        self.assertIn('<span class="mgmt-row-label">Netzbetreiber</span>', html)
+        self.assertIn(f'<span class="mgmt-operator">{OPERATOR}</span>', html)
+        self.assertNotIn(reverse("admin:community_gridoperator_change", args=(1,)), html)
+
+    def test_the_operator_is_a_link_to_its_form_for_a_system_administrator(self):
+        html = self.page(self.login(self.administrator))
+
+        self.assertIn('<span class="mgmt-row-label">Netzbetreiber</span>', html)
+        self.assertIn(f'<a href="/admin/community/gridoperator/1/change/">{OPERATOR}</a>', html)
+
+    def test_without_a_name_the_page_shows_the_neutral_word_in_its_place(self):
+        GridOperator.objects.filter(pk=1).update(name="")
+
+        html = self.page()
+
+        self.assertIn('<span class="mgmt-operator">Netzbetreiber</span>', html)
+        self.assertIn("Gilt für alle Messpunkte. Die Netzbetreiber vergibt den Identifikator.", html)
 
     def test_the_defaults_come_from_the_row_and_the_page_needs_no_inline_code(self):
         html = self.page()
@@ -87,7 +116,7 @@ class SettingsPageTests(TestCase):
         self.assertNotRegex(html, r"<style|\sstyle=")
 
     def test_saving_stores_everything_and_records_the_three_kinds_of_change(self):
-        client = self.login(self.editor)
+        client = self.login(self.staff)
 
         response = client.post(URL, VALID, follow=True)
 
@@ -101,13 +130,13 @@ class SettingsPageTests(TestCase):
         events = list(HistoryEntry.objects.filter(subject_type="settings").values_list("event", "actor"))
         self.assertEqual(
             events,
-            [(HistoryEvent.SENDER_ADDRESS_CHANGED, self.editor.pk), (HistoryEvent.IDENTIFIER_CHANGED, self.editor.pk)],
+            [(HistoryEvent.SENDER_ADDRESS_CHANGED, self.staff.pk), (HistoryEvent.IDENTIFIER_CHANGED, self.staff.pk)],
         )
         # The values come back in the fields.
         self.assertIn('name="identifier" value="1A2B3C4D5E6"', response.content.decode())
 
     def test_the_country_and_the_identifier_are_capitalised_and_the_rest_is_trimmed(self):
-        client = self.login(self.editor)
+        client = self.login(self.staff)
         client.post(URL, {**VALID, "country_code": " li ", "identifier": " 1a2b3c4d5e6 ", "sender_town": " Ittigen ",
                           "sender_street": " Musterstrasse "})
 
@@ -116,7 +145,7 @@ class SettingsPageTests(TestCase):
                          ("LI", "1A2B3C4D5E6", "Ittigen", "Musterstrasse"))
 
     def test_invalid_entries_are_refused_with_a_message_under_the_field_and_nothing_is_saved(self):
-        client = self.login(self.editor)
+        client = self.login(self.staff)
         bad = {
             "sender_street": "", "sender_house_number": "", "sender_address_addition": "",
             "sender_postal_code": "123", "sender_town": "", "country_code": "1C",
@@ -140,29 +169,14 @@ class SettingsPageTests(TestCase):
         self.assertEqual(ManagementSettings.load().identifier, "")
 
     def test_the_threshold_is_a_whole_percentage_up_to_100(self):
-        client = self.login(self.editor)
+        client = self.login(self.staff)
         for value, saved in (("100", True), ("1", True), ("101", False), ("-1", False), ("9.5", False), ("x", False)):
             with self.subTest(value=value):
                 response = client.post(URL, {**VALID, "warning_threshold_percent": value})
                 self.assertEqual(response.status_code, 302 if saved else 200)
 
-    def test_the_right_to_view_shows_the_values_without_a_way_to_change_them(self):
-        ManagementSettings.objects.create(id=1, identifier="1A2B3C4D5E6")
-        client = self.login(self.viewer)
-
-        html = self.page(client)
-
-        self.assertIn('name="identifier" value="1A2B3C4D5E6"', html)
-        self.assertNotIn(">Speichern</button>", html)
-        self.assertEqual(len(re.findall(r"<input[^>]* disabled", html)), 8)
-        editor_html = self.page()
-        self.assertEqual(len(re.findall(r"<input[^>]* disabled", editor_html)), 0)
-        self.assertEqual(client.post(URL, VALID).status_code, 403)
-        self.assertEqual(ManagementSettings.load().identifier, "1A2B3C4D5E6")
-        self.assertFalse(HistoryEntry.objects.exists())
-
     def test_an_unknown_action_is_refused(self):
-        self.assertEqual(self.login(self.editor).post(URL, {**VALID, "action": "delete"}).status_code, 400)
+        self.assertEqual(self.login(self.staff).post(URL, {**VALID, "action": "delete"}).status_code, 400)
 
     def test_the_page_changes_nothing_on_a_get_request(self):
         self.page()
@@ -175,11 +189,11 @@ class AddressBannerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.editor = staff_user("editor.person@example.org", "view_managementsettings", "change_managementsettings")
+        cls.staff = staff_user("staff.person@example.org")
 
     def setUp(self):
         self.client = VerifiedClient()
-        self.client.force_login(self.editor)
+        self.client.force_login(self.staff)
         ManagementSettings.objects.create(
             id=1, sender_street="musterstrasse", sender_house_number="1", sender_postal_code="3063",
             sender_town="Ittigen", identifier="1A2B3C4D5E6",
@@ -216,7 +230,7 @@ class AddressBannerTests(TestCase):
         self.assertEqual((row.sender_street, row.identifier), (before, "1A2B3C4D5E6"))
         # Only the decision is recorded (L-5), with the actor; the address is not changed by it.
         entry = HistoryEntry.objects.get()
-        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_ACCEPTED, self.editor))
+        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_ACCEPTED, self.staff))
         self.assertEqual(entry.detail, {"suggested": list(SUGGESTION.as_tuple())})
 
     def test_not_accepting_remembers_the_address_until_it_changes(self):
@@ -228,7 +242,7 @@ class AddressBannerTests(TestCase):
         self.assertTrue(row.sender_suggestion_dismissed_for)
         self.assertNotIn("Adressverzeichnis ab", self.client.get(URL).content.decode())
         entry = HistoryEntry.objects.get()  # the decision, with the actor (L-5)
-        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_DISMISSED, self.editor))
+        self.assertEqual((entry.event, entry.actor), (HistoryEvent.SENDER_SUGGESTION_DISMISSED, self.staff))
         # A changed address (here the town) is checked again.
         self.client.post(URL, {**VALID, "sender_street": "musterstrasse", "sender_town": "Ittigen Dorf"})
         self.assertIn("Adressverzeichnis ab", self.client.get(URL).content.decode())
@@ -246,16 +260,6 @@ class AddressBannerTests(TestCase):
             html = self.client.get(URL).content.decode()
 
         self.assertIn("Diese Adresse wurde nicht gefunden.", html)
-        self.assertNotIn(">Übernehmen</button>", html)
-
-    def test_the_banner_and_the_notice_are_for_an_account_that_can_change_the_settings_only(self):
-        viewer = staff_user("viewer.person@example.org", "view_managementsettings")
-        client = VerifiedClient()
-        client.force_login(viewer)
-
-        html = client.get(URL).content.decode()
-
-        self.assertNotIn("Adressverzeichnis ab", html)
         self.assertNotIn(">Übernehmen</button>", html)
 
     def test_an_address_that_is_complete_and_known_shows_nothing(self):
@@ -277,7 +281,7 @@ class RealDirectoryTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.editor = staff_user("editor.person@example.org", "view_managementsettings", "change_managementsettings")
+        cls.staff = staff_user("staff.person@example.org")
         generation = uuid.uuid4()
         Directory.objects.create(
             pk=1, generation=generation, data_date=timezone.localdate(), imported_at=timezone.now(),
@@ -289,7 +293,7 @@ class RealDirectoryTests(TestCase):
 
     def test_the_page_checks_the_saved_address_against_the_directory(self):
         client = VerifiedClient()
-        client.force_login(self.editor)
+        client.force_login(self.staff)
         client.post(URL, {**VALID, "sender_street": "musterstrasse"})
 
         html = client.get(URL).content.decode()

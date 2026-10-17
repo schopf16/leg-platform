@@ -20,6 +20,7 @@ from leg_platform.community.models import (
     ManagementSettings,
     PersonAssignment,
     PersonRecord,
+    ShareChange,
 )
 from leg_platform.community.tests.helpers import (
     assign_leg,
@@ -542,8 +543,10 @@ class HistoryPreferenceAndPersonRecordTests(TestCase):
             preferences.save_expanded_locations(self.person, [0])
 
     def test_the_side_record_belongs_to_the_account_and_leaves_it_untouched(self):
-        record = PersonRecord.objects.create(person=self.person, staff_note="note", shares=3)
+        record = PersonRecord.objects.create(person=self.person, staff_note="note", operator_customer_number="OPR 3")
+        ShareChange.objects.create(record=record, quantity=3, valid_from=TODAY)
         self.assertEqual(self.person.person_record, record)
+        self.assertEqual([entry.quantity for entry in record.share_changes.all()], [3])
         self.assertEqual(record.current_address(), ("Examplestrasse", "12a", "3000", "Bern"))
         self.assertEqual(PersonRecord.objects.filter(person=self.other).count(), 0)
         # The side record is removed with the account; the account is not changed by it.

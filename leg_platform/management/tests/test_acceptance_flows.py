@@ -55,7 +55,6 @@ from leg_platform.community.tests.helpers import (
     make_location,
     make_metering_point,
     number,
-    staff_user,
 )
 from leg_platform.management.printing import areas, pdf
 from leg_platform.management.tests.test_acceptance_matrix import (
@@ -100,12 +99,12 @@ class RefusedRequestTests(MatrixBase):
 
     def test_a_step_out_of_order_is_refused_in_every_status(self):
         terminated = make_metering_point(
-            8, location=self.place, registered_with_bkw_on=TODAY - timedelta(days=90),
+            8, location=self.place, registered_with_operator_on=TODAY - timedelta(days=90),
             confirmed_on=TODAY - timedelta(days=89), start_date=TODAY - timedelta(days=80),
             terminated_on=TODAY - timedelta(days=1),
         )
         ending = make_metering_point(
-            9, location=self.place, registered_with_bkw_on=TODAY - timedelta(days=90),
+            9, location=self.place, registered_with_operator_on=TODAY - timedelta(days=90),
             confirmed_on=TODAY - timedelta(days=89), start_date=TODAY - timedelta(days=80),
             terminated_on=month_end(TODAY + timedelta(days=40)),  # recorded, not reached: still active
         )
@@ -306,15 +305,16 @@ class RefusedRequestTests(MatrixBase):
             ("locations_address", {"street": "Neuweg", "house_number": "8", "postal_code": "3000", "town": "Bern"}),
             ("locations_remark", {"remark": "changed"}),
             ("locations_circuit", {"transformer_circuit": "TRA2000"}),
-            ("locations_circuit_new", {"bkw_number": "TRA9999", "name": "Neun"}),
+            ("locations_circuit_new", {"grid_number": "TRA9999", "name": "Neun"}),
             ("locations_metering_point_new", {"direction": "consumption", "number_digits": "999"}),
             ("locations_confirm", {}),
             ("locations_suggestion", {"action": "dismiss"}),
             ("locations_suggestion", {"action": "accept"}),
+            ("locations_delete", {}),
         ):
             with self.subTest(name=name, data=data):
                 self.assert_archived_refusal(name, old, data, text)
-        for name in ("locations_address", "locations_remark", "locations_circuit_new", "locations_metering_point_new"):
+        for name in ("locations_address", "locations_remark", "locations_circuit_new", "locations_metering_point_new", "locations_delete"):
             with self.subTest(dialog=name):
                 response = self.client.get(url(name, old), follow=True)
                 self.assertContains(response, text)  # no dialog of an archived location
@@ -352,6 +352,7 @@ class RefusedRequestTests(MatrixBase):
         for name, data in (
             ("legs_quota", {"quota": "30", "checked_on": iso(0)}),
             ("legs_edit", {"name": "LEG Renamed", "remark": "r"}),
+            ("legs_delete", {}),
         ):
             with self.subTest(name=name):
                 self.assert_archived_refusal(name, self.leg_archived, data, text)
@@ -436,7 +437,7 @@ class RefusedRequestTests(MatrixBase):
         location is looked up first, so that no transformer circuit is created for nothing)."""
         before = snapshot()
         response = self.client.post(
-            reverse("management:locations_circuit_new", args=[999999]), {"bkw_number": "TRA777", "name": "x"}
+            reverse("management:locations_circuit_new", args=[999999]), {"grid_number": "TRA777", "name": "x"}
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(snapshot(), before)
@@ -467,7 +468,7 @@ class LifeOfTheObjectsTests(MatrixBase):
 
     def test_a_transformer_circuit_number_is_normalised_and_unique(self):
         created = transformer_circuits.create("  tra555 ", "Fuenf")
-        self.assertEqual(created.bkw_number, "TRA555")
+        self.assertEqual(created.grid_number, "TRA555")
         for duplicate in ("TRA555", "tra555", " Tra555  "):
             with self.assertRaises(ValidationError):
                 transformer_circuits.create(duplicate, "Other")
@@ -483,20 +484,20 @@ class LifeOfTheObjectsTests(MatrixBase):
     def test_creating_a_circuit_that_exists_uses_the_existing_one_and_changes_it_not(self):
         client = self.login(self.administrator)
         before = TransformerCircuit.objects.count()
-        response = client.post(url("circuits_new"), {"bkw_number": "tra1000", "name": "Other name"})
+        response = client.post(url("circuits_new"), {"grid_number": "tra1000", "name": "Other name"})
         self.assertEqual(response.status_code, 200)  # the hint, with the button "use this one"
         self.assertEqual(TransformerCircuit.objects.count(), before)
-        response = client.post(url("circuits_new"), {"bkw_number": "tra1000", "name": "Other name", "use_existing": "1"})
+        response = client.post(url("circuits_new"), {"grid_number": "tra1000", "name": "Other name", "use_existing": "1"})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response["Location"].endswith(f"circuit={self.circuit.pk}"), response["Location"])
         self.assertEqual(TransformerCircuit.objects.count(), before)
         self.circuit.refresh_from_db()
-        self.assertEqual((self.circuit.bkw_number, self.circuit.name), ("TRA1000", "Eins"))
+        self.assertEqual((self.circuit.grid_number, self.circuit.name), ("TRA1000", "Eins"))
         # Changing a circuit into the number of another one is refused.
-        response = client.post(url("circuits_edit", self.circuit_two), {"bkw_number": "tra1000", "name": "Zwei"})
+        response = client.post(url("circuits_edit", self.circuit_two), {"grid_number": "tra1000", "name": "Zwei"})
         self.assertEqual(response.status_code, 200)
         self.circuit_two.refresh_from_db()
-        self.assertEqual(self.circuit_two.bkw_number, "TRA2000")
+        self.assertEqual(self.circuit_two.grid_number, "TRA2000")
 
     # Locations --------------------------------------------------------------------------------------
 
@@ -534,19 +535,15 @@ class LifeOfTheObjectsTests(MatrixBase):
     def test_changing_an_address_into_an_existing_one_needs_the_confirmation_of_the_shown_target(self):
         source = make_location("Quellweg", "4", "3000", "Bern")
         move = make_metering_point(300, location=source)
-        both = staff_user("both.person@example.org", "view_location", "change_location", "delete_location")
-        change_only = staff_user("change.person@example.org", "view_location", "change_location")
         address = {"street": "Examplestrasse", "house_number": "1", "postal_code": "3000", "town": "Bern"}
-        # Without the right to delete the confirmation is no confirmation (the changed location is deleted).
-        for forged in ({}, {"confirm_merge": "1", "merge_target": str(self.place.pk)}):
-            response = self.login(change_only).post(url("locations_address", source), {**address, **forged})
-            self.assertEqual(response.status_code, 200)
+        client = self.login(self.administrator)
+        # First answer: the warning (the target is named), nothing is moved; a forged confirmation without the
+        # target that was shown is no confirmation.
+        for forged in ({}, {"confirm_merge": "1"}, {"confirm_merge": "1", "merge_target": ""}):
+            warning = client.post(url("locations_address", source), {**address, **forged})
+            self.assertEqual(warning.status_code, 200)
+            self.assertContains(warning, "Übertragen und speichern")
             self.assertTrue(Location.objects.filter(pk=source.pk).exists())
-        client = self.login(both)
-        # First answer: the warning (the target is named), nothing is moved.
-        warning = client.post(url("locations_address", source), address)
-        self.assertEqual(warning.status_code, 200)
-        self.assertContains(warning, "Übertragen und speichern")
         move.refresh_from_db()
         self.assertEqual(move.location_id, source.pk)
         # A confirmation for another target than the one that is the address now is no confirmation.
@@ -563,7 +560,7 @@ class LifeOfTheObjectsTests(MatrixBase):
         merged = history.entries_for(self.place).get(event=HistoryEvent.LOCATIONS_MERGED)
         self.assertEqual(merged.detail["metering_points"], 1)
         self.assertNotIn("Quellweg", json.dumps(merged.detail))
-        self.assertEqual(merged.actor, both)
+        self.assertEqual(merged.actor, self.administrator)
 
     def test_nothing_is_merged_into_an_archived_location(self):
         source = make_location("Quellweg", "4", "3000", "Bern")
@@ -578,6 +575,9 @@ class LifeOfTheObjectsTests(MatrixBase):
         with self.assertRaises(locations.NotDeletable):
             locations.delete(self.place)  # has metering points
         locations.set_archived(self.place_clean, True, self.administrator)
+        with self.assertRaises(locations.Archived):
+            locations.delete(self.place_clean)  # an archived location is only restored (D-086)
+        locations.set_archived(self.place_clean, False, self.administrator)
         with self.assertRaises(locations.NotDeletable):
             locations.delete(self.place_clean)  # has a history now
         client = self.login(self.administrator)
@@ -627,7 +627,7 @@ class LifeOfTheObjectsTests(MatrixBase):
                 numbers.compose_metering_point_number(*bad, "1")
         self.assertEqual(numbers.compose_metering_point_number("CH", "1A2B3C4D5E6", "007"), "CH1A2B3C4D5E6" + "007".zfill(20))
 
-    def test_a_number_without_digits_is_a_point_that_the_bkw_does_not_know_yet(self):
+    def test_a_number_without_digits_is_a_point_that_the_grid_operator_does_not_know_yet(self):
         first = metering_points.create_metering_point(direction=Direction.CONSUMPTION, number=None)
         second = metering_points.create_metering_point(direction=Direction.FEED_IN, number="")
         self.assertIsNone(first.number)
@@ -692,7 +692,8 @@ class LifeOfTheObjectsTests(MatrixBase):
     def test_the_start_date_in_the_future_and_the_termination_are_day_exact_and_the_database_agrees(self):
         start, end = BASE + timedelta(days=20), month_end(BASE + timedelta(days=60))
         point = make_metering_point(
-            201, location=self.place, registered_with_bkw_on=BASE - timedelta(days=5), confirmed_on=BASE - timedelta(days=4),
+            201, location=self.place, registered_with_operator_on=BASE - timedelta(days=5),
+            confirmed_on=BASE - timedelta(days=4),
             start_date=start,
         )
         expected = (
@@ -730,13 +731,16 @@ class LifeOfTheObjectsTests(MatrixBase):
         d = BASE
         rows = [
             dict(),
-            dict(registered_with_bkw_on=d),
-            dict(registered_with_bkw_on=d, confirmed_on=d),
-            dict(registered_with_bkw_on=d, confirmed_on=d, start_date=d),
-            dict(registered_with_bkw_on=d, confirmed_on=d, start_date=d + timedelta(days=1)),
-            dict(registered_with_bkw_on=d, confirmed_on=d, start_date=d, terminated_on=d),
-            dict(registered_with_bkw_on=d, confirmed_on=d, start_date=d, terminated_on=d + timedelta(days=1)),
-            dict(registered_with_bkw_on=d, confirmed_on=d, start_date=d - timedelta(days=9), terminated_on=d - timedelta(days=1)),
+            dict(registered_with_operator_on=d),
+            dict(registered_with_operator_on=d, confirmed_on=d),
+            dict(registered_with_operator_on=d, confirmed_on=d, start_date=d),
+            dict(registered_with_operator_on=d, confirmed_on=d, start_date=d + timedelta(days=1)),
+            dict(registered_with_operator_on=d, confirmed_on=d, start_date=d, terminated_on=d),
+            dict(registered_with_operator_on=d, confirmed_on=d, start_date=d, terminated_on=d + timedelta(days=1)),
+            dict(
+                registered_with_operator_on=d, confirmed_on=d, start_date=d - timedelta(days=9),
+                terminated_on=d - timedelta(days=1),
+            ),
         ]
         points = [make_metering_point(400 + index, **row) for index, row in enumerate(rows)]
         for day in (d - timedelta(days=1), d, d + timedelta(days=1), d + timedelta(days=30)):
@@ -918,7 +922,7 @@ class LifeOfTheObjectsTests(MatrixBase):
 
     # Counts and problem filters --------------------------------------------------------------------
 
-    def test_the_counts_of_the_overview_only_cover_the_lists_that_may_be_seen(self):
+    def test_the_overview_counts_every_list_and_links_to_it(self):
         full = problems.problem_counts(TODAY)
         self.assertEqual(set(full), {"locations", "metering_points", "legs"})
         self.assertEqual(full["locations"], 1)  # the one with the open address correction
@@ -930,21 +934,11 @@ class LifeOfTheObjectsTests(MatrixBase):
             pk=self.point_active.pk
         ).count()  # the active one has all three; the others have none of at least one
         self.assertEqual(full["metering_points"], expected)
-        client = self.login(self.viewers["legs"])
-        page = client.get(url("overview"))
-        self.assertEqual(page.status_code, 200)
-        for hidden in ("locations", "metering-points", "persons"):
-            self.assertNotContains(page, f"/management/{hidden}/")
         make_leg("LEG Low", production_quota_percent=Decimal("1"), quota_checked_on=TODAY)
-        page = client.get(url("overview"))
-        self.assertContains(page, "/management/legs/?problems=1")
-        self.assertNotContains(page, "/management/locations/?problems=1")
-        self.assertNotContains(page, "/management/metering-points/?problems=1")
-        # With the view right of the metering points the count of the locations is not learned either.
-        page = self.login(self.viewers["metering_points"]).get(url("overview"))
-        self.assertContains(page, "/management/metering-points/?problems=1")
-        self.assertNotContains(page, "/management/legs/?problems=1")
-        self.assertNotContains(page, "/management/locations/?problems=1")
+        page = self.login(self.administrator).get(url("overview"))
+        self.assertEqual(page.status_code, 200)
+        for name in ("legs", "locations", "metering-points"):
+            self.assertContains(page, f"/management/{name}/?problems=1")
 
     def test_the_problem_filter_shows_the_rows_that_the_button_counts(self):
         client = self.login(self.administrator)
@@ -1070,7 +1064,9 @@ class HostileListParameterTests(MatrixBase):
         point = make_metering_point(800, Direction.CONSUMPTION, place, remark="SECRETPOINTREMARK")
         leg = make_leg("LEG Visible", remark="SECRETLEGREMARK")
         person = create_active_user("note.person@example.org", first_name="Nora", last_name="Notiz")
-        PersonRecord.objects.create(person=person, staff_note="SECRETNOTE", iban="CH9300762011623852957", bkw_customer_number="BKW-SECRET-1")
+        PersonRecord.objects.create(
+            person=person, staff_note="SECRETNOTE", iban="CH9300762011623852957", operator_customer_number="OP-SECRET-1"
+        )
         assign_leg(point, leg, TODAY - timedelta(days=1))
         client = self.login(self.administrator)
         for name, secret, visible in (
@@ -1091,27 +1087,19 @@ class HostileListParameterTests(MatrixBase):
         pdf_response = client.post(url("locations_print") + "?q=SECRETLOCATIONREMARK", {"scope": "all"})
         self.assertEqual(pdf_response["Content-Type"], "application/pdf")
 
-    def test_the_search_does_not_leak_what_the_account_may_not_see(self):
-        for user, name, text, secret in (
-            (self.viewers["metering_points"], "metering_points", "Muster", self.point_active),  # the name of the person
-            (self.viewers["metering_points"], "metering_points", self.anna.email, self.point_active),
-            (self.viewers["metering_points"], "metering_points", "LEG Main", self.point_active),  # the name of the LEG
-            (self.viewers["metering_points"], "metering_points", "Examplestrasse", self.point_active),  # the address
-            (self.viewers["locations"], "locations", "Muster", self.place),
-            (self.viewers["locations"], "locations", number(4)[20:], self.place),  # a number of a metering point
-            (self.viewers["locations"], "locations", "LEG Main", self.place),
-            (self.viewers["legs"], "legs", "Examplestrasse", self.leg),
-            (self.viewers["legs"], "legs", number(4)[20:], self.leg),
+    def test_the_search_finds_what_the_pages_show_to_every_staff_account(self):
+        """D-086: persons' names, LEG names and addresses are searchable for every staff account."""
+        client = self.login(self.administrator)
+        for name, text, marker in (
+            ("metering_points", "Muster", number(4)[13:]),  # the name of the person
+            ("metering_points", "LEG Main", number(4)[13:]),  # the name of the LEG
+            ("metering_points", "Examplestrasse", number(4)[13:]),  # the address
+            ("locations", "Muster", "Examplestrasse"),
+            ("locations", "LEG Main", "Examplestrasse"),
+            ("locations", number(4)[20:], "Examplestrasse"),  # a number of a metering point
         ):
-            with self.subTest(viewer=name, text=text):
-                body = self.login(user).get(url(name), {"q": text}).content.decode()
-                marker = {
-                    "metering_points": number(4)[13:], "locations": "Examplestrasse", "legs": "LEG Main"
-                }[name]
-                self.assertNotIn(marker, body)
-        # With the right to see persons the name finds the metering point.
-        both = staff_user("both.persons@example.org", "view_meteringpoint", "view_personrecord")
-        self.assertContains(self.login(both).get(url("metering_points"), {"q": "Muster"}), number(4)[13:])
+            with self.subTest(list=name, text=text):
+                self.assertContains(client.get(url(name), {"q": text}), marker)
 
 
 @tag("mariadb")
@@ -1132,9 +1120,9 @@ class PrintingHostileInputTests(MatrixBase):
 
         for key in ("persons", "locations", "legs", "metering_points"):
             area = areas.AREAS[key]
-            prepared = area.prepare(self.administrator, QueryDict(""))
+            prepared = area.prepare(QueryDict(""))
             items = prepared.load()
-            document = area.document(self.administrator, prepared, items, items, TODAY)
+            document = area.document(prepared, items, items, TODAY)
             raw = pdf.render(document, compress=False)
             # The address of the link and the path of the image are printed as text (that is what the name says);
             # a link, an annotation or a fetched image would be an object of the document.
