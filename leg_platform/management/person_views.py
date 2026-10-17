@@ -14,6 +14,8 @@ links to a location ``view_location``, to a LEG ``view_leg``, to the metering po
 "Person anlegen" and "Anmeldung starten" have no specified effect and are not built (D-081, open points).
 """
 
+from dataclasses import dataclass
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import SuspiciousOperation
@@ -98,48 +100,83 @@ def points_text(count, word):
     return f"{count} · {label}"
 
 
+def status_options():
+    return [
+        (person_list.STATUS_ALL, _("All")),
+        (person_list.STATUS_ACTIVE, person_list.AccountState.ACTIVE.label),
+        (person_list.STATUS_BLOCKED, person_list.AccountState.BLOCKED.label),
+        (person_list.STATUS_ARCHIVED, _("archived")),
+    ]
+
+
+def points_options():
+    return [
+        (person_list.POINTS_ALL, _("All")),
+        (person_list.POINTS_WITH, _("with metering point")),
+        (person_list.POINTS_WITHOUT, _("without metering point")),
+    ]
+
+
+@dataclass
+class PersonList:
+    """The list of persons as the address asks for it: the state and the queryset of every row of the view
+    (search and filters applied, sorted), not only one page. The page and the printing use it."""
+
+    state: lists.ListState
+    columns: tuple
+    see_points: bool
+    queryset: object
+    locked: set
+
+
+def build_list(params, user):
+    today = timezone.localdate()
+    see_points = user.has_perm(VIEW_POINTS)
+    columns = list_columns(see_points)
+    filters = {"status": (person_list.STATUSES, person_list.STATUS_ALL)}
+    if see_points:
+        filters["points"] = (person_list.POINTS_FILTERS, person_list.POINTS_ALL)
+    state = lists.parse(
+        params, path=reverse("management:persons"), columns=columns, default_sort=person_list.DEFAULT_SORT,
+        filters=filters,
+    )
+    locked = person_list.locked_account_ids()
+    queryset = person_list.base_queryset(today, locked)
+    queryset = person_list.apply_search(queryset, state.query)
+    queryset = person_list.apply_status(queryset, state.values["status"])
+    if see_points:
+        queryset = person_list.apply_points(queryset, state.values["points"])
+    queryset = person_list.apply_sort(queryset, state.sort, state.descending)
+    return PersonList(state, columns, see_points, queryset, locked)
+
+
+def list_entry(person, locked):
+    """What the list shows of one person (the template and the printing read the same texts)."""
+    name, contact = person_list.display_names(person)
+    account = person_list.AccountState(person_list.account_state(person, locked))
+    return {
+        "person": person,
+        "name": name,
+        "contact": contact,
+        "number": person.customer_number_display,
+        "address": person.street_address_display,
+        "points": points_text(person.point_count, person_list.points_word(person.point_count, person.has_unregistered)),
+        "account_label": account.label,
+        "account_tone": STATE_TONES[account],
+        "detail_url": reverse("management:persons_detail", args=[person.pk]),
+    }
+
+
 class PersonListView(ManagementAccessMixin, View):
     """The list (``liste-desktop`` and ``liste-handy``)."""
 
     permission_required = (VIEW,)
 
     def get(self, request):
-        today = timezone.localdate()
-        see_points = request.user.has_perm(VIEW_POINTS)
-        columns = list_columns(see_points)
-        filters = {"status": (person_list.STATUSES, person_list.STATUS_ALL)}
-        if see_points:
-            filters["points"] = (person_list.POINTS_FILTERS, person_list.POINTS_ALL)
-        state = lists.parse(
-            request.GET, path=reverse("management:persons"), columns=columns, default_sort=person_list.DEFAULT_SORT,
-            filters=filters,
-        )
-        locked = person_list.locked_account_ids()
-        queryset = person_list.base_queryset(today, locked)
-        queryset = person_list.apply_search(queryset, state.query)
-        queryset = person_list.apply_status(queryset, state.values["status"])
-        if see_points:
-            queryset = person_list.apply_points(queryset, state.values["points"])
-        queryset = person_list.apply_sort(queryset, state.sort, state.descending)
-        page = lists.paginate(queryset, state)
-
-        entries = []
-        for person in page.items:
-            name, contact = person_list.display_names(person)
-            account = person_list.AccountState(person_list.account_state(person, locked))
-            entries.append(
-                {
-                    "person": person,
-                    "name": name,
-                    "contact": contact,
-                    "number": person.customer_number_display,
-                    "address": person.street_address_display,
-                    "points": points_text(person.point_count, person_list.points_word(person.point_count, person.has_unregistered)),
-                    "account_label": account.label,
-                    "account_tone": STATE_TONES[account],
-                    "detail_url": reverse("management:persons_detail", args=[person.pk]),
-                }
-            )
+        found = build_list(request.GET, request.user)
+        state, columns, see_points = found.state, found.columns, found.see_points
+        page = lists.paginate(found.queryset, state)
+        entries = [list_entry(person, found.locked) for person in page.items]
         context = lists.list_context(
             request, "persons", columns, state, page,
             count_text=_("%(first)d–%(last)d of %(total)d persons") % {
@@ -151,18 +188,10 @@ class PersonListView(ManagementAccessMixin, View):
             page_title=_("Persons"),
             page_subtitle=_("All customers of the LEG."),
             entries=entries,
+            print_url=state.url_to(reverse("management:persons_print")),
             see_points=see_points,
-            status_options=[
-                (person_list.STATUS_ALL, _("All")),
-                (person_list.STATUS_ACTIVE, person_list.AccountState.ACTIVE.label),
-                (person_list.STATUS_BLOCKED, person_list.AccountState.BLOCKED.label),
-                (person_list.STATUS_ARCHIVED, _("archived")),
-            ],
-            points_options=[
-                (person_list.POINTS_ALL, _("All")),
-                (person_list.POINTS_WITH, _("with metering point")),
-                (person_list.POINTS_WITHOUT, _("without metering point")),
-            ],
+            status_options=status_options(),
+            points_options=points_options(),
             empty_text=_("No persons found."),
         )
         return render(request, "management/persons/list.html", context)

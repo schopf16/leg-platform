@@ -3,12 +3,13 @@
 The list of LEGs (LEG-Design-Vorgaben/verwaltung/legs/referenz/leg-liste-desktop and leg-liste-handy; D-080). On a
 desktop a table, on a phone one card per LEG. The name is plain text (the link icon at the right opens the detail
 page); the quota is only the value; a warning triangle stands behind a problem with its text as the hint; the
-discount tier is a dot and a word. No button "Print" yet (the printing block adds it; no print on a phone). The page
-works without a script: the filters are a GET form.
+discount tier is a dot and a word. The button "Print" (a desktop only) is in the head, left of the create button
+(D-082). The page works without a script: the filters are a GET form.
 {% endcomment %}
 {% block inner_class %}mgmt-page mgmt-wide mgmt-legs{% endblock %}
 {% block header_actions %}
   {% if problem_count %}<a class="btn btn-warning-outline" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  {% include "management/_print_button.html" %}
   {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create LEG" %}</a>{% endif %}
 {% endblock %}
 {% block page_content %}

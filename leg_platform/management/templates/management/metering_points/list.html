@@ -10,6 +10,7 @@ the form on change.
 {% block inner_class %}mgmt-page mgmt-wide mgmt-points mgmt-points-list{% endblock %}
 {% block header_actions %}
   {% if problem_count %}<a class="btn btn-warning-outline mgmt-phone-only" href="{{ problem_url }}" aria-pressed="{% if list_state.problems %}true{% else %}false{% endif %}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+  {% include "management/_print_button.html" %}
   {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create metering point" %}</a>{% endif %}
 {% endblock %}
 {% block page_content %}

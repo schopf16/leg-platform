@@ -24,6 +24,7 @@ Licences as declared in the package metadata (`License-Expression`, `License` or
 | django-phonenumber-field | MIT | Validation and E.164 storage of the phone number (D-034) |
 | phonenumberslite | Apache-2.0 | Phone number metadata for django-phonenumber-field (D-034) |
 | idna | BSD-3-Clause | UTS #46 canonicalisation of internationalised email domains (D-034) |
+| reportlab | BSD-3-Clause (metadata: "BSD license"; the bundled `LICENSE` is the 3-clause BSD licence of ReportLab Inc.) | PDF printing of the lists of the management area (D-082, D-083); checked on 2026-10-17 (version 5.0.1, PyPI metadata and the installed `LICENSE`) |
 
 Transitive dependencies:
 
@@ -35,7 +36,8 @@ Transitive dependencies:
 | requests | Apache-2.0 | msal |
 | PyJWT | MIT | msal |
 | urllib3 | MIT | requests |
-| charset-normalizer | MIT | requests |
+| charset-normalizer | MIT | requests, reportlab |
+| Pillow | MIT-CMU (`License-Expression` of 13.0.0) | reportlab (declared dependency `pillow>=9.0.0`; LEG-Platform draws no image) |
 | certifi | MPL-2.0 | requests |
 | cffi | MIT-0 | cryptography |
 | pycparser | BSD-3-Clause | cffi |
@@ -61,13 +63,15 @@ The following third-party assets are part of this repository, below `leg_platfor
 | Bricolage Grotesque (`fonts/BricolageGrotesque.ttf`) | repository `google/fonts`, `ofl/bricolagegrotesque`, unmodified | SIL Open Font License 1.1 (`fonts/OFL-BricolageGrotesque.txt`) | Headings in the register "Warm" (D-024) |
 | IBM Plex Mono (`fonts/IBMPlexMono-Regular.ttf`) | repository `google/fonts`, `ofl/ibmplexmono`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Plex" (`fonts/OFL-IBMPlexMono.txt`) | Identifiers such as the customer number (D-024) |
 | Tabler Icons (`tabler-icons/lock.svg`, inlined in `leg_platform/templates/icons/lock.html`; `tabler-icons/circle-check.svg`, `alert-triangle.svg`, `info-circle.svg`, `alert-circle.svg`, used as CSS masks for the icons of the alerts, D-054) | v3.49.0, repository `tabler/tabler-icons`, `icons/outline/<name>.svg`, unmodified | MIT (`tabler-icons/LICENSE`) | Icons (D-024); further icons are added with the pages that use them |
+| DejaVu Sans Condensed (`leg_platform/management/printing/fonts/DejaVuSansCondensed.ttf` and `DejaVuSansCondensed-Bold.ttf`) | DejaVu fonts 2.37, release archive `dejavu-fonts-ttf-2.37.zip` of https://github.com/dejavu-fonts/dejavu-fonts (SHA-256 of the archive `7576310B219E04159D35FF61DD4A4EC4CDBA4F35C00E002A136F00E96A908B0A`; of the files: `8550CD5CA1ACB65A8FC7877C46939CD0B4D909F8E7BC1E24716873D918C5E549` and `38098D0B8EDD8430A0F53FB2831B5D36037563A998A620D3C87A4D7591766D20`), unmodified | Bitstream Vera Fonts Copyright (permissive; the changes of DejaVu are public domain; `printing/fonts/LICENSE-DejaVu.txt`) | Typeface of the PDF printouts of the lists (D-083); read from the package directory by ReportLab, never served |
 
-The fonts are used unmodified, as `docs/DESIGN.md`, section 4, requires (OFL condition 3 forbids a modified version under a Reserved Font Name). The own files `leg_platform/static/img/select-arrow.svg`, `check.svg` and `radio-dot.svg` replace `data:` images of Tabler's stylesheet (D-037, D-054) and are part of this project's BSD 3-Clause licence.
+The fonts are used unmodified, as `docs/DESIGN.md`, section 4, requires (OFL condition 3 forbids a modified version under a Reserved Font Name). The own files `leg_platform/static/img/select-arrow.svg`, `check.svg` and `radio-dot.svg` replace `data:` images of Tabler's stylesheet (D-037, D-054) and are part of this project's BSD 3-Clause licence. The DejaVu fonts are no web fonts and are not part of the pages' design (D-083); the Bitstream Vera licence allows bundling them with a larger software package, as long as no copy of a typeface is sold by itself, and requires its notice with the copies.
 
 ## Sources
 
 * Installed package metadata in `.venv` (Python 3.14.8, newest packages), checked on 2026-10-11 with `importlib.metadata`, and the licence files in the packages' `.dist-info` directories (segno, sqlparse); for django-countries 9.1.0, django-phonenumber-field 8.5.0, phonenumberslite 9.0.41 and typing_extensions checked on 2026-10-12 with `importlib.metadata` and against https://pypi.org/pypi/<package>/json; idna 3.15 and 3.20 metadata checked on 2026-10-12
 * https://pypi.org/ (package pages of the packages listed above)
+* https://pypi.org/pypi/reportlab/json and https://api.osv.dev/v1/query (package `reportlab`, PyPI ecosystem), read on 2026-10-17: version 5.0.1 (2026-08-20), Python 3.9 to 4 (classifiers 3.10 to 3.14), BSD licence, requires `pillow>=9.0.0` and `charset-normalizer`; four known advisories, all fixed in 3.6.13 or earlier (CVE-2019-17626, CVE-2019-19450, CVE-2020-28463, CVE-2023-33733)
 * https://www.gnu.org/licenses/license-list.en.html (checked on 2026-10-11)
 * https://www.gnu.org/licenses/gpl-3.0.en.html (section 0, definitions of "propagate" and "convey"; section 2, "Basic Permissions"; checked on 2026-10-11)
 * https://github.com/mariadb-corporation/mariadb-connector-c (licence of MariaDB Connector/C, checked on 2026-10-11)

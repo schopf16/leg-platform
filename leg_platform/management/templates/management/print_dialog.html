@@ -1,0 +1,26 @@
+{% extends "management/dialog.html" %}
+{% load i18n %}{% comment %}
+The dialog "Print list" (LEG-Design-Vorgaben/verwaltung/legs/referenz/liste-drucken-desktop and the "Liste drucken"
+frame of leg-dialoge-handy; D-082). A centred card over the dimmed page, a normal page without a script: "Cancel" is
+the link back to the list, "Create PDF" posts the form to this address (which carries the state of the list; the
+server parses it again). Three options; the checkboxes of the entries belong to the third one and are shown while it
+is chosen. Only on a desktop is there a link to this page; the page itself is the same on a phone.
+Context: ``scope`` and the ``scope_*`` values, ``all_allowed`` (not too many detail pages), ``can_print`` (the list
+is not too long), ``notice`` (a refusal), ``choices`` (the entries: ``pk``, ``label``, ``checked``).
+{% endcomment %}
+{% block dialog_notice %}{% if notice %}<div class="alert alert-danger" role="alert">{{ notice }}</div>{% endif %}{% endblock %}
+{% block dialog_fields %}
+  {% if can_print %}
+    <fieldset class="mgmt-print-options">
+      <legend class="visually-hidden">{{ page_title }}</legend>
+      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_list }}"{% if scope == scope_list %} checked{% endif %}> <span>{% translate "List only" %}</span></label>
+      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_all }}"{% if scope == scope_all %} checked{% endif %}{% if not all_allowed %} disabled{% endif %}> <span>{% translate "List and detail pages of all shown entries" %}</span></label>
+      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_selected }}"{% if scope == scope_selected %} checked{% endif %}> <span>{% translate "List and detail pages of selected entries" %}</span></label>
+      {% if choices %}<div class="mgmt-print-select">
+        {% for choice in choices %}<label><input type="checkbox" name="ids" value="{{ choice.pk }}"{% if choice.checked %} checked{% endif %}> <span>{{ choice.label }}</span></label>
+        {% endfor %}
+      </div>{% endif %}
+      <p class="mgmt-hint mgmt-print-hint">{% translate "The selected detail pages are printed after the list, in the order of the list, each on a new page." %}</p>
+    </fieldset>
+  {% endif %}
+{% endblock %}

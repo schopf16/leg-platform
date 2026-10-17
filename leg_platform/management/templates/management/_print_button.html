@@ -1,0 +1,5 @@
+{% load i18n %}{% comment %}
+The button "Print" in the head of a list (LISTEN-STANDARD.md, section 10; D-082): left of the button that creates an
+entry, a desktop only (it does not exist on a phone). It opens the dialog "Print list" with the state of the list.
+Context: ``print_url``.
+{% endcomment %}<a class="btn btn-secondary-action mgmt-desktop-only" href="{{ print_url }}">{% translate "Print" %}</a>

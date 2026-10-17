@@ -24,7 +24,7 @@ The form posts to the same address with the CSRF token and the ``next`` value.
         {% block dialog_fields %}{% endblock %}
         <div class="mgmt-actions">
           <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Cancel" %}</a>
-          <button type="submit" class="btn {% if danger %}btn-danger{% else %}btn-primary{% endif %}">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>
+          {% if not no_submit %}<button type="submit" class="btn {% if danger %}btn-danger{% else %}btn-primary{% endif %}">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>{% endif %}
         </div>
       </form>
     </section>

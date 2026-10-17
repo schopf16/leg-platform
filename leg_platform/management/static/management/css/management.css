@@ -1854,10 +1854,123 @@ a.mgmt-sort:hover {
 }
 
 /* The small buttons of the cards: 36 px high, 14 px text, as in the template (.btn-xs). The general rule
-   .register-clear .btn (48 px) is more specific than .btn-xs, so the template size needs its own selector;
-   scoped to the person pages (the other pages keep the look that was accepted for them). */
-.register-clear .mgmt-person .btn.btn-xs {
+   .register-clear .btn (48 px) is more specific than .btn-xs, so the template size needs its own selector. It is
+   global in the management area (D-082): the small buttons of the location, metering point, LEG and person pages
+   and of the list of metering points are all 36 px high. Only the management pages use .btn-xs. */
+.register-clear .btn.btn-xs {
   min-height: 36px;
   padding: 4px 12px;
   font-size: 14px;
+}
+
+/* ---- The overview (D-082; uebersicht/referenz) ---- */
+.mgmt-overview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-overview-row:first-child {
+  border-top: 0;
+}
+
+.mgmt-overview-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.mgmt-overview-text {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.mgmt-overview-count {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.mgmt-overview-count .mgmt-warning {
+  margin-left: 0;
+  margin-right: 4px;
+}
+
+.mgmt-overview-row .mgmt-goto {
+  margin-left: 0;
+}
+
+.mgmt-overview-hint {
+  margin: 12px 0 0;
+}
+
+/* ---- The dialog "Print list" (D-082; legs/referenz/liste-drucken-desktop) ---- */
+.mgmt-print-options {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.mgmt-print-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.mgmt-print-option input,
+.mgmt-print-select input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.mgmt-print-option input {
+  margin-top: 4px;
+}
+
+.mgmt-print-select {
+  max-height: 260px;
+  margin: 4px 0 8px 28px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.mgmt-print-select label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 16px;
+}
+
+/* The entries belong to the third option: they are shown while it is chosen (without :has() support they
+   are always shown, which works as well). */
+.mgmt-print-options:not(:has(input[value="selected"]:checked)) .mgmt-print-select {
+  display: none;
+}
+
+.mgmt-print-hint {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 760px) {
+  .mgmt-overview-row {
+    gap: 12px;
+    padding: 12px 0;
+  }
+
+  .mgmt-overview-name {
+    font-size: 17px;
+  }
+
+  .mgmt-print-select {
+    margin-left: 0;
+  }
 }

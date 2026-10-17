@@ -14,6 +14,8 @@ changes the LEG ``change_meteringpoint`` (it opens the shared dialog of the mete
 ``management:metering_points_leg``, which needs ``view_leg`` too, which every page here has).
 """
 
+from dataclasses import dataclass
+
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -95,44 +97,68 @@ def problem_text(summary, kinds, threshold):
     )
 
 
+def display_options():
+    return [(leg_list.DISPLAY_ALL, _("All")), (leg_list.DISPLAY_ARCHIVED, _("archived"))]
+
+
+@dataclass
+class LegList:
+    """The list of LEGs as the address asks for it: the state, and every row of the view (the search, the
+    display and the problem switch applied, sorted), not only one page. The page and the printing use it."""
+
+    state: lists.ListState
+    columns: tuple
+    threshold: int
+    today: object
+    problem_count: int
+    rows: list
+
+
+def build_list(params):
+    today = timezone.localdate()
+    threshold = ManagementSettings.load().warning_threshold_percent
+    columns = list_columns(threshold)
+    state = lists.parse(
+        params, path=reverse("management:legs"), columns=columns, default_sort=leg_list.DEFAULT_SORT,
+        filters={"display": (leg_list.DISPLAYS, leg_list.DISPLAY_ALL)},
+    )
+    queryset = leg_list.apply_search(leg_list.base_queryset(state.values["display"]), state.query, today)
+    rows = leg_list.rows_for(queryset, threshold, today)
+    # The button counts the LEGs with a problem in the current view (the search and the display).
+    problem_count = len(leg_list.apply_problems(rows))
+    if state.problems:
+        rows = leg_list.apply_problems(rows)
+    rows = leg_list.sort_rows(rows, state.sort, state.descending)
+    return LegList(state, columns, threshold, today, problem_count, rows)
+
+
+def list_entry(row, threshold):
+    """What the list shows of one LEG (the template and the printing read the same texts)."""
+    summary = row.summary
+    return {
+        "leg": row.leg,
+        "summary": summary,
+        "quota_text": legs.format_quota(row.leg.production_quota_percent),
+        "quota_problem": problem_text(summary, QUOTA_PROBLEMS, threshold),
+        "ratio_problem": problem_text(summary, RATIO_PROBLEMS, threshold),
+        "all_problems": problem_text(summary, legs.LegProblem.values, threshold),
+        "has_tier": summary.tier != legs.DiscountTier.NONE,
+        "tier_tone": TIER_TONES.get(summary.tier, ""),
+        "tier_label": legs.DiscountTier(summary.tier).label,
+        "detail_url": reverse("management:legs_detail", args=[row.leg.pk]),
+    }
+
+
 class LegListView(ManagementAccessMixin, View):
     """The list (``leg-liste-desktop`` and ``leg-liste-handy``)."""
 
     permission_required = (VIEW,)
 
     def get(self, request):
-        today = timezone.localdate()
-        threshold = ManagementSettings.load().warning_threshold_percent
-        columns = list_columns(threshold)
-        state = lists.parse(
-            request.GET, path=reverse("management:legs"), columns=columns, default_sort=leg_list.DEFAULT_SORT,
-            filters={"display": (leg_list.DISPLAYS, leg_list.DISPLAY_ALL)},
-        )
-        queryset = leg_list.apply_search(leg_list.base_queryset(state.values["display"]), state.query, today)
-        rows = leg_list.rows_for(queryset, threshold, today)
-        # The button counts the LEGs with a problem in the current view (the search and the display).
-        problem_count = len(leg_list.apply_problems(rows))
-        if state.problems:
-            rows = leg_list.apply_problems(rows)
-        page = lists.paginate(lists.ListRows(leg_list.sort_rows(rows, state.sort, state.descending)), state)
-
-        entries = []
-        for row in page.items:
-            summary = row.summary
-            entries.append(
-                {
-                    "leg": row.leg,
-                    "summary": summary,
-                    "quota_text": legs.format_quota(row.leg.production_quota_percent),
-                    "quota_problem": problem_text(summary, QUOTA_PROBLEMS, threshold),
-                    "ratio_problem": problem_text(summary, RATIO_PROBLEMS, threshold),
-                    "all_problems": problem_text(summary, legs.LegProblem.values, threshold),
-                    "has_tier": summary.tier != legs.DiscountTier.NONE,
-                    "tier_tone": TIER_TONES.get(summary.tier, ""),
-                    "tier_label": legs.DiscountTier(summary.tier).label,
-                    "detail_url": reverse("management:legs_detail", args=[row.leg.pk]),
-                }
-            )
+        found = build_list(request.GET)
+        state, columns, threshold, problem_count = found.state, found.columns, found.threshold, found.problem_count
+        page = lists.paginate(lists.ListRows(found.rows), state)
+        entries = [list_entry(row, threshold) for row in page.items]
         context = lists.list_context(
             request, "legs", columns, state, page,
             count_text=_("%(first)d–%(last)d of %(total)d LEGs") % {
@@ -144,11 +170,12 @@ class LegListView(ManagementAccessMixin, View):
             page_title=_("LEGs"),
             page_subtitle=_("The local electricity communities."),
             entries=entries,
+            print_url=state.url_to(reverse("management:legs_print")),
             problem_count=problem_count,
             problem_url=state.url(problems="" if state.problems else "1"),
             can_add=request.user.has_perm(ADD),
             create_url=with_next(reverse("management:legs_new"), request),
-            display_options=[(leg_list.DISPLAY_ALL, _("All")), (leg_list.DISPLAY_ARCHIVED, _("archived"))],
+            display_options=display_options(),
             empty_text=_("No LEGs yet. Create the first LEG."),
         )
         return render(request, "management/legs/list.html", context)

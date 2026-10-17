@@ -100,10 +100,10 @@ class LegPageTests(TestCase):
         # A LEG without metering points: "–", no tier and no triangle; archived ones are not in this view.
         self.assertNotContains(page, "LEG Alt")
         self.assertContains(page, "LEG Neuland")
-        # Neither the remark nor a button "print" (the printing block adds it; never on a phone), no create
-        # button without the right.
-        for text in ("Pilot Ittigen Nord", "Drucken", "LEG anlegen", "Nur Verbraucher", "knapp"):
+        # Neither the remark nor a create button without the right; the button "Print" is in the head (D-082).
+        for text in ("Pilot Ittigen Nord", "LEG anlegen", "Nur Verbraucher", "knapp"):
             self.assertNotContains(page, text)
+        self.assertContains(page, ">Drucken</a>")
         # The name is plain text, the icon at the right is the link to the page; the columns have their handle.
         self.assertContains(page, f'href="{self.detail(self.muster)}"')
         self.assertContains(page, 'class="mgmt-grip"')

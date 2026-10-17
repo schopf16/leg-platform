@@ -102,9 +102,10 @@ class MeteringPointPageTests(TestCase):
             "archiviert (0)", number(5), "aktiv", "registriert", "Probleme filtern (5)",
         ):
             self.assertContains(page, text)
-        # In the view "all" the last column is the status; no button of a step, no button "print".
-        for text in ("Als angemeldet setzen", "Drucken", "Messpunkt anlegen"):
+        # In the view "all" the last column is the status; no button of a step; the button "Print" is in the head.
+        for text in ("Als angemeldet setzen", "Messpunkt anlegen"):
             self.assertNotContains(page, text)
+        self.assertContains(page, ">Drucken</a>")
         # The warning triangle names the problem in text.
         self.assertContains(page, "Dieser Messpunkt ist keiner LEG zugeordnet.")
         # The full number with the direction, never cut; the column widths have their handle.

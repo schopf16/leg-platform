@@ -3,11 +3,12 @@
 The list of persons (LEG-Design-Vorgaben/verwaltung/personen/referenz/liste-desktop and liste-handy; D-081). On a
 desktop a table, on a phone one card per person. The name is plain text (the link icon at the right opens the
 detail page); a company shows its contact person in grey below the name; the account is a dot and a word. No
-warning triangle (no problems of persons are defined yet), no button "Create person" and no button "Print" (no
-specified effect and no printing block yet; never a dead button). The page works without a script: the filters
+warning triangle (no problems of persons are defined yet) and no button "Create person" (no specified effect; never a dead
+button). The button "Print" (a desktop only) is in the head (D-082). The page works without a script: the filters
 are a GET form.
 {% endcomment %}
 {% block inner_class %}mgmt-page mgmt-wide mgmt-persons{% endblock %}
+{% block header_actions %}{% include "management/_print_button.html" %}{% endblock %}
 {% block page_content %}
   {% translate "Name, customer number or e-mail" as search_placeholder %}
   {% include "management/_list_form_start.html" %}

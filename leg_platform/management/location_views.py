@@ -7,6 +7,7 @@ without JavaScript and returns to the place it was opened from (``management.ret
 """
 
 import json
+from dataclasses import dataclass
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
@@ -105,34 +106,63 @@ class ListWidthsView(ManagementAccessMixin, View):
         return JsonResponse({"saved": True})
 
 
+def occupancy_options():
+    return [
+        (location_list.OCCUPANCY_ALL, _("All")),
+        (location_list.OCCUPANCY_OCCUPIED, _("occupied")),
+        (location_list.OCCUPANCY_FREE, _("free")),
+        (location_list.OCCUPANCY_EMPTY, _("empty")),
+        (location_list.OCCUPANCY_ARCHIVED, _("archived")),
+    ]
+
+
+@dataclass
+class LocationList:
+    """The list of locations as the address asks for it: the state and the queryset of every row of the view
+    (search and filters applied, sorted), not only one page. The page and the printing use it."""
+
+    state: lists.ListState
+    circuits: list
+    see_persons: bool
+    today: object
+    problem_count: int
+    queryset: object
+
+
+def build_list(params, user):
+    today = timezone.localdate()
+    see_persons = user.has_perm(VIEW_PERSONS)
+    circuits = transformer_circuits.choices()
+    state = lists.parse(
+        params, path=reverse("management:locations"), columns=COLUMNS, default_sort=location_list.DEFAULT_SORT,
+        filters={
+            "circuit": ([c.bkw_number for c in circuits], ""),
+            "occupancy": (location_list.OCCUPANCIES, location_list.OCCUPANCY_ALL),
+        },
+    )
+    queryset = location_list.apply_search(
+        location_list.base_queryset(today), state.query, see_persons=see_persons, today=today
+    )
+    queryset = location_list.apply_circuit(queryset, state.values["circuit"])
+    queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
+    # The button counts the entries with a problem in the current view (search and filters).
+    problem_count = location_list.apply_problems(queryset.filter(is_archived=False)).count()
+    if state.problems:
+        queryset = location_list.apply_problems(queryset)
+    queryset = location_list.apply_sort(queryset, state.sort, state.descending)
+    return LocationList(state, circuits, see_persons, today, problem_count, queryset)
+
+
 class LocationListView(ManagementAccessMixin, View):
     """The list of locations (``standorte-liste-desktop`` and ``-handy``)."""
 
     permission_required = (VIEW,)
 
     def get(self, request):
-        today = timezone.localdate()
-        see_persons = request.user.has_perm(VIEW_PERSONS)
-        circuits = transformer_circuits.choices()
-        path = reverse("management:locations")
-        state = lists.parse(
-            request.GET, path=path, columns=COLUMNS, default_sort=location_list.DEFAULT_SORT,
-            filters={
-                "circuit": ([c.bkw_number for c in circuits], ""),
-                "occupancy": (location_list.OCCUPANCIES, location_list.OCCUPANCY_ALL),
-            },
-        )
-        queryset = location_list.apply_search(
-            location_list.base_queryset(today), state.query, see_persons=see_persons, today=today
-        )
-        queryset = location_list.apply_circuit(queryset, state.values["circuit"])
-        queryset = location_list.apply_occupancy(queryset, state.values["occupancy"])
-        # The button counts the entries with a problem in the current view (search and filters).
-        problem_count = location_list.apply_problems(queryset.filter(is_archived=False)).count()
-        if state.problems:
-            queryset = location_list.apply_problems(queryset)
-        queryset = location_list.apply_sort(queryset, state.sort, state.descending)
-        page = lists.paginate(queryset, state)
+        found = build_list(request.GET, request.user)
+        state, circuits, see_persons, today = found.state, found.circuits, found.see_persons, found.today
+        problem_count = found.problem_count
+        page = lists.paginate(found.queryset, state)
         rows, persons = location_list.details(page.items, today, see_persons=see_persons)
         expanded = set(preferences.get_preference(request.user, "locations").expanded_locations)
 
@@ -165,6 +195,7 @@ class LocationListView(ManagementAccessMixin, View):
             page_title=_("Locations"),
             page_subtitle=_("All locations of the LEG with their metering points."),
             entries=entries,
+            print_url=state.url_to(reverse("management:locations_print")),
             all_open=all_open,
             expand_ids=[entry["location"].pk for entry in openable],
             expand_url=reverse("management:locations_expanded"),
@@ -173,13 +204,7 @@ class LocationListView(ManagementAccessMixin, View):
             can_add=request.user.has_perm(ADD),
             create_url=with_next(reverse("management:locations_new"), request),
             circuit_options=[(c.bkw_number, c.bkw_number) for c in circuits],
-            occupancy_options=[
-                (location_list.OCCUPANCY_ALL, _("All")),
-                (location_list.OCCUPANCY_OCCUPIED, _("occupied")),
-                (location_list.OCCUPANCY_FREE, _("free")),
-                (location_list.OCCUPANCY_EMPTY, _("empty")),
-                (location_list.OCCUPANCY_ARCHIVED, _("archived")),
-            ],
+            occupancy_options=occupancy_options(),
             see_persons=see_persons,
             current_url=request.get_full_path(),
             all_label_open=_("Collapse all"),

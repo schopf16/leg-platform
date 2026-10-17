@@ -208,6 +208,10 @@ Block 5 (D-081) adds the persons. Domain modules: `person_list` (a person is an 
 
 Sources: D-077, D-081 and their sources.
 
+Block 6 (D-082, D-083) finishes the overview and adds the printing. The overview (`views.OverviewView`) asks `problems.problem_counts(only=...)` for the lists the account may view and lists the lists with a problem; the button of each list opens `management:<area>_print`. The package `management/printing/`: `document.py` (the description of a printout: plain texts only), `pdf.py` (draws it with ReportLab in memory; the only place that knows ReportLab's paragraph markup, escapes every text, bundled font in `fonts/`), `areas.py` (for each list: the table, the lines above it and the detail pages, built from the same `build_list` function of the view modules as the pages, so the address of the list is parsed again on the server) and `views.py` (the dialog and the PDF; the bounds `MAX_LIST_ENTRIES`, `MAX_DETAIL_PAGES`, `MAX_ROWS`). The view modules `*_views.py` expose `build_list` (the rows of a list without the paging) for the page and the printing. The menu group ends with the link to the email texts of the system administration (`navigation.menu_entries`).
+
+Sources: D-077, D-082, D-083 and their sources.
+
 ## Data Storage
 
 MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.

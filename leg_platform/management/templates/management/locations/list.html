@@ -19,6 +19,7 @@ columns, the opening of a row by a click and the sending of the form on change.
       <button type="submit" class="btn btn-secondary-action" data-expand-all data-label-open="{{ all_label_open }}" data-label-closed="{{ all_label_closed }}">{% if all_open %}{{ all_label_open }}{% else %}{{ all_label_closed }}{% endif %}</button>
     </form>
   {% endif %}
+  {% include "management/_print_button.html" %}
   {% if can_add %}<a class="btn btn-primary" href="{{ create_url }}">{% translate "Create location" %}</a>{% endif %}
 {% endblock %}
 {% block page_content %}

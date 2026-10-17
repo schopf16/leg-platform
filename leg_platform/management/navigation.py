@@ -39,6 +39,9 @@ AREA_VIEW_PERMISSIONS = (
     "community.view_managementsettings",
 )
 
+# The rights on the email texts of the system administration (the link "Mail texts" at the end of the group).
+EMAIL_TEXT_PERMISSIONS = ("accounts.view_emailtext", "accounts.change_emailtext")
+
 # One line per entry, in the order of the menu: overview, persons, locations, LEGs, metering
 # points, settings.
 MENU = (
@@ -69,10 +72,12 @@ def is_active_entry(entry, view_name):
 
 def menu_entries(user, view_name=""):
     """The entries of the group for the account: a list of dicts with ``label``, ``url``,
-    ``icon``, ``active`` and ``key``; empty if the account may use none."""
+    ``icon``, ``active`` and ``key``; empty if the account may use none. The last entry is the link to the
+    email texts of the system administration (the page that exists; nothing new is built for it, D-082) for
+    an account that holds a right on them; the administration checks the right again."""
     if not (user.is_authenticated and user.is_staff):
         return []
-    return [
+    entries = [
         {
             "key": entry.key,
             "label": entry.label,
@@ -83,3 +88,14 @@ def menu_entries(user, view_name=""):
         for entry in MENU
         if may_use(user, entry)
     ]
+    if user.is_active and any(user.has_perm(permission) for permission in EMAIL_TEXT_PERMISSIONS):
+        entries.append(
+            {
+                "key": "email_texts",
+                "label": _("Mail texts"),
+                "url": reverse("admin:accounts_emailtext_changelist"),
+                "icon": "i-mail",
+                "active": False,
+            }
+        )
+    return entries

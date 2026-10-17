@@ -39,6 +39,9 @@ dependencies = [
     "idna>=3.15",
     # Imported directly by leg_platform/mail.py (D-048).
     "requests>=2.34.2",
+    # PDF printing of the lists of the management area (D-082): the newest release at the decision; the
+    # known advisories (CVE-2019-17626, CVE-2019-19450, CVE-2020-28463, CVE-2023-33733) are fixed in 3.6.13.
+    "reportlab>=5.0.1",
 ]
 
 [tool.setuptools.packages.find]

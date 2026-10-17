@@ -134,11 +134,13 @@ class PersonPageTests(TestCase):
         self.assertContains(page, 'mgmt-person-contact" title="Lea Probe"')
         self.assertContains(page, f'href="{self.detail(self.anna)}"')
         self.assertContains(page, 'class="mgmt-grip"')
-        # Nothing that has no specified effect: no buttons "Create person" or "Start registration", no print, no
-        # triangle; no inactive account, no unverified one, no note and no BKW customer number.
-        for text in ("Person anlegen", "Anmeldung starten", "Drucken", "mgmt-warning", "Max Inaktiv", "Emil Probe " + "x",
+        # Nothing that has no specified effect: no buttons "Create person" or "Start registration", no
+        # triangle; no inactive account, no unverified one, no note and no BKW customer number. The button
+        # "Print" is there (a desktop only, D-082).
+        for text in ("Person anlegen", "Anmeldung starten", "mgmt-warning", "Max Inaktiv", "Emil Probe " + "x",
                      "unverified", "Telefonat", "BKW-4711", "CH93 0076"):
             self.assertNotContains(page, text)
+        self.assertContains(page, ">Drucken</a>")
         # On a phone one card per person, the dot has the word as its accessible name.
         self.assertContains(page, 'role="img" aria-label="Gesperrt"')
         self.assertContains(page, 'class="mgmt-cards-view"')

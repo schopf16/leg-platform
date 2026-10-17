@@ -82,8 +82,8 @@ class LocationPageTests(TestCase):
             self.assertContains(page, "Musterweg 12")
             self.assertContains(page, "TRA21359")
             self.assertEqual("Standort anlegen" in page.content.decode(), can_add)
-        # No button "Drucken" yet (the printing block adds it).
-        self.assertNotContains(self.login(self.full).get(url), "Drucken")
+        # The button "Drucken" (the printing block, D-082): a desktop only, left of the create button.
+        self.assertContains(self.login(self.full).get(url), "Drucken")
 
     def test_the_names_of_persons_are_shown_and_searched_only_with_the_right_to_see_persons(self):
         url = reverse("management:locations")

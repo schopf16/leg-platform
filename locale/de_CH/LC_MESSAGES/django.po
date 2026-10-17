@@ -4049,3 +4049,102 @@ msgstr "BKW-Kundennummer geändert"
 
 msgid "Shares changed"
 msgstr "Anteile geändert"
+
+# Overview and printing (D-082)
+msgid "Problem"
+msgstr "Problem"
+
+msgid "Go to the list %(name)s"
+msgstr "Zur Liste %(name)s"
+
+msgid "%(count)d location with a problem"
+msgid_plural "%(count)d locations with a problem"
+msgstr[0] "%(count)d Standort mit Problem"
+msgstr[1] "%(count)d Standorte mit Problem"
+
+msgid "%(count)d LEG with a problem"
+msgid_plural "%(count)d LEGs with a problem"
+msgstr[0] "%(count)d LEG mit Problem"
+msgstr[1] "%(count)d LEGs mit Problem"
+
+msgid "%(count)d metering point with a problem"
+msgid_plural "%(count)d metering points with a problem"
+msgstr[0] "%(count)d Messpunkt mit Problem"
+msgstr[1] "%(count)d Messpunkte mit Problem"
+
+msgid "The button \"Filter problems\" appears only when a list has a problem. It shows only the entries with a problem in each list."
+msgstr "Der Knopf \"Probleme filtern\" erscheint nur, wenn eine Liste ein Problem hat. Er zeigt in jeder Liste nur die Einträge mit Problem."
+
+msgid "No problems."
+msgstr "Keine Probleme."
+
+msgid "Mail texts"
+msgstr "Mailtexte"
+
+msgid "Print"
+msgstr "Drucken"
+
+msgid "Print list"
+msgstr "Liste drucken"
+
+msgid "The list is printed as it is filtered and sorted. %(count)d entry will be printed."
+msgid_plural "The list is printed as it is filtered and sorted. %(count)d entries will be printed."
+msgstr[0] "Die Liste wird so gedruckt, wie sie gefiltert und sortiert ist. Es wird %(count)d Eintrag gedruckt."
+msgstr[1] "Die Liste wird so gedruckt, wie sie gefiltert und sortiert ist. Es werden %(count)d Einträge gedruckt."
+
+msgid "List only"
+msgstr "Nur die Liste"
+
+msgid "List and detail pages of all shown entries"
+msgstr "Liste und Detailseiten aller angezeigten Einträge"
+
+msgid "List and detail pages of selected entries"
+msgstr "Liste und Detailseiten ausgewählter Einträge"
+
+msgid "The selected detail pages are printed after the list, in the order of the list, each on a new page."
+msgstr "Die ausgewählten Detailseiten werden nach der Liste gedruckt, in der Reihenfolge der Liste, je auf einer neuen Seite."
+
+msgid "Create PDF"
+msgstr "PDF erstellen"
+
+msgid "Select at least one entry."
+msgstr "Wählen Sie mindestens einen Eintrag aus."
+
+msgid "At most %(max)d detail pages can be printed at once. Narrow the list or choose fewer entries."
+msgstr "Es können höchstens %(max)d Detailseiten auf einmal gedruckt werden. Grenzen Sie die Liste ein oder wählen Sie weniger Einträge aus."
+
+msgid "The list is too long to print. It has more than %(max)d entries. Narrow it with the search or the filters."
+msgstr "Die Liste ist zu lang zum Drucken. Sie hat mehr als %(max)d Einträge. Grenzen Sie sie mit der Suche oder den Filtern ein."
+
+msgid "The printout is too large. Choose fewer entries."
+msgstr "Der Ausdruck ist zu gross. Wählen Sie weniger Einträge aus."
+
+msgid "The PDF could not be created."
+msgstr "Das PDF konnte nicht erstellt werden."
+
+msgid "Sorting"
+msgstr "Sortierung"
+
+msgid "ascending"
+msgstr "aufsteigend"
+
+msgid "descending"
+msgstr "absteigend"
+
+msgid "Filter"
+msgstr "Filter"
+
+msgid "Problems only"
+msgstr "Nur Probleme"
+
+msgid "Quick filter"
+msgstr "Schnellfilter"
+
+msgid "Notify the BKW"
+msgstr "Bei der BKW anmelden"
+
+msgid "Confirmation pending"
+msgstr "Bestätigung ausstehend"
+
+msgid "Start date pending"
+msgstr "Startdatum ausstehend"

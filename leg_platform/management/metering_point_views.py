@@ -14,6 +14,8 @@ showing a person needs ``view_personrecord``, choosing a LEG ``view_leg``, choos
 it ``view_location``.
 """
 
+from dataclasses import dataclass
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.http import Http404, JsonResponse
@@ -99,41 +101,67 @@ def number_lead(point):
     return {"number": point_title(point), "direction": direction_label(point)}
 
 
+@dataclass
+class MeteringPointList:
+    """The list of metering points as the address asks for it: the state and the queryset of every row of the
+    view (search, LEG, quick filter and the problem switch applied, sorted), not only one page. The page and
+    the printing use it."""
+
+    state: lists.ListState
+    legs: list
+    step: str
+    show_steps: bool
+    columns: tuple
+    counts: dict
+    problem_count: int
+    today: object
+    see_persons: bool
+    queryset: object
+
+
+def build_list(params, user):
+    today = timezone.localdate()
+    see_persons = user.has_perm(VIEW_PERSONS)
+    legs = list(Leg.objects.filter(is_archived=False).order_by("name"))
+    state = lists.parse(
+        params, path=reverse("management:metering_points"), columns=ALL_COLUMNS,
+        default_sort=metering_point_list.DEFAULT_SORT,
+        filters={
+            "step": (metering_point_list.STEPS, metering_point_list.STEP_ALL),
+            "leg": ([str(leg.pk) for leg in legs], ""),
+        },
+    )
+    step = state.values["step"]
+    leg_id = int(state.values["leg"]) if state.values["leg"] else None
+    view = metering_point_list.apply_leg(metering_point_list.base_queryset(today), leg_id)
+    view = metering_point_list.apply_search(view, state.query, see_persons=see_persons, today=today)
+    # The numbers of the quick filters and of the button "Filter problems" count the metering points
+    # of this view (the search, the LEG); the rows that the list shows are always the same count.
+    counted = metering_point_list.apply_problems(view) if state.problems else view
+    counts = metering_point_list.step_counts(counted, today)
+    queryset = metering_point_list.apply_step(view, step, today)
+    problem_count = metering_point_list.apply_problems(queryset).count()
+    if state.problems:
+        queryset = metering_point_list.apply_problems(queryset)
+    queryset = metering_point_list.apply_sort(queryset, state.sort, state.descending, today)
+    show_steps = step in (metering_point_list.STEP_NOTIFY, metering_point_list.STEP_CONFIRM, metering_point_list.STEP_START)
+    columns = (*ALL_COLUMNS[:3], COLUMN_NEXT if show_steps else COLUMN_STATUS)
+    return MeteringPointList(state, legs, step, show_steps, columns, counts, problem_count, today, see_persons, queryset)
+
+
 class MeteringPointListView(ManagementAccessMixin, View):
     """The list (``messpunkte-liste-desktop`` and ``-handy``): a table on a desktop, cards on a phone."""
 
     permission_required = (VIEW,)
 
     def get(self, request):
-        today = timezone.localdate()
         user = request.user
-        see_persons = user.has_perm(VIEW_PERSONS)
-        legs = list(Leg.objects.filter(is_archived=False).order_by("name"))
-        path = reverse("management:metering_points")
-        state = lists.parse(
-            request.GET, path=path, columns=ALL_COLUMNS, default_sort=metering_point_list.DEFAULT_SORT,
-            filters={
-                "step": (metering_point_list.STEPS, metering_point_list.STEP_ALL),
-                "leg": ([str(leg.pk) for leg in legs], ""),
-            },
-        )
-        step = state.values["step"]
-        leg_id = int(state.values["leg"]) if state.values["leg"] else None
-        view = metering_point_list.apply_leg(metering_point_list.base_queryset(today), leg_id)
-        view = metering_point_list.apply_search(view, state.query, see_persons=see_persons, today=today)
-        # The numbers of the quick filters and of the button "Filter problems" count the metering points
-        # of this view (the search, the LEG); the rows that the list shows are always the same count.
-        counted = metering_point_list.apply_problems(view) if state.problems else view
-        counts = metering_point_list.step_counts(counted, today)
-        queryset = metering_point_list.apply_step(view, step, today)
-        problem_count = metering_point_list.apply_problems(queryset).count()
-        if state.problems:
-            queryset = metering_point_list.apply_problems(queryset)
-        queryset = metering_point_list.apply_sort(queryset, state.sort, state.descending, today)
-        page = lists.paginate(queryset, state)
+        found = build_list(request.GET, user)
+        state, legs, step, show_steps = found.state, found.legs, found.step, found.show_steps
+        columns, counts, problem_count, today = found.columns, found.counts, found.problem_count, found.today
+        see_persons = found.see_persons
+        page = lists.paginate(found.queryset, state)
 
-        show_steps = step in (metering_point_list.STEP_NOTIFY, metering_point_list.STEP_CONFIRM, metering_point_list.STEP_START)
-        columns = (*ALL_COLUMNS[:3], COLUMN_NEXT if show_steps else COLUMN_STATUS)
         can_change = user.has_perm(CHANGE)
         can_view_location = user.has_perm(VIEW_LOCATION)
         entries = []
@@ -174,6 +202,7 @@ class MeteringPointListView(ManagementAccessMixin, View):
             page_title=_("Metering points"),
             page_subtitle=_("All metering points with their state. Here you see what is still to do at the BKW."),
             entries=entries,
+            print_url=state.url_to(reverse("management:metering_points_print")),
             show_steps=show_steps,
             quick_filters=[
                 {"value": value, "label": label, "url": state.url(step=value), "active": value == step}

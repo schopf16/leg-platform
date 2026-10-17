@@ -1,18 +1,33 @@
 {% extends "management/page.html" %}
 {% load i18n %}{% comment %}
-The overview, the start page of the management area (LEG-Design-Vorgaben/verwaltung/uebersicht;
-D-077). So far the skeleton: the header. The button "Filter problems" and the rows of the lists with
-problems come with the lists (the rows use ``_warning`` and ``_goto``).
+The overview, the start page of the management area (LEG-Design-Vorgaben/verwaltung/uebersicht/referenz/uebersicht-desktop and
+-handy; D-082). The button "Filter problems (n)" with the border of the warning colour stands in the head, only
+while at least one list has a problem; below it a row for each list with a problem (the name, "N ... with a
+problem", the count behind the warning triangle, the link to the list with the problem filter on); lists without a
+problem do not appear. Only the lists that the account may view are counted (the view). On a phone the button is
+as wide as the page and the rows are the same card; there is no button "Print" on this page.
 {% endcomment %}
+{% block header_actions %}
+  {% if problem_count %}<a class="btn btn-warning-outline" href="{{ filter_url }}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
+{% endblock %}
 {% block page_content %}
   {% if problem_lists %}
-    <section class="mgmt-card">
+    <section class="mgmt-card mgmt-overview">
       {% for entry in problem_lists %}
-        <div class="mgmt-row">
-          <div><strong>{{ entry.name }}</strong></div>
-          <div>{% include "management/_warning.html" with text=entry.text %} {{ entry.count }}{% include "management/_goto.html" with url=entry.url label=entry.label %}</div>
+        <div class="mgmt-overview-row">
+          <div>
+            <div class="mgmt-overview-name">{{ entry.name }}</div>
+            <div class="mgmt-overview-text">{{ entry.text }}</div>
+          </div>
+          <span class="mgmt-overview-count tnum">{% translate "Problem" as problem_label %}{% include "management/_warning.html" with text=problem_label %} {{ entry.count }}</span>
+          {% include "management/_goto.html" with url=entry.url label=entry.label %}
         </div>
       {% endfor %}
+    </section>
+    <p class="mgmt-hint mgmt-overview-hint">{% translate 'The button "Filter problems" appears only when a list has a problem. It shows only the entries with a problem in each list.' %}</p>
+  {% else %}
+    <section class="mgmt-card mgmt-overview">
+      <p class="mgmt-empty-text">{% translate "No problems." %}</p>
     </section>
   {% endif %}
 {% endblock %}

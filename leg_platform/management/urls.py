@@ -9,6 +9,7 @@ from django.urls import path
 
 from leg_platform.management import leg_views, location_views, person_views, views
 from leg_platform.management import metering_point_views as mp_views
+from leg_platform.management.printing import views as print_views
 
 app_name = "management"
 
@@ -19,6 +20,7 @@ urlpatterns = [
     path("lists/<slug:list_key>/widths/", location_views.ListWidthsView.as_view(), name="list_widths"),
     # Persons (an account with a customer number; the id is the id of the account)
     path("persons/", person_views.PersonListView.as_view(), name="persons"),
+    path("persons/print/", print_views.PersonPrintView.as_view(), name="persons_print"),
     path("persons/<int:pk>/", person_views.PersonDetailView.as_view(), name="persons_detail"),
     path("persons/<int:pk>/note/", person_views.PersonNoteView.as_view(), name="persons_note"),
     path(
@@ -32,6 +34,7 @@ urlpatterns = [
     ),
     # Locations
     path("locations/", location_views.LocationListView.as_view(), name="locations"),
+    path("locations/print/", print_views.LocationPrintView.as_view(), name="locations_print"),
     path("locations/expanded/", location_views.LocationExpandedView.as_view(), name="locations_expanded"),
     path("locations/new/", location_views.LocationCreateView.as_view(), name="locations_new"),
     path("locations/<int:pk>/", location_views.LocationDetailView.as_view(), name="locations_detail"),
@@ -60,6 +63,7 @@ urlpatterns = [
     ),
     # Metering points
     path("metering-points/", mp_views.MeteringPointListView.as_view(), name="metering_points"),
+    path("metering-points/print/", print_views.MeteringPointPrintView.as_view(), name="metering_points_print"),
     path("metering-points/new/", mp_views.MeteringPointNewView.as_view(), name="metering_points_new"),
     path(
         "metering-points/check-number/", mp_views.CheckNumberView.as_view(), name="metering_points_check_number"
@@ -89,6 +93,7 @@ urlpatterns = [
     path("metering-points/<int:pk>/delete/", mp_views.DeleteView.as_view(), name="metering_points_delete"),
     # LEGs
     path("legs/", leg_views.LegListView.as_view(), name="legs"),
+    path("legs/print/", print_views.LegPrintView.as_view(), name="legs_print"),
     path("legs/new/", leg_views.LegCreateView.as_view(), name="legs_new"),
     path("legs/<int:pk>/", leg_views.LegDetailView.as_view(), name="legs_detail"),
     path("legs/<int:pk>/quota/", leg_views.LegQuotaView.as_view(), name="legs_quota"),

@@ -99,14 +99,20 @@ def legs_with_problem(today=None, threshold_percent=None):
     return [(leg, found[leg.pk]) for leg in all_legs if found[leg.pk].problems]
 
 
-def problem_counts(today=None, threshold_percent=None):
+def problem_counts(today=None, threshold_percent=None, only=None):
     """The number of entries with a problem per list, for the overview and the button "Filter
-    problems": ``{"locations": n, "metering_points": n, "legs": n}`` (persons have none yet)."""
-    return {
-        "locations": locations_with_problem().count(),
-        "metering_points": metering_points_with_problem(today).count(),
-        "legs": len(legs_with_problem(today, threshold_percent)),
-    }
+    problems": ``{"locations": n, "metering_points": n, "legs": n}`` (persons have none yet).
+    ``only`` names the lists to count (the overview counts only the lists the account may see: it must
+    not learn the figure of another list); the others are left out of the result."""
+    wanted = {"locations", "metering_points", "legs"} if only is None else set(only)
+    counts = {}
+    if "locations" in wanted:
+        counts["locations"] = locations_with_problem().count()
+    if "metering_points" in wanted:
+        counts["metering_points"] = metering_points_with_problem(today).count()
+    if "legs" in wanted:
+        counts["legs"] = len(legs_with_problem(today, threshold_percent))
+    return counts
 
 
 def describe(problem, threshold_percent=None):

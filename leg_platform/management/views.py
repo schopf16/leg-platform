@@ -1,13 +1,17 @@
 """Views of the management area (D-077). Every view uses ``leg_platform.management.access``."""
 
+from dataclasses import dataclass
+
 from django.contrib import messages
 from django.core.exceptions import SuspiciousOperation
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
-from leg_platform.community import addressing, settings_service
+from leg_platform.community import addressing, problems, settings_service
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, ManagementSettings
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
@@ -17,16 +21,75 @@ VIEW_SETTINGS = "community.view_managementsettings"
 CHANGE_SETTINGS = "community.change_managementsettings"
 
 
+@dataclass(frozen=True)
+class ProblemList:
+    """A list that can have problems: the key of ``problems.problem_counts``, the right to view it, the URL
+    name and the two texts. The order of ``PROBLEM_LISTS`` is the order of the menu."""
+
+    key: str
+    permission: str
+    url_name: str
+    name: object
+    text: object
+
+
+PROBLEM_LISTS = (
+    ProblemList(
+        "locations", "community.view_location", "management:locations", lambda: _("Locations"),
+        lambda count: ngettext(
+            "%(count)d location with a problem", "%(count)d locations with a problem", count
+        ) % {"count": count},
+    ),
+    ProblemList(
+        "legs", "community.view_leg", "management:legs", lambda: _("LEGs"),
+        lambda count: ngettext("%(count)d LEG with a problem", "%(count)d LEGs with a problem", count)
+        % {"count": count},
+    ),
+    ProblemList(
+        "metering_points", "community.view_meteringpoint", "management:metering_points",
+        lambda: _("Metering points"),
+        lambda count: ngettext(
+            "%(count)d metering point with a problem", "%(count)d metering points with a problem", count
+        ) % {"count": count},
+    ),
+)
+
+
 class OverviewView(ManagementAccessMixin, TemplateView):
-    """The start page of the management area (``uebersicht/UMSETZUNG.md``). Whoever may open one of
-    the areas may open it; it shows only what the account may see. The lists with problems and the
-    button "Filter problems" are added with the lists."""
+    """The start page of the management area (``uebersicht/UMSETZUNG.md``). Whoever may open one of the areas
+    may open it; it shows only what the account may see: a row for each list with a problem, for the lists the
+    account may view only (the counts of another list are not even computed), and the button "Filter problems"
+    with the sum of those counts. The button opens the first of the affected lists (in the order of the menu)
+    with the problem filter on; from there each list has its own switch."""
 
     template_name = "management/overview.html"
     any_permission_required = AREA_VIEW_PERMISSIONS
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(page_title=_("Overview"), problem_lists=[], **kwargs)
+        user = self.request.user
+        allowed = [entry for entry in PROBLEM_LISTS if user.has_perm(entry.permission)]
+        counts = problems.problem_counts(only=[entry.key for entry in allowed])
+        rows = []
+        for entry in allowed:
+            count = counts[entry.key]
+            if count:
+                url = reverse(entry.url_name) + "?problems=1"
+                rows.append(
+                    {
+                        "name": entry.name(),
+                        "text": entry.text(count),
+                        "count": count,
+                        "url": url,
+                        "label": _("Go to the list %(name)s") % {"name": entry.name()},
+                    }
+                )
+        return super().get_context_data(
+            page_title=_("Overview"),
+            problem_lists=rows,
+            problem_count=sum(row["count"] for row in rows),
+            filter_url=rows[0]["url"] if rows else "",
+            **kwargs,
+        )
 
 
 class SettingsView(ManagementAccessMixin, View):

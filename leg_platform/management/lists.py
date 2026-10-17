@@ -95,6 +95,11 @@ class ListState:
         params = self.params(**changes)
         return f"{self.path}?{urlencode(params)}" if params else self.path
 
+    def url_to(self, path, **changes):
+        """The address of another page of the list (the print dialog) with this state; never a page number."""
+        params = self.params(page=1, **changes)
+        return f"{path}?{urlencode(params)}" if params else path
+
     def hidden(self):
         """The state that a form of the list must carry along (the sort and the "problems" filter);
         the form's own fields are the search, the filters and the page size."""
