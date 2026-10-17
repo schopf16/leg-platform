@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient
 from leg_platform.community import grid_operator, numbers
 from leg_platform.community.models import GridOperator
@@ -94,6 +95,11 @@ class GridOperatorAdminTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(GridOperator.objects.get(pk=1).name, OPERATOR)
         self.assertContains(client.get(CHANGE_URL), OPERATOR)
+        # L-8: the change is a security event for the long period (actor only, no value); a save without a change is none.
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.GRID_OPERATOR_CHANGED)
+        self.assertEqual((event.actor_id, event.account_id, event.long_retention), (self.administrator.pk, None, True))
+        client.post(CHANGE_URL, {"name": OPERATOR, "_save": "Speichern"})
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.GRID_OPERATOR_CHANGED).count(), 1)
 
     def test_the_list_leads_straight_to_the_form_of_the_one_row(self):
         response = self.client_of(self.administrator).get(reverse("admin:community_gridoperator_changelist"))

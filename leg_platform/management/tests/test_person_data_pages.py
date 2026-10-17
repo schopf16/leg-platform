@@ -15,7 +15,7 @@ from django.utils import timezone
 from leg_platform.accounts import rate_limits
 from leg_platform.accounts.models import MailJob, PendingEmailChange, SecurityEvent, VerificationToken
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user, run_mail_queue
-from leg_platform.community import history
+from leg_platform.community import history, persons
 from leg_platform.community.models import HistoryEntry, PersonRecord
 from leg_platform.community.tests.helpers import staff_user
 
@@ -267,6 +267,20 @@ class PersonDataPageTests(TestCase):
             page = client.post(self.url("contact", self.anna), {"phone_number": "", "secondary_email": "", **data})
             self.assertContains(page, "mgmt-field-error", msg_prefix=str(data))
         self.assertEqual(self.anna.__class__.objects.get(pk=self.anna.pk).email, "anna.data@example.org")
+
+    def test_a_refused_second_address_keeps_the_phone_of_the_same_dialog_unchanged(self):
+        """L-3: the dialog is one transaction; a limit that refuses the second address undoes the phone."""
+        client = self.login(self.staff)
+        before = self.anna.phone_number
+        with patch.object(persons, "change_second_email", side_effect=persons.PersonError("rate_limited")):
+            page = client.post(
+                self.url("contact", self.anna), {"phone_number": "031 311 11 11", "secondary_email": "x.second@example.org"}
+            )
+        self.assertContains(page, "Zu viele Anfragen")
+        self.anna.refresh_from_db()
+        self.assertEqual(self.anna.phone_number, before)
+        self.assertFalse(HistoryEntry.objects.filter(subject_id=self.anna.pk).exists())
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF).exists())
 
     def test_the_payment_card_stores_the_iban_encrypted_shows_it_in_groups_and_never_puts_it_elsewhere(self):
         client = self.login(self.staff)

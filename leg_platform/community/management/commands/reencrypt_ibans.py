@@ -3,14 +3,16 @@
 Run on the server after ``SECRET_KEY`` was replaced and the old key is listed in ``SECRET_KEY_FALLBACKS``, as
 ``emergency_access reencrypt-second-factor-keys`` does for the second factor keys. Until then the IBANs are readable
 with the fallback key; if the old key is removed from the fallbacks before this ran, the IBANs under it cannot be
-read any more (the pages then show no IBAN and the log names the account number). Prints the numbers only, never a value.
+read any more (the pages then show no IBAN and the log names the account number). A text that is not bound to its
+account yet (before L-7) is bound too. Prints the numbers only, never a value, and **fails (exit code 1) if any IBAN
+could not be decrypted**, so that a script does not go on and drop the old key (review L-6).
 """
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from leg_platform.accounts.encryption import DecryptionError, is_current, reencrypt
-from leg_platform.community.iban import PERSON_IBAN_PURPOSE
+from leg_platform.accounts.encryption import DecryptionError, is_current
+from leg_platform.community import iban
 from leg_platform.community.models import PersonRecord
 
 
@@ -24,11 +26,14 @@ class Command(BaseCommand):
                 record = PersonRecord.objects.select_for_update().filter(pk=pk).first()
                 if record is None or not record.iban_encrypted:
                     continue
-                if is_current(record.iban_encrypted, PERSON_IBAN_PURPOSE):
-                    skipped += 1
-                    continue
                 try:
-                    record.iban_encrypted = reencrypt(record.iban_encrypted, PERSON_IBAN_PURPOSE)
+                    if is_current(record.iban_encrypted, iban.PERSON_IBAN_PURPOSE) and iban.is_bound(
+                        record.iban_encrypted
+                    ):
+                        skipped += 1
+                        continue
+                    # Read with any key of the instance and for this account, written with the current key.
+                    record.iban = record.iban
                 except DecryptionError:
                     failed += 1
                     continue
@@ -37,3 +42,5 @@ class Command(BaseCommand):
         self.stdout.write(
             f"{done} IBANs were encrypted again, {skipped} were already current, {failed} could not be decrypted."
         )
+        if failed:
+            raise CommandError(f"{failed} IBANs could not be decrypted; keep the old key in SECRET_KEY_FALLBACKS.")

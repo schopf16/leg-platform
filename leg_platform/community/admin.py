@@ -12,6 +12,8 @@ from django.contrib import admin
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 
+from leg_platform.accounts import security_log
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.community.models import GridOperator
 
 
@@ -51,6 +53,13 @@ class GridOperatorAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # The name is in every text and in the PDFs of the management area (review L-8): a change is a security
+        # event kept for the long period. The log line names the event and the actor only.
+        if "name" in form.changed_data:
+            security_log.record(SecurityEvent.Event.GRID_OPERATOR_CHANGED, actor=request.user)
 
 
 admin.site.register(GridOperator, GridOperatorAdmin)

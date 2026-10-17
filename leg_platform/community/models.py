@@ -594,12 +594,15 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     @property
     def iban(self):
         """The IBAN in its normal form, or "". Raises ``DecryptionError`` if no key of the instance decrypts it
-        (``iban.readable`` gives "" and logs the account number for display)."""
-        return iban_module.decrypt_iban(self.iban_encrypted)
+        or if it was copied from another person's record (``iban.readable`` gives "" and logs the account number
+        for display)."""
+        return iban_module.decrypt_iban(self.iban_encrypted, self.person_id)
 
     @iban.setter
     def iban(self, value):
-        self.iban_encrypted = iban_module.encrypt_iban(value)
+        if self.person_id is None and iban_module.compact(value):
+            raise ValueError("Set the person before the IBAN: the IBAN is bound to the account.")
+        self.iban_encrypted = iban_module.encrypt_iban(value, self.person_id)
 
     def current_address(self):
         person = self.person

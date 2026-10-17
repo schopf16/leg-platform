@@ -15,6 +15,7 @@ again. A dialog is a normal page: it works without JavaScript and returns to the
 from dataclasses import dataclass
 
 from django.contrib import messages
+from django.db import transaction
 from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -319,7 +320,8 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
         name, contact = person_list.display_names(person)
         locked = person_list.locked_account_ids(only=[person.pk]) if person.is_active else set()
         account = person_list.AccountState(person_list.account_state(person, locked))
-        suggestion = persons.address_suggestion(person)
+        # The banner has buttons: only for an actor who may change this account (D-087, review M-1).
+        suggestion = persons.address_suggestion(person) if persons.may_change_customer_data(request.user, person) else None
         share_entries = persons.share_history(person)
         context = {
             "page_title": name,
@@ -541,11 +543,14 @@ class PersonContactView(CustomerDataDialog):
         person = self.person()
         second_requested = False
         try:
-            if "secondary_email" in form.fields:
-                second_requested = persons.change_second_email(
-                    request, person, form.cleaned_data["secondary_email"], request.user
-                )
-            persons.update_customer_data(person, self.group, form.values(), request.user)
+            # One transaction (review L-3): the phone is validated and written first, the second address is
+            # requested after it; if either step is refused, nothing of the dialog is kept (no job, no change).
+            with transaction.atomic():
+                persons.update_customer_data(person, self.group, form.values(), request.user)
+                if "secondary_email" in form.fields:
+                    second_requested = persons.change_second_email(
+                        request, person, form.cleaned_data["secondary_email"], request.user
+                    )
         except ValidationError as error:
             add_validation_errors(form, error)
             return None
@@ -634,7 +639,10 @@ class PersonAddressSuggestionView(PersonObjectMixin, ManagementAccessMixin, View
                 persons.accept_address_suggestion(person, token, request.user)
             else:
                 persons.dismiss_address_suggestion(person, token, request.user)
-        except persons.PersonError:
+        except persons.PersonError as error:
+            if error.code == "not_allowed":
+                # The data of a staff user or an administrator (D-012, D-087): not for this actor.
+                raise PermissionDenied from None
             messages.error(request, _("There is no suggestion to decide on."))
         else:
             messages.success(request, _("Saved."))

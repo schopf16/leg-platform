@@ -236,10 +236,15 @@ def _current_suggestion(fresh, token):
 def accept_address_suggestion(person, token, actor=None):
     """Replace the address of the account by the suggestion that the ``token`` names; the entry goes to the
     history with the actor and the time. The suggestion is asked again under the lock; if it is not the one
-    that was shown, ``PersonError("no_open_suggestion")``."""
+    that was shown, ``PersonError("no_open_suggestion")``. The actor must be an active staff account that may
+    change this account (``may_change_customer_data``, D-012, review M-1): the data of a staff user or an
+    administrator only by an administrator, never the archive (``PersonError("not_allowed")``). The security log
+    names the changed fields (``ACCOUNT_DATA_CHANGED_BY_STAFF``)."""
     with transaction.atomic():
         fresh = _lock_person(person)
+        _check_actor(actor, fresh)
         suggestion = _current_suggestion(fresh, token)
+        before = {name: getattr(fresh, name) for name in ADDRESS_FIELDS}
         fresh.street, fresh.house_number, postal_code, fresh.town = suggestion.as_tuple()
         fresh.swiss_postal_code = parse_swiss_postal_code(postal_code)
         fresh.foreign_postal_code = ""
@@ -255,13 +260,20 @@ def accept_address_suggestion(person, token, actor=None):
             suggested_postal_code="", suggested_town="", address_correction_open=False,
         )
         history.record(fresh, HistoryEvent.ADDRESS_CORRECTION_ACCEPTED, actor)
+        changed = [name for name in ADDRESS_FIELDS if getattr(fresh, name) != before[name]]
+        security_log.record(
+            SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF, account=fresh, actor=actor,
+            detail="fields " + ", ".join(changed or ["address (suggestion accepted)"]),
+        )
     return fresh
 
 
 def dismiss_address_suggestion(person, token, actor=None):
-    """"Do not accept": the address stays and the warning is gone until the address changes."""
+    """"Do not accept": the address stays and the warning is gone until the address changes. The same actor rule
+    as for accepting (review M-1)."""
     with transaction.atomic():
         fresh = _lock_person(person)
+        _check_actor(actor, fresh)
         _current_suggestion(fresh, token)
         record = _locked_record(fresh, create=True)
         record.suggestion_dismissed_for = addressing.address_signature(*_address_of(fresh))
@@ -476,7 +488,10 @@ def update_payment_data(person, actor, *, iban=UNSET, paper_invoice=UNSET, opera
         if record is None:
             return []
         changed = []
-        if iban is not UNSET and iban != _current_iban(record):
+        current = _current_iban(record)
+        # An IBAN that cannot be decrypted is not touched by an empty value (review M-2): the form shows it empty, so
+        # an empty submission is "unchanged"; only a valid IBAN replaces it.
+        if iban is not UNSET and iban != current and not (current is None and iban == ""):
             record.iban = iban
             changed.append("iban")
         if paper_invoice is not UNSET and bool(paper_invoice) != record.paper_invoice:
@@ -500,8 +515,7 @@ def update_payment_data(person, actor, *, iban=UNSET, paper_invoice=UNSET, opera
 
 
 def _current_iban(record):
-    """The IBAN of the record, or None if it cannot be decrypted (then every value counts as a change, and a new one
-    or an empty one replaces it)."""
+    """The IBAN of the record, or None if it cannot be decrypted (a valid IBAN replaces it; an empty value leaves it)."""
     try:
         return record.iban
     except DecryptionError:
@@ -540,5 +554,5 @@ def change_second_email(request, person, address, actor):
                 email_change.request_changes(request, fresh, remove_secondary=True, actor=actor)
         except email_change.RequestRefused:
             raise PersonError("rate_limited") from None
-        history.record(fresh, HistoryEvent.PERSON_DATA_CHANGED, actor, {"fields": ["secondary_email"]})
+        _record_data_change(fresh, ["secondary_email"], actor)
     return True

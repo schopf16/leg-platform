@@ -4224,6 +4224,9 @@ msgstr "Einladung von der Verwaltung erneut gesendet"
 msgid "Account data changed by staff"
 msgstr "Kontodaten von der Verwaltung geändert"
 
+msgid "Grid operator changed"
+msgstr "Netzbetreiber geändert"
+
 msgid "Invitation: link to confirm the address and choose a password"
 msgstr "Einladung: Link zur Bestätigung der Adresse und zur Wahl eines Passworts"
 

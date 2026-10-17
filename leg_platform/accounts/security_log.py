@@ -60,6 +60,7 @@ MESSAGES = {
     Event.PERSON_INVITED: "A person was created and invited by staff",
     Event.INVITATION_RESENT: "An invitation was sent again by staff",
     Event.ACCOUNT_DATA_CHANGED_BY_STAFF: "The data of an account was changed by staff",
+    Event.GRID_OPERATOR_CHANGED: "The grid operator of the instance was changed",
 }
 
 

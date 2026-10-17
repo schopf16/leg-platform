@@ -84,9 +84,11 @@ class PrintView(ManagementAccessMixin, View):
             return self.show(request, prepared, selected_ids, scope, _("The PDF could not be created."))
         response = HttpResponse(data, content_type="application/pdf")
         # The security log (M-2 of the review of D-082): who printed which list; no content.
+        # The details of a person hold the IBAN (review L-9): the log line says so, still no content.
+        with_iban = ", with IBAN" if self.area.key == "persons" and chosen else ""
         security_log.record(
             security_log.Event.LIST_PRINTED, actor=request.user,
-            detail=f"list {self.area.key}, scope {scope}, {len(items)} entries, {len(chosen)} detail pages",
+            detail=f"list {self.area.key}, scope {scope}, {len(items)} entries, {len(chosen)} detail pages{with_iban}",
         )
         response["Content-Disposition"] = f'attachment; filename="{self.area.filename}"'
         patch_cache_control(response, no_store=True, private=True)

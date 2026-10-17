@@ -549,9 +549,18 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             if user is None or token is None:
                 return self.invalid(self.request)
             # The consent: the time and the address of the privacy notice that was shown.
+            # Only the fields of the form are written, from the account that was read under the lock (L-2):
+            # the instance of the form was loaded when the page was opened and must not write back any other
+            # column (a password, a status or a mark changed in the meantime).
             form.instance.privacy_accepted_at = timezone.now()
             form.instance.privacy_accepted_url = privacy_url
-            user = form.save()
+            written = (
+                *form._meta.fields, "swiss_postal_code", "foreign_postal_code",
+                "privacy_accepted_at", "privacy_accepted_url",
+            )
+            for name in written:
+                setattr(user, name, getattr(form.instance, name))
+            user.save(update_fields=list(written))
             user.complete_registration(password_hash=password_hash)
             token.delete()
             security_log.record(SecurityEvent.Event.REGISTRATION_COMPLETED, account=user)

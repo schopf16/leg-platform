@@ -425,6 +425,25 @@ class PersonPageTests(TestCase):
             self.assertContains(page, text)
         self.assertContains(page, timezone.localtime().strftime("%d.%m.%Y"))
 
+    def test_the_banner_and_its_buttons_are_not_for_the_data_of_a_staff_user_unless_the_actor_is_an_administrator(self):
+        """M-1: a forged POST of a staff account on the address suggestion of another staff account is a 403."""
+        target = create_active_user(
+            "staff.target.page@example.org", first_name="Max", last_name="Probe", street="musterweg", house_number="12",
+            town="Bern", swiss_postal_code=3063,
+        )
+        target.set_privileges(is_staff=True, is_superuser=False)
+        token = persons.suggestion_token(persons.address_suggestion(target))
+        post = reverse("management:persons_address_suggestion", args=[target.pk])
+        client = self.login(self.staff)
+        self.assertNotContains(client.get(self.detail(target)), "Die Adresse weicht vom Adressverzeichnis ab.")
+        for action in ("accept", "dismiss"):
+            self.assertEqual(client.post(post, {"action": action, "token": token}).status_code, 403)
+        self.assertEqual(User.objects.get(pk=target.pk).street, "musterweg")
+        administrator = self.login(staff_user("administrator.page@example.org", superuser=True))
+        self.assertContains(administrator.get(self.detail(target)), "Die Adresse weicht vom Adressverzeichnis ab.")
+        self.assertEqual(administrator.post(post, {"action": "accept", "token": token}).status_code, 302)
+        self.assertEqual(User.objects.get(pk=target.pk).street, "Musterweg")
+
     def test_do_not_accept_keeps_the_address_and_a_stale_or_unknown_decision_is_refused(self):
         client = self.login(self.staff)
         post = reverse("management:persons_address_suggestion", args=[self.fixable.pk])

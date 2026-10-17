@@ -84,13 +84,15 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
     from leg_platform.accounts.mail_queue import enqueue_for_account, submit_mail_request
 
     requested = False
+    requester = getattr(actor, "pk", None)
     with transaction.atomic():
         locked = User._base_manager.select_for_update().get(pk=user.pk)
         expires_at = timezone.now() + EMAIL_CHANGE_LIFETIME
         submissions = []
         if login:
             PendingEmailChange.objects.update_or_create(
-                user=locked, kind=Kind.LOGIN, defaults={"address": login, "expires_at": expires_at}
+                user=locked, kind=Kind.LOGIN,
+                defaults={"address": login, "expires_at": expires_at, "requested_by": requester},
             )
             VerificationToken.objects.filter(user=locked, purpose=Purpose.EMAIL_CHANGE).delete()
             submissions.append((MailJob.Kind.EMAIL_CHANGE_REQUEST, login))
@@ -98,7 +100,7 @@ def request_changes(request, user, *, login=None, secondary=None, remove_seconda
             PendingEmailChange.objects.update_or_create(
                 user=locked,
                 kind=Kind.SECONDARY,
-                defaults={"address": secondary, "expires_at": expires_at},
+                defaults={"address": secondary, "expires_at": expires_at, "requested_by": requester},
             )
             VerificationToken.objects.filter(user=locked, purpose=Purpose.SECONDARY_EMAIL).delete()
             submissions.append((MailJob.Kind.SECONDARY_EMAIL_REQUEST, secondary))
@@ -250,10 +252,16 @@ def confirm_change(token):
                 locked_token.delete()
                 return None
             locked_token.delete()
+            requested_by = pending.requested_by
             pending.delete()
             _drop_stop_tokens_if_idle(user)
             enqueue_for_account(MailJob.Kind.SECONDARY_EMAIL_CHANGED, user, addresses=recipients)
-            security_log.record(SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=user)
+            # A change that a staff account asked for says so in the log (D-087, review M-3): the owner of the
+            # new address confirmed it, the staff account made the request.
+            security_log.record(
+                SecurityEvent.Event.SECONDARY_EMAIL_CHANGED, account=user,
+                detail=f"requested by staff account {requested_by}" if requested_by else "",
+            )
             return user
         duplicate = (
             User._base_manager.select_for_update()

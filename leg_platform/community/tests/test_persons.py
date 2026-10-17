@@ -12,6 +12,7 @@ from django.test import SimpleTestCase, TestCase, tag
 from django.utils import timezone
 
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT, axes_username
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses.models import Address, Directory
 from leg_platform.community import history, numbers, person_list, persons
@@ -23,6 +24,7 @@ from leg_platform.community.tests.helpers import (
     make_leg,
     make_location,
     make_metering_point,
+    staff_user,
 )
 
 User = get_user_model()
@@ -405,7 +407,7 @@ class PersonAddressCorrectionTests(TestCase):
             Address.objects.create(
                 generation=generation, street=street, house_number=number, postal_code=postal_code, locality=locality
             )
-        cls.actor = create_active_user("actor.address@example.org")
+        cls.actor = staff_user("actor.address@example.org")
         cls.person = create_active_user(
             "person.address@example.org", first_name="Anna", last_name="Muster", street="musterweg", house_number="12",
             town="Bern", swiss_postal_code=3063, phone_number="+41791234567",
@@ -450,6 +452,36 @@ class PersonAddressCorrectionTests(TestCase):
         self.assertEqual(User.objects.get(pk=self.person.pk).street, "musterweg")
         self.assertEqual(token, persons.suggestion_token(persons.address_suggestion(self.person)))
         self.assertEqual(history.entries_for(self.person).count(), 0)
+
+    def test_the_staff_guard_applies_to_the_decision_and_an_accepted_suggestion_is_a_security_event(self):
+        """M-1: the data of a staff user or an administrator is decided on only by an administrator."""
+        target = create_active_user(
+            "staff.target@example.org", first_name="Max", last_name="Probe", street="musterweg", house_number="12",
+            town="Bern", swiss_postal_code=3063,
+        )
+        target.set_privileges(is_staff=True, is_superuser=False)
+        administrator = staff_user("admin.address@example.org", superuser=True)
+        plain = create_active_user("plain.address@example.org")
+        token = persons.suggestion_token(persons.address_suggestion(target))
+        for action in (persons.accept_address_suggestion, persons.dismiss_address_suggestion):
+            for actor in (self.actor, plain, target, None):
+                with self.subTest(action=action.__name__, actor=getattr(actor, "email", None)):
+                    with self.assertRaises(persons.PersonError) as raised:
+                        action(target, token, actor)
+                    self.assertEqual(raised.exception.code, "not_allowed")
+        self.assertEqual(User.objects.get(pk=target.pk).street, "musterweg")
+        self.assertEqual(history.entries_for(target).count(), 0)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF).exists())
+        with self.assertLogs("leg_platform.security", "WARNING") as logs, self.captureOnCommitCallbacks(execute=True):
+            persons.accept_address_suggestion(target, token, administrator)
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF)
+        self.assertEqual((event.account_id, event.actor_id), (target.pk, administrator.pk))
+        self.assertIn("fields street, town", "\n".join(logs.output))
+        self.assertNotIn("Musterweg", "\n".join(logs.output))
+        # A plain customer account is decided on by every staff account, and that too is logged.
+        token = persons.suggestion_token(persons.address_suggestion(self.person))
+        persons.accept_address_suggestion(self.person, token, self.actor)
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF).count(), 2)
 
     def test_there_is_no_suggestion_for_an_inactive_account_a_foreign_address_or_one_that_does_not_fit(self):
         def make(email, **values):

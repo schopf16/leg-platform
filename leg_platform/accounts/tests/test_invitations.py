@@ -155,6 +155,32 @@ class InvitationFlowTests(TestCase):
         self.assertEqual((person.country.code, person.swiss_postal_code, person.foreign_postal_code), ("DE", None, "10115"))
         self.assertEqual(person.status, "active")
 
+    def test_the_last_step_never_saves_every_column_of_the_account(self):
+        """L-2: only the fields of the form and of the consent are written, from the account read under the lock."""
+        from unittest.mock import patch
+
+        person, path = self.invite()
+        client = Client()
+        reference = self.open(client, path)
+        calls = []
+        real_save = User.save
+
+        def spy(self, **kwargs):
+            calls.append(kwargs.get("update_fields"))
+            return real_save(self, **kwargs)
+
+        with patch.object(User, "save", spy):
+            self.assertEqual(self.complete(client, reference, first_name="Erika", last_name="Neu").status_code, 302)
+        self.assertTrue(calls and all(fields is not None for fields in calls), calls)
+        data_step = next(fields for fields in calls if "privacy_accepted_at" in fields)
+        self.assertEqual(
+            set(data_step),
+            {"first_name", "last_name", "street", "house_number", "town", "swiss_postal_code", "foreign_postal_code",
+             "privacy_accepted_at", "privacy_accepted_url"},
+        )
+        person.refresh_from_db()
+        self.assertEqual(person.status, "active")
+
     def test_a_registration_of_somebody_else_keeps_working_as_before(self):
         """The ordinary registration is not changed: the address of a plain pending registration is replaced."""
         from leg_platform.accounts import registration

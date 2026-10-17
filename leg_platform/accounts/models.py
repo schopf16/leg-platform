@@ -277,6 +277,8 @@ class UserQuerySet(models.QuerySet):
             # logic may write them (end_all_sessions, the password change, the administration).
             "session_version",
             "password_change_required",
+            # The mark of an invitation (D-087): written only by create_invited_user.
+            "invited_at",
         }
     )
 
@@ -393,7 +395,9 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
         user = self.model(email=email, invited_at=timezone.now(), **profile)
         user.set_unusable_password()
         user.full_clean(exclude=["password", "last_login"], validate_unique=False)
-        user.save(using=self._db)
+        # The mark is a controlled field: only this function may write it, and only at creation (L-1).
+        with user._account_change("invited_at"):
+            user.save(using=self._db)
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
@@ -610,6 +614,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         "is_superuser": False,
         "customer_number": None,
         "retention_obligation": False,
+        "invited_at": None,
     }
     # Written together whenever one of them is written, so that derived values never go stale.
     _DERIVATION_FIELDS = frozenset({"email", "status", "normalized_email", "is_active"})
@@ -1406,6 +1411,10 @@ class PendingEmailChange(models.Model):
     address = models.EmailField(max_length=EMAIL_MAX_LENGTH, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(db_index=True)
+    # The internal number of the staff account that made the request for the customer (D-087), else
+    # empty; the confirmation by the owner of the new address is logged with it (not a foreign key:
+    # numbers only, as in the security log).
+    requested_by = models.PositiveBigIntegerField(null=True, blank=True, editable=False)
 
     class Meta:
         # A name for the rights of this model in the lists of the administration (they are only
@@ -2289,6 +2298,8 @@ class SecurityEvent(models.Model):
         PERSON_INVITED = "person_invited", _("Person created and invited by staff")
         INVITATION_RESENT = "invitation_resent", _("Invitation sent again by staff")
         ACCOUNT_DATA_CHANGED_BY_STAFF = "account_data_changed_by_staff", _("Account data changed by staff")
+        # D-087, review L-8: the name of the grid operator is shown in every text of the management area.
+        GRID_OPERATOR_CHANGED = "grid_operator_changed", _("Grid operator changed")
 
     # Kept for the long period: misuse of privileges is often noticed late (D-018). The reset of
     # a second factor is long only for staff users and system administrators; the caller says so.
@@ -2310,6 +2321,7 @@ class SecurityEvent(models.Model):
             Event.LIST_PRINTED,
             # Staff changing the data of a customer: misuse is noticed late (D-087).
             Event.ACCOUNT_DATA_CHANGED_BY_STAFF,
+            Event.GRID_OPERATOR_CHANGED,
         }
     )
 

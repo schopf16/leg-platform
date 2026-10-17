@@ -191,6 +191,16 @@ class ReviewRoundTests(TestCase):
             client.post(url, {"scope": "list"})
         self.assertEqual(SecurityEvent.objects.filter(event="list_printed").count(), 1)
 
+    def test_the_printout_of_person_details_says_in_the_log_that_it_holds_the_iban(self):
+        """L-9: the details of a person hold the IBAN; the log line says so (no value); the list alone does not."""
+        client = self.login(self.staff)
+        url = reverse("management:persons_print")
+        with self.assertLogs("leg_platform.security", "WARNING") as logged, self.captureOnCommitCallbacks(execute=True):
+            client.post(url, {"scope": "all"})
+            client.post(url, {"scope": "list"})
+        self.assertIn("detail pages, with IBAN", logged.output[0])
+        self.assertNotIn("IBAN", logged.output[1])
+
     def test_a_list_with_too_many_entries_cannot_be_selected_from_and_never_ends_in_a_bare_400(self):
         client = self.login(self.staff)
         url = reverse("management:persons_print")

@@ -16,12 +16,27 @@ PURPOSE = b"LEG-Platform person IBAN v1"
 
 
 def encrypt_existing(apps, schema_editor):
-    from leg_platform.accounts.encryption import encrypt
+    """Encrypt every plain value; idempotent: a value that already decrypts (the migration ran before, or the
+    column holds tokens) is skipped (L-5). A value that is not ASCII stops the migration with the number of the
+    record (never the value); correct or clear it, then run migrate again."""
+    from leg_platform.accounts.encryption import DecryptionError, decrypt, encrypt
 
     PersonRecord = apps.get_model("community", "PersonRecord")
     for pk, value in list(PersonRecord.objects.exclude(iban_encrypted="").values_list("pk", "iban_encrypted")):
+        try:
+            decrypt(value, PURPOSE)
+        except DecryptionError:
+            pass
+        else:
+            continue
         number = "".join(value.replace("-", " ").split()).upper()
-        token = encrypt(number.encode("ascii"), PURPOSE) if number else ""
+        try:
+            token = encrypt(number.encode("ascii"), PURPOSE) if number else ""
+        except UnicodeEncodeError:
+            raise RuntimeError(
+                f"The IBAN of person record {pk} contains characters that are not ASCII and cannot be migrated. "
+                "Correct or clear the value in the column iban_encrypted, then run migrate again."
+            ) from None
         PersonRecord.objects.filter(pk=pk).update(iban_encrypted=token)
 
 

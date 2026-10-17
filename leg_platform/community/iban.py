@@ -23,6 +23,8 @@ from leg_platform.accounts.encryption import DecryptionError, decrypt, encrypt
 logger = logging.getLogger(__name__)
 
 PERSON_IBAN_PURPOSE = b"LEG-Platform person IBAN v1"
+# The encrypted payload of an IBAN bound to its account (L-7); the migration 0006 repeats it on purpose.
+BOUND_PREFIX = "v2|"
 IBAN_MAX_LENGTH = 34
 
 
@@ -53,15 +55,39 @@ def display(value):
     return " ".join(number[i : i + 4] for i in range(0, len(number), 4))
 
 
-def encrypt_iban(value):
-    """The encrypted text that is stored for an IBAN (normal form); "" for no IBAN."""
+def encrypt_iban(value, account_id):
+    """The encrypted text that is stored for an IBAN (normal form); "" for no IBAN.
+
+    The number of the account is part of the encrypted text (``v2|<account>|<IBAN>``, L-7): the stored text
+    cannot be copied to the record of another person, ``decrypt_iban`` refuses it there."""
     number = compact(value)
-    return encrypt(number.encode("ascii"), PERSON_IBAN_PURPOSE) if number else ""
+    if not number:
+        return ""
+    return encrypt(f"{BOUND_PREFIX}{int(account_id)}|{number}".encode("ascii"), PERSON_IBAN_PURPOSE)
 
 
-def decrypt_iban(token):
-    """The IBAN of a stored text; "" for none. ``DecryptionError`` if no key of the instance decrypts it."""
-    return decrypt(token, PERSON_IBAN_PURPOSE).decode("ascii") if token else ""
+def decrypt_iban(token, account_id):
+    """The IBAN of a stored text; "" for none. ``DecryptionError`` if no key of the instance decrypts it or if it
+    belongs to another account. A text without the account (made by the migration 0005, before L-7) is
+    accepted and is bound by migration 0006 or ``reencrypt_ibans``."""
+    if not token:
+        return ""
+    payload = decrypt(token, PERSON_IBAN_PURPOSE).decode("ascii")
+    return split_payload(payload, account_id)
+
+
+def split_payload(payload, account_id):
+    if not payload.startswith(BOUND_PREFIX):
+        return payload  # the form before the binding
+    _prefix, bound_to, number = payload.split("|", 2)
+    if bound_to != str(int(account_id)):
+        raise DecryptionError("The value belongs to another account.")
+    return number
+
+
+def is_bound(token):
+    """Whether a stored text holds the account (needs the key)."""
+    return decrypt(token, PERSON_IBAN_PURPOSE).decode("ascii").startswith(BOUND_PREFIX)
 
 
 def readable(record):

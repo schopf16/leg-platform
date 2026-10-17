@@ -13,14 +13,14 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.exceptions import ValidationError
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import RequestFactory, TestCase, override_settings, tag
 from django.utils import timezone
 
 from leg_platform.accounts import email_change, invitations, rate_limits
 from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.login_protection import axes_client_ip
-from leg_platform.accounts.models import MailJob, PendingEmailChange, SecurityEvent, VerificationToken
+from leg_platform.accounts.models import AccountIntegrityError, MailJob, PendingEmailChange, SecurityEvent, VerificationToken
 from leg_platform.accounts.tests.helpers import create_active_user, run_mail_queue, verification_path
 from leg_platform.community import history, iban, person_list, persons
 from leg_platform.community.history import HistoryEvent
@@ -85,6 +85,28 @@ class CreatePersonTests(TestCase):
         self.assertIn(f"actor {self.staff.pk}", line)
         for secret in ("Erika", "Neu", "Neuweg", "neu.person", "1234567"):
             self.assertNotIn(secret, line)
+
+    def test_the_invitation_mark_is_a_controlled_field_that_nothing_but_the_creation_writes(self):
+        """L-1: like the status or the rights, it cannot be changed by a save, a bulk update or a plain creation."""
+        person = self.create()
+        stale = User.objects.get(pk=person.pk)
+        stale.invited_at = None
+        with self.assertRaises(AccountIntegrityError):
+            stale.save()
+        with self.assertRaises(AccountIntegrityError):
+            User.objects.filter(pk=person.pk).update(invited_at=None)
+        self.plain.invited_at = timezone.now()
+        with self.assertRaises(AccountIntegrityError):
+            self.plain.save()
+        with self.assertRaises(AccountIntegrityError):
+            User(email="mark.person@example.org", invited_at=timezone.now()).save()
+        self.assertIsNotNone(User.objects.get(pk=person.pk).invited_at)
+        self.assertIsNone(User.objects.get(pk=self.plain.pk).invited_at)
+        # Every other save of the account leaves the mark as it is.
+        again = User.objects.get(pk=person.pk)
+        again.first_name = "Erica"
+        again.save()
+        self.assertIsNotNone(User.objects.get(pk=person.pk).invited_at)
 
     def test_only_a_staff_account_creates_a_person(self):
         for actor in (self.plain, self.gone, self.blocked, None):
@@ -402,7 +424,7 @@ class ChangeCustomerDataTests(TestCase):
         for part in (GOOD_IBAN, "CH93", "0076201162385"):
             self.assertNotIn(part, record.iban_encrypted)
         # The stored text differs per write (Fernet): there is nothing to look the IBAN up by.
-        self.assertNotEqual(record.iban_encrypted, iban.encrypt_iban(GOOD_IBAN))
+        self.assertNotEqual(record.iban_encrypted, iban.encrypt_iban(GOOD_IBAN, self.customer.pk))
         with self.assertRaises(Exception):
             PersonRecord.objects.filter(iban=GOOD_IBAN)
         self.assertFalse(PersonRecord.objects.filter(iban_encrypted__contains=GOOD_IBAN).exists())
@@ -447,9 +469,12 @@ class ChangeCustomerDataTests(TestCase):
             found = person_list.apply_search(person_list.base_queryset(), word)
             self.assertFalse(found.filter(pk=self.customer.pk).exists(), word)
 
-    def test_an_iban_that_cannot_be_decrypted_is_not_shown_and_can_be_replaced(self):
+    def test_an_iban_that_cannot_be_decrypted_is_not_shown_and_an_empty_submission_leaves_it(self):
+        """M-2: the form shows it empty; saving that empty value is "unchanged" (no write, no history, no event);
+        only a valid IBAN replaces it."""
         persons.update_payment_data(self.customer, self.staff, iban=GOOD_IBAN)
         record = PersonRecord.objects.get(person=self.customer)
+        before = record.iban_encrypted
         with override_settings(SECRET_KEY="another secret key for this test only, not used anywhere else, 123456"):
             with self.assertRaises(DecryptionError):
                 PersonRecord.objects.get(pk=record.pk).iban
@@ -457,8 +482,47 @@ class ChangeCustomerDataTests(TestCase):
                 self.assertEqual(iban.readable(PersonRecord.objects.get(pk=record.pk)), "")
             self.assertNotIn(GOOD_IBAN, "\n".join(logs.output))
             self.assertIn(str(self.customer.pk), "\n".join(logs.output))
-            persons.update_payment_data(self.customer, self.staff, iban="")
-            self.assertEqual(PersonRecord.objects.get(pk=record.pk).iban, "")
+            events = (HistoryEntry.objects.count(), SecurityEvent.objects.count())
+            self.assertEqual(persons.update_payment_data(self.customer, self.staff, iban=""), [])
+            self.assertEqual(persons.update_payment_data(self.customer, self.staff, iban="", paper_invoice=False), [])
+            self.assertEqual(PersonRecord.objects.get(pk=record.pk).iban_encrypted, before)
+            self.assertEqual((HistoryEntry.objects.count(), SecurityEvent.objects.count()), events)
+            # The other values of the dialog still save; a valid IBAN overwrites the unreadable one.
+            self.assertEqual(persons.update_payment_data(self.customer, self.staff, iban="", paper_invoice=True), ["paper_invoice"])
+            self.assertEqual(PersonRecord.objects.get(pk=record.pk).iban_encrypted, before)
+            self.assertEqual(persons.update_payment_data(self.customer, self.staff, iban=GOOD_IBAN), ["iban"])
+            self.assertEqual(PersonRecord.objects.get(pk=record.pk).iban, GOOD_IBAN)
+
+    def test_a_stored_iban_cannot_be_moved_to_the_record_of_another_person(self):
+        """L-7: the account is part of the encrypted text."""
+        persons.update_payment_data(self.customer, self.staff, iban=GOOD_IBAN)
+        token = PersonRecord.objects.get(person=self.customer).iban_encrypted
+        other = PersonRecord.objects.create(person=self.blocked, iban_encrypted=token)
+        with self.assertRaises(DecryptionError):
+            other.iban
+        with self.assertLogs("leg_platform.community.iban", "ERROR"):
+            self.assertEqual(iban.readable(other), "")
+        with self.assertRaises(ValueError):
+            PersonRecord(iban=GOOD_IBAN)  # no person yet: nothing to bind it to
+        # A text from before the binding (migration 0005) is readable and is bound by the command.
+        from leg_platform.accounts.encryption import encrypt
+
+        PersonRecord.objects.filter(pk=other.pk).update(iban_encrypted=encrypt(GOOD_IBAN.encode(), iban.PERSON_IBAN_PURPOSE))
+        self.assertEqual(PersonRecord.objects.get(pk=other.pk).iban, GOOD_IBAN)
+        out = StringIO()
+        call_command("reencrypt_ibans", stdout=out)
+        self.assertIn("1 IBANs were encrypted again", out.getvalue())
+        self.assertTrue(iban.is_bound(PersonRecord.objects.get(pk=other.pk).iban_encrypted))
+        self.assertEqual(PersonRecord.objects.get(pk=other.pk).iban, GOOD_IBAN)
+
+    def test_the_command_fails_when_an_iban_cannot_be_decrypted(self):
+        """L-6: a script must not go on and drop the old key."""
+        persons.update_payment_data(self.customer, self.staff, iban=GOOD_IBAN)
+        with override_settings(SECRET_KEY="another secret key for this test only, not used anywhere else, 123456"):
+            out = StringIO()
+            with self.assertRaises(CommandError):
+                call_command("reencrypt_ibans", stdout=out)
+            self.assertIn("1 could not be decrypted", out.getvalue())
 
     def test_a_replaced_secret_key_keeps_the_iban_readable_and_the_command_encrypts_it_again(self):
         persons.update_payment_data(self.customer, self.staff, iban=GOOD_IBAN)
@@ -498,12 +562,19 @@ class ChangeCustomerDataTests(TestCase):
                 self.assertNotIn("/email-change/verify/", message.body)
         event = SecurityEvent.objects.get(event=SecurityEvent.Event.EMAIL_CHANGE_REQUESTED)
         self.assertEqual((event.account_id, event.actor_id), (self.customer.pk, self.staff.pk))
+        # M-3: the request is also "account data changed by staff" (field name only), in the history too.
+        changed = SecurityEvent.objects.get(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF)
+        self.assertEqual((changed.account_id, changed.actor_id, changed.long_retention), (self.customer.pk, self.staff.pk, True))
         self.assertIn(
             {"fields": ["secondary_email"]}, [e.detail for e in history.entries_for(self.customer)]
         )
-        # Whoever holds the link confirms it; only then does the address change.
+        self.assertEqual(PendingEmailChange.objects.get(user=self.customer).requested_by, self.staff.pk)
+        # Whoever holds the link confirms it; only then does the address change. The log says who asked for it.
         token = VerificationToken.objects.get(user=self.customer, purpose=VerificationToken.Purpose.SECONDARY_EMAIL)
-        email_change.confirm_change(token)
+        with self.assertLogs("leg_platform.security", "WARNING") as logs, self.captureOnCommitCallbacks(execute=True):
+            email_change.confirm_change(token)
+        self.assertIn(f"requested by staff account {self.staff.pk}", "\n".join(logs.output))
+        self.assertNotIn("new.second", "\n".join(logs.output))
         after = self.reload(self.customer)
         self.assertEqual((after.email, after.secondary_email), ("customer.change@example.org", "new.second@example.org"))
 
@@ -532,6 +603,8 @@ class ChangeCustomerDataTests(TestCase):
         self.assertTrue(persons.change_second_email(request, self.customer, "", self.staff))
         self.assertEqual(self.reload(self.customer).secondary_email, "")
         self.assertTrue(MailJob.objects.filter(kind=MailJob.Kind.SECONDARY_EMAIL_CHANGED).exists())
+        removed = SecurityEvent.objects.get(event=SecurityEvent.Event.ACCOUNT_DATA_CHANGED_BY_STAFF)
+        self.assertEqual((removed.account_id, removed.actor_id), (self.customer.pk, self.staff.pk))
         key = rate_limits.ip_key(axes_client_ip(request))
         with patch.object(rate_limits, "MAIL_IP_LIMITS", ((1, timedelta(hours=1)),)):
             rate_limits.consume(rate_limits.SCOPE_MAIL_IP, key, rate_limits.MAIL_IP_LIMITS)  # the client has used its budget

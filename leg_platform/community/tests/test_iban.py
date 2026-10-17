@@ -7,6 +7,7 @@ from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase, tag
 
+from leg_platform.accounts.encryption import DecryptionError, encrypt
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.community import iban
 from leg_platform.community.models import PersonRecord
@@ -41,12 +42,18 @@ class IbanTests(SimpleTestCase):
         self.assertEqual(iban.display("ch93 0076"), "CH93 0076")
         self.assertEqual(iban.display(""), "")
 
-    def test_encryption_is_reversible_and_not_deterministic(self):
-        first, second = iban.encrypt_iban(GOOD), iban.encrypt_iban("ch93 0076 2011 6238 5295 7")
+    def test_encryption_is_reversible_not_deterministic_and_bound_to_the_account(self):
+        first, second = iban.encrypt_iban(GOOD, 7), iban.encrypt_iban("ch93 0076 2011 6238 5295 7", 7)
         self.assertNotEqual(first, second)
-        self.assertEqual((iban.decrypt_iban(first), iban.decrypt_iban(second)), (GOOD, GOOD))
-        self.assertEqual((iban.encrypt_iban(""), iban.decrypt_iban("")), ("", ""))
+        self.assertEqual((iban.decrypt_iban(first, 7), iban.decrypt_iban(second, 7)), (GOOD, GOOD))
+        self.assertEqual((iban.encrypt_iban("", 7), iban.decrypt_iban("", 7)), ("", ""))
         self.assertNotIn("CH93", first)
+        # L-7: the text of one account is refused for another; a text from before the binding is accepted.
+        with self.assertRaises(DecryptionError):
+            iban.decrypt_iban(first, 8)
+        legacy = encrypt(GOOD.encode(), iban.PERSON_IBAN_PURPOSE)
+        self.assertEqual(iban.decrypt_iban(legacy, 8), GOOD)
+        self.assertEqual((iban.is_bound(first), iban.is_bound(legacy)), (True, False))
 
 
 @tag("mariadb")
@@ -77,3 +84,44 @@ class MigrationDataFunctionTests(TestCase):
         migration.decrypt_existing(apps, None)
 
         self.assertEqual((self.raw(self.first), self.raw(self.second), self.raw(self.empty)), (GOOD, "DE89370400440532013000", ""))
+
+    def test_running_the_encryption_again_changes_nothing_and_a_non_ascii_value_stops_it_without_showing_it(self):
+        """L-5: idempotent (a value that decrypts is skipped), and a clear message with the record number only."""
+        PersonRecord.objects.filter(pk=self.first.pk).update(iban_encrypted=GOOD)
+        migration.encrypt_existing(apps, None)
+        once = self.raw(self.first)
+        migration.encrypt_existing(apps, None)
+        self.assertEqual(self.raw(self.first), once)
+        PersonRecord.objects.filter(pk=self.second.pk).update(iban_encrypted="ÄÄ93 SECRET")
+        with self.assertRaises(RuntimeError) as caught:
+            migration.encrypt_existing(apps, None)
+        self.assertIn(f"person record {self.second.pk}", str(caught.exception))
+        self.assertNotIn("SECRET", str(caught.exception))
+
+    def test_the_binding_migration_binds_every_token_and_is_reversible_and_idempotent(self):
+        """L-7: migration 0006 on the data of 0005."""
+        PersonRecord.objects.filter(pk=self.first.pk).update(iban_encrypted=GOOD)
+        migration.encrypt_existing(apps, None)
+        legacy = self.raw(self.first)
+        self.assertFalse(iban.is_bound(legacy))
+        binder = importlib.import_module("leg_platform.community.migrations.0006_bind_iban_to_account")
+        self.assertEqual((binder.PURPOSE, binder.PREFIX), (iban.PERSON_IBAN_PURPOSE, iban.BOUND_PREFIX))
+
+        binder.bind(apps, None)
+
+        bound = self.raw(self.first)
+        self.assertTrue(iban.is_bound(bound))
+        self.assertEqual(PersonRecord.objects.get(pk=self.first.pk).iban, GOOD)
+        binder.bind(apps, None)
+        self.assertEqual(self.raw(self.first), bound)  # skipped, not made again
+        self.assertEqual(self.raw(self.empty), "")
+        binder.unbind(apps, None)
+        self.assertFalse(iban.is_bound(self.raw(self.first)))
+        self.assertEqual(PersonRecord.objects.get(pk=self.first.pk).iban, GOOD)
+
+    def test_a_token_that_cannot_be_decrypted_stops_the_binding_with_the_record_number(self):
+        PersonRecord.objects.filter(pk=self.first.pk).update(iban_encrypted="gAAAAnotatoken")
+        binder = importlib.import_module("leg_platform.community.migrations.0006_bind_iban_to_account")
+        with self.assertRaises(RuntimeError) as caught:
+            binder.bind(apps, None)
+        self.assertIn(f"person record {self.first.pk}", str(caught.exception))
