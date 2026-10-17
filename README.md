@@ -2,119 +2,94 @@
 
 Web application for local electricity communities (German: "lokale Elektrizitätsgemeinschaft", LEG) in Switzerland.
 
-The project was initiated by the LEG Ittigen. The software is developed neutrally, so that other interested municipalities can run their own, independent instance from the same code base with their own configuration (`docs/DECISIONS.md`, D-013 and D-014). References to Ittigen in the documentation refer to the initiating instance.
+Initiated by the LEG Ittigen, developed neutrally. Other municipalities run their own, independent instance from the same code base with their own configuration (`docs/DECISIONS.md`, D-013, D-014). References to Ittigen mean the initiating instance.
 
 ## Project Goal
 
-The first phase creates a secure, extensible foundation. LEG domain functions, billing and financial functions are explicitly not part of this phase.
+The first phase creates a secure, extensible foundation. LEG domain functions, billing and financial functions are not part of it.
 
 ## Technology Direction
 
-* Backend: Python and Django
-* Database: MariaDB (minimum 10.11, used 12.3 LTS; MySQL is not supported, D-002, D-030)
-* User interface: Tabler, responsive for desktop computers, tablets and mobile phones; design language in `docs/DESIGN.md`
-* System administration: Django admin
-* Outgoing email: Microsoft Graph, configured in the Django admin
-* Login: email address with password
-* Two-factor authentication: authenticator app (TOTP), mandatory for staff users and system administrators; a later switch to AGOV as the second factor is prepared (approval requested, answer pending)
-* Development: local, then stage, later production
-* Hosting of the Ittigen instance: Infomaniak "VPS Lite 1" (decided by the project owner on 2026-10-11, D-008); the remaining hosting details are open
-* Deployment model: one independent instance per municipality
-* Supported versions: minimum versions only, as old as technically possible while still receiving vendor security updates (D-015)
-* Language of software and documentation: English (code, database, comments, commits, documents, etc.)
-* User interface language: Swiss German (`de-ch`, no "ß") by default, prepared for additional languages
+* Python, Django, MariaDB (minimum 10.11, used 12.3 LTS; MySQL not supported; D-002, D-030). Tabler (responsive; `docs/DESIGN.md`). Django admin for system administration.
+* Email: Microsoft Graph, configured in the Django admin. Login: email address with password.
+* Two-factor: authenticator app (TOTP), mandatory for staff users and system administrators. A later switch to AGOV is prepared (approval requested, answer pending).
+* Environments: local, stage, production. Hosting of the Ittigen instance: Infomaniak "VPS Lite 1" (owner, 2026-10-11, D-008); other hosting details open.
+* One independent instance per municipality. Minimum versions only: as old as possible while still receiving vendor security updates (D-015).
+* Software and documentation in English. User interface: Swiss German (`de-ch`, no "ß") by default, prepared for more languages.
 
 ## Binding Rules
 
-1. `CONDUCT.md` contains the protected rules of conduct for all AI agents ("don't be evil").
-2. `AGENTS.md` contains the shared development rules, including the language rules and the obligation to work fact-based without assumptions.
-3. `CLAUDE.md` is the entry point for Claude Code.
-4. `docs/SECURITY.md` contains the binding security policy.
-5. `docs/PROJECT.md` defines the scope.
-6. `docs/ACCEPTANCE.md` defines the acceptance criteria.
-7. `docs/DECISIONS.md` records all decisions with their sources.
-8. `docs/DESIGN.md` defines the binding design language of the user interface (D-024).
-9. `docs/CODEMAP.md` maps the code base (what is where, where to change what, conventions, test map); with `CONDUCT.md` and `AGENTS.md` it is the fixed reading core of every agent.
+1. `CONDUCT.md`: protected rules of conduct for all AI agents ("don't be evil").
+2. `AGENTS.md`: shared development rules, language rules, fact-based work without assumptions.
+3. `CLAUDE.md`: entry point for Claude Code.
+4. `docs/SECURITY.md`: binding security policy.
+5. `docs/PROJECT.md`: scope. `docs/ACCEPTANCE.md`: acceptance criteria.
+6. `docs/DECISIONS.md`: all decisions with sources.
+7. `docs/DESIGN.md`: binding design language (D-024).
+8. `docs/CODEMAP.md`: what is where, where to change what, conventions, test map. With `CONDUCT.md` and `AGENTS.md` it is the fixed reading core of every agent.
 
-Read the relevant rules before every larger change; `AGENTS.md`, section 1, has the topic index that tells which documents a task needs.
+`AGENTS.md`, section 1, has the topic index that tells which documents a task needs.
 
 ## Operation Documents
 
-* `docs/STARTUP.md`: start, check, use and stop the complete local environment (Windows, PowerShell), for developers and for the designer and tester agents; test commands and troubleshooting.
-* `docs/DEPLOYMENT.md`: entry point for "deploy to stage" and "deploy to production" (section 0.5), with a reusable non-secret instance record, a separate update procedure and one-time VPS installation instructions (D-053, D-064). Production requires explicit release approval. The current stage configuration and the revised procedure still need live verification.
-* `docs/INSTALLATION.md`: configuration variables, local setup of MariaDB, Microsoft Graph steps and the address directory.
-* `docs/OPERATIONS.md`: roles, rules, CI and the step list for stage and production.
+* `docs/STARTUP.md`: start, check, use and stop the local environment (Windows, PowerShell); test commands; troubleshooting.
+* `docs/DEPLOYMENT.md`: entry point for "deploy to stage" and "deploy to production" (section 0.5), reusable non-secret instance record, update procedure, one-time VPS installation (D-053, D-064). Production needs explicit release approval. The current stage configuration and the revised procedure still need live verification.
+* `docs/INSTALLATION.md`: configuration variables, local MariaDB setup, Microsoft Graph steps, address directory.
+* `docs/OPERATIONS.md`: roles, rules, CI, step list for stage and production.
 
 ## First Phase
 
-* Login page as the entry point; no public home page, information about the LEG is provided by its own website (D-025)
-* Registration and email verification
-* Login with email address, and logout, protected against automated attacks
-* Two-factor authentication with an authenticator app (mandatory for staff users and system administrators, optional for users)
-* Password change and password reset
-* Personal user profile: viewing, editing and deleting one's own account
-* All user functions fully usable on mobile phones
-* Account lifecycle including deactivation for later retention obligations
-* User management, role management and role assignment
-* Microsoft Graph email configuration in the Django admin, including a test send
-* Security logging
-* Instance configuration outside the code, so that further instances can be set up
-* Secure baseline configuration and automated tests
-* Preparation for AGOV as the second factor: the completed second factor is checked centrally and independently of the method; this is intended to allow a switch from TOTP to AGOV without changing the architecture or weakening security, and a switch requires a new security review (`docs/PROJECT.md`, "AGOV and Passkeys")
+Scope: `docs/PROJECT.md`. In short: login page as entry point (no public home page, D-025); registration with email verification; login protected against automated attacks; password change and reset; two-factor (TOTP, mandatory for staff users and system administrators); own profile (view, edit, delete); account lifecycle with deactivation for retention obligations; user, role and role-assignment management; Microsoft Graph configuration with a test send; security logging; instance configuration outside the code; all user functions usable on mobile phones; AGOV preparation (central second-factor check; a switch needs a new security review, `docs/PROJECT.md`, "AGOV and Passkeys").
 
 ## Not Part of the First Phase
 
-* LEGs as entities and all domain functions (phase 2 starts with them, see "Current Status" and D-077)
-* Billing logic and invoicing
-* Calculation of electricity costs or energy distribution
-* Productive financial processes
-* Bank file processing
-* Productive payout processes
-* AGOV integration (only prepared) and passkeys
-* Multi-tenancy (several municipalities in one instance)
-* Additional user interface languages and language selection
-* Public home page and publication of aggregated figures (D-025)
-
-## Principles
-
-Security, data protection and server-side access control are part of development from the start. A function is not considered secure merely because it works.
-
-Established, maintained solutions are preferred over custom developments, especially for security functions.
-
-The software is written in English without exception. Only the user interface is language-dependent.
-
-No assumptions are made. Decisions are based on verified facts from official sources. When in doubt, ask.
+* LEGs as entities and all domain functions (phase 2 starts with them, D-077; see "Current Status").
+* Billing, invoicing, calculation of electricity costs or energy distribution, productive financial processes, bank file processing, payout processes.
+* AGOV integration (only prepared) and passkeys.
+* Multi-tenancy. Additional UI languages and language selection. Public home page and publication of aggregated figures (D-025).
 
 ## Licence
 
-LEG-Platform is licensed under the BSD 3-Clause License (`LICENSE`), the same licence as Django (`docs/DECISIONS.md`, D-029). The dependencies are installed separately and keep their own licences; `mysqlclient` is licensed under GPL-2.0-or-later. The licences of all dependencies are listed in `docs/THIRD_PARTY_LICENSES.md`. This information is not legal advice.
+BSD 3-Clause License (`LICENSE`), the same as Django (D-029). Dependencies are installed separately and keep their own licences (`mysqlclient`: GPL-2.0-or-later); all are listed in `docs/THIRD_PARTY_LICENSES.md`. No legal advice.
 
 ## Current Status
 
-**What exists.** Phase 1 (login and entry pages, the frame with start page and task tiles, three-step registration, the profile in cards with a second email address and the second factor, address suggestions, security notifications, portal settings, error pages, grouped administration) and phase 2, the management area ("Verwaltung") for staff users (locations, metering points, LEGs, persons, overview, PDF printing, "Person anlegen" and support dialogs; open to every active staff user with a completed second factor, D-086). Details: `docs/DECISIONS.md`. The automated tests pass locally (`scripts/test.ps1`, `docs/STARTUP.md` section 13). The work is **not yet formally accepted**: `docs/ACCEPTANCE.md` is ticked only for what has been verified on a real system.
+**What exists.**
 
-The imprint and the privacy notice are not part of the portal: the portal only links their two addresses (portal settings); the operator writes and maintains the texts elsewhere (D-022, D-074). Notes for the operator are in `docs/DEPLOYMENT.md`, section 14.
+* Phase 1: login and entry pages, the frame with start page and task tiles, three-step registration, the profile in cards with a second email address and the second factor, address suggestions, security notifications, portal settings, error pages, grouped administration.
+* Phase 2: the management area ("Verwaltung") for staff (locations, metering points, LEGs, persons, overview, PDF printing, "Person anlegen", support dialogs). Open to every active staff user with a completed second factor (D-086). Details: `docs/DECISIONS.md`.
+* The automated tests pass locally (`scripts/test.ps1`, `docs/STARTUP.md` section 13).
+* The work is **not yet formally accepted**: `docs/ACCEPTANCE.md` is ticked only for what was verified on a real system.
+* Imprint and privacy notice are not part of the portal. The portal only links their two addresses (portal settings); the operator maintains the texts elsewhere (D-022, D-074). Operator notes: `docs/DEPLOYMENT.md`, section 14.
 
-**Not built and deliberately open in the management area:** "Anmeldung starten" and the change of the login address by staff (D-081, D-087 item 10), billing.
+**Not built, deliberately open in the management area:** "Anmeldung starten", change of the login address by staff (D-081, D-087 item 10), billing.
 
-**Open, by who acts**
+**Open, by who acts.**
 
-* **Owner:** the AGOV answer (waiting, nothing to do until it arrives, D-004); the own human review of the security-critical changes (D-019): second factor, reset, account lifecycle, administration, stage equal to production (D-070), the logo upload and the right to change the portal settings (D-073), the access rule of the management area (D-086).
-* **Operator (Infomaniak, owner statement D-074):** confirm the legal points of the retention flag that could not be verified with the tools (version of the OR in force, that the instance operator is obliged under Art. 957, the date from which an account may be deleted again; D-086 item 2), and the **verification on a real system** (not possible on the development machine), listed next.
-Verification on a real system:
+* **Owner:**
+  * the AGOV answer (waiting; D-004);
+  * the own human review of the security-critical changes (D-019): second factor, reset, account lifecycle, administration, stage equal to production (D-070), logo upload and the right to change the portal settings (D-073), the access rule of the management area (D-086).
+* **Operator (Infomaniak, D-074):**
+  * confirm the legal points of the retention flag that could not be verified with the tools: version of the OR in force, that the instance operator is obliged under Art. 957, the date from which an account may be deleted again (D-086 item 2);
+  * the verification on a real system (below; not possible on the development machine).
 
-* Inspect and record the existing stage setup (D-064); every step of `docs/DEPLOYMENT.md` during the initial setup.
-* Microsoft Graph delivery with real credentials; then open one link mail in Outlook, Apple Mail, Gmail and a Swiss webmail and click the link (D-069).
-* Address directory: a real import (time, file size, `StateDirectory=`, file modes) and the query plans of the lookup (`docs/DEPLOYMENT.md` section 10.2); the bounds 1000 streets, 300 comparisons, 0.25 s and the threshold 0.75 are not measured; `AXES_IPWARE_PROXY_COUNT` must be correct (`docs/INSTALLATION.md`).
+**Verification on a real system.**
+
+* Inspect and record the existing stage setup (D-064). Every step of `docs/DEPLOYMENT.md` during the initial setup.
+* Microsoft Graph delivery with real credentials. Then open one link mail in Outlook, Apple Mail, Gmail and a Swiss webmail and click the link (D-069).
+* Address directory: a real import (time, file size, `StateDirectory=`, file modes) and the query plans of the lookup (`docs/DEPLOYMENT.md` section 10.2). Not measured: the bounds 1000 streets, 300 comparisons, 0.25 s and the threshold 0.75. `AXES_IPWARE_PROXY_COUNT` must be correct (`docs/INSTALLATION.md`).
 * Real host: HTTPS, HSTS, cookies, request body limits including the `3m` logo upload location, proxy and client IP check (F-1 in `docs/DEPLOYMENT.md`; ASGI needs the proxy body limit, D-052), supervised services and the scheduler (D-008).
-* Real phones, browsers and screen readers (WCAG 2.2 AA is not established by automated tests), an SVG logo with style attributes under the sandbox policy, the live colour preview under the CSP, the portal settings at 375 px (D-073).
-* The automatic first start (D-076): `leg-setup.service` (`manage.py setup_instance`) on a real server with an **empty** MariaDB database and only the environment file; a restart of the web service runs the unit again (`docs/DEPLOYMENT.md`, section 8.0, V3a, V4a); the first login forces password change and second factor; the password line is removed afterwards. Not run on a real server yet.
+* Real phones, browsers and screen readers (WCAG 2.2 AA is not established by automated tests); an SVG logo with style attributes under the sandbox policy; the live colour preview under the CSP; the portal settings at 375 px (D-073).
+* The automatic first start (D-076): `leg-setup.service` (`manage.py setup_instance`) on a real server with an **empty** MariaDB database and only the environment file. A restart of the web service runs the unit again (`docs/DEPLOYMENT.md`, section 8.0, V3a, V4a). The first login forces password change and second factor; the password line is removed afterwards. Not run on a real server yet.
 
-**Later phases, not built:** Mitteilungen, Standorte, Rechnungen and Energie (menu entries marked "später", WL-27); proof of work for the mail forms (ALTCHA, D-069); address suggestions on the account page of the administration (D-069); the notification of system administrators when the portal addresses change (D-073). See also "Not Part of the First Phase".
+**Later phases, not built:** Mitteilungen, Standorte, Rechnungen, Energie (menu entries marked "später", WL-27); proof of work for the mail forms (ALTCHA, D-069); address suggestions on the account page of the administration (D-069); notification of system administrators when the portal addresses change (D-073). See "Not Part of the First Phase".
 
-**Rule for developers:** a new admin URL must be wrapped with `admin_site.admin_view()` (the route walk test fails otherwise). A new management URL (`/management/`) must use `ManagementAccessMixin` or `@management_view` from `leg_platform/management/access.py` (the route walk test of `leg_platform/management/tests/test_access.py` fails otherwise); there is no permission to name (D-086), and a new page adds one line to `leg_platform/management/navigation.py`.
+**Rule for developers:**
 
-Deployment gates: no stage or production instance is deployed before
+* A new admin URL is wrapped with `admin_site.admin_view()` (the route walk test fails otherwise).
+* A new management URL (`/management/`) uses `ManagementAccessMixin` or `@management_view` from `leg_platform/management/access.py` (route walk test `leg_platform/management/tests/test_access.py`). There is no permission to name (D-086). A new page adds one line to `leg_platform/management/navigation.py`.
+
+**Deployment gates.** No stage or production instance is deployed before:
 
 1. Microsoft Graph email delivery is tested with real credentials (a real test send) and restricted to the sender mailbox (D-006, D-028). Stage delivers like production, without a recipient restriction (D-070).
 2. The owner's human review of the second-factor, reset, lifecycle and administration changes (D-019) and a passed CI run of the current code on both jobs.

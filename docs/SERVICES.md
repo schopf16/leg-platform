@@ -1,10 +1,19 @@
 # Service Register – LEG-Platform
 
-The register is in English (the privacy notice and the imprint are written and maintained by the operator elsewhere and only linked from the portal, D-074); the owner's privacy notice is built from it (`LEG-Design-Vorgaben/legal/VORGABEN.md`, section 5a, D-056).
+The register is in English. The privacy notice and the imprint are maintained by the operator elsewhere and only linked from the portal (D-074). The owner's privacy notice is built from this register (`LEG-Design-Vorgaben/legal/VORGABEN.md`, section 5a, D-056).
 
-**Rule.** Whenever the software uses a service that receives or stores personal data, it is recorded here **before** the feature goes live: a backup service, an email or SMS provider, an API that receives user data (address check, payment, bot check), an error tracker, log service or analytics tool, and a font, script or CDN host that a page loads from another server. Each entry gives: service, provider, purpose, data categories, country or region, encryption and key holder, contract basis. The developer adds the entry, the security review checks that it is there, and the owner confirms the entry before the page is published. Every new entry is also named in the change description.
+**Rule.** Record a service here **before** the feature goes live when it receives or stores personal data. Examples:
 
-Entries marked **open** are not verified by the developer: the owner or the operator of the instance has to fill them in. The developer did not guess them.
+* backup service, email or SMS provider
+* API that receives user data (address check, payment, bot check)
+* error tracker, log service, analytics tool
+* font, script or CDN host that a page loads from another server
+
+Each entry gives: service, provider, purpose, data categories, country or region, encryption and key holder, contract basis.
+
+* The developer adds the entry. The security review checks it. The owner confirms it before the page is published.
+* Name every new entry in the change description.
+* **open** = not verified. The owner or the operator fills it in. Never guess.
 
 ## 1. Services that receive personal data
 
@@ -28,7 +37,7 @@ Entries marked **open** are not verified by the developer: the owner or the oper
 
 ## 3. Links to other websites (the portal sends no data)
 
-The footer links "Datenschutz", "Impressum" and the host of the website of the instance open the addresses that the administrator maintains (portal settings, D-056) in a new tab with `rel="noopener noreferrer"`. The portal sends no data to these sites; the browser of the visitor connects to them only after a click.
+The footer links "Datenschutz", "Impressum" and the website of the instance open the addresses of the portal settings (D-056) in a new tab with `rel="noopener noreferrer"`. The portal sends no data. The browser connects only after a click.
 
 ## 4. How to add an entry
 

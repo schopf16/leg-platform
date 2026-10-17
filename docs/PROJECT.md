@@ -106,19 +106,14 @@ Defined in D-016:
 
 ## Access Levels and Roles
 
-The role model is D-012; levels and enforcement: `docs/ARCHITECTURE.md`, "Users and Roles".
+The role model is D-012; levels and enforcement: `docs/ARCHITECTURE.md`, "Users and Roles"; rules: `AGENTS.md`, section 6, and `docs/SECURITY.md`, section 4.
 
-### Fixed Access Levels
-
-Two-factor is mandatory for system administrators and staff users, optional for authenticated users. Only system administrators manage roles and permissions, assign roles and change `is_staff`, `is_superuser` and direct permissions; staff users never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin) and never change another account's password, email address or second factor.
-
-### Further Roles
-
-No further roles are defined or hard-coded. They are created later in the admin as Django groups, named freely and linked to permissions; authorization checks use permissions, never role names. Roles are never implemented by granting superuser status.
+* **Fixed access levels.** Two-factor is mandatory for system administrators and staff users, optional for authenticated users. Only system administrators manage roles and permissions, assign roles and change `is_staff`, `is_superuser` and direct permissions. Staff users never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin) and never change another account's password, email address or second factor.
+* **Further roles.** None is defined or hard-coded. They are created later in the admin as Django groups, named freely and linked to permissions. Authorization checks use permissions, never role names. Roles are never implemented by granting superuser status.
 
 ## Instances
 
-Each municipality runs its own, independent instance (D-013): own database, configuration, users and administrators; no shared data. A person using several instances has a separate account in each. The application runs on its own host name (e.g. a subdomain of the LEG's website), never under a path of another website; the LEG's website links to the login page (D-025). Operation, updates, backups and data are the operator's responsibility; set-up: `docs/ARCHITECTURE.md`, "Deployment Model".
+Each municipality runs its own, independent instance (D-013): own database, configuration, users and administrators; no shared data. A person using several instances has a separate account in each. The application runs on its own host name (e.g. a subdomain of the LEG's website), never under a path of another website; the LEG's website links to the login page (D-025). Operation, updates, backups and data are the operator's responsibility. Set-up: `docs/ARCHITECTURE.md`, "Deployment Model".
 
 ## First System Administrator
 
@@ -130,7 +125,12 @@ The initial account is created by a controlled command on the server (D-005, D-0
 
 ## Email
 
-Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email"). Security notifications tell the person to contact the operator immediately if they did not request the change, name the instance's contact information where configured, and do not invite a reply (D-038). They greet by first and last name only for a person with a suitable name and only at addresses belonging to the account at that time, otherwise neutrally; the name is blanked at once for a deleted or deactivated account (D-068; `docs/DESIGN.md`, section 8). The owner of the mailbox of a confirmed second address learns the account holder's name (D-068, L4; input for the privacy notice). The application is restricted to the sender mailbox in Microsoft Entra / Exchange Online (installation guide, which also describes the procedure after a report of an unrequested change). Stage delivers like production (D-070).
+Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email"; rules: `docs/SECURITY.md`, sections 3 and 8). Stage delivers like production (D-070).
+
+* Security notifications tell the person to contact the operator immediately if they did not request the change, name the instance's contact information where configured, and do not invite a reply (D-038).
+* They greet by first and last name only for a person with a suitable name and only at addresses belonging to the account at that time, otherwise neutrally. The name is blanked at once for a deleted or deactivated account (D-068; `docs/DESIGN.md`, section 8).
+* The owner of the mailbox of a confirmed second address learns the account holder's name (D-068, L4; input for the privacy notice).
+* The application is restricted to the sender mailbox in Microsoft Entra / Exchange Online (installation guide, which also describes the procedure after a report of an unrequested change).
 
 ## AGOV and Passkeys
 
