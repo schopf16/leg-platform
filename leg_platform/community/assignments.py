@@ -22,7 +22,7 @@ from django.utils import timezone
 from leg_platform.accounts import security_log
 from leg_platform.community import history
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import LegAssignment, MeteringPoint, PersonAssignment
+from leg_platform.community.models import Leg, LegAssignment, MeteringPoint, PersonAssignment
 
 PERSON = "person"
 LEG = "leg"
@@ -48,7 +48,7 @@ _KINDS = {
 class AssignmentError(Exception):
     """A change that the rules refuse. ``code`` is one of: ``starts_not_after_previous``,
     ``end_before_start``, ``already_ended``, ``not_deletable``, ``not_a_person``,
-    ``person_not_active``."""
+    ``person_not_active``, ``leg_archived`` (D-085), ``not_related``."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -91,6 +91,11 @@ def assign(kind, metering_point, subject, valid_from, actor=None, today=None):
     model = spec["model"]
     today = today or timezone.localdate()
     with transaction.atomic():
+        if kind == LEG:
+            # An archived LEG takes no new assignment (D-085). The LEG is locked first, as ``switch_leg`` does
+            # (the same order of locks everywhere).
+            if Leg.objects.select_for_update().get(pk=subject.pk).is_archived:
+                raise AssignmentError("leg_archived")
         locked = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
         if kind == PERSON:
             subject = _lock_person(subject)

@@ -4171,3 +4171,9 @@ msgstr "Liste gedruckt"
 
 msgid "Location changed"
 msgstr "Standort geändert"
+
+msgid "This location is archived."
+msgstr "Dieser Standort ist archiviert."
+
+msgid "The location or the LEG is archived."
+msgstr "Der Standort oder die LEG ist archiviert."

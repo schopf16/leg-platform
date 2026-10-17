@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from leg_platform.community import assignments, history
+from leg_platform.community import archived, assignments, history
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import HistoryEntry, MeteringPoint
+from leg_platform.community.models import HistoryEntry, Leg, Location, MeteringPoint
 from leg_platform.community.status import MeteringPointStatus
 
 
@@ -44,6 +44,12 @@ def create_metering_point(*, direction, location=None, number=None, leg=None, ac
     metering_point.full_clean(validate_unique=False)
     try:
         with transaction.atomic():
+            if leg is not None:
+                # Locked first, as everywhere (``assignments.assign``); an archived LEG is refused there.
+                Leg.objects.select_for_update().get(pk=leg.pk)
+            if location is not None:
+                # A location that is archived is read-only: no metering point is created at it (D-085).
+                archived.ensure_open(Location.objects.select_for_update().get(pk=location.pk), archived.LOCATION)
             if number:
                 existing = find_by_number(metering_point.number)
                 if existing is not None:

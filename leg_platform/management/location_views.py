@@ -19,6 +19,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views import View
 
+from leg_platform.community import assignments as assignment_rules
 from leg_platform.community import (
     history,
     location_list,
@@ -302,9 +303,9 @@ class LocationDetailView(ManagementAccessMixin, View):
         see_legs = user.has_perm(VIEW_LEG)
         rows, persons = location_list.details([location], today, see_persons=see_persons, see_legs=see_legs)
         points = rows[location.pk]
-        can_change = user.has_perm(CHANGE)
-        deletable = locations.can_delete(location)
-        assignments = []
+        may_change = user.has_perm(CHANGE)
+        # An archived location is read-only (D-085): no edit buttons, only "Restore".
+        can_change = may_change and not location.is_archived
         deletable = locations.can_delete(location)
         assignments = []
         if see_persons:
@@ -340,11 +341,11 @@ class LocationDetailView(ManagementAccessMixin, View):
             ],
             "back_url": return_url(request, reverse("management:locations")),
             "can_change": can_change,
-            "can_add_point": user.has_perm("community.add_meteringpoint"),
+            "can_add_point": can_change and user.has_perm("community.add_meteringpoint"),
             "can_edit_circuit": user.has_perm("community.change_transformercircuit"),
             "can_add_circuit": can_change and user.has_perm("community.add_transformercircuit"),
-            "show_delete": deletable and user.has_perm(DELETE),
-            "show_archive": can_change and not (deletable and user.has_perm(DELETE)),
+            "show_delete": deletable and user.has_perm(DELETE) and not location.is_archived,
+            "show_archive": may_change and (location.is_archived or not (deletable and user.has_perm(DELETE))),
             "suggestion_text": "",
             "see_persons": see_persons,
             "see_legs": see_legs,
@@ -464,8 +465,25 @@ class LocationCreateView(DialogView):
         return redirect(self.back(request))
 
 
-class LocationObjectDialog(DialogView):
-    """A dialog about one location."""
+class ArchivedLocationGuard:
+    """An archived location is read-only (D-085): every request that changes it is refused here, before the
+    handler, with a message in the style of D-079, and the person goes back to the page. A view that must
+    work on an archived location (the restore) sets ``allow_archived``."""
+
+    allow_archived = False
+
+    def refusal(self, request, *args, **kwargs):
+        if self.allow_archived:
+            return None
+        pk = kwargs["pk"]
+        if get_object_or_404(Location, pk=pk).is_archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(return_url(request, reverse("management:locations_detail", args=[pk])))
+        return None
+
+
+class LocationObjectDialog(ArchivedLocationGuard, DialogView):
+    """A dialog about one location (refused for an archived one, D-085)."""
 
     def location(self):
         return get_object_or_404(Location.objects.select_related("transformer_circuit"), pk=self.kwargs["pk"])
@@ -508,6 +526,9 @@ class LocationAddressView(LocationObjectDialog):
                 location, **form.address(), address_addition=form.cleaned_data["address_addition"],
                 actor=request.user, merge=confirmed, merge_target_id=form.target_id(),
             )
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(reverse("management:locations_detail", args=[location.pk]))
         except locations.MergeRefused:
             form.add_error(None, _("This address already exists."))
             return self.render_dialog(request, form)
@@ -543,9 +564,11 @@ class LocationRemarkView(LocationObjectDialog):
         return RemarkForm(data, initial={"remark": self.location().remark})
 
     def save(self, request, form):
-        location = self.location()
-        location.remark = form.cleaned_data["remark"].strip()
-        location.save(update_fields=["remark", "updated_at"])
+        try:
+            locations.update_remark(self.location(), form.cleaned_data["remark"], request.user)
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
@@ -597,7 +620,11 @@ class LocationCircuitNewView(CircuitDialog, LocationObjectDialog):
         }
 
     def use(self, request, circuit):
-        locations.set_circuit(self.location(), circuit, request.user)
+        try:
+            locations.set_circuit(self.location(), circuit, request.user)
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
@@ -672,6 +699,12 @@ class LocationMeteringPointNewView(LocationObjectDialog):
             # The page shows the existing metering point (the notice of the dialog).
             form.duplicate = duplicate.existing
             return None
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
+            return redirect(reverse("management:locations_detail", args=[self.kwargs["pk"]]))
+        except assignment_rules.AssignmentError:
+            form.add_error(None, _("This LEG is archived."))
+            return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
@@ -681,14 +714,17 @@ class LocationMeteringPointNewView(LocationObjectDialog):
         return super().render_dialog(request, form, duplicate=summary, **extra)
 
 
-class LocationPostView(ManagementAccessMixin, View):
+class LocationPostView(ArchivedLocationGuard, ManagementAccessMixin, View):
     """A button of the detail page: POST only, then back to the page."""
 
     http_method_names = ["post"]
 
     def post(self, request, pk):
         location = get_object_or_404(Location, pk=pk)
-        self.act(request, location)
+        try:
+            self.act(request, location)
+        except locations.Archived:
+            messages.error(request, _("This location is archived."))
         return redirect(return_url(request, reverse("management:locations_detail", args=[pk])))
 
     def act(self, request, location):
@@ -712,7 +748,10 @@ class LocationCircuitView(LocationPostView):
 
 
 class LocationArchiveView(LocationPostView):
+    """Archive and restore: the only change that an archived location accepts is the restore (D-085)."""
+
     permission_required = (CHANGE,)
+    allow_archived = True
 
     def act(self, request, location):
         archive = request.POST.get("archive") != "0"

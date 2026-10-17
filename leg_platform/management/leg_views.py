@@ -192,8 +192,11 @@ class LegDetailView(ManagementAccessMixin, View):
         today = timezone.localdate()
         threshold = ManagementSettings.load().warning_threshold_percent
         summary = legs.summaries([leg], threshold, today)[leg.pk]
-        can_change = user.has_perm(CHANGE)
-        show_delete = leg_services.can_delete(leg) and user.has_perm(DELETE)
+        may_change = user.has_perm(CHANGE)
+        # An archived LEG is read-only (D-085): no edit buttons, only "Restore LEG".
+        can_change = may_change and not leg.is_archived
+        # An archived LEG offers "Restore" and nothing else (D-085), also when it could be deleted.
+        show_delete = leg_services.can_delete(leg) and user.has_perm(DELETE) and not leg.is_archived
         level = legs.quota_level(leg.production_quota_percent, threshold)
         circuits = list(
             TransformerCircuit.objects.filter(pk__in=summary.circuit_ids).order_by("bkw_number")
@@ -217,7 +220,7 @@ class LegDetailView(ManagementAccessMixin, View):
             "back_url": return_url(request, reverse("management:legs")),
             "can_change": can_change,
             "show_delete": show_delete,
-            "show_archive": can_change and not show_delete,
+            "show_archive": may_change and (leg.is_archived or not show_delete),
             "current_url": request.get_full_path(),
         }
         if user.has_perm(VIEW_POINTS):
@@ -295,10 +298,17 @@ class LegCreateView(DialogView):
 
 
 class LegObjectDialog(DialogView):
-    """A dialog about one LEG."""
+    """A dialog about one LEG. An archived LEG is read-only (D-085): the dialog is refused, with a message in
+    the style of D-079, for a GET and for a direct POST alike."""
 
     permission_required = (VIEW, CHANGE)
     template_name = "management/legs/dialog_quota.html"
+
+    def refusal(self, request, *args, **kwargs):
+        if get_object_or_404(Leg, pk=kwargs["pk"]).is_archived:
+            messages.error(request, _("This LEG is archived."))
+            return redirect(return_url(request, reverse("management:legs_detail", args=[kwargs["pk"]])))
+        return None
 
     def leg(self):
         if not hasattr(self, "_leg"):
@@ -327,7 +337,11 @@ class LegQuotaView(LegObjectDialog):
 
     def save(self, request, form):
         data = form.cleaned_data
-        leg_services.update_quota(self.leg(), data["quota"], data["checked_on"], actor=request.user)
+        try:
+            leg_services.update_quota(self.leg(), data["quota"], data["checked_on"], actor=request.user)
+        except leg_services.Archived:
+            messages.error(request, _("This LEG is archived."))
+            return redirect(reverse("management:legs_detail", args=[self.kwargs["pk"]]))
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
@@ -350,6 +364,9 @@ class LegMasterDataView(LegObjectDialog):
         except leg_services.DuplicateName:
             form.add_error("name", _("This name is already in use."))
             return None
+        except leg_services.Archived:
+            messages.error(request, _("This LEG is archived."))
+            return redirect(reverse("management:legs_detail", args=[self.kwargs["pk"]]))
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 

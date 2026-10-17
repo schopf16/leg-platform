@@ -15,9 +15,11 @@ from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 
-from leg_platform.community import addressing, history, legs
+from leg_platform.community import addressing, archived, history, legs
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import HistoryEntry, Leg, LegAssignment
+
+Archived = archived.Archived
 
 
 class DuplicateName(Exception):
@@ -81,6 +83,7 @@ def update_quota(leg, quota_percent, checked_on, actor=None):
     quota_percent, checked_on = _quota_pair(quota_percent, checked_on)
     with transaction.atomic():
         fresh = Leg.objects.select_for_update().get(pk=leg.pk)
+        archived.ensure_open(fresh, archived.LEG)
         if fresh.production_quota_percent == quota_percent and fresh.quota_checked_on == checked_on:
             return fresh
         detail = {
@@ -102,6 +105,7 @@ def update_master_data(leg, name, remark, actor=None):
     try:
         with transaction.atomic():
             fresh = Leg.objects.select_for_update().get(pk=leg.pk)
+            archived.ensure_open(fresh, archived.LEG)
             changed = [field for field, value in (("name", name), ("remark", remark)) if getattr(fresh, field) != value]
             if not changed:
                 return fresh
@@ -141,6 +145,6 @@ def delete(leg):
 
 
 __all__ = [
-    "DuplicateName", "NotDeletable", "can_delete", "create_leg", "delete", "name_in_use",
+    "Archived", "DuplicateName", "NotDeletable", "can_delete", "create_leg", "delete", "name_in_use",
     "normalise_name", "set_archived", "update_master_data", "update_quota",
 ]

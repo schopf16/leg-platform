@@ -31,6 +31,7 @@ from leg_platform.community import (
     history,
     leg_switch,
     location_list,
+    locations,
     metering_point_list,
     metering_points,
     person_search,
@@ -785,6 +786,10 @@ class MeteringPointNewView(DialogView):
             )
         except metering_points.DuplicateNumber as duplicate:
             form.duplicate = duplicate.existing
+            return None
+        except (locations.Archived, assignments.AssignmentError):
+            # Archived in the meantime (D-085): nothing was created.
+            form.add_error(None, _("The location or the LEG is archived."))
             return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))

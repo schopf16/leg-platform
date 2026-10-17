@@ -89,7 +89,16 @@ class ManagementAccessMixin:
         denied = check_access(request, self.get_required_permissions(), self.get_any_permissions())
         if denied is not None:
             return denied
+        if request.method.lower() in self.http_method_names:
+            refused = self.refusal(request, *args, **kwargs)
+            if refused is not None:
+                return refused
         return super().dispatch(request, *args, **kwargs)
+
+    def refusal(self, request, *args, **kwargs):
+        """A hook after the permission check and before the handler: a response that refuses the request (for
+        example the change of an archived object, D-085), or None. The default refuses nothing."""
+        return None
 
 
 def management_view(*permissions, any_of=()):

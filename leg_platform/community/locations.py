@@ -9,9 +9,11 @@ changes (``standorte/adresskorrektur/VORGABEN.md``).
 
 from django.db import transaction
 
-from leg_platform.community import addressing, history
+from leg_platform.community import addressing, archived, history
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import HistoryEntry, Location, MeteringPoint
+
+Archived = archived.Archived
 
 
 class SuggestionError(Exception):
@@ -62,6 +64,7 @@ def accept_suggestion(location, actor):
     merge of two locations is a separate, confirmed action)."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
         suggestion = fresh.suggestion
         if suggestion is None or not fresh.address_correction_open:
             raise SuggestionError("no_open_suggestion")
@@ -79,6 +82,7 @@ def dismiss_suggestion(location, actor):
     """"Do not accept": the address stays, the warning is gone until the address changes."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
         if fresh.suggestion is None or not fresh.address_correction_open:
             raise SuggestionError("no_open_suggestion")
         fresh.dismiss_suggestion()
@@ -133,6 +137,7 @@ def update_address(
         ids = sorted({location.pk, probe.pk} if probe is not None else {location.pk})
         locked = {row.pk: row for row in Location.objects.select_for_update().filter(pk__in=ids).order_by("pk")}
         fresh = locked[location.pk]
+        archived.ensure_open(fresh, archived.LOCATION)
         other = Location.find_by_address(*new)
         if other is not None and other.pk != fresh.pk:
             if other.is_archived:
@@ -176,6 +181,7 @@ def set_circuit(location, circuit, actor=None):
     """Assign the transformer circuit (None removes it); a change is logged with the numbers."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().select_related("transformer_circuit").get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
         before = fresh.transformer_circuit
         if before == circuit:
             return fresh
@@ -188,10 +194,21 @@ def set_circuit(location, circuit, actor=None):
     return fresh
 
 
+def update_remark(location, remark, actor=None):
+    """Save the remark of the location (no entry in the history: the text is internal, never logged)."""
+    with transaction.atomic():
+        fresh = Location.objects.select_for_update().get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
+        fresh.remark = (remark or "").strip()
+        fresh.save(update_fields=["remark", "updated_at"])
+    return fresh
+
+
 def confirm(location, actor=None):
     """"Confirm the address" of a location that a customer created: the mark "new" goes."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().get(pk=location.pk)
+        archived.ensure_open(fresh, archived.LOCATION)
         if fresh.needs_confirmation:
             fresh.needs_confirmation = False
             fresh.save(update_fields=["needs_confirmation", "updated_at"])
@@ -227,7 +244,7 @@ def delete(location):
 
 
 __all__ = [
-    "ADDRESS_FIELDS", "MergeNeeded", "MergeRefused", "NotDeletable", "SuggestionError", "accept_suggestion",
+    "ADDRESS_FIELDS", "Archived", "MergeNeeded", "MergeRefused", "NotDeletable", "SuggestionError", "accept_suggestion",
     "can_delete", "confirm", "create_location", "delete", "dismiss_suggestion", "refresh_suggestion",
-    "set_archived", "set_circuit", "update_address",
+    "set_archived", "set_circuit", "update_address", "update_remark",
 ]
