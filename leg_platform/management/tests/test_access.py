@@ -100,6 +100,10 @@ class CheckAccessTests(SimpleTestCase):
 
 @tag("mariadb")
 class AccessTests(TestCase):
+    # The page of a person asks the address directory for the correction of the address (D-081); the walk
+    # opens it with the rights of the correction.
+    databases = {"default", "addresses"}
+
     @classmethod
     def setUpTestData(cls):
         cls.plain = create_active_user("plain.person@example.org")

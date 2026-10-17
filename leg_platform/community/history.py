@@ -52,6 +52,11 @@ class HistoryEvent(models.TextChoices):
     SENDER_SUGGESTION_DISMISSED = "sender_suggestion_dismissed", _("Sender address correction not accepted")
     COUNTRY_CHANGED = "country_changed", _("Country changed")
     IDENTIFIER_CHANGED = "identifier_changed", _("Identifier changed")
+    # The events of a person (D-081). They name no value: the note, the BKW customer number and the
+    # address of a customer never go into the history (L-6 of the security review of block 1).
+    PERSON_NOTE_CHANGED = "person_note_changed", _("Note changed")
+    PERSON_BKW_NUMBER_CHANGED = "person_bkw_number_changed", _("BKW customer number changed")
+    PERSON_SHARES_CHANGED = "person_shares_changed", _("Shares changed")
 
 
 def subject_of(obj):

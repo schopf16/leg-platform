@@ -7,7 +7,7 @@ key (``navigation.MENU``), so that the menu marks the entry as active.
 
 from django.urls import path
 
-from leg_platform.management import leg_views, location_views, views
+from leg_platform.management import leg_views, location_views, person_views, views
 from leg_platform.management import metering_point_views as mp_views
 
 app_name = "management"
@@ -17,6 +17,19 @@ urlpatterns = [
     path("settings/", views.SettingsView.as_view(), name="settings"),
     # The saved column widths of the lists (any list).
     path("lists/<slug:list_key>/widths/", location_views.ListWidthsView.as_view(), name="list_widths"),
+    # Persons (an account with a customer number; the id is the id of the account)
+    path("persons/", person_views.PersonListView.as_view(), name="persons"),
+    path("persons/<int:pk>/", person_views.PersonDetailView.as_view(), name="persons_detail"),
+    path("persons/<int:pk>/note/", person_views.PersonNoteView.as_view(), name="persons_note"),
+    path(
+        "persons/<int:pk>/bkw-customer-number/", person_views.PersonBkwNumberView.as_view(),
+        name="persons_bkw_number",
+    ),
+    path("persons/<int:pk>/shares/", person_views.PersonSharesView.as_view(), name="persons_shares"),
+    path(
+        "persons/<int:pk>/address-suggestion/", person_views.PersonAddressSuggestionView.as_view(),
+        name="persons_address_suggestion",
+    ),
     # Locations
     path("locations/", location_views.LocationListView.as_view(), name="locations"),
     path("locations/expanded/", location_views.LocationExpandedView.as_view(), name="locations_expanded"),

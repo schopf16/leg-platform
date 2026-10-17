@@ -40,9 +40,10 @@ AREA_VIEW_PERMISSIONS = (
 )
 
 # One line per entry, in the order of the menu: overview, persons, locations, LEGs, metering
-# points, settings. The pages that do not exist yet have no line yet.
+# points, settings.
 MENU = (
     MenuEntry("overview", _("Overview"), "i-overview", any_of=AREA_VIEW_PERMISSIONS),
+    MenuEntry("persons", _("Persons"), "i-persons", ("community.view_personrecord",)),
     MenuEntry("locations", _("Locations"), "i-building", ("community.view_location",)),
     MenuEntry("legs", _("LEGs"), "i-network", ("community.view_leg",)),
     MenuEntry("metering_points", _("Metering points"), "i-metering", ("community.view_meteringpoint",)),

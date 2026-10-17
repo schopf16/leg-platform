@@ -1,0 +1,73 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list of persons (LEG-Design-Vorgaben/verwaltung/personen/referenz/liste-desktop and liste-handy; D-081). On a
+desktop a table, on a phone one card per person. The name is plain text (the link icon at the right opens the
+detail page); a company shows its contact person in grey below the name; the account is a dot and a word. No
+warning triangle (no problems of persons are defined yet), no button "Create person" and no button "Print" (no
+specified effect and no printing block yet; never a dead button). The page works without a script: the filters
+are a GET form.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-persons{% endblock %}
+{% block page_content %}
+  {% translate "Name, customer number or e-mail" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Status" %}</span>
+      <select name="status" class="form-select" data-autosubmit>
+        {% for value, text in status_options %}<option value="{{ value }}"{% if value == list_state.values.status %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if see_points %}
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Metering points" %}</span>
+      <select name="points" class="form-select" data-autosubmit>
+        {% for value, text in points_options %}<option value="{{ value }}"{% if value == list_state.values.points %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            <tr>
+              <td><div class="mgmt-cut mgmt-person-name" title="{{ entry.name }}">{{ entry.name }}</div>{% if entry.contact %}<div class="mgmt-cut mgmt-person-contact" title="{{ entry.contact }}">{{ entry.contact }}</div>{% endif %}</td>
+              <td class="tnum">{{ entry.number }}</td>
+              <td>{% if entry.address %}<div class="mgmt-cut" title="{{ entry.address }}">{{ entry.address }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+              {% if see_points %}<td>{{ entry.points }}</td>{% endif %}
+              <td>{% include "management/_status.html" with tone=entry.account_tone label=entry.account_label %}</td>
+              <td class="mgmt-link-col">{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
+            </tr>
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=list_columns|length|add:1 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        <article class="mgmt-place">
+          <div class="mgmt-place-addr">{{ entry.name }}{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</div>
+          {% if entry.contact %}<div class="mgmt-place-sub">{{ entry.contact }}</div>{% endif %}
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{{ entry.number }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Account" %}</dt><dd><span class="mgmt-status is-{{ entry.account_tone }}" role="img" aria-label="{{ entry.account_label }}"></span></dd></div>
+          </dl>
+        </article>
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

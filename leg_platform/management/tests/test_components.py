@@ -181,7 +181,9 @@ class StyleAndScriptTests(SimpleTestCase):
     def test_a_link_to_a_page_that_does_not_exist_yet_is_empty(self):
         from leg_platform.management.templatetags import management_ui as ui
 
-        self.assertEqual(ui.optional_url("management:persons_detail", 1), "")
+        # Every area has its pages now: an unknown name is the only case that gives an empty address.
+        self.assertEqual(ui.optional_url("management:no_such_page", 1), "")
+        self.assertEqual(ui.optional_url("management:persons_detail", 1), "/management/persons/1/")
         self.assertEqual(ui.optional_url("management:legs_detail", 7), "/management/legs/7/")
         self.assertEqual(ui.optional_url("management:locations_detail", 5), "/management/locations/5/")
 

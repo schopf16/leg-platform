@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load i18n static management_ui %}{% comment %}
+The detail page of a person (LEG-Design-Vorgaben/verwaltung/personen/detail/referenz/person-detail-desktop and
+-handy; D-081). On a desktop two columns of cards (details, contact, billing address, payment and customer numbers on
+the left; cooperative and note on the right) and the metering points over the full width; on a phone all cards one
+under the other, the metering points after the payment card. The master data of the customer is read only (the
+customer changes it through the own login); the staff edit only the note, the BKW customer number and the shares,
+and accept or do not accept the address suggestion in the banner. No "Edit" on the cards of the customer's data, no
+button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate" (not decided).
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-person{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to persons" %}</a>
+
+  <div class="mgmt-header mgmt-detail-header">
+    <div>
+      <h1 class="start-title">{{ name }}</h1>
+      <p class="mgmt-subtitle mgmt-person-line">{% translate "Customer number" %} <span class="tnum mgmt-person-fg">{{ number }}</span> · {% include "management/_status.html" with tone=account_tone label=account_label %}</p>
+    </div>
+  </div>
+
+  {% if suggestion_text %}
+    {% include "management/_banner.html" with text=suggestion_text actions="management/persons/_suggestion_actions.html" %}
+  {% endif %}
+
+  <div class="mgmt-person-grid">
+    <div class="mgmt-col">
+      <section class="mgmt-card" data-order="1">
+        <div class="mgmt-card-head"><h2>{% translate "Details" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Salutation" %}</dt><dd>{% if salutation %}{{ salutation }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Company" %}</dt><dd>{% if person.organisation_name %}{{ person.organisation_name }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "First name" %}</dt><dd>{% if person.first_name %}{{ person.first_name }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Last name" %}</dt><dd>{% if person.last_name %}{{ person.last_name }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Second person" %}</dt><dd>{% if person.address_line_1 %}{{ person.address_line_1 }}{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+
+      <section class="mgmt-card" data-order="2">
+        <div class="mgmt-card-head"><h2>{% translate "Contact" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Email" %}</dt><dd>{{ person.email }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd>{% if person.secondary_email %}{{ person.secondary_email }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Phone" %}</dt><dd>{% if phone %}{{ phone }}{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+
+      <section class="mgmt-card" data-order="3">
+        <div class="mgmt-card-head"><h2>{% translate "Billing address" %}</h2></div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Street" %}</dt><dd>{% if street %}{{ street }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Postal code, town" %}</dt><dd>{% if postal_town %}{{ postal_town }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Country" %}</dt><dd>{% if country %}{{ country }}{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+
+      <section class="mgmt-card" data-order="4">
+        <div class="mgmt-card-head"><h2>{% translate "Payment and customer numbers" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_bkw_number' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "IBAN" %}</dt><dd class="tnum">{% if iban %}{{ iban }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Paper invoice" %}</dt><dd>{% if paper_invoice %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{{ number }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "BKW customer number" %}</dt><dd>{% if bkw_number %}{{ bkw_number }}{% else %}–{% endif %}</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <div class="mgmt-col">
+      <section class="mgmt-card" data-order="6">
+        <div class="mgmt-card-head"><h2>{% translate "Cooperative" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_shares' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        {% if shares %}
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Shares" %}</dt><dd class="tnum">{{ shares }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Period" %}</dt><dd>{{ shares_period }}</dd></div>
+          </dl>
+        {% else %}
+          <p class="mgmt-muted mgmt-person-empty">{% translate "No shares recorded." %}</p>
+        {% endif %}
+      </section>
+
+      <section class="mgmt-card" data-order="7">
+        <div class="mgmt-card-head"><h2>{% translate "Note" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_note' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a>{% endif %}</div>
+        <div class="mgmt-remark">{% if note %}{{ note|linebreaksbr }}{% else %}–{% endif %}</div>
+      </section>
+    </div>
+
+    {% if show_points %}
+    <section class="mgmt-card mgmt-card-flush mgmt-person-points" data-order="5">
+      <div class="mgmt-card-head mgmt-card-pad"><h2><span class="mgmt-desktop-only">{% translate "Metering points and assignments" %}</span><span class="mgmt-phone-only">{% translate "Metering points" %}</span></h2></div>
+      <div class="mgmt-table-view">
+        <table class="mgmt-table mgmt-person-table">
+          <thead>
+            <tr>
+              {% for column in point_columns %}
+                <th data-col="{{ column.key }}"{% if column.aria_sort %} aria-sort="{{ column.aria_sort }}"{% endif %}>
+                  <a class="mgmt-sort{% if column.active %} is-active{% endif %}" href="{{ column.url }}">{{ column.label }} <span aria-hidden="true">{{ column.arrow }}</span></a>
+                  {% blocktranslate asvar info_label with name=column.label %}Information: {{ name }}{% endblocktranslate %}<span class="mgmt-info{% if column.info_placement == 'left' %} is-left{% elif column.info_placement == 'left-up' %} is-left-up{% endif %}"><button type="button" class="mgmt-info-btn" aria-label="{{ info_label }}" aria-describedby="{{ column.tip_id }}">i</button><span class="mgmt-tip" role="tooltip" id="{{ column.tip_id }}">{% if column.info_template %}{% include column.info_template %}{% else %}{{ column.info }}{% endif %}</span></span>
+                </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in point_entries %}
+              {% with row=entry.row %}
+              <tr>
+                <td>{% if row.address %}{{ row.address }}{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                <td class="tnum">{% if entry.number %}<span class="mgmt-person-number">{{ entry.number }}</span>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                <td>{% include "management/_direction.html" with direction=row.point.direction %}</td>
+                <td>{% if row.leg_name %}{{ row.leg_name }}{% if entry.leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=entry.leg_url label=leg_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                <td>{% for line in entry.assigned %}<div>{{ line }}</div>{% endfor %}</td>
+                <td><span class="mgmt-person-bkw is-{{ entry.bkw_tone }}">{{ entry.bkw_text }}</span></td>
+              </tr>
+              {% endwith %}
+            {% empty %}
+              {% include "management/_empty_row.html" with colspan=6 text=empty_points_text %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="mgmt-cards-view mgmt-card-pad">
+        {% for entry in point_entries %}
+          {% with row=entry.row %}
+          <div class="mgmt-mp">
+            <div class="mgmt-mp-nr mgmt-point-nr"><strong>{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</strong>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}</div>
+            <div class="mgmt-mp-person">{% if row.address %}{{ row.address }}{% else %}–{% endif %} · {{ row.point.direction|direction_label }}{% if row.leg_name %} · {{ row.leg_name }}{% endif %}</div>
+            <div class="mgmt-mp-person mgmt-person-lines">{{ entry.assigned|join:" · " }} · <span class="mgmt-person-bkw is-{{ entry.bkw_tone }}">{{ entry.bkw_text }}</span></div>
+          </div>
+          {% endwith %}
+        {% empty %}
+          <p class="mgmt-empty-text">{{ empty_points_text }}</p>
+        {% endfor %}
+      </div>
+      <p class="mgmt-note mgmt-card-pad">{% translate "You change assignments on the page of the metering point." %}</p>
+    </section>
+    {% endif %}
+
+    {% if history %}
+    <section class="mgmt-card mgmt-card-flush mgmt-person-history" data-order="8">
+      <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "History" %}</h2></div>
+      <table class="mgmt-table mgmt-history">
+        <thead><tr><th>{% translate "Date" %}</th><th>{% translate "Event" %}</th><th>{% translate "By" %}</th></tr></thead>
+        <tbody>
+          {% for entry in history %}
+            <tr><td>{{ entry.time|date:"d.m.Y H:i" }}</td><td>{{ entry.label }}</td><td>{{ entry.actor|default:"–" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+  </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+{% endblock %}

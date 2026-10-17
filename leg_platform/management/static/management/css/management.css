@@ -1759,3 +1759,105 @@ a.mgmt-sort:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---- Persons (D-081; personen/referenz and personen/detail/referenz) ---- */
+.mgmt-person-name {
+  font-weight: 600;
+}
+
+.mgmt-person-contact {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mgmt-person-line {
+  margin-top: 4px;
+}
+
+.mgmt-person-fg {
+  color: var(--fg);
+}
+
+/* Desktop: two columns of cards, the table of the metering points over the full width. */
+.mgmt-person-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.mgmt-person-grid .mgmt-person-points,
+.mgmt-person-grid .mgmt-person-history {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+/* The bubbles of the headings may reach out of the card (the template: overflow visible). */
+.mgmt-person-grid .mgmt-person-points {
+  overflow: visible;
+}
+
+.mgmt-person-empty {
+  margin: 0;
+}
+
+.mgmt-person-number {
+  overflow-wrap: anywhere;
+}
+
+.mgmt-person-bkw.is-ok {
+  color: var(--ok);
+}
+
+.mgmt-person-bkw.is-warn {
+  color: var(--warn);
+}
+
+.mgmt-person-lines {
+  color: var(--fg);
+}
+
+@media (max-width: 760px) {
+  /* Phone: all cards one under the other in the order of the template (the metering points after the
+     payment card); the two columns dissolve and every card takes its place from data-order. */
+  .mgmt-person-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mgmt-person-grid .mgmt-col {
+    display: contents;
+  }
+
+  .mgmt-person-grid [data-order="1"] { order: 1; }
+  .mgmt-person-grid [data-order="2"] { order: 2; }
+  .mgmt-person-grid [data-order="3"] { order: 3; }
+  .mgmt-person-grid [data-order="4"] { order: 4; }
+  .mgmt-person-grid [data-order="5"] { order: 5; }
+  .mgmt-person-grid [data-order="6"] { order: 6; }
+  .mgmt-person-grid [data-order="7"] { order: 7; }
+  .mgmt-person-grid [data-order="8"] { order: 8; }
+
+  .mgmt-person-grid .mgmt-card {
+    margin: 0;
+  }
+
+  /* The title and the button of a card stay in one row (the template), the title wraps if it must. */
+  .mgmt-person .mgmt-card-head {
+    flex-wrap: nowrap;
+  }
+
+  .mgmt-person .mgmt-card-head h2 {
+    min-width: 0;
+  }
+}
+
+/* The small buttons of the cards: 36 px high, 14 px text, as in the template (.btn-xs). The general rule
+   .register-clear .btn (48 px) is more specific than .btn-xs, so the template size needs its own selector;
+   scoped to the person pages (the other pages keep the look that was accepted for them). */
+.register-clear .mgmt-person .btn.btn-xs {
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 14px;
+}

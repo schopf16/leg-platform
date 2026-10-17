@@ -82,6 +82,19 @@ def normalise_metering_point_number(value):
     return (value or "").strip().upper()
 
 
+def format_metering_point_number(number):
+    """The number as the person page shows it: the country, then a space after every four characters
+    ("CH 1A2B 3C4D ..."; ``personen/detail/VORGABEN.md``: "mit Leerzeichen nach vier Stellen", the
+    template shows "CH 0000 0000 0001"). A value that is no complete number is returned as it is;
+    a missing number gives an empty text."""
+    if not number:
+        return ""
+    if not is_valid_metering_point_number(number):
+        return number
+    rest = number[COUNTRY_LENGTH:]
+    return " ".join([number[:COUNTRY_LENGTH], *(rest[i : i + 4] for i in range(0, len(rest), 4))])
+
+
 def normalise_transformer_circuit_number(value):
     """The BKW number as it is stored and compared: surrounding white space removed and converted
     to capital letters before the comparison (``standorte/VORGABEN.md``, "Nachtrag: Trafokreis")."""

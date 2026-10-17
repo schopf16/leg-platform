@@ -3840,3 +3840,212 @@ msgstr "Produktionsquote geändert"
 
 msgid "Master data changed"
 msgstr "Stammdaten geändert"
+
+# Persons (D-081): the texts of personen/referenz and personen/detail/referenz 1:1; the others are neutral
+# wording of the developer (listed in D-081).
+msgid "Persons"
+msgstr "Personen"
+
+msgid "All customers of the LEG."
+msgstr "Alle Kundinnen und Kunden der LEG."
+
+msgid "Name, customer number or e-mail"
+msgstr "Name, Kundennummer oder E-Mail"
+
+msgid "with metering point"
+msgstr "mit Messpunkt"
+
+msgid "without metering point"
+msgstr "ohne Messpunkt"
+
+msgid "Inactive"
+msgstr "Inaktiv"
+
+msgid "No persons found."
+msgstr "Keine Personen gefunden."
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d persons"
+msgstr "%(first)d–%(last)d von %(total)d Personen"
+
+msgid "Name of the person, or of the company for property managers and companies."
+msgstr "Name der Person, oder der Firma bei Verwaltungen und Firmen."
+
+msgid "The six-digit number under which the person is kept in the portal."
+msgstr "Die sechsstellige Nummer, unter der die Person im Portal geführt wird."
+
+msgid "Street and house number of the billing address."
+msgstr "Strasse und Hausnummer der Rechnungsadresse."
+
+msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the BKW. Recording, if at least one is still being recorded."
+msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei der BKW angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
+
+msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive."
+msgstr "Ob sich die Person im Portal anmelden kann. Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen. Inaktiv: Das Konto ist deaktiviert und steht im Archiv."
+
+msgctxt "person metering points"
+msgid "recording"
+msgstr "Aufnahme"
+
+msgctxt "person metering points"
+msgid "notified"
+msgstr "angemeldet"
+
+msgid "Back to persons"
+msgstr "Zurück zu Personen"
+
+msgid "Second person"
+msgstr "Zweite Person"
+
+msgid "Contact"
+msgstr "Kontakt"
+
+msgid "Email"
+msgstr "E-Mail"
+
+msgid "Second email"
+msgstr "Zweite E-Mail"
+
+msgid "Billing address"
+msgstr "Rechnungsadresse"
+
+msgid "Country"
+msgstr "Land"
+
+msgid "Payment and customer numbers"
+msgstr "Zahlung und Kundennummern"
+
+msgid "Paper invoice"
+msgstr "Papierrechnung"
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "No"
+msgstr "Nein"
+
+msgid "Cooperative"
+msgstr "Genossenschaft"
+
+msgid "Shares"
+msgstr "Anteile"
+
+msgid "Period"
+msgstr "Zeitraum"
+
+msgid "No shares recorded."
+msgstr "Keine Anteile erfasst."
+
+msgid "Note"
+msgstr "Notiz"
+
+msgid "Metering points and assignments"
+msgstr "Messpunkte und Zuordnungen"
+
+msgid "You change assignments on the page of the metering point."
+msgstr "Zuordnungen ändern Sie auf der Seite des Messpunkts."
+
+msgid "No metering points assigned."
+msgstr "Keine Messpunkte zugeordnet."
+
+msgid "The location is the address where the metering point is installed. A metering point belongs to its location for good."
+msgstr "Der Standort ist die Adresse, an der der Messpunkt liegt. Ein Messpunkt gehört fest zu seinem Standort."
+
+msgid "Number of the smart meter at the BKW. If it is missing, the metering point is recorded but not yet known at the BKW."
+msgstr "Nummer des Smart Meters bei der BKW. Fehlt sie, ist der Messpunkt angelegt, aber bei der BKW noch nicht bekannt."
+
+msgid "The billing group the metering point belongs to."
+msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört."
+
+msgid "BKW registration"
+msgstr "BKW-Anmeldung"
+
+msgid "Consumption:"
+msgstr "Bezug:"
+
+msgid "The person draws electricity from the grid."
+msgstr "Die Person bezieht Strom aus dem Netz."
+
+msgid "Feed-in:"
+msgstr "Einspeisung:"
+
+msgid "The person feeds electricity into the grid, for example from a PV system."
+msgstr "Die Person speist Strom ins Netz ein, zum Beispiel aus einer PV-Anlage."
+
+msgid "A metering point is either consumption or feed-in."
+msgstr "Ein Messpunkt ist entweder Bezug oder Einspeisung."
+
+msgid "from:"
+msgstr "ab:"
+
+msgid "The assignment is valid from this date."
+msgstr "Die Zuordnung gilt ab diesem Datum."
+
+msgid "until:"
+msgstr "bis:"
+
+msgid "The assignment ends on this date."
+msgstr "Die Zuordnung endet an diesem Datum."
+
+msgid "registered:"
+msgstr "registriert:"
+
+msgid "The metering point is recorded, the notification to the BKW is not yet submitted."
+msgstr "Der Messpunkt ist angelegt, die Anmeldung bei der BKW ist noch nicht eingereicht."
+
+msgid "notified on …:"
+msgstr "angemeldet am …:"
+
+msgid "The notification is submitted to the BKW."
+msgstr "Die Anmeldung ist bei der BKW eingereicht."
+
+msgid "confirmed on …:"
+msgstr "bestätigt am …:"
+
+msgid "The person has confirmed the notification at the BKW. The date is the day on which the LEG recorded the confirmation."
+msgstr "Die Person hat die Anmeldung bei der BKW bestätigt. Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat."
+
+#, python-format
+msgid "notified on %(date)s"
+msgstr "angemeldet am %(date)s"
+
+#, python-format
+msgid "confirmed on %(date)s"
+msgstr "bestätigt am %(date)s"
+
+#, python-format
+msgid "from %(from)s to %(to)s"
+msgstr "ab %(from)s bis %(to)s"
+
+msgid "Edit note"
+msgstr "Notiz bearbeiten"
+
+msgid "Edit BKW customer number"
+msgstr "BKW-Kundennummer bearbeiten"
+
+msgid "Edit shares"
+msgstr "Anteile bearbeiten"
+
+msgid "Number of shares"
+msgstr "Anzahl Anteile"
+
+msgid "Without a number of shares the shares are removed."
+msgstr "Ohne Anzahl werden die Anteile entfernt."
+
+msgid "The end must not be before the start."
+msgstr "Das Ende darf nicht vor dem Beginn liegen."
+
+msgid "This value is not valid."
+msgstr "Dieser Wert ist ungültig."
+
+msgid "The shares could not be saved."
+msgstr "Die Anteile konnten nicht gespeichert werden."
+
+msgid "Note changed"
+msgstr "Notiz geändert"
+
+msgid "BKW customer number changed"
+msgstr "BKW-Kundennummer geändert"
+
+msgid "Shares changed"
+msgstr "Anteile geändert"

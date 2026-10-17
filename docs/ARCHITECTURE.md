@@ -204,6 +204,10 @@ Block 4 (D-080) adds the LEGs. Domain modules: `leg_services` (create, change th
 
 Sources: D-077, D-078, D-079, D-080 and their sources.
 
+Block 5 (D-081) adds the persons. Domain modules: `person_list` (a person is an account with a customer number; the three states of the account including the lockout of the login protection, the count and the state word of the metering points, search, filters, sort, and the metering points of one person with their sorting) and `persons` (the note, the BKW customer number and the shares in the side record `PersonRecord`, created when first needed, and the address correction through the directory with a token for the suggestion that was shown; every change one transaction with its history entry), `numbers.format_metering_point_number`. In `management`: `person_views.py`, `person_forms.py` and the templates `persons/*.html`. The links of the other pages to a person (`management:persons_detail`, the id of the account) resolve now.
+
+Sources: D-077, D-081 and their sources.
+
 ## Data Storage
 
 MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the traceable source for schema changes.
