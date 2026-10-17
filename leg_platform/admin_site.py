@@ -19,6 +19,15 @@ from django.utils.translation import gettext_lazy as _
 ADMIN_GROUPS = (
     ("users", _("Users"), ("User", "Group")),
     ("content", _("Content"), ("PortalSettings", "EmailText", "GridOperator")),
+    # Plain tables of the management data (D-091), read only; shown to who holds the "view" right of a table.
+    (
+        "data",
+        _("Management data"),
+        (
+            "Location", "MeteringPoint", "Leg", "TransformerCircuit", "PersonRecord", "PersonAssignment",
+            "LegAssignment", "ShareChange", "HistoryEntry", "ManagementSettings",
+        ),
+    ),
     (
         "system",
         _("System"),
@@ -70,6 +79,10 @@ class PortalAdminSite(AdminSite):
         return None
 
     def index(self, request, extra_context=None):
+        # The first visit after the due time starts the automatic refresh of the address directory (D-090).
+        from leg_platform.addresses.runner import maybe_start_automatic
+
+        maybe_start_automatic()
         # The hint names the group "Content": only an account that sees that group gets it. An
         # account that sees nothing gets Django's own sentence for it (reworded in the catalogue).
         groups = self.get_app_list(request)
@@ -181,6 +194,18 @@ class PortalAdminSite(AdminSite):
                 # Anything not named in any group ends here, so that no model gets lost.
                 known = {n for _key, _name, names in ADMIN_GROUPS for n in names}
                 members += [m for m in entries if m["object_name"] not in known]
+                if request.user.is_superuser:
+                    # The log pages are not a model: a plain link, for system administrators only (D-092).
+                    members.append(
+                        {
+                            "name": _("Log files"),
+                            "object_name": "LogFiles",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:logs", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        }
+                    )
             if members:
                 grouped.append(
                     {
@@ -192,6 +217,21 @@ class PortalAdminSite(AdminSite):
                     }
                 )
         return grouped
+
+    def get_urls(self):
+        # The log pages (D-092): wrapped like every administration view (login, second factor, never cached);
+        # each view checks "system administrator" itself.
+        from django.urls import path
+
+        from leg_platform import log_views
+
+        return [
+            path("logs/", self.admin_view(log_views.log_list), name="logs"),
+            path("logs/<logkey:log>/", self.admin_view(log_views.log_view), name="logs_view"),
+            path("logs/<logkey:log>/tail/", self.admin_view(log_views.log_tail), name="logs_tail"),
+            path("logs/<logkey:log>/download/", self.admin_view(log_views.log_download), name="logs_download"),
+            *super().get_urls(),
+        ]
 
     def has_permission(self, request):
         from leg_platform.accounts.second_factor import is_second_factor_complete

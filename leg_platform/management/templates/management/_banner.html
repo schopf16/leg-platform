@@ -1,9 +1,10 @@
 {% comment %}
 A banner in the warning colour (D-077). Context: ``text`` (the sentence) and optionally ``actions`` (the
 name of a template with the buttons, included on the right; the same pattern as ``after`` of the form
-fields). A button of a banner that sits inside a form needs the hidden default button before it
+fields) and ``neutral`` (true: the next-step banner after a create, in the neutral colour: it is no warning, D-097).
+A button of a banner that sits inside a form needs the hidden default button before it
 (``management/_default_submit.html``), or the key Enter would press the first one.
-{% endcomment %}<div class="mgmt-banner" role="status">
+{% endcomment %}<div class="mgmt-banner{% if neutral %} is-neutral{% endif %}" role="status">
   <p>{{ text }}</p>
   {% if actions %}<div class="mgmt-banner-actions">{% include actions %}</div>{% endif %}
 </div>

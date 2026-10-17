@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}A long session ("Stay signed in") was started for your account at {{ instance_name }}. On that device you stay logged in for several days, without a new code, until you log out.{% endblocktranslate %}
+
+{% if contact_url %}{% blocktranslate %}If this was not you, contact the operator immediately and choose a new password with "Forgot password" on the login page. You will find contact information here:
+
+{{ contact_url }}{% endblocktranslate %}{% else %}{% blocktranslate %}If this was not you, contact the operator of this portal immediately and choose a new password with "Forgot password" on the login page.{% endblocktranslate %}{% endif %}
+{% endautoescape %}

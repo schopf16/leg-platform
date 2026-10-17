@@ -47,6 +47,8 @@ ADDRESS_DIRECTORY_FILE_VARIABLE = "ADDRESS_DIRECTORY_FILE"
 ADDRESS_DIRECTORY_DEFAULT_FILE = "/var/lib/leg-platform/address-directory.sqlite3"
 ADDRESS_DIRECTORY_LOCAL_FOLDER = ".leg-platform-dev"
 ADDRESS_DIRECTORY_FILE_NAME = "address-directory.sqlite3"
+LOG_DIRECTORY_VARIABLE = "LOG_DIRECTORY"
+LOG_DIRECTORY_DEFAULT = "/var/log/leg-platform"
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 # First-start variables of the initial system administrator (D-005, D-076). The password name
@@ -108,6 +110,10 @@ class EnvironmentConfig:
     security_log_long_retention_days: int
     # The SQLite file of the address directory (D-075); a path, never a secret.
     address_directory_file: str = ""
+    # The import in the web process starts by itself when due (D-090); False: only the worker or the button.
+    address_import_automatic: bool = True
+    # Folder of the application log files (D-092); "" = no file logging (standard error only, e.g. journald).
+    log_directory: str = ""
 
     @property
     def is_local(self) -> bool:
@@ -538,6 +544,39 @@ def parse_address_directory_file(env: Mapping[str, str], app_env: str) -> str:
     return value
 
 
+def parse_log_directory(env: Mapping[str, str], app_env: str) -> str:
+    """Return the folder of the application log files, or "" for no file logging (D-092).
+
+    Empty value: ``~/.leg-platform-dev/logs`` locally and ``/var/log/leg-platform`` elsewhere (the
+    systemd units name ``LogsDirectory=leg-platform``). ``off`` turns file logging off (standard
+    error only, e.g. journald). A configured value must be an absolute path to a folder outside the
+    repository, without control characters; nothing is created here. Error messages do not repeat it.
+    """
+    value = env.get(LOG_DIRECTORY_VARIABLE, "").strip()
+    if value.lower() == "off":
+        return ""
+    if not value:
+        if app_env != APP_ENV_LOCAL:
+            return LOG_DIRECTORY_DEFAULT
+        try:
+            return str(Path.home() / ADDRESS_DIRECTORY_LOCAL_FOLDER / "logs")
+        except RuntimeError:
+            return ""
+    if any(unicodedata.category(character) in ("Cc", "Cf", "Zl", "Zp") for character in value):
+        raise ImproperlyConfigured("LOG_DIRECTORY must not contain NUL or other control characters.")
+    if not os.path.isabs(value):
+        raise ImproperlyConfigured("LOG_DIRECTORY must be an absolute path.")
+    try:
+        resolved = Path(value).resolve()
+    except (OSError, ValueError, RuntimeError):
+        raise ImproperlyConfigured("LOG_DIRECTORY is not a valid path.") from None
+    if resolved == REPOSITORY_ROOT or REPOSITORY_ROOT in resolved.parents:
+        raise ImproperlyConfigured("LOG_DIRECTORY must point outside the repository.")
+    if resolved.is_file():
+        raise ImproperlyConfigured("LOG_DIRECTORY must name a folder, not a file.")
+    return value
+
+
 def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     """Validate the environment and return the configuration; raise ImproperlyConfigured."""
     app_env = parse_app_env(env)
@@ -578,6 +617,8 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         security_log_retention_days=security_log_retention[0],
         security_log_long_retention_days=security_log_retention[1],
         address_directory_file=parse_address_directory_file(env, app_env),
+        address_import_automatic=_parse_bool(env, "ADDRESS_IMPORT_AUTOMATIC", True),
+        log_directory=parse_log_directory(env, app_env),
     )
 
 

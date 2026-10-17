@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{# One log file, live (D-092): the page asks the tail address every few seconds and appends the new lines. #}
+{# Only text is written into the page (never markup); no inline script or style. #}
+{% block extrahead %}{{ block.super }}<script defer src="{% static 'js/log-viewer.js' %}"></script>{% endblock %}
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+<li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+<li><a href="{{ list_url }}">{% translate "Log files" %}</a></li>
+<li aria-current="page">{{ title }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<section aria-label="{{ title }}" id="log-viewer" data-tail-url="{{ tail_url }}" data-poll-seconds="{{ poll_seconds }}" data-live="{% if live %}1{% else %}0{% endif %}" data-text-ended="{% translate 'The log can no longer be updated. Reload the page; you may have to sign in again.' %}" data-text-retry="{% translate 'The log could not be loaded. Trying again.' %}" data-text-paused="{% translate 'Paused. New lines are not shown until you continue.' %}" data-text-live="{% translate 'Live: new lines appear by themselves.' %}" data-text-static="{% translate 'This older file does not change.' %}" data-text-missing="{% translate 'Nothing was logged to this file yet.' %}">
+  <p class="log-file"><code>{{ file_name }}</code></p>
+  <p class="log-controls">
+    {# One state only: the label changes between "Pause" and "Continue", no aria-pressed (UX-014). #}
+    {% if live %}<button type="button" class="button" id="log-pause" data-label-pause="{% translate 'Pause' %}" data-label-continue="{% translate 'Continue' %}">{% translate "Pause" %}</button>
+    <label><input type="checkbox" id="log-follow" checked> {% translate "Scroll to the end automatically" %}</label>{% endif %}
+    <a href="{{ download_url }}">{% translate "Download" %}</a><a href="{{ list_url }}">{% translate "All log files" %}</a>
+  </p>
+  <p class="help" id="log-state" role="status" aria-live="polite">{% if not exists %}{% translate "Nothing was logged to this file yet." %}{% elif live %}{% translate "Live: new lines appear by themselves." %}{% else %}{% translate "This older file does not change." %}{% endif %}</p>
+  <pre class="log-output" id="log-output" tabindex="0" role="region" aria-label="{% translate 'Log lines' %}"></pre>
+  <noscript><p class="help">{% translate "Without JavaScript the log cannot be shown live. Use the download." %}</p></noscript>
+</section>
+{% endblock %}

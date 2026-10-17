@@ -37,6 +37,11 @@ notice and "Confirm address" first.
     </div>
   </div>
 
+  {% if show_new %}
+    {% translate "Location created. Next: add the metering points of this location." as new_text %}
+    {% include "management/_banner.html" with text=new_text actions="management/locations/_new_actions.html" neutral=True %}
+  {% endif %}
+
   {% if suggestion_text %}
     {% include "management/_banner.html" with text=suggestion_text actions="management/locations/_suggestion_actions.html" %}
   {% endif %}
@@ -55,22 +60,12 @@ notice and "Confirm address" first.
 
     <div class="mgmt-col">
       <section class="mgmt-card">
-        <div class="mgmt-card-head"><h2>{% translate "Grid" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Grid" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_circuit' location.pk %}">{% translate "Edit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
-          <div class="mgmt-fact mgmt-fact-top"><dt>{% translate "Transformer circuit" %}</dt>
+          <div class="mgmt-fact"><dt>{% translate "Transformer circuit" %}</dt>
             <dd>
-              <form method="post" action="{% url 'management:locations_circuit' location.pk %}" class="mgmt-circuit-form">
-                {% csrf_token %}
-                <input type="search" name="transformer_circuit" value="{{ circuit_text }}" list="circuit-options" class="form-control tnum" autocomplete="off" aria-label="{% translate 'Search transformer circuit' %}"{% if not can_change %} disabled{% endif %}>
-                {% if can_change %}<button type="submit" class="mgmt-icon-btn" aria-label="{% translate 'Change transformer circuit' %}" title="{% translate 'Change transformer circuit' %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-pencil"/></svg></button>{% endif %}
-              </form>
-              <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.grid_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
-              {% if can_change or circuit %}
-                <p class="mgmt-circuit-links">
-                  {% if can_change %}<a href="{% url 'management:locations_circuit_new' location.pk %}">+ {% translate "Create new transformer circuit" %}</a>{% endif %}
-                  {% if circuit %}<a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a>{% endif %}
-                </p>
-              {% endif %}
+              {% if circuit %}<span class="tnum">{{ circuit.grid_number }}</span>{% if circuit.name %} · {{ circuit.name }}{% endif %}{% else %}–{% endif %}
+              {% if circuit %}<p class="mgmt-circuit-links"><a href="{% url 'management:circuits_edit' circuit.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit transformer circuit" %}</a></p>{% endif %}
             </dd>
           </div>
           <div class="mgmt-fact"><dt>{% translate "Locations in the transformer circuit" %}</dt><dd class="tnum mgmt-num">{% if circuit_stats %}{{ circuit_stats.locations }}{% else %}–{% endif %}</dd></div>
@@ -88,7 +83,7 @@ notice and "Confirm address" first.
   </div>
 
   <section class="mgmt-card mgmt-card-flush">
-    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a>{% endif %}</div>
+    <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points" %}</h2>{% if can_change %}<span class="mgmt-card-buttons"><a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a><a class="btn btn-secondary-action btn-xs" href="{% url 'management:locations_metering_point_assign' location.pk %}">{% translate "Assign existing metering point" %}</a></span>{% endif %}</div>
     <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view">
       <table class="mgmt-table mgmt-table-fixed">

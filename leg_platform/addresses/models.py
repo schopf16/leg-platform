@@ -98,6 +98,17 @@ class ImportRequest(models.Model):
     # Last manual repair that ended without an intact directory; the next one waits (importer.
     # REPAIR_RETRY_INTERVAL, D-076). Kept here because the directory file is what is damaged.
     last_failed_repair_at = models.DateTimeField(null=True, editable=False)
+    # Progress of the running import (D-090): the runner's heartbeat writes these every few seconds. A
+    # RUNNING job whose heartbeat is old belongs to a process that is gone (restart, kill) and is taken over.
+    claim_token = models.UUIDField(null=True, editable=False)
+    heartbeat_at = models.DateTimeField(null=True, editable=False)
+    # One of ``progress.PHASES`` while running; "unchanged" after a success without a download.
+    phase = models.CharField(max_length=16, blank=True, default="", editable=False)
+    bytes_done = models.PositiveBigIntegerField(null=True, editable=False)
+    bytes_total = models.PositiveBigIntegerField(null=True, editable=False)
+    rows_done = models.PositiveIntegerField(null=True, editable=False)
+    # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
+    last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
 
     class Meta:
         default_permissions = ()

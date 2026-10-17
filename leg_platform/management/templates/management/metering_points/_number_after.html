@@ -1,0 +1,7 @@
+{% load i18n %}{% comment %}
+After the number field of the metering point form (D-093, D-094): the link to the settings when the identifier is
+missing, the complete number (written by ``field-check.js`` on leaving the field) and the place of the notice "this
+number exists already" (server side on saving, script side on leaving the field).
+{% endcomment %}{% if form.identifier_missing %}<p class="mgmt-hint"><a href="{% url 'management:settings' %}">{% translate "Go to the settings" %}</a></p>{% endif %}
+<div class="mgmt-hint tnum" data-number-complete hidden aria-live="polite"></div>
+<div data-number-feedback>{% if duplicate %}{% include "management/_duplicate.html" %}{% endif %}</div>

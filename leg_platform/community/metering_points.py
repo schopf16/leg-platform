@@ -58,6 +58,60 @@ def create_metering_point(*, direction, location=None, number=None, leg=None, ac
     return metering_point
 
 
+DETAIL_FIELDS = ("pv_power_kwp", "battery_kwh", "wallbox_kw", "remark")
+
+
+class LocationUnavailable(Exception):
+    """The chosen location does not exist any more."""
+
+
+def update(metering_point, *, location, details=None, actor=None):
+    """Change the location (``None`` removes it) and, with ``details``, the plant data and the remark (D-095).
+
+    One transaction: the new location is locked first (the order of the merge of locations), then the point, which
+    must not be archived (``StatusError("archived")``); a location that is new for the point must exist
+    (``LocationUnavailable``) and be open (``archived.Archived``). The transformer circuit is not stored at the
+    point: it follows the location. History entries hold ids and field names only, never values (D-077, D-087).
+    Raises ``ValidationError`` for values outside the model rules."""
+    with transaction.atomic():
+        target = None
+        if location is not None:
+            try:
+                target = Location.objects.select_for_update().get(pk=location.pk)
+            except Location.DoesNotExist:
+                raise LocationUnavailable from None
+        try:
+            fresh = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
+        except MeteringPoint.DoesNotExist:
+            # Deleted between the form and the save: the normal refusal, not an error page (L-7).
+            raise StatusError("missing") from None
+        if fresh.is_archived:
+            raise StatusError("archived")
+        old_location_id = fresh.location_id
+        changed = []
+        if (target.pk if target else None) != old_location_id:
+            if target is not None:
+                archived.ensure_open(target, archived.LOCATION)
+            fresh.location = target
+            changed.append("location")
+        for name in DETAIL_FIELDS:
+            if details is not None and name in details and getattr(fresh, name) != details[name]:
+                setattr(fresh, name, details[name])
+                changed.append(name)
+        if not changed:
+            return fresh
+        fresh.full_clean(validate_unique=False)
+        fresh.save()
+        if "location" in changed:
+            history.record(
+                fresh, HistoryEvent.METERING_POINT_LOCATION_CHANGED, actor,
+                {"old_location_id": old_location_id, "new_location_id": target.pk if target else None},
+            )
+        data_fields = [name for name in changed if name != "location"]
+        if data_fields:
+            history.record(fresh, HistoryEvent.METERING_POINT_DATA_CHANGED, actor, {"fields": data_fields})
+    return fresh
+
 NOTIFY = "notify"
 CONFIRM = "confirm"
 START = "start"
@@ -65,7 +119,7 @@ LEG_MISSING = "leg_missing"
 
 
 class StatusError(Exception):
-    """A refused step; ``code``: ``archived``, ``wrong_status``, ``date_in_future``,
+    """A refused step; ``code``: ``archived``, ``missing`` (deleted meanwhile), ``wrong_status``, ``date_in_future``,
     ``date_before_previous`` or ``not_month_end``."""
 
     def __init__(self, code):

@@ -2,7 +2,7 @@
 The notice "this metering point number exists already" (``messpunkte/VORGABEN.md``, "Dublette beim
 Anlegen"): in the colour of the warning, with the existing metering point (number, direction, location,
 LEG, status) and the link to its page. Context: ``duplicate`` (``management.summaries.duplicate_summary``).
-The script of the dialog (``management/js/lookup.js``) builds the same structure when the number is
+The script of the dialog (``management/js/field-check.js``) builds the same structure when the number is
 checked on leaving the field.
 {% endcomment %}<div class="mgmt-banner mgmt-duplicate" role="status">
   <p><b>{% translate "This metering point number already exists." %}</b> {{ duplicate.number }}{% if duplicate.direction %}, {{ duplicate.direction }}{% endif %}{% if duplicate.location %}, {{ duplicate.location }}{% endif %}{% if duplicate.leg %}, {{ duplicate.leg }}{% endif %}{% if duplicate.status %}, {{ duplicate.status }}{% endif %}.</p>

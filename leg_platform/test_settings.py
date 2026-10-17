@@ -54,3 +54,9 @@ DATABASES = {  # noqa: F405
 # the fixtures of the tests), so it is a writer. The tests of the read-only default switch the
 # flag off explicitly (leg_platform/addresses/tests/test_directory.py).
 mark_writer()
+
+# No file logging and no automatic import in the tests (they must neither write into the folder of
+# the developer nor download); the tests that need them set the values themselves.
+LOG_DIRECTORY = ""
+LOGGING = logging_config("")  # noqa: F405
+ADDRESS_IMPORT_AUTOMATIC = False

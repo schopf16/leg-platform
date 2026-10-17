@@ -1,0 +1,231 @@
+"""The plain, read-only tables of the management data in the Django administration (D-091).
+
+Who may see them: the "view" right of the table, handed out by a system administrator (never by a group
+name in code). Nobody changes anything there. Free text of the staff, the IBAN and the email address of a
+person never appear."""
+
+from datetime import date
+
+from django.contrib import admin
+from django.contrib.auth.models import Group, Permission
+from django.test import TestCase, tag
+from django.urls import reverse
+
+from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.community.models import (
+    GridOperator,
+    HistoryEntry,
+    Leg,
+    LegAssignment,
+    Location,
+    ManagementSettings,
+    MeteringPoint,
+    PersonAssignment,
+    PersonRecord,
+    ShareChange,
+    TransformerCircuit,
+)
+from leg_platform.community.tests.helpers import (
+    assign_leg,
+    assign_person,
+    make_circuit,
+    make_leg,
+    make_location,
+    make_metering_point,
+    staff_user,
+)
+
+MODELS = (
+    HistoryEntry, Leg, LegAssignment, Location, ManagementSettings, MeteringPoint, PersonAssignment,
+    PersonRecord, ShareChange, TransformerCircuit,
+)
+SECRET_NOTE = "SECRET-NOTE-TEXT"
+SECRET_REMARK = "SECRET-REMARK-TEXT"
+SECRET_EMAIL = "secret.customer@example.org"
+SECRET_IBAN = "CH9300762011623852957"
+FORBIDDEN_COLUMNS = {
+    "iban", "iban_encrypted", "staff_note", "remark", "email", "address_digest", "first_name", "last_name",
+    "suggested_street", "suggested_town", "suggestion_dismissed_for", "password", "operator_customer_number",
+}
+
+
+def url(model, kind="changelist", *args):
+    return reverse(f"admin:community_{model._meta.model_name}_{kind}", args=args)
+
+
+@tag("mariadb")
+class PlainTablesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.administrator = staff_user("administrator.person@example.org", superuser=True)
+        cls.customer = create_active_user(SECRET_EMAIL, first_name="Secretia", last_name="Customerson")
+        cls.circuit = make_circuit("TRA4711", "Circuit name")
+        cls.location = make_location(transformer_circuit=cls.circuit, remark=SECRET_REMARK)
+        cls.point = make_metering_point(5, location=cls.location, remark=SECRET_REMARK)
+        cls.leg = make_leg("LEG Table", remark=SECRET_REMARK)
+        cls.leg_assignment = assign_leg(cls.point, cls.leg)
+        cls.person_assignment = assign_person(cls.point, cls.customer)
+        cls.record = PersonRecord(person=cls.customer, staff_note=SECRET_NOTE, operator_customer_number="OP-1")
+        cls.record.iban = SECRET_IBAN
+        cls.record.save()
+        cls.shares = ShareChange.objects.create(
+            record=cls.record, quantity=4, valid_from=date(2026, 1, 1), actor=cls.administrator
+        )
+        cls.history = HistoryEntry.objects.create(
+            subject_type="location", subject_id=cls.location.pk, event="created", actor=cls.administrator,
+            detail={"fields": ["street"]},
+        )
+        cls.settings_row = ManagementSettings.load()
+        cls.objects = {
+            HistoryEntry: cls.history, Leg: cls.leg, LegAssignment: cls.leg_assignment, Location: cls.location,
+            ManagementSettings: cls.settings_row, MeteringPoint: cls.point,
+            PersonAssignment: cls.person_assignment, PersonRecord: cls.record, ShareChange: cls.shares,
+            TransformerCircuit: cls.circuit,
+        }
+
+    def client_of(self, person):
+        client = VerifiedClient()
+        client.force_login(person)
+        return client
+
+    def staff_with(self, email, *codenames):
+        """A staff account that holds exactly these rights, through a group a test makes itself."""
+        person = staff_user(email)
+        group = Group.objects.create(name=f"Test group for {email}")
+        group.permissions.set(Permission.objects.filter(codename__in=codenames))
+        person.groups.add(group)
+        return self.client_of(person)
+
+    def test_every_table_is_registered_with_a_plain_read_only_admin(self):
+        for model in MODELS:
+            with self.subTest(model=model.__name__):
+                model_admin = admin.site._registry[model]
+                self.assertIsNone(model_admin.actions)
+                self.assertEqual(list(model_admin.inlines), [])
+                self.assertEqual(set(model_admin.get_readonly_fields(None)), set(model_admin.fields))
+                for method in ("has_add_permission", "has_change_permission", "has_delete_permission"):
+                    self.assertFalse(getattr(model_admin, method)(None))
+                self.assertTrue(model_admin.list_display)
+                self.assertLessEqual(model_admin.list_per_page, 100)
+        self.assertIn(GridOperator, admin.site._registry)
+
+    def test_no_column_or_field_can_show_free_text_the_iban_or_personal_data(self):
+        for model in MODELS:
+            model_admin = admin.site._registry[model]
+            with self.subTest(model=model.__name__):
+                shown = {*model_admin.list_display, *model_admin.fields, *model_admin.search_fields}
+                shown = {name.lstrip("=^@").split("__")[-1] for name in shown}
+                self.assertFalse(shown & FORBIDDEN_COLUMNS, shown & FORBIDDEN_COLUMNS)
+                # The search reaches no personal column of the account either.
+                for field in model_admin.search_fields:
+                    self.assertNotIn("person__", field.replace("person__customer_number", ""))
+
+    def test_a_system_administrator_sees_every_table_and_every_row(self):
+        client = self.client_of(self.administrator)
+        for model in MODELS:
+            with self.subTest(model=model.__name__):
+                self.assertEqual(client.get(url(model)).status_code, 200)
+                row = self.objects[model]
+                self.assertEqual(client.get(url(model, "change", row.pk)).status_code, 200)
+
+    def test_nothing_secret_is_in_any_page_of_any_table(self):
+        client = self.client_of(self.administrator)
+        for model in MODELS:
+            for page in (url(model), url(model, "change", self.objects[model].pk)):
+                html = client.get(page).content.decode()
+                with self.subTest(page=page):
+                    for secret in (SECRET_NOTE, SECRET_REMARK, SECRET_EMAIL, SECRET_IBAN, "Secretia", "Customerson", "OP-1"):
+                        self.assertNotIn(secret, html)
+                    self.assertNotIn(self.record.iban_encrypted[:20], html)
+
+    def test_the_lists_show_the_data_they_are_for(self):
+        client = self.client_of(self.administrator)
+        self.assertContains(client.get(url(TransformerCircuit)), "TRA4711")
+        self.assertContains(client.get(url(Location)), "Examplestrasse")
+        self.assertContains(client.get(url(MeteringPoint)), self.point.number)
+        self.assertContains(client.get(url(Leg)), "LEG Table")
+        # The number at the grid operator is shown on the detail page of the management area only (M-2).
+        self.assertNotContains(client.get(url(PersonRecord)), "OP-1")
+        self.assertEqual(admin.site._registry[PersonRecord].search_fields, ())  # nothing to search it with either
+        # A person is the customer number ("Konto ..."), not the name or the email.
+        self.assertContains(client.get(url(PersonAssignment)), "Konto")
+        self.assertContains(client.get(url(HistoryEntry)), "location")
+        self.assertContains(client.get(url(ManagementSettings)), "CH")
+
+    def test_a_system_administrator_cannot_add_change_or_delete_a_row_either(self):
+        client = self.client_of(self.administrator)
+        for model in MODELS:
+            row = self.objects[model]
+            with self.subTest(model=model.__name__):
+                # The page of a row is the read-only view; everything that writes is refused.
+                self.assertEqual(client.get(url(model, "change", row.pk)).status_code, 200)
+                self.assertNotContains(client.get(url(model, "change", row.pk)), 'name="_save"')
+                self.assertEqual(client.get(url(model, "add")).status_code, 403)
+                self.assertEqual(client.get(url(model, "delete", row.pk)).status_code, 403)
+                self.assertEqual(client.post(url(model, "add"), {}).status_code, 403)
+                self.assertEqual(client.post(url(model, "change", row.pk), {"_save": "x"}).status_code, 403)
+                self.assertEqual(client.post(url(model, "delete", row.pk), {"post": "yes"}).status_code, 403)
+        # Nothing changed.
+        self.assertEqual(Location.objects.count(), 1)
+        self.assertEqual(Leg.objects.get(pk=self.leg.pk).name, "LEG Table")
+
+    def test_a_staff_account_without_a_right_sees_nothing(self):
+        client = self.client_of(staff_user("no.rights@example.org"))
+        for model in MODELS:
+            row = self.objects[model]
+            for page in (url(model), url(model, "change", row.pk), url(model, "history", row.pk)):
+                with self.subTest(page=page):
+                    self.assertEqual(client.get(page).status_code, 403)
+        index = client.get(reverse("admin:index")).content.decode()
+        self.assertNotIn("/admin/community/", index)
+
+    def test_the_view_right_of_one_table_opens_that_table_only_and_changes_nothing(self):
+        client = self.staff_with("viewer.person@example.org", "view_location")
+        self.assertEqual(client.get(url(Location)).status_code, 200)
+        self.assertEqual(client.get(url(Location, "change", self.location.pk)).status_code, 200)
+        for model in MODELS:
+            if model is Location:
+                continue
+            with self.subTest(model=model.__name__):
+                self.assertEqual(client.get(url(model)).status_code, 403)
+        self.assertEqual(client.get(url(Location, "add")).status_code, 403)
+        self.assertEqual(client.get(url(Location, "delete", self.location.pk)).status_code, 403)
+        self.assertEqual(client.post(url(Location, "change", self.location.pk), {"street": "Hacked"}).status_code, 403)
+        self.assertEqual(client.post(url(Location, "delete", self.location.pk), {"post": "yes"}).status_code, 403)
+        self.assertEqual(Location.objects.get(pk=self.location.pk).street, "Examplestrasse")
+        index = client.get(reverse("admin:index")).content.decode()
+        self.assertIn(url(Location), index)
+        self.assertNotIn(url(MeteringPoint), index)
+
+    def test_a_staff_account_with_every_view_right_still_cannot_change_a_thing(self):
+        client = self.staff_with("viewer.two@example.org", *[f"view_{model._meta.model_name}" for model in MODELS])
+        for model in MODELS:
+            row = self.objects[model]
+            with self.subTest(model=model.__name__):
+                self.assertEqual(client.get(url(model)).status_code, 200)
+                self.assertEqual(client.post(url(model, "change", row.pk), {}).status_code, 403)
+                self.assertEqual(client.post(url(model, "delete", row.pk), {"post": "yes"}).status_code, 403)
+                self.assertEqual(client.post(url(model, "add"), {}).status_code, 403)
+        for model in MODELS:
+            self.assertTrue(model.objects.filter(pk=self.objects[model].pk).exists())
+
+    def test_the_grid_operator_stays_for_system_administrators_only(self):
+        client = self.staff_with("viewer.three@example.org", *[f"view_{model._meta.model_name}" for model in MODELS])
+        self.assertEqual(client.get(reverse("admin:community_gridoperator_changelist")).status_code, 403)
+
+    def test_the_start_page_groups_the_tables_under_management_data(self):
+        client = self.staff_with("viewer.four@example.org", "view_meteringpoint", "view_leg")
+        index = client.get(reverse("admin:index")).content.decode()
+        self.assertIn("Verwaltungsdaten", index)
+        self.assertIn(url(MeteringPoint), index)
+        self.assertIn(url(Leg), index)
+        self.assertNotIn(url(Location), index)
+
+    def test_the_labels_are_swiss_german(self):
+        client = self.client_of(self.administrator)
+        index = client.get(reverse("admin:index")).content.decode()
+        for text in ("Standorte", "Messpunkte", "LEGs", "Trafokreise", "Verlaufseinträge"):
+            self.assertIn(text, index)
+        page = client.get(url(MeteringPoint)).content.decode()
+        for text in ("Messpunkt-Nummer", "Richtung", "Status"):
+            self.assertIn(text, page)

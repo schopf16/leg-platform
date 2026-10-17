@@ -17,6 +17,7 @@ from leg_platform.accounts.models import EMAIL_MAX_LENGTH, SWITZERLAND, User, va
 from leg_platform.accounts.normalization import normalize_email_address
 from leg_platform.community import grid_operator, persons
 from leg_platform.community import iban as iban_module
+from leg_platform.management.form_fields import REMARK_ROWS
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 SELECT = {"class": "form-select", "autocomplete": "off"}
@@ -25,10 +26,10 @@ SELECT = {"class": "form-select", "autocomplete": "off"}
 class NoteForm(forms.Form):
     note = forms.CharField(
         label=_("Note"), required=False, max_length=persons.NOTE_MAX_LENGTH,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": REMARK_ROWS}),
     )
     layout = [("single", ["note"])]
-    optional = ()
+    optional = ("note",)
 
 
 class PaymentForm(forms.Form):
@@ -227,9 +228,13 @@ class PersonCreateForm(PersonDataForm):
 
     def clean(self):
         cleaned = super().clean()
-        # The registration asks for a street.
+        # The registration asks for a street. The account rule says "street or post office box", which this form has no
+        # field for, so its message is replaced by one that names the street only (C-12).
+        model_message = str(_("Enter a street or a post office box."))
+        if "street" in self.errors and list(self.errors["street"]) == [model_message]:
+            del self.errors["street"]
         if not self.cleaned_data.get("street") and "street" not in self.errors:
-            self.add_error("street", _("Enter a street or a post office box."))
+            self.add_error("street", _("Enter the street."))
         return cleaned
 
 

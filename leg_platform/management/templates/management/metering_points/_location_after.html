@@ -1,0 +1,5 @@
+{% load i18n %}{% comment %}
+After the location drop-down of the metering point form: the consequence line of a move (change mode, UX-005) and the
+way to create a location that is missing. The link comes back to this form with the new location chosen (``next``,
+D-095). Context: ``field``, ``form``, ``new_location_url``.
+{% endcomment %}{% if form.point %}{% include "management/_option_note.html" %}{% endif %}{% if new_location_url %}<p class="mgmt-circuit-links"><a href="{{ new_location_url }}">{% translate "Location missing? Create a new location" %}</a></p>{% endif %}

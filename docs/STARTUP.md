@@ -110,6 +110,8 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
     'A PID file exists. Run the status block of section 8 first; remove a PID file only if it is stale.'
 } else {
     $env:DJANGO_ALLOWED_HOSTS = '127.0.0.1,localhost'
+    # D-090: no automatic download of the real address directory on a development machine.
+    $env:ADDRESS_IMPORT_AUTOMATIC = 'False'
     if ($Port -ne 8000) { $env:INSTANCE_BASE_URL = "http://127.0.0.1:$Port" }
     # Local instance presentation (section 4)
     $env:INSTANCE_NAME = 'LEG-Portal'
@@ -193,7 +195,9 @@ foreach ($name in 'runserver', 'worker') {
   ```
 
   A code works **once** (30-second step plus one step of tolerance); a second login within the same 30 seconds needs a newer code: wait and run the command again. Do not enter wrong codes repeatedly: 15 wrong codes pause code entry for the account for 24 hours (D-040); the only ways out are a password reset or the emergency command, which would remove the seeded second factor.
-* Session timeouts (D-041): users 30 minutes idle or 8 hours; staff users and system administrators 15 minutes and 4 hours.
+* Session timeouts (D-041, D-088): a session ends after 30 minutes idle (users) or 15 minutes idle (staff users and system administrators) or at the logout; activity extends it and there is no absolute limit. "Stay signed in" (14 days) is available for every account, the second factor is asked once at the login. The portal settings ask for one proof (the code of the app) at the save, not for a recent login.
+* Logs (D-092): the dev server and the mail worker write to their `.err.log` files and the application writes `application.log` and `security.log` to `$HOME\.leg-platform-dev\logs\` (a system administrator also reads them in the administration, "Protokolldateien").
+* Address directory (D-090): the import runs in the portal itself. In the administration "Adressverzeichnis" the button starts it and the page shows the progress; **it downloads the real official file (about 143 MB, needs 4 GB free): do not press it casually on a development machine**. The automatic refresh is off in the automated tests and in the start block of section 6 (`ADDRESS_IMPORT_AUTOMATIC=False`); without that variable (default `True`) it starts at the first visit to the administration or the management overview when the directory is empty or due.
 
 ### 9.2 A self-registered test account
 

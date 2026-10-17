@@ -54,7 +54,7 @@ columns, the opening of a row by a click and the sending of the form on change.
               <td>
                 <div class="mgmt-addr mgmt-cut" title="{{ location.street }} {{ location.house_number }}">
                   {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% else %}<span class="mgmt-caret-space"></span>{% endif %}
-                  {{ location.street }} {{ location.house_number }}
+                  <a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ location.street }} {{ location.house_number }}</a>
                   {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
                   {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
                 </div>
@@ -106,7 +106,7 @@ columns, the opening of a row by a click and the sending of the form on change.
         <article class="mgmt-place" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
           <div class="mgmt-place-addr">
             {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% endif %}
-            <span>{{ location.street }} {{ location.house_number }}</span>
+            <a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ location.street }} {{ location.house_number }}</a>
             {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
             {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
             {% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}

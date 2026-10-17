@@ -98,7 +98,7 @@ class MeteringPointPageTests(TestCase):
     def test_the_list_shows_the_status_and_counts_the_points_in_the_quick_filters(self):
         page = self.login(self.staff).get(LIST)
         for text in (
-            "Alle (6)", "Bei der Netzbetreiber Beispiel anmelden (3)", "Bestätigung ausstehend (1)",
+            "Alle (6)", "Bei Netzbetreiber Beispiel anmelden (3)", "Bestätigung ausstehend (1)",
             "Startdatum ausstehend (1)", "archiviert (0)", number(5), "aktiv", "registriert", "Probleme filtern (5)",
             "Messpunkt anlegen",
         ):
@@ -163,7 +163,7 @@ class MeteringPointPageTests(TestCase):
             "Dieser Messpunkt ist keiner LEG zugeordnet.", "Dieser Messpunkt ist keiner Person zugeordnet.",
             "Als angemeldet setzen", "LEG zuweisen", "Person zuweisen",
             "Messpunkt löschen",  # without a history the one button is "delete"
-            "Erfasst, noch nicht bei der Netzbetreiber Beispiel angemeldet.", "TRA21359", number(2),
+            "Erfasst, noch nicht bei Netzbetreiber Beispiel angemeldet.", "TRA21359", number(2),
         ):
             self.assertIn(text, page)
         self.assertNotIn("BKW", page)
@@ -247,7 +247,7 @@ class MeteringPointPageTests(TestCase):
         point = self.no_leg_point
         notify = self.url("notify", point)
         page = client.get(notify, {"next": LIST})
-        self.assertContains(page, "Als bei der Netzbetreiber Beispiel angemeldet setzen")
+        self.assertContains(page, "Als bei Netzbetreiber Beispiel angemeldet setzen")
         self.assertNotContains(page, "BKW")
         self.assertContains(page, f'value="{TODAY.isoformat()}"')  # "Angemeldet am" is today
         self.assertContains(page, f'href="{LIST}"')
@@ -324,16 +324,64 @@ class MeteringPointPageTests(TestCase):
         self.assertNotContains(page, 'href="https://evil.example')
         self.assertContains(page, f'href="{self.detail(self.registered)}"')
 
+    def test_a_hostile_way_back_is_never_followed_by_the_dialogs_that_create_change_and_assign(self):
+        """The dialogs of D-095 (create, create at a location, edit, assign to a location, assign to a LEG): a ``next``
+        that leaves the site is ignored on the page (way back) and after the save (redirect)."""
+        client = self.login(self.staff)
+
+        def on_this_site(location):
+            self.assertTrue(location.startswith("/management/"), location)
+            self.assertNotIn("evil", location)
+            self.assertNotIn("//", location.split("?")[0])
+
+        for index, hostile in enumerate(HOSTILE):
+            with self.subTest(next=hostile):
+                edited = make_metering_point(300 + index)
+                moved = make_metering_point(400 + index)
+                joined = make_metering_point(500 + index)
+                dialogs = (
+                    (reverse("management:metering_points_new"), {"number_digits": str(100 + index), "direction": "consumption"}),
+                    (
+                        reverse("management:locations_metering_point_new", args=[self.place.pk]),
+                        {"number_digits": str(200 + index), "direction": "consumption"},
+                    ),
+                    (self.url("edit", edited), {"location": str(self.place.pk)}),
+                    (
+                        reverse("management:locations_metering_point_assign", args=[self.place.pk]),
+                        {"metering_point": str(moved.pk)},
+                    ),
+                    (
+                        reverse("management:legs_metering_point_assign", args=[self.leg_a.pk]),
+                        {"metering_point": str(joined.pk), "valid_from": d(0).isoformat()},
+                    ),
+                )
+                for url, data in dialogs:
+                    page = client.get(url, {"next": hostile})
+                    on_this_site(page.context["back_url"])
+                    self.assertNotContains(page, 'href="https://evil.example')
+                    response = client.post(url, {**data, "next": hostile})
+                    self.assertEqual(response.status_code, 302, url)
+                    on_this_site(response["Location"])
+        self.assertEqual(MeteringPoint.objects.get(number=number(500)).location_id, None)
+        self.assertEqual(LegAssignment.objects.get(metering_point__number=number(500)).leg, self.leg_a)
+        self.assertEqual(MeteringPoint.objects.get(number=number(400)).location, self.place)
+
     # The person ---------------------------------------------------------------------------------
 
     def test_assigning_changing_ending_and_deleting_a_person(self):
         client = self.login(self.staff)
         url = self.url("person", self.no_leg_point)
         page = client.get(url)
-        self.assertContains(page, 'list="person-options"')
+        # The person field is a combobox of the page script (no browser list): the address of the suggestions is
+        # in the field, and the way to create a missing person is under it (D-094).
+        self.assertContains(page, f'data-suggest-url="{reverse("management:metering_points_person_search")}"')
+        self.assertNotContains(page, "<datalist")
+        self.assertContains(page, "Person fehlt? Neue Person einladen")
         self.assertContains(page, "Name, Kundennummer oder E-Mail suchen")
+        self.assertContains(page, "Person zuweisen</button>")
         # A text that names nobody or several, or a date that is not valid, is refused with a message.
-        self.assertContains(client.post(url, {"person": "nobody here", "valid_from": d(0).isoformat()}), "Keine Person gefunden.")
+        nobody = client.post(url, {"person": "nobody here", "valid_from": d(0).isoformat()})
+        self.assertContains(nobody, "Keine Person gefunden. Zugewiesen werden können nur aktive Personen mit Kundennummer.")
         self.assertContains(client.post(url, {"person": "muster", "valid_from": d(0).isoformat()}), "Mehrere Personen passen.")
         self.assertContains(client.post(url, {"person": "Anna Muster", "valid_from": "x"}), "mgmt-field-error")
         self.assertFalse(PersonAssignment.objects.filter(metering_point=self.no_leg_point).exists())
@@ -401,6 +449,30 @@ class MeteringPointPageTests(TestCase):
             create_active_user(f"bulk{index}.person@example.org", first_name="Bulk", last_name=f"Person{index}")
         self.assertEqual(len(client.get(search, {"q": "bulk"}).json()["results"]), 10)
 
+    def test_the_person_search_is_limited_per_account_and_cut_to_five_words_and_a_hundred_characters(self):
+        from unittest import mock
+
+        from leg_platform.accounts import rate_limits
+
+        search = reverse("management:metering_points_person_search")
+        client = self.login(self.staff)
+        with mock.patch.object(rate_limits, "PERSON_SEARCH_LIMITS", ((2, timedelta(minutes=1)),)):
+            self.assertEqual(client.get(search, {"q": "muster"}).status_code, 200)
+            self.assertEqual(client.get(search, {"q": "muster"}).status_code, 200)
+            refused = client.get(search, {"q": "muster"})
+            self.assertEqual(refused.status_code, 429)
+            self.assertEqual(refused.json(), {"results": [], "limited": True})
+            self.assertEqual(refused["Retry-After"], "30")
+            # A query that is too short is not counted and not refused.
+            self.assertEqual(client.get(search, {"q": "m"}).status_code, 200)
+        # Only the first five words filter: "zzz" is the sixth word and is ignored, so Anna is still found.
+        found = client.get(search, {"q": "anna muster a a a zzz"}).json()["results"]
+        self.assertEqual([text.split(" · ")[0] for text in found], ["Anna Muster"])
+        self.assertEqual(client.get(search, {"q": "anna muster a a zzz"}).json()["results"], [])  # the fifth word
+        # The text is cut to 100 characters before it is split.
+        self.assertEqual(client.get(search, {"q": "anna " + " " * 100 + "zzz"}).status_code, 200)
+        self.assertEqual(len(client.get(search, {"q": "anna muster " + "a" * 500}).json()["results"]), 0)
+
     # The LEG ------------------------------------------------------------------------------------
 
     def test_assigning_a_leg_and_the_switch_with_the_move_mask(self):
@@ -451,21 +523,27 @@ class MeteringPointPageTests(TestCase):
         url = reverse("management:metering_points_new")
         page = client.get(url, {"next": LIST})
         for text in (
-            "CH1A2B3C4D5E6", "Messpunkt anlegen", "Nur die letzten Stellen. Land und Identifikator kommen aus den Einstellungen.",
-            "Strasse oder Messpunkt-Nummer suchen", "Optional", "Bemerkung", "data-number-check-url",
-            'name="location"', 'name="leg"',
+            "CH1A2B3C4D5E6", "Messpunkt anlegen",
+            "Nur die letzten Ziffern. Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023).",
+            "Standort fehlt? Neuen Standort anlegen", "Noch kein Standort gewählt", "Noch keine LEG gewählt",
+            "Optional", "Bemerkung", 'data-check="digits"', 'data-check="decimal"', 'name="location"', 'name="leg"',
         ):
             self.assertContains(page, text)
+        for gone in ("<datalist", 'list="location-options"', "Strasse oder Messpunkt-Nummer suchen", 'maxlength="20"'):
+            self.assertNotContains(page, gone)
         data = {
-            "number_digits": "7", "direction": "feed_in", "location": str(self.place), "leg": self.leg_a.pk,
-            "pv_power_kwp": "9.5", "battery_kwh": "", "wallbox_kw": "11", "remark": "  Dach  ", "next": LIST,
+            "number_digits": "7", "direction": "feed_in", "location": str(self.place.pk), "leg": self.leg_a.pk,
+            "pv_power_kwp": "9.5", "battery_kwh": "", "wallbox_kw": "11,25", "remark": "  Dach  ", "next": LIST,
         }
-        self.assertRedirects(client.post(url, data), LIST, fetch_redirect_response=False)
+        response = client.post(url, data)
         created = MeteringPoint.objects.get(number=number(7))
+        # The page of the new metering point opens; its way back is the list.
+        self.assertRedirects(response, f"{self.detail(created)}?new=1&next={LIST.replace('/', '%2F')}", fetch_redirect_response=False)
         self.assertEqual(
             (created.direction, created.location, str(created.pv_power_kwp), created.battery_kwh, created.remark),
             (Direction.FEED_IN, self.place, "9.50", None, "Dach"),
         )
+        self.assertEqual(str(created.wallbox_kw), "11.25")  # the decimal comma
         self.assertEqual(LegAssignment.objects.get(metering_point=created).leg, self.leg_a)
         self.assertEqual(history.entries_for(created).first().event, HistoryEvent.CREATED)
         # The number exists: the notice with the link, and nothing is saved.
@@ -476,17 +554,108 @@ class MeteringPointPageTests(TestCase):
         self.assertEqual(MeteringPoint.objects.filter(number=number(1)).count(), 1)
         for bad in (
             {"number_digits": ""}, {"number_digits": "abc"}, {"number_digits": "1" * 21}, {"direction": "x"},
-            {"location": "nowhere"}, {"pv_power_kwp": "-1"}, {"leg": 99999},
+            {"location": "nowhere"}, {"location": "999999"}, {"pv_power_kwp": "-1"}, {"leg": 99999},
         ):
             before = MeteringPoint.objects.count()
             response = client.post(url, {**data, "number_digits": "8", **bad})
             self.assertEqual(response.status_code, 200, bad)
             self.assertEqual(MeteringPoint.objects.count(), before, bad)
 
-    def test_the_location_search_of_the_create_dialog_finds_a_location(self):
-        search = reverse("management:metering_points_location_search")
-        self.assertEqual(self.login(self.staff).get(search, {"q": "muster"}).json()["results"], [str(self.place)])
+    def test_the_number_is_filled_with_zeros_and_every_wrong_entry_has_its_own_message(self):
+        client = self.login(self.staff)
+        url = reverse("management:metering_points_new")
+        base = {"direction": "consumption", "location": ""}
+        created = client.post(url, {**base, "number_digits": "23"})
+        self.assertEqual(created.status_code, 302)
+        self.assertTrue(MeteringPoint.objects.filter(number="CH1A2B3C4D5E6" + "23".zfill(20)).exists())
+        # Twenty digits are as they are, and a page shown again holds the filled-up digits.
+        shown = client.post(url, {**base, "number_digits": "5", "pv_power_kwp": "x"})
+        self.assertContains(shown, 'value="00000000000000000005"')
+        for typed, message in (
+            ("", "Geben Sie die letzten Ziffern der Nummer ein."),
+            ("12ab", "Nur die Ziffern 0–9 sind erlaubt."),
+            ("1 2", "Nur die Ziffern 0–9 sind erlaubt."),
+            ("٣", "Nur die Ziffern 0–9 sind erlaubt."),
+            ("1" * 21, "Es sind höchstens 20 Ziffern erlaubt (eingegeben: 21)."),
+        ):
+            with self.subTest(typed=typed):
+                response = client.post(url, {**base, "number_digits": typed})
+                self.assertContains(response, message)
+        self.assertEqual(MeteringPoint.objects.filter(number__endswith="0" * 12 + "12ab").count(), 0)
 
+    def test_the_power_fields_take_digits_and_one_separator_only(self):
+        client = self.login(self.staff)
+        url = reverse("management:metering_points_new")
+        base = {"direction": "consumption", "location": "", "number_digits": "31"}
+        messages = {
+            "invalid": "Geben Sie eine Zahl ein, z. B. 12.5 (Ziffern und ein Dezimalpunkt oder -komma).",
+            "places": "Höchstens 2 Nachkommastellen.",
+            "range": "Der Wert muss zwischen 0 und 999999.99 liegen.",
+        }
+        for typed, kind in (
+            ("abc", "invalid"), ("12a", "invalid"), ("1.2.3", "invalid"), ("1,2,3", "invalid"), ("-1", "invalid"),
+            ("+1", "invalid"), (".", "invalid"), (",", "invalid"), ("1e3", "invalid"), ("1 000", "invalid"),
+            ("١", "invalid"), ("1.234", "places"), ("1,234", "places"), ("1000000", "range"), ("999999.991", "places"),
+        ):
+            with self.subTest(typed=typed):
+                response = client.post(url, {**base, "pv_power_kwp": typed})
+                self.assertContains(response, messages[kind])
+                self.assertFalse(MeteringPoint.objects.filter(number=number(31)).exists())
+        for typed, expected in (("12,5", "12.50"), ("12.5", "12.50"), ("0", "0.00"), ("999999.99", "999999.99"), (".5", "0.50"), ("7.", "7.00")):
+            with self.subTest(accepted=typed):
+                client.post(url, {**base, "pv_power_kwp": typed})
+                point = MeteringPoint.objects.get(number=number(31))
+                self.assertEqual(str(point.pv_power_kwp), expected)
+                point.delete()
+
+    def test_changing_a_metering_point_sets_the_location_and_the_plant_data(self):
+        client = self.login(self.staff)
+        point = self.loose
+        url = self.url("edit", point)
+        page = client.get(url)
+        # The same form as "Create metering point": number and direction are facts, the LEG has its own dialog.
+        self.assertContains(page, "Messpunkt bearbeiten")
+        self.assertContains(page, point.number)
+        self.assertNotContains(page, 'name="number_digits"')
+        self.assertNotContains(page, 'name="direction"')
+        self.assertContains(page, self.url("leg", point))
+        self.assertContains(page, "Der Trafokreis ergibt sich aus dem Standort.")
+        response = client.post(
+            url, {"location": str(self.place.pk), "pv_power_kwp": "4,5", "remark": "Dach", "number_digits": "9999", "direction": "feed_in"}
+        )
+        self.assertRedirects(response, self.detail(point), fetch_redirect_response=False)
+        point.refresh_from_db()
+        self.assertEqual((point.location, str(point.pv_power_kwp), point.remark), (self.place, "4.50", "Dach"))
+        # Number and direction are not changed by a forged post.
+        self.assertNotEqual(point.number, "CH1A2B3C4D5E6" + "9999".zfill(20))
+        self.assertEqual(point.direction, Direction.CONSUMPTION)
+        events = [(entry.event, entry.detail) for entry in history.entries_for(point)]
+        self.assertIn(
+            (HistoryEvent.METERING_POINT_LOCATION_CHANGED, {"old_location_id": None, "new_location_id": self.place.pk}), events
+        )
+        self.assertIn((HistoryEvent.METERING_POINT_DATA_CHANGED, {"fields": ["pv_power_kwp", "remark"]}), events)
+        self.assertNotIn("Dach", str(events))  # the history names fields, never values
+        # The detail page offers the action where there was none.
+        loose_page = client.get(self.detail(self.loose))
+        self.assertContains(loose_page, self.url("edit", self.loose))
+
+    def test_changing_a_metering_point_refuses_a_location_that_cannot_be_chosen(self):
+        client = self.login(self.staff)
+        archived = make_location("Altweg", "9", is_archived=True)
+        url = self.url("edit", self.registered)
+        before = self.registered.location
+        for forged in (str(archived.pk), "999999", "abc", "-1", "9" * 40):
+            with self.subTest(forged=forged[:12]):
+                response = client.post(url, {"location": forged})
+                self.assertEqual(response.status_code, 200)
+        self.registered.refresh_from_db()
+        self.assertEqual(self.registered.location, before)
+        # An archived metering point is not changed.
+        self.registered.is_archived = True
+        self.registered.save()
+        client.post(url, {"location": ""})
+        self.registered.refresh_from_db()
+        self.assertEqual(self.registered.location, before)
     def test_the_number_is_checked_on_leaving_the_field(self):
         check = reverse("management:metering_points_check_number")
         client = self.login(self.staff)

@@ -253,7 +253,7 @@ class PrintDocumentTests(Fixture):
         _prepared, document = self.document("metering_points", "step=notify&leg=%d" % self.fine.pk, details=False)
         self.assertEqual(
             [line for line in document.info if line[0] in ("Schnellfilter", "LEG")],
-            [("Schnellfilter", "Bei der Netzbetreiber Beispiel anmelden"), ("LEG", "LEG Ruhig")],
+            [("Schnellfilter", "Bei Netzbetreiber Beispiel anmelden"), ("LEG", "LEG Ruhig")],
         )
         # An unknown value is the default, as on the page; nothing of the address is printed that was not parsed.
         _prepared, document = self.document("legs", "sort=password&dir=x&display=zzz&evil=1", details=False)

@@ -258,12 +258,13 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         self.assertIn(Path(tempfile.gettempdir()).resolve(), test_file.parents)
 
     def test_web_modules_never_import_the_importer_or_the_downloader(self):
-        # The import runs only in the worker process (D-075). The modules that a web request
-        # reaches must not import the importer or the HTTP client, neither at the top nor inside a
-        # function; jobs.py imports the importer only inside process_one (worker only).
+        # A web request never downloads (D-075, D-090): the modules that a request reaches must not import
+        # the importer or the HTTP client, neither at the top nor inside a function. The one door is the
+        # import thread of ``runner.py`` (and ``jobs.py`` for the failure text), which import the
+        # importer only inside a function that runs in that thread or in the worker.
         directory = Path(importer.__file__).parent
         for name in ("admin.py", "views.py", "urls.py", "services.py", "limits.py", "models.py", "apps.py",
-                     "router.py", "storage.py", "keys.py"):
+                     "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
             tree = ast.parse((directory / name).read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 modules = []
@@ -276,12 +277,14 @@ class DirectoryFileSettingsTests(SimpleTestCase):
                     with self.subTest(file=name, module=module):
                         self.assertFalse(module.split(".")[0] == "requests", module)
                         self.assertNotIn("importer", module.split("."))
-        tree = ast.parse((directory / "jobs.py").read_text(encoding="utf-8"))
-        top_level = [
-            node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))
-        ]
-        for node in top_level:
-            self.assertNotIn("importer", ast.dump(node))
+        for name in ("jobs.py", "runner.py"):
+            tree = ast.parse((directory / name).read_text(encoding="utf-8"))
+            top_level = [
+                node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))
+            ]
+            for node in top_level:
+                self.assertNotIn("importer", ast.dump(node), name)
+                self.assertNotIn("requests", ast.dump(node), name)
         callers = sorted(
             path.relative_to(directory.parent).as_posix()
             for path in directory.parent.rglob("*.py")
@@ -292,6 +295,10 @@ class DirectoryFileSettingsTests(SimpleTestCase):
             "addresses/management/commands/import_address_directory.py",
             "addresses/management/commands/process_address_imports.py",
         ])
+        # The running thread is the only web-side code that may write the file, and only its own connection.
+        runner_text = (directory / "runner.py").read_text(encoding="utf-8")
+        self.assertIn("mark_thread_writer", runner_text)
+        self.assertNotIn("mark_writer()", runner_text)
 
 
 class RateLimitAdapterTests(SimpleTestCase):
@@ -1631,8 +1638,15 @@ class DirectoryDatabaseTests(TestCase):
                 with self.assertLogs("leg_platform.addresses.jobs", level="ERROR") as logs:
                     with self.assertRaises(importer.ImportFailure):
                         process_one(schedule_automatic=True)
-        self.assertEqual(logs.output, ["ERROR:leg_platform.addresses.jobs:Address directory import attempt failed."])
+        self.assertEqual(
+            logs.output,
+            ["ERROR:leg_platform.addresses.jobs:Address directory import failed (automatic): "
+             "The import failed unexpectedly. (ImportFailure)"],
+        )
         job = ImportRequest.objects.get(pk=1)
+        # Only the fixed sentences of the importer reach the row, the log and the page (D-090).
+        self.assertEqual(job.last_error, jobs.UNEXPECTED_FAILURE)
+        self.assertNotIn("private detail", job.last_error)
         self.assertEqual(job.state, ImportRequest.State.FAILED)
         self.assertEqual(job.last_automatic_attempt_at, now)
         with patch("leg_platform.addresses.jobs.timezone.now", return_value=now + timedelta(days=89)):
@@ -1918,14 +1932,19 @@ class DirectoryDatabaseTests(TestCase):
     def test_admin_status_and_enqueue_never_download(self):
         client = self._staff_client(True)
         url = reverse("admin:addresses_importrequest_changelist")
-        with patch("leg_platform.addresses.importer.import_directory") as download:
+        with patch("leg_platform.addresses.importer.import_directory") as download, \
+                patch("leg_platform.addresses.runner.threading.Thread") as thread:
             response = client.get(url)
             self.assertNotContains(response, "swisstopo")
             self.assertContains(response, "Data date")
             with patch("leg_platform.addresses.admin.allow_request", return_value=True):
                 self.assertEqual(client.post(url).status_code, 302)
+            # The request itself never downloads: it claims the job and starts the import thread (D-090).
             download.assert_not_called()
-        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+            thread.assert_called_once()
+            self.assertIs(thread.call_args.kwargs["daemon"], True)
+            thread.return_value.start.assert_called_once_with()
+        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
 
     def test_admin_enqueue_requires_csrf(self):
         self._staff_client(True)
@@ -1945,11 +1964,12 @@ class DirectoryDatabaseTests(TestCase):
         client = self._staff_client(True)
         user = get_user_model().objects.get(email="directory-staff@example.org")
         url = reverse("admin:addresses_importrequest_changelist")
-        with patch("leg_platform.addresses.admin.allow_request", return_value=True):
+        with patch("leg_platform.addresses.admin.allow_request", return_value=True), \
+                patch("leg_platform.addresses.runner.threading.Thread"):
             with self.assertLogs("leg_platform.security", level="WARNING") as logs:
                 with self.captureOnCommitCallbacks(execute=True):
                     self.assertEqual(client.post(url).status_code, 302)
-                    # The second request is coalesced with the queued one, but it is a request too.
+                    # The second request finds the import running, but it is a request too.
                     self.assertEqual(client.post(url).status_code, 302)
         entries = list(SecurityEvent.objects.filter(event="address_import_requested"))
         self.assertEqual(len(entries), 2)
@@ -1959,7 +1979,7 @@ class DirectoryDatabaseTests(TestCase):
             logs.output,
             [f"WARNING:leg_platform.security:An address directory import was requested (actor {user.pk})."] * 2,
         )
-        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
 
     def test_the_event_has_a_swiss_german_label_in_the_security_log(self):
         from django.utils import translation
@@ -2363,6 +2383,7 @@ class MigrateTests(SimpleTestCase):
             self.assertIn("Applying addresses.0001_initial... OK", first.stdout)
             # 0002 only changes the queue table, which is not in the file: recorded, nothing else.
             self.assertIn("Applying addresses.0002_importrequest_last_failed_repair_at... OK", first.stdout)
+            self.assertIn("Applying addresses.0003_import_progress_and_error... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2379,6 +2400,7 @@ class MigrateTests(SimpleTestCase):
                              {"django_migrations", "addresses_address", "addresses_directory"})
             self.assertEqual(recorded, {
                 ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
+                ("addresses", "0003_import_progress_and_error"),
             })
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":

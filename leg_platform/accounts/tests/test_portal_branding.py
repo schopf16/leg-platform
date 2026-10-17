@@ -7,7 +7,6 @@ The validation of the files themselves is in ``test_logo_images``."""
 import importlib
 import json
 import re
-import time
 from pathlib import Path
 from unittest import mock
 
@@ -23,7 +22,14 @@ from django.utils.csp import CSP
 
 from leg_platform import branding
 from leg_platform.accounts import emails, second_factor
-from leg_platform.accounts.models import EmailText, PortalSettings, SecurityEvent, User
+from leg_platform.accounts.models import (
+    AuthenticatorDevice,
+    EmailText,
+    PortalSettings,
+    SecurityEvent,
+    SessionCodeFailure,
+    User,
+)
 from leg_platform.accounts.portal_settings import (
     LOGO_VERSION_LENGTH,
     effective_colours,
@@ -32,7 +38,14 @@ from leg_platform.accounts.portal_settings import (
     portal_values,
 )
 from leg_platform.accounts.portal_settings_form import PortalSettingsForm
-from leg_platform.accounts.tests.helpers import VerifiedClient, age_authentication, create_active_user
+from leg_platform.accounts.tests.helpers import (
+    PASSWORD,
+    ProvingClient,
+    VerifiedClient,
+    age_authentication,
+    code_for,
+    create_active_user,
+)
 from leg_platform.accounts.tests.test_logo_images import MINIMAL, chunk, make_png, svg
 from leg_platform.branding import colour_problems, load_branding
 from leg_platform.middleware import body_limit
@@ -95,7 +108,7 @@ def upload(content, name="logo.png", content_type="image/png"):
 def administrator():
     person = create_active_user("administrator@example.org")
     person.set_privileges(is_staff=True, is_superuser=True)
-    client = VerifiedClient()
+    client = ProvingClient()
     client.force_login(person)
     return client, person
 
@@ -104,7 +117,7 @@ def staff_with(email, *codenames):
     person = create_active_user(email)
     person.set_privileges(is_staff=True, is_superuser=False)
     person.user_permissions.set(Permission.objects.filter(codename__in=codenames))
-    client = VerifiedClient()
+    client = ProvingClient()
     client.force_login(person)
     return client, person
 
@@ -1155,18 +1168,11 @@ class AdminFormTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-def make_login_older(client, seconds):
-    """Let the session of the client have logged in ``seconds`` ago (the server-side time of
-    D-055)."""
-    age_authentication(client, seconds)
-
-
 @override_settings(**SERVER)
 @tag("mariadb")
-class RecentLoginTests(TestCase):
-    """Saving the portal settings needs a login within five minutes (review of D-073, L-5)."""
-
-    MESSAGE = "nur innerhalb von 5 Minuten nach der Anmeldung gespeichert werden"
+class SaveProofTests(TestCase):
+    """Saving the portal settings needs one proof of identity (D-088); it replaced the rule "log in
+    again within five minutes" of D-073, which forced a logout and login."""
 
     def setUp(self):
         self.client, self.administrator = administrator()
@@ -1174,153 +1180,144 @@ class RecentLoginTests(TestCase):
     def row_is_empty(self):
         return not PortalSettings.objects.exclude(name="").exists()
 
-    def test_a_save_after_the_window_is_refused_and_changes_nothing(self):
-        make_login_older(self.client, 301)
-
-        response = self.client.post(SETTINGS_URL, form_data(name="Changed", **GOOD))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.MESSAGE)
-        self.assertTrue(self.row_is_empty())
-        self.assertFalse(PortalSettings.objects.filter(accent_light="#004E86").exists())
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists())
-
-    def test_a_save_inside_the_window_works(self):
-        make_login_older(self.client, 240)
+    def test_the_session_age_does_not_matter_any_more(self):
+        age_authentication(self.client, 3600)
 
         response = self.client.post(SETTINGS_URL, form_data(name="Changed"))
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(PortalSettings.objects.get(pk=1).name, "Changed")
 
-    def test_a_missing_or_invalid_time_of_the_login_is_not_recent(self):
-        for label, value in (
-            ("missing", None),
-            ("a boolean", True),
-            ("a string", "now"),
-            ("in the future", time.time() + 3600),
-        ):
-            with self.subTest(label):
-                session = self.client.session
-                if value is None:
-                    session.pop(second_factor.AUTHENTICATED_AT_KEY, None)
-                else:
-                    session[second_factor.AUTHENTICATED_AT_KEY] = value
-                session.save()
+    def test_the_page_has_no_logout_warning_and_no_logout_form_any_more(self):
+        age_authentication(self.client, 3600)
 
-                response = self.client.post(SETTINGS_URL, form_data(name="Changed"))
+        html = self.client.get(SETTINGS_URL).content.decode()
 
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, self.MESSAGE)
-                self.assertTrue(self.row_is_empty())
+        self.assertNotIn("portal-login-warning", html)
+        self.assertNotIn("portal-logout-form", html)
+        self.assertNotIn("in den letzten 5 Minuten", html)
+        # The field of the proof is there: the code of the app (staff always have a second factor).
+        self.assertIn('name="otp_token"', html)
+        self.assertNotIn('name="current_password"', html)
+        self.assertIn("Bestätigung", html)
 
-    def test_a_staff_user_with_only_the_change_right_needs_it_as_well(self):
+    def test_a_save_without_the_proof_is_refused_and_changes_nothing(self):
+        self.client.auto_proof = False
+
+        response = self.client.post(SETTINGS_URL, form_data(name="Changed", **GOOD))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Geben Sie den 2FA-Authentifizierungscode ein.")
+        self.assertTrue(self.row_is_empty())
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists())
+
+    def test_a_wrong_code_is_refused_counted_and_nothing_is_saved(self):
+        self.client.auto_proof = False
+
+        response = self.client.post(SETTINGS_URL, form_data(name="Changed", otp_token="000000"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Der 2FA-Authentifizierungscode ist falsch oder abgelaufen.")
+        self.assertTrue(self.row_is_empty())
+        self.assertEqual(SessionCodeFailure.objects.get(account=self.administrator).failures, 1)
+
+    def test_the_password_is_no_proof_for_an_account_with_a_second_factor(self):
+        self.client.auto_proof = False
+
+        response = self.client.post(SETTINGS_URL, form_data(name="Changed", current_password=PASSWORD))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self.row_is_empty())
+
+    def test_the_fifth_wrong_code_ends_the_session(self):
+        self.client.auto_proof = False
+        for _attempt in range(second_factor.SESSION_CODE_LIMIT):
+            response = self.client.post(SETTINGS_URL, form_data(name="Changed", otp_token="000000"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(LOGIN_URL))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertTrue(self.row_is_empty())
+
+    def test_a_staff_user_with_only_the_change_right_needs_the_proof_as_well(self):
         client, _person = staff_with("change.person@example.org", "view_portalsettings", "change_portalsettings")
-        make_login_older(client, 3600)
+        client.auto_proof = False
 
         response = client.post(SETTINGS_URL, form_data(name="Changed"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.MESSAGE)
         self.assertTrue(self.row_is_empty())
+        client.auto_proof = True
+        self.assertEqual(client.post(SETTINGS_URL, form_data(name="Changed")).status_code, 302)
 
-    def test_an_old_session_does_not_get_to_read_or_log_an_upload(self):
-        make_login_older(self.client, 3600)
+    def test_a_wrong_code_stores_no_upload_even_for_an_old_session(self):
+        age_authentication(self.client, 3600)
+        self.client.auto_proof = False
 
         with mock.patch("leg_platform.accounts.portal_settings_form.validate_logo") as validate:
-            response = self.client.post(
-                SETTINGS_URL,
-                form_data(logo_light_file=upload(PNG), logo_dark_file=upload(PNG_DARK)),
+            self.client.post(
+                SETTINGS_URL, form_data(logo_light_file=upload(PNG), logo_dark_file=upload(PNG_DARK), otp_token="000000")
             )
 
-        self.assertContains(response, self.MESSAGE)
-        validate.assert_not_called()
+        # The wrong code is only looked at last, so the upload was validated; but nothing was stored.
         self.assertFalse(PortalSettings.objects.exclude(logo_light_sha256="").exists())
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_UPLOAD_REJECTED).exists())
+        self.assertTrue(validate.called)
 
-    WARNING = "Um Änderungen zu speichern, müssen Sie sich in den letzten 5 Minuten angemeldet haben."
+    def test_a_code_is_not_used_up_by_a_form_with_another_error(self):
+        device = AuthenticatorDevice.objects.get(user=self.administrator)
+        self.client.auto_proof = False
+        code = code_for(device)
 
-    def test_the_page_can_still_be_viewed_and_says_why_saving_will_fail(self):
-        make_login_older(self.client, 3600)
-
-        response = self.client.get(SETTINGS_URL)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.WARNING)
-        self.assertContains(
-            response,
-            "Bitte melden Sie sich zuerst ab und wieder an.",
+        refused = self.client.post(
+            SETTINGS_URL, form_data(name="Changed", accent_light="#FFFFFF", text_light="#FFFFFF", otp_token=code)
         )
 
-    def test_the_warning_is_at_the_top_before_the_form_and_has_a_post_logout_with_the_token(self):
-        make_login_older(self.client, 3600)
-
-        html = self.client.get(SETTINGS_URL).content.decode()
-
-        warning = html.index(self.WARNING)
-        self.assertLess(warning, html.index('id="portalsettings_form"'))
-        self.assertLess(warning, html.index("<h1"))
-        logout = re.search(r'<form id="portal-logout-form" method="post" action="([^"]*)">(.*?)</form>', html, re.S)
-        self.assertIsNotNone(logout)
-        self.assertEqual(logout.group(1), reverse("admin:logout"))
-        self.assertIn('name="csrfmiddlewaretoken"', logout.group(2))
-        button = re.search(r'<button type="submit"[^>]*form="portal-logout-form"[^>]*>\s*Abmelden\s*</button>', html)
-        self.assertIsNotNone(button)
-        self.assertLess(warning, button.start())
-        self.assertEqual(self.client.get(reverse("admin:logout")).status_code, 405)
-
-    def test_the_logout_action_ends_the_session(self):
-        make_login_older(self.client, 3600)
-
-        response = self.client.post(reverse("admin:logout"))
-
-        self.assertEqual(response.status_code, 302)
-        self.assertNotIn("_auth_user_id", self.client.session)
-
-    def test_a_refused_save_shows_the_logout_action_next_to_the_message(self):
-        make_login_older(self.client, 3600)
-
-        html = self.client.post(SETTINGS_URL, form_data(name="Changed")).content.decode()
-
-        message = html.index(self.MESSAGE)
-        action = html.index('class="button portal-logout-button" form="portal-logout-form"', message)
-        self.assertLess(action - message, 600)
-        self.assertTrue(self.row_is_empty())
-
-    def test_a_recent_login_gets_no_warning_block(self):
-        html = self.client.get(SETTINGS_URL).content.decode()
-
-        self.assertNotIn(self.WARNING, html)
-        self.assertNotIn("portal-login-warning", html)
-
-    def test_a_saved_input_stays_filled_after_a_refused_save(self):
-        make_login_older(self.client, 3600)
-
-        response = self.client.post(SETTINGS_URL, form_data(name="Typed name"))
-
-        self.assertContains(response, 'value="Typed name"')
-
-    def test_a_recent_login_gets_no_warning(self):
-        self.assertNotContains(self.client.get(SETTINGS_URL), "in den letzten 5 Minuten angemeldet")
-
-    def test_a_person_who_can_only_view_gets_no_warning_and_still_cannot_save(self):
-        client, _person = staff_with("view.person@example.org", "view_portalsettings")
-        make_login_older(client, 3600)
-
-        html = client.get(SETTINGS_URL).content.decode()
-        self.assertNotIn("in den letzten 5 Minuten angemeldet", html)
-        self.assertNotIn("portal-logout-form", html)
-        self.assertEqual(client.post(SETTINGS_URL, form_data(name="Changed")).status_code, 403)
-        self.assertTrue(self.row_is_empty())
+        self.assertEqual(refused.status_code, 200)
+        # The code was not checked, so the corrected form can use the same code.
+        again = self.client.post(SETTINGS_URL, form_data(name="Changed", otp_token=code, **GOOD))
+        self.assertEqual(again.status_code, 302)
 
     def test_the_form_without_a_request_fails_closed(self):
         form = PortalSettingsForm(form_data(name="Changed"), instance=PortalSettings.load_without_logo_files())
 
         self.assertFalse(form.is_valid())
-        self.assertIn("recent_login", [error.code for error in form.non_field_errors().as_data()])
+        self.assertIn("proof", [error.code for error in form.non_field_errors().as_data()])
 
-    def test_the_window_is_the_one_of_the_second_factor_setup(self):
-        self.assertEqual(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds(), 300)
+    def form_for(self, person, data):
+        request = mock.Mock(user=person)
+        form_class = type("ProvedForm", (PortalSettingsForm,), {"request": request, "actor": person})
+        return form_class(data, instance=PortalSettings.load_without_logo_files())
+
+    def test_an_account_without_a_second_factor_confirms_with_the_password(self):
+        person = create_active_user("password.person@example.org")
+
+        with mock.patch.object(second_factor, "verify_password", return_value=False) as verify:
+            wrong = self.form_for(person, form_data(name="Changed", current_password="wrong"))
+            self.assertFalse(wrong.is_valid())
+            self.assertIn("current_password", wrong.errors)
+            self.assertEqual(wrong.proof, "password")
+            verify.assert_called_once()
+        with mock.patch.object(second_factor, "verify_password", return_value=True):
+            right = self.form_for(person, form_data(name="Changed", current_password=PASSWORD))
+            self.assertTrue(right.is_valid(), right.errors)
+        # No password, nothing else is looked at.
+        with mock.patch("leg_platform.accounts.portal_settings_form.validate_logo") as validate:
+            missing = self.form_for(person, form_data(name="Changed", logo_light_file=upload(PNG)))
+            self.assertFalse(missing.is_valid())
+            validate.assert_not_called()
+
+    def test_a_person_who_can_only_view_gets_no_proof_field_and_still_cannot_save(self):
+        client, _person = staff_with("view.person@example.org", "view_portalsettings")
+
+        html = client.get(SETTINGS_URL).content.decode()
+        self.assertNotIn('name="current_password"', html)
+        self.assertNotIn('name="otp_token"', html)
+        self.assertEqual(client.post(SETTINGS_URL, form_data(name="Changed")).status_code, 403)
+        self.assertTrue(self.row_is_empty())
+
+    def test_the_proof_field_is_never_stored_on_the_model(self):
+        self.assertNotIn("current_password", [field.name for field in PortalSettings._meta.get_fields()])
+        self.assertNotIn("otp_token", [field.name for field in PortalSettings._meta.get_fields()])
 
 
 @override_settings(**SERVER)
@@ -1647,6 +1644,20 @@ class AuditTests(TestCase):
         event = self.events(SecurityEvent.Event.PORTAL_UPLOAD_REJECTED).get()
         self.assertEqual(event.actor_id, self.administrator.pk)
         self.assertFalse(self.events().exists())
+
+    def test_repeated_rejected_uploads_of_one_session_are_one_event_per_minute(self):
+        # M-5: with the app code as the proof, the upload is judged before the code, so the log is collapsed per session.
+        def bad():  # a new upload each time: a posted file is read once
+            return form_data(logo_light_file=upload(b"hello", "b.png"))
+
+        for _round in range(3):  # five wrong proofs end the session (D-062): stay below it
+            self.assertEqual(self.client.post(SETTINGS_URL, bad()).status_code, 200)
+        self.assertEqual(self.events(SecurityEvent.Event.PORTAL_UPLOAD_REJECTED).count(), 1)
+        session = self.client.session
+        session["upload_rejected_logged_at"] -= 61
+        session.save()
+        self.client.post(SETTINGS_URL, bad())
+        self.assertEqual(self.events(SecurityEvent.Event.PORTAL_UPLOAD_REJECTED).count(), 2)
 
     def test_a_rejected_upload_of_a_person_without_the_right_records_nothing(self):
         client, _person = staff_with("none.person@example.org", "view_user")

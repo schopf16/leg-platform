@@ -1,0 +1,195 @@
+"""The status of the address directory import for the operator page and its polling endpoint (D-090).
+
+One function builds everything the page shows (texts already translated), so that the page rendered
+by the server and the JSON that the script polls say the same. Nothing here writes.
+"""
+
+import os
+
+from django.conf import settings
+from django.utils import timezone
+from django.utils.formats import date_format
+from django.utils.translation import gettext
+from django.utils.translation import gettext_lazy as _
+
+from . import jobs
+from .models import ImportRequest
+from .services import directory_status
+
+# The fixed texts of ``importer.ImportFailure`` and of the jobs, in words for the page. A text that is
+# not listed (it should not happen) is shown as "unexpected".
+REASONS = {
+    "Unapproved download URL.": _("The download address is not an approved one."),
+    "Official download failed.": _("The official server did not deliver the file. Check that this server can reach data.geo.admin.ch."),
+    "Unexpected HTTP content encoding.": _("The official server answered in an unexpected format."),
+    "Download exceeds the size limit.": _("The official file is larger than allowed."),
+    "Download exceeds its resource limit.": _("The download was larger or slower than allowed."),
+    "Incomplete download.": _("The download was incomplete. Try again later."),
+    "Invalid official catalogue metadata.": _("The catalogue of the official server could not be understood."),
+    "CSV exceeds its resource limit.": _("The official file is larger than allowed."),
+    "Invalid address field length.": _("The official file contains an address that is too long."),
+    "Invalid address field.": _("The official file contains an invalid address."),
+    "Expected exactly one CSV member.": _("The official file does not have the expected content."),
+    "Unsafe ZIP member.": _("The official file does not have the expected content."),
+    "Invalid CSV header.": _("The official file does not have the expected content."),
+    "Missing approved CSV columns.": _("The official file does not have the expected content."),
+    "Invalid CSV row count or width.": _("The official file does not have the expected content."),
+    "Invalid postal label.": _("The official file contains an invalid postal code."),
+    "Empty directory.": _("The official file contains no addresses."),
+    "Invalid official archive format.": _("The official file could not be read."),
+    "Another import is running.": _("Another import is running."),
+    "The import lease was lost.": _("The import was taken over by another process."),
+    "The free disk space could not be checked.": _("The free disk space could not be checked."),
+    "Not enough free disk space for an import.": _("There is not enough free disk space for the import (at least 4 GB are needed)."),
+    "Catalogue data date predates the published directory.": _("The official file is older than the directory in use. Nothing was changed."),
+    "A repair was tried recently and did not succeed.": _("A repair was tried a short time ago and did not succeed. Try again in a few hours."),
+    "Official archive checksum mismatch.": _("The downloaded file does not match its checksum and was discarded."),
+    "The official directory could not be imported.": _("The official directory could not be downloaded or read. Check the network connection and try again."),
+    jobs.UNEXPECTED_FAILURE: _("The import failed unexpectedly. The application log has the details."),
+    jobs.INTERRUPTED: _("The import was interrupted because the application stopped or restarted. Request it again."),
+}
+
+PHASES = {
+    "starting": _("Starting"),
+    "catalogue": _("Checking the official catalogue"),
+    "downloading": _("Downloading the official file"),
+    "importing": _("Importing the addresses"),
+    "publishing": _("Publishing the new directory"),
+    "finishing": _("Finishing up"),
+}
+
+
+def reason_text(message):
+    """The words for a stored failure text; "" for none."""
+    if not message:
+        return ""
+    return str(REASONS.get(message, REASONS[jobs.UNEXPECTED_FAILURE]))
+
+
+def _when(value):
+    """A date and time in the numeric form of the design language (DESIGN section 8): 17.10.2026 02:44."""
+    return date_format(timezone.localtime(value), "d.m.Y H:i") if value else ""
+
+
+def _megabytes(size):
+    return f"{size / (1024 * 1024):.1f}".rstrip("0").rstrip(".") if size is not None else ""
+
+
+def file_size():
+    """The size of the directory file in bytes, or None if it cannot be read."""
+    try:
+        return os.stat(str(settings.DATABASES["addresses"]["NAME"])).st_size
+    except OSError:
+        return None
+
+
+def effective_state(job, now=None):
+    """The state the person should see: a "running" job without a sign of life is "interrupted"."""
+    if job is None:
+        return "idle"
+    now = now or timezone.now()
+    if job.state == ImportRequest.State.RUNNING and not jobs.is_alive(job, now):
+        return "interrupted"
+    return str(job.state)
+
+
+def next_automatic_text(job):
+    """A sentence about the automatic refresh; honest about what triggers it."""
+    if not settings.ADDRESS_IMPORT_AUTOMATIC:
+        return gettext(
+            "The automatic refresh is turned off on this server. The directory is only updated when you "
+            "request it here or when the operator starts the import on the server."
+        )
+    interval = jobs.EMPTY_DIRECTORY_INTERVAL if jobs.directory_is_empty() else jobs.AUTOMATIC_INTERVAL
+    base = gettext(
+        "The portal refreshes the directory by itself: the first time a staff member opens the "
+        "administration or the management area after the due time. It needs no scheduler, but nothing "
+        "happens while nobody uses the portal."
+    )
+    last = job.last_automatic_attempt_at if job else None
+    if last is None:
+        return base + " " + gettext("The first refresh is due now.")
+    due = last + interval
+    if due <= timezone.now():
+        return base + " " + gettext("The next refresh is due now.")
+    return base + " " + gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
+
+
+def build():
+    """Everything the page and the polling endpoint show, as plain values (texts translated)."""
+    job = ImportRequest.objects.filter(pk=1).first()
+    now = timezone.now()
+    state = effective_state(job, now)
+    status, directory = directory_status()
+    active = state in ("queued", "running")
+    percent = None
+    message = ""
+    phase = ""
+    if job is not None:
+        phase = str(PHASES.get(job.phase, "")) if state == "running" else ""
+        if state == "running" and job.phase == "downloading" and job.bytes_total:
+            percent = min(100, (job.bytes_done or 0) * 100 // job.bytes_total)
+    if state == "idle":
+        # The state label already says "no import requested": the message tells what to do (UX-013).
+        message = gettext("Use the button below to load or update the directory.")
+    elif state == "queued":
+        message = gettext("The import is queued and waits to be started.")
+    elif state == "running":
+        message = phase or gettext("The import is running.")
+    elif state == "interrupted":
+        # The reason follows in its own line ("Reason"): the headline does not repeat it.
+        message = gettext("The import did not finish.")
+    elif state == "succeeded":
+        message = (
+            gettext("The directory was already up to date. Nothing was downloaded.")
+            if job.phase == "unchanged"
+            else gettext("The import completed.")
+        )
+    elif state == "failed":
+        message = gettext("The import failed.")
+    detail = ""
+    if job is not None and state == "running":
+        parts = []
+        if job.bytes_done is not None:
+            parts.append(
+                gettext("%(done)s of %(total)s MB downloaded")
+                % {"done": _megabytes(job.bytes_done), "total": _megabytes(job.bytes_total) or "?"}
+            )
+        if job.rows_done is not None:
+            parts.append(gettext("%(count)s addresses read") % {"count": job.rows_done})
+        detail = ", ".join(parts)
+    error = reason_text(job.last_error) if job is not None and state in ("failed", "interrupted") else ""
+    if state == "interrupted" and not error:
+        error = reason_text(jobs.INTERRUPTED)
+    size = file_size()
+    labels = {
+        "idle": _("No import requested"),
+        "queued": _("Queued"),
+        "running": _("Running"),
+        "succeeded": _("Completed"),
+        "failed": _("Failed"),
+        "interrupted": _("Interrupted"),
+    }
+    return {
+        "state": state,
+        "state_label": str(labels[state]),
+        "active": active,
+        "message": message,
+        "detail": detail,
+        "percent": percent,
+        "error": error,
+        "requested_at": _when(job.requested_at) if job else "",
+        "started_at": _when(job.started_at) if job else "",
+        "finished_at": _when(job.finished_at) if job else "",
+        "last_automatic_attempt_at": _when(job.last_automatic_attempt_at) if job else "",
+        "automatic_text": next_automatic_text(job),
+        "directory": {
+            "available": directory is not None,
+            "data_date": date_format(directory.data_date, "d.m.Y") if directory and directory.data_date else "",
+            "imported_at": _when(directory.imported_at) if directory else "",
+            "row_count": directory.row_count if directory else 0,
+            "file_megabytes": _megabytes(size),
+            "warning": str(status["warning"]) if status["warning"] else "",
+        },
+        "server_time": _when(now),
+    }

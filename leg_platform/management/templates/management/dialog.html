@@ -15,7 +15,7 @@ The form posts to the same address with the CSRF token and the ``next`` value.
   <div class="mgmt-dialog-layer">
     <section class="mgmt-dialog" role="dialog" aria-labelledby="dialog-title">
       <h1 id="dialog-title">{{ page_title }}</h1>
-      {% if dialog_lead %}<p class="mgmt-dialog-lead">{{ dialog_lead }}</p>{% endif %}
+      {% if dialog_lead %}<p class="mgmt-dialog-lead" id="dialog-lead">{{ dialog_lead }}</p>{% endif %}
       <form method="post" novalidate>
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ back_url }}">
@@ -24,7 +24,7 @@ The form posts to the same address with the CSRF token and the ``next`` value.
         {% block dialog_notice %}{% endblock %}
         {% block dialog_fields %}{% endblock %}
         <div class="mgmt-actions">
-          <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Cancel" %}</a>
+          <a class="btn btn-secondary-action" href="{{ back_url }}"{% if not form %} data-first-field{% endif %}>{% translate "Cancel" %}</a>
           {% if not no_submit %}<button type="submit" class="btn {% if danger %}btn-danger{% else %}btn-primary{% endif %}">{% if submit_label %}{{ submit_label }}{% else %}{% translate "Save" %}{% endif %}</button>{% endif %}
         </div>
       </form>
@@ -34,4 +34,9 @@ The form posts to the same address with the CSRF token and the ``next`` value.
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  <script defer src="{% static 'management/js/field-check.js' %}"></script>
+  <script defer src="{% static 'management/js/combobox.js' %}"></script>
+  <script defer src="{% static 'management/js/circuit-field.js' %}"></script>
+  <script defer src="{% static 'management/js/option-note.js' %}"></script>
+  <script defer src="{% static 'management/js/dialog-focus.js' %}"></script>
 {% endblock %}

@@ -59,6 +59,7 @@ HANDLERS = {
     MailJob.Kind.SECONDARY_EMAIL_CHANGED: _notification(emails.send_secondary_email_changed),
     MailJob.Kind.SESSION_ENDED_WRONG_CODES: _notification(emails.send_session_ended_wrong_codes),
     MailJob.Kind.ALL_SESSIONS_ENDED: _notification(emails.send_all_sessions_ended),
+    MailJob.Kind.PERSISTENT_SESSION_STARTED: _notification(emails.send_persistent_session_started),
     MailJob.Kind.TWO_FACTOR_ENABLED: _notification(emails.send_two_factor_enabled),
     MailJob.Kind.TWO_FACTOR_DISABLED: _notification(emails.send_two_factor_disabled),
     MailJob.Kind.RECOVERY_CODES_RENEWED: _notification(emails.send_recovery_codes_renewed),

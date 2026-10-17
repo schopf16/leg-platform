@@ -7,6 +7,7 @@ names the rights and explains which one is needed for what.
 
 from django.contrib.auth.models import Permission
 from django.utils.text import capfirst
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 
@@ -27,11 +28,34 @@ def permission_label(permission):
     return str(permission)
 
 
+def _community_tables():
+    """The tables of the management data that a role may be allowed to read in the administration (D-091)."""
+    from leg_platform.community.models import (
+        HistoryEntry,
+        Leg,
+        LegAssignment,
+        Location,
+        ManagementSettings,
+        MeteringPoint,
+        PersonAssignment,
+        PersonRecord,
+        ShareChange,
+        TransformerCircuit,
+    )
+
+    return (
+        Location, MeteringPoint, Leg, TransformerCircuit, PersonRecord, PersonAssignment, LegAssignment,
+        ShareChange, HistoryEntry, ManagementSettings,
+    )
+
+
 def assignable_permissions_filter():
-    """The rights a group may hold: exactly the ones the help names (accounts, email texts, portal settings: view and change).
+    """The rights a group may hold: exactly the ones the help names (accounts, email texts, portal settings:
+    view and change; the tables of the management data: view only).
 
     Graph, the security log and the other system pages stay with the system administrators; the
-    management area has no rights to assign (D-086).
+    management area itself has no rights to assign (D-086), the "view" of its tables is only for the
+    plain lists of the administration (D-091).
     """
     from django.db.models import Q
 
@@ -45,6 +69,12 @@ def assignable_permissions_filter():
             content_type__app_label=model._meta.app_label,
             content_type__model=model._meta.model_name,
             codename__in=codenames,
+        )
+    for model in _community_tables():
+        condition |= Q(
+            content_type__app_label=model._meta.app_label,
+            content_type__model=model._meta.model_name,
+            codename=f"view_{model._meta.model_name}",
         )
     return condition
 
@@ -77,4 +107,11 @@ def rights_help():
             _("Change name, logo, colours and addresses of the portal"),
             right(PortalSettings, "change"),
         ),
+        *[
+            (
+                gettext("See the table of %(name)s (read only)") % {"name": model._meta.verbose_name_plural},
+                right(model, "view"),
+            )
+            for model in _community_tables()
+        ],
     ]

@@ -36,7 +36,7 @@ from leg_platform.management.person_forms import (
     PersonCreateForm,
     SharesForm,
 )
-from leg_platform.management.returns import return_url, with_next
+from leg_platform.management.returns import created_redirect, origin_point_url, return_url, view_name_of, with_next
 
 STATE_TONES = {
     person_list.AccountState.ACTIVE: "ok",
@@ -338,7 +338,12 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
                 for entry in history.entries_for(person).order_by("-created_at", "-pk")
             ],
             "back_url": return_url(request, reverse("management:persons")),
+            # A back link that leads to another page than the list (the dialog the person was invited from) is neutral.
+            "back_is_origin": return_url(request, reverse("management:persons")) != reverse("management:persons"),
             "current_url": request.get_full_path(),
+            "show_new": request.GET.get("new") == "1",
+            "origin_point_url": origin_point_url(request) if request.GET.get("new") == "1" else "",
+            "metering_points_url": reverse("management:metering_points"),
         }
         context.update(self.points_context(request, person, today))
         return render(request, "management/persons/detail.html", context)
@@ -543,12 +548,14 @@ class PersonContactView(CustomerDataDialog):
 
 class PersonCreateView(DialogView):
     """"Person anlegen" (D-087): the person gets an email with a link to confirm the address and choose a password,
-    and is listed as "Invited"."""
+    and is listed as "Invited". Afterwards the page of the person opens with the next step (D-095); from another page
+    (the dialog "Assign person") the person goes back there."""
 
     title = gettext_lazy("Create person")
     lead = gettext_lazy(
         "The person receives an email with a link to confirm the email address and to choose a password."
     )
+    submit_label = gettext_lazy("Create person")
     form_class = PersonCreateForm
     template_name = "management/persons/dialog_data.html"
 
@@ -556,10 +563,19 @@ class PersonCreateView(DialogView):
         return return_url(request, reverse("management:persons"))
 
     def save(self, request, form):
-        if not run_service(form, lambda: persons.create_person(request.user, form.cleaned_data["email"], form.values())):
+        created = []
+        if not run_service(
+            form, lambda: created.append(persons.create_person(request.user, form.cleaned_data["email"], form.values()))
+        ):
             return None
-        messages.success(request, _("The person was created and the invitation was sent."))
-        return redirect(self.back(request))
+        back = self.back(request)
+        # From the dialog "Assign person" the person goes to the page of the new person too (an invited person cannot be
+        # assigned yet) and comes back to the dialog from there.
+        list_view = "management:metering_points_person" if view_name_of(back) == "management:metering_points_person" else "management:persons"
+        return created_redirect(
+            request, list_view, back, reverse("management:persons_detail", args=[created[0].pk]),
+            _("The person was created and the invitation was sent."),
+        )
 
 
 class PersonInvitationView(PersonObjectMixin, ManagementAccessMixin, View):

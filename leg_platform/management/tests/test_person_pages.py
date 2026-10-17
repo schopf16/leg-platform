@@ -124,7 +124,7 @@ class PersonPageTests(TestCase):
             "2 · angemeldet", "Ruth Gesperrt", "Gesperrt", "Aktiv", "Kundennummer", "Adresse", "Messpunkte", "Konto",
             "Die sechsstellige Nummer, unter der die Person im Portal geführt wird.", "Strasse und Hausnummer der Rechnungsadresse.",
             "Name der Person, oder der Firma bei Verwaltungen und Firmen.", "Information: Konto", "Information: Messpunkte",
-            "angemeldet, wenn alle bei der Netzbetreiber Beispiel angemeldet sind.",
+            "angemeldet, wenn alle bei Netzbetreiber Beispiel angemeldet sind.",
             "Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen.", f"1–{self.shown_count()} von {self.shown_count()} Personen",
             "mit Messpunkt", "ohne Messpunkt", "archiviert",
         ):
@@ -144,8 +144,9 @@ class PersonPageTests(TestCase):
         self.assertContains(page, ">Person anlegen</a>")
         content = page.content.decode()
         self.assertLess(content.index(">Drucken</a>"), content.index(">Person anlegen</a>"))
-        # On a phone one card per person, the dot has the word as its accessible name.
-        self.assertContains(page, 'role="img" aria-label="Gesperrt"')
+        # On a phone one card per person; the status is the dot with its word, as everywhere (DESIGN section 3.5, UX-007).
+        self.assertNotContains(page, 'role="img" aria-label="Gesperrt"')
+        self.assertContains(page, '<span class="mgmt-status is-bad">Gesperrt</span>', count=2)  # the table and the card
         self.assertContains(page, 'class="mgmt-cards-view"')
         self.assertContains(page, 'class="frame-item is-active" href="/management/persons/" aria-current="page"')
 
@@ -208,9 +209,9 @@ class PersonPageTests(TestCase):
         # The hints (information buttons) of the template, without the sentence about 30 days.
         for text in (
             "Der Standort ist die Adresse, an der der Messpunkt liegt.",
-            "Nummer des Smart Meters bei der Netzbetreiber Beispiel.",
+            "Nummer des Smart Meters bei Netzbetreiber Beispiel.",
             "Die Person speist Strom ins Netz ein, zum Beispiel aus einer PV-Anlage.",
-            "Die Zuordnung endet an diesem Datum.", "Die Anmeldung ist bei der Netzbetreiber Beispiel eingereicht.",
+            "Die Zuordnung endet an diesem Datum.", "Die Anmeldung ist bei Netzbetreiber Beispiel eingereicht.",
             "Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat.",
         ):
             self.assertContains(page, text)

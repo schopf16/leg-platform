@@ -25,17 +25,17 @@ on a phone it stands at the end of the page.
   </div>
 
   {% if problems %}
-    <div class="mgmt-banner mgmt-banner-lines" role="status">{% for text in problems %}<p>{{ text }}</p>{% endfor %}</div>
+    <div class="mgmt-banner mgmt-banner-lines" role="status">{% for text in problems %}<p>{{ text }}</p>{% endfor %}{% if not location and can_change %}<p><a class="btn btn-accent-outline btn-xs" href="{{ edit_url }}">{% translate "Set location" %}</a></p>{% endif %}</div>
   {% endif %}
 
   <div class="mgmt-two-cols">
     <div class="mgmt-col">
       <section class="mgmt-card">
-        <div class="mgmt-card-head"><h2>{% translate "Metering point" %}</h2></div>
+        <div class="mgmt-card-head"><h2>{% translate "Metering point" %}</h2>{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{{ edit_url }}">{% translate "Edit" %}</a>{% endif %}</div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact mgmt-desktop-only-row"><dt>{% translate "Direction" %}</dt><dd>{{ direction|direction_label }}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "Location" %}</dt><dd>{% if location %}{{ location.street }} {{ location.house_number }}{% if location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=location_url label=location_label %}{% endif %}{% else %}–{% endif %}</dd></div>
-          <div class="mgmt-fact"><dt>{% translate "Transformer circuit" %}</dt><dd class="tnum">{% if circuit %}{{ circuit }}{% else %}–{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Location" %}</dt><dd>{% if location %}{{ location.street }} {{ location.house_number }}{% if location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=location_url label=location_label %}{% endif %}{% else %}–{% if can_change %} <a href="{{ edit_url }}">{% translate "Set location" %}</a>{% endif %}{% endif %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Transformer circuit" %}</dt><dd class="tnum">{% if circuit %}{{ circuit }}{% else %}–{% endif %} <span class="mgmt-note-inline">{% translate "Derived from the location" %}</span></dd></div>
           {% if point.pv_power_kwp is not None %}<div class="mgmt-fact"><dt>{% translate "PV power" %}</dt><dd class="tnum">{{ point.pv_power_kwp|floatformat:"2u" }} kWp</dd></div>{% endif %}
           {% if point.battery_kwh is not None %}<div class="mgmt-fact"><dt>{% translate "Battery" %}</dt><dd class="tnum">{{ point.battery_kwh|floatformat:"2u" }} kWh</dd></div>{% endif %}
           {% if point.wallbox_kw is not None %}<div class="mgmt-fact"><dt>{% translate "Wallbox" %}</dt><dd class="tnum">{{ point.wallbox_kw|floatformat:"2u" }} kW</dd></div>{% endif %}

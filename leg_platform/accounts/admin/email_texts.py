@@ -57,7 +57,15 @@ EMAIL_TEXT_PROCESSES = (
             _Key.TWO_FACTOR_RESET,
         ),
     ),
-    (_("Account"), (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES, _Key.ALL_SESSIONS_ENDED)),
+    (
+        _("Account"),
+        (
+            _Key.ACCOUNT_DELETED,
+            _Key.SESSION_ENDED_WRONG_CODES,
+            _Key.ALL_SESSIONS_ENDED,
+            _Key.PERSISTENT_SESSION_STARTED,
+        ),
+    ),
 )
 
 

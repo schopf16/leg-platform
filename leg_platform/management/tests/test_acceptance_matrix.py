@@ -97,8 +97,8 @@ def preferences():
 # control payloads and the forged ids below still ask every route.
 SAMPLE = frozenset({
     "overview", "settings", "list_widths", "persons_note",
-    "locations", "locations_detail", "locations_address", "locations_circuit_new", "circuits_new",
-    "metering_points_detail", "metering_points_notify",
+    "locations", "locations_detail", "locations_address", "locations_circuit", "locations_metering_point_assign",
+    "metering_points_detail", "metering_points_notify", "metering_points_edit", "legs_metering_point_assign",
     "legs", "legs_quota", "legs_delete",
 })
 
@@ -145,6 +145,8 @@ class MatrixBase(TestCase):
         )
         cls.point_future = make_metering_point(5, location=cls.place)
         cls.point_clean = make_metering_point(6)
+        cls.point_loose = make_metering_point(60)  # no location: the target of "Assign existing metering point"
+        cls.point_without_leg = make_metering_point(61)  # no LEG: the target of the LEG page
         cls.point_archived = make_metering_point(7, location=cls.place, is_archived=True)
         assign_leg(cls.point_registered, cls.leg, d - timedelta(days=30))
         assign_leg(cls.point_active, cls.leg, d - timedelta(days=30))
@@ -201,23 +203,22 @@ class MatrixBase(TestCase):
             Case("locations_detail", pk(self.place)),
             Case("locations_address", pk(self.place), address, True),
             Case("locations_remark", pk(self.place), {"remark": "a remark"}, True),
-            Case("locations_circuit", pk(self.place), {"transformer_circuit": "TRA2000"}, True),
-            Case("locations_circuit_new", pk(self.place), {"grid_number": "TRA3000", "name": "Drei"}, True),
+            Case("locations_circuit", pk(self.place), {"transformer_circuit": str(self.circuit_two.pk)}, True),
             Case("locations_metering_point_new", pk(self.place), {"direction": "consumption", "number_digits": "123"}, True),
+            Case("locations_metering_point_assign", pk(self.place), {"metering_point": str(self.point_loose.pk)}, True),
             Case("locations_archive", pk(self.place), {}, True),
             Case("locations_delete", pk(self.place_clean), {}, True),
             Case("locations_confirm", pk(self.place_new), {}, True),
             Case("locations_suggestion", pk(self.place_suggestion), {"action": "dismiss"}, True),
-            Case("circuits_new",             data={"grid_number": "TRA4000", "name": "Vier"}, changes=True),
-                        Case("circuits_edit", pk(self.circuit_two), {"grid_number": "TRA2001", "name": "Zwei b"}, True),
+            Case("circuits_edit", pk(self.circuit_two), {"grid_number": "TRA2001", "name": "Zwei b"}, True),
             # Metering points
             Case("metering_points"),
             Case("metering_points_print", data={"scope": "list"}),
             Case("metering_points_new", data={"number_digits": "555", "direction": "consumption"}, changes=True),
             Case("metering_points_check_number", query={"digits": "1"}),
-            Case("metering_points_location_search", query={"q": "exam"}),
             Case("metering_points_person_search", query={"q": "anna"}),
             Case("metering_points_detail", pk(self.point_registered)),
+            Case("metering_points_edit", pk(self.point_registered), {"location": str(self.place.pk), "remark": "x"}, True),
             Case("metering_points_notify", pk(self.point_registered), {"registered_on": date(0)}, True),
             Case("metering_points_confirm", pk(self.point_notified), {"confirmed_on": date(0)}, True),
             Case("metering_points_start", pk(self.point_standby), {"start_date": date(0)}, True),
@@ -241,6 +242,10 @@ class MatrixBase(TestCase):
             Case("legs_detail", pk(self.leg)),
             Case("legs_quota", pk(self.leg), {"quota": "20", "checked_on": date(0)}, True),
             Case("legs_edit", pk(self.leg), {"name": "LEG Renamed", "remark": "r"}, True),
+            Case(
+                "legs_metering_point_assign", pk(self.leg),
+                {"metering_point": str(self.point_without_leg.pk), "valid_from": date(0)}, True,
+            ),
             Case("legs_archive", pk(self.leg), {}, True),
             Case("legs_delete", pk(self.leg_clean), {}, True),
         ]

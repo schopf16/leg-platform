@@ -32,6 +32,8 @@ class HistoryEvent(models.TextChoices):
     MASTER_DATA_CHANGED = "master_data_changed", _("Master data changed")
     LOCATIONS_MERGED = "locations_merged", _("Locations merged")
     METERING_POINT_LOCATION_CHANGED = "metering_point_location_changed", _("Location changed")
+    # D-095: names the changed fields in ``detail["fields"]`` (names, never values).
+    METERING_POINT_DATA_CHANGED = "metering_point_data_changed", _("Details changed")
     ADDRESS_CORRECTION_ACCEPTED = "address_correction_accepted", _("Address correction accepted")
     ADDRESS_CORRECTION_DISMISSED = "address_correction_dismissed", _("Address correction not accepted")
     PERSON_ASSIGNED = "person_assigned", _("Person assigned")

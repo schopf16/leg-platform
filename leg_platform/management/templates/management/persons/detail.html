@@ -17,7 +17,7 @@ invited and who has not completed the registration has no customer number yet; t
 {% block content %}
   {% operator_name as operator %}
   {% include "management/_icons.html" %}
-  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to persons" %}</a>
+  <a class="mgmt-back" href="{{ back_url }}">← {% if back_is_origin %}{% translate "Back" %}{% else %}{% translate "Back to persons" %}{% endif %}</a>
 
   <div class="mgmt-header mgmt-detail-header">
     <div>
@@ -37,6 +37,15 @@ invited and who has not completed the registration has no customer number yet; t
       </div>
     {% endif %}
   </div>
+
+  {% if show_new %}
+    {% if invitation %}{% translate "Person created. The invitation was sent. Assign a metering point once the person has registered." as new_text %}{% else %}{% translate "Person created. Next: assign a metering point." as new_text %}{% endif %}
+    {% if origin_point_url %}
+      {% include "management/_banner.html" with text=new_text actions="management/persons/_new_actions.html" neutral=True %}
+    {% else %}
+      {% include "management/_banner.html" with text=new_text neutral=True %}
+    {% endif %}
+  {% endif %}
 
   {% if suggestion_text %}
     {% include "management/_banner.html" with text=suggestion_text actions="management/persons/_suggestion_actions.html" %}
@@ -155,7 +164,7 @@ invited and who has not completed the registration has no customer number yet; t
           <p class="mgmt-empty-text">{{ empty_points_text }}</p>
         {% endfor %}
       </div>
-      <p class="mgmt-note mgmt-card-pad">{% translate "You change assignments on the page of the metering point." %}</p>
+      <p class="mgmt-note mgmt-card-pad">{% translate "You change assignments on the page of the metering point." %} <a href="{{ metering_points_url }}">{% translate "Go to the metering points" %}</a></p>
     </section>
 
     {% if history %}

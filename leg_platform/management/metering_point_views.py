@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -15,6 +16,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy, ngettext
 from django.views import View
 
+from leg_platform.accounts import rate_limits
 from leg_platform.community import (
     assignments,
     grid_operator,
@@ -28,11 +30,11 @@ from leg_platform.community import (
     problems,
 )
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, Leg, MeteringPoint, PersonAssignment
+from leg_platform.community.models import Direction, Leg, Location, MeteringPoint, PersonAssignment
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
-from leg_platform.management.location_views import DialogView, event_label
+from leg_platform.management.location_views import DialogView, LocationObjectDialog, archived_redirect, event_label
 from leg_platform.management.metering_point_forms import (
     ASSIGNMENT_ERRORS,
     STATUS_ERRORS,
@@ -40,13 +42,14 @@ from leg_platform.management.metering_point_forms import (
     ConfirmationForm,
     LegAssignForm,
     LegSwitchForm,
-    MeteringPointCreateForm,
+    LocationPointForm,
+    MeteringPointForm,
     NotifiedForm,
     PersonAssignForm,
     StartDateForm,
     TerminationForm,
 )
-from leg_platform.management.returns import return_url, with_next
+from leg_platform.management.returns import created_redirect, return_url, with_next
 from leg_platform.management.summaries import duplicate_summary
 
 COLUMN_NUMBER = lists.Column(
@@ -273,6 +276,7 @@ class MeteringPointDetailView(ManagementAccessMixin, View):
             "history": history_rows(point),
             "back_url": return_url(request, reverse("management:metering_points")),
             "current_url": request.get_full_path(),
+            "edit_url": with_next(reverse("management:metering_points_edit", args=[pk]), request),
         }
         return render(request, "management/metering_points/detail.html", context)
 
@@ -457,14 +461,15 @@ class PersonView(AssignmentDialog):
     """Assign a person or, with a person, change it (the former person ends the day before "Applies from")."""
 
     form_class = PersonAssignForm
-    template_name = "management/metering_points/dialog_person.html"
-    submit_label = gettext_lazy("Save")
 
     def has_person(self):
         return bool(metering_points.chain(assignments.PERSON, self.point()))
 
     @property
     def title(self):
+        return _("Change person") if self.has_person() else _("Assign person")
+
+    def get_submit_label(self, form):
         return _("Change person") if self.has_person() else _("Assign person")
 
     def get_form(self, data=None):
@@ -478,7 +483,7 @@ class PersonView(AssignmentDialog):
 
     def render_dialog(self, request, form, **extra):
         return super().render_dialog(
-            request, form, suggest_url=reverse("management:metering_points_person_search"), **extra
+            request, form, new_person_url=with_next(reverse("management:persons_new"), request), **extra
         )
 
     def save(self, request, form):
@@ -581,8 +586,9 @@ class LegView(AssignmentDialog):
     """Assign a LEG or, with a LEG, change it with the move mask; the LEG pages use this dialog too."""
 
     template_name = "management/metering_points/dialog_leg.html"
-    submit_label = gettext_lazy("Save")
 
+    def get_submit_label(self, form):
+        return _("Change LEG") if self.current() else _("Assign LEG")
     def current(self):
         if not hasattr(self, "_current"):
             self._current = leg_switch.current_assignment(assignments.LEG, self.point())
@@ -658,43 +664,183 @@ def person_names(points):
     return found
 
 
-class MeteringPointNewView(DialogView):
-    """Create from the list. The number is checked on leaving the field and again on saving; an existing
-    number shows a notice with a link and blocks saving."""
+def returned_location(request, locked=None):
+    """The location to choose in advance: the one of the page (locked), or the one just created when the person comes
+    back from "Create a new location" (``?location=<id>``; the form checks that it can be chosen)."""
+    if locked is not None:
+        return locked.pk
+    value = request.GET.get("location", "")
+    return int(value) if value.isascii() and value.isdigit() and len(value) < 12 else None
+
+
+class MeteringPointCreateMixin:
+    """"Create metering point": the one form (``MeteringPointForm``) and the one template of this subject, wherever it
+    is opened (D-094). A context only pre-fills and locks the location (``locked_location``, taken from the page's
+    object on the server, never from the POST). The number is checked on leaving the field and again on saving; an
+    existing number shows a notice with a link and blocks saving."""
 
     title = gettext_lazy("Create metering point")
+    submit_label = gettext_lazy("Create metering point")
+
+    def locked_location(self):
+        return None
+
+    def get_form(self, data=None):
+        locked = self.locked_location()
+        initial = {"location": returned_location(self.request, locked)}
+        return MeteringPointForm(data, location=locked, initial=initial)
+
+    def render_dialog(self, request, form, **extra):
+        duplicate = getattr(form, "duplicate", None)
+        locked = self.locked_location()
+        return super().render_dialog(
+            request, form, duplicate=duplicate_summary(duplicate) if duplicate is not None else None,
+            new_location_url=with_next(reverse("management:locations_new"), request) if locked is None else "",
+            **extra,
+        )
+
+    def save(self, request, form):
+        locked = self.locked_location()
+        location = locked if locked is not None else form.cleaned_data.get("location")
+        try:
+            point = metering_points.create_metering_point(
+                direction=form.cleaned_data["direction"], number=form.number, location=location,
+                leg=form.cleaned_data.get("leg"), actor=request.user, **form.metering_point_details(),
+            )
+        except metering_points.DuplicateNumber as duplicate:
+            form.duplicate = duplicate.existing
+            return None
+        except locations.Archived:
+            # Archived in the meantime (D-085).
+            if locked is not None:
+                return archived_redirect(request, locked.pk)
+            form.add_error("location", _("This location is archived."))
+            return None
+        except Location.DoesNotExist:
+            form.add_error("location", _("This location does not exist any more."))
+            return None
+        except assignments.AssignmentError:
+            form.add_error("leg", _("This LEG is archived."))
+            return None
+        except ValidationError as error:
+            add_model_errors(form, error)
+            return None
+        return created_redirect(request, "management:metering_points", self.back(request), point_url(point), _("Saved."))
+
+
+def point_url(point):
+    return reverse("management:metering_points_detail", args=[point.pk])
+
+
+def add_model_errors(form, error):
+    """The messages of a model ``ValidationError`` at the form fields (or at the form)."""
+    for name, messages_ in error.message_dict.items():
+        form.add_error(name if name in form.fields else None, messages_)
+
+
+class MeteringPointNewView(MeteringPointCreateMixin, DialogView):
+    """Create from the list (the location is chosen in the form)."""
+
     lead = gettext_lazy("A metering point belongs to a location. Choose the location before you enter the other details.")
-    template_name = "management/metering_points/dialog_create.html"
     default_back = ""
 
     def back(self, request):
         return return_url(request, reverse("management:metering_points"))
 
+
+class LocationMeteringPointNewView(MeteringPointCreateMixin, LocationObjectDialog):
+    """Create at a location: the same form, with the location locked (D-094)."""
+
+    lead = gettext_lazy("The metering point is created at this location.")
+
+    def locked_location(self):
+        if not hasattr(self, "_locked_location"):
+            self._locked_location = self.location()
+        return self._locked_location
+
+
+class MeteringPointEditView(PointDialog):
+    """Change the location, the plant data and the remark of a metering point: the form of "Create metering point" in
+    change mode (D-094, D-095). The number and the direction are fixed, the LEG has its own dialog. The transformer
+    circuit follows the location and is not entered."""
+
+    title = gettext_lazy("Edit metering point")
+    submit_label = gettext_lazy("Save")
+
     def get_form(self, data=None):
-        return MeteringPointCreateForm(data)
+        initial = {}
+        location_id = returned_location(self.request)
+        if location_id is not None:
+            initial["location"] = location_id
+        return MeteringPointForm(data, point=self.point(), initial=initial)
+
+    def get_lead(self):
+        # No lead sentence: the locked rows of the form name the point (S-3).
+        return ""
 
     def render_dialog(self, request, form, **extra):
-        duplicate = getattr(form, "duplicate", None)
         return super().render_dialog(
-            request, form, duplicate=duplicate_summary(duplicate) if duplicate is not None else None,
-            check_url=reverse("management:metering_points_check_number"),
-            location_url=reverse("management:metering_points_location_search"),
-            **extra,
+            request, form, new_location_url=with_next(reverse("management:locations_new"), request), **extra
         )
 
     def save(self, request, form):
         try:
-            metering_points.create_metering_point(
-                direction=form.cleaned_data["direction"], number=form.number,
-                location=form.cleaned_data.get("location"), leg=form.cleaned_data.get("leg"),
-                actor=request.user, **form.metering_point_details(),
+            metering_points.update(
+                self.point(), location=form.cleaned_data.get("location"), details=form.metering_point_details(),
+                actor=request.user,
             )
-        except metering_points.DuplicateNumber as duplicate:
-            form.duplicate = duplicate.existing
+        except metering_points.StatusError as error:
+            return self.refuse(form, error)
+        except locations.Archived:
+            form.add_error("location", _("This location is archived."))
             return None
-        except (locations.Archived, assignments.AssignmentError):
-            # Archived in the meantime (D-085).
-            form.add_error(None, _("The location or the LEG is archived."))
+        except Location.DoesNotExist:
+            form.add_error("location", _("This location does not exist any more."))
+            return None
+        except metering_points.LocationUnavailable:
+            form.add_error("location", _("This location does not exist any more."))
+            return None
+        except ValidationError as error:
+            add_model_errors(form, error)
+            return None
+        return self.done(request)
+
+
+class LocationPointAssignView(LocationObjectDialog):
+    """"Assign existing metering point" on the page of a location (D-095): chooses a metering point without a
+    location, or one at another location, and moves it here. The same service as the dialog "Edit metering point"."""
+
+    title = gettext_lazy("Assign existing metering point")
+    submit_label = gettext_lazy("Assign metering point")
+    template_name = "management/locations/dialog_assign.html"
+
+    def get_form(self, data=None):
+        return LocationPointForm(data, location=self.location())
+
+    def get_lead(self):
+        location = self.location()
+        circuit = location.transformer_circuit.grid_number if location.transformer_circuit_id else _("none")
+        return _(
+            "Choose a metering point for the location %(address)s. A metering point at another location moves here. "
+            "The transformer circuit of the metering point then is: %(circuit)s."
+        ) % {"address": f"{location.street} {location.house_number}", "circuit": circuit}
+
+    def render_dialog(self, request, form, **extra):
+        create_url = with_next(reverse("management:locations_metering_point_new", args=[self.kwargs["pk"]]), request)
+        return super().render_dialog(request, form, empty=form.empty, no_submit=form.empty, create_url=create_url, **extra)
+
+    def save(self, request, form):
+        try:
+            metering_points.update(form.cleaned_data["metering_point"], location=self.location(), actor=request.user)
+        except metering_points.StatusError as error:
+            form.add_error("metering_point", STATUS_ERRORS.get(error.code, STATUS_ERRORS["archived"]))
+            return None
+        except locations.Archived:
+            return archived_redirect(request, self.kwargs["pk"])
+        except metering_points.LocationUnavailable:
+            raise Http404 from None
+        except ValidationError as error:
+            add_model_errors(form, error)
             return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
@@ -708,7 +854,7 @@ class CheckNumberView(ManagementAccessMixin, View):
 
     def get(self, request):
         digits = request.GET.get("digits", "")[:40]
-        form = MeteringPointCreateForm({"number_digits": digits})
+        form = MeteringPointForm({"number_digits": digits})
         form.full_clean()
         errors = form.errors.get("number_digits")
         if errors:
@@ -734,13 +880,21 @@ class SuggestView(ManagementAccessMixin, View):
         return JsonResponse({"results": self.texts(text) if len(text) >= 2 else []})
 
 
-class LocationSearchView(SuggestView):
-    def texts(self, text):
-        return [str(location) for location in location_list.location_suggestions(text)]
-
-
 class PersonSearchView(SuggestView):
-    """Active accounts with a customer number; the text holds the name and the customer number."""
+    """Active accounts with a customer number; the text holds the name and the customer number.
+
+    Counted per staff account (``rate_limits.PERSON_SEARCH_LIMITS``, 300 per minute); beyond it the answer is 429 with
+    ``Retry-After`` and no result, and the combobox waits (M-3 of the review of 2026-10-17)."""
+
+    def get(self, request):
+        text = request.GET.get("q", "").strip()[:100]
+        if len(text) >= 2 and not rate_limits.consume(
+            rate_limits.SCOPE_PERSON_SEARCH, str(request.user.pk), rate_limits.PERSON_SEARCH_LIMITS
+        ):
+            response = JsonResponse({"results": [], "limited": True}, status=429)
+            response["Retry-After"] = "30"
+            return response
+        return super().get(request)
 
     def texts(self, text):
         return [person_search.label(person) for person in person_search.search(text)]

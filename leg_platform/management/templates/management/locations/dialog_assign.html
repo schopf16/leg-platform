@@ -1,0 +1,10 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n %}{% comment %}
+The dialog "Assign existing metering point" at a location (D-095): one drop-down, the metering points without a
+location first. Without a metering point to assign the notice says so and points to "Create metering point".
+{% endcomment %}
+{% block dialog_notice %}
+  {% if empty %}
+    <div class="mgmt-banner" role="status"><p>{% translate "All metering points already have a location." %} <a href="{{ create_url }}">{% translate "Create a new metering point" %}</a>.</p></div>
+  {% endif %}
+{% endblock %}

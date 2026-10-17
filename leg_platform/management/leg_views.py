@@ -15,14 +15,15 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views import View
 
-from leg_platform.community import grid_operator, leg_list, leg_services, legs, preferences, problems
+from leg_platform.community import assignments, grid_operator, leg_list, leg_services, legs, preferences, problems
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, Leg, ManagementSettings, TransformerCircuit
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
-from leg_platform.management.leg_forms import LegCreateForm, MasterDataForm, QuotaForm
+from leg_platform.management.leg_forms import LegCreateForm, LegPointForm, MasterDataForm, QuotaForm
 from leg_platform.management.location_views import DialogView, count_phrase
+from leg_platform.management.metering_point_forms import ASSIGNMENT_ERRORS
 from leg_platform.management.metering_point_views import format_date
-from leg_platform.management.returns import return_url, with_next
+from leg_platform.management.returns import created_redirect, return_url, with_next
 
 QUOTA_PROBLEMS = (legs.LegProblem.QUOTA_BELOW_LEGAL, legs.LegProblem.QUOTA_BELOW_WARNING, legs.LegProblem.QUOTA_STALE)
 RATIO_PROBLEMS = (legs.LegProblem.NO_PRODUCER, legs.LegProblem.NO_CONSUMER)
@@ -192,6 +193,7 @@ class LegDetailView(ManagementAccessMixin, View):
             "show_delete": show_delete,
             "show_archive": leg.is_archived or not show_delete,
             "current_url": request.get_full_path(),
+            "show_new": request.GET.get("new") == "1" and can_change,
         }
         context.update(self.members_context(request, leg, summary, threshold, today))
         return render(request, "management/legs/detail.html", context)
@@ -233,10 +235,11 @@ class LegDetailView(ManagementAccessMixin, View):
 
 
 class LegCreateView(DialogView):
-    """Create a LEG; afterwards back to the list."""
+    """Create a LEG; afterwards its page opens with the next step (D-095)."""
 
     title = gettext_lazy("Create LEG")
     lead = gettext_lazy("A LEG is a virtual grid association. You assign metering points to the LEG afterwards.")
+    submit_label = gettext_lazy("Create LEG")
     form_class = LegCreateForm
     template_name = "management/legs/dialog_quota.html"
 
@@ -247,14 +250,15 @@ class LegCreateView(DialogView):
     def save(self, request, form):
         data = form.cleaned_data
         try:
-            leg_services.create_leg(
+            leg = leg_services.create_leg(
                 data["name"], data["quota"], data["checked_on"], data["remark"], actor=request.user
             )
         except leg_services.DuplicateName:
             form.add_error("name", _("This name is already in use."))
             return None
-        messages.success(request, _("Saved."))
-        return redirect(self.back(request))
+        return created_redirect(
+            request, "management:legs", self.back(request), reverse("management:legs_detail", args=[leg.pk]), _("Saved.")
+        )
 
 
 def archived_refusal(request, pk):
@@ -330,6 +334,41 @@ class LegMasterDataView(LegObjectDialog):
         except leg_services.Archived:
             messages.error(request, _("This LEG is archived."))
             return redirect(reverse("management:legs_detail", args=[self.kwargs["pk"]]))
+        messages.success(request, _("Saved."))
+        return redirect(self.back(request))
+
+
+class LegPointAssignView(LegObjectDialog):
+    """"Assign metering point" on the page of a LEG (D-095): a metering point without a LEG joins this LEG from a
+    day. One at a time; moving a point from another LEG is "Change LEG" on the point."""
+
+    title = gettext_lazy("Assign metering point")
+    submit_label = gettext_lazy("Assign metering point")
+    template_name = "management/legs/dialog_assign.html"
+
+    def get_form(self, data=None):
+        return LegPointForm(data)
+
+    def get_lead(self):
+        return _("Choose a metering point that has no LEG yet. It is assigned to the LEG “%(name)s”.") % {"name": self.leg().name}
+
+    def render_dialog(self, request, form, **extra):
+        return super().render_dialog(request, form, empty=form.empty, no_submit=form.empty, **extra)
+
+    def save(self, request, form):
+        data = form.cleaned_data
+        try:
+            leg_services.assign_metering_point(self.leg(), data["metering_point"], data["valid_from"], request.user)
+        except assignments.AssignmentError as error:
+            if error.code == "leg_archived":
+                return archived_refusal(request, self.kwargs["pk"])
+            if error.code == "leg_missing":
+                raise Http404 from None
+            form.add_error(
+                "valid_from" if error.code == "starts_not_after_previous" else "metering_point",
+                ASSIGNMENT_ERRORS.get(error.code, _("This change is not possible.")),
+            )
+            return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 

@@ -290,12 +290,25 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
                     "will be removed."
                 ),
             ),
+            "end_sessions": (
+                gettext("End all sessions"),
+                gettext(
+                    "Every session of the account on every device ends at its next request, including "
+                    "sessions with \"Stay signed in\". The account can log in again (with its second "
+                    "factor, if it has one). Use this when a device or a session may have got into "
+                    "the wrong hands."
+                ),
+            ),
         }
         if operation not in operations:
             raise Http404
         obj = self.get_object(request, unquote(object_id))
         if obj is None:
             raise Http404
+        if operation == "end_sessions" and obj.pk == request.user.pk:
+            # Like the reset of the second factor (D-041): not for the own account, so that an administrator does not
+            # cut the own session by accident; a new password ends the own sessions as well (D-100).
+            raise PermissionDenied
 
         title, description = operations[operation]
         form = AccountLifecycleForm(request.POST if request.method == "POST" else None)
@@ -309,6 +322,7 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
                         "unblock": account.status == User.Status.BLOCKED,
                         "delete": account.status != User.Status.DEACTIVATED,
                         "reactivate": account.status == User.Status.DEACTIVATED,
+                        "end_sessions": account.status != User.Status.DEACTIVATED,
                     }
                     if not expected[operation]:
                         raise AccountIntegrityError(
@@ -326,6 +340,10 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
                         account.reactivate()
                         event = Event.ACCOUNT_REACTIVATED
                         message = gettext("Restored the account.")
+                    elif operation == "end_sessions":
+                        account.end_all_sessions()
+                        event = Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN
+                        message = gettext("Ended all sessions of the account.")
                     else:
                         result = account.delete_or_deactivate()
                         if result == "deactivated":

@@ -18,7 +18,7 @@
   "use strict";
 
   const MAX_OPTIONS = 5;
-  const SUGGEST_DELAY = 300;
+  const SUGGEST_DELAY = 200;
   const CHECK_DELAY = 1000;
 
   // One pass over the template: each "%(name)s" is replaced by its value, and a value is never
@@ -57,6 +57,7 @@
 
     let suggestTimer;
     let checkTimer;
+    let pausedUntil = 0; // set by a 429 answer: no request before this time (M-4)
     const channels = {
       suggest: {version: 0, controller: null},
       check: {version: 0, controller: null},
@@ -117,11 +118,12 @@
       });
     };
 
-    // The answer, or null if it is stale or was aborted.
+    // The answer, or null if it is stale, was aborted or the server asked for a pause.
     const send = async (mode) => {
       const channel = channels[mode];
       const version = ++channel.version;
       if (channel.controller) channel.controller.abort();
+      if (Date.now() < pausedUntil) return null; // after a 429 no request until the pause has passed (M-4)
       channel.controller = new AbortController();
       const body = new URLSearchParams({mode});
       Object.entries(fields).forEach(([name, field]) => body.set(name, name === "country" ? country() : field.value));
@@ -133,6 +135,11 @@
           headers: {"X-CSRFToken": token.value, "Content-Type": "application/x-www-form-urlencoded"},
           body, signal: channel.controller.signal, cache: "no-store",
         });
+        if (response.status === 429) {
+          const seconds = Number(response.headers.get("Retry-After"));
+          pausedUntil = Date.now() + (seconds > 0 && seconds <= 120 ? seconds : 60) * 1000;
+          return null;
+        }
         const data = await response.json();
         if (version !== channel.version) return null;
         return {ok: response.ok, data};

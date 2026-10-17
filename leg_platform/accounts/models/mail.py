@@ -52,6 +52,7 @@ class MailJob(models.Model):
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", "Session ended after wrong codes"
         ALL_SESSIONS_ENDED = "all_sessions_ended", "All sessions ended after wrong entries"
         INVITATION = "invitation", "Invitation"
+        PERSISTENT_SESSION_STARTED = "persistent_session_started", "Long session started"
 
     # Notifications about a change of the account, as opposed to the requests of a person who
     # may have no account (D-038, D-040).
@@ -70,6 +71,7 @@ class MailJob(models.Model):
         Kind.TWO_FACTOR_RESET,
         Kind.EMAIL_CHANGE_NOTICE,
         Kind.ACCOUNT_DELETED,
+        Kind.PERSISTENT_SESSION_STARTED,
     )
 
     kind = models.CharField(max_length=32, choices=Kind, editable=False)
@@ -163,6 +165,9 @@ class EmailText(models.Model):
             "Notification: all sessions ended after wrong entries"
         )
         INVITATION = "invitation", _("Invitation: link to confirm the address and choose a password")
+        PERSISTENT_SESSION_STARTED = "persistent_session_started", _(
+            "Notification: long session (stay signed in) started"
+        )
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False

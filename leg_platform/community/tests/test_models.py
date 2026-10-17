@@ -179,9 +179,11 @@ class LegAndAssignmentConstraintTests(TestCase):
             Leg(name="Y", production_quota_percent=30).full_clean()
         Leg.objects.create(name="Z", production_quota_percent=30, quota_checked_on=TODAY)
         Leg.objects.create(name="W")  # no quota, no date
-        for bad in (-1, 101):
+        for bad in (-1, 1000):  # no upper bound of 100 %, but at most 999.99 (D-088)
             with self.assertRaises(ValidationError):
                 Leg(name="Q", production_quota_percent=bad, quota_checked_on=TODAY).full_clean()
+        for good in (100, 204.1, 999.99):
+            Leg(name="R", production_quota_percent=good, quota_checked_on=TODAY).full_clean()
 
     def test_an_assignment_cannot_end_before_it_starts_or_start_twice(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
@@ -230,11 +232,19 @@ class SingletonAndHistoryTests(TestCase):
                 self.assertEqual(model._meta.get_field(name).db_collation, EXACT_COLLATION)
                 self.assertTrue(model._meta.get_field(name).unique)
 
-    def test_the_community_models_have_no_rights_of_their_own(self):
-        # D-086: every staff account may use the management area; no model creates a permission.
+    # The plain tables of the Django administration have the "view" right (D-091); the grid operator and the
+    # list preferences have none. Nothing has an add, change or delete right and no custom right.
+    VIEWABLE = {
+        "HistoryEntry", "Leg", "LegAssignment", "Location", "ManagementSettings", "MeteringPoint",
+        "PersonAssignment", "PersonRecord", "ShareChange", "TransformerCircuit",
+    }
+
+    def test_the_community_models_have_at_most_the_view_right_for_the_administration_tables(self):
+        # D-086: every staff account may use the management area; no model creates a right it needs.
         for model in apps.get_app_config("community").get_models():
             with self.subTest(model=model.__name__):
-                self.assertEqual(model._meta.default_permissions, ())
+                expected = ("view",) if model.__name__ in self.VIEWABLE else ()
+                self.assertEqual(tuple(model._meta.default_permissions), expected)
                 self.assertEqual(list(model._meta.permissions), [])
 
     def test_no_group_holds_a_right_of_the_community_after_the_migrations(self):
@@ -242,8 +252,10 @@ class SingletonAndHistoryTests(TestCase):
 
         self.assertEqual(Group.objects.count(), 0)
 
-    def test_only_the_grid_operator_of_the_community_is_in_the_django_administration(self):
-        # The pages of the management area are the interface (D-077); the grid operator of the instance
-        # is the one model that system administrators maintain in the administration (D-086).
+    def test_the_community_tables_and_the_grid_operator_are_in_the_django_administration(self):
+        # The pages of the management area are the interface (D-077); the administration shows plain read-only
+        # tables of the data and, for system administrators, the grid operator of the instance (D-086, D-091).
         registered = {model._meta.label for model in admin.site._registry if model._meta.app_label == "community"}
-        self.assertEqual(registered, {"community.GridOperator"})
+        self.assertEqual(registered, {f"community.{name}" for name in self.VIEWABLE} | {"community.GridOperator"})
+        # The preferences of a staff member's lists are no data to look at.
+        self.assertNotIn("community.ListPreference", registered)

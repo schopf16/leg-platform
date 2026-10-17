@@ -95,6 +95,17 @@ class GroupRightsTests(TestCase):
                     "Mailtext: ändern",
                     "Portal-Einstellungen: ansehen",
                     "Portal-Einstellungen: ändern",
+                    # The plain tables of the management data: view only (D-091).
+                    "Einstellungen der Verwaltung: ansehen",
+                    "LEG-Zuordnung: ansehen",
+                    "LEG: ansehen",
+                    "Messpunkt: ansehen",
+                    "Person: ansehen",
+                    "Personenzuordnung: ansehen",
+                    "Standort: ansehen",
+                    "Trafokreis: ansehen",
+                    "Verlaufseintrag: ansehen",
+                    "Änderung der Anteile: ansehen",
                 ]
             ),
         )

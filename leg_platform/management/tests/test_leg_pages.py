@@ -219,16 +219,71 @@ class LegPageTests(TestCase):
 
     # The dialogs --------------------------------------------------------------------------------
 
+    def test_a_metering_point_without_a_leg_is_assigned_from_the_page_of_the_leg(self):
+        loose = make_metering_point(20, Direction.CONSUMPTION, self.place_a)
+        elsewhere = self.point_one  # has a LEG: not offered, "Change LEG" moves it
+        archived_point = make_metering_point(21, is_archived=True)
+        url = self.url("metering_point_assign", self.neuland)
+        page = self.client.get(url)
+        self.assertContains(page, "Messpunkt zuordnen")
+        self.assertContains(page, f'<option value="{loose.pk}">')
+        self.assertNotContains(page, f'<option value="{elsewhere.pk}">')
+        self.assertNotContains(page, f'<option value="{archived_point.pk}">')
+        self.assertContains(page, "Ab diesem Tag gehört der Messpunkt zu dieser LEG.")
+        # UX-013: the lead names the LEG in words that read well; UX-011: a point without a location says so.
+        self.assertContains(page, "Er wird der LEG «%s» zugeordnet." % self.neuland.name)
+        self.assertNotContains(page, "Er kommt zur LEG")
+        self.assertContains(page, "Gilt ab")
+        bare = make_metering_point(23)  # no location at all
+        page = self.client.get(url)
+        self.assertRegex(page.content.decode(), rf'<option value="{bare.pk}">[^<]* · [^<]* · kein Standort</option>')
+        # Nothing is chosen in advance: the empty option that says so is the selected one.
+        self.assertContains(page, '<option value="" selected>Noch kein Messpunkt gewählt</option>')
+        before = self.client.post(url, {"valid_from": TODAY.isoformat()})
+        self.assertEqual(before.status_code, 200)
+        done = self.client.post(url, {"metering_point": str(loose.pk), "valid_from": TODAY.isoformat()})
+        self.assertRedirects(done, self.detail(self.neuland), fetch_redirect_response=False)
+        self.assertEqual(loose.leg_assignments.get().leg, self.neuland)
+        # The page of the LEG offers the action, with the new point listed.
+        self.assertContains(self.client.get(self.detail(self.neuland)), self.url("metering_point_assign", self.neuland))
+
+    def test_the_assignment_from_the_page_of_a_leg_refuses_what_is_not_offered(self):
+        archived_point = make_metering_point(21, is_archived=True)
+        url = self.url("metering_point_assign", self.neuland)
+        before = Leg.objects.count(), self.point_one.leg_assignments.count()
+        for forged in (str(self.point_one.pk), str(archived_point.pk), "999999", "-1", "abc", "9" * 40, ""):
+            with self.subTest(forged=forged[:12]):
+                self.assertEqual(
+                    self.client.post(url, {"metering_point": forged, "valid_from": TODAY.isoformat()}).status_code, 200
+                )
+        self.assertEqual((Leg.objects.count(), self.point_one.leg_assignments.count()), before)
+        self.assertFalse(archived_point.leg_assignments.exists())
+        # An archived LEG offers no dialog and takes no point, also not by a direct post.
+        gone = self.client.post(
+            self.url("metering_point_assign", self.old),
+            {"metering_point": str(make_metering_point(22).pk), "valid_from": TODAY.isoformat()}, follow=True,
+        )
+        self.assertContains(gone, "Diese LEG ist archiviert.")
+        self.assertEqual(self.client.get(self.url("metering_point_assign", self.old)).status_code, 302)
+        self.assertEqual(self.client.get(reverse("management:legs_metering_point_assign", args=[999999])).status_code, 404)
+
+    def test_the_dialog_says_so_when_every_metering_point_has_a_leg(self):
+        page = self.client.get(self.url("metering_point_assign", self.neuland))
+        self.assertContains(page, "Alle Messpunkte gehören bereits zu einer LEG.")
+        self.assertNotContains(page, "Messpunkt zuordnen</button>")
+
     def test_creating_a_leg_checks_the_name_and_the_date_and_returns_to_the_list(self):
         client = self.client
         create = reverse("management:legs_new")
         page = client.get(create)
         for text in (
             "LEG anlegen", "Eine LEG ist ein virtueller Netzzusammenschluss. Messpunkte ordnen Sie der LEG danach zu.",
-            "z. B. LEG Musterquartier", "(optional)", "Geprüft am", "Bemerkung", "Abbrechen", "Speichern", 'type="date"',
-            "leg-quota.js", f'data-today="{TODAY.isoformat()}"',
+            "z. B. LEG Musterquartier", "(optional)", "Geprüft am", "Bemerkung", "Abbrechen", 'type="date"',
+            "leg-quota.js", f'data-today="{TODAY.isoformat()}"', "Kann auch über 100 % liegen.",
+            "Erforderlich, wenn eine Quote eingegeben wird.", 'data-check="decimal"',
         ):
             self.assertContains(page, text)
+        self.assertNotContains(page, "Speichern</button>")  # the button names the action
         self.assertNotContains(page, f'value="{TODAY.isoformat()}"')  # no quota: no date
         # A name in use (the case does not matter): the message under the field, nothing saved.
         refused = client.post(create, {"name": "leg musterquartier", "quota": "", "checked_on": ""})
@@ -236,7 +291,7 @@ class LegPageTests(TestCase):
         self.assertEqual(Leg.objects.filter(name__iexact="leg musterquartier").count(), 1)
         # A quota needs its date; the quota is a percentage; the day of the reading is not in the future.
         self.assertContains(client.post(create, {"name": "LEG X", "quota": "20"}), "Bitte füllen Sie dieses Feld aus.")
-        self.assertContains(client.post(create, {"name": "LEG X", "quota": "120", "checked_on": TODAY.isoformat()}), "100")
+        self.assertEqual(client.post(create, {"name": "LEG X", "quota": "-1", "checked_on": TODAY.isoformat()}).status_code, 200)
         self.assertContains(client.post(create, {"name": "LEG X", "quota": "abc", "checked_on": TODAY.isoformat()}), "Zahl")
         tomorrow = (TODAY + timedelta(days=1)).isoformat()
         self.assertContains(
@@ -245,9 +300,18 @@ class LegPageTests(TestCase):
         self.assertFalse(Leg.objects.filter(name="LEG X").exists())
         # A decimal comma is accepted; the new LEG is in the list with its quota.
         done = client.post(create, {"name": "LEG Neu", "quota": "37,6", "checked_on": EARLIER.isoformat(), "remark": "x"})
-        self.assertRedirects(done, LIST, fetch_redirect_response=False)
         leg = Leg.objects.get(name="LEG Neu")
+        self.assertRedirects(done, f"{self.detail(leg)}?new=1&next=%2Fmanagement%2Flegs%2F", fetch_redirect_response=False)
         self.assertEqual((leg.production_quota_percent, leg.quota_checked_on), (Decimal("37.60"), EARLIER))
+        self.assertContains(client.get(self.detail(leg), {"new": "1"}), "LEG angelegt. Weiter: Messpunkte der LEG zuordnen.")
+        # A quota above 100 is a quota (D-089); a number that cannot be one is refused with the message of the field.
+        self.assertEqual(
+            client.post(create, {"name": "LEG Hoch", "quota": "204,1", "checked_on": EARLIER.isoformat()}).status_code, 302
+        )
+        self.assertContains(
+            client.post(create, {"name": "LEG X", "quota": "1000", "checked_on": EARLIER.isoformat()}),
+            "Die Quote muss zwischen 0 und 999.99 % liegen.",
+        )
         self.assertEqual(history.entries_for(leg).get().event, HistoryEvent.CREATED)
         self.assertContains(client.get(LIST), "37.6 %")
         # Without a quota the date is dropped, whatever the form sent.

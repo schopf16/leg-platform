@@ -360,8 +360,8 @@ msgstr "Läuft"
 msgid "Started at"
 msgstr "Gestartet am"
 
-msgid "The address directory import has been queued."
-msgstr "Der Import des Adressverzeichnisses wurde vorgemerkt."
+msgid "The address directory import has started. This page shows the progress."
+msgstr "Der Import des Adressverzeichnisses wurde gestartet. Diese Seite zeigt den Fortschritt."
 
 msgid "The address directory is more than 92 days old."
 msgstr "Das Adressverzeichnis ist mehr als 92 Tage alt."
@@ -369,14 +369,271 @@ msgstr "Das Adressverzeichnis ist mehr als 92 Tage alt."
 msgid "The address directory is unavailable."
 msgstr "Das Adressverzeichnis ist nicht verfügbar."
 
-msgid "The import runs in a separate background worker. Addresses already entered are not changed."
-msgstr "Der Import läuft in einem separaten Hintergrundprozess. Bereits eingegebene Adressen werden nicht verändert."
+msgid "The import runs in the portal itself, you do not need to set up anything else. Addresses already entered are not changed. The result is also written to the application log and to the security log."
+msgstr "Der Import läuft im Portal selbst, Sie müssen nichts weiter einrichten. Bereits eingegebene Adressen werden nicht verändert. Das Ergebnis wird auch in das Anwendungsprotokoll und in das Sicherheitsprotokoll geschrieben."
 
 msgid "This address was not found. Please check street, house number, postal code and town. You can still save it as entered."
 msgstr "Diese Adresse wurde nicht gefunden. Bitte prüfen Sie Strasse, Hausnummer, PLZ und Ort. Sie können sie trotzdem so speichern, wie Sie sie eingegeben haben."
 
 msgid "Too many import requests. Please try again later."
 msgstr "Zu viele Importanfragen. Bitte versuchen Sie es später erneut."
+
+# D-090: the import of the address directory in the portal itself, its status page and its failure reasons.
+msgid "Interrupted"
+msgstr "Unterbrochen"
+
+msgid "Reason"
+msgstr "Grund"
+
+msgid "Directory in use"
+msgstr "Verwendetes Verzeichnis"
+
+msgid "File size"
+msgstr "Dateigrösse"
+
+msgid "Download progress"
+msgstr "Fortschritt des Downloads"
+
+msgid "Starting"
+msgstr "Wird gestartet"
+
+msgid "Checking the official catalogue"
+msgstr "Der offizielle Katalog wird geprüft"
+
+msgid "Downloading the official file"
+msgstr "Die offizielle Datei wird heruntergeladen"
+
+msgid "Importing the addresses"
+msgstr "Die Adressen werden importiert"
+
+msgid "Publishing the new directory"
+msgstr "Das neue Verzeichnis wird veröffentlicht"
+
+msgid "Finishing up"
+msgstr "Der Import wird abgeschlossen"
+
+msgid "Use the button below to load or update the directory."
+msgstr "Laden oder aktualisieren Sie das Verzeichnis mit der Schaltfläche unten."
+
+msgid "The import did not finish."
+msgstr "Der Import wurde nicht abgeschlossen."
+
+msgid "You can leave this page; the import goes on. A restart of the portal interrupts it."
+msgstr "Sie können diese Seite verlassen; der Import läuft weiter. Ein Neustart des Portals unterbricht ihn."
+
+msgid "Try again"
+msgstr "Erneut versuchen"
+
+msgid "The import is queued and waits to be started."
+msgstr "Der Import ist vorgemerkt und wartet auf den Start."
+
+msgid "The import is running."
+msgstr "Der Import läuft."
+
+msgid "The directory was already up to date. Nothing was downloaded."
+msgstr "Das Verzeichnis war bereits aktuell. Es wurde nichts heruntergeladen."
+
+msgid "The import completed."
+msgstr "Der Import ist abgeschlossen."
+
+msgid "The import failed."
+msgstr "Der Import ist fehlgeschlagen."
+
+#, python-format
+msgid "%(done)s of %(total)s MB downloaded"
+msgstr "%(done)s von %(total)s MB heruntergeladen"
+
+#, python-format
+msgid "%(count)s addresses read"
+msgstr "%(count)s Adressen gelesen"
+
+msgid "The automatic refresh is turned off on this server. The directory is only updated when you request it here or when the operator starts the import on the server."
+msgstr "Die automatische Aktualisierung ist auf diesem Server ausgeschaltet. Das Verzeichnis wird nur aktualisiert, wenn Sie es hier anfordern oder wenn die Betreiber den Import auf dem Server starten."
+
+msgid "The portal refreshes the directory by itself: the first time a staff member opens the administration or the management area after the due time. It needs no scheduler, but nothing happens while nobody uses the portal."
+msgstr "Das Portal aktualisiert das Verzeichnis selbst: Sobald nach dem Fälligkeitszeitpunkt eine Mitarbeiterin oder ein Mitarbeiter die Administration oder die Verwaltung öffnet. Dafür ist kein Zeitplaner nötig, aber es passiert nichts, solange niemand das Portal benutzt."
+
+msgid "The first refresh is due now."
+msgstr "Die erste Aktualisierung ist jetzt fällig."
+
+msgid "The next refresh is due now."
+msgstr "Die nächste Aktualisierung ist jetzt fällig."
+
+#, python-format
+msgid "The next refresh is due after %(date)s."
+msgstr "Die nächste Aktualisierung ist nach dem %(date)s fällig."
+
+msgid "The status can no longer be updated. Reload the page; you may have to sign in again."
+msgstr "Der Status kann nicht mehr aktualisiert werden. Laden Sie die Seite neu; eventuell müssen Sie sich erneut anmelden."
+
+msgid "The status could not be loaded. Trying again."
+msgstr "Der Status konnte nicht geladen werden. Es wird erneut versucht."
+
+msgid "The download address is not an approved one."
+msgstr "Die Download-Adresse gehört nicht zu den zugelassenen Adressen."
+
+msgid "The official server did not deliver the file. Check that this server can reach data.geo.admin.ch."
+msgstr "Der offizielle Server hat die Datei nicht geliefert. Prüfen Sie, ob dieser Server data.geo.admin.ch erreichen kann."
+
+msgid "The official server answered in an unexpected format."
+msgstr "Der offizielle Server hat in einem unerwarteten Format geantwortet."
+
+msgid "The official file is larger than allowed."
+msgstr "Die offizielle Datei ist grösser als erlaubt."
+
+msgid "The download was larger or slower than allowed."
+msgstr "Der Download war grösser oder langsamer als erlaubt."
+
+msgid "The download was incomplete. Try again later."
+msgstr "Der Download war unvollständig. Versuchen Sie es später erneut."
+
+msgid "The catalogue of the official server could not be understood."
+msgstr "Der Katalog des offiziellen Servers konnte nicht verstanden werden."
+
+msgid "The official file contains an address that is too long."
+msgstr "Die offizielle Datei enthält eine zu lange Adresse."
+
+msgid "The official file contains an invalid address."
+msgstr "Die offizielle Datei enthält eine ungültige Adresse."
+
+msgid "The official file does not have the expected content."
+msgstr "Die offizielle Datei hat nicht den erwarteten Inhalt."
+
+msgid "The official file contains an invalid postal code."
+msgstr "Die offizielle Datei enthält eine ungültige Postleitzahl."
+
+msgid "The official file contains no addresses."
+msgstr "Die offizielle Datei enthält keine Adressen."
+
+msgid "The official file could not be read."
+msgstr "Die offizielle Datei konnte nicht gelesen werden."
+
+msgid "Another import is running."
+msgstr "Ein anderer Import läuft."
+
+msgid "The import was taken over by another process."
+msgstr "Der Import wurde von einem anderen Prozess übernommen."
+
+msgid "The free disk space could not be checked."
+msgstr "Der freie Speicherplatz konnte nicht geprüft werden."
+
+msgid "There is not enough free disk space for the import (at least 4 GB are needed)."
+msgstr "Für den Import ist nicht genug freier Speicherplatz vorhanden (mindestens 4 GB nötig)."
+
+msgid "The official file is older than the directory in use. Nothing was changed."
+msgstr "Die offizielle Datei ist älter als das verwendete Verzeichnis. Es wurde nichts verändert."
+
+msgid "A repair was tried a short time ago and did not succeed. Try again in a few hours."
+msgstr "Eine Reparatur wurde vor kurzer Zeit versucht und ist nicht gelungen. Versuchen Sie es in einigen Stunden erneut."
+
+msgid "The downloaded file does not match its checksum and was discarded."
+msgstr "Die heruntergeladene Datei stimmt nicht mit ihrer Prüfsumme überein und wurde verworfen."
+
+msgid "The official directory could not be downloaded or read. Check the network connection and try again."
+msgstr "Das offizielle Verzeichnis konnte nicht heruntergeladen oder gelesen werden. Prüfen Sie die Netzwerkverbindung und versuchen Sie es erneut."
+
+msgid "The import failed unexpectedly. The application log has the details."
+msgstr "Der Import ist unerwartet fehlgeschlagen. Das Anwendungsprotokoll enthält die Einzelheiten."
+
+msgid "The import was interrupted because the application stopped or restarted. Request it again."
+msgstr "Der Import wurde unterbrochen, weil die Anwendung angehalten oder neu gestartet wurde. Fordern Sie ihn erneut an."
+
+msgid "Address directory import completed"
+msgstr "Import des Adressverzeichnisses abgeschlossen"
+
+msgid "Address directory import failed"
+msgstr "Import des Adressverzeichnisses fehlgeschlagen"
+
+# D-092: the log files and the log pages of the administration.
+msgid "Log file viewed"
+msgstr "Protokolldatei angesehen"
+
+msgid "Log file downloaded"
+msgstr "Protokolldatei heruntergeladen"
+
+msgid "Log files"
+msgstr "Protokolldateien"
+
+msgid "Application log"
+msgstr "Anwendungsprotokoll"
+
+msgid "Security log (file)"
+msgstr "Sicherheitsprotokoll (Datei)"
+
+msgid "File"
+msgstr "Datei"
+
+msgid "Size"
+msgstr "Grösse"
+
+msgid "Last change"
+msgstr "Letzte Änderung"
+
+msgid "Live view"
+msgstr "Live-Ansicht"
+
+msgid "Download"
+msgstr "Herunterladen"
+
+msgid "older file"
+msgstr "ältere Datei"
+
+msgid "Show"
+msgstr "Anzeigen"
+
+msgid "Watch live"
+msgstr "Live verfolgen"
+
+msgid "Nothing was logged to a file yet."
+msgstr "Es wurde noch nichts in eine Datei protokolliert."
+
+#, python-format
+msgid "The portal writes its application log and its security log to files. Each file is at most %(size)s MB; when it is full it is renamed and up to %(files)s older files are kept. The lines are cleaned of links with tokens, email addresses and IBANs. Opening a page or downloading a file is written to the security log."
+msgstr "Das Portal schreibt sein Anwendungsprotokoll und sein Sicherheitsprotokoll in Dateien. Jede Datei ist höchstens %(size)s MB gross; ist sie voll, wird sie umbenannt und es bleiben bis zu %(files)s ältere Dateien erhalten. Die Zeilen werden von Links mit Token, E-Mail-Adressen und IBAN bereinigt. Das Öffnen einer Seite oder das Herunterladen einer Datei wird im Sicherheitsprotokoll festgehalten."
+
+msgid "No log folder is configured on this server, so there are no log files to show. The portal then writes its log to the standard error output of its processes; on a server with systemd read it with journalctl (see the operating instructions). Set LOG_DIRECTORY on the server to write log files."
+msgstr "Auf diesem Server ist kein Protokollordner eingerichtet, daher gibt es keine Protokolldateien. Das Portal schreibt sein Protokoll dann in die Standardfehlerausgabe seiner Prozesse; auf einem Server mit systemd lesen Sie es mit journalctl (siehe Betriebsanleitung). Setzen Sie LOG_DIRECTORY auf dem Server, um Protokolldateien zu schreiben."
+
+msgid "The log can no longer be updated. Reload the page; you may have to sign in again."
+msgstr "Das Protokoll kann nicht mehr aktualisiert werden. Laden Sie die Seite neu; eventuell müssen Sie sich erneut anmelden."
+
+msgid "The log could not be loaded. Trying again."
+msgstr "Das Protokoll konnte nicht geladen werden. Es wird erneut versucht."
+
+msgid "Paused. New lines are not shown until you continue."
+msgstr "Angehalten. Neue Zeilen werden erst nach dem Fortfahren angezeigt."
+
+msgid "Live: new lines appear by themselves."
+msgstr "Live: Neue Zeilen erscheinen von selbst."
+
+msgid "This older file does not change."
+msgstr "Diese ältere Datei ändert sich nicht."
+
+msgid "Nothing was logged to this file yet."
+msgstr "In diese Datei wurde noch nichts protokolliert."
+
+msgid "Pause"
+msgstr "Anhalten"
+
+msgid "Scroll to the end automatically"
+msgstr "Automatisch zum Ende scrollen"
+
+msgid "All log files"
+msgstr "Alle Protokolldateien"
+
+msgid "Log lines"
+msgstr "Protokollzeilen"
+
+msgid "Without JavaScript the log cannot be shown live. Use the download."
+msgstr "Ohne JavaScript kann das Protokoll nicht live angezeigt werden. Verwenden Sie den Download."
+
+# D-091: plain, read-only tables of the management data in the administration.
+msgid "Management data"
+msgstr "Verwaltungsdaten"
+
+#, python-format
+msgid "See the table of %(name)s (read only)"
+msgstr "Die Tabelle «%(name)s» ansehen (nur lesen)"
 
 #: leg_platform/accounts/models.py
 msgid "customer number"
@@ -2459,13 +2716,11 @@ msgstr "Farben der Serverkonfiguration wieder verwenden"
 msgid "Upload both logos or none. The portal needs one version for light and one for dark mode."
 msgstr "Laden Sie beide Logos hoch oder keines. Das Portal braucht je eine Version für den hellen und den dunklen Modus."
 
-#, python-format
-msgid "For your safety, the portal settings can only be saved within %(minutes)s minutes after logging in. Log out, log in again and save the changes right away. Nothing was saved."
-msgstr "Aus Sicherheitsgründen können die Portal-Einstellungen nur innerhalb von %(minutes)s Minuten nach der Anmeldung gespeichert werden. Melden Sie sich ab, melden Sie sich erneut an und speichern Sie die Änderungen sofort. Es wurde nichts gespeichert."
+msgid "The identity cannot be checked. Nothing was saved."
+msgstr "Die Identität kann nicht geprüft werden. Es wurde nichts gespeichert."
 
-#, python-format
-msgid "To save changes you must have logged in within the last %(minutes)s minutes. Please log out and log in again first."
-msgstr "Um Änderungen zu speichern, müssen Sie sich in den letzten %(minutes)s Minuten angemeldet haben. Bitte melden Sie sich zuerst ab und wieder an."
+msgid "To protect what every visitor sees, confirm the change with the code from your authenticator app or, if you have none, with your password."
+msgstr "Zum Schutz dessen, was alle Besucher sehen, bestätigen Sie die Änderung mit dem Code aus Ihrer Authenticator-App oder, falls Sie keine haben, mit Ihrem Passwort."
 
 msgid "Choose either new logos or the removal of the uploaded logos, not both."
 msgstr "Wählen Sie entweder neue Logos oder das Entfernen der hochgeladenen Logos, nicht beides."
@@ -2690,9 +2945,6 @@ msgstr "Geben Sie 11 Zeichen ein: Grossbuchstaben und Ziffern."
 
 msgid "Enter a number of 33 characters: capital letters and digits."
 msgstr "Geben Sie eine Nummer mit 33 Zeichen ein: Grossbuchstaben und Ziffern."
-
-msgid "Enter up to 20 digits."
-msgstr "Geben Sie bis zu 20 Ziffern ein."
 
 msgid "Enter the %(operator)s number: TRA followed by digits."
 msgstr "Geben Sie die %(operator)s-Nummer ein: TRA und Ziffern."
@@ -2983,9 +3235,6 @@ msgstr "Standorte zusammengeführt"
 msgid "Transformer circuit"
 msgstr "Trafokreis"
 
-msgid "Choose a transformer circuit from the list or create a new one."
-msgstr "Wählen Sie einen Trafokreis aus der Liste oder legen Sie einen neuen an."
-
 msgid "e.g. rear building"
 msgstr "z. B. Hinterhaus"
 
@@ -3070,16 +3319,6 @@ msgstr "Übertragen und speichern"
 msgid "Edit remark"
 msgstr "Bemerkung bearbeiten"
 
-msgid "Create transformer circuit"
-msgstr "Trafokreis anlegen"
-
-msgid "Use this one"
-msgstr "Diesen verwenden"
-
-#, python-format
-msgid "The location %(address)s gets this transformer circuit."
-msgstr "Der Standort %(address)s erhält diesen Trafokreis."
-
 msgid "Change transformer circuit"
 msgstr "Trafokreis ändern"
 
@@ -3095,10 +3334,6 @@ msgstr "Diesen Trafokreis gibt es schon."
 
 msgid "Create metering point"
 msgstr "Messpunkt anlegen"
-
-#, python-format
-msgid "At the location %(address)s%(circuit)s."
-msgstr "Am Standort %(address)s%(circuit)s."
 
 msgid "There is no suggestion to decide on."
 msgstr "Es gibt keinen Vorschlag, über den zu entscheiden wäre."
@@ -3138,10 +3373,10 @@ msgid "Status of the metering point"
 msgstr "Status des Messpunkts"
 
 msgid "Recorded, not yet announced to the %(operator)s."
-msgstr "Erfasst, noch nicht bei der %(operator)s angemeldet."
+msgstr "Erfasst, noch nicht bei %(operator)s angemeldet."
 
 msgid "Announced to the %(operator)s. The person has to confirm."
-msgstr "Bei der %(operator)s angemeldet. Die Person muss bestätigen."
+msgstr "Bei %(operator)s angemeldet. Die Person muss bestätigen."
 
 msgid "The person has confirmed. The start date is not reached yet."
 msgstr "Die Person hat bestätigt. Startdatum noch nicht erreicht."
@@ -3153,7 +3388,7 @@ msgid "The assignment has ended."
 msgstr "Die Zuordnung ist beendet."
 
 msgid "The transformer circuit of the %(operator)s that the location belongs to. The number is the reference for questions to the %(operator)s."
-msgstr "Der Trafokreis der %(operator)s, zu dem der Standort gehört. Die Nummer ist die Referenz für Rückfragen bei der %(operator)s."
+msgstr "Der Trafokreis von %(operator)s, zu dem der Standort gehört. Die Nummer ist die Referenz für Rückfragen bei %(operator)s."
 
 msgid "Street and house number. A location is an address. A click on the row opens or closes the metering points."
 msgstr "Strasse und Hausnummer. Ein Standort ist eine Adresse. Ein Klick auf die Zeile klappt die Messpunkte auf oder zu."
@@ -3202,9 +3437,6 @@ msgstr "PLZ, Ort"
 
 msgid "Grid"
 msgstr "Netz"
-
-msgid "Search transformer circuit"
-msgstr "Trafokreis suchen"
 
 msgid "Create new transformer circuit"
 msgstr "Neuen Trafokreis anlegen"
@@ -3278,12 +3510,6 @@ msgid_plural "%(address)s with %(counter)s metering points. Saving transfers the
 msgstr[0] "%(address)s mit %(counter)s Messpunkt. Beim Speichern werden die Messpunkte dieses Standorts auf jenen Standort übertragen und dieser Standort wird gelöscht. Das lässt sich nicht rückgängig machen."
 msgstr[1] "%(address)s mit %(counter)s Messpunkten. Beim Speichern werden die Messpunkte dieses Standorts auf jenen Standort übertragen und dieser Standort wird gelöscht. Das lässt sich nicht rückgängig machen."
 
-msgid "This transformer circuit already exists:"
-msgstr "Diesen Trafokreis gibt es schon:"
-
-msgid "It is assigned to the location, a second one is not created."
-msgstr "Er wird dem Standort zugeordnet, ein zweiter wird nicht angelegt."
-
 #, python-format
 msgid "%(address)s with %(counter)s metering point. If it is the same place, "
 msgid_plural "%(address)s with %(counter)s metering points. If it is the same place, "
@@ -3295,9 +3521,6 @@ msgstr "zum bestehenden Standort wechseln"
 
 msgid "This metering point number already exists."
 msgstr "Diese Messpunkt-Nummer gibt es schon."
-
-msgid "Only the last digits. Country and identifier come from the settings."
-msgstr "Nur die letzten Stellen. Land und Identifikator kommen aus den Einstellungen."
 
 #, python-format
 msgid "Filter problems (%(problem_count)s)"
@@ -3372,12 +3595,6 @@ msgstr "Name, Kundennummer oder E-Mail suchen"
 msgid "Applies from"
 msgstr "Gilt ab"
 
-msgid "Valid from"
-msgstr "Gültig ab"
-
-msgid "No person found."
-msgstr "Keine Person gefunden."
-
 msgid "Several persons match. Type more of the name or the customer number."
 msgstr "Mehrere Personen passen. Geben Sie mehr vom Namen oder von der Kundennummer ein."
 
@@ -3426,15 +3643,6 @@ msgstr "Das Datum darf nicht in der Zukunft liegen."
 msgid "The date must not be before the earlier step."
 msgstr "Das Datum darf nicht vor dem vorherigen Schritt liegen."
 
-msgid "Search street or metering point number"
-msgstr "Strasse oder Messpunkt-Nummer suchen"
-
-msgid "Choose a location from the list."
-msgstr "Wählen Sie einen Standort aus der Liste."
-
-msgid "Several locations match. Type more of the address."
-msgstr "Mehrere Standorte passen. Geben Sie mehr von der Adresse ein."
-
 msgid "PV power"
 msgstr "PV-Leistung"
 
@@ -3448,7 +3656,7 @@ msgid "Optional"
 msgstr "Optional"
 
 msgid "Number of the smart meter at the %(operator)s, followed by the direction. Blue is consumption, green is feed-in."
-msgstr "Nummer des Smart Meters bei der %(operator)s, dahinter die Richtung. Blau ist Bezug, grün Einspeisung."
+msgstr "Nummer des Smart Meters bei %(operator)s, dahinter die Richtung. Blau ist Bezug, grün Einspeisung."
 
 msgid "The address where the metering point is installed."
 msgstr "Adresse, an der der Messpunkt liegt."
@@ -3478,7 +3686,7 @@ msgstr "Alle (%(count)d)"
 
 #, python-format
 msgid "Notify the %(operator)s (%(count)d)"
-msgstr "Bei der %(operator)s anmelden (%(count)d)"
+msgstr "Bei %(operator)s anmelden (%(count)d)"
 
 #, python-format
 msgid "Confirmation pending (%(count)d)"
@@ -3493,7 +3701,7 @@ msgid "archived (%(count)d)"
 msgstr "archiviert (%(count)d)"
 
 msgid "All metering points with their state. Here you see what is still to do at the %(operator)s."
-msgstr "Alle Messpunkte mit ihrem Stand. Hier sieht man, was bei der %(operator)s noch ansteht."
+msgstr "Alle Messpunkte mit ihrem Stand. Hier sieht man, was bei %(operator)s noch ansteht."
 
 msgid "No metering points yet. Create the first metering point."
 msgstr "Noch keine Messpunkte. Legen Sie den ersten Messpunkt an."
@@ -3518,10 +3726,10 @@ msgstr "%(label)s, Startdatum %(date)s"
 
 #, python-format
 msgid "Metering point %(number)s (%(direction)s). The registration at the %(operator)s has taken place."
-msgstr "Messpunkt %(number)s (%(direction)s). Die Anmeldung bei der %(operator)s ist erfolgt."
+msgstr "Messpunkt %(number)s (%(direction)s). Die Anmeldung bei %(operator)s ist erfolgt."
 
 msgid "Mark as notified to the %(operator)s"
-msgstr "Als bei der %(operator)s angemeldet setzen"
+msgstr "Als bei %(operator)s angemeldet setzen"
 
 #, python-format
 msgid "Metering point %(number)s (%(direction)s). The %(operator)s has confirmed the registration."
@@ -3636,7 +3844,7 @@ msgid "Registration on standby, start date missing."
 msgstr "Anmeldung auf Standby, Startdatum fehlt."
 
 msgid "Recorded, not yet notified to the %(operator)s."
-msgstr "Erfasst, noch nicht bei der %(operator)s angemeldet."
+msgstr "Erfasst, noch nicht bei %(operator)s angemeldet."
 
 msgid "Terminate"
 msgstr "Kündigen"
@@ -3753,7 +3961,7 @@ msgid "Action"
 msgstr "Aktion"
 
 msgid "No metering points belong to this LEG yet."
-msgstr "Dieser LEG gehören noch keine Messpunkte zu."
+msgstr "Zu dieser LEG gehören noch keine Messpunkte."
 
 msgctxt "LEG action"
 msgid "own"
@@ -3858,7 +4066,7 @@ msgid "Street and house number of the billing address."
 msgstr "Strasse und Hausnummer der Rechnungsadresse."
 
 msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the %(operator)s. Recording, if at least one is still being recorded."
-msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei der %(operator)s angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
+msgstr "Anzahl der Messpunkte der Person. Dahinter der Stand: angemeldet, wenn alle bei %(operator)s angemeldet sind. Aufnahme, wenn mindestens einer noch in Aufnahme ist."
 
 msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive. Invited: the person has not completed the registration yet."
 msgstr "Ob sich die Person im Portal anmelden kann. Gesperrt: vorübergehend gesperrt, zum Beispiel nach Fehlversuchen. Inaktiv: Das Konto ist deaktiviert und steht im Archiv. Eingeladen: Die Person hat die Registrierung noch nicht abgeschlossen."
@@ -3945,7 +4153,7 @@ msgid "The location is the address where the metering point is installed. A mete
 msgstr "Der Standort ist die Adresse, an der der Messpunkt liegt. Ein Messpunkt gehört fest zu seinem Standort."
 
 msgid "Number of the smart meter at the %(operator)s. If it is missing, the metering point is recorded but not yet known at the %(operator)s."
-msgstr "Nummer des Smart Meters bei der %(operator)s. Fehlt sie, ist der Messpunkt angelegt, aber bei der %(operator)s noch nicht bekannt."
+msgstr "Nummer des Smart Meters bei %(operator)s. Fehlt sie, ist der Messpunkt angelegt, aber bei %(operator)s noch nicht bekannt."
 
 msgid "The billing group the metering point belongs to."
 msgstr "Die Abrechnungsgruppe, zu der der Messpunkt gehört."
@@ -3984,19 +4192,19 @@ msgid "registered:"
 msgstr "registriert:"
 
 msgid "The metering point is recorded, the notification to the %(operator)s is not yet submitted."
-msgstr "Der Messpunkt ist angelegt, die Anmeldung bei der %(operator)s ist noch nicht eingereicht."
+msgstr "Der Messpunkt ist angelegt, die Anmeldung bei %(operator)s ist noch nicht eingereicht."
 
 msgid "notified on …:"
 msgstr "angemeldet am …:"
 
 msgid "The notification is submitted to the %(operator)s."
-msgstr "Die Anmeldung ist bei der %(operator)s eingereicht."
+msgstr "Die Anmeldung ist bei %(operator)s eingereicht."
 
 msgid "confirmed on …:"
 msgstr "bestätigt am …:"
 
 msgid "The person has confirmed the notification at the %(operator)s. The date is the day on which the LEG recorded the confirmation."
-msgstr "Die Person hat die Anmeldung bei der %(operator)s bestätigt. Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat."
+msgstr "Die Person hat die Anmeldung bei %(operator)s bestätigt. Das Datum ist der Tag, an dem die LEG die Bestätigung erfasst hat."
 
 #, python-format
 msgid "notified on %(date)s"
@@ -4008,9 +4216,6 @@ msgstr "bestätigt am %(date)s"
 
 msgid "Edit note"
 msgstr "Notiz bearbeiten"
-
-msgid "Edit %(operator)s customer number"
-msgstr "%(operator)s-Kundennummer bearbeiten"
 
 msgid "Number of shares"
 msgstr "Anzahl Anteile"
@@ -4121,7 +4326,7 @@ msgid "Quick filter"
 msgstr "Schnellfilter"
 
 msgid "Notify the %(operator)s"
-msgstr "Bei der %(operator)s anmelden"
+msgstr "Bei %(operator)s anmelden"
 
 msgid "Confirmation pending"
 msgstr "Bestätigung ausstehend"
@@ -4154,9 +4359,6 @@ msgstr "Standort geändert"
 
 msgid "This location is archived."
 msgstr "Dieser Standort ist archiviert."
-
-msgid "The location or the LEG is archived."
-msgstr "Der Standort oder die LEG ist archiviert."
 
 # D-087: creating a person, the invitation and the changes of the customer's data by the staff. The texts of the
 # specification stay as they are ("Person anlegen", "Einladung erneut senden", "Bearbeiten", the names of the cards
@@ -4253,3 +4455,225 @@ msgstr ""
 "%(verification_url)s\n"
 "\n"
 "Wenn Sie diese E-Mail nicht erwarten, können Sie sie ignorieren."
+
+# Management area, work package B (D-093 to D-096): forms, assignments, navigation.
+msgid "Enter the last digits of the number."
+msgstr "Geben Sie die letzten Ziffern der Nummer ein."
+
+msgid "Only the digits 0–9 are allowed."
+msgstr "Nur die Ziffern 0–9 sind erlaubt."
+
+msgid "At most %(limit)s digits are allowed (entered: %(count)s)."
+msgstr "Es sind höchstens %(limit)s Ziffern erlaubt (eingegeben: %(count)s)."
+
+msgid "Enter a number, for example 12.5 (digits and one decimal point or comma)."
+msgstr "Geben Sie eine Zahl ein, z. B. 12.5 (Ziffern und ein Dezimalpunkt oder -komma)."
+
+msgid "At most %(places)s decimal places."
+msgstr "Höchstens %(places)s Nachkommastellen."
+
+msgid "The value must be between 0 and %(max)s."
+msgstr "Der Wert muss zwischen 0 und %(max)s liegen."
+
+msgid "Complete number:"
+msgstr "Vollständige Nummer:"
+
+msgid "Enter a quota between 0 and %(max)s %%."
+msgstr "Die Quote muss zwischen 0 und %(max)s %% liegen."
+
+msgid "As shown in the %(operator)s LEG portal. It can also be above 100 %%."
+msgstr "Wie im LEG-Portal angezeigt (%(operator)s). Kann auch über 100 %% liegen."
+
+msgid "Required when a quota is entered."
+msgstr "Erforderlich, wenn eine Quote eingegeben wird."
+
+msgid "From this day the metering point belongs to this LEG. This can change the discount tier of the LEG."
+msgstr "Ab diesem Tag gehört der Messpunkt zu dieser LEG. Das kann die Rabattstufe der LEG ändern."
+
+msgid "No metering point chosen yet"
+msgstr "Noch kein Messpunkt gewählt"
+
+msgid "No transformer circuit"
+msgstr "Kein Trafokreis"
+
+msgid "+ Create new transformer circuit…"
+msgstr "+ Neuen Trafokreis anlegen …"
+
+msgid "Choose an existing transformer circuit or enter a new one, not both."
+msgstr "Wählen Sie einen bestehenden Trafokreis oder geben Sie einen neuen ein, nicht beides."
+
+msgid "Enter the %(operator)s number."
+msgstr "Geben Sie die Nummer von %(operator)s ein."
+
+msgid "This transformer circuit already exists. Choose it from the list."
+msgstr "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste."
+
+msgid "TRA followed by digits, for example TRA21359."
+msgstr "TRA gefolgt von Ziffern, z. B. TRA21359."
+
+msgid "No location chosen yet"
+msgstr "Noch kein Standort gewählt"
+
+msgid "Only the last digits. Shorter entries are filled with zeros on the left (23 becomes …0023)."
+msgstr "Nur die letzten Ziffern. Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023)."
+
+msgid "The transformer circuit follows the location. If you change the location, the transformer circuit of the metering point changes with it. This can change the discount tier of the LEG."
+msgstr "Der Trafokreis ergibt sich aus dem Standort. Wenn Sie den Standort ändern, wechselt auch der Trafokreis des Messpunkts. Das kann die Rabattstufe der LEG ändern."
+
+msgid "1 suggestion available."
+msgstr "1 Vorschlag verfügbar."
+
+msgid "%(count)s suggestions available."
+msgstr "%(count)s Vorschläge verfügbar."
+
+msgid "Customer no."
+msgstr "Kundennr."
+
+msgid "No person found. Only active persons with a customer number can be assigned. A person who has not yet registered cannot be assigned yet."
+msgstr "Keine Person gefunden. Zugewiesen werden können nur aktive Personen mit Kundennummer. Wer sich noch nicht registriert hat, kann noch nicht zugewiesen werden."
+
+msgid "no location"
+msgstr "kein Standort"
+
+msgid "Without location"
+msgstr "Ohne Standort"
+
+msgid "At another location"
+msgstr "An einem anderen Standort"
+
+msgid "This metering point already has a LEG."
+msgstr "Dieser Messpunkt hat bereits eine LEG."
+
+msgid "The metering point is created at this location."
+msgstr "Der Messpunkt wird an diesem Standort angelegt."
+
+msgid "Edit metering point"
+msgstr "Messpunkt bearbeiten"
+
+msgid "Assign existing metering point"
+msgstr "Bestehenden Messpunkt zuordnen"
+
+msgid "Assign metering point"
+msgstr "Messpunkt zuordnen"
+
+msgid "Choose a metering point for the location %(address)s. A metering point at another location moves here. The transformer circuit of the metering point then is: %(circuit)s."
+msgstr "Wählen Sie einen Messpunkt für den Standort %(address)s. Ein Messpunkt an einem anderen Standort wechselt hierher. Der Trafokreis des Messpunkts ist dann: %(circuit)s."
+
+msgid "This location does not exist any more."
+msgstr "Diesen Standort gibt es nicht mehr."
+
+msgid "Choose the transformer circuit of the location %(address)s or create a new one."
+msgstr "Wählen Sie den Trafokreis des Standorts %(address)s oder legen Sie einen neuen an."
+
+msgid "Enter the street."
+msgstr "Geben Sie die Strasse ein."
+
+msgid "Choose a metering point that has no LEG yet. It is assigned to the LEG “%(name)s”."
+msgstr "Wählen Sie einen Messpunkt, der noch keine LEG hat. Er wird der LEG «%(name)s» zugeordnet."
+
+msgid "Location missing? Create a new location"
+msgstr "Standort fehlt? Neuen Standort anlegen"
+
+msgid "Person missing? Invite a new person"
+msgstr "Person fehlt? Neue Person einladen"
+
+msgid "Back to the metering point"
+msgstr "Zurück zum Messpunkt"
+
+msgid "The transformer circuit changes: %(old)s → %(new)s. This can change the discount tier of the LEG."
+msgstr "Der Trafokreis ändert sich: %(old)s → %(new)s. Das kann die Rabattstufe der LEG ändern."
+
+msgid "Without a location the metering point has no transformer circuit any more (now: %(old)s). This can change the discount tier of the LEG."
+msgstr "Ohne Standort hat der Messpunkt keinen Trafokreis mehr (jetzt: %(old)s). Das kann die Rabattstufe der LEG ändern."
+
+msgid "No LEG assigned"
+msgstr "Keine LEG zugeordnet"
+
+msgid "Go to the settings"
+msgstr "Zu den Einstellungen"
+
+msgid "Set location"
+msgstr "Standort festlegen"
+
+msgid "Derived from the location"
+msgstr "Ergibt sich aus dem Standort"
+
+msgid "Location created. Next: add the metering points of this location."
+msgstr "Standort angelegt. Weiter: Messpunkte dieses Standorts erfassen."
+
+msgid "LEG created. Next: assign metering points to the LEG."
+msgstr "LEG angelegt. Weiter: Messpunkte der LEG zuordnen."
+
+msgid "Person created. The invitation was sent. Assign a metering point once the person has registered."
+msgstr "Person angelegt. Die Einladung wurde gesendet. Ordnen Sie der Person einen Messpunkt zu, sobald sie sich registriert hat."
+
+msgid "Person created. Next: assign a metering point."
+msgstr "Person angelegt. Weiter: Messpunkt zuordnen."
+
+msgid "All metering points already have a location."
+msgstr "Alle Messpunkte haben bereits einen Standort."
+
+msgid "Create a new metering point"
+msgstr "Neuen Messpunkt anlegen"
+
+msgid "All metering points already belong to a LEG."
+msgstr "Alle Messpunkte gehören bereits zu einer LEG."
+
+msgid "Go to the metering points"
+msgstr "Zu den Messpunkten"
+
+msgid "Details changed"
+msgstr "Angaben geändert"
+
+msgid "No person found. Only active persons with a customer number can be assigned."
+msgstr "Keine Person gefunden. Zugewiesen werden können nur aktive Personen mit Kundennummer."
+
+msgid "Too many searches. Please wait a moment."
+msgstr "Zu viele Suchanfragen. Bitte warten Sie einen Moment."
+
+msgid "Long session (stay signed in) started for a staff or administrator account"
+msgstr "Lange Sitzung (angemeldet bleiben) für ein Mitarbeitenden- oder Administratorkonto gestartet"
+
+msgid "All sessions of an account ended by a system administrator"
+msgstr "Alle Sitzungen eines Kontos durch einen Systemadministrator beendet"
+
+msgid "Notification: long session (stay signed in) started"
+msgstr "Benachrichtigung: Lange Sitzung (angemeldet bleiben) gestartet"
+
+msgid "A long session was started for your account at %(instance_name)s"
+msgstr "Für Ihr Konto bei %(instance_name)s wurde eine lange Sitzung gestartet"
+
+#, python-format
+msgid "A long session (\"Stay signed in\") was started for your account at %(instance_name)s. On that device you stay logged in for several days, without a new code, until you log out."
+msgstr "Für Ihr Konto bei %(instance_name)s wurde eine lange Sitzung («Angemeldet bleiben») gestartet. Auf diesem Gerät bleiben Sie mehrere Tage angemeldet, ohne neuen Code, bis Sie sich abmelden."
+
+#, python-format
+msgid ""
+"If this was not you, contact the operator immediately and choose a new password with \"Forgot password\" on the login page. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr ""
+"Wenn Sie das nicht waren, wenden Sie sich sofort an die Betreiber und wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort. Kontaktangaben finden Sie hier:\n"
+"\n"
+"%(contact_url)s"
+
+msgid "If this was not you, contact the operator of this portal immediately and choose a new password with \"Forgot password\" on the login page."
+msgstr "Wenn Sie das nicht waren, wenden Sie sich sofort an die Betreiber dieses Portals und wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
+
+msgid "End all sessions"
+msgstr "Alle Sitzungen beenden"
+
+msgid "Every session of the account on every device ends at its next request, including sessions with \"Stay signed in\". The account can log in again (with its second factor, if it has one). Use this when a device or a session may have got into the wrong hands."
+msgstr "Jede Sitzung des Kontos auf jedem Gerät endet bei der nächsten Anfrage, auch Sitzungen mit «Angemeldet bleiben». Das Konto kann sich wieder anmelden (mit dem zweiten Faktor, falls es einen hat). Verwenden Sie dies, wenn ein Gerät oder eine Sitzung in falsche Hände geraten sein könnte."
+
+msgid "Ended all sessions of the account."
+msgstr "Alle Sitzungen des Kontos beendet."
+
+msgid "This metering point does not exist any more."
+msgstr "Diesen Messpunkt gibt es nicht mehr."
+
+msgid "Back"
+msgstr "Zurück"
+
+msgid "This entry does not exist any more."
+msgstr "Diesen Eintrag gibt es nicht mehr."

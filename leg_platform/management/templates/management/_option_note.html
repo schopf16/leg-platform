@@ -1,0 +1,6 @@
+{% comment %}
+The live line under a drop-down whose options carry a note (``NotedSelect``, ``option-note.js``): the consequence of
+the chosen option, e.g. a move that changes the transformer circuit (UX-005). Always in the page and empty until an
+option with a note is chosen (an empty line is not shown), so that a screen reader announces the change politely.
+Context: ``field``.
+{% endcomment %}<p class="mgmt-hint mgmt-option-note" id="{{ field.auto_id }}_note" role="status" aria-live="polite"></p>

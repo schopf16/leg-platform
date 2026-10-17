@@ -43,12 +43,12 @@ urlpatterns = [
     path("locations/<int:pk>/remark/", location_views.LocationRemarkView.as_view(), name="locations_remark"),
     path("locations/<int:pk>/circuit/", location_views.LocationCircuitView.as_view(), name="locations_circuit"),
     path(
-        "locations/<int:pk>/circuit/new/", location_views.LocationCircuitNewView.as_view(),
-        name="locations_circuit_new",
+        "locations/<int:pk>/metering-points/new/", mp_views.LocationMeteringPointNewView.as_view(),
+        name="locations_metering_point_new",
     ),
     path(
-        "locations/<int:pk>/metering-points/new/", location_views.LocationMeteringPointNewView.as_view(),
-        name="locations_metering_point_new",
+        "locations/<int:pk>/metering-points/assign/", mp_views.LocationPointAssignView.as_view(),
+        name="locations_metering_point_assign",
     ),
     path("locations/<int:pk>/archive/", location_views.LocationArchiveView.as_view(), name="locations_archive"),
     path("locations/<int:pk>/delete/", location_views.LocationDeleteView.as_view(), name="locations_delete"),
@@ -57,7 +57,6 @@ urlpatterns = [
         "locations/<int:pk>/suggestion/", location_views.LocationSuggestionView.as_view(),
         name="locations_suggestion",
     ),
-    path("transformer-circuits/new/", location_views.CircuitCreateView.as_view(), name="circuits_new"),
     path(
         "transformer-circuits/<int:pk>/edit/", location_views.CircuitEditView.as_view(),
         name="circuits_edit",
@@ -70,13 +69,10 @@ urlpatterns = [
         "metering-points/check-number/", mp_views.CheckNumberView.as_view(), name="metering_points_check_number"
     ),
     path(
-        "metering-points/location-search/", mp_views.LocationSearchView.as_view(),
-        name="metering_points_location_search",
-    ),
-    path(
         "metering-points/person-search/", mp_views.PersonSearchView.as_view(), name="metering_points_person_search"
     ),
     path("metering-points/<int:pk>/", mp_views.MeteringPointDetailView.as_view(), name="metering_points_detail"),
+    path("metering-points/<int:pk>/edit/", mp_views.MeteringPointEditView.as_view(), name="metering_points_edit"),
     path("metering-points/<int:pk>/notify/", mp_views.NotifyView.as_view(), name="metering_points_notify"),
     path("metering-points/<int:pk>/confirm/", mp_views.ConfirmView.as_view(), name="metering_points_confirm"),
     path("metering-points/<int:pk>/start-date/", mp_views.StartDateView.as_view(), name="metering_points_start"),
@@ -99,6 +95,10 @@ urlpatterns = [
     path("legs/<int:pk>/", leg_views.LegDetailView.as_view(), name="legs_detail"),
     path("legs/<int:pk>/quota/", leg_views.LegQuotaView.as_view(), name="legs_quota"),
     path("legs/<int:pk>/edit/", leg_views.LegMasterDataView.as_view(), name="legs_edit"),
+    path(
+        "legs/<int:pk>/metering-points/assign/", leg_views.LegPointAssignView.as_view(),
+        name="legs_metering_point_assign",
+    ),
     path("legs/<int:pk>/archive/", leg_views.LegArchiveView.as_view(), name="legs_archive"),
     path("legs/<int:pk>/delete/", leg_views.LegDeleteView.as_view(), name="legs_delete"),
 ]

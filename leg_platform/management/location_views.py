@@ -17,13 +17,11 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views import View
 
-from leg_platform.community import assignments as assignment_rules
 from leg_platform.community import (
     addressing,
     history,
     location_list,
     locations,
-    metering_points,
     preferences,
     transformer_circuits,
 )
@@ -33,14 +31,12 @@ from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_forms import (
     AddressEditForm,
-    CircuitChoiceField,
     CircuitForm,
+    LocationCircuitForm,
     LocationCreateForm,
-    MeteringPointForm,
     RemarkForm,
 )
-from leg_platform.management.returns import return_url, with_next
-from leg_platform.management.summaries import duplicate_summary
+from leg_platform.management.returns import created_redirect, return_url, view_name_of, with_next, with_parameter
 
 COLUMNS = (
     lists.Column("address", gettext_lazy("Location"), width=380, info_template="management/locations/_tip_location.html"),
@@ -266,9 +262,8 @@ class LocationDetailView(ManagementAccessMixin, View):
                 [circuit_phrase(location), count_phrase(len(points)), occupancy_phrase(len(points), persons[location.pk])]
             ),
             "circuit": circuit,
-            "circuit_text": transformer_circuits.label(circuit),
             "circuit_stats": transformer_circuits.stats(circuit) if circuit else None,
-            "circuit_options": transformer_circuits.choices(),
+            "show_new": request.GET.get("new") == "1" and can_change,
             "assignment_history": [
                 {
                     "number": a.metering_point.number,
@@ -352,21 +347,19 @@ class DialogView(ManagementAccessMixin, View):
 
 
 class LocationCreateView(DialogView):
-    """The dialog "Create location"."""
+    """The dialog "Create location": the address, the transformer circuit (chosen, or a new one entered in the same
+    form and saved with the location in one transaction) and the remark (D-095). Afterwards the page of the new location
+    opens with the next steps; if the dialog came from the form "Create metering point", that form opens again with
+    the new location chosen."""
 
     title = gettext_lazy("Create location")
     lead = gettext_lazy("A location is an address. You create the metering points afterwards at the location.")
+    submit_label = gettext_lazy("Create location")
     form_class = LocationCreateForm
     template_name = "management/locations/dialog_create.html"
 
     def get_form(self, data=None):
-        initial = {}
-        circuit_id = self.request.GET.get("circuit", "")
-        if circuit_id.isascii() and circuit_id.isdigit() and len(circuit_id) < 12:
-            circuit = TransformerCircuit.objects.filter(pk=int(circuit_id)).first()
-            if circuit is not None:
-                initial["transformer_circuit"] = transformer_circuits.label(circuit)
-        return LocationCreateForm(data, initial=initial)
+        return LocationCreateForm(data)
 
     def render_dialog(self, request, form, **extra):
         duplicate = form.duplicate
@@ -377,24 +370,28 @@ class LocationCreateView(DialogView):
                 "count": duplicate.metering_points.filter(is_archived=False).count(),
                 "url": reverse("management:locations_detail", args=[duplicate.pk]),
             }
-        return super().render_dialog(
-            request, form, duplicate=summary, circuit_options=transformer_circuits.choices(),
-            new_circuit_url=with_next(reverse("management:circuits_new"), request),
-            **extra,
-        )
+        return super().render_dialog(request, form, duplicate=summary, **extra)
 
     def save(self, request, form):
         try:
-            locations.create_location(
+            location = locations.create_location(
                 **form.address(), address_addition=form.cleaned_data["address_addition"],
-                transformer_circuit=form.cleaned_data["transformer_circuit"],
+                transformer_circuit=form.cleaned_data["transformer_circuit"], new_circuit=form.new_circuit,
                 remark=form.cleaned_data["remark"], actor=request.user,
             )
-        except ValidationError:
-            form.add_error(None, _("This address already exists."))
+        except ValidationError as error:
+            if hasattr(error, "error_dict") and {"grid_number", "name"} & set(error.error_dict):
+                form.circuit_errors(error)
+            else:
+                form.add_error(None, _("This address already exists."))
             return None
-        messages.success(request, _("Saved."))
-        return redirect(self.back(request))
+        back = self.back(request)
+        if view_name_of(back) in ("management:metering_points_new", "management:metering_points_edit"):
+            # The form that waits for the location is a dialog (it shows no message): no flash message is queued.
+            return redirect(with_parameter(back, "location", location.pk))
+        return created_redirect(
+            request, "management:locations", back, reverse("management:locations_detail", args=[location.pk]), _("Saved.")
+        )
 
 
 def archived_redirect(request, pk):
@@ -499,67 +496,42 @@ class LocationRemarkView(LocationObjectDialog):
         return redirect(self.back(request))
 
 
-class CircuitDialog(DialogView):
-    """Create a circuit; an existing number is offered with "Use this one" (``use_existing``) instead of a duplicate."""
+class LocationCircuitView(LocationObjectDialog):
+    """"Change transformer circuit" at a location: the same fields as in the form "Create location" (a drop-down of the
+    existing circuits whose last option creates a new one, saved with the change in one transaction, D-095)."""
 
-    form_class = CircuitForm
-    template_name = "management/locations/dialog_circuit.html"
-    title = gettext_lazy("Create transformer circuit")
+    title = gettext_lazy("Change transformer circuit")
+    form_class = LocationCircuitForm
 
     def get_form(self, data=None):
-        return CircuitForm(data)
-
-    def get_submit_label(self, form):
-        return _("Use this one") if form.is_bound and form.existing is not None else _("Save")
-
-    def use(self, request, circuit):
-        raise NotImplementedError
-
-    def post(self, request, **kwargs):
-        form = self.get_form(request.POST)
-        if form.is_valid():
-            if form.existing is None:
-                circuit = transformer_circuits.create(form.cleaned_data["grid_number"], form.cleaned_data["name"])
-                return self.use(request, circuit)
-            if request.POST.get("use_existing") == "1":
-                return self.use(request, form.existing)
-        return self.render_dialog(request, form)
-
-    def render_dialog(self, request, form, **extra):
-        existing = form.existing if form.is_bound and form.is_valid() else None
-        return super().render_dialog(request, form, existing=existing, **extra)
-
-
-class LocationCircuitNewView(CircuitDialog, LocationObjectDialog):
-    """Create a circuit at a location; the location gets it."""
+        return LocationCircuitForm(data, location=self.location())
 
     def get_lead(self):
-        location = self.location()
-        return _("The location %(address)s gets this transformer circuit.") % {
-            "address": f"{location.street} {location.house_number}"
+        return _("Choose the transformer circuit of the location %(address)s or create a new one.") % {
+            "address": f"{self.location().street} {self.location().house_number}"
         }
 
-    def use(self, request, circuit):
+    def save(self, request, form):
         try:
-            locations.set_circuit(self.location(), circuit, request.user)
+            locations.set_circuit(
+                self.location(), form.cleaned_data["transformer_circuit"], request.user, new_circuit=form.new_circuit
+            )
+        except ValidationError as error:
+            if hasattr(error, "error_dict"):
+                form.circuit_errors(error)
+            else:
+                form.add_error(None, _("The data could not be saved."))
+            return None
         except locations.Archived:
             return archived_redirect(request, self.kwargs["pk"])
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 
 
-class CircuitCreateView(CircuitDialog):
-    """Create a circuit from the dialog "Create location": the person comes back with it chosen."""
-
-    def use(self, request, circuit):
-        back = self.back(request)
-        return redirect(f"{back}{'&' if '?' in back else '?'}circuit={circuit.pk}")
-
-
 class CircuitEditView(DialogView):
     """Change name or number of a circuit; it reaches every location with it (the dialog says how many)."""
 
-    title = gettext_lazy("Change transformer circuit")
+    title = gettext_lazy("Edit transformer circuit")
     form_class = CircuitForm
     template_name = "management/dialog_form.html"
 
@@ -585,45 +557,6 @@ class CircuitEditView(DialogView):
         return redirect(self.back(request))
 
 
-class LocationMeteringPointNewView(LocationObjectDialog):
-    """Create a metering point at the location: direction required, number and LEG optional."""
-
-    title = gettext_lazy("Create metering point")
-    template_name = "management/locations/dialog_metering_point.html"
-
-    def get_form(self, data=None):
-        return MeteringPointForm(data)
-
-    def get_lead(self):
-        location = self.location()
-        circuit = f", {location.transformer_circuit.grid_number}" if location.transformer_circuit_id else ""
-        return _("At the location %(address)s%(circuit)s.") % {
-            "address": f"{location.street} {location.house_number}", "circuit": circuit,
-        }
-
-    def save(self, request, form):
-        try:
-            metering_points.create_metering_point(
-                direction=form.cleaned_data["direction"], location=self.location(), number=form.number,
-                leg=form.cleaned_data.get("leg"), actor=request.user,
-            )
-        except metering_points.DuplicateNumber as duplicate:
-            form.duplicate = duplicate.existing
-            return None
-        except locations.Archived:
-            return archived_redirect(request, self.kwargs["pk"])
-        except assignment_rules.AssignmentError:
-            form.add_error(None, _("This LEG is archived."))
-            return None
-        messages.success(request, _("Saved."))
-        return redirect(self.back(request))
-
-    def render_dialog(self, request, form, **extra):
-        duplicate = getattr(form, "duplicate", None)
-        summary = duplicate_summary(duplicate) if duplicate is not None else None
-        return super().render_dialog(request, form, duplicate=summary, **extra)
-
-
 class LocationPostView(ArchivedLocationGuard, ManagementAccessMixin, View):
     """A button of the detail page: POST only, then back to the page."""
 
@@ -639,19 +572,6 @@ class LocationPostView(ArchivedLocationGuard, ManagementAccessMixin, View):
 
     def act(self, request, location):
         raise NotImplementedError
-
-
-class LocationCircuitView(LocationPostView):
-    """The pencil field of the card "Netz": assigns the chosen circuit; an empty field removes it."""
-
-    def act(self, request, location):
-        try:
-            circuit = CircuitChoiceField().clean(request.POST.get("transformer_circuit", ""))
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
-            return
-        locations.set_circuit(location, circuit, request.user)
-        messages.success(request, _("Saved."))
 
 
 class LocationArchiveView(LocationPostView):

@@ -10,9 +10,13 @@ lead and the buttons are shown.
   {% if form %}
     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
     {% for row, names in form.layout %}
+      {% if row == "divider" %}
+        <div class="mgmt-dialog-divider">{{ names }}</div>
+      {% else %}
       <div class="mgmt-dialog-row is-{{ row }}">
         {% for name in names %}{% include "management/_dialog_field.html" with field=form|bound:name %}{% endfor %}
       </div>
+      {% endif %}
     {% endfor %}
     {% if form.hint %}<div class="mgmt-hint mgmt-dialog-hint">{{ form.hint }}</div>{% endif %}
   {% endif %}

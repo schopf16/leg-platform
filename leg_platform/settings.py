@@ -213,16 +213,18 @@ AUTH_PASSWORD_VALIDATORS = [
 
 SESSION_COOKIE_HTTPONLY = True
 
-# Idle and absolute session timeouts (D-041), enforced on the server by
-# leg_platform.accounts.session_timeout; staff users and system administrators have the shorter
-# values. The cookie lives as long as the longest absolute timeout.
+# Idle session timeouts (D-041, D-088), enforced on the server by leg_platform.accounts.session_timeout;
+# staff users and system administrators have the shorter value. Activity extends the idle timeout;
+# there is no absolute limit for an ordinary session (owner decision, 2026-10-17). A session ends at
+# the idle timeout or at the logout.
 SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
-SESSION_ABSOLUTE_TIMEOUT = timedelta(hours=8)
 SESSION_PRIVILEGED_IDLE_TIMEOUT = timedelta(minutes=15)
-SESSION_PRIVILEGED_ABSOLUTE_TIMEOUT = timedelta(hours=4)
-SESSION_COOKIE_AGE = int(SESSION_ABSOLUTE_TIMEOUT.total_seconds())
-# "Stay signed in" (D-056): a persistent, non-sliding session; ignored for staff users and
-# system administrators.
+# The stored session slides with every save (at most once a minute while active); the value only
+# bounds how long the cookie and the row of an abandoned session live. It must be longer than the
+# longest idle timeout; the idle timeouts decide.
+SESSION_COOKIE_AGE = int(timedelta(hours=8).total_seconds())
+# "Stay signed in" (D-056, D-088): a persistent, non-sliding session for every account, with its own
+# absolute limit; the second factor is asked once, at the login.
 STAY_SIGNED_IN_DURATION = timedelta(days=14)
 # No JavaScript reads the CSRF cookie (docs/SECURITY.md, section 3); scripts use the form field.
 CSRF_COOKIE_HTTPONLY = True
@@ -301,52 +303,14 @@ else:
 SECURITY_LOG_RETENTION_DAYS = ENVIRONMENT.security_log_retention_days
 SECURITY_LOG_LONG_RETENTION_DAYS = ENVIRONMENT.security_log_long_retention_days
 
-# Logging: warnings and errors go to standard error; no mail handler (ADMINS is not set). Log
-# messages never contain passwords, tokens, secrets or complete security links.
+# Logging: warnings and errors go to standard error (journald in production); no mail handler
+# (ADMINS is not set). With a usable ``LOG_DIRECTORY`` the application log and the security log are
+# also written to bounded rotating files that the system administrator can read in the administration
+# (D-092). Log messages never contain passwords, tokens, secrets or complete security links; the
+# filter also removes email addresses, IBANs and the values of database errors.
+from leg_platform.logfiles import logging_config, usable_log_directory
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-        # Removes tokens of verification links from the request logs.
-        "redact_tokens": {"()": "leg_platform.log_filters.TokenRedactionFilter"},
-    },
-    "formatters": {
-        "default": {"format": "{asctime} {levelname} {name} {message}", "style": "{"},
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "default",
-            "filters": ["redact_tokens"],
-        },
-    },
-    "root": {"handlers": ["console"], "level": "WARNING"},
-    "loggers": {
-        "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        # The development server's request log names every requested path.
-        "django.server": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        # Security events: the internal number of the account and nothing else.
-        "leg_platform.security": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        # MSAL logs a non-JSON token response at ERROR level with the body, which can contain
-        # tenant details: only CRITICAL is written for this logger (D-048).
-        "msal.oauth2cli.oauth2": {
-            "handlers": ["console"],
-            "level": "CRITICAL",
-            "propagate": False,
-        },
-        "msal.oauth2cli.assertion": {
-            "handlers": ["console"],
-            "level": "CRITICAL",
-            "propagate": False,
-        },
-    },
-}
+LOG_DIRECTORY = usable_log_directory(ENVIRONMENT.log_directory)
+LOGGING = logging_config(LOG_DIRECTORY)
+# The web application starts the import of the address directory when it is due (D-090).
+ADDRESS_IMPORT_AUTOMATIC = ENVIRONMENT.address_import_automatic

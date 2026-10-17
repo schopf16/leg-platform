@@ -45,7 +45,7 @@ class MigrationDataFunctionTests(TestCase):
     def test_only_the_rights_of_the_community_are_deleted(self):
         leg = ContentType.objects.get(app_label="community", model="leg")
         user = ContentType.objects.get(app_label="accounts", model="user")
-        Permission.objects.create(content_type=leg, codename="view_leg", name="Can view LEG")
+        Permission.objects.get_or_create(content_type=leg, codename="view_leg", defaults={"name": "Can view LEG"})
 
         migration.delete_rights(apps, None)
 

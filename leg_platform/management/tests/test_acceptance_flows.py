@@ -304,9 +304,10 @@ class RefusedRequestTests(MatrixBase):
         for name, data in (
             ("locations_address", {"street": "Neuweg", "house_number": "8", "postal_code": "3000", "town": "Bern"}),
             ("locations_remark", {"remark": "changed"}),
-            ("locations_circuit", {"transformer_circuit": "TRA2000"}),
-            ("locations_circuit_new", {"grid_number": "TRA9999", "name": "Neun"}),
+            ("locations_circuit", {"transformer_circuit": str(self.circuit_two.pk)}),
+            ("locations_circuit", {"transformer_circuit": "__new__", "new_circuit_number": "TRA9999"}),
             ("locations_metering_point_new", {"direction": "consumption", "number_digits": "999"}),
+            ("locations_metering_point_assign", {"metering_point": str(self.point_loose.pk)}),
             ("locations_confirm", {}),
             ("locations_suggestion", {"action": "dismiss"}),
             ("locations_suggestion", {"action": "accept"}),
@@ -314,13 +315,16 @@ class RefusedRequestTests(MatrixBase):
         ):
             with self.subTest(name=name, data=data):
                 self.assert_archived_refusal(name, old, data, text)
-        for name in ("locations_address", "locations_remark", "locations_circuit_new", "locations_metering_point_new", "locations_delete"):
+        for name in (
+            "locations_address", "locations_remark", "locations_circuit", "locations_metering_point_new",
+            "locations_metering_point_assign", "locations_delete",
+        ):
             with self.subTest(dialog=name):
                 response = self.client.get(url(name, old), follow=True)
                 self.assertContains(response, text)  # no dialog of an archived location
         # The page offers no edit button, only "Restore".
         page = self.client.get(url("locations_detail", old))
-        for name in ("locations_address", "locations_remark", "locations_metering_point_new"):
+        for name in ("locations_address", "locations_remark", "locations_circuit", "locations_metering_point_new", "locations_metering_point_assign"):
             self.assertNotContains(page, url(name, old))
         self.assertContains(page, "Standort wiederherstellen")
         # Restore is the one action; afterwards the location can be changed again.
@@ -426,18 +430,26 @@ class RefusedRequestTests(MatrixBase):
 
     def test_a_circuit_text_that_is_hostile_is_refused_or_ignored(self):
         before = snapshot()
-        for text in ("x" * 10000, "TRA1000 · <script>", "\x00", "TRA-1", "tra 1000", "TRA" + "9" * 40, "ＴＲＡ１０００"):
-            with self.subTest(text=text[:20]):
+        hostile = ("x" * 10000, "TRA1000 · <script>", "\x00", "TRA-1", "tra 1000", "TRA" + "9" * 40, "ＴＲＡ１０００", "TRA1000")
+        for text in hostile:
+            with self.subTest(choice=text[:20]):
+                # Only the id of a listed circuit or the marker of a new one is a choice; the answer is the form again.
                 response = self.post("locations_circuit", self.place, {"transformer_circuit": text})
-                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.status_code, 200)
+            with self.subTest(number=text[:20]):
+                response = self.post(
+                    "locations_circuit", self.place, {"transformer_circuit": "__new__", "new_circuit_number": text}
+                )
+                self.assertEqual(response.status_code, 200)
         self.assertEqual(snapshot(), before)
 
     def test_a_circuit_is_not_created_for_a_location_that_does_not_exist(self):
-        """F-1: a POST to ``locations/<unknown id>/circuit/new/`` is a 404 before anything is written (the
-        location is looked up first, so that no transformer circuit is created for nothing)."""
+        """F-1: a POST that creates a circuit for a location that does not exist is a 404 before anything is written
+        (the location is looked up first, so that no transformer circuit is created for nothing)."""
         before = snapshot()
         response = self.client.post(
-            reverse("management:locations_circuit_new", args=[999999]), {"grid_number": "TRA777", "name": "x"}
+            reverse("management:locations_circuit", args=[999999]),
+            {"transformer_circuit": "__new__", "new_circuit_number": "TRA777", "new_circuit_name": "x"},
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(snapshot(), before)
@@ -481,15 +493,15 @@ class LifeOfTheObjectsTests(MatrixBase):
         self.assertEqual(TransformerCircuit.objects.filter(name="Fuenf").count(), 2)
         self.assertEqual(transformer_circuits.number_of_choice("tra555 · Fuenf"), "TRA555")
 
-    def test_creating_a_circuit_that_exists_uses_the_existing_one_and_changes_it_not(self):
+    def test_a_new_circuit_with_a_number_that_exists_is_refused_in_the_form_and_changes_it_not(self):
         client = self.login(self.administrator)
         before = TransformerCircuit.objects.count()
-        response = client.post(url("circuits_new"), {"grid_number": "tra1000", "name": "Other name"})
-        self.assertEqual(response.status_code, 200)  # the hint, with the button "use this one"
-        self.assertEqual(TransformerCircuit.objects.count(), before)
-        response = client.post(url("circuits_new"), {"grid_number": "tra1000", "name": "Other name", "use_existing": "1"})
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(response["Location"].endswith(f"circuit={self.circuit.pk}"), response["Location"])
+        response = client.post(
+            url("locations_circuit", self.place),
+            {"transformer_circuit": "__new__", "new_circuit_number": "tra1000", "new_circuit_name": "Other name"},
+        )
+        self.assertEqual(response.status_code, 200)  # the form again, with the message at the number
+        self.assertContains(response, "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste.")
         self.assertEqual(TransformerCircuit.objects.count(), before)
         self.circuit.refresh_from_db()
         self.assertEqual((self.circuit.grid_number, self.circuit.name), ("TRA1000", "Eins"))
@@ -962,7 +974,7 @@ class LifeOfTheObjectsTests(MatrixBase):
         for data in (
             {"name": "leg main"}, {"name": "  LEG   Main "}, {"name": "LÉG Main"}, {"name": ""}, {"name": "x" * 121},
             {"name": "A", "quota": "37", "checked_on": ""}, {"name": "A", "quota": "37", "checked_on": iso(1)},
-            {"name": "A", "quota": "100.01", "checked_on": iso(0)}, {"name": "A", "quota": "-0.01", "checked_on": iso(0)},
+            {"name": "A", "quota": "1000", "checked_on": iso(0)}, {"name": "A", "quota": "-0.01", "checked_on": iso(0)},
             {"name": "A", "quota": "1.234", "checked_on": iso(0)}, {"name": "A", "quota": "abc", "checked_on": iso(0)},
             {"name": "A", "quota": "NaN", "checked_on": iso(0)},
         ):
@@ -973,6 +985,18 @@ class LifeOfTheObjectsTests(MatrixBase):
         response = client.post(url("legs_new"), {"name": "LEG Comma", "quota": "37,6", "checked_on": iso(0)})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Leg.objects.get(name="LEG Comma").production_quota_percent, Decimal("37.60"))
+        # No upper bound of 100 % (owner, 2026-10-17): a LEG may produce more than its members consume.
+        for typed, stored in (("204,1", "204.10"), ("100.01", "100.01"), ("999.99", "999.99")):
+            with self.subTest(over_hundred=typed):
+                response = client.post(url("legs_new"), {"name": f"LEG over {typed}", "quota": typed, "checked_on": iso(0)})
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(
+                    Leg.objects.get(name=f"LEG over {typed}").production_quota_percent, Decimal(stored)
+                )
+        client.post(url("legs_quota", self.leg), {"quota": "204.1", "checked_on": iso(0)})
+        self.leg.refresh_from_db()
+        self.assertEqual(self.leg.production_quota_percent, Decimal("204.10"))
+        self.assertContains(client.get(url("legs_detail", self.leg)), "204.1 %")
         # Without a quota the date is dropped.
         client.post(url("legs_quota", self.leg), {"quota": "20", "checked_on": iso(0)})
         self.leg.refresh_from_db()

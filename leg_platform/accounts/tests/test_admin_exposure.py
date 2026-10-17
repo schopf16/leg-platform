@@ -16,7 +16,13 @@ from leg_platform.accounts.models import User
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 
 # Not routes with converters: the administration's app index patterns are regular expressions.
-EXTRA_PATHS = ("/admin/accounts/", "/admin/auth/", "/admin/axes/", "/admin/addresses/")
+EXTRA_PATHS = (
+    "/admin/accounts/", "/admin/auth/", "/admin/axes/", "/admin/addresses/", "/admin/community/",
+    # The log pages (D-092) have a converter that only matches the two fixed names, so the walk cannot invent a value.
+    "/admin/logs/", "/admin/logs/application/", "/admin/logs/application/tail/",
+    "/admin/logs/application/download/", "/admin/logs/security/", "/admin/logs/security/tail/",
+    "/admin/logs/security/download/", "/admin/addresses/importrequest/status/",
+)
 # Reachable by a verified staff account without any permission: the empty index, the translation
 # catalogue and the static "password changed" page; none shows data of the application.
 OPEN_TO_VERIFIED_STAFF = {
@@ -79,6 +85,12 @@ class AdministrationExposureTests(TestCase):
             "/admin/accounts/graphconfiguration/send-test/",
             "/admin/accounts/securityevent/",
             "/admin/addresses/importrequest/",
+            "/admin/addresses/importrequest/status/",
+            "/admin/community/location/",
+            "/admin/community/meteringpoint/",
+            "/admin/community/leg/",
+            "/admin/community/transformercircuit/",
+            "/admin/logs/",
         ):
             self.assertIn(expected, self.paths)
 
@@ -136,7 +148,7 @@ class AdministrationExposureTests(TestCase):
                     else:
                         self.assertNotEqual(response.status_code, 200)
         index = client.get("/admin/").content.decode()
-        for application in ("/admin/accounts/", "/admin/auth/", "/admin/axes/", "/admin/addresses/"):
+        for application in ("/admin/accounts/", "/admin/auth/", "/admin/axes/", "/admin/addresses/", "/admin/community/", "/admin/logs/"):
             self.assertNotIn(application, index)
 
     def test_no_account_state_changes_through_a_get_request(self):

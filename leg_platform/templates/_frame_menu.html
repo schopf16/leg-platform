@@ -3,7 +3,8 @@ The entries of the menu, shared by the left menu of the desktop and the menu of 
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
 (team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
 aria-current. Log out is a real POST form. "System administration" (the Django administration) is
-only for staff users (K13); the permissions are checked by the administration itself. The group
+only for staff users (K13) and the very last entry, in its own group "System" below "Coming next" (D-096); the
+permissions are checked by the administration itself. The group
 "Management" lists the entries of leg_platform.management.navigation.MENU that the account may use
 (D-077); it is left out when there are none.
 {% endcomment %}{% with view=request.resolver_match.view_name %}
@@ -14,11 +15,6 @@ only for staff users (K13); the permissions are checked by the administration it
 <a class="frame-item{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span>{% translate "Profile" %}</span>
 </a>
-{% if user.is_staff %}
-  <a class="frame-item" href="{% url 'admin:index' %}">
-    <svg class="frame-icon" aria-hidden="true"><use href="#i-settings"/></svg><span>{% translate "System administration" %}</span>
-  </a>
-{% endif %}
 {% management_menu as management_entries %}{% if management_entries %}
 <p class="frame-group">{% translate "Management" %}</p>
 {% for entry in management_entries %}
@@ -39,6 +35,12 @@ only for staff users (K13); the permissions are checked by the administration it
   <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Messages" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
+{% if user.is_staff %}
+<p class="frame-group">{% translate "System" %}</p>
+<a class="frame-item" href="{% url 'admin:index' %}">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-server"/></svg><span>{% translate "System administration" %}</span>
+</a>
+{% endif %}
 <div class="frame-menu-foot">
   <form method="post" action="{% url 'accounts:logout' %}">
     {% csrf_token %}

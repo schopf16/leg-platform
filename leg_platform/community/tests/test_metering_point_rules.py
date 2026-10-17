@@ -35,6 +35,29 @@ TODAY = day()
 
 
 @tag("mariadb")
+class DeletedMeanwhileTests(TestCase):
+    """L-7: an object that was deleted between the form and the save is refused like any other refusal."""
+
+    def test_a_point_or_a_leg_that_is_gone_is_a_refusal_and_no_error(self):
+        from leg_platform.community import leg_services
+
+        leg = make_leg("LEG Gone")
+        point = make_metering_point(1)
+        other = make_metering_point(2)
+        MeteringPoint.objects.filter(pk=point.pk).delete()
+        with self.assertRaises(metering_points.StatusError) as caught:
+            metering_points.update(point, location=None)
+        self.assertEqual(caught.exception.code, "missing")
+        with self.assertRaises(assignments.AssignmentError) as caught:
+            leg_services.assign_metering_point(leg, point, day(1))
+        self.assertEqual(caught.exception.code, "point_missing")
+        leg.delete()
+        with self.assertRaises(assignments.AssignmentError) as caught:
+            leg_services.assign_metering_point(leg, other, day(1))
+        self.assertEqual(caught.exception.code, "leg_missing")
+
+
+@tag("mariadb")
 class StepTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -245,6 +268,21 @@ class PersonSearchTests(TestCase):
     def test_the_result_is_limited(self):
         self.assertEqual(len(person_search.search("example", limit=2)), 2)
         self.assertLessEqual(len(person_search.search("example")), person_search.LIMIT)
+
+    def test_names_that_start_with_the_first_word_come_first(self):
+        # UX-012: "st" finds "Staff" before "Administrator" although "Administrator" sorts first by name.
+        inside = create_active_user("admin.design@example.org", first_name="Administrator", last_name="Design")
+        start = create_active_user("staff.design@example.org", first_name="Staff", last_name="Design")
+        found = person_search.search("st")
+        self.assertLess(found.index(start), found.index(inside))
+
+    def test_only_the_first_words_count_and_the_text_is_cut(self):
+        # M-3: the sixth word and everything beyond 100 characters is ignored (no flood of LIKE conditions).
+        found_anna = {p.pk for p in person_search.search("anna muster a a a zzz")}
+        self.assertEqual(found_anna, {self.anna.pk, self.annabelle.pk})
+        self.assertEqual(person_search.search("anna muster a a zzz"), [])
+        self.assertEqual({p.pk for p in person_search.search("anna" + " " * 100 + "zzz")}, {self.anna.pk, self.annabelle.pk})
+        self.assertEqual(person_search.MAX_WORDS, 5)
 
     def test_a_text_names_one_person_or_it_is_refused(self):
         resolve = person_search.resolve

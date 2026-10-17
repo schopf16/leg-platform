@@ -21,19 +21,37 @@ walks the URL configuration and checks it (the equivalent of the rule for admin 
 admin URL in ``admin_view()``").
 """
 
+import logging
 from functools import wraps
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.http import Http404
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext
 from django.views.decorators.cache import never_cache
 
 from leg_platform.accounts.second_factor import is_second_factor_complete
+from leg_platform.management.returns import return_url
+
+logger = logging.getLogger(__name__)
 
 MARKER = "management_protected"
+
+
+def gone(request):
+    """The answer for an object that a service did not find any more (deleted between the form and the save, L-C of the
+    review of 2026-10-17): a POST gets the normal refusal, a message and the way back (``next``, else the overview),
+    anything else is a 404. Nothing was changed: the service runs in one transaction that the exception rolled back."""
+    logger.warning("A management request named an object that does not exist any more (%s).", request.method)
+    if request.method != "POST":
+        raise Http404
+    messages.error(request, gettext("This entry does not exist any more."))
+    return redirect(return_url(request, reverse("management:overview")))
 
 
 def is_management_user(user):
@@ -72,7 +90,10 @@ class ManagementAccessMixin:
             refused = self.refusal(request, *args, **kwargs)
             if refused is not None:
                 return refused
-        return super().dispatch(request, *args, **kwargs)
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except ObjectDoesNotExist:
+            return gone(request)
 
     def refusal(self, request, *args, **kwargs):
         """A hook after the access check and before the handler: a response that refuses the request (for
@@ -89,7 +110,10 @@ def management_view(view):
         denied = check_access(request)
         if denied is not None:
             return denied
-        return view(request, *args, **kwargs)
+        try:
+            return view(request, *args, **kwargs)
+        except ObjectDoesNotExist:
+            return gone(request)
 
     setattr(wrapped, MARKER, True)
     return wrapped

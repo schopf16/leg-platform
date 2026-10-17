@@ -148,6 +148,32 @@ class VerifiedClient(Client):
             complete_second_factor(self, user)
 
 
+class ProvingClient(VerifiedClient):
+    """A verified client that adds the proof of identity (the code of its device) to a post to the
+    portal settings (D-088), unless ``auto_proof`` is off or the data brings its own proof."""
+
+    auto_proof = True
+    person = None
+
+    def force_login(self, user, backend=None):
+        super().force_login(user, backend)
+        self.person = user
+
+    def post(self, path, data=None, *args, **kwargs):
+        if (
+            self.auto_proof
+            and path == reverse("admin:accounts_portalsettings_change", args=(1,))
+            and isinstance(data, dict)
+            and "otp_token" not in data
+            and "current_password" not in data
+            and self.person is not None
+        ):
+            device = AuthenticatorDevice.objects.filter(user=self.person, confirmed=True).first()
+            if device is not None:
+                data = {**data, "otp_token": code_for(device)}
+        return super().post(path, data, *args, **kwargs)
+
+
 def age_authentication(client, seconds=3600):
     """Make the login of the client's session older, so that the five minutes without the
     password for setting up two-factor authentication (D-055) are over."""

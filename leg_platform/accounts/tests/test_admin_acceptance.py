@@ -16,7 +16,7 @@ from leg_platform.accounts.models import (
     PortalSettings,
     SecurityEvent,
 )
-from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import ProvingClient, VerifiedClient, create_active_user
 
 INDEX_URL = reverse("admin:index")
 
@@ -26,7 +26,7 @@ def staff_client(email, *codenames):
     staff = create_active_user(email)
     staff.set_privileges(is_staff=True, is_superuser=False)
     staff.user_permissions.set(Permission.objects.filter(codename__in=codenames))
-    client = VerifiedClient()
+    client = ProvingClient()
     client.force_login(staff)
     return client
 
@@ -39,7 +39,7 @@ def status_cells(page):
 def administrator_client():
     administrator = create_active_user("admin.person@example.org")
     administrator.set_privileges(is_staff=True, is_superuser=True)
-    client = VerifiedClient()
+    client = ProvingClient()
     client.force_login(administrator)
     return client, administrator
 

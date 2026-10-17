@@ -428,7 +428,7 @@ def complete_login(request, user, device, stay=False):
     """Log the account in after the password and the second factor were verified.
 
     ``stay`` is the wish of the pending login; the receiver of the session start reads it from
-    the request (``session_timeout.STAY_WISH_ATTRIBUTE``) and ignores it for staff users.
+    the request (``session_timeout.STAY_WISH_ATTRIBUTE``); it is valid for every account (D-088).
     """
     request.session.pop(PENDING_SESSION_KEY, None)
     setattr(request, STAY_WISH_ATTRIBUTE, stay is True)

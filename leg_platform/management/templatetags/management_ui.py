@@ -1,6 +1,6 @@
 """Template tags of the management area."""
 
-from django import template
+from django import forms, template
 from django.urls import NoReverseMatch, reverse
 
 from leg_platform.community import grid_operator
@@ -47,6 +47,36 @@ def management_return_url(context, default):
 def bound(form, name):
     """The bound field of a form by its name (for a layout that is a list of names)."""
     return form[name]
+
+
+def first_field_name(form):
+    """The name of the first control of a form that a person types in, in the order of its layout ("" if none):
+    not a fact row, hidden field, group of options or check boxes (D-094, focus in the first field)."""
+    skipped = (forms.HiddenInput, forms.RadioSelect, forms.CheckboxSelectMultiple)
+    already_chosen = getattr(form, "focus_skips", ())
+    for row, names in getattr(form, "layout", None) or []:
+        if row == "divider":
+            continue
+        for name in names:
+            field = form.fields.get(name)
+            if field is None or field.disabled or isinstance(field.widget, skipped) or name in already_chosen:
+                continue
+            return name
+    return ""
+
+
+@register.filter
+def described(field, form=None):
+    """The field drawn with ``aria-describedby`` (its message, its hint) and, for the first control of the form,
+    ``data-first-field`` (the page script puts the cursor there on a desktop) and the lead sentence."""
+    ids = [f"{field.auto_id}_error", f"{field.auto_id}_hint"]
+    attrs = {}
+    if form is not None and first_field_name(form) == field.name:
+        attrs["data-first-field"] = True
+        if not getattr(form, "no_lead", False):
+            ids.append("dialog-lead")
+    attrs["aria-describedby"] = " ".join(ids)
+    return field.as_widget(attrs=attrs)
 
 
 @register.filter

@@ -3,25 +3,28 @@
 from decimal import Decimal
 
 from django import forms
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
+from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.community import leg_services
-from leg_platform.community.models import REMARK_MAX_LENGTH
+from leg_platform.community import grid_operator, leg_services
+from leg_platform.community.models import Direction, LegAssignment, MeteringPoint
+from leg_platform.management.form_fields import DecimalInputField, date_field, remark_field
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 
 
-class PercentField(forms.DecimalField):
-    """A percentage with at most two decimals; a decimal comma is accepted. The template draws ``unit`` after the field."""
+class PercentField(DecimalInputField):
+    """A percentage up to 999.99 with at most two decimals (D-089: no upper limit of 100); a decimal comma is
+    accepted. The template draws ``unit`` after the field."""
 
-    unit = "%"
-
-    def to_python(self, value):
-        if isinstance(value, str):
-            value = value.strip().replace(",", ".")
-        return super().to_python(value)
+    def __init__(self, **kwargs):
+        kwargs.setdefault("unit", "%")
+        kwargs.setdefault("max_digits", 5)
+        kwargs.setdefault("error_messages", {"range": _("Enter a quota between 0 and %(max)s %%.")})
+        super().__init__(**kwargs)
 
 
 class QuotaFields(forms.Form):
@@ -29,11 +32,9 @@ class QuotaFields(forms.Form):
     in the future (the page script defaults it to today; the server only requires it)."""
 
     quota = PercentField(
-        label=_("Production quota"), required=False, max_digits=5, decimal_places=2,
-        validators=[MinValueValidator(Decimal(0)), MaxValueValidator(Decimal(100))],
-        widget=forms.TextInput(
-            attrs={**CONTROL, "inputmode": "decimal", "data-quota-input": "", "placeholder": _("e.g. 37.6")}
-        ),
+        label=_("Production quota"),
+        validators=[MinValueValidator(Decimal(0))],
+        attrs={"data-quota-input": "", "placeholder": _("e.g. 37.6")},
     )
     checked_on = forms.DateField(
         label=_("Checked on"), required=False,
@@ -44,6 +45,10 @@ class QuotaFields(forms.Form):
         super().__init__(*args, **kwargs)
         self.today = timezone.localdate()
         self.fields["quota"].widget.attrs["data-today"] = self.today.isoformat()
+        self.fields["quota"].help_text = grid_operator.text(
+            _("As shown in the %(operator)s LEG portal. It can also be above 100 %%.")
+        )
+        self.fields["checked_on"].help_text = _("Required when a quota is entered.")
 
     def clean(self):
         cleaned = super().clean()
@@ -60,13 +65,9 @@ class QuotaFields(forms.Form):
 
 
 def _name_field():
-    return forms.CharField(label=_("Name"), max_length=120, widget=forms.TextInput(attrs=CONTROL))
-
-
-def _remark_field():
     return forms.CharField(
-        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        label=_("Name"), max_length=120,
+        widget=forms.TextInput(attrs={**CONTROL, "placeholder": _("e.g. LEG Musterquartier")}),
     )
 
 
@@ -88,15 +89,11 @@ class NameMixin:
 
 class LegCreateForm(NameMixin, QuotaFields):
     name = _name_field()
-    remark = _remark_field()
+    remark = remark_field()
     field_order = ("name", "quota", "checked_on", "remark")
 
     layout = [("single", ["name"]), ("quota", ["quota", "checked_on"]), ("single", ["remark"])]
-    optional = ("quota",)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["name"].widget.attrs["placeholder"] = _("e.g. LEG Musterquartier")
+    optional = ("quota", "remark")
 
 
 class QuotaForm(QuotaFields):
@@ -106,6 +103,40 @@ class QuotaForm(QuotaFields):
 
 class MasterDataForm(NameMixin, forms.Form):
     name = _name_field()
-    remark = _remark_field()
+    remark = remark_field()
     layout = [("single", ["name"]), ("single", ["remark"])]
+    optional = ("remark",)
+
+
+class LegPointForm(forms.Form):
+    """"Assign metering point" on the page of a LEG (D-095): one drop-down of the metering points that have no LEG (also
+    none planned) and the day it applies from. A metering point of another LEG is moved with "Change LEG", which
+    knows the related points. The choices are built from the database for every request; the service checks again
+    under the locks."""
+
+    metering_point = forms.ChoiceField(label=_("Metering point"), widget=forms.Select(attrs={"class": "form-select tnum"}))
+    valid_from = date_field(_("Applies from"), initial="today")
+    layout = [("single", ["metering_point"]), ("single", ["valid_from"])]
     optional = ()
+    hint = _("From this day the metering point belongs to this LEG. This can change the discount tier of the LEG.")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        today = timezone.localdate()
+        has_leg = LegAssignment.objects.not_ended(today).filter(metering_point=OuterRef("pk"))
+        points = (
+            MeteringPoint.objects.filter(is_archived=False).exclude(Exists(has_leg))
+            .select_related("location").order_by("number", "pk")
+        )
+        self.points = {str(point.pk): point for point in points}
+        choices = []
+        for key, point in self.points.items():
+            parts = [point.number or "–", str(Direction(point.direction).label)]
+            # The same words as in the location dialog: a point without a location says so (UX-011).
+            parts.append(str(point.location) if point.location_id else gettext("no location"))
+            choices.append((key, " · ".join(parts)))
+        self.fields["metering_point"].choices = [("", gettext("No metering point chosen yet")), *choices]
+        self.empty = not self.points
+
+    def clean_metering_point(self):
+        return self.points[self.cleaned_data["metering_point"]]

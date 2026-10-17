@@ -12,6 +12,7 @@ from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
+from leg_platform.addresses.runner import maybe_start_automatic
 from leg_platform.community import addressing, grid_operator, problems, settings_service
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, GridOperator, ManagementSettings
 from leg_platform.community.settings_service import EDITABLE_FIELDS
@@ -59,6 +60,8 @@ class OverviewView(ManagementAccessMixin, TemplateView):
     template_name = "management/overview.html"
 
     def get_context_data(self, **kwargs):
+        # The first visit after the due time starts the automatic refresh of the address directory (D-090).
+        maybe_start_automatic()
         counts = problems.problem_counts(only=[entry.key for entry in PROBLEM_LISTS])
         rows = []
         for entry in PROBLEM_LISTS:

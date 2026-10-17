@@ -51,6 +51,12 @@ MESSAGES = {
         "Two-factor authentication was removed with a recovery code (phone lost)"
     ),
     Event.ADDRESS_IMPORT_REQUESTED: "An address directory import was requested",
+    Event.ADDRESS_IMPORT_SUCCEEDED: "An address directory import completed",
+    Event.ADDRESS_IMPORT_FAILED: "An address directory import failed",
+    Event.LOG_VIEWED: "A log file was viewed",
+    Event.LOG_DOWNLOADED: "A log file was downloaded",
+    Event.PERSISTENT_SESSION_STARTED: "A long session (stay signed in) was started for a privileged account",
+    Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN: "All sessions of an account were ended by a system administrator",
     Event.RETENTION_OBLIGATION_SET: "The retention obligation of an account was set",
     Event.LIST_PRINTED: "A list of the management area was printed as PDF",
     Event.PERSON_INVITED: "A person was created and invited by staff",

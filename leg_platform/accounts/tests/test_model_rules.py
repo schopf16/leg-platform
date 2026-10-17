@@ -174,6 +174,17 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "addresses.ImportRequest",
                 "auth.Group",
                 "community.GridOperator",
+                # Plain read-only tables of the management data (D-091).
+                "community.Location",
+                "community.MeteringPoint",
+                "community.Leg",
+                "community.TransformerCircuit",
+                "community.PersonRecord",
+                "community.PersonAssignment",
+                "community.LegAssignment",
+                "community.ShareChange",
+                "community.HistoryEntry",
+                "community.ManagementSettings",
             },
         )
 

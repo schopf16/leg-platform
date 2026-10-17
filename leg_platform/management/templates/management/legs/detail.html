@@ -26,6 +26,11 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
     <div class="mgmt-header-actions mgmt-desktop-only">{% include "management/legs/_leg_buttons.html" %}</div>
   </div>
 
+  {% if show_new %}
+    {% translate "LEG created. Next: assign metering points to the LEG." as new_text %}
+    {% include "management/_banner.html" with text=new_text actions="management/legs/_new_actions.html" neutral=True %}
+  {% endif %}
+
   {% if problems %}
     <div class="mgmt-banner mgmt-banner-lines" role="status">{% for text in problems %}<p>{{ text }}</p>{% endfor %}</div>
   {% endif %}
@@ -66,7 +71,7 @@ history) or "Archive LEG"; on a phone it stands at the end of the page.
   </div>
 
   <section class="mgmt-card mgmt-card-flush">
-      <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points of this LEG" %}</h2><span class="mgmt-count mgmt-desktop-only">{{ count_text }}</span></div>
+      <div class="mgmt-card-head mgmt-card-pad"><h2>{% translate "Metering points of this LEG" %}</h2><span class="mgmt-card-buttons">{% if can_change %}<a class="btn btn-secondary-action btn-xs" href="{% url 'management:legs_metering_point_assign' leg.pk %}">{% translate "Assign metering point" %}</a>{% endif %}<span class="mgmt-count mgmt-desktop-only">{{ count_text }}</span></span></div>
       <div class="mgmt-list" data-list data-list-key="leg_metering_points" data-widths-url="{{ member_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
         <div class="mgmt-table-view">
           <table class="mgmt-table mgmt-table-fixed mgmt-members">

@@ -5,6 +5,8 @@ worker, operator commands, ``migrate``). This guards against code mistakes, not 
 compromised web process (same service user).
 """
 
+import threading
+
 from django.db.backends.signals import connection_created
 
 DIRECTORY_ALIAS = "addresses"
@@ -13,6 +15,9 @@ ENGINE = "leg_platform.addresses.sqlite"
 BUSY_TIMEOUT_SECONDS = 20
 
 _writer = False
+# A web process stays read-only, except for the one thread that runs an import (D-090): the flag is
+# thread-local, and Django opens one connection per thread, so only that thread's connection writes.
+_thread = threading.local()
 
 
 def mark_writer():
@@ -21,8 +26,21 @@ def mark_writer():
     _writer = True
 
 
+def mark_thread_writer():
+    """Declare that the calling thread (an import thread of the web process) may write the directory.
+
+    Call it before the thread's first directory connection and ``unmark_thread_writer`` (with a
+    close of the thread's connections) when the thread ends.
+    """
+    _thread.writer = True
+
+
+def unmark_thread_writer():
+    _thread.writer = False
+
+
 def is_writer():
-    return _writer
+    return _writer or getattr(_thread, "writer", False) is True
 
 
 def directory_database(path):
@@ -46,7 +64,7 @@ def directory_database(path):
 
 
 def _make_connection_read_only(sender, connection, **kwargs):
-    if connection.alias == DIRECTORY_ALIAS and not _writer:
+    if connection.alias == DIRECTORY_ALIAS and not is_writer():
         connection.connection.execute("PRAGMA query_only = ON")
 
 

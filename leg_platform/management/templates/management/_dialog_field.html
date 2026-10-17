@@ -1,10 +1,26 @@
-{% load i18n %}{% comment %}
-One field of a dialog (D-078): the label (with "(optional)" for a field named in ``form.optional``), the
-field, the message under it and a hint. Context: ``field`` and ``form``.
-{% endcomment %}<div class="mgmt-dialog-field">
+{% load i18n management_ui %}{% comment %}
+One field of a dialog (D-078, D-094): the label (with "(optional)" for a field named in ``form.optional``), the
+field, the message under it and a hint. Context: ``field`` and ``form``. A field of the form can say how it is drawn:
+``fact`` (a read-only row: a locked or fixed value, with an optional ``fact_link``; the field is disabled and
+never trusted from the browser), ``segmented`` (a choice of few options as a segmented control), ``prefix_text``
+(a grey fixed text in front of the input), ``unit`` (a unit after the input), ``after_template`` (what follows the
+field). A checked field (``CheckedInput``) always has its message slot, which ``field-check.js`` fills while typing.
+{% endcomment %}{% if field.field.fact is not None %}<div class="mgmt-dialog-field is-fact">
+  <span class="mgmt-dialog-label" id="{{ field.auto_id }}_label">{{ field.label }}</span>
+  <div class="mgmt-fact-value" aria-labelledby="{{ field.auto_id }}_label">{{ field.field.fact }}{% if field.field.fact_link %} <a href="{{ field.field.fact_link.0 }}">{{ field.field.fact_link.1 }}</a>{% endif %}</div>
+</div>{% else %}<div class="mgmt-dialog-field">
+  {% if field.field.segmented %}
+  <span class="mgmt-dialog-label" id="{{ field.auto_id }}_label">{{ field.label }}</span>
+  <div class="mgmt-seg" role="radiogroup" aria-labelledby="{{ field.auto_id }}_label">
+    {% for radio in field %}<label class="mgmt-seg-option is-{{ radio.data.value|cut:'_' }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
+  </div>
+  {% else %}
   <label class="mgmt-dialog-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.name in form.optional %} <span class="mgmt-optional">({% translate "optional" context "management" %})</span>{% endif %}</label>
-  {% if field.field.unit %}<div class="mgmt-input-unit">{{ field }}<span class="mgmt-input-unit-sign" aria-hidden="true">{{ field.field.unit }}</span></div>{% else %}{{ field }}{% endif %}
-  {% if field.errors %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
-  {% if field.help_text %}<div class="mgmt-hint">{{ field.help_text }}</div>{% endif %}
+  {% if field.field.prefix_text is not None %}<div class="mgmt-number-field">{% if field.field.prefix_text %}<span class="mgmt-number-prefix tnum">{{ field.field.prefix_text }}</span>{% endif %}{{ field|described:form }}</div>
+  {% elif field.field.unit %}<div class="mgmt-input-unit">{{ field|described:form }}<span class="mgmt-input-unit-sign" aria-hidden="true">{{ field.field.unit }}</span></div>
+  {% else %}{{ field|described:form }}{% endif %}
+  {% endif %}
+  {% if field.errors %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% elif field.field.widget.kind %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error" hidden></div>{% endif %}
+  {% if field.help_text %}<div class="mgmt-hint" id="{{ field.auto_id }}_hint">{{ field.help_text }}</div>{% endif %}
   {% if field.field.after_template %}{% include field.field.after_template %}{% endif %}
-</div>
+</div>{% endif %}

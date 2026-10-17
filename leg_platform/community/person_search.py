@@ -6,11 +6,13 @@ import re
 from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, When
 
 from leg_platform.accounts.models import format_customer_number
 
 LIMIT = 10
+MAX_WORDS = 5  # every word is a filter of non-indexed LIKE conditions: the number of words is bounded (M-3)
+MAX_TEXT_LENGTH = 100
 SEPARATOR = " · "
 CUSTOMER_NUMBER = re.compile(r"(\d{3}) ?(\d{3})")
 
@@ -28,9 +30,11 @@ def label(person):
 
 
 def search(text, limit=LIMIT):
-    """At most ``limit`` accounts that match every word of the text."""
+    """At most ``limit`` accounts that match every one of the first ``MAX_WORDS`` words of the text (the text is cut
+    to ``MAX_TEXT_LENGTH`` characters first)."""
     queryset = candidates()
-    for word in (text or "").split():
+    words = (text or "")[:MAX_TEXT_LENGTH].split()[:MAX_WORDS]
+    for word in words:
         condition = (
             Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(organisation_name__icontains=word)
             | Q(normalized_email__contains=word.lower())
@@ -39,6 +43,20 @@ def search(text, limit=LIMIT):
         if digits.isascii() and digits.isdigit():
             condition |= Q(customer_number__number__startswith=digits)
         queryset = queryset.filter(condition)
+    if words:
+        # Names that start with the first word come first ("St" finds "Staff" before "Administrator"), UX-012.
+        first = words[0]
+        queryset = queryset.annotate(
+            starts=Case(
+                When(
+                    Q(first_name__istartswith=first) | Q(last_name__istartswith=first)
+                    | Q(organisation_name__istartswith=first),
+                    then=0,
+                ),
+                default=1,
+                output_field=IntegerField(),
+            )
+        ).order_by("starts", "last_name", "first_name", "organisation_name", "pk")
     return list(queryset[:limit])
 
 

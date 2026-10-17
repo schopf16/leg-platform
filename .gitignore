@@ -85,7 +85,9 @@ cover/
 # Django
 
 *.log
-logs/
+# Only the log folder at the root of the repository (the log pages of the administration have templates in
+# leg_platform/templates/admin/logs/, which must be tracked; tests/test_packaging.py).
+/logs/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal

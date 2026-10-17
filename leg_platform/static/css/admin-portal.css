@@ -119,14 +119,6 @@ input.portal-colour {
   margin-top: 2px;
 }
 
-.portal-login-warning .portal-logout-button {
-  margin-inline-start: 12px;
-}
-
-.portal-login-refused {
-  margin: 0 0 12px;
-}
-
 /* Preview: two panels (light, dark) */
 .portal-preview {
   display: grid;
@@ -256,4 +248,189 @@ input.portal-colour {
     display: block;
     overflow-wrap: anywhere;
   }
+}
+
+/* Address directory import (D-090): the status box, a spinner while it runs, a progress bar. */
+.import-box {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-inline-start-width: 4px;
+  border-radius: 4px;
+  background: var(--darkened-bg, #f8f8f8);
+}
+
+.import-box.import-running,
+.import-box.import-queued {
+  border-inline-start-color: var(--link-fg, #447e9b);
+}
+
+.import-box.import-succeeded {
+  border-inline-start-color: #2e7d32;
+}
+
+.import-box.import-failed,
+.import-box.import-interrupted {
+  border-inline-start-color: var(--error-fg, #ba2121);
+}
+
+.import-box p {
+  margin: 4px 0;
+  font-size: 0.9375rem;
+}
+
+.import-box [hidden] {
+  display: none;
+}
+
+.import-error {
+  color: var(--error-fg, #ba2121);
+}
+
+.import-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-inline-end: 8px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: import-spin 0.8s linear infinite;
+}
+
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion: the ring stands still; the words of the status carry the meaning (DESIGN section 3.5, UX-006). */
+@media (prefers-reduced-motion: reduce) {
+  .import-spinner {
+    animation: none;
+  }
+}
+
+.import-progress-row progress {
+  width: min(30em, 70%);
+  height: 14px;
+  vertical-align: middle;
+}
+
+.import-facts {
+  display: grid;
+  grid-template-columns: 16em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+}
+
+.import-facts dt {
+  font-weight: 600;
+}
+
+.import-facts dd {
+  margin: 0;
+}
+
+/* The buttons of the pages of the import and the logs are the admin buttons; on a touch screen they are 44 px high
+   (DESIGN section 4, UX-003). */
+@media (pointer: coarse), (max-width: 767px) {
+  .import-form input[type="submit"],
+  .log-controls .button,
+  .log-controls a,
+  .log-controls label,
+  .log-files a {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+  }
+
+  .import-form input[type="submit"] {
+    padding: 0 20px;
+  }
+
+  .log-controls input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    margin: 0 8px 0 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .import-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Log files (D-092): the list and the console-like live view. */
+.log-files {
+  width: 100%;
+  max-width: 70em;
+}
+
+/* A phone shows each file as one block: the name, then size and date, then the two links (UX-002). */
+@media (max-width: 767px) {
+  .log-files thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .log-files,
+  .log-files tbody,
+  .log-files tr,
+  .log-files th,
+  .log-files td {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .log-files tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--hairline-color, #ccc);
+  }
+
+  .log-files th,
+  .log-files td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .log-files td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+  }
+}
+
+.log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.log-output {
+  box-sizing: border-box;
+  width: 100%;
+  height: 60vh;
+  margin: 0;
+  padding: 8px 12px;
+  overflow: auto;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 4px;
+  background: #111;
+  color: #e6e6e6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

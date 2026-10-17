@@ -80,11 +80,18 @@ class PersonDataPageTests(TestCase):
     def test_saving_creates_an_invited_person_who_is_listed_at_once_and_goes_back(self):
         client = self.login(self.staff)
         response = client.post(NEW, {**CREATE, "next": LIST})
-        self.assertRedirects(response, LIST, fetch_redirect_response=False)
         person = User.objects.get(email="erika.neu@example.org")
+        # The page of the new person opens with the next step; its way back is the list (D-095).
+        self.assertRedirects(
+            response, f"{self.url('detail', person)}?new=1&next={LIST.replace('/', '%2F')}", fetch_redirect_response=False
+        )
         self.assertEqual((person.status, person.customer_number_id, person.has_usable_password()), ("unverified", None, False))
+        opened = client.get(self.url("detail", person), {"new": "1"})
+        self.assertContains(
+            opened, "Person angelegt. Die Einladung wurde gesendet. Ordnen Sie der Person einen Messpunkt zu, sobald sie sich registriert hat."
+        )
         page = client.get(LIST)
-        for text in ("Die Person wurde angelegt und die Einladung wurde gesendet.", "Erika Neu", "Eingeladen"):
+        for text in ("Erika Neu", "Eingeladen"):
             self.assertContains(page, text)
         self.assertContains(page, f'href="{self.url("detail", person)}"')
         # The list does not show a number for her; the search finds her by name and address.
@@ -122,7 +129,7 @@ class PersonDataPageTests(TestCase):
             ({"postal_code": "30"}, "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ({"postal_code": "ABCD"}, "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."),
             ({"email": "no address"}, "Geben Sie eine gültige E-Mail-Adresse ein."),
-            ({"street": ""}, "Geben Sie eine Strasse"),
+            ({"street": ""}, "Geben Sie die Strasse ein."),
             ({"town": ""}, "mgmt-field-error"),
             ({"phone_number": "123"}, "mgmt-field-error"),
             ({"country": "XX"}, "mgmt-field-error"),
@@ -154,11 +161,27 @@ class PersonDataPageTests(TestCase):
         self.assertFalse(person.groups.exists() or person.user_permissions.exists() or person.has_usable_password())
         self.assertGreater(person.invited_at, timezone.now() - timedelta(minutes=5))
 
+    def test_a_person_created_from_the_assign_dialog_opens_her_page_and_comes_back_from_there(self):
+        client = self.login(self.staff)
+        dialog = "/management/metering-points/1/person/"
+        response = client.post(NEW, {**CREATE, "next": dialog})
+        person = User.objects.get(email="erika.neu@example.org")
+        self.assertRedirects(
+            response, f"{self.url('detail', person)}?new=1&next=%2Fmanagement%2Fmetering-points%2F1%2Fperson%2F",
+            fetch_redirect_response=False,
+        )
+        self.assertContains(client.get(response["Location"]), f'href="{dialog}"')  # the way back to the dialog
+
     def test_a_hostile_next_value_never_leads_away_and_the_limit_is_shown(self):
         client = self.login(self.staff)
         for index, hostile in enumerate(HOSTILE):
             response = client.post(NEW, {**CREATE, "email": f"hostile{index}@example.org", "next": hostile})
-            self.assertRedirects(response, LIST, fetch_redirect_response=False)
+            person = User.objects.get(email=f"hostile{index}@example.org")
+            # The hostile value is ignored: the answer is the page of the new person with the list as the way back.
+            self.assertRedirects(
+                response, f"{self.url('detail', person)}?new=1&next={LIST.replace('/', '%2F')}",
+                fetch_redirect_response=False,
+            )
         self.assertEqual(client.get(NEW, {"next": HOSTILE[0]}).context["back_url"], LIST)
         with patch.object(rate_limits, "INVITATION_ACTOR_LIMITS", ((1, timedelta(hours=1)),)):
             page = client.post(NEW, {**CREATE, "email": "limited@example.org"})

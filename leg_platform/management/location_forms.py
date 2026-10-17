@@ -1,45 +1,91 @@
-"""Forms of the location pages (D-078)."""
+"""Forms of the location pages (D-078, D-094): the address, the transformer circuit (chosen from a list, a new one
+entered in the same form) and the remark. The metering point form is in ``metering_point_forms``."""
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import grid_operator, numbers, transformer_circuits
-from leg_platform.community.models import (
-    REMARK_MAX_LENGTH,
-    Direction,
-    Leg,
-    Location,
-    ManagementSettings,
-    validate_postal_code,
-)
+from leg_platform.community.models import Location, validate_postal_code
+from leg_platform.management.form_fields import CONTROL, remark_field
 
-CONTROL = {"class": "form-control", "autocomplete": "off"}
+NEW_CIRCUIT = "__new__"  # the value of the last option of the circuit list: "+ Create new transformer circuit"
 
 
-class CircuitChoiceField(forms.CharField):
-    """Chooses a transformer circuit by number (a suggestion text or just the number); empty means none; cleans to the circuit."""
+class CircuitFields(forms.Form):
+    """The transformer circuit of a location: a drop-down of the existing circuits whose last option creates a new one
+    in the same form (D-095). The two fields of the new circuit are always in the page; the page script shows them
+    only for that option, and the server decides from what is posted: a chosen circuit with a number typed is refused,
+    a number without a choice creates a circuit. ``cleaned_data["transformer_circuit"]`` is the circuit or None,
+    ``new_circuit`` the pair ``(grid number, name)`` or None; the service creates the circuit and saves it with the
+    location in one transaction."""
 
-    def __init__(self, **kwargs):
-        kwargs.setdefault("required", False)
-        kwargs.setdefault("label", _("Transformer circuit"))
-        kwargs.setdefault(
-            "widget",
-            forms.TextInput(attrs={**CONTROL, "list": "circuit-options", "class": "form-control tnum"}),
-        )
-        super().__init__(**kwargs)
+    transformer_circuit = forms.ChoiceField(
+        label=_("Transformer circuit"), required=False, widget=forms.Select(attrs={"class": "form-select tnum"})
+    )
+    new_circuit_number = forms.CharField(
+        required=False, max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
+        widget=forms.TextInput(attrs={**CONTROL, "class": "form-control tnum"}),
+    )
+    new_circuit_name = forms.CharField(
+        label=_("Name"), required=False, max_length=120, widget=forms.TextInput(attrs=CONTROL)
+    )
 
-    def clean(self, value):
-        value = super().clean(value)
-        number = transformer_circuits.number_of_choice(value)
-        if not number:
-            return None
-        circuit = transformer_circuits.find(number)
-        if circuit is None:
-            raise ValidationError(
-                _("Choose a transformer circuit from the list or create a new one."), code="unknown_circuit"
-            )
-        return circuit
+    circuit_layout = [("single", ["transformer_circuit"]), ("circuit-new", ["new_circuit_number", "new_circuit_name"])]
+    circuit_optional = ("transformer_circuit", "new_circuit_name")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.new_circuit = None
+        self.circuits = {str(circuit.pk): circuit for circuit in transformer_circuits.choices()}
+        self.fields["transformer_circuit"].choices = [
+            ("", _("No transformer circuit")),
+            *((key, transformer_circuits.label(circuit)) for key, circuit in self.circuits.items()),
+            (NEW_CIRCUIT, _("+ Create new transformer circuit…")),
+        ]
+        number = self.fields["new_circuit_number"]
+        number.label = grid_operator.text(_("%(operator)s number"))
+        number.help_text = _("TRA followed by digits, for example TRA21359.")
+
+    def clean(self):
+        cleaned = super().clean()
+        choice = cleaned.get("transformer_circuit", "")
+        number = numbers.normalise_transformer_circuit_number(cleaned.get("new_circuit_number"))
+        name = (cleaned.get("new_circuit_name") or "").strip()
+        if "transformer_circuit" in self.errors or "new_circuit_number" in self.errors:
+            return cleaned
+        if choice and choice != NEW_CIRCUIT:
+            cleaned["transformer_circuit"] = self.circuits[choice]
+            if number or name:
+                self.add_error(
+                    "new_circuit_number",
+                    _("Choose an existing transformer circuit or enter a new one, not both."),
+                )
+            return cleaned
+        cleaned["transformer_circuit"] = None
+        if choice == NEW_CIRCUIT or number or name:
+            try:
+                if not number:
+                    raise ValidationError(
+                        _("Enter the %(operator)s number."), code="required", params={"operator": grid_operator.name()}
+                    )
+                numbers.validate_transformer_circuit_number(number)
+            except ValidationError as error:
+                self.add_error("new_circuit_number", error)
+                return cleaned
+            if transformer_circuits.find(number) is not None:
+                self.add_error(
+                    "new_circuit_number", _("This transformer circuit already exists. Choose it from the list.")
+                )
+                return cleaned
+            self.new_circuit = (number, name)
+        return cleaned
+
+    def circuit_errors(self, error):
+        """Show the messages of a service ``ValidationError`` for the new circuit at its fields."""
+        names = {"grid_number": "new_circuit_number", "name": "new_circuit_name"}
+        for key, messages in error.message_dict.items():
+            self.add_error(names.get(key), messages)
 
 
 class AddressForm(forms.Form):
@@ -87,25 +133,33 @@ class AddressForm(forms.Form):
         return {name: self.cleaned_data[name] for name in ("street", "house_number", "postal_code", "town")}
 
 
-class LocationCreateForm(AddressForm):
-    transformer_circuit = CircuitChoiceField()
-    remark = forms.CharField(
-        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
-    )
+class LocationCreateForm(CircuitFields, AddressForm):
+    """"Create location": the address, the transformer circuit (existing or new, D-095) and the remark."""
 
-    layout = [
-        *AddressForm.layout,
-        ("single", ["transformer_circuit"]),
-        ("single", ["remark"]),
-    ]
-    optional = ("address_addition", "transformer_circuit")
+    remark = remark_field()
+
+    layout = [*AddressForm.layout, *CircuitFields.circuit_layout, ("single", ["remark"])]
+    optional = ("address_addition", *CircuitFields.circuit_optional, "remark")
 
     def clean(self):
         cleaned = super().clean()
         if self.duplicate is not None:
             raise ValidationError(_("This address already exists."), code="duplicate_address")
         return cleaned
+
+
+class LocationCircuitForm(CircuitFields):
+    """"Change transformer circuit" at a location: the same fields as in the form "Create location"."""
+
+    layout = list(CircuitFields.circuit_layout)
+    optional = CircuitFields.circuit_optional
+
+    def __init__(self, *args, location=None, **kwargs):
+        initial = kwargs.setdefault("initial", {})
+        if location is not None and location.transformer_circuit_id:
+            initial.setdefault("transformer_circuit", str(location.transformer_circuit_id))
+        super().__init__(*args, **kwargs)
+        self.location = location
 
 
 class AddressEditForm(AddressForm):
@@ -121,16 +175,14 @@ class AddressEditForm(AddressForm):
 
 
 class RemarkForm(forms.Form):
-    remark = forms.CharField(
-        label=_("Remark"), required=False, max_length=REMARK_MAX_LENGTH,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-    )
+    remark = remark_field()
     layout = [("single", ["remark"])]
-    optional = ()
+    optional = ("remark",)
 
 
 class CircuitForm(forms.Form):
-    """Create or change a transformer circuit (grid number and free name)."""
+    """Change a transformer circuit (grid number and free name); the new-circuit fields of the location forms use the
+    same rules."""
 
     grid_number = forms.CharField(
         max_length=numbers.TRANSFORMER_CIRCUIT_MAX_LENGTH,
@@ -138,13 +190,14 @@ class CircuitForm(forms.Form):
     )
     name = forms.CharField(label=_("Name"), max_length=120, required=False, widget=forms.TextInput(attrs=CONTROL))
     layout = [("single", ["grid_number"]), ("single", ["name"])]
-    optional = ()
+    optional = ("name",)
 
     def __init__(self, *args, circuit=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.circuit = circuit
         self.existing = None
         self.fields["grid_number"].label = grid_operator.text(_("%(operator)s number"))  # D-086
+        self.fields["grid_number"].help_text = _("TRA followed by digits, for example TRA21359.")
 
     def clean_grid_number(self):
         value = numbers.normalise_transformer_circuit_number(self.cleaned_data["grid_number"])
@@ -153,44 +206,3 @@ class CircuitForm(forms.Form):
         if found is not None and (self.circuit is None or found.pk != self.circuit.pk):
             self.existing = found
         return value
-
-
-class MeteringPointForm(forms.Form):
-    """A metering point at a location: direction required; number (last digits only) and LEG optional."""
-
-    direction = forms.ChoiceField(
-        label=_("Direction"), choices=Direction.choices, initial=Direction.CONSUMPTION,
-        widget=forms.RadioSelect,
-    )
-    number_digits = forms.CharField(
-        label=_("Metering point number"), required=False, max_length=numbers.SUFFIX_LENGTH,
-        widget=forms.TextInput(attrs={"class": "form-control tnum", "autocomplete": "off", "inputmode": "numeric"}),
-    )
-    leg = forms.ModelChoiceField(
-        label=_("LEG"), queryset=Leg.objects.none(), required=False, empty_label=_("No LEG chosen yet"),
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-    optional = ("number_digits", "leg")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.prefix_text = ManagementSettings.load().metering_point_prefix
-        self.number = None
-        self.fields["leg"].queryset = Leg.objects.filter(is_archived=False).order_by("name")
-
-    def clean_number_digits(self):
-        digits = self.cleaned_data["number_digits"].strip()
-        if not digits:
-            return ""
-        settings_row = ManagementSettings.load()
-        try:
-            self.number = numbers.compose_metering_point_number(
-                settings_row.country_code, settings_row.identifier, digits
-            )
-        except ValidationError as error:
-            if not settings_row.identifier:
-                raise ValidationError(
-                    _("Enter the country and the identifier in the settings first."), code="no_identifier"
-                ) from error
-            raise
-        return digits

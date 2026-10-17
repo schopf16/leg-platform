@@ -222,24 +222,78 @@ class LocationPageTests(TestCase):
         url = reverse("management:locations_new")
         data = {
             "street": "Bachweg", "house_number": "7", "address_addition": "Hinterhaus", "postal_code": "3000",
-            "town": "Bern", "transformer_circuit": "TRA21359 · Ittigen Nord", "remark": "intern",
+            "town": "Bern", "transformer_circuit": str(self.circuit.pk), "remark": "intern",
         }
         response = client.post(url, {**data, "next": reverse("management:locations")})
-        self.assertRedirects(response, reverse("management:locations"), fetch_redirect_response=False)
         created = Location.objects.get(street="Bachweg")
+        # The page of the new location opens (with the next steps), and its way back is the list (D-095).
+        self.assertRedirects(
+            response, f"{self.detail(created)}?new=1&next=%2Fmanagement%2Flocations%2F", fetch_redirect_response=False
+        )
         self.assertEqual(
             (created.transformer_circuit, created.remark, created.address_addition),
             (self.circuit, "intern", "Hinterhaus"),
         )
         self.assertEqual(history.entries_for(created).get().actor, self.staff)
+        page = client.get(self.detail(created), {"new": "1"})
+        self.assertContains(page, "Standort angelegt. Weiter: Messpunkte dieses Standorts erfassen.")
+        self.assertContains(page, reverse("management:locations_metering_point_assign", args=[created.pk]))
         # The same address again: the hint, with the way to the existing location, and nothing is created.
         again = client.post(url, data)
         self.assertContains(again, "Diese Adresse gibt es schon:")
         self.assertContains(again, reverse("management:locations_detail", args=[created.pk]))
         self.assertEqual(Location.objects.filter(street="Bachweg").count(), 1)
-        for bad in ({"postal_code": "30"}, {"street": ""}, {"transformer_circuit": "TRA99999"}):
+        for bad in ({"postal_code": "30"}, {"street": ""}, {"transformer_circuit": "999999"}):
             self.assertEqual(client.post(url, {**data, "street": "Anderer Weg", **bad}).status_code, 200)
             self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
+
+    def test_a_new_circuit_is_created_with_the_location_in_one_step(self):
+        url = reverse("management:locations_new")
+        data = {
+            "street": "Bachweg", "house_number": "7", "postal_code": "3000", "town": "Bern",
+            "transformer_circuit": "__new__", "new_circuit_number": "tra777", "new_circuit_name": "Neu",
+        }
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        created = Location.objects.get(street="Bachweg")
+        self.assertEqual((created.transformer_circuit.grid_number, created.transformer_circuit.name), ("TRA777", "Neu"))
+        # Everything typed is kept when something is wrong, and nothing is created, not even the circuit.
+        circuits = TransformerCircuit.objects.count()
+        for bad, message in (
+            ({"street": "Anderer Weg", "postal_code": "30"}, None),
+            ({"street": "Anderer Weg", "new_circuit_number": "555"}, "Geben Sie die Netzbetreiber-Nummer ein: TRA und Ziffern."),
+            ({"street": "Anderer Weg", "new_circuit_number": "TRA21359"}, "Dieser Trafokreis existiert bereits."),
+            ({"new_circuit_number": "TRA888"}, "Diese Adresse gibt es schon"),  # the address exists: no circuit
+        ):
+            with self.subTest(bad=bad):
+                response = self.client.post(url, {**data, **bad})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'value="Anderer Weg"' if "street" in bad else 'value="Bachweg"')
+                if message:
+                    self.assertContains(response, message)
+        self.assertEqual(TransformerCircuit.objects.count(), circuits)
+        self.assertFalse(Location.objects.filter(street="Anderer Weg").exists())
+        # A chosen circuit together with a typed number is refused, a number without a choice creates a circuit.
+        both = {**data, "street": "Zweiter Weg", "transformer_circuit": str(self.circuit.pk)}
+        self.assertContains(self.client.post(url, both), "nicht beides")
+        self.assertFalse(Location.objects.filter(street="Zweiter Weg").exists())
+        only_number = {**data, "street": "Dritter Weg", "transformer_circuit": "", "new_circuit_number": "TRA999"}
+        self.assertEqual(self.client.post(url, only_number).status_code, 302)
+        self.assertEqual(Location.objects.get(street="Dritter Weg").transformer_circuit.grid_number, "TRA999")
+
+    def test_a_location_created_for_the_metering_point_form_returns_to_it_with_the_location_chosen(self):
+        form = reverse("management:metering_points_new")
+        response = self.client.post(
+            reverse("management:locations_new"),
+            {"street": "Bachweg", "house_number": "7", "postal_code": "3000", "town": "Bern",
+             "next": f"{form}?next=%2Fmanagement%2Fmetering-points%2F"},
+        )
+        created = Location.objects.get(street="Bachweg")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"], f"{form}?next=%2Fmanagement%2Fmetering-points%2F&location={created.pk}"
+        )
+        page = self.client.get(response["Location"])
+        self.assertContains(page, f'<option value="{created.pk}" selected>')
 
     def test_changing_the_address_and_the_merge_with_its_confirmation_step(self):
         url = reverse("management:locations_address", args=[self.fresh.pk])
@@ -281,50 +335,43 @@ class LocationPageTests(TestCase):
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.remark, "neu")
 
-    def test_the_circuit_is_chosen_with_the_field_and_an_unknown_one_is_refused(self):
+    def test_the_circuit_is_chosen_in_the_dialog_and_an_unknown_one_is_refused(self):
         url = reverse("management:locations_circuit", args=[self.fresh.pk])
         client = self.client
-        client.post(url, {"transformer_circuit": "tra21359"})
+        page = client.get(url)
+        self.assertContains(page, "Kein Trafokreis")
+        self.assertContains(page, "+ Neuen Trafokreis anlegen")
+        client.post(url, {"transformer_circuit": str(self.circuit.pk)})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
-        client.post(url, {"transformer_circuit": "TRA1"})
+        client.post(url, {"transformer_circuit": "999999"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit, self.circuit)
         client.post(url, {"transformer_circuit": ""})
         self.fresh.refresh_from_db()
         self.assertIsNone(self.fresh.transformer_circuit)
 
-    def test_the_new_circuit_dialog_with_the_hint_for_a_number_that_exists(self):
+    def test_a_new_circuit_is_created_and_assigned_by_the_circuit_dialog(self):
         client = self.client
-        url = reverse("management:locations_circuit_new", args=[self.fresh.pk])
-        # An existing number: first the hint with "Diesen verwenden"; nothing is created or assigned.
-        first = client.post(url, {"grid_number": "tra21359", "name": "Anders"})
-        self.assertContains(first, "Diesen Trafokreis gibt es schon:")
-        self.assertContains(first, "Diesen verwenden")
+        url = reverse("management:locations_circuit", args=[self.fresh.pk])
+        # A number that exists: the message at the number, nothing is created or assigned.
+        taken = client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "tra21359", "new_circuit_name": "Anders"})
+        self.assertContains(taken, "Dieser Trafokreis existiert bereits. Wählen Sie ihn in der Liste.")
         self.assertEqual(TransformerCircuit.objects.count(), 1)
         self.fresh.refresh_from_db()
         self.assertIsNone(self.fresh.transformer_circuit)
-        client.post(url, {"grid_number": "tra21359", "name": "Anders", "use_existing": "1"})
-        self.fresh.refresh_from_db()
-        self.assertEqual(self.fresh.transformer_circuit, self.circuit)
         self.circuit.refresh_from_db()
         self.assertEqual(self.circuit.name, "Ittigen Nord")  # the existing one is not changed
-        # A new number is created and assigned.
-        client.post(url, {"grid_number": "tra555", "name": "Neu"})
+        # A new number is created and assigned, in one step.
+        client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "tra555", "new_circuit_name": "Neu"})
         self.fresh.refresh_from_db()
         self.assertEqual(self.fresh.transformer_circuit.grid_number, "TRA555")
-        self.assertEqual(client.post(url, {"grid_number": "555", "name": ""}).status_code, 200)
-
-    def test_the_circuit_dialog_of_the_create_dialog_returns_with_the_new_circuit(self):
-        client = self.client
-        response = client.post(
-            reverse("management:circuits_new"), {"grid_number": "tra777", "name": "", "next": "/management/locations/new/"}
-        )
-        created = TransformerCircuit.objects.get(grid_number="TRA777")
-        self.assertRedirects(response, f"/management/locations/new/?circuit={created.pk}", fetch_redirect_response=False)
-        page = client.get(reverse("management:locations_new"), {"circuit": created.pk})
-        self.assertContains(page, 'value="TRA777"')
-
+        self.assertEqual(self.fresh.transformer_circuit.name, "Neu")
+        # A wrong number: the dialog again, nothing changes.
+        bad = client.post(url, {"transformer_circuit": "__new__", "new_circuit_number": "555"})
+        self.assertEqual(bad.status_code, 200)
+        self.assertEqual(TransformerCircuit.objects.count(), 2)
+        self.assertEqual(history.entries_for(self.fresh).filter(event=HistoryEvent.TRANSFORMER_CIRCUIT_CHANGED).count(), 1)
     def test_changing_a_circuit_says_how_many_locations_it_reaches(self):
         url = reverse("management:circuits_edit", args=[self.circuit.pk])
         client = self.client
@@ -339,9 +386,13 @@ class LocationPageTests(TestCase):
     def test_creating_a_metering_point_at_the_location(self):
         client = self.client
         url = reverse("management:locations_metering_point_new", args=[self.fresh.pk])
-        # The location is preset by the address; direction is required, number and LEG are optional.
-        self.assertEqual(client.post(url, {"number_digits": "5"}).status_code, 200)
-        self.assertContains(client.get(url), 'name="leg"')
+        # The location is locked (a fact row, no field); direction and number are required, LEG and the rest optional.
+        page = client.get(url)
+        self.assertContains(page, "Neuweg 1, 3000 Bern")
+        self.assertNotContains(page, 'name="location"')
+        self.assertContains(page, 'name="leg"')
+        self.assertEqual(client.post(url, {"number_digits": "5"}).status_code, 200)  # no direction
+        self.assertContains(client.post(url, {"direction": Direction.CONSUMPTION}), "Geben Sie die letzten Ziffern")
         self.assertRedirects(
             client.post(url, {"direction": Direction.FEED_IN, "number_digits": "77", "leg": self.leg.pk}),
             self.detail(self.fresh), fetch_redirect_response=False,
@@ -350,13 +401,77 @@ class LocationPageTests(TestCase):
         self.assertEqual(point.number, "CH1A2B3C4D5E6" + "77".zfill(20))
         self.assertEqual(point.leg_assignments.get().leg, self.leg)
         self.assertFalse(point.person_assignments.exists())
-        # Without number and LEG.
-        client.post(url, {"direction": Direction.CONSUMPTION})
-        self.assertEqual(MeteringPoint.objects.filter(location=self.fresh, number__isnull=True).count(), 1)
         # The number exists: the page tells, nothing is created.
         again = client.post(url, {"direction": Direction.CONSUMPTION, "number_digits": "77"})
         self.assertContains(again, "Diese Messpunkt-Nummer gibt es schon.")
-        self.assertEqual(MeteringPoint.objects.filter(location=self.fresh).count(), 2)
+        self.assertEqual(MeteringPoint.objects.filter(location=self.fresh).count(), 1)
+
+    def test_the_locked_location_comes_from_the_page_and_never_from_the_post(self):
+        url = reverse("management:locations_metering_point_new", args=[self.fresh.pk])
+        before = MeteringPoint.objects.count()
+        for forged in (str(self.other.pk), str(self.old.pk), "999999", "abc", ""):
+            with self.subTest(forged=forged):
+                response = self.client.post(
+                    url, {"direction": Direction.CONSUMPTION, "number_digits": "9", "location": forged}
+                )
+                self.assertEqual(response.status_code, 302)
+                created = MeteringPoint.objects.get(number="CH1A2B3C4D5E6" + "9".zfill(20))
+                self.assertEqual(created.location, self.fresh)
+                created.delete()
+        self.assertEqual(MeteringPoint.objects.count(), before)
+        # An archived location is refused before anything is read or written.
+        gone = self.client.post(
+            reverse("management:locations_metering_point_new", args=[self.old.pk]),
+            {"direction": Direction.CONSUMPTION, "number_digits": "8"},
+            follow=True,
+        )
+        self.assertContains(gone, "Dieser Standort ist archiviert.")
+        self.assertFalse(MeteringPoint.objects.filter(location=self.old).exists())
+
+    def test_an_existing_metering_point_is_assigned_to_the_location(self):
+        loose = make_metering_point(2)  # no location
+        elsewhere = make_metering_point(3, location=self.other)
+        archived_point = make_metering_point(4, is_archived=True)
+        url = reverse("management:locations_metering_point_assign", args=[self.fresh.pk])
+        page = self.client.get(url)
+        self.assertContains(page, "Ohne Standort")
+        self.assertContains(page, "An einem anderen Standort")
+        self.assertContains(page, f'<option value="{loose.pk}">')
+        self.assertContains(page, f'<option value="{elsewhere.pk}">')
+        self.assertNotContains(page, f'<option value="{archived_point.pk}">')  # archived: not offered
+        response = self.client.post(url, {"metering_point": str(loose.pk)})
+        self.assertRedirects(response, self.detail(self.fresh), fetch_redirect_response=False)
+        loose.refresh_from_db()
+        self.assertEqual(loose.location, self.fresh)
+        entry = history.entries_for(loose).get(event=HistoryEvent.METERING_POINT_LOCATION_CHANGED)
+        self.assertEqual(entry.detail, {"old_location_id": None, "new_location_id": self.fresh.pk})
+        # A point of another location moves; its new circuit is the one of this location.
+        self.client.post(url, {"metering_point": str(elsewhere.pk)})
+        elsewhere.refresh_from_db()
+        self.assertEqual(elsewhere.location, self.fresh)
+
+    def test_assigning_refuses_what_is_not_offered(self):
+        url = reverse("management:locations_metering_point_assign", args=[self.fresh.pk])
+        archived_point = make_metering_point(4, is_archived=True)
+        here = make_metering_point(5, location=self.fresh)
+        before = list(MeteringPoint.objects.order_by("pk").values_list("pk", "location_id"))
+        for forged in (str(archived_point.pk), str(here.pk), "999999", "-1", "abc", "9" * 40, ""):
+            with self.subTest(forged=forged[:12]):
+                self.assertEqual(self.client.post(url, {"metering_point": forged}).status_code, 200)
+        self.assertEqual(list(MeteringPoint.objects.order_by("pk").values_list("pk", "location_id")), before)
+        # An archived or unknown location takes none.
+        for pk in (self.old.pk, 999999):
+            self.client.post(
+                reverse("management:locations_metering_point_assign", args=[pk]), {"metering_point": str(self.point.pk)}
+            )
+        self.point.refresh_from_db()
+        self.assertEqual(self.point.location, self.musterweg)
+
+    def test_the_assign_dialog_says_so_when_there_is_nothing_to_assign(self):
+        MeteringPoint.objects.exclude(location=self.fresh).update(is_archived=True)
+        page = self.client.get(reverse("management:locations_metering_point_assign", args=[self.fresh.pk]))
+        self.assertContains(page, "Alle Messpunkte haben bereits einen Standort.")
+        self.assertNotContains(page, "Messpunkt zuordnen</button>")
 
     def test_a_metering_point_needs_the_identifier_from_the_settings_for_a_number(self):
         ManagementSettings.objects.update(identifier="")

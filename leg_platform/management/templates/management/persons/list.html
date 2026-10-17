@@ -37,7 +37,7 @@ are a GET form.
         <tbody>
           {% for entry in entries %}
             <tr>
-              <td><div class="mgmt-cut mgmt-person-name" title="{{ entry.name }}">{{ entry.name }}</div>{% if entry.contact %}<div class="mgmt-cut mgmt-person-contact" title="{{ entry.contact }}">{{ entry.contact }}</div>{% endif %}</td>
+              <td><div class="mgmt-cut mgmt-person-name" title="{{ entry.name }}"><a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ entry.name }}</a></div>{% if entry.contact %}<div class="mgmt-cut mgmt-person-contact" title="{{ entry.contact }}">{{ entry.contact }}</div>{% endif %}</td>
               <td class="tnum">{% if entry.number %}{{ entry.number }}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
               <td>{% if entry.address %}<div class="mgmt-cut" title="{{ entry.address }}">{{ entry.address }}</div>{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
               <td>{{ entry.points }}</td>
@@ -54,11 +54,11 @@ are a GET form.
     <div class="mgmt-cards-view">
       {% for entry in entries %}
         <article class="mgmt-place">
-          <div class="mgmt-place-addr">{{ entry.name }}{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.name %}</div>
+          <div class="mgmt-place-addr"><a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ entry.name }}</a>{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.name %}</div>
           {% if entry.contact %}<div class="mgmt-place-sub">{{ entry.contact }}</div>{% endif %}
           <dl class="mgmt-facts">
             <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</dd></div>
-            <div class="mgmt-fact"><dt>{% translate "Account" %}</dt><dd><span class="mgmt-status is-{{ entry.account_tone }}" role="img" aria-label="{{ entry.account_label }}"></span></dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Account" %}</dt><dd>{% include "management/_status.html" with tone=entry.account_tone label=entry.account_label %}</dd></div>
           </dl>
         </article>
       {% empty %}

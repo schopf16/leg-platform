@@ -8,10 +8,11 @@ date; a LEG is deleted only if no metering point was ever assigned to it, otherw
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
-from leg_platform.community import addressing, archived, history, legs
+from leg_platform.community import addressing, archived, assignments, history, legs
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import HistoryEntry, Leg, LegAssignment
+from leg_platform.community.models import HistoryEntry, Leg, LegAssignment, MeteringPoint
 
 Archived = archived.Archived
 
@@ -128,6 +129,31 @@ def can_delete(leg):
     return not LegAssignment.objects.filter(leg=leg).exists()
 
 
+def assign_metering_point(leg, metering_point, valid_from, actor=None, today=None):
+    """Assign a metering point that has no LEG (none in force and none planned) to the LEG from ``valid_from``
+    (the LEG page, D-095). Locks the LEG, then the point (the order of ``assignments.assign``); refuses an archived
+    LEG, an archived point and a point that has a LEG meanwhile (``AssignmentError``: ``leg_archived``,
+    ``point_archived``, ``already_has_leg``; ``leg_missing`` and ``point_missing`` when one was deleted meanwhile, L-7).
+    A move from another LEG is ``leg_switch.switch_leg``."""
+    today = today or timezone.localdate()
+    with transaction.atomic():
+        try:
+            if Leg.objects.select_for_update().get(pk=leg.pk).is_archived:
+                raise assignments.AssignmentError("leg_archived")
+        except Leg.DoesNotExist:
+            raise assignments.AssignmentError("leg_missing") from None
+        try:
+            point = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
+        except MeteringPoint.DoesNotExist:
+            # Deleted between the form and the save: the normal refusal, not an error page (L-7).
+            raise assignments.AssignmentError("point_missing") from None
+        if point.is_archived:
+            raise assignments.AssignmentError("point_archived")
+        if LegAssignment.objects.not_ended(today).filter(metering_point=point).exists():
+            raise assignments.AssignmentError("already_has_leg")
+        return assignments.assign(assignments.LEG, point, leg, valid_from, actor, today)
+
+
 def delete(leg):
     """Delete a LEG without a history. Raises ``NotDeletable`` or ``Archived`` (D-085, D-086)."""
     with transaction.atomic():
@@ -140,6 +166,6 @@ def delete(leg):
 
 
 __all__ = [
-    "Archived", "DuplicateName", "NotDeletable", "can_delete", "create_leg", "delete", "name_in_use",
-    "normalise_name", "set_archived", "update_master_data", "update_quota",
+    "Archived", "DuplicateName", "NotDeletable", "assign_metering_point", "can_delete", "create_leg", "delete",
+    "name_in_use", "normalise_name", "set_archived", "update_master_data", "update_quota",
 ]

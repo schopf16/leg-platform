@@ -5,7 +5,3 @@
     <div class="mgmt-banner" role="status"><p><b>{% translate "This address already exists:" %}</b> {% blocktranslate count counter=duplicate.count with address=duplicate.address %}{{ address }} with {{ counter }} metering point. If it is the same place, {% plural %}{{ address }} with {{ counter }} metering points. If it is the same place, {% endblocktranslate %}<a href="{{ duplicate.url }}">{% translate "go to the existing location" %}</a>.</p></div>
   {% endif %}
 {% endblock %}
-{% block dialog_after_fields %}
-  <datalist id="circuit-options">{% for option in circuit_options %}<option value="{{ option.grid_number }}{% if option.name %} · {{ option.name }}{% endif %}">{% endfor %}</datalist>
-  {% if new_circuit_url %}<p class="mgmt-circuit-links"><a href="{{ new_circuit_url }}">+ {% translate "Create new transformer circuit" %}</a></p>{% endif %}
-{% endblock %}

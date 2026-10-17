@@ -219,8 +219,18 @@ class SecurityEvent(models.Model):
         INVITATION_RESENT = "invitation_resent", _("Invitation sent again by staff")
         ACCOUNT_DATA_CHANGED_BY_STAFF = "account_data_changed_by_staff", _("Account data changed by staff")
         GRID_OPERATOR_CHANGED = "grid_operator_changed", _("Grid operator changed")
+        ADDRESS_IMPORT_SUCCEEDED = "address_import_succeeded", _("Address directory import completed")
+        ADDRESS_IMPORT_FAILED = "address_import_failed", _("Address directory import failed")
+        LOG_VIEWED = "log_viewed", _("Log file viewed")
+        LOG_DOWNLOADED = "log_downloaded", _("Log file downloaded")
+        PERSISTENT_SESSION_STARTED = "persistent_session_started", _(
+            "Long session (stay signed in) started for a staff or administrator account"
+        )
+        ACCOUNT_SESSIONS_ENDED_BY_ADMIN = "account_sessions_ended_by_admin", _(
+            "All sessions of an account ended by a system administrator"
+        )
 
-    # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087).
+    # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
         {
             Event.PRIVILEGES_CHANGED,
@@ -236,6 +246,10 @@ class SecurityEvent(models.Model):
             Event.LIST_PRINTED,
             Event.ACCOUNT_DATA_CHANGED_BY_STAFF,
             Event.GRID_OPERATOR_CHANGED,
+            Event.LOG_VIEWED,
+            Event.LOG_DOWNLOADED,
+            Event.PERSISTENT_SESSION_STARTED,
+            Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN,
         }
     )
 

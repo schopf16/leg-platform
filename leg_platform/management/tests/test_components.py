@@ -208,7 +208,10 @@ class DialogTests(TestCase):
         self.assertIn('<form method="post"', html)
         self.assertIn("csrfmiddlewaretoken", html)
         self.assertIn('<input type="hidden" name="next" value="/management/legs/?page=2">', html)
-        self.assertIn('<a class="btn btn-secondary-action" href="/management/legs/?page=2">Abbrechen</a>', html)
+        # A dialog without fields (a question) puts the cursor on "Cancel", never on the button of the action (D-094).
+        self.assertIn(
+            '<a class="btn btn-secondary-action" href="/management/legs/?page=2" data-first-field>Abbrechen</a>', html
+        )
         self.assertIn(">Speichern</button>", html)
         # No script is needed: the only scripts are the files of the page frame.
         self.assertNotRegex(html, r"<script(?![^>]*\ssrc=\"/static/)")

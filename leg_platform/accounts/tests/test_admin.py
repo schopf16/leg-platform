@@ -377,14 +377,14 @@ class AdminPresentationTests(TestCase):
         self.assertIn("LEG-Portal", content)
         self.assertNotIn("LEG-Plattform", content)
 
-    def test_the_start_page_has_three_groups_and_the_hint(self):
+    def test_the_start_page_has_four_groups_and_the_hint(self):
         self.client.force_login(self.administrator)
 
         with translation.override("de-ch"):
             content = self.client.get(reverse("admin:index")).content.decode()
 
         groups = re.findall(r'<a href="[^"]*" class="section"[^>]*>([^<]+)</a>', content)
-        self.assertEqual(groups, ["Benutzer", "Inhalte", "System"])
+        self.assertEqual(groups, ["Benutzer", "Inhalte", "Verwaltungsdaten", "System"])
         self.assertIn(
             "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
             content,

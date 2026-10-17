@@ -6,7 +6,7 @@ asking the directory per row. "Not accept" is remembered for the address as it i
 
 from django.db import transaction
 
-from leg_platform.community import addressing, archived, history
+from leg_platform.community import addressing, archived, history, transformer_circuits
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import HistoryEntry, Location, MeteringPoint
 
@@ -93,10 +93,14 @@ ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town")
 
 
 def create_location(
-    *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None,
+    *, street, house_number, postal_code, town, address_addition="", transformer_circuit=None, new_circuit=None,
     remark="", needs_confirmation=False, actor=None,
 ):
-    """A new location; raises ``ValidationError`` (also for an existing address). The directory check runs once."""
+    """A new location; raises ``ValidationError`` (also for an existing address). The directory check runs once.
+
+    ``new_circuit`` = ``(grid number, name)`` creates a transformer circuit in the same transaction as the location
+    (D-095): if either fails nothing is kept; a wrong or existing number raises ``ValidationError`` with the keys
+    ``grid_number`` / ``name``. It replaces ``transformer_circuit``."""
     location = Location(
         street=street, house_number=house_number, postal_code=postal_code, town=town,
         address_addition=address_addition, transformer_circuit=transformer_circuit,
@@ -104,6 +108,8 @@ def create_location(
     )
     location.full_clean()
     with transaction.atomic():
+        if new_circuit is not None:
+            location.transformer_circuit = transformer_circuits.create(*new_circuit)
         location.save()
         history.record(location, HistoryEvent.CREATED, actor)
     refresh_suggestion(location)
@@ -166,11 +172,14 @@ def _merge(source, target, actor):
     return target
 
 
-def set_circuit(location, circuit, actor=None):
-    """Assign the transformer circuit (None removes it); a change is logged."""
+def set_circuit(location, circuit, actor=None, new_circuit=None):
+    """Assign the transformer circuit (None removes it); a change is logged. ``new_circuit`` = ``(grid number,
+    name)`` creates the circuit in the same transaction (D-095; ``ValidationError`` as for ``create_location``)."""
     with transaction.atomic():
         fresh = Location.objects.select_for_update().select_related("transformer_circuit").get(pk=location.pk)
         archived.ensure_open(fresh, archived.LOCATION)
+        if new_circuit is not None:
+            circuit = transformer_circuits.create(*new_circuit)
         before = fresh.transformer_circuit
         if before == circuit:
             return fresh

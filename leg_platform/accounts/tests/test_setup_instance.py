@@ -98,7 +98,7 @@ class SetupInstanceTests(TransactionTestCase):
         # in the SQLite file and are created by `migrate addresses --database=addresses` (D-075).
         self.assertIn("addresses_importrequest", connection.introspection.table_names())
         self.assertNotIn("addresses_directory", connection.introspection.table_names())
-        self.assertIn("Database migrations: 2 applied.", output)
+        self.assertIn("Database migrations: 3 applied.", output)
         user = User.objects.get()
         self.assertTrue(user.is_superuser and user.is_staff and user.is_active)
         self.assertTrue(user.password_change_required)
@@ -210,6 +210,8 @@ class SetupInstanceTests(TransactionTestCase):
         self.assertEqual(columns, {
             "id", "state", "requested_at", "started_at", "finished_at",
             "last_automatic_attempt_at", "is_automatic", "last_failed_repair_at",
+            # Progress and last error of the import in the web process (migration 0003, D-090).
+            "claim_token", "heartbeat_at", "phase", "bytes_done", "bytes_total", "rows_done", "last_error",
         })
 
         output = self.run_command()
@@ -497,7 +499,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                     {"django_migrations", "addresses_address", "addresses_directory"},
                 )
         self.assertEqual(errors, "")
-        self.assertIn("Address directory: file prepared, 2 migration(s) applied.", output)
+        self.assertIn("Address directory: file prepared, 3 migration(s) applied.", output)
         self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
 
     def test_a_second_run_changes_nothing_in_the_directory(self):
@@ -523,7 +525,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
 
                 output, _errors = self.run_command()
 
-                self.assertIn("file prepared, 2 migration(s) applied", output)
+                self.assertIn("file prepared, 3 migration(s) applied", output)
                 self.assertIn("addresses_directory", alias.introspection.table_names())
 
     def test_a_directory_path_that_cannot_be_used_is_reported_and_does_not_stop_the_administrator(self):

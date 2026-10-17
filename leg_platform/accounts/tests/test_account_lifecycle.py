@@ -439,6 +439,70 @@ class AdminLifecycleTests(TestCase):
         self.assertEqual(unblocked.status_code, 302)
         self.assertEqual(account.status, User.Status.ACTIVE)
 
+    def test_an_administrator_can_end_all_sessions_of_another_account(self):
+        # H-2 of the review of 2026-10-17: also a session with "Stay signed in" ends at its next request (D-100).
+        account = create_active_user("target.sessions@example.org")
+        other = VerifiedClient()
+        other.force_login(account)
+        self.assertEqual(other.get(reverse("accounts:profile")).status_code, 200)
+        before = User.objects.get(pk=account.pk).session_version
+        url = self.lifecycle_url(account, "end_sessions")
+        self.assertContains(self.client.get(url), "Alle Sitzungen beenden")
+        # Without the confirmation nothing happens.
+        self.client.post(url, {})
+        self.assertEqual(User.objects.get(pk=account.pk).session_version, before)
+
+        response = self.client.post(url, {"confirm": "on"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertGreater(User.objects.get(pk=account.pk).session_version, before)
+        ended = other.get(reverse("accounts:profile"))
+        self.assertEqual(ended.status_code, 302)
+        self.assertTrue(ended["Location"].startswith(reverse("accounts:login")))
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN)
+        self.assertEqual((event.account_id, event.actor_id), (account.pk, self.administrator.pk))
+        self.assertTrue(event.long_retention)
+        # The account stays as it was: no block, no change of status.
+        self.assertEqual(User.objects.get(pk=account.pk).status, User.Status.ACTIVE)
+        # The button is on the page of the other account and not on the own page.
+        self.assertContains(
+            self.client.get(reverse("admin:accounts_user_change", args=(account.pk,))), url
+        )
+        self.assertNotContains(
+            self.client.get(reverse("admin:accounts_user_change", args=(self.administrator.pk,))),
+            self.lifecycle_url(self.administrator, "end_sessions"),
+        )
+
+    def test_the_own_account_a_staff_user_and_a_deleted_account_cannot_be_ended_this_way(self):
+        before = User.objects.get(pk=self.administrator.pk).session_version
+        own = self.lifecycle_url(self.administrator, "end_sessions")
+        self.assertEqual(self.client.get(own).status_code, 403)
+        self.assertEqual(self.client.post(own, {"confirm": "on"}).status_code, 403)
+        self.assertEqual(User.objects.get(pk=self.administrator.pk).session_version, before)
+        # A deleted account (retention obligation) has no sessions to end: refused, nothing changes.
+        retained = create_active_user("retained.sessions@example.org")
+        retained.set_retention_obligation()
+        retained.delete_or_deactivate()
+        before = User.objects.get(pk=retained.pk).session_version
+        self.client.post(self.lifecycle_url(retained, "end_sessions"), {"confirm": "on"})
+        self.assertEqual(User.objects.get(pk=retained.pk).session_version, before)
+        # Staff without system administrator rights, and an account without staff rights: 403, nothing changes.
+        account = create_active_user("target.sessions2@example.org")
+        before = User.objects.get(pk=account.pk).session_version
+        for who in ("staff", "person"):
+            actor = create_active_user(f"{who}.sessions@example.org")
+            if who == "staff":
+                actor.set_privileges(is_staff=True, is_superuser=False)
+            client = VerifiedClient()
+            client.force_login(actor)
+            response = client.post(self.lifecycle_url(account, "end_sessions"), {"confirm": "on"})
+            self.assertIn(response.status_code, (302, 403), who)
+            if response.status_code == 302:
+                self.assertTrue(response["Location"].startswith("/admin/login/") or "login" in response["Location"])
+            self.assertEqual(User.objects.get(pk=account.pk).session_version, before, who)
+        self.assertEqual(Client().post(self.lifecycle_url(account, "end_sessions"), {"confirm": "on"}).status_code, 302)
+        self.assertEqual(User.objects.get(pk=account.pk).session_version, before)
+
     def test_a_staff_user_cannot_use_the_lifecycle_endpoint(self):
         staff = create_active_user("staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)

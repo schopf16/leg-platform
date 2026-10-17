@@ -277,6 +277,22 @@ class TransformerCircuitServiceTests(TestCase):
         created = transformer_circuits.create(" tra555 ", "Neu")
         self.assertEqual((created.grid_number, created.name), ("TRA555", "Neu"))
 
+    def test_a_circuit_created_in_parallel_is_a_validation_error_and_no_server_error(self):
+        # L-7: the check passes, another request saves the number first, the constraint of the database decides.
+        with mock.patch.object(type(self.circuit), "full_clean"):
+            with self.assertRaises(ValidationError) as caught:
+                transformer_circuits.create("tra21359", "Parallel")
+        self.assertIn("grid_number", caught.exception.message_dict)
+        self.assertEqual(type(self.circuit).objects.filter(grid_number="TRA21359").count(), 1)
+        # Inside the transaction of a location nothing is kept either (the savepoint rolled back).
+        with mock.patch.object(type(self.circuit), "full_clean"), NO_SUGGESTION:
+            with self.assertRaises(ValidationError):
+                locations.create_location(
+                    street="Raceweg", house_number="1", postal_code="3063", town="Ittigen",
+                    new_circuit=("TRA21359", "Parallel"),
+                )
+        self.assertFalse(Location.objects.filter(street="Raceweg").exists())
+
     def test_a_change_reaches_every_location_and_may_not_take_another_number(self):
         self.assertEqual(transformer_circuits.affected_locations(self.circuit), 3)
         with self.assertRaises(ValidationError):

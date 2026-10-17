@@ -30,21 +30,25 @@ The directory is an own SQLite file (D-075), **not part of any backup**. Optiona
 python manage.py migrate addresses --database=addresses
 ```
 
-**Restore:** the file is not restored from a backup; start the services (`setup_instance` recreates it) and the worker imports within 24 hours, or an administrator presses the button (about 12 minutes, about 143 MB, D-075). A corrupted file is deleted and rebuilt (`docs/DEPLOYMENT.md`, section 10.2).
+**Restore:** the file is not restored from a backup; start the services (`setup_instance` recreates it); the portal then imports by itself when a staff member next opens the administration or the management area (within 24 hours of an empty directory), or an administrator presses the button (about 12 minutes, about 143 MB, D-075, D-090). A corrupted file is deleted and rebuilt (`docs/DEPLOYMENT.md`, section 10.2).
 
-Run a supervised worker (same environment as the web application; the web process never downloads or imports):
+**The import needs no extra service (D-090).** The web application downloads and imports the directory itself, in a background thread of one web worker, when an administrator with the right `addresses.request_directory_import` presses "Request directory update" (administration, "Adressverzeichnis"; the page shows the progress and the result, also failures with their reason) and when the automatic refresh is due (every 90 days; every 24 hours while the directory is missing or empty): it starts at the first visit of a staff member to the administration start page or the management overview after the due time. It needs no cron job or scheduler, but nothing happens while nobody signs in. `ADDRESS_IMPORT_AUTOMATIC=False` turns the automatic refresh off. The web service needs outbound HTTPS to `data.geo.admin.ch`, about 4 GB free in the folder of the file and in the temporary folder, and about 0.9 GB per generation on disk. A restart or recycle of the web service during an import interrupts it (the directory in use stays as it was); the page then says so and the button starts it again. Start, end and failure are written to the application log (`leg_platform.addresses`, see "Logs" below) and to the security log. If the published directory is the official file and passes the integrity check, a manual request ends without a download, otherwise it imports again (D-076).
+
+Optional alternative, a supervised worker (same environment as the web application; it claims the same job, so it cannot run twice with the web application):
 
 ```powershell
 python manage.py process_address_imports
 ```
 
-It handles queued manual imports (permission `addresses.request_directory_import`, logged in the security log) and makes one automatic attempt every 90 days (D-052), every 24 hours while the directory is missing or empty (D-076). If the published directory is the official file and passes the integrity check, a manual request ends without a download, otherwise it imports again (D-076). The importer refuses to run with less than 4 GB free where the file lives. Manually:
+It handles queued manual imports and makes the automatic attempt (D-052). The importer refuses to run with less than 4 GB free where the file lives. Manually:
 
 ```powershell
 python manage.py import_address_directory
 ```
 
-Allow outbound HTTPS only to `data.geo.admin.ch` for the worker. It verifies the official SHA-256 multihash before parsing. No second import runs at the same time (lease on the directory row, expires after 6 hours). Reserve disk for **three** generations at the peak (about 0.9 GB each), the temporary download and the write-ahead log. A hard-killed job (state stays `running`) is taken over only after its lease has expired; before that confirm that no importer remains active (`docs/DEPLOYMENT.md`, section 8.4). Do not blindly reset its state.
+**Logs (D-092).** The portal writes to the standard error output of its processes (journald under systemd) and, with `LOG_DIRECTORY`, to `application.log` and `security.log` in that folder (default locally `~/.leg-platform-dev/logs`; outside local `/var/log/leg-platform`, which needs `LogsDirectory=leg-platform` in the systemd units; `LOG_DIRECTORY=off` writes no files). System administrators read, watch live and download them in the administration ("Protokolldateien"). The files are bounded (10 MB, 5 older files each), readable by the service user only.
+
+Allow outbound HTTPS only to `data.geo.admin.ch` for the web service (and the worker, if you run it). The import verifies the official SHA-256 multihash before parsing. No second import runs at the same time (the job row is the claim; the lease on the directory row expires after 6 hours). Reserve disk for **three** generations at the peak (about 0.9 GB each), the temporary download and the write-ahead log. A job of the web application whose process was stopped is found dead after about 90 seconds without a sign of life and can be requested again; a hard-killed worker job (state stays `running`) is taken over only after its lease of 6 hours has expired (`docs/DEPLOYMENT.md`, section 8.4). Do not blindly reset its state.
 
 `POST /addresses/lookup/` accepts at most 4096 bytes of body. The web server or reverse proxy must also limit request bodies for the whole instance (for example `client_max_body_size` in Nginx), because Django's limits apply only after the request has been received; **this limit is mandatory before any stage or production deployment**.
 

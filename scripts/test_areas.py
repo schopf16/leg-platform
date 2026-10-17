@@ -188,13 +188,14 @@ AREAS: dict[str, Area] = {
         "Environment variables, settings, security settings, logging filters and error pages "
         "(leg_platform/environment.py itself is a core file: the full suite runs).",
         paths=(
-            "leg_platform/debug.py", "leg_platform/log_filters.py",
+            "leg_platform/debug.py", "leg_platform/log_filters.py", "leg_platform/logfiles.py",
+            "leg_platform/log_views.py",
             "leg_platform/wsgi.py", "leg_platform/asgi.py", ".env.example",
         ),
         tests=_labels(
             T, "test_environment", "test_settings", "test_production_settings", "test_responses",
             "test_instance_configuration", "test_request_body_limit", "test_database",
-            "test_error_pages",
+            "test_error_pages", "test_logs",
         ),
     ),
     "address-directory": Area(
@@ -287,7 +288,8 @@ AREAS: dict[str, Area] = {
     ),
     "admin": Area(
         "The administration: users, rights, email texts, Graph configuration and portal settings.",
-        paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py",
+        paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py", "leg_platform/community/admin.py",
+               "leg_platform/log_views.py", "leg_platform/logfiles.py",
                "leg_platform/addresses/admin.py", "leg_platform/accounts/permission_names.py",
                "leg_platform/accounts/forms.py", "leg_platform/templates/admin/",
                "leg_platform/*/templates/admin/"),
@@ -296,8 +298,8 @@ AREAS: dict[str, Area] = {
                     "test_admin_spotcheck", "test_portal_settings", "test_graph_test_email_limits",
                     "test_email_texts", "test_translations", "test_acceptance_negative_authorization",
                     "test_portal_branding")
-            + _labels(T, "test_mail_graph")
-            + _labels(C, "test_rights")
+            + _labels(T, "test_mail_graph", "test_logs")
+            + _labels(C, "test_rights", "test_admin_tables")
         ),
     ),
     "mail": Area(

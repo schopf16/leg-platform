@@ -1,0 +1,37 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# The log files (D-092): for system administrators only. Links to the live view and the download. #}
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+<li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+<li aria-current="page">{{ title }}</li>
+</ol>
+{% endblock %}
+{% block content %}
+<section aria-label="{% translate 'Log files' %}">
+  {% if directory_configured %}
+    <p class="help">{% blocktranslate with size=max_mb files=backups %}The portal writes its application log and its security log to files. Each file is at most {{ size }} MB; when it is full it is renamed and up to {{ files }} older files are kept. The lines are cleaned of links with tokens, email addresses and IBANs. Opening a page or downloading a file is written to the security log.{% endblocktranslate %}</p>
+    {% if rows %}
+    <table class="log-files">
+      <thead><tr><th scope="col">{% translate "File" %}</th><th scope="col">{% translate "Size" %}</th><th scope="col">{% translate "Last change" %}</th><th scope="col">{% translate "Live view" %}</th><th scope="col">{% translate "Download" %}</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <th scope="row">{{ row.title }}{% if row.backup %} ({% translate "older file" %} {{ row.backup }}){% endif %}<br><code>{{ row.name }}</code></th>
+          <td data-label="{% translate 'Size' %}">{{ row.size_kb }} KB</td>
+          <td data-label="{% translate 'Last change' %}">{{ row.modified|date:"d.m.Y H:i" }}</td>
+          <td><a href="{{ row.view_url }}">{% if row.backup %}{% translate "Show" %}{% else %}{% translate "Watch live" %}{% endif %}</a></td>
+          <td><a href="{{ row.download_url }}">{% translate "Download" %}</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>{% translate "Nothing was logged to a file yet." %}</p>
+    <p><a href="{% url 'admin:logs_view' log='application' %}">{% translate "Application log" %}</a> · <a href="{% url 'admin:logs_view' log='security' %}">{% translate "Security log (file)" %}</a></p>
+    {% endif %}
+  {% else %}
+    <p class="help">{% translate "No log folder is configured on this server, so there are no log files to show. The portal then writes its log to the standard error output of its processes; on a server with systemd read it with journalctl (see the operating instructions). Set LOG_DIRECTORY on the server to write log files." %}</p>
+  {% endif %}
+</section>
+{% endblock %}

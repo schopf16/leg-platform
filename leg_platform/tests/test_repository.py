@@ -61,6 +61,42 @@ def tracked_files(root):
     return [root / name for name in names]
 
 
+class IgnoreRulesTests(SimpleTestCase):
+    """The rules of ``.gitignore`` must not swallow source files (H-1 of the review of 2026-10-17: the rule ``logs/``
+    ignored ``leg_platform/templates/admin/logs/``, so a clean checkout lacked the templates of the log pages)."""
+
+    def test_no_template_or_static_file_of_the_project_is_ignored(self):
+        root = Path(settings.BASE_DIR)
+        git = shutil.which("git")
+        if git is None:
+            message = "Git is not available; the check needs 'git check-ignore'."
+            if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+                self.fail(message)
+            self.skipTest(message)
+        package = root / "leg_platform"
+        files = [
+            path.relative_to(root).as_posix()
+            for pattern in ("**/templates/**/*", "**/static/**/*")
+            for path in package.glob(pattern)
+            if path.is_file() and "vendor" not in path.parts and "__pycache__" not in path.parts
+        ]
+        self.assertGreater(len(files), 50)
+        for name in ("leg_platform/templates/admin/logs/list.html", "leg_platform/templates/admin/logs/viewer.html"):
+            self.assertIn(name, files)
+        # ``--no-index``: judge by the rules alone, also for a file that is not tracked yet.
+        result = subprocess.run(
+            [git, "check-ignore", "--no-index", "--stdin", "-z", "-v"], cwd=root, input="\0".join(files).encode("utf-8"),
+            capture_output=True, check=False, timeout=60,
+        )
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        self.assertEqual(result.stdout.decode("utf-8").replace("\0", " "), "", "Ignored source files")
+
+    def test_the_rule_for_log_folders_names_only_the_folder_at_the_root(self):
+        text = (Path(settings.BASE_DIR) / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn("/logs/", text)
+        self.assertNotIn("logs/", text)
+
+
 class ReservedEmailDomainTests(SimpleTestCase):
     def test_reserved_domains_are_recognised(self):
         for address in (

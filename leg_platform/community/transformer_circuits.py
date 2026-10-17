@@ -1,6 +1,6 @@
 """Transformer circuits (unique by normalised grid number, free name) and the figures of the card "Netz" (D-078)."""
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from leg_platform.community import numbers
 from leg_platform.community.models import Direction, MeteringPoint, Location, TransformerCircuit
@@ -27,12 +27,18 @@ def find(number):
 
 
 def create(number, name=""):
-    """A new circuit. Raises ``ValidationError`` for a wrong number or a number that exists."""
+    """A new circuit. Raises ``ValidationError`` for a wrong number or a number that exists (also when a parallel
+    request created it between the check and the save: the database constraint decides, L-7)."""
     circuit = TransformerCircuit(
         grid_number=numbers.normalise_transformer_circuit_number(number), name=name
     )
     circuit.full_clean()
-    circuit.save()
+    try:
+        with transaction.atomic():
+            circuit.save()
+    except IntegrityError:
+        circuit.validate_unique()  # now finds the other one and raises the same message as the check above
+        raise
     return circuit
 
 

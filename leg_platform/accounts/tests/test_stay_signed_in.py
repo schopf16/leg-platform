@@ -1,7 +1,9 @@
-"""Stay signed in (D-056, team lead decision K21): a persistent session for users who ask for it.
+"""Stay signed in (D-056, D-088): a persistent session for everyone who asks for it.
 
-Off by default; for a user a session of ``STAY_SIGNED_IN_DURATION`` that does not slide; ignored
-(not hidden) for staff users and system administrators, whose shorter timeouts of D-041 stay.
+Off by default; a session of ``STAY_SIGNED_IN_DURATION`` that does not slide, for users as well as
+staff users and system administrators (owner decision D-088). The second factor is asked once, at the
+login; the persistent session exists only after the code was accepted. A privileged account
+without a second factor gets no persistent session.
 """
 
 from datetime import timedelta
@@ -15,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts import session_timeout
-from leg_platform.accounts.models import VerificationToken
+from leg_platform.accounts.models import MailJob, SecurityEvent, VerificationToken
 from leg_platform.accounts.second_factor import PENDING_SESSION_KEY
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
@@ -128,7 +130,9 @@ class StaySignedInTests(TestCase):
         self.assertAlmostEqual(cookie_max_age(response), DURATION - 3 * DAY, delta=10)
         self.assertEqual(Session.objects.get(session_key=key).expire_date, ends)
 
-    def test_a_staff_user_gets_no_persistent_session_the_shorter_timeouts_stay(self):
+    def test_a_staff_user_without_a_second_factor_gets_no_persistent_session(self):
+        # The wish is ignored until the account has its second factor: the restricted session that
+        # can only set the factor up never becomes a 14-day session (D-088).
         promote(self.user)
         response = log_in(self.client, self.user.email, remember=True)
         # The login worked; the account still has to set up the second factor.
@@ -139,26 +143,22 @@ class StaySignedInTests(TestCase):
         self.assertEqual(session.get_expiry_age(), settings.SESSION_COOKIE_AGE)
         self.assertEqual(
             session_timeout.timeouts_for(self.user, session),
-            (
-                settings.SESSION_PRIVILEGED_IDLE_TIMEOUT.total_seconds(),
-                settings.SESSION_PRIVILEGED_ABSOLUTE_TIMEOUT.total_seconds(),
-            ),
+            (settings.SESSION_PRIVILEGED_IDLE_TIMEOUT.total_seconds(), None),
         )
 
-    def test_the_timeouts_of_a_staying_session_are_the_duration_for_users_only(self):
+    def test_the_timeouts_of_a_staying_session_are_the_duration_for_everyone(self):
         session = {session_timeout.STAYING_KEY: True}
         self.assertEqual(session_timeout.timeouts_for(self.user, session), (DURATION, DURATION))
         self.assertEqual(
             session_timeout.timeouts_for(self.user, {}),
-            (
-                settings.SESSION_IDLE_TIMEOUT.total_seconds(),
-                settings.SESSION_ABSOLUTE_TIMEOUT.total_seconds(),
-            ),
+            (settings.SESSION_IDLE_TIMEOUT.total_seconds(), None),
         )
         promote(self.user)
+        # A staying session of a staff user keeps its own limit; without the mark the idle timeout is the short one.
+        self.assertEqual(session_timeout.timeouts_for(self.user, session), (DURATION, DURATION))
         self.assertEqual(
-            session_timeout.timeouts_for(self.user, session)[0],
-            settings.SESSION_PRIVILEGED_IDLE_TIMEOUT.total_seconds(),
+            session_timeout.timeouts_for(self.user, {}),
+            (settings.SESSION_PRIVILEGED_IDLE_TIMEOUT.total_seconds(), None),
         )
 
     def test_a_wrong_password_starts_no_session_and_keeps_no_wish(self):
@@ -229,12 +229,98 @@ class StaySignedInWithSecondFactorTests(TestCase):
         self.assertNotIn(session_timeout.STAYING_KEY, self.client.session)
         self.assertEqual(cookie_max_age(response), settings.SESSION_COOKIE_AGE)
 
-    def test_a_staff_user_with_the_second_factor_is_not_persistent_either(self):
+    def test_a_staff_user_with_the_second_factor_can_stay_signed_in_after_the_code(self):
+        promote(self.user)
+        response = log_in(self.client, self.user.email, remember=True)
+        self.assertRedirects(response, CODE_URL)
+        # Nothing is persistent before the code: no login, the wish waits in the pending login.
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertIs(self.client.session[PENDING_SESSION_KEY]["stay"], True)
+        response = send_code(self.client, code_for(self.device), address="10.9.0.1")
+        session = self.client.session
+        self.assertIs(session[session_timeout.STAYING_KEY], True)
+        self.assertAlmostEqual(session.get_expiry_age(), DURATION, delta=10)
+        self.assertAlmostEqual(cookie_max_age(response), DURATION, delta=10)
+        # The session is verified (the factor is complete), so the privileges work, also days later.
+        started = session[session_timeout.STARTED_KEY]
+        with mock.patch.object(session_timeout, "time") as clock:
+            clock.time.return_value = started + 5 * DAY
+            self.assertEqual(self.client.get(PROFILE_URL).status_code, 200)
+            self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
+            # Its own limit stays: after the duration the staying session of a staff user ends too.
+            clock.time.return_value = started + 14 * DAY + 60
+            ended = self.client.get(PROFILE_URL)
+        self.assertEqual(ended.status_code, 302)
+        self.assertTrue(ended["Location"].startswith(LOGIN_URL))
+
+    def test_a_long_session_of_a_staff_user_is_logged_and_announced_by_email_but_not_that_of_a_person(self):
+        # H-2 of the review of 2026-10-17: the second factor is checked once per login; a stolen long session is
+        # noticed through the security log and the email to the account's addresses (D-100).
+        promote(self.user)
+        log_in(self.client, self.user.email, remember=False)
+        send_code(self.client, code_for(self.device), address="10.9.0.1")
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED).exists())
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED).exists())
+        self.client.post(reverse("accounts:logout"))
+        log_in(self.client, self.user.email, remember=True)
+        send_code(self.client, code_for(self.device), address="10.9.0.1")
+        event = SecurityEvent.objects.get(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED)
+        self.assertEqual(event.account_id, self.user.pk)
+        self.assertTrue(event.long_retention)
+        job = MailJob.objects.get(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED)
+        self.assertEqual((job.address, job.account_id), (self.user.email, None))
+
+    def test_a_person_without_staff_rights_gets_no_notice_for_a_long_session(self):
+        log_in(self.client, self.user.email, remember=True)
+        send_code(self.client, code_for(self.device), address="10.9.0.1")
+        self.assertIs(self.client.session[session_timeout.STAYING_KEY], True)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED).exists())
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED).exists())
+
+    def test_a_staff_user_without_a_second_factor_gets_no_long_session_and_no_notice(self):
+        user = create_active_user("nofactor.staff@example.org")
+        promote(user)
+        log_in(self.client, user.email, remember=True)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED).exists())
+
+    def test_a_wrong_code_gives_a_staff_user_no_session_even_with_the_wish(self):
         promote(self.user)
         log_in(self.client, self.user.email, remember=True)
+        response = send_code(self.client, "000000", address="10.9.0.1")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotIn(session_timeout.STAYING_KEY, self.client.session)
+
+    def test_the_logout_ends_the_staying_session_of_a_staff_user(self):
+        promote(self.user)
+        log_in(self.client, self.user.email, remember=True)
+        send_code(self.client, code_for(self.device), address="10.9.0.1")
+        self.assertIs(self.client.session[session_timeout.STAYING_KEY], True)
+        self.client.post(reverse("accounts:logout"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotIn(session_timeout.STAYING_KEY, self.client.session)
+
+    def test_a_staff_user_unticked_gets_the_short_idle_timeout_and_no_persistence(self):
+        promote(self.user)
+        log_in(self.client, self.user.email, remember=False)
         response = send_code(self.client, code_for(self.device), address="10.9.0.1")
         self.assertNotIn(session_timeout.STAYING_KEY, self.client.session)
         self.assertEqual(cookie_max_age(response), settings.SESSION_COOKIE_AGE)
+        with mock.patch.object(session_timeout, "time") as clock:
+            clock.time.return_value = self.client.session[session_timeout.STARTED_KEY] + 16 * 60
+            ended = self.client.get(PROFILE_URL)
+        self.assertEqual(ended.status_code, 302)
+
+    def test_removing_the_rights_of_a_staying_staff_user_ends_the_session(self):
+        promote(self.user)
+        log_in(self.client, self.user.email, remember=True)
+        send_code(self.client, code_for(self.device), address="10.9.0.1")
+        self.assertEqual(self.client.get(PROFILE_URL).status_code, 200)
+        self.user.refresh_from_db()
+        self.user.end_all_sessions()
+        response = self.client.get(PROFILE_URL)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith(LOGIN_URL))
 
 
 @tag("mariadb")

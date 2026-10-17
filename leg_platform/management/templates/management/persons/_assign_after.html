@@ -1,0 +1,4 @@
+{% load i18n %}{% comment %}
+After the person field of the dialog "Assign person": the way to create a person that is missing (D-095).
+Context: ``new_person_url``.
+{% endcomment %}{% if new_person_url %}<p class="mgmt-circuit-links"><a href="{{ new_person_url }}">{% translate "Person missing? Invite a new person" %}</a></p>{% endif %}

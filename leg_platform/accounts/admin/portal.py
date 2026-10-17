@@ -9,6 +9,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
@@ -94,28 +95,28 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                     },
                 )
             )
+        if can_change:
+            fieldsets.append(
+                (
+                    _("Confirmation"),
+                    {"fields": (("otp_token" if second_factor.has_second_factor(request.user) else "current_password"),)},
+                )
+            )
         return fieldsets
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        # The acting account of a rejected upload and the request for the recent-login check; the
+        # The acting account of a rejected upload and the request for the proof of identity; the
         # class is built for this request only.
         return type(form.__name__, (form,), {"actor": request.user, "request": request})
 
-    def change_view(self, request, object_id, form_url="", extra_context=None):
-        # Saving needs a recent login (``PortalSettingsForm``, which stays authoritative); say so
-        # before the person types and uploads.
-        if (
-            request.method == "GET"
-            and self.has_change_permission(request)
-            and not second_factor.recently_authenticated(request)
-        ):
-            extra_context = {
-                **(extra_context or {}),
-                "portal_login_stale": True,
-                "portal_login_minutes": int(second_factor.RECENT_AUTHENTICATION_WINDOW.total_seconds() // 60),
-            }
-        return super().change_view(request, object_id, form_url, extra_context)
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        response = super().changeform_view(request, object_id, form_url, extra_context)
+        if getattr(request, second_factor.SESSION_ENDED_ATTRIBUTE, False):
+            # Too many wrong passwords or codes (D-062): end this session and say so at the login page.
+            second_factor.end_session_for_wrong_codes(request)
+            return redirect(settings.LOGIN_URL)
+        return response
 
     def get_urls(self):
         # Before the catch-all of the model admin; protected like its other pages.

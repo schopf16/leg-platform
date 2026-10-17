@@ -59,7 +59,8 @@ class TransformerCircuit(TimestampedModel):
     name = models.CharField(_("name"), max_length=120, blank=True)
 
     class Meta:
-        default_permissions = ()
+        # Only "view", for the plain tables of the Django administration (D-091); the management area uses none (D-086).
+        default_permissions = ("view",)
         verbose_name = _("transformer circuit")
         verbose_name_plural = _("transformer circuits")
         ordering = ("grid_number",)
@@ -156,7 +157,7 @@ class Location(AddressSuggestionMixin, TimestampedModel):
     needs_confirmation = models.BooleanField(_("not yet confirmed"), default=False)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("location")
         verbose_name_plural = _("locations")
         ordering = ("street", "house_number")
@@ -253,7 +254,7 @@ class MeteringPoint(TimestampedModel):
     objects = MeteringPointQuerySet.as_manager()
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("metering point")
         verbose_name_plural = _("metering points")
         ordering = ("number",)
@@ -284,16 +285,18 @@ class Leg(TimestampedModel):
     """A local electricity community. ``quota_checked_on`` is the date the quota was read from the operator's portal."""
 
     name = models.CharField(_("name"), max_length=120, unique=True)
+    # No upper bound of 100 (owner, 2026-10-17: a LEG may produce more than its members consume, e.g. 204.1 %);
+    # the column holds up to 999.99 (max_digits=5, decimal_places=2).
     production_quota_percent = models.DecimalField(
         _("production quota (%)"), max_digits=5, decimal_places=2, null=True, blank=True,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        validators=[MinValueValidator(0)],
     )
     quota_checked_on = models.DateField(_("checked on"), null=True, blank=True)
     remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
     is_archived = models.BooleanField(_("archived"), default=False)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("LEG")
         verbose_name_plural = _("LEGs")
         ordering = ("name",)
@@ -370,6 +373,7 @@ class PersonAssignment(AssignmentBase):
     )
 
     class Meta(AssignmentBase.Meta):
+        default_permissions = ("view",)
         verbose_name = _("person assignment")
         verbose_name_plural = _("person assignments")
         ordering = ("valid_from",)
@@ -382,6 +386,7 @@ class LegAssignment(AssignmentBase):
     leg = models.ForeignKey(Leg, on_delete=models.PROTECT, related_name="assignments")
 
     class Meta(AssignmentBase.Meta):
+        default_permissions = ("view",)
         verbose_name = _("LEG assignment")
         verbose_name_plural = _("LEG assignments")
         ordering = ("valid_from",)
@@ -403,7 +408,7 @@ class HistoryEntry(models.Model):
     detail = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("history entry")
         verbose_name_plural = _("history entries")
         ordering = ("created_at", "pk")
@@ -447,7 +452,7 @@ class ManagementSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("management settings")
         verbose_name_plural = _("management settings")
         constraints = [
@@ -518,7 +523,7 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     paper_invoice = models.BooleanField(_("paper invoice"), default=False)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("person")
         verbose_name_plural = _("persons")
 
@@ -558,7 +563,7 @@ class ShareChange(models.Model):
     created_at = models.DateTimeField(_("time"), default=timezone.now, editable=False)
 
     class Meta:
-        default_permissions = ()
+        default_permissions = ("view",)
         verbose_name = _("share change")
         verbose_name_plural = _("share changes")
         ordering = ("-valid_from", "-pk")

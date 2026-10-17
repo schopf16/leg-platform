@@ -1,0 +1,2 @@
+{% load i18n %}<a class="btn btn-accent-outline" href="{% url 'management:locations_metering_point_new' location.pk %}">{% translate "Create metering point" %}</a>
+<a class="btn btn-secondary-action" href="{% url 'management:locations_metering_point_assign' location.pk %}">{% translate "Assign existing metering point" %}</a>

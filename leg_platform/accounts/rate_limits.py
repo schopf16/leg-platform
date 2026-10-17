@@ -41,6 +41,11 @@ SCOPE_INVITATION_ACTOR = "invitation-actor"
 SCOPE_INVITATION_ACCOUNT = "invitation-account"
 INVITATION_ACTOR_LIMITS = ((60, timedelta(hours=1)),)
 INVITATION_ACCOUNT_LIMITS = ((1, timedelta(seconds=60)),)
+# The person search of the management area (M-3 of the review of 2026-10-17): counted per staff account, so that a
+# hijacked session cannot keep the database busy with searches. A person typing with the delay of 120 ms sends at most
+# about 8 requests per second only while typing without a pause, far below this budget in use.
+SCOPE_PERSON_SEARCH = "person-search"
+PERSON_SEARCH_LIMITS = ((300, timedelta(minutes=1)),)
 
 # Buckets that were not used for longer than the longest window are deleted by the cleanup.
 LONGEST_WINDOW = timedelta(hours=24)

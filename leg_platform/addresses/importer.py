@@ -1,8 +1,10 @@
-"""Bounded importer for the fixed official Swiss CSV asset (D-049, D-075).
+"""Bounded importer for the fixed official Swiss CSV asset (D-049, D-075, D-090).
 
-Worker process only (web processes open the directory file read-only). A new generation is
-inserted in chunked transactions and stays invisible until one short final transaction switches
-the ``Directory`` row; a failure or crash before that leaves the previous generation serving.
+One writer at a time: the import thread of the web process (``runner``), the worker process or an
+operator command (the directory file is read-only for every other thread and process). A new
+generation is inserted in chunked transactions and stays invisible until one short final
+transaction switches the ``Directory`` row; a failure or crash before that leaves the previous
+generation serving.
 """
 
 import csv
@@ -66,7 +68,8 @@ class ImportFailure(Exception):
     """Safe generic failure; do not include upstream responses or CSV data."""
 
 
-def _chunks(session, url, limit):
+def _chunks(session, url, limit, on_chunk=None):
+    """Yield the body of an approved URL in chunks; ``on_chunk(size so far, announced length or None)`` reports progress."""
     if url not in {ITEM_URL, ASSET_URL}:
         raise ImportFailure("Unapproved download URL.")
     started = time.monotonic()
@@ -86,6 +89,8 @@ def _chunks(session, url, limit):
             size += len(chunk)
             if size > limit or time.monotonic() - started > MAX_DOWNLOAD_SECONDS:
                 raise ImportFailure("Download exceeds its resource limit.")
+            if on_chunk is not None:
+                on_chunk(size, int(length) if length is not None else None)
             yield chunk
         if not size or (length is not None and size != int(length)):
             raise ImportFailure("Incomplete download.")
@@ -238,7 +243,7 @@ def _insert_chunk(rows, token):
         Address.objects.bulk_create(rows, batch_size=BATCH_SIZE)
 
 
-def _load_generation(archive, generation, token):
+def _load_generation(archive, generation, token, progress=None):
     """Insert every row of the archive as the (still invisible) generation; return the count."""
     chunk = []
     count = 0
@@ -248,8 +253,12 @@ def _load_generation(archive, generation, token):
         if len(chunk) >= CHUNK_ROWS:
             _insert_chunk(chunk, token)
             chunk = []
+            if progress is not None:
+                progress.rows(count)
     if chunk:
         _insert_chunk(chunk, token)
+    if progress is not None:
+        progress.rows(count)
     return count
 
 
@@ -332,7 +341,7 @@ def _require_free_disk():
             raise ImportFailure("Not enough free disk space for an import.")
 
 
-def _publish(archive, checksum, data_date, *, repair=False):
+def _publish(archive, checksum, data_date, *, repair=False, progress=None):
     """Publish a verified archive as a new generation (skipped if already published, see ``_is_published``)."""
     token = _acquire_lease()
     generation = uuid.uuid4()
@@ -344,7 +353,11 @@ def _publish(archive, checksum, data_date, *, repair=False):
             return directory.row_count
         previous = directory.generation
         try:
-            count = _load_generation(archive, generation, token)
+            if progress is not None:
+                progress.phase("importing")
+            count = _load_generation(archive, generation, token, progress)
+            if progress is not None:
+                progress.phase("publishing")
             with transaction.atomic(using=DIRECTORY_ALIAS):
                 switched = Directory.objects.filter(pk=1, import_token=token).update(
                     generation=generation, data_date=data_date, imported_at=timezone.now(),
@@ -357,6 +370,8 @@ def _publish(archive, checksum, data_date, *, repair=False):
             raise
         # Keep the new and the previous generation only (D-075).
         try:
+            if progress is not None:
+                progress.phase("finishing")
             prune_old_generations({generation, previous})
         except DatabaseError:
             # The import itself succeeded; the next successful import removes what is left.
@@ -423,29 +438,42 @@ def _published_directory_is_intact():
     return directory is not None and _is_intact(directory)
 
 
-def _download_and_publish(session, archive, checksum, data_date, *, repair):
+def _download_and_publish(session, archive, checksum, data_date, *, repair, progress=None):
     digest = hashlib.sha256()
-    for chunk in _chunks(session, ASSET_URL, MAX_ARCHIVE_BYTES):
+    if progress is not None:
+        progress.phase("downloading")
+    on_chunk = progress.download if progress is not None else None
+    for chunk in _chunks(session, ASSET_URL, MAX_ARCHIVE_BYTES, on_chunk):
         digest.update(chunk)
         archive.write(chunk)
     if not hmac.compare_digest(digest.hexdigest(), checksum):
         raise ImportFailure("Official archive checksum mismatch.")
     archive.seek(0)
-    return _publish(archive, checksum, data_date, repair=repair)
+    if progress is not None:
+        progress.downloaded = True
+    return _publish(archive, checksum, data_date, repair=repair, progress=progress)
 
 
-def import_directory(*, repair=False):
-    """Download, verify and publish; worker process only (D-075).
+def clear_stale_lease():
+    """Free the lease of an import whose process is gone (called only after the job was found dead, D-090)."""
+    Directory.objects.filter(pk=1).update(import_token=None, import_lease_until=None)
+
+
+def import_directory(*, repair=False, progress=None):
+    """Download, verify and publish; one writer thread or process (D-075, D-090).
 
     Order: catalogue entry; shortcut if already published (with ``repair`` only when intact);
     refuse an older catalogue; refuse a repair within six hours of a failed one; free-disk check;
     download with checksum and limits; import. A repair is followed by one more integrity check
-    whose outcome starts or clears the six hours (D-076).
+    whose outcome starts or clears the six hours (D-076). ``progress`` (``progress.Progress``)
+    receives the phase and the counters for the status page.
     """
     try:
         # Ignore netrc/proxy credentials inherited from an operator environment.
         with requests.Session() as session, tempfile.TemporaryFile() as archive:
             session.trust_env = False
+            if progress is not None:
+                progress.phase("catalogue")
             checksum, data_date = _metadata(session)
             row_count = _published_row_count(checksum, repair=repair)
             if row_count is not None:
@@ -456,7 +484,9 @@ def import_directory(*, repair=False):
                 _require_repair_allowed()
             _require_free_disk()
             try:
-                count = _download_and_publish(session, archive, checksum, data_date, repair=repair)
+                count = _download_and_publish(
+                    session, archive, checksum, data_date, repair=repair, progress=progress
+                )
             except Exception:
                 if repairing:
                     _record_repair_result(False)

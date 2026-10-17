@@ -41,7 +41,8 @@ _KINDS = {
 
 class AssignmentError(Exception):
     """A change that the rules refuse; ``code`` is one of: ``starts_not_after_previous``, ``end_before_start``,
-    ``already_ended``, ``not_deletable``, ``not_a_person``, ``person_not_active``, ``leg_archived``, ``not_related``."""
+    ``already_ended``, ``not_deletable``, ``not_a_person``, ``person_not_active``, ``leg_archived``, ``not_related``,
+    ``point_archived``, ``already_has_leg``."""
 
     def __init__(self, code):
         super().__init__(code)
