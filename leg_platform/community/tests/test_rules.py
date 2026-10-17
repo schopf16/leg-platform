@@ -38,15 +38,18 @@ class MeteringPointNumberTests(SimpleTestCase):
             ("CH", "1A2B3C4D5E6X", "1"),
             ("CH", "1A2B3C4D5-6", "1"),
             ("CH", "1A2B3C4D5E6", ""),
-            ("CH", "1A2B3C4D5E6", "A1"),
+            ("CH", "1A2B3C4D5E6", "A!"),  # a character the standard does not allow
             ("CH", "1A2B3C4D5E6", "1" * 21),
         ):
             with self.subTest(country=country, identifier=identifier, digits=digits):
                 with self.assertRaises(ValidationError):
                     numbers.compose_metering_point_number(country, identifier, digits)
 
-    def test_a_valid_number_has_33_capital_letters_and_digits(self):
+    def test_a_valid_number_has_33_characters_and_the_hyphen_only_in_the_last_20(self):
         self.assertTrue(numbers.is_valid_metering_point_number("CH1A2B3C4D5E600000000000000000004"))
+        self.assertTrue(numbers.is_valid_metering_point_number("CH1A2B3C4D5E6AB-12-00000000000000"))
+        self.assertFalse(numbers.is_valid_metering_point_number("CH1A2B3C4D5-6" + "0" * 20))  # not in the identifier
+        self.assertFalse(numbers.is_valid_metering_point_number("C-1A2B3C4D5E6" + "0" * 20))  # not in the country
         for invalid in (
             "", "CH1A2B3C4D5E60000000000000000004", "ch1a2b3c4d5e600000000000000000004",
             "CH1A2B3C4D5E6000000000000000000044", "CH1A2B3C4D5E6 0000000000000000004", None, 33,

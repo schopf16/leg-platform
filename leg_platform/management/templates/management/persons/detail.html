@@ -39,7 +39,7 @@ invited and who has not completed the registration has no customer number yet; t
   </div>
 
   {% if show_new %}
-    {% if invitation %}{% translate "Person created. The invitation was sent. Assign a metering point once the person has registered." as new_text %}{% else %}{% translate "Person created. Next: assign a metering point." as new_text %}{% endif %}
+    {% if invitation %}{% translate "Person created. The invitation was sent. A metering point can be assigned once the person has registered and has a customer number." as new_text %}{% else %}{% translate "Person created. Next: assign a metering point." as new_text %}{% endif %}
     {% if origin_point_url %}
       {% include "management/_banner.html" with text=new_text actions="management/persons/_new_actions.html" neutral=True %}
     {% else %}

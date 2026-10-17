@@ -2943,8 +2943,8 @@ msgstr "Geben Sie zwei Grossbuchstaben ein, z. B. CH."
 msgid "Enter 11 characters: capital letters and digits."
 msgstr "Geben Sie 11 Zeichen ein: Grossbuchstaben und Ziffern."
 
-msgid "Enter a number of 33 characters: capital letters and digits."
-msgstr "Geben Sie eine Nummer mit 33 Zeichen ein: Grossbuchstaben und Ziffern."
+msgid "Enter a number of 33 characters: capital letters, digits and hyphens."
+msgstr "Geben Sie eine Nummer mit 33 Zeichen ein: Grossbuchstaben, Ziffern und Bindestriche."
 
 msgid "Enter the %(operator)s number: TRA followed by digits."
 msgstr "Geben Sie die %(operator)s-Nummer ein: TRA und Ziffern."
@@ -4457,14 +4457,14 @@ msgstr ""
 "Wenn Sie diese E-Mail nicht erwarten, können Sie sie ignorieren."
 
 # Management area, work package B (D-093 to D-096): forms, assignments, navigation.
-msgid "Enter the last digits of the number."
-msgstr "Geben Sie die letzten Ziffern der Nummer ein."
+msgid "Enter the last characters of the number."
+msgstr "Geben Sie die letzten Zeichen der Nummer ein."
 
-msgid "Only the digits 0–9 are allowed."
-msgstr "Nur die Ziffern 0–9 sind erlaubt."
+msgid "Only the letters A–Z, the digits 0–9 and the hyphen are allowed."
+msgstr "Erlaubt sind nur die Buchstaben A–Z, die Ziffern 0–9 und der Bindestrich."
 
-msgid "At most %(limit)s digits are allowed (entered: %(count)s)."
-msgstr "Es sind höchstens %(limit)s Ziffern erlaubt (eingegeben: %(count)s)."
+msgid "The metering point number is invalid: it is too long. At most %(limit)s characters are allowed, and only zeros at the start can be left out (entered: %(count)s)."
+msgstr "Die Messpunktnummer ist ungültig: Sie ist zu lang. Es sind höchstens %(limit)s Zeichen erlaubt, und nur Nullen am Anfang können weggelassen werden (eingegeben: %(count)s)."
 
 msgid "Enter a number, for example 12.5 (digits and one decimal point or comma)."
 msgstr "Geben Sie eine Zahl ein, z. B. 12.5 (Ziffern und ein Dezimalpunkt oder -komma)."
@@ -4514,8 +4514,8 @@ msgstr "TRA gefolgt von Ziffern, z. B. TRA21359."
 msgid "No location chosen yet"
 msgstr "Noch kein Standort gewählt"
 
-msgid "Only the last digits. Shorter entries are filled with zeros on the left (23 becomes …0023)."
-msgstr "Nur die letzten Ziffern. Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023)."
+msgid "The last 20 characters: capital letters A–Z, digits 0–9 and the hyphen (small letters become capitals). Shorter entries are filled with zeros on the left (23 becomes …0023)."
+msgstr "Die letzten 20 Zeichen: Grossbuchstaben A–Z, Ziffern 0–9 und der Bindestrich (Kleinbuchstaben werden zu Grossbuchstaben). Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023)."
 
 msgid "The transformer circuit follows the location. If you change the location, the transformer circuit of the metering point changes with it. This can change the discount tier of the LEG."
 msgstr "Der Trafokreis ergibt sich aus dem Standort. Wenn Sie den Standort ändern, wechselt auch der Trafokreis des Messpunkts. Das kann die Rabattstufe der LEG ändern."
@@ -4604,8 +4604,8 @@ msgstr "Standort angelegt. Weiter: Messpunkte dieses Standorts erfassen."
 msgid "LEG created. Next: assign metering points to the LEG."
 msgstr "LEG angelegt. Weiter: Messpunkte der LEG zuordnen."
 
-msgid "Person created. The invitation was sent. Assign a metering point once the person has registered."
-msgstr "Person angelegt. Die Einladung wurde gesendet. Ordnen Sie der Person einen Messpunkt zu, sobald sie sich registriert hat."
+msgid "Person created. The invitation was sent. A metering point can be assigned once the person has registered and has a customer number."
+msgstr "Person angelegt. Die Einladung wurde gesendet. Ein Messpunkt kann zugeordnet werden, sobald sich die Person registriert hat und eine Kundennummer besitzt."
 
 msgid "Person created. Next: assign a metering point."
 msgstr "Person angelegt. Weiter: Messpunkt zuordnen."

@@ -392,7 +392,7 @@ class LocationPageTests(TestCase):
         self.assertNotContains(page, 'name="location"')
         self.assertContains(page, 'name="leg"')
         self.assertEqual(client.post(url, {"number_digits": "5"}).status_code, 200)  # no direction
-        self.assertContains(client.post(url, {"direction": Direction.CONSUMPTION}), "Geben Sie die letzten Ziffern")
+        self.assertContains(client.post(url, {"direction": Direction.CONSUMPTION}), "Geben Sie die letzten Zeichen")
         self.assertRedirects(
             client.post(url, {"direction": Direction.FEED_IN, "number_digits": "77", "leg": self.leg.pk}),
             self.detail(self.fresh), fetch_redirect_response=False,

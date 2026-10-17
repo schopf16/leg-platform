@@ -2,9 +2,10 @@
 The entries of the menu, shared by the left menu of the desktop and the menu of the phone
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
 (team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
-aria-current. Log out is a real POST form. "System administration" (the Django administration) is
-only for staff users (K13) and the very last entry, in its own group "System" below "Coming next" (D-096); the
-permissions are checked by the administration itself. The group
+aria-current. Log out is a real POST form. "System administration" (the Django administration) is shown only to an
+active staff account for which the administration lists at least one thing (``navigation.system_administration_visible``,
+D-102; the administration itself checks every request) and is the very last entry, in its own group "System" below
+"Coming next" (D-096). The group
 "Management" lists the entries of leg_platform.management.navigation.MENU that the account may use
 (D-077); it is left out when there are none.
 {% endcomment %}{% with view=request.resolver_match.view_name %}
@@ -35,7 +36,7 @@ permissions are checked by the administration itself. The group
   <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Messages" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
-{% if user.is_staff %}
+{% system_administration as show_system %}{% if show_system %}
 <p class="frame-group">{% translate "System" %}</p>
 <a class="frame-item" href="{% url 'admin:index' %}">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-server"/></svg><span>{% translate "System administration" %}</span>

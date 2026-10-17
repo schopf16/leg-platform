@@ -803,7 +803,8 @@ class AccountDeletionNegativeTests(TestCase):
 
 @tag("mariadb")
 class AdministrationAccessTests(TestCase):
-    """The portal settings need the right to see or to change them (D-073); the menu entry is for staff only."""
+    """The portal settings need the right to see or to change them (D-073); the menu entry is for accounts that can use
+    the administration (D-102)."""
 
     client_class = VerifiedClient
 
@@ -894,9 +895,21 @@ class AdministrationAccessTests(TestCase):
                 self.assertEqual(page.status_code, 200)
                 self.assertNotContains(page, "Verwaltung")
                 self.assertNotContains(page, 'href="/admin/"')
+                # Staff without any right of the administration: no dead end in the menu (D-102).
                 staff_page = staff_client.get(url)
-                self.assertContains(staff_page, 'href="/admin/"')
-                self.assertContains(staff_page, "Systemverwaltung")
+                self.assertNotContains(staff_page, 'href="/admin/"')
+                self.assertNotContains(staff_page, "Systemverwaltung")
+        # With one right of the administration the entry is there (the administration checks every request anyway).
+        self.staff.set_access_relations(
+            groups=[], user_permissions=[Permission.objects.get(codename="view_portalsettings")]
+        )
+        allowed = VerifiedClient()
+        allowed.force_login(self.staff)
+        for url in (HOME_URL, PROFILE_URL):
+            with self.subTest(url=url, right=True):
+                page = allowed.get(url)
+                self.assertContains(page, 'href="/admin/"')
+                self.assertContains(page, "Systemverwaltung")
 
 
 @tag("mariadb")

@@ -22,6 +22,13 @@ def management_menu(context):
     return navigation.menu_entries(request.user, view_name)
 
 
+@register.simple_tag(takes_context=True)
+def system_administration(context):
+    """Whether the menu shows "System administration": ``{% system_administration as show_system %}`` (D-102)."""
+    request = context.get("request")
+    return request is not None and navigation.system_administration_visible(request)
+
+
 @register.simple_tag
 def operator_name():
     """The grid operator name: ``{% operator_name as operator %}`` (D-086)."""

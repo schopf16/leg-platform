@@ -4,8 +4,6 @@ draws a rule with a label), ``optional`` (fields marked "(optional)") and ``hint
 expects. One form per subject, in every place it is used (D-094): ``MeteringPointForm`` creates and changes a metering
 point; a context only pre-fills and locks a field."""
 
-import re
-
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -33,8 +31,7 @@ from leg_platform.management.form_fields import (
     select_field,
 )
 
-NUMBER_ATTRS = {"class": "form-control tnum", "autocomplete": "off", "inputmode": "numeric"}
-DIGITS_ONLY = re.compile(r"[0-9]{1,%d}" % numbers.SUFFIX_LENGTH)
+NUMBER_ATTRS = {"class": "form-control tnum", "autocomplete": "off", "autocapitalize": "characters", "spellcheck": "false"}
 
 
 def location_queryset(*include):
@@ -68,7 +65,10 @@ class MeteringPointForm(forms.Form):
     number_digits = forms.CharField(
         label=_("Metering point number"),
         error_messages={"required": numbers.NO_DIGITS_MESSAGE},
-        help_text=_("Only the last digits. Shorter entries are filled with zeros on the left (23 becomes …0023)."),
+        help_text=_(
+            "The last 20 characters: capital letters A–Z, digits 0–9 and the hyphen (small letters become capitals). "
+            "Shorter entries are filled with zeros on the left (23 becomes …0023)."
+        ),
         widget=CheckedInput("digits", attrs=NUMBER_ATTRS, limit=numbers.SUFFIX_LENGTH),
     )
     direction = SegmentedChoiceField(
@@ -145,13 +145,18 @@ class MeteringPointForm(forms.Form):
 
     @staticmethod
     def padded(data):
-        """The posted data with the typed digits zero-padded, so that a page shown again after an error holds the
-        value that is checked and saved."""
+        """The posted data with the typed number brought to its 20 characters (``numbers.normalise_entered_number``), so
+        that a page shown again after an error holds the value that is checked and saved. An entry that is not valid
+        stays as typed (the check says why)."""
         value = (data.get("number_digits") or "").strip()
-        if DIGITS_ONLY.fullmatch(value) is None or len(value) == numbers.SUFFIX_LENGTH:
+        try:
+            normalised = numbers.normalise_entered_number(value)
+        except ValidationError:
+            return data
+        if normalised == value:
             return data
         data = data.copy()
-        data["number_digits"] = value.zfill(numbers.SUFFIX_LENGTH)
+        data["number_digits"] = normalised
         return data
 
     def change_mode(self, point):
@@ -187,7 +192,7 @@ class MeteringPointForm(forms.Form):
     def clean_number_digits(self):
         if self.fields["number_digits"].disabled:
             return ""
-        digits = numbers.validate_entered_digits(self.cleaned_data["number_digits"])
+        digits = numbers.normalise_entered_number(self.cleaned_data["number_digits"])
         settings_row = ManagementSettings.load()
         try:
             self.number = numbers.compose_metering_point_number(settings_row.country_code, settings_row.identifier, digits)

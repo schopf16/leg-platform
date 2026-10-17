@@ -193,6 +193,7 @@ The software is called LEG-Platform (initiated by the LEG Ittigen, developed neu
 * Never present a dummy implementation as a finished security feature.
 * Do not change existing architecture or dependencies unnecessarily.
 * Follow the language rules in section 2.
+* Documentation style: short sentences, bullets, facts and sources only, no narration, one place per fact, point to D-numbers instead of repeating. A decision entry is `### D-xxx Title (date)` with 3-8 bullets (Decision / Why (source) / Consequence / Residual risk / Amends). Merge overlapping decisions: the later number is the heading, the earlier number stays as a stub line.
 
 ## 8. Secrets
 

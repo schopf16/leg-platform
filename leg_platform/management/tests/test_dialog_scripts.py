@@ -3,11 +3,16 @@ the cursor in the first field, the transformer circuit field, the order of the m
 widget. The scripts are not run here (no browser); what is checked is the markup that they need, the contract between
 server and script, and rules that a reader of the source can verify (no markup built from text, no dynamic code)."""
 
+import html
+import json
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 from django.conf import settings
-from django.test import TestCase, tag
+from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.tests.helpers import VerifiedClient
@@ -21,6 +26,82 @@ NEW_SCRIPTS = ("field-check.js", "combobox.js", "circuit-field.js", "option-note
 
 def script(name):
     return (SCRIPTS / name).read_text(encoding="utf-8")
+
+
+class ScriptBehaviourTests(SimpleTestCase):
+    """The number rule of ``field-check.js`` run in a headless Chrome or Chromium (skipped where there is none): the same
+    cases as ``numbers.normalise_entered_number`` (D-102), so that the script and the server cannot drift apart."""
+
+    CASES = (
+        ("23", "0" * 18 + "23", False),
+        ("0" + "4" * 20, "4" * 20, False),  # 21 characters, one leading zero
+        ("00" + "4" * 20, "4" * 20, False),  # 22, two
+        ("00" + "4" * 19, "0" + "4" * 19, False),  # only as many zeros as needed
+        ("0" * 25, "0" * 20, False),
+        ("ab-12", "0" * 15 + "AB-12", False),  # small letters become capitals
+        ("-5", "0" * 18 + "-5", False),
+        ("A" * 20, "A" * 20, False),
+        ("1" * 21, "1" * 21, True),  # too long: nothing is changed, a message is shown
+        ("0" + "1" * 21, "0" + "1" * 21, True),
+        ("1" + "0" * 20, "1" + "0" * 20, True),
+        ("12!", "12!", True),
+        ("ß", "ß", True),
+        ("1 2", "1 2", True),
+    )
+
+    @staticmethod
+    def browser():
+        for name in ("chrome", "google-chrome", "chromium", "chromium-browser"):
+            found = shutil.which(name)
+            if found:
+                return found
+        for path in (
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ):
+            if Path(path).exists():
+                return path
+        return None
+
+    def test_the_script_normalises_like_the_server(self):
+        chrome = self.browser()
+        if chrome is None:
+            self.skipTest("no Chrome or Chromium found")
+        cases = json.dumps([[typed, expected, error] for typed, expected, error in self.CASES])
+        page = (
+            '<!doctype html><meta charset="utf-8"><body><div class="mgmt-dialog-field">'
+            '<input id="n" data-check="digits" data-limit="20" data-prefix="CH1A2B3C4D5E6" '
+            'data-message-digits="NOT_ALLOWED" data-message-many="TOO_LONG %(count)s" data-message-empty="EMPTY">'
+            '<div id="n_error" hidden></div><div data-number-complete hidden></div><div data-number-feedback></div>'
+            f'</div><pre id="out"></pre><script src="{(SCRIPTS / "field-check.js").as_uri()}"></script>'
+            "<script>const n=document.getElementById('n');const rows=[];"
+            f"for (const [typed, expected, error] of {cases}) {{"
+            "n.value=typed;n.dispatchEvent(new Event('input'));n.dispatchEvent(new Event('blur'));"
+            "const slot=document.getElementById('n_error');"
+            "rows.push({typed, expected, value:n.value, message: slot.hidden ? '' : slot.textContent, error});}"
+            "document.getElementById('out').textContent='RESULT'+JSON.stringify(rows)+'END';</script>"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            file = Path(folder) / "check.html"
+            file.write_text(page, encoding="utf-8")
+            done = subprocess.run(
+                [chrome, "--headless=new", "--no-sandbox", "--disable-gpu", f"--user-data-dir={folder}/profile",
+                 "--allow-file-access-from-files", "--virtual-time-budget=3000", "--dump-dom", file.as_uri()],
+                capture_output=True, timeout=120, check=False,
+            )
+        output = done.stdout.decode("utf-8", "replace")
+        found = re.search(r"RESULT(.*?)END", output, re.S)
+        self.assertIsNotNone(found, output[:500])
+        for row in json.loads(html.unescape(found.group(1))):
+            with self.subTest(typed=row["typed"][:25]):
+                self.assertEqual(row["value"], row["expected"])
+                if row["error"]:
+                    self.assertTrue(row["message"], row)
+                else:
+                    self.assertEqual(row["message"], "")
+        # The messages are the ones of the server (carried in data attributes), with the count of what was typed.
+        too_long = [r for r in json.loads(html.unescape(found.group(1))) if r["typed"] == "1" * 21][0]
+        self.assertEqual(too_long["message"], "TOO_LONG 21")
 
 
 class ScriptSourceTests(TestCase):
@@ -91,7 +172,8 @@ class ScriptSourceTests(TestCase):
                        "dataset.messageMany", "dataset.messageEmpty", 'aria-live", "polite"', "aria-invalid", "AbortController"):
             self.assertIn(needle, text, needle)
         self.assertNotIn('role", "alert"', text)  # never an alert per key
-        self.assertIn("padStart", text)
+        self.assertIn('"0".repeat(limit - result.length)', text)  # zeros are put in front by hand (not with padStart on a hyphen)
+        self.assertNotIn("[0-9]+$/.test(value)", text)  # the digits-only rule is gone (D-102)
 
     def test_every_suggest_widget_has_a_delay_that_the_rate_budget_allows(self):
         # The address lookup: 60 requests per minute and address (addresses/limits.py); 200 ms with the cancellation of
@@ -170,7 +252,8 @@ class MarkupTests(TestCase):
         self.assertIn('data-check="digits"', number)
         self.assertIn('data-limit="20"', number)
         self.assertNotIn("maxlength", number)  # a limit that cuts silently hides the message
-        self.assertIn('inputmode="numeric"', number)
+        self.assertNotIn("inputmode", number)  # letters are allowed: the full keyboard
+        self.assertIn('autocapitalize="characters"', number)
         self.assertIn('data-prefix="CH1A2B3C4D5E6"', number)
         self.assertIn(f'data-check-url="{reverse("management:metering_points_check_number")}"', number)
         first = re.search(r'<select[^>]*name="location"[^>]*>', html).group(0)
@@ -297,7 +380,7 @@ class MarkupTests(TestCase):
 class MenuOrderTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.staff = staff_user("staff.menu@example.org")
+        cls.staff = staff_user("staff.menu@example.org", superuser=True)  # can use the administration (D-102)
 
     def test_the_system_administration_is_the_very_last_entry_of_the_menu_on_a_desktop_and_a_phone(self):
         client = VerifiedClient()

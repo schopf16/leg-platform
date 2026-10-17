@@ -2,11 +2,12 @@
    again and has the last word; this script only says it sooner, with the same messages (they come from the
    server in data attributes, in the language of the page).
 
-   - data-check="digits": the typed last digits of a metering point number. Only the digits 0-9, at most
-     data-limit of them. On leaving the field the digits are filled up with zeros on the left (23 becomes 0023,
-     twenty digits in all), the complete number is shown under the field and the number is looked up
-     (data-check-url): a message, or the notice "this number exists already" with the link to it. A text that
-     starts with the fixed prefix (data-prefix) loses the prefix.
+   - data-check="digits": the typed last characters of a metering point number (D-102): letters A-Z (small letters
+     become capitals), digits 0-9 and the hyphen, as the standard allows. On leaving the field the entry is made
+     exactly data-limit (20) characters long: shorter gets zeros on the left (23 becomes 0023), longer loses leading
+     zeros only (a number that needs more removed is invalid). The complete number is shown under the field and the
+     number is looked up (data-check-url): a message, or the notice "this number exists already" with the link to it.
+     A text that starts with the fixed prefix (data-prefix) loses the prefix.
    - data-check="decimal": digits and one decimal point or comma, at most data-places decimals, at most data-max.
      On leaving the field a comma becomes a point.
 
@@ -111,20 +112,34 @@
     return "";
   };
 
-  // ---- The typed digits of a metering point number ----
+  // ---- The typed last characters of a metering point number (D-102) ----
+  // The same rule as the server (``numbers.normalise_entered_number``): letters A-Z (small ones become capitals), digits
+  // and the hyphen; shorter than the limit: zeros on the left; longer: only leading zeros are left out, and only as
+  // many as needed; if that is not enough the number is invalid. Nothing else is ever removed.
+  const enteredNumber = (input) => {
+    const limit = Number(input.dataset.limit);
+    const value = input.value.trim();
+    if (!/^[A-Za-z0-9-]+$/.test(value)) {
+      return { problem: input.dataset.messageDigits };
+    }
+    let result = value.toUpperCase();
+    if (result.length > limit) {
+      const extra = result.length - limit;
+      const zeros = result.length - result.replace(/^0+/, "").length;
+      if (zeros < extra) {
+        return { problem: input.dataset.messageMany.replace("%(count)s", String(value.length)) };
+      }
+      result = result.slice(extra);
+    }
+    return { value: "0".repeat(limit - result.length) + result };
+  };
+
   const digitsProblem = (input, leaving) => {
     const value = input.value.trim();
     if (value === "") {
       return leaving && input.required ? input.dataset.messageEmpty : "";
     }
-    if (!/^[0-9]+$/.test(value)) {
-      return input.dataset.messageDigits;
-    }
-    const limit = Number(input.dataset.limit);
-    if (value.length > limit) {
-      return input.dataset.messageMany.replace("%(count)s", String(value.length));
-    }
-    return "";
+    return enteredNumber(input).problem || "";
   };
 
   const sequences = new Map();
@@ -198,9 +213,9 @@
   };
 
   const padDigits = (input) => {
-    const value = input.value.trim();
-    if (/^[0-9]+$/.test(value) && value.length <= Number(input.dataset.limit)) {
-      input.value = value.padStart(Number(input.dataset.limit), "0");
+    const entered = enteredNumber(input);
+    if (entered.value) {
+      input.value = entered.value;
     }
   };
 

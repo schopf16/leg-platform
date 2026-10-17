@@ -248,9 +248,12 @@ class AccessTests(TestCase):
         home = self.login(self.staff).get(reverse("home")).content.decode()
         self.assertNotIn('href="/management/settings/" aria-current', home)
 
-    def test_the_system_administration_link_has_its_own_name(self):
-        html = self.login(self.staff).get(reverse("home")).content.decode()
+    def test_the_system_administration_link_has_its_own_name_and_is_for_accounts_that_can_use_it(self):
+        # D-102: a superuser sees it; staff without any right of the administration do not (see
+        # ``test_review_corrections.SystemAdministrationMenuTests`` for the full set of accounts).
+        html = self.login(self.administrator).get(reverse("home")).content.decode()
         self.assertIn("Systemverwaltung", html)
+        self.assertNotIn("Systemverwaltung", self.login(self.staff).get(reverse("home")).content.decode())
 
 
 class MenuRuleTests(SimpleTestCase):

@@ -26,6 +26,7 @@ from leg_platform.community import (
     locations,
     metering_point_list,
     metering_points,
+    numbers,
     person_search,
     problems,
 )
@@ -853,7 +854,7 @@ class CheckNumberView(ManagementAccessMixin, View):
     http_method_names = ["get"]
 
     def get(self, request):
-        digits = request.GET.get("digits", "")[:40]
+        digits = request.GET.get("digits", "")[: numbers.MAX_ENTRY_LENGTH + 1]
         form = MeteringPointForm({"number_digits": digits})
         form.full_clean()
         errors = form.errors.get("number_digits")

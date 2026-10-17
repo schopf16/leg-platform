@@ -88,7 +88,7 @@ class PersonDataPageTests(TestCase):
         self.assertEqual((person.status, person.customer_number_id, person.has_usable_password()), ("unverified", None, False))
         opened = client.get(self.url("detail", person), {"new": "1"})
         self.assertContains(
-            opened, "Person angelegt. Die Einladung wurde gesendet. Ordnen Sie der Person einen Messpunkt zu, sobald sie sich registriert hat."
+            opened, "Person angelegt. Die Einladung wurde gesendet. Ein Messpunkt kann zugeordnet werden, sobald sich die Person registriert hat und eine Kundennummer besitzt."
         )
         page = client.get(LIST)
         for text in ("Erika Neu", "Eingeladen"):

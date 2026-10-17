@@ -25,32 +25,78 @@ TODAY = day()
 
 
 class TypedDigitsTests(SimpleTestCase):
-    """What a person types of the number: only the last digits, filled up with zeros on the left (MC-CH 2025, 4.2.3)."""
+    """What a person types of the number: the last 20 characters as the standard allows (A-Z, 0-9, hyphen), filled up
+    with zeros on the left, shortened by leading zeros only (MC-CH 2025, 4.2.3; D-102)."""
 
-    def test_short_entries_are_filled_up_to_twenty_digits(self):
-        for typed, expected in (("23", "0" * 18 + "23"), ("0", "0" * 20), ("1" * 20, "1" * 20), (" 7 ", "0" * 19 + "7")):
+    def test_short_entries_are_filled_up_to_twenty_characters(self):
+        for typed, expected in (
+            ("23", "0" * 18 + "23"), ("0", "0" * 20), ("1" * 20, "1" * 20), (" 7 ", "0" * 19 + "7"),
+            ("AB-12", "0" * 15 + "AB-12"), ("-5", "0" * 18 + "-5"),  # zeros in front of a hyphen, never behind it
+        ):
             with self.subTest(typed=typed):
-                self.assertEqual(numbers.validate_entered_digits(typed), expected)
+                self.assertEqual(numbers.normalise_entered_number(typed), expected)
         self.assertEqual(
             numbers.compose_metering_point_number("CH", "1A2B3C4D5E6", "23"), "CH1A2B3C4D5E6" + "0" * 18 + "23"
         )
 
+    def test_letters_hyphens_and_small_letters_are_accepted_and_small_letters_become_capitals(self):
+        self.assertEqual(numbers.normalise_entered_number("ab12cd"), "0" * 14 + "AB12CD")
+        self.assertEqual(numbers.normalise_entered_number("A" * 20), "A" * 20)
+        self.assertEqual(numbers.normalise_entered_number("a-b-c"), "0" * 15 + "A-B-C")
+        self.assertEqual(
+            numbers.compose_metering_point_number("CH", "1A2B3C4D5E6", "x-1"), "CH1A2B3C4D5E6" + "0" * 17 + "X-1"
+        )
+
+    def test_a_longer_entry_loses_leading_zeros_only_and_only_as_many_as_needed(self):
+        self.assertEqual(numbers.normalise_entered_number("0" + "1" * 20), "1" * 20)  # 21 characters, one leading zero
+        self.assertEqual(numbers.normalise_entered_number("00" + "1" * 20), "1" * 20)  # 22, two
+        self.assertEqual(numbers.normalise_entered_number("00" + "1" * 19), "0" + "1" * 19)  # 21, only one is removed
+        self.assertEqual(numbers.normalise_entered_number("0" * 25), "0" * 20)  # all zeros: valid, as before
+        self.assertEqual(numbers.normalise_entered_number("0" * 25 + "5"), "0" * 19 + "5")
+        self.assertEqual(numbers.normalise_entered_number("0" * 190 + "7" * 10), "0" * 10 + "7" * 10)
+        self.assertEqual(numbers.normalise_entered_number("0" + "a" * 20), "A" * 20)
+
+    def test_a_longer_entry_that_needs_more_than_leading_zeros_removed_is_invalid(self):
+        for typed in ("1" * 21, "9" * 40, "0" + "1" * 21):  # the last: 22 characters, one leading zero, one too many
+            with self.subTest(typed=typed[:30]):
+                with self.assertRaises(ValidationError) as caught:
+                    numbers.normalise_entered_number(typed)
+                self.assertEqual(caught.exception.code, "too_long")
+        self.assertEqual(numbers.normalise_entered_number("000" + "1" * 20), "1" * 20)  # 23 characters, three zeros: fits
+        # A zero inside the entry is never removed, also not when it would help.
+        with self.assertRaises(ValidationError):
+            numbers.normalise_entered_number("1" + "0" * 20)
+        # More than the longest entry that is looked at is too long at once, whatever its start.
+        with self.assertRaises(ValidationError) as caught:
+            numbers.normalise_entered_number("0" * (numbers.MAX_ENTRY_LENGTH + 1))
+        self.assertEqual(caught.exception.code, "too_long")
+
     def test_every_wrong_entry_has_its_own_code_and_message(self):
         for typed, code in (
             ("", "empty"), ("   ", "empty"), (None, "empty"),
-            ("12ab", "not_digits"), ("ab", "not_digits"), ("1 2", "not_digits"), ("1.5", "not_digits"),
-            ("-1", "not_digits"), ("+1", "not_digits"), ("٣", "not_digits"), ("²", "not_digits"), ("1\n2", "not_digits"),
-            ("1" * 21, "too_many_digits"), ("9" * 40, "too_many_digits"),
+            ("12 ab", "not_allowed"), ("1 2", "not_allowed"), ("1.5", "not_allowed"), ("+1", "not_allowed"),
+            ("٣", "not_allowed"), ("²", "not_allowed"), ("1\n2", "not_allowed"), ("ß", "not_allowed"),
+            ("é", "not_allowed"), ("1_2", "not_allowed"), ("1/2", "not_allowed"), ("İ", "not_allowed"),
+            ("1" * 21, "too_long"), ("9" * 40, "too_long"),
         ):
             with self.subTest(typed=typed):
                 with self.assertRaises(ValidationError) as caught:
-                    numbers.validate_entered_digits(typed)
+                    numbers.normalise_entered_number(typed)
                 self.assertEqual(caught.exception.code, code)
         with self.assertRaises(ValidationError) as caught:
-            numbers.validate_entered_digits("1" * 23)
+            numbers.normalise_entered_number("1" * 23)
         self.assertEqual(
-            caught.exception.messages, ["Es sind höchstens 20 Ziffern erlaubt (eingegeben: 23)."]
+            caught.exception.messages,
+            [
+                "Die Messpunktnummer ist ungültig: Sie ist zu lang. Es sind höchstens 20 Zeichen erlaubt, und nur "
+                "Nullen am Anfang können weggelassen werden (eingegeben: 23)."
+            ],
         )  # the count of what was typed
+        with self.assertRaises(ValidationError) as caught:
+            numbers.normalise_entered_number("a!")
+        self.assertEqual(
+            caught.exception.messages, ["Erlaubt sind nur die Buchstaben A–Z, die Ziffern 0–9 und der Bindestrich."]
+        )
 
 
 @tag("mariadb")

@@ -142,8 +142,9 @@ class FrameTests(TestCase):
         self.assertNotIn("is-active", bar)
         self.assertNotIn("aria-current", bar)
 
-    def test_administration_is_in_the_menu_for_staff_users_only(self):
-        # K13.
+    def test_administration_is_in_the_menu_for_accounts_that_can_use_it_only(self):
+        # K13, D-102: not for a member, not for staff without any right of the administration, yes for a system
+        # administrator.
         member_menu = part(self.client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
         self.assertNotIn("Verwaltung", member_menu)
         self.assertNotIn("/admin/", member_menu)
@@ -152,8 +153,15 @@ class FrameTests(TestCase):
         client = VerifiedClient()
         client.force_login(staff)
         staff_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
-        self.assertIn('href="/admin/"', staff_menu)
-        self.assertIn("Systemverwaltung", staff_menu)
+        self.assertNotIn('href="/admin/"', staff_menu)
+        self.assertNotIn("Systemverwaltung", staff_menu)
+        administrator = create_active_user("administrator.member@example.org")
+        administrator.set_privileges(is_staff=True, is_superuser=True)
+        client = VerifiedClient()
+        client.force_login(administrator)
+        admin_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
+        self.assertIn('href="/admin/"', admin_menu)
+        self.assertIn("Systemverwaltung", admin_menu)
 
     def test_a_link_with_a_token_renders_no_page_and_the_fixed_page_has_no_logout_form(self):
         # D-054, D-067: the link of an email only redirects (with no-referrer); the fixed page it

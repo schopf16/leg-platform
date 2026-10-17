@@ -9,6 +9,7 @@ from unittest import mock
 from urllib.parse import quote
 
 from django.conf import settings
+from django.contrib.auth.models import Permission
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 
@@ -23,6 +24,8 @@ from leg_platform.community.tests.helpers import (
     staff_user,
 )
 from leg_platform.management import leg_views, returns
+
+ROOT = Path(settings.BASE_DIR) / "leg_platform"
 
 CREATE = {
     "email": "round.trip@example.org", "salutation": "mrs", "organisation_name": "", "first_name": "Rita",
@@ -62,6 +65,9 @@ class RoundTripTests(TestCase):
         self.assertIn(f'<a class="btn btn-accent-outline" href="{back}">Zurück zum Messpunkt</a>', text)
         self.assertIn('class="mgmt-banner is-neutral"', text)  # a hint, no warning (UX-016)
         self.assertIn("Person angelegt. Die Einladung wurde gesendet.", text)
+        # D-081 stays: the text does not suggest that the person can be assigned now (UX-004, D-102).
+        self.assertIn("sobald sich die Person registriert hat und eine Kundennummer besitzt", text)
+        self.assertNotIn("Ordnen Sie der Person", text)
         # The plain message is not queued as well (UX-016): one statement, not two.
         self.assertNotIn("Die Person wurde angelegt und die Einladung wurde gesendet.", text)
 
@@ -188,6 +194,105 @@ class GoneObjectTests(TestCase):
         TransformerCircuit.objects.filter(pk=gone_circuit.pk).delete()
         with self.assertRaises(TransformerCircuit.DoesNotExist):
             transformer_circuits.update(gone_circuit, "TRA780", "x")
+
+
+@tag("mariadb")
+class SystemAdministrationMenuTests(TestCase):
+    """D-102: the entry "Systemverwaltung" is shown only to an account that can open something in the Django
+    administration (Django's own app list), in the menu of the desktop and of the phone (one template). Hiding is not
+    security: the administration checks every request itself."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.customer = create_active_user("customer.menu@example.org")
+        cls.bare = staff_user("bare.staff.menu@example.org")  # staff without any right of the administration
+        cls.one = staff_user("one.staff.menu@example.org")
+        cls.one.user_permissions.add(Permission.objects.get(codename="view_leg", content_type__app_label="community"))
+        cls.mail = staff_user("mail.staff.menu@example.org")
+        cls.mail.user_permissions.add(Permission.objects.get(codename="change_emailtext"))
+        cls.superuser = staff_user("super.menu@example.org", superuser=True)
+
+    def menu(self, user, url="/management/"):
+        client = VerifiedClient()
+        client.force_login(user)
+        response = client.get(url)
+        return response.status_code, response.content.decode()
+
+    def test_the_entry_is_shown_twice_for_a_superuser_and_for_staff_with_one_right(self):
+        for user in (self.superuser, self.one, self.mail):
+            with self.subTest(user=user.email):
+                status, text = self.menu(user)
+                self.assertEqual(status, 200)
+                self.assertEqual(text.count("Systemverwaltung"), 2)  # the left menu and the menu of the phone
+                self.assertEqual(text.count('href="/admin/"'), 2)
+                self.assertEqual(text.count('<p class="frame-group">System</p>'), 2)
+
+    def test_the_entry_is_not_shown_to_a_customer_or_to_staff_without_a_right(self):
+        for user, url in ((self.customer, "/profile/"), (self.bare, "/management/"), (self.bare, "/profile/")):
+            with self.subTest(user=user.email, url=url):
+                status, text = self.menu(user, url)
+                self.assertEqual(status, 200)
+                self.assertNotIn("Systemverwaltung", text)
+                self.assertNotIn('href="/admin/"', text)
+                self.assertNotIn('<p class="frame-group">System</p>', text)
+        # The rest of the menu is unchanged for staff without a right.
+        _status, text = self.menu(self.bare)
+        for entry in ("Übersicht", "Personen", "Messpunkte", "Abmelden"):
+            self.assertIn(entry, text)
+
+    def test_the_mail_texts_entry_follows_the_same_rule_and_the_administration_still_refuses(self):
+        _status, text = self.menu(self.mail)
+        self.assertEqual(text.count("Mailtexte"), 2)
+        for user in (self.bare, self.one):
+            self.assertNotIn(">Mailtexte<", self.menu(user)[1])
+        # Hiding is not security: the pages that the account has no right for answer 403 whatever the menu says.
+        client = VerifiedClient()
+        client.force_login(self.bare)
+        for url in ("/admin/accounts/user/", "/admin/accounts/emailtext/", "/admin/community/leg/", "/admin/logs/"):
+            self.assertEqual(client.get(url).status_code, 403, url)
+        one = VerifiedClient()
+        one.force_login(self.one)
+        self.assertEqual(one.get("/admin/community/leg/").status_code, 200)
+        self.assertEqual(one.get("/admin/accounts/user/").status_code, 403)
+        self.assertEqual(Client().get("/admin/").status_code, 302)  # not logged in: the login
+
+    def test_the_menu_template_is_the_one_of_the_desktop_and_the_phone(self):
+        template = (ROOT / "templates" / "_frame_menu.html").read_text(encoding="utf-8")
+        self.assertEqual(template.count("system_administration as show_system"), 1)
+        self.assertNotIn("user.is_staff", template)
+
+
+@tag("mariadb")
+class MissingLocationWarningTests(TestCase):
+    """The location stays optional (D-095); a metering point without one is a problem that the list and the page of the
+    point both show, with the way to set it (owner decision, work package E)."""
+
+    databases = {"default", "addresses"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = staff_user("staff.nolocation@example.org")
+        cls.point = make_metering_point(41)
+        cls.placed = make_metering_point(42, location=make_location("Musterweg", "12", "3063", "Ittigen"))
+
+    def setUp(self):
+        self.client = VerifiedClient()
+        self.client.force_login(self.staff)
+
+    def test_the_list_and_the_page_of_a_point_without_a_location_show_the_warning(self):
+        warning = "Dieser Messpunkt ist keinem Standort zugeordnet."
+        listing = self.client.get(reverse("management:metering_points")).content.decode()
+        # The table and the card of a phone both carry the warning (the title and the hidden text of each).
+        self.assertGreaterEqual(listing.count(warning), 4)
+        detail = self.client.get(reverse("management:metering_points_detail", args=[self.point.pk])).content.decode()
+        self.assertIn(f"<p>{warning}</p>", detail)
+        self.assertIn(f'href="{reverse("management:metering_points_edit", args=[self.point.pk])}', detail)
+        self.assertIn("Standort festlegen", detail)
+        placed = self.client.get(reverse("management:metering_points_detail", args=[self.placed.pk])).content.decode()
+        self.assertNotIn(warning, placed)
+        # The filter "problems" lists it; the person page text does not offer an assignment before registration.
+        filtered = self.client.get(reverse("management:metering_points"), {"problems": "1"}).content.decode()
+        self.assertIn(self.point.number, filtered)
 
 
 class TouchRuleTests(SimpleTestCase):

@@ -619,7 +619,7 @@ class LifeOfTheObjectsTests(MatrixBase):
         self.assertEqual(client.post(url("metering_points_new"), {"number_digits": twenty, "direction": "consumption"}).status_code, 302)
         self.assertTrue(MeteringPoint.objects.filter(number="DEABCDEFGHIJK" + twenty).exists())
         count = MeteringPoint.objects.count()
-        for digits in ("1" * 21, "12a", "1 2", "٣", "-1", "1.5", "", "   ", "%"):
+        for digits in ("1" * 21, "12!", "1 2", "٣", "ß", "1.5", "", "   ", "%"):
             with self.subTest(digits=digits):
                 response = client.post(url("metering_points_new"), {"number_digits": digits, "direction": "consumption"})
                 self.assertEqual(response.status_code, 200)

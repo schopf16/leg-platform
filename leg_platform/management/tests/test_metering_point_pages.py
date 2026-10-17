@@ -524,7 +524,7 @@ class MeteringPointPageTests(TestCase):
         page = client.get(url, {"next": LIST})
         for text in (
             "CH1A2B3C4D5E6", "Messpunkt anlegen",
-            "Nur die letzten Ziffern. Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023).",
+            "Die letzten 20 Zeichen: Grossbuchstaben A–Z, Ziffern 0–9 und der Bindestrich (Kleinbuchstaben werden zu Grossbuchstaben). Kürzere Eingaben werden links mit Nullen aufgefüllt (23 wird zu …0023).",
             "Standort fehlt? Neuen Standort anlegen", "Noch kein Standort gewählt", "Noch keine LEG gewählt",
             "Optional", "Bemerkung", 'data-check="digits"', 'data-check="decimal"', 'name="location"', 'name="leg"',
         ):
@@ -553,7 +553,7 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(again, self.detail(self.registered))
         self.assertEqual(MeteringPoint.objects.filter(number=number(1)).count(), 1)
         for bad in (
-            {"number_digits": ""}, {"number_digits": "abc"}, {"number_digits": "1" * 21}, {"direction": "x"},
+            {"number_digits": ""}, {"number_digits": "a!c"}, {"number_digits": "1" * 21}, {"direction": "x"},
             {"location": "nowhere"}, {"location": "999999"}, {"pv_power_kwp": "-1"}, {"leg": 99999},
         ):
             before = MeteringPoint.objects.count()
@@ -561,27 +561,65 @@ class MeteringPointPageTests(TestCase):
             self.assertEqual(response.status_code, 200, bad)
             self.assertEqual(MeteringPoint.objects.count(), before, bad)
 
-    def test_the_number_is_filled_with_zeros_and_every_wrong_entry_has_its_own_message(self):
+    def test_the_number_is_normalised_to_twenty_characters_and_every_wrong_entry_has_its_own_message(self):
+        # D-102: A-Z, 0-9 and the hyphen; zeros on the left; a longer entry only loses leading zeros.
         client = self.login(self.staff)
         url = reverse("management:metering_points_new")
         base = {"direction": "consumption", "location": ""}
-        created = client.post(url, {**base, "number_digits": "23"})
-        self.assertEqual(created.status_code, 302)
-        self.assertTrue(MeteringPoint.objects.filter(number="CH1A2B3C4D5E6" + "23".zfill(20)).exists())
-        # Twenty digits are as they are, and a page shown again holds the filled-up digits.
+        prefix = "CH1A2B3C4D5E6"
+
+        def stored(suffix):
+            return MeteringPoint.objects.filter(number=prefix + suffix).exists()
+
+        for typed, suffix in (
+            ("23", "23".rjust(20, "0")),  # shorter
+            ("0" + "4" * 20, "4" * 20),  # 21 characters, one leading zero
+            ("0" * 25, "0" * 20),  # all zeros: valid
+            ("ab-12", "AB-12".rjust(20, "0")),  # small letters and a hyphen
+            ("A" * 20, "A" * 20),  # exactly 20
+        ):
+            with self.subTest(accepted=typed[:25]):
+                created = client.post(url, {**base, "number_digits": typed})
+                self.assertEqual(created.status_code, 302)
+                self.assertTrue(stored(suffix), typed)
+        # The same value in another spelling is the same number (duplicate detection on the normalised value).
+        again = client.post(url, {**base, "number_digits": "000" + "a" * 20})
+        self.assertContains(again, "Diese Messpunkt-Nummer gibt es schon.")
+        self.assertEqual(MeteringPoint.objects.filter(number=prefix + "A" * 20).count(), 1)
+        # A page shown again holds the normalised value.
         shown = client.post(url, {**base, "number_digits": "5", "pv_power_kwp": "x"})
         self.assertContains(shown, 'value="00000000000000000005"')
+        too_long = "Die Messpunktnummer ist ungültig: Sie ist zu lang."
+        not_allowed = "Erlaubt sind nur die Buchstaben A–Z, die Ziffern 0–9 und der Bindestrich."
+        before = MeteringPoint.objects.count()
         for typed, message in (
-            ("", "Geben Sie die letzten Ziffern der Nummer ein."),
-            ("12ab", "Nur die Ziffern 0–9 sind erlaubt."),
-            ("1 2", "Nur die Ziffern 0–9 sind erlaubt."),
-            ("٣", "Nur die Ziffern 0–9 sind erlaubt."),
-            ("1" * 21, "Es sind höchstens 20 Ziffern erlaubt (eingegeben: 21)."),
+            ("", "Geben Sie die letzten Zeichen der Nummer ein."),
+            ("12!", not_allowed), ("1 2", not_allowed), ("٣", not_allowed), ("ß", not_allowed), ("a_b", not_allowed),
+            ("1" * 21, too_long + " Es sind höchstens 20 Zeichen erlaubt"),
+            ("0" + "1" * 21, "(eingegeben: 22)"),  # 22 characters with one leading zero
+            ("1" + "0" * 20, too_long),  # a zero that is not at the start stays
         ):
             with self.subTest(typed=typed):
                 response = client.post(url, {**base, "number_digits": typed})
                 self.assertContains(response, message)
-        self.assertEqual(MeteringPoint.objects.filter(number__endswith="0" * 12 + "12ab").count(), 0)
+        self.assertEqual(MeteringPoint.objects.count(), before)
+
+    def test_the_live_check_uses_the_same_rule(self):
+        client = self.login(self.staff)
+        check = reverse("management:metering_points_check_number")
+        for typed, message in (
+            ("0" + "4" * 20, ""), ("ab-1", ""), ("0" * 150 + "7", ""),
+            ("12!", "Erlaubt sind nur die Buchstaben"), ("1" * 21, "Die Messpunktnummer ist ungültig"),
+            ("0" + "1" * 21, "Die Messpunktnummer ist ungültig"),
+        ):
+            with self.subTest(typed=typed[:25]):
+                answer = client.get(check, {"digits": typed}).json()
+                self.assertTrue(answer["message"].startswith(message) if message else answer["message"] == "", answer)
+        # An entry of an existing point is the duplicate, whatever its spelling.
+        existing = self.registered.number[13:]
+        found = client.get(check, {"digits": "00" + existing.lower()}).json()
+        self.assertEqual(found["message"], "")
+        self.assertIsNotNone(found["duplicate"])
 
     def test_the_power_fields_take_digits_and_one_separator_only(self):
         client = self.login(self.staff)
@@ -661,7 +699,7 @@ class MeteringPointPageTests(TestCase):
         client = self.login(self.staff)
         ok = client.get(check, {"digits": "77"}).json()
         self.assertEqual((ok["message"], ok["duplicate"]), ("", None))
-        self.assertTrue(client.get(check, {"digits": "x"}).json()["message"])
+        self.assertTrue(client.get(check, {"digits": "x!"}).json()["message"])
         duplicate = client.get(check, {"digits": "2"}).json()
         self.assertEqual(duplicate["duplicate"]["number"], number(2))
         self.assertEqual(duplicate["duplicate"]["url"], self.detail(self.no_leg_point))
