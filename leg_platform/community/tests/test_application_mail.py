@@ -173,7 +173,7 @@ class PlainWordsTests(SimpleTestCase):
         with self.settings(LANGUAGE_CODE="en"):
             subject, body = email_texts.default_texts(Key.APPLICATION_RETURNED)
         self.assertIn("returned your application", body)
-        self.assertIn("after you sign in", body)
+        self.assertIn("after you log in", body)
         self.assertIn("{login_url}", body)
         self.assertEqual(email_texts.placeholders_of(Key.APPLICATION_RETURNED).count(email_texts.GREETING), 1)
         # No placeholder can carry the reason: the mail jobs have no payload.
@@ -202,14 +202,14 @@ class ContactLineTests(TestCase):
         for kind in CUSTOMER_KINDS:
             with self.subTest(kind=kind), translation.override("de-ch"):
                 body = self.sent(kind).body
-                self.assertIn("Kontaktinformationen: https://leg.example.org/", body)
+                self.assertIn("Fragen oder Probleme: https://leg.example.org/", body)
                 self.assertEqual(body.count("https://leg.example.org/"), 1)
 
     def test_without_a_website_the_line_is_left_out(self):
         for kind in CUSTOMER_KINDS:
             with self.subTest(kind=kind), translation.override("de-ch"):
                 body = self.sent(kind).body
-                self.assertNotIn("Kontaktinformationen", body)
+                self.assertNotIn("Fragen oder Probleme", body)
                 self.assertNotIn("Contact information", body)
 
     def test_the_new_mails_say_it_in_german_in_plain_words(self):
@@ -222,3 +222,167 @@ class ContactLineTests(TestCase):
         self.assertIn("Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen", operator.body)
         self.assertIn("muss korrigiert werden", returned.subject)
         self.assertIn("zur Korrektur zurückgegeben", returned.body)
+
+
+@tag("mariadb")
+class LoginWordsTests(TestCase):
+    """Walkthrough N-05: "Anmeldung" is the application, logging in is "Einloggen" (also in the English source)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.person = customer("mail.words@example.org")
+
+    def sent(self, kind):
+        django_mail.outbox.clear()
+        mail_queue.enqueue_for_account(kind, self.person)
+        mail_queue.process_pending()
+        (message,) = django_mail.outbox
+        return message
+
+    def test_no_customer_mail_uses_the_application_word_for_logging_in(self):
+        for kind in CUSTOMER_KINDS:
+            with self.subTest(kind=kind):
+                body = self.sent(kind).body
+                for phrase in ("nach der Anmeldung", "sobald Sie sich anmelden", "sich anmelden", "melden Sie sich an"):
+                    self.assertNotIn(phrase, body)
+        with self.settings(LANGUAGE_CODE="en"):
+            english = " ".join(email_texts.default_texts(kind)[1] for kind in CUSTOMER_KINDS)
+        self.assertNotIn("sign in", english)
+        self.assertIn("after you log in", english)
+
+    def test_the_texts_use_the_agreed_sentences(self):
+        self.assertIn("Den Stand sehen Sie nach dem Einloggen im Portal:", self.sent(MailJob.Kind.APPLICATION_SUBMITTED).body)
+        self.assertIn(
+            "Sie können jederzeit eine neue Anmeldung starten. Loggen Sie sich dazu ein:",
+            self.sent(MailJob.Kind.APPLICATION_REJECTED).body,
+        )
+        self.assertIn(
+            "Den Grund und was Sie prüfen müssen, sehen Sie nach dem Einloggen im Portal:",
+            self.sent(MailJob.Kind.APPLICATION_RETURNED).body,
+        )
+        dereg = self.sent(MailJob.Kind.DEREGISTRATION_SUBMITTED).body
+        self.assertIn("Sie können die Kündigung nicht selbst zurücknehmen.", dereg)
+        self.assertIn("Die LEG bestätigt den Termin.", dereg)
+
+    def test_the_instance_name_is_used_with_beim_in_the_onboarding_mails(self):
+        from leg_platform.accounts.portal_settings import portal_values
+
+        name = portal_values().name
+        for kind in CUSTOMER_KINDS:
+            with self.subTest(kind=kind):
+                message = self.sent(kind)
+                text = message.subject + message.body
+                self.assertIn(f"beim {name}", text)
+                self.assertNotIn(f"bei {name}", text)
+
+    def test_one_label_for_the_contact_line(self):
+        from leg_platform.accounts.models import PortalSettings
+
+        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
+        for kind in CUSTOMER_KINDS:
+            with self.subTest(kind=kind):
+                body = self.sent(kind).body
+                self.assertIn("Fragen oder Probleme: https://leg.example.org/", body)
+                self.assertNotIn("Kontaktinformationen", body)
+
+
+@tag("mariadb")
+class ReminderDateTests(TestCase):
+    """The reminder "not completed yet" names the deletion day, found when the mail is made (no payload in the job)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.person = customer("mail.reminder@example.org")
+
+    def pause(self, reminded_days_ago=0):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from leg_platform.community.models import Application
+        from leg_platform.community.tests.onboarding import start_with_building
+
+        application, _building = start_with_building(self.person, 90_100)
+        reminded = timezone.now() - timedelta(days=reminded_days_ago)
+        Application.objects.filter(pk=application.pk).update(state=Application.State.PAUSED, reminded_at=reminded)
+        return application, reminded
+
+    def reminder(self):
+        django_mail.outbox.clear()
+        mail_queue.enqueue_for_account(MailJob.Kind.APPLICATION_REMINDER, self.person)
+        mail_queue.process_pending()
+        (message,) = django_mail.outbox
+        return message.body
+
+    def test_the_mail_names_the_day_the_draft_is_deleted(self):
+        from datetime import timedelta
+
+        from django.utils import formats, timezone
+
+        application, reminded = self.pause()
+        with translation.override("de-ch"):
+            expected = formats.date_format(timezone.localdate(reminded + timedelta(days=14)), "SHORT_DATE_FORMAT")
+        body = self.reminder()
+        self.assertIn(f"wird die Anmeldung am {expected} automatisch gelöscht", body)
+        self.assertNotIn("nach einiger Zeit", body)
+        self.assertEqual(len(re.findall(r"\d\d\.\d\d\.\d{4}", body)), 1)
+        self.assertIsNotNone(application)
+
+    def test_the_day_follows_the_setting_and_the_earliest_paused_draft(self):
+        from datetime import timedelta
+
+        from django.utils import formats, timezone
+
+        from leg_platform.community import deadline_settings
+        from leg_platform.community.tests.helpers import staff_user
+
+        self.pause(reminded_days_ago=3)
+        deadline_settings.update({"rollback_after_days": 30}, staff_user("mail.reminder.staff@example.org"))
+        from leg_platform.community.models import Application
+
+        first = Application.objects.get()
+        with translation.override("de-ch"):
+            expected = formats.date_format(timezone.localdate(first.reminded_at + timedelta(days=30)), "SHORT_DATE_FORMAT")
+        self.assertIn(f"am {expected} automatisch gelöscht", self.reminder())
+
+    def test_without_a_paused_draft_the_old_sentence_is_used(self):
+        body = self.reminder()
+        self.assertIn("nach einiger Zeit automatisch gelöscht", body)
+        self.assertIsNone(re.search(r"\d\d\.\d\d\.\d{4}", body))
+
+    def test_the_helper_and_the_sender_without_a_day_are_safe(self):
+        from leg_platform.community import applications
+
+        self.assertIsNone(applications.next_deletion_date(self.person.pk))
+        self.assertIsNone(applications.next_deletion_date(0))
+        django_mail.outbox.clear()
+        emails.send_application_reminder("direct@example.org", "")
+        (message,) = django_mail.outbox
+        self.assertIn("nach einiger Zeit", message.body)
+
+    def test_the_placeholder_is_offered_to_the_editor_and_the_preview_shows_a_day(self):
+        self.assertIn(email_texts.DELETION_DATE, email_texts.placeholders_of(Key.APPLICATION_REMINDER))
+        self.assertNotIn(email_texts.DELETION_DATE, email_texts.placeholders_of(Key.APPLICATION_RETURNED))
+        subject, body = emails.preview(Key.APPLICATION_REMINDER, "", "")
+        self.assertRegex(body, r"31\.12\.2026")
+
+    def test_the_scheduler_mail_end_to_end(self):
+        from leg_platform.community import application_deadlines
+        from leg_platform.community.models import Application
+        from leg_platform.community.tests.onboarding import configure_numbers, start_with_building
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        configure_numbers()
+        application, _building = start_with_building(self.person, 90_101)
+        Application.objects.filter(pk=application.pk).update(last_activity_at=timezone.now() - timedelta(days=3))
+        application_deadlines.process()
+        body = self.reminder_from_queue()
+        self.assertRegex(body, r"am \d\d\.\d\d\.\d{4} automatisch gelöscht")
+
+    def reminder_from_queue(self):
+        django_mail.outbox.clear()
+        mail_queue.process_pending()
+        (message,) = django_mail.outbox
+        return message.body

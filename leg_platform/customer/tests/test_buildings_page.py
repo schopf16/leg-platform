@@ -131,7 +131,7 @@ class BuildingsPageTests(TestCase):
         html = self.page()
         self.assertRegex(html, r'<span class="dot tone-bad" aria-hidden="true"></span>In Abmeldung')
         self.assertIn("Abmeldung: 1 von 3 erledigt", html)
-        self.assertIn("Termin offen: wird von der LEG bestätigt.", html)
+        self.assertIn(f"Frühestens am {deregistrations.earliest_date_preview().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
         self.assertNotIn("Abmeldung starten", html)
 
     def test_a_terminated_point_is_ended(self):

@@ -7,12 +7,12 @@ nor tokens are logged.
 """
 
 import math
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.urls import reverse
-from django.utils import translation
+from django.utils import formats, translation
 from django.utils.translation import gettext
 
 from leg_platform.accounts import email_texts, greeting
@@ -81,6 +81,9 @@ def _sample_values(key, greeting_name=""):
             specific[placeholder.name] = "24"
         elif placeholder is email_texts.LIFETIME_DAYS:
             specific[placeholder.name] = "7"
+        elif placeholder is email_texts.DELETION_DATE:
+            with translation.override(settings.LANGUAGE_CODE):
+                specific[placeholder.name] = formats.date_format(date(2026, 12, 31), "SHORT_DATE_FORMAT")
         elif placeholder in _SAMPLE_LINK_VIEWS:
             specific[placeholder.name] = absolute_url(
                 reverse(_SAMPLE_LINK_VIEWS[placeholder], kwargs={"token": EXAMPLE_TOKEN})
@@ -301,9 +304,16 @@ def send_application_submitted(address, greeting_name=""):
     _send(address, Key.APPLICATION_SUBMITTED, {}, greeting_name)
 
 
-def send_application_reminder(address, greeting_name=""):
-    """Remind the customer that an application is not completed."""
-    _send(address, Key.APPLICATION_REMINDER, {}, greeting_name)
+def send_application_reminder(address, greeting_name="", deletion_date=None):
+    """Remind the customer that an application is not completed. ``deletion_date`` (a date or None) is the day the
+    paused application is deleted if nothing changes; without it the text says "after some time"."""
+    values = {}
+    if deletion_date is not None:
+        with translation.override(settings.LANGUAGE_CODE):
+            values["deletion_date"] = formats.date_format(deletion_date, "SHORT_DATE_FORMAT")
+    else:
+        values["deletion_date"] = ""
+    _send(address, Key.APPLICATION_REMINDER, values, greeting_name)
 
 
 def send_application_rolled_back(address, greeting_name=""):

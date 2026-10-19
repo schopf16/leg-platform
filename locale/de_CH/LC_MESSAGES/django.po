@@ -1285,7 +1285,7 @@ msgstr "Die Änderung konnte nicht vorgenommen werden."
 
 #: leg_platform/accounts/second_factor.py
 msgid "Please log in again."
-msgstr "Bitte melden Sie sich erneut an."
+msgstr "Bitte loggen Sie sich erneut ein."
 
 msgid "Your account needs two-factor authentication. Set it up to continue."
 msgstr "Ihr Konto braucht die Zwei-Faktor-Anmeldung (2FA). Richten Sie sie ein, um fortzufahren."
@@ -1354,7 +1354,7 @@ msgstr "Bei %(instance_name)s wurden neue Wiederherstellungscodes erstellt"
 #: leg_platform/accounts/templates/accounts/email/two_factor_enabled.txt
 #, python-format
 msgid "Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or a recovery code, to log in."
-msgstr "Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) eingerichtet. Ab jetzt brauchen Sie für die Anmeldung einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
+msgstr "Für Ihr Konto bei %(instance_name)s wurde die Zwei-Faktor-Anmeldung (2FA) eingerichtet. Ab jetzt brauchen Sie zum Einloggen einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode."
 
 #, python-format
 msgid ""
@@ -1381,7 +1381,7 @@ msgstr "Bei %(instance_name)s wurde ein Wiederherstellungscode verwendet"
 #: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
 #, python-format
 msgid "A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
-msgstr "Für die Anmeldung bei Ihrem Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
+msgstr "Zum Einloggen in Ihr Konto bei %(instance_name)s wurde ein Wiederherstellungscode verwendet. Dieser Code kann nicht mehr verwendet werden."
 
 #: leg_platform/accounts/templates/accounts/email/recovery_codes_renewed.txt
 #, python-format
@@ -1421,7 +1421,7 @@ msgstr "Codes kopieren"
 
 #: leg_platform/accounts/session_timeout.py
 msgid "You were logged out for security reasons. Please log in again."
-msgstr "Sie wurden aus Sicherheitsgründen abgemeldet. Bitte melden Sie sich erneut an."
+msgstr "Sie wurden aus Sicherheitsgründen ausgeloggt. Bitte loggen Sie sich erneut ein."
 
 #: leg_platform/accounts/models.py (security log, D-041)
 msgid "Password changed"
@@ -1554,7 +1554,7 @@ msgstr ""
 #: leg_platform/accounts/templates/accounts/email/two_factor_reset.txt
 #, python-format
 msgid "Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
-msgstr "Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach der Anmeldung können Sie die Zwei-Faktor-Anmeldung erneut einrichten."
+msgstr "Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos bei %(instance_name)s wurde zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach dem Einloggen können Sie die Zwei-Faktor-Anmeldung erneut einrichten."
 
 #, python-format
 msgid ""
@@ -1794,7 +1794,7 @@ msgid "Password"
 msgstr "Passwort"
 
 msgid "You have been logged out."
-msgstr "Sie wurden abgemeldet."
+msgstr "Sie wurden ausgeloggt."
 
 msgid "If you forgot your password, you can choose a new one."
 msgstr "Wenn Sie Ihr Passwort vergessen haben, können Sie ein neues wählen."
@@ -2060,6 +2060,9 @@ msgstr "Passwort festlegen"
 msgid "Personal link that stops the requested change of an email address."
 msgstr "Persönlicher Link, der die beantragte Änderung einer E-Mail-Adresse stoppt."
 
+msgid "Day on which the paused application is deleted if nothing changes; empty if no day is known. The default text uses it only when it is known."
+msgstr "Tag, an dem die pausierte Anmeldung gelöscht wird, wenn sich nichts ändert; leer, wenn kein Tag bekannt ist. Der Standardtext verwendet ihn nur, wenn er bekannt ist."
+
 msgid "Greeting with the name of the person the account belongs to, or a neutral greeting if no suitable name is known. Best written on a line of its own at the start."
 msgstr "Anrede mit dem Namen der Person, der das Konto gehört, oder eine neutrale Anrede, wenn kein passender Name bekannt ist. Am besten auf einer eigenen Zeile am Anfang."
 
@@ -2147,7 +2150,7 @@ msgid "Your account was deleted"
 msgstr "Ihr Konto wurde gelöscht"
 
 msgid "Your details are removed. You are logged out. If you want to take part again, you can register anew at any time."
-msgstr "Ihre Angaben sind entfernt. Sie sind abgemeldet. Falls Sie wieder teilnehmen möchten, können Sie sich jederzeit neu registrieren."
+msgstr "Ihre Angaben sind entfernt. Sie wurden ausgeloggt. Falls Sie wieder teilnehmen möchten, können Sie sich jederzeit neu registrieren."
 
 msgid "To the start page"
 msgstr "Zur Startseite"
@@ -2169,7 +2172,7 @@ msgstr ""
 "%(stop_url)s"
 
 msgid "The email address for your account at %(instance_name)s was changed. You have to log in again."
-msgstr "Die E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Sie müssen sich erneut anmelden."
+msgstr "Die E-Mail-Adresse Ihres Kontos bei %(instance_name)s wurde geändert. Sie müssen sich erneut einloggen."
 
 msgid ""
 "Hello\n"
@@ -2243,7 +2246,7 @@ msgid "Save"
 msgstr "Speichern"
 
 msgid "Login (username)"
-msgstr "Anmeldung (Benutzername)"
+msgstr "Login (Benutzername)"
 
 msgid "Pending"
 msgstr "Ausstehend"
@@ -2572,7 +2575,7 @@ msgid "You have neither the app nor a recovery code? Then contact the operator o
 msgstr "Sie haben weder die App noch einen Wiederherstellungscode? Dann wenden Sie sich an den Betrieb des Portals. Ein Administrator kann das Entfernen von 2FA starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-Adresse gesendet wird."
 
 msgid "For your safety you were logged out: wrong codes or passwords were entered several times. Please log in again."
-msgstr "Aus Sicherheitsgründen wurden Sie abgemeldet: Es wurde mehrmals ein falscher Code oder ein falsches Passwort eingegeben. Bitte melden Sie sich erneut an."
+msgstr "Aus Sicherheitsgründen wurden Sie ausgeloggt: Es wurde mehrmals ein falscher Code oder ein falsches Passwort eingegeben. Bitte loggen Sie sich erneut ein."
 
 msgid "A session at %(instance_name)s was ended"
 msgstr "Eine Sitzung bei %(instance_name)s wurde beendet"
@@ -4951,94 +4954,94 @@ msgid "Deregistration"
 msgstr "Abmeldung"
 
 msgid "Your application at %(instance_name)s was submitted"
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde eingereicht"
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde eingereicht"
 
 msgid "Your application at %(instance_name)s is not completed yet"
-msgstr "Ihre Anmeldung bei %(instance_name)s ist noch nicht abgeschlossen"
+msgstr "Ihre Anmeldung beim %(instance_name)s ist noch nicht abgeschlossen"
 
 msgid "Your application at %(instance_name)s was deleted"
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde gelöscht"
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde gelöscht"
 
 msgid "Your application at %(instance_name)s needs a correction"
-msgstr "Ihre Anmeldung bei %(instance_name)s muss korrigiert werden"
+msgstr "Ihre Anmeldung beim %(instance_name)s muss korrigiert werden"
 
 msgid "Your application at %(instance_name)s was not accepted"
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen"
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde nicht angenommen"
 
 msgid "Please approve the contract at %(instance_name)s"
-msgstr "Bitte stimmen Sie dem Vertrag bei %(instance_name)s zu"
+msgstr "Bitte stimmen Sie dem Vertrag beim %(instance_name)s zu"
 
 msgid "Bank connection needed at %(instance_name)s"
-msgstr "Bankverbindung nötig bei %(instance_name)s"
+msgstr "Bankverbindung nötig beim %(instance_name)s"
 
 msgid "Your deregistration at %(instance_name)s was received"
-msgstr "Ihre Abmeldung bei %(instance_name)s ist eingegangen"
+msgstr "Ihre Abmeldung beim %(instance_name)s ist eingegangen"
 
 msgid "Your deregistration at %(instance_name)s has taken effect"
-msgstr "Ihre Abmeldung bei %(instance_name)s ist wirksam geworden"
+msgstr "Ihre Abmeldung beim %(instance_name)s ist wirksam geworden"
 
 msgid "The IBAN of your account at %(instance_name)s was changed"
-msgstr "Die IBAN Ihres Kontos bei %(instance_name)s wurde geändert"
+msgstr "Die IBAN Ihres Kontos beim %(instance_name)s wurde geändert"
 
 msgid "Registration at the grid operator to be withdrawn: %(instance_name)s"
 msgstr "Anmeldung beim Netzbetreiber zurückziehen: %(instance_name)s"
 
-msgid "Your application at %(instance_name)s was submitted. It is being checked now. You can follow the progress after you sign in:"
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde eingereicht. Sie wird jetzt geprüft. Den Stand sehen Sie nach der Anmeldung im Portal:"
+msgid "Your application at %(instance_name)s was submitted. It is being checked now. You can follow the progress after you log in to the portal:"
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde eingereicht. Sie wird jetzt geprüft. Den Stand sehen Sie nach dem Einloggen im Portal:"
 
-msgid "Your application at %(instance_name)s is not completed yet. You can continue at any time after you sign in:"
-msgstr "Ihre Anmeldung bei %(instance_name)s ist noch nicht abgeschlossen. Sie können jederzeit weitermachen, sobald Sie sich anmelden:"
+msgid "Your application at %(instance_name)s is not completed yet. You can continue at any time. Log in to do so:"
+msgstr "Ihre Anmeldung beim %(instance_name)s ist noch nicht abgeschlossen. Sie können jederzeit weitermachen. Loggen Sie sich dazu ein:"
+
+msgid "If you do not continue, the application is deleted automatically on %(deletion_date)s, together with the details you entered about buildings and metering points. Your account is kept."
+msgstr "Wenn Sie nicht weitermachen, wird die Anmeldung am %(deletion_date)s automatisch gelöscht, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
 msgid "If you do not continue, the application is deleted automatically after some time, together with the details you entered about buildings and metering points. Your account is kept."
 msgstr "Wenn Sie nicht weitermachen, wird die Anmeldung nach einiger Zeit automatisch gelöscht, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
 msgid "Your application at %(instance_name)s was not completed in time and was deleted, together with the details you entered about buildings and metering points. Your account is kept."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht rechtzeitig abgeschlossen und ist gelöscht worden, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde nicht rechtzeitig abgeschlossen und ist gelöscht worden, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
-msgid "You can start a new application at any time after you sign in:"
-msgstr "Sie können jederzeit eine neue Anmeldung starten, sobald Sie sich anmelden:"
+msgid "You can start a new application at any time. Log in to do so:"
+msgstr "Sie können jederzeit eine neue Anmeldung starten. Loggen Sie sich dazu ein:"
 
-msgid "Your application at %(instance_name)s is almost complete. The contract still needs your approval. You can read and approve it after you sign in:"
-msgstr "Ihre Anmeldung bei %(instance_name)s ist fast vollständig. Dem Vertrag fehlt noch Ihre Zustimmung. Sie können ihn nach der Anmeldung lesen und ihm zustimmen:"
+msgid "Your application at %(instance_name)s is almost complete. The contract still needs your approval. You can read and approve it after you log in:"
+msgstr "Ihre Anmeldung beim %(instance_name)s ist fast vollständig. Dem Vertrag fehlt noch Ihre Zustimmung. Sie können ihn nach dem Einloggen lesen und ihm zustimmen:"
 
 msgid "If the contract is not approved in time, the application is deleted, together with the details you entered about buildings and metering points."
 msgstr "Wird dem Vertrag nicht rechtzeitig zugestimmt, wird die Anmeldung gelöscht, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten."
 
 msgid "Your application at %(instance_name)s was deleted because the contract was not approved in time, together with the details you entered about buildings and metering points. Your account is kept."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde gelöscht, weil dem Vertrag nicht rechtzeitig zugestimmt wurde, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde gelöscht, weil dem Vertrag nicht rechtzeitig zugestimmt wurde, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
-msgid "The LEG returned your application at %(instance_name)s for correction. You can see why, and what to check, after you sign in:"
-msgstr "Die LEG hat Ihre Anmeldung bei %(instance_name)s zur Korrektur zurückgegeben. Den Grund und was Sie prüfen müssen, sehen Sie nach der Anmeldung:"
+msgid "The LEG returned your application at %(instance_name)s for correction. You can see why, and what to check, after you log in to the portal:"
+msgstr "Die LEG hat Ihre Anmeldung beim %(instance_name)s zur Korrektur zurückgegeben. Den Grund und was Sie prüfen müssen, sehen Sie nach dem Einloggen im Portal:"
 
 msgid "Please check your details and submit the application again."
 msgstr "Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab."
 
 msgid "Your application at %(instance_name)s was not accepted. For privacy reasons we deleted your building and metering point details. Your account remains."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
 
 msgid "Your application at %(instance_name)s was not accepted. The grid operator did not accept the registration of your metering points. For privacy reasons we deleted your building and metering point details. Your account remains."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen. Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
+msgstr "Ihre Anmeldung beim %(instance_name)s wurde nicht angenommen. Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
 
-msgid "Your application at %(instance_name)s needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you sign in:"
-msgstr "Für Ihre Anmeldung bei %(instance_name)s brauchen wir eine Bank- oder Postverbindung, damit der eingespeiste Strom vergütet werden kann. Bitte tragen Sie sie nach der Anmeldung ein:"
+msgid "Your application at %(instance_name)s needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you log in:"
+msgstr "Für Ihre Anmeldung beim %(instance_name)s brauchen wir eine Bank- oder Postverbindung, damit der eingespeiste Strom vergütet werden kann. Bitte tragen Sie sie nach dem Einloggen ein:"
 
-msgid "Your deregistration at %(instance_name)s was received. The LEG confirms the date. You can follow the progress after you sign in:"
-msgstr "Ihre Abmeldung bei %(instance_name)s ist eingegangen. Die LEG bestätigt den Termin. Den Stand sehen Sie nach der Anmeldung:"
+msgid "Your deregistration at %(instance_name)s was received. The LEG confirms the date. You cannot withdraw the termination yourself. You can follow the progress after you log in to the portal:"
+msgstr "Ihre Abmeldung beim %(instance_name)s ist eingegangen. Die LEG bestätigt den Termin. Sie können die Kündigung nicht selbst zurücknehmen. Den Stand sehen Sie nach dem Einloggen im Portal:"
 
-msgid "Your deregistration at %(instance_name)s has taken effect. You can see the details after you sign in:"
-msgstr "Ihre Abmeldung bei %(instance_name)s ist wirksam geworden. Die Einzelheiten sehen Sie nach der Anmeldung:"
+msgid "Your deregistration at %(instance_name)s has taken effect. You can see the details after you log in to the portal:"
+msgstr "Ihre Abmeldung beim %(instance_name)s ist wirksam geworden. Die Einzelheiten sehen Sie nach dem Einloggen im Portal:"
 
 msgid "The IBAN stored for your account at %(instance_name)s was changed."
-msgstr "Die für Ihr Konto bei %(instance_name)s gespeicherte IBAN wurde geändert."
+msgstr "Die für Ihr Konto beim %(instance_name)s gespeicherte IBAN wurde geändert."
 
-msgid "If you did not do this, sign in and check the IBAN, and contact the operator immediately."
-msgstr "Wenn Sie das nicht veranlasst haben, melden Sie sich an, prüfen Sie die IBAN und wenden Sie sich sofort an den Betreiber."
+msgid "If you did not do this, log in and check the IBAN, and contact the operator immediately."
+msgstr "Wenn Sie das nicht veranlasst haben, loggen Sie sich ein, prüfen Sie die IBAN und wenden Sie sich sofort an den Betreiber."
 
-msgid "Contact information: %(contact_url)s"
-msgstr "Kontaktinformationen: %(contact_url)s"
-
-msgid "At %(instance_name)s an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you sign in:"
-msgstr "Bei %(instance_name)s wurde eine Anmeldung rückabgewickelt, weil die Bestätigung des Netzbetreibers nicht rechtzeitig eingetroffen ist. Bitte ziehen Sie die Anmeldung beim Netzbetreiber zurück. Die Einzelheiten finden Sie nach der Anmeldung im Verwaltungsbereich:"
+msgid "At %(instance_name)s an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you log in:"
+msgstr "Bei %(instance_name)s wurde eine Anmeldung rückabgewickelt, weil die Bestätigung des Netzbetreibers nicht rechtzeitig eingetroffen ist. Bitte ziehen Sie die Anmeldung beim Netzbetreiber zurück. Die Einzelheiten finden Sie nach dem Einloggen im Verwaltungsbereich:"
 
 # ---- Management pages of the onboarding: processes, contracts, deadlines (D-103; owner design verwaltung/vorgaenge, vertraege) ----
 msgid "Processes"
@@ -5254,9 +5257,6 @@ msgstr "Zugestimmt am %(date)s (Fassung vom %(version)s)"
 
 msgid "Only the customer accepts the contract."
 msgstr "Nur der Kunde stimmt dem Vertrag zu."
-
-msgid "Switch-on"
-msgstr "Aufschaltung"
 
 msgctxt "process step"
 msgid "Done"
@@ -5808,7 +5808,7 @@ msgstr "Geben Sie eine Zahl ein."
 msgid "Enter a number of at least 0."
 msgstr "Geben Sie eine Zahl ab 0 ein."
 
-msgid "Metering point number for the draw"
+msgid "Metering point number for consumption"
 msgstr "Messpunkt-Nummer für den Bezug"
 
 msgid "You find the number on your last electricity bill."
@@ -6068,7 +6068,7 @@ msgstr "Haben Sie eine PV-Anlage? Dann melden Sie den Messpunkt für die Einspei
 msgid "Add metering point"
 msgstr "Messpunkt hinzufügen"
 
-msgid "Start registration"
+msgid "Start application"
 msgstr "Anmeldung starten"
 
 msgid "My participation"
@@ -6094,7 +6094,7 @@ msgstr[0] "Noch %(remaining)s Schritt offen"
 msgstr[1] "Noch %(remaining)s Schritte offen"
 
 msgid "Continue application"
-msgstr "Weitermachen"
+msgstr "Weiter anmelden"
 
 msgid "If you start again, the details of this application are deleted."
 msgstr "Wenn Sie neu beginnen, werden die bisherigen Angaben dieser Anmeldung gelöscht."
@@ -6318,9 +6318,6 @@ msgstr "Ihre Angaben zu Gebäude und Messpunkten werden gelöscht."
 msgid "Your bank or postal connection is kept because it belongs to you as a person."
 msgstr "Ihre Bank- oder Postverbindung bleibt erhalten, weil sie zu Ihrer Person gehört."
 
-msgid "Continue registration"
-msgstr "Weiter anmelden"
-
 msgid "Cancel application"
 msgstr "Anmeldung abbrechen"
 
@@ -6369,7 +6366,7 @@ msgid "Already on file"
 msgstr "Bereits hinterlegt"
 
 #, python-format
-msgid "Registration: %(done)s of %(total)s done"
+msgid "Application: %(done)s of %(total)s done"
 msgstr "Anmeldung: %(done)s von %(total)s erledigt"
 
 #, python-format
@@ -6377,7 +6374,7 @@ msgid "Deregistration: %(done)s of %(total)s done"
 msgstr "Abmeldung: %(done)s von %(total)s erledigt"
 
 #, python-format
-msgid "Registration: %(done)s of %(total)s steps done"
+msgid "Application: %(done)s of %(total)s steps done"
 msgstr "Anmeldung: %(done)s von %(total)s Schritten erledigt"
 
 #, python-format
@@ -6414,8 +6411,8 @@ msgstr "Die Adresse, an der sich der Messpunkt befindet."
 msgid "You enter the metering point for the draw. If you also feed in electricity, you add the metering point for the feed-in."
 msgstr "Sie tragen den Messpunkt für den Bezug ein. Wenn Sie auch Strom einspeisen, tragen Sie den Messpunkt für die Einspeisung dazu."
 
-msgid "Choice of the start date"
-msgstr "Wahl des Startdatums"
+msgid "You choose when your participation starts."
+msgstr "Sie wählen, ab wann Ihre Teilnahme beginnt."
 
 msgid "Enter bank or postal connection"
 msgstr "Bank- oder Postverbindung angeben"
@@ -6460,8 +6457,8 @@ msgid "Desired date (last day of a month)"
 msgstr "Wunschdatum (letzter Tag eines Monats)"
 
 #, python-format
-msgid "Earliest on %(date)s"
-msgstr "Frühestens am %(date)s"
+msgid "Earliest on %(date)s. The LEG confirms the date."
+msgstr "Frühestens am %(date)s. Die LEG bestätigt den Termin."
 
 msgid "Already deregistered"
 msgstr "Bereits abgemeldet"
@@ -6515,8 +6512,9 @@ msgstr "Die LEG prüft den Termin und meldet Sie bei %(operator)s ab. Eine Best�
 msgid "Until the date the metering points stay active. Afterwards they are ended."
 msgstr "Bis zum Termin bleiben die Messpunkte aktiv. Danach sind sie beendet."
 
-msgid "Date open: the LEG confirms it."
-msgstr "Termin offen: wird von der LEG bestätigt."
+#, python-format
+msgid "Desired date %(date)s. The LEG confirms the date."
+msgstr "Wunschtermin %(date)s. Die LEG bestätigt den Termin."
 
 msgid "Your deregistration is started. You can now delete your account."
 msgstr "Ihre Abmeldung ist gestartet. Sie können Ihr Konto jetzt löschen."
@@ -6550,7 +6548,7 @@ msgid "Your account was deactivated"
 msgstr "Ihr Konto wurde deaktiviert"
 
 msgid "Your details are kept for retention reasons. You are logged out."
-msgstr "Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten. Sie sind abgemeldet."
+msgstr "Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten. Sie wurden ausgeloggt."
 
 msgid "You have too many drafts. Please finish or cancel one first."
 msgstr "Sie haben zu viele Entwürfe. Bitte schliessen Sie einen ab oder brechen Sie einen ab."
@@ -6632,5 +6630,36 @@ msgstr "Sie nehmen seit dem %(date)s an der LEG teil."
 msgid "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted on %(date)s."
 msgstr "Ihre Anmeldung ist pausiert, weil Sie sie länger nicht bearbeitet haben. Machen Sie weiter, sonst wird sie am %(date)s gelöscht."
 
-msgid "Your deregistration continues. The metering points end on the confirmed date."
-msgstr "Ihre Abmeldung läuft weiter. Die Messpunkte enden am bestätigten Termin."
+msgid "Your deregistration continues. The metering points end on the date that the LEG confirms."
+msgstr "Ihre Abmeldung läuft weiter. Die Messpunkte enden zum Termin, den die LEG bestätigt."
+
+# Second designer walkthrough, customer part (N-01 to N-15).
+msgid "Check your details"
+msgstr "Angaben prüfen"
+
+msgid "Please correct what the LEG described. Then submit the application again."
+msgstr "Bitte korrigieren Sie, was die LEG beschrieben hat. Danach schicken Sie die Anmeldung erneut ab."
+
+msgid "Your deregistration was submitted."
+msgstr "Ihre Abmeldung ist eingereicht."
+
+msgid "Deregister metering points"
+msgstr "Messpunkte abmelden"
+
+msgid "The EGID is the number of your building in the federal register of buildings."
+msgstr "Die EGID ist die Nummer Ihres Gebäudes im eidgenössischen Gebäuderegister."
+
+msgid "opens in a new tab"
+msgstr "öffnet in neuem Tab"
+
+msgid "Registration at the grid operator"
+msgstr "Anmeldung beim Netzbetreiber"
+
+msgid "You confirm the request in the email from the grid operator"
+msgstr "Sie bestätigen die Anfrage in der E-Mail vom Netzbetreiber"
+
+msgid "Set by the grid operator"
+msgstr "Wird vom Netzbetreiber festgelegt"
+
+msgid "Your desired date"
+msgstr "Ihr Wunschdatum"

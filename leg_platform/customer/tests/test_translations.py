@@ -95,7 +95,7 @@ class CustomerTextsTests(SimpleTestCase):
 
     def test_the_words_of_the_owner_are_used_as_they_are(self):
         owner = {
-            "Start registration": "Anmeldung starten",
+            "Start application": "Anmeldung starten",
             "Start deregistration": "Abmeldung starten",
             "Add metering point": "Messpunkt hinzufügen",
             "Remove metering point": "Messpunkt entfernen",
@@ -108,7 +108,7 @@ class CustomerTextsTests(SimpleTestCase):
             "Your application was submitted": "Ihre Anmeldung ist abgeschickt",
             "Your way into the LEG": "Ihr Weg in die LEG",
             "Cancel application?": "Anmeldung abbrechen?",
-            "Continue registration": "Weiter anmelden",
+            "Continue application": "Weiter anmelden",
             "Cancel application": "Anmeldung abbrechen",
             "Withdraw application": "Anmeldung zurückziehen",
             "Already on file": "Bereits hinterlegt",
@@ -135,4 +135,4 @@ class CustomerTextsTests(SimpleTestCase):
     def test_the_catalogue_is_not_used_for_the_other_languages_here(self):
         # The French and Italian catalogues are the owner's; an English text is shown where there is no translation.
         with translation.override("en"):
-            self.assertEqual(translation.gettext("Start registration"), "Start registration")
+            self.assertEqual(translation.gettext("Start application"), "Start application")

@@ -15,6 +15,7 @@ only deactivated: the notice says so, ``User.delete_or_deactivate``). While the 
       <p class="profile-text">{% translate "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted." %}</p>
       <div class="profile-notice">{% if privacy_url %}{% blocktranslate with url=privacy_url %}Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the <a href="{{ url }}" target="_blank" rel="noopener noreferrer">privacy notice</a>.{% endblocktranslate %}{% else %}{% translate "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the privacy notice." %}{% endif %}</div>
     {% endif %}
+    {% if delete_info.deregistration_running %}<p class="profile-text">{% translate "Your deregistration continues. The metering points end on the date that the LEG confirms." %}</p>{% endif %}
     {% with form=delete_form %}
       <form method="post" action="{% url 'accounts:account_delete' %}" class="profile-form profile-form-inset" novalidate>
         {% csrf_token %}
@@ -32,7 +33,7 @@ only deactivated: the notice says so, ``User.delete_or_deactivate``). While the 
     {% if not delete_info.released %}
       {% if delete_info.can_start %}
         <p class="profile-text">{% translate "You still have metering points. Deregister them first. Then you can delete your account." %}</p>
-        <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'customer:deregistration_start' %}?for=account_deletion">{% translate "Delete account" %}</a></div>
+        <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'customer:deregistration_start' %}?for=account_deletion">{% translate "Deregister metering points" %}</a></div>
       {% else %}
         <p class="profile-text">{% translate "You cannot delete your account yet: a registration is still running or a metering point is not active yet. Withdraw the registration on the page Buildings, or wait until the metering point is active and deregister it." %}</p>
         {% if delete_info.customer %}<div class="profile-actions"><a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "To the buildings" %}</a></div>{% endif %}
@@ -43,7 +44,7 @@ only deactivated: the notice says so, ``User.delete_or_deactivate``). While the 
       {% else %}
         <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
       {% endif %}
-      {% if delete_info.deregistration_running %}<p class="profile-text">{% translate "Your deregistration continues. The metering points end on the confirmed date." %}</p>{% endif %}
+      {% if delete_info.deregistration_running %}<p class="profile-text">{% translate "Your deregistration continues. The metering points end on the date that the LEG confirms." %}</p>{% endif %}
       <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></div>
     {% endif %}
   {% endif %}

@@ -34,6 +34,7 @@ D-102; the administration itself checks every request) and is the very last entr
   <li><a class="frame-sub-item{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Questions and answers" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Event" context "customer menu" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
+  {% if instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<li><a class="frame-sub-item" href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}<span class="visually-hidden"> ({% translate "opens in a new tab" %})</span></a></li>{% endif %}
 </ul>
 {% endif %}
 {% management_menu as management_entries %}{% if management_entries %}
@@ -88,7 +89,6 @@ D-102; the administration itself checks every request) and is the very last entr
   <div class="frame-legal">
     {% if instance_privacy_url %}<a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>{% else %}<span>{% translate "Privacy notice" %}</span>{% endif %}
     {% if instance_imprint_url %}<a href="{{ instance_imprint_url }}" target="_blank" rel="noopener noreferrer">{% translate "Legal notice" %}</a>{% else %}<span>{% translate "Legal notice" %}</span>{% endif %}
-    {% if not user.is_staff and instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<a href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}</a>{% endif %}
   </div>
 </div>
 {% endwith %}

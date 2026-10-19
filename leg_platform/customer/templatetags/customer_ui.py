@@ -24,7 +24,10 @@ def leg_link(context):
     # validated already; this is the second check at the place where it becomes a link).
     if not url.lower().startswith("https://"):
         return word
-    return format_html('<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>', url, word)
+    return format_html(
+        '<a href="{}" target="_blank" rel="noopener noreferrer">{}<span class="visually-hidden"> ({})</span></a>',
+        url, word, gettext("opens in a new tab"),
+    )
 
 
 @register.simple_tag(takes_context=True)

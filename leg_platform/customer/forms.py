@@ -84,7 +84,7 @@ class MeteringPointsForm(CustomerForm):
     has a feed-in there; ``feed_in_required`` is True where the draw exists and only a feed-in can be added."""
 
     draw_number = forms.CharField(
-        label=_("Metering point number for the draw"), required=False, max_length=250,
+        label=_("Metering point number for consumption"), required=False, max_length=250,
         help_text=_("You find the number on your last electricity bill."),
     )
     draw_name = forms.CharField(

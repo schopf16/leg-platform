@@ -360,7 +360,7 @@ class ApplicationPageTests(ProcessBase):
         self.assertEqual(ApplicationDetailView.step_numbers(True),
                          {"building": 1, "points": 2, "bank": 3, "contract": 4, "start": 5})
         page = self.client.get(self.url(self.submitted(self.anna))).content.decode()
-        self.assertIn('aria-hidden="true">4</span>Aufschaltung', page)
+        self.assertIn('aria-hidden="true">4</span>Startdatum', page)
         self.assertNotIn(">5</span>", page)
 
     def test_what_a_customer_typed_is_escaped_on_every_page(self):

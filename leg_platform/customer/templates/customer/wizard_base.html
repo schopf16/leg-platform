@@ -9,13 +9,13 @@ the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of th
 {% block content %}
   <div class="wizard">
     {% if paused %}<div class="alert alert-warning" role="status">{% include "customer/_paused_note.html" with paused_date=paused_date %}</div>{% endif %}
-    {% include "customer/_returned_note.html" with reason=returned_reason returned=returned %}
+    {% url 'customer:application_start' as overview_url %}{% include "customer/_returned_note.html" with reason=returned_reason returned=returned check_url=overview_url %}
     {% if confirm_cancel %}
       <section class="step-card cancel-card" aria-labelledby="cancel-title">
         <h2 id="cancel-title">{% translate "Cancel application?" %}</h2>
         <p>{% translate "Your details about the building and the metering points will be deleted." %}{% if has_iban %} {% translate "Your bank or postal connection is kept because it belongs to you as a person." %}{% endif %}</p>
         <div class="step-actions">
-          <a class="btn btn-primary" href="{{ request.path }}" autofocus>{% translate "Continue registration" %}</a>
+          <a class="btn btn-primary" href="{{ request.path }}" autofocus>{% translate "Continue application" %}</a>
           <form method="post" action="{% url 'customer:application_cancel' application.pk %}" class="inline-form">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger-outline">{% translate "Cancel application" %}</button>
@@ -24,6 +24,7 @@ the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of th
       </section>
     {% endif %}
     <div class="progress-block">
+      <a class="back-link" href="{{ back_url }}">{% translate "Back" %}</a>
       <p class="page-label">{% translate "My participation · Application" %}</p>
       {% if step == "metering_points" %}
         <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>

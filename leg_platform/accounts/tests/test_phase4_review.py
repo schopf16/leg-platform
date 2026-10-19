@@ -404,7 +404,7 @@ class SecondAddressMailTests(TestCase):
         mail_queue.enqueue(MailJob.Kind.EMAIL_CHANGED, "holder.person@example.org")
         run_mail_queue()
 
-        self.assertIn("erneut anmelden", mail.outbox[0].body)
+        self.assertIn("erneut einloggen", mail.outbox[0].body)
 
     @override_settings(INSTANCE_WEBSITE_URL="https://www.example.org/contact?a=1&b=2")
     def test_the_contact_link_is_not_escaped_in_either_text(self):

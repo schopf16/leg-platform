@@ -1,10 +1,10 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}Your application at {{ instance_name }} is almost complete. The contract still needs your approval. You can read and approve it after you sign in:{% endblocktranslate %}
+{% blocktranslate %}Your application at {{ instance_name }} is almost complete. The contract still needs your approval. You can read and approve it after you log in:{% endblocktranslate %}
 
 {{ login_url }}
 
 {% translate "If the contract is not approved in time, the application is deleted, together with the details you entered about buildings and metering points." %}{% if contact_url %}
 
-{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

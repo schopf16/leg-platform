@@ -114,6 +114,7 @@ class Card:
     rows: list = field(default_factory=list)
     application_states: list = field(default_factory=list)
     application_labels: list = field(default_factory=list)
+    extra_blocks: list = field(default_factory=list)  # the progress of a draft that has no metering point row yet
     can_add_point: bool = False
     removal: str | None = None  # "link": a point can be deregistered; "withdraw": a submitted registration can be withdrawn
     # (``withdraw_pk``); "blocked": not possible yet
@@ -174,6 +175,16 @@ def _registration_block(application, operator):
     )
 
 
+def date_note(deregistration):
+    """The words about the date of a deregistration that the LEG has not confirmed yet (N-10): the earliest month end of
+    the notice period, or the customer's wish; the LEG confirms it."""
+    if deregistration.wants_earliest:
+        return _("Earliest on %(date)s. The LEG confirms the date.") % {
+            "date": deregistration.earliest_date.strftime("%d.%m.%Y")
+        }
+    return _("Desired date %(date)s. The LEG confirms the date.") % {"date": deregistration.desired_date.strftime("%d.%m.%Y")}
+
+
 def _deregistration_block(deregistration):
     confirmed = deregistration.state != Deregistration.State.SUBMITTED
     states = (STEP_DONE, STEP_DONE if confirmed else STEP_NEXT, STEP_NEXT if confirmed else STEP_OPEN)
@@ -185,7 +196,7 @@ def _deregistration_block(deregistration):
     return Block(
         "deregistration", steps, sum(step.state == STEP_DONE for step in steps), len(steps),
         deregistration=deregistration,
-        note="" if confirmed else _("Date open: the LEG confirms it."),
+        note="" if confirmed else date_note(deregistration),
     )
 
 
@@ -278,6 +289,9 @@ def build(person, today=None):
             rows.sort(key=lambda row: row.direction != Direction.CONSUMPTION)
             if rows:
                 rows[-1].block = block
+            elif block not in card.extra_blocks:
+                # A draft without metering points yet still shows its progress, its notes and "Continue" (N-07).
+                card.extra_blocks.append(block)
             card.rows.extend(rows)
 
     seen_deregistrations = {}

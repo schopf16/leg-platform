@@ -60,6 +60,14 @@ LIFETIME_DAYS = Placeholder(
 STOP_URL = Placeholder(
     "stop_url", _("Personal link that stops the requested change of an email address.")
 )
+# Only in the reminder "application not completed yet": the day the paused application is deleted.
+DELETION_DATE = Placeholder(
+    "deletion_date",
+    _(
+        "Day on which the paused application is deleted if nothing changes; empty if no day is known. "
+        "The default text uses it only when it is known."
+    ),
+)
 # Only in notifications to an account's addresses (``MailJob.NOTIFICATION_KINDS``, D-068).
 GREETING = Placeholder(
     "greeting",
@@ -227,7 +235,7 @@ DEFINITIONS = {
     Key.APPLICATION_REMINDER: Definition(
         "accounts/email/application_reminder.txt",
         lambda: gettext("Your application at %(instance_name)s is not completed yet"),
-        (GREETING,),
+        (GREETING, DELETION_DATE),
         (),
     ),
     Key.APPLICATION_ROLLED_BACK: Definition(

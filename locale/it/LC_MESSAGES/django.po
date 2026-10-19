@@ -137,7 +137,7 @@ msgid "Hello, %(name)s"
 msgstr "Buongiorno, %(name)s"
 
 msgid "Open"
-msgstr "Apri"
+msgstr "Da fare"
 
 msgid "Hide"
 msgstr "Nascondi"
@@ -1185,7 +1185,7 @@ msgid "Profile"
 msgstr "Profilo"
 
 msgid "Log out"
-msgstr "Esci"
+msgstr "Disconnetti"
 
 msgid "Privacy notice"
 msgstr "Informativa sulla protezione dei dati"
@@ -2004,6 +2004,9 @@ msgstr "Imposta password"
 # The profile in cards and the second address (D-059)
 msgid "Personal link that stops the requested change of an email address."
 msgstr "Collegamento personale che interrompe la modifica richiesta di un indirizzo e-mail."
+
+msgid "Day on which the paused application is deleted if nothing changes; empty if no day is known. The default text uses it only when it is known."
+msgstr "Giorno in cui la richiesta in pausa viene eliminata se non cambia nulla; vuoto se non è noto alcun giorno. Il testo predefinito lo utilizza solo se è noto."
 
 msgid "Greeting with the name of the person the account belongs to, or a neutral greeting if no suitable name is known. Best written on a line of its own at the start."
 msgstr "Saluto con il nome della persona a cui appartiene il conto, oppure un saluto neutro se non è noto un nome adatto. Meglio scriverlo su una riga a sé all'inizio."
@@ -4900,11 +4903,14 @@ msgstr "L'IBAN del Suo conto presso %(instance_name)s è stato modificato"
 msgid "Registration at the grid operator to be withdrawn: %(instance_name)s"
 msgstr "Registrazione presso il gestore di rete da ritirare: %(instance_name)s"
 
-msgid "Your application at %(instance_name)s was submitted. It is being checked now. You can follow the progress after you sign in:"
-msgstr "La Sua richiesta presso %(instance_name)s è stata inoltrata. Ora viene verificata. Dopo l'accesso può seguire lo stato di avanzamento:"
+msgid "Your application at %(instance_name)s was submitted. It is being checked now. You can follow the progress after you log in to the portal:"
+msgstr "La Sua richiesta presso %(instance_name)s è stata inoltrata. Ora viene verificata. Dopo l'accesso al portale può seguire lo stato di avanzamento:"
 
-msgid "Your application at %(instance_name)s is not completed yet. You can continue at any time after you sign in:"
-msgstr "La Sua richiesta presso %(instance_name)s non è ancora completata. Dopo l'accesso può continuare in qualsiasi momento:"
+msgid "Your application at %(instance_name)s is not completed yet. You can continue at any time. Log in to do so:"
+msgstr "La Sua richiesta presso %(instance_name)s non è ancora completata. Può continuare in qualsiasi momento. Per farlo, acceda:"
+
+msgid "If you do not continue, the application is deleted automatically on %(deletion_date)s, together with the details you entered about buildings and metering points. Your account is kept."
+msgstr "Se non prosegue, la richiesta viene eliminata automaticamente il %(deletion_date)s, insieme ai dati inseriti su edifici e punti di misura. Il Suo conto rimane."
 
 msgid "If you do not continue, the application is deleted automatically after some time, together with the details you entered about buildings and metering points. Your account is kept."
 msgstr "Se non prosegue, la richiesta viene eliminata automaticamente dopo un certo tempo, insieme ai dati inseriti su edifici e punti di misura. Il Suo conto rimane."
@@ -4912,10 +4918,10 @@ msgstr "Se non prosegue, la richiesta viene eliminata automaticamente dopo un ce
 msgid "Your application at %(instance_name)s was not completed in time and was deleted, together with the details you entered about buildings and metering points. Your account is kept."
 msgstr "La Sua richiesta presso %(instance_name)s non è stata completata in tempo ed è stata eliminata, insieme ai dati inseriti su edifici e punti di misura. Il Suo conto rimane."
 
-msgid "You can start a new application at any time after you sign in:"
-msgstr "Dopo l'accesso può avviare una nuova richiesta in qualsiasi momento:"
+msgid "You can start a new application at any time. Log in to do so:"
+msgstr "Può avviare una nuova richiesta in qualsiasi momento. Per farlo, acceda:"
 
-msgid "Your application at %(instance_name)s is almost complete. The contract still needs your approval. You can read and approve it after you sign in:"
+msgid "Your application at %(instance_name)s is almost complete. The contract still needs your approval. You can read and approve it after you log in:"
 msgstr "La Sua richiesta presso %(instance_name)s è quasi completa. Al contratto manca ancora la Sua accettazione. Dopo l'accesso può leggerlo e accettarlo:"
 
 msgid "If the contract is not approved in time, the application is deleted, together with the details you entered about buildings and metering points."
@@ -4924,8 +4930,8 @@ msgstr "Se il contratto non viene accettato in tempo, la richiesta viene elimina
 msgid "Your application at %(instance_name)s was deleted because the contract was not approved in time, together with the details you entered about buildings and metering points. Your account is kept."
 msgstr "La Sua richiesta presso %(instance_name)s è stata eliminata perché il contratto non è stato accettato in tempo, insieme ai dati inseriti su edifici e punti di misura. Il Suo conto rimane."
 
-msgid "The LEG returned your application at %(instance_name)s for correction. You can see why, and what to check, after you sign in:"
-msgstr "La CEL ha restituito per correzione la Sua richiesta presso %(instance_name)s. Dopo l'accesso può vedere il motivo e cosa deve verificare:"
+msgid "The LEG returned your application at %(instance_name)s for correction. You can see why, and what to check, after you log in to the portal:"
+msgstr "La CEL ha restituito per correzione la Sua richiesta presso %(instance_name)s. Dopo l'accesso al portale può vedere il motivo e cosa deve verificare:"
 
 msgid "Please check your details and submit the application again."
 msgstr "Verifichi i Suoi dati e inoltri di nuovo la richiesta."
@@ -4936,25 +4942,22 @@ msgstr "La Sua richiesta presso %(instance_name)s non è stata accettata. Per mo
 msgid "Your application at %(instance_name)s was not accepted. The grid operator did not accept the registration of your metering points. For privacy reasons we deleted your building and metering point details. Your account remains."
 msgstr "La Sua richiesta presso %(instance_name)s non è stata accettata. Il gestore di rete non ha accettato la registrazione dei Suoi punti di misura. Per motivi di protezione dei dati abbiamo eliminato i Suoi dati su edifici e punti di misura. Il Suo conto rimane."
 
-msgid "Your application at %(instance_name)s needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you sign in:"
+msgid "Your application at %(instance_name)s needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you log in:"
 msgstr "Per la Sua richiesta presso %(instance_name)s ci serve un conto bancario o postale, affinché l'elettricità immessa possa essere rimunerata. Lo inserisca dopo l'accesso:"
 
-msgid "Your deregistration at %(instance_name)s was received. The LEG confirms the date. You can follow the progress after you sign in:"
-msgstr "La Sua uscita presso %(instance_name)s è stata ricevuta. La CEL conferma la data. Dopo l'accesso può seguire lo stato di avanzamento:"
+msgid "Your deregistration at %(instance_name)s was received. The LEG confirms the date. You cannot withdraw the termination yourself. You can follow the progress after you log in to the portal:"
+msgstr "La Sua uscita presso %(instance_name)s è stata ricevuta. La CEL conferma la data. Non può ritirare personalmente la disdetta. Dopo l'accesso al portale può seguire lo stato di avanzamento:"
 
-msgid "Your deregistration at %(instance_name)s has taken effect. You can see the details after you sign in:"
-msgstr "La Sua uscita presso %(instance_name)s è avvenuta. Dopo l'accesso può vedere i dettagli:"
+msgid "Your deregistration at %(instance_name)s has taken effect. You can see the details after you log in to the portal:"
+msgstr "La Sua uscita presso %(instance_name)s è avvenuta. Dopo l'accesso al portale può vedere i dettagli:"
 
 msgid "The IBAN stored for your account at %(instance_name)s was changed."
 msgstr "L'IBAN memorizzato per il Suo conto presso %(instance_name)s è stato modificato."
 
-msgid "If you did not do this, sign in and check the IBAN, and contact the operator immediately."
+msgid "If you did not do this, log in and check the IBAN, and contact the operator immediately."
 msgstr "Se non è stato Lei, acceda, verifichi l'IBAN e contatti subito il gestore."
 
-msgid "Contact information: %(contact_url)s"
-msgstr "Informazioni di contatto: %(contact_url)s"
-
-msgid "At %(instance_name)s an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you sign in:"
+msgid "At %(instance_name)s an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you log in:"
 msgstr "Presso %(instance_name)s una richiesta è stata annullata perché la conferma del gestore di rete non è arrivata in tempo. Ritiri la registrazione presso il gestore di rete. I dettagli si trovano nella gestione dopo l'accesso:"
 
 # ---- Management pages of the onboarding: processes, contracts, deadlines (D-103; owner design verwaltung/vorgaenge, vertraege) ----
@@ -5112,7 +5115,7 @@ msgid "Return for correction"
 msgstr "Restituisci per correzione"
 
 msgid "Roll back application"
-msgstr "Annulla richiesta"
+msgstr "Rifiuta la richiesta"
 
 msgid "Side column"
 msgstr "Colonna laterale"
@@ -5172,9 +5175,6 @@ msgstr "Accettato il %(date)s (versione del %(version)s)"
 msgid "Only the customer accepts the contract."
 msgstr "Solo il cliente accetta il contratto."
 
-msgid "Switch-on"
-msgstr "Attivazione"
-
 msgctxt "process step"
 msgid "Done"
 msgstr "Completato"
@@ -5185,7 +5185,7 @@ msgstr "Prossimo"
 
 msgctxt "process step"
 msgid "Open"
-msgstr "Aperto"
+msgstr "Da fare"
 
 #, python-format
 msgid "The wish of the customer; the %(operator)s decides."
@@ -5725,7 +5725,7 @@ msgstr "Inserisca un numero."
 msgid "Enter a number of at least 0."
 msgstr "Inserisca un numero pari ad almeno 0."
 
-msgid "Metering point number for the draw"
+msgid "Metering point number for consumption"
 msgstr "Numero del punto di misura per il consumo"
 
 msgid "You find the number on your last electricity bill."
@@ -5873,7 +5873,7 @@ msgstr "Partecipante"
 
 #, python-format
 msgid "This address could not be assigned to one building clearly. Please check your entry or contact the %(leg)s."
-msgstr "Questo indirizzo non ha potuto essere assegnato con certezza a un solo edificio. Verifichi l'inserimento o contatti %(leg)s."
+msgstr "Questo indirizzo non ha potuto essere assegnato con certezza a un solo edificio. Verifichi l'inserimento o contatti la %(leg)s."
 
 msgid "This address could not be assigned to one building clearly. Please check your entry or contact the LEG."
 msgstr "Questo indirizzo non ha potuto essere assegnato con certezza a un solo edificio. Verifichi l'inserimento o contatti la CEL."
@@ -5985,8 +5985,8 @@ msgstr "Ha un impianto FV? Allora registri il punto di misura per l'immissione."
 msgid "Add metering point"
 msgstr "Aggiungi punto di misura"
 
-msgid "Start registration"
-msgstr "Avvia la registrazione"
+msgid "Start application"
+msgstr "Avvia la richiesta"
 
 msgid "My participation"
 msgstr "La mia partecipazione"
@@ -6235,9 +6235,6 @@ msgstr "I Suoi dati su edificio e punti di misura verranno eliminati."
 msgid "Your bank or postal connection is kept because it belongs to you as a person."
 msgstr "Le Sue coordinate bancarie o postali rimangono perché appartengono alla Sua persona."
 
-msgid "Continue registration"
-msgstr "Continua la registrazione"
-
 msgid "Cancel application"
 msgstr "Annulla la richiesta"
 
@@ -6286,16 +6283,16 @@ msgid "Already on file"
 msgstr "Già memorizzato"
 
 #, python-format
-msgid "Registration: %(done)s of %(total)s done"
-msgstr "Registrazione: %(done)s di %(total)s completati"
+msgid "Application: %(done)s of %(total)s done"
+msgstr "Richiesta: %(done)s di %(total)s completati"
 
 #, python-format
 msgid "Deregistration: %(done)s of %(total)s done"
 msgstr "Uscita: %(done)s di %(total)s completati"
 
 #, python-format
-msgid "Registration: %(done)s of %(total)s steps done"
-msgstr "Registrazione: %(done)s di %(total)s passaggi completati"
+msgid "Application: %(done)s of %(total)s steps done"
+msgstr "Richiesta: %(done)s di %(total)s passaggi completati"
 
 #, python-format
 msgid "Deregistration: %(done)s of %(total)s steps done"
@@ -6331,8 +6328,8 @@ msgstr "L'indirizzo in cui si trova il punto di misura."
 msgid "You enter the metering point for the draw. If you also feed in electricity, you add the metering point for the feed-in."
 msgstr "Inserisce il punto di misura per il consumo. Se immette anche elettricità, aggiunge il punto di misura per l'immissione."
 
-msgid "Choice of the start date"
-msgstr "Scelta della data di inizio"
+msgid "You choose when your participation starts."
+msgstr "Sceglie Lei da quando inizia la Sua partecipazione."
 
 msgid "Enter bank or postal connection"
 msgstr "Indica le coordinate bancarie o postali"
@@ -6377,8 +6374,8 @@ msgid "Desired date (last day of a month)"
 msgstr "Data desiderata (ultimo giorno di un mese)"
 
 #, python-format
-msgid "Earliest on %(date)s"
-msgstr "Al più presto il %(date)s"
+msgid "Earliest on %(date)s. The LEG confirms the date."
+msgstr "Al più presto il %(date)s. La CEL conferma la data."
 
 msgid "Already deregistered"
 msgstr "Uscita già effettuata"
@@ -6391,7 +6388,7 @@ msgstr "Desidera eliminare il Suo conto. Per farlo, richieda prima l'uscita dei 
 
 #, python-format
 msgid "You cannot withdraw the termination yourself afterwards. Questions: contact the %(leg)s."
-msgstr "In seguito non potrà ritirare personalmente la disdetta. In caso di domande contatti %(leg)s."
+msgstr "In seguito non potrà ritirare personalmente la disdetta. In caso di domande contatti la %(leg)s."
 
 msgid "The notice period is four months to the end of a month. The LEG confirms the date."
 msgstr "Il termine di disdetta è di quattro mesi per la fine di un mese. La CEL conferma la data."
@@ -6400,10 +6397,10 @@ msgid "Choose at least one metering point."
 msgstr "Selezioni almeno un punto di misura."
 
 msgid "You are deregistering 1 metering point at the chosen date."
-msgstr "Per la data scelta annuncia l'uscita di 1 punto di misura."
+msgstr "Con la data scelta richiede l'uscita di 1 punto di misura."
 
 msgid "You are deregistering %(count)s metering points at the chosen date."
-msgstr "Per la data scelta annuncia l'uscita di %(count)s punti di misura."
+msgstr "Con la data scelta richiede l'uscita di %(count)s punti di misura."
 
 msgid "A confirmation is sent to your email addresses."
 msgstr "Una conferma viene inviata ai Suoi indirizzi e-mail."
@@ -6427,13 +6424,14 @@ msgid "Your deregistration was submitted"
 msgstr "La Sua uscita è stata inoltrata"
 
 msgid "The LEG checks the date and deregisters you at %(operator)s. A confirmation was sent to your email addresses."
-msgstr "La CEL verifica la data e La cancella presso %(operator)s. Una conferma è stata inviata ai Suoi indirizzi e-mail."
+msgstr "La CEL verifica la data e La disiscrive presso %(operator)s. Una conferma è stata inviata ai Suoi indirizzi e-mail."
 
 msgid "Until the date the metering points stay active. Afterwards they are ended."
 msgstr "Fino alla data i punti di misura restano attivi. Dopo sono terminati."
 
-msgid "Date open: the LEG confirms it."
-msgstr "Data aperta: viene confermata dalla CEL."
+#, python-format
+msgid "Desired date %(date)s. The LEG confirms the date."
+msgstr "Data desiderata %(date)s. La CEL conferma la data."
 
 msgid "Your deregistration is started. You can now delete your account."
 msgstr "La Sua uscita è avviata. Ora può eliminare il Suo conto."
@@ -6449,7 +6447,7 @@ msgstr "Non memorizzato"
 
 #, python-format
 msgid "The address is confirmed and cannot be changed. Please contact the %(leg)s for a change."
-msgstr "L'indirizzo è confermato e non può essere modificato. Per una modifica contatti %(leg)s."
+msgstr "L'indirizzo è confermato e non può essere modificato. Per una modifica contatti la %(leg)s."
 
 msgid "With the deletion you lose access to the portal."
 msgstr "Con l'eliminazione perde l'accesso al portale."
@@ -6477,12 +6475,12 @@ msgstr "Da verificare da parte della CEL"
 
 #, python-format
 msgid "This address could not be found in the building register yet. The %(leg)s will check it. You can continue."
-msgstr "Questo indirizzo non è ancora stato trovato nel registro degli edifici. %(leg)s lo verifica. Può continuare."
+msgstr "Questo indirizzo non è ancora stato trovato nel registro degli edifici. La %(leg)s lo verifica. Può continuare."
 
 # Design walkthrough 2026-10-19, customer part (W1 to W4).
 #, python-format
 msgid "Choose the building where your electricity meter is. Not sure? Contact the %(leg)s."
-msgstr "Scelga l'edificio in cui si trova il Suo contatore elettrico. Non è sicuro? Contatti %(leg)s."
+msgstr "Scelga l'edificio in cui si trova il Suo contatore elettrico. Non è sicuro? Contatti la %(leg)s."
 
 msgid "Contact the LEG"
 msgstr "Contatto con la CEL"
@@ -6522,7 +6520,7 @@ msgstr "La Sua richiesta è stata eliminata perché la Sua conferma nell'e-mail 
 
 #, python-format
 msgid "You can register again at any time. Questions: contact the %(leg)s."
-msgstr "Può registrarsi di nuovo in qualsiasi momento. In caso di domande contatti %(leg)s."
+msgstr "Può inoltrare una nuova richiesta in qualsiasi momento. In caso di domande contatti la %(leg)s."
 
 msgid "View"
 msgstr "Visualizza"
@@ -6549,5 +6547,36 @@ msgstr "Partecipa alla CEL dal %(date)s."
 msgid "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted on %(date)s."
 msgstr "La Sua richiesta è in pausa perché non è stata modificata per un po' di tempo. La continui, altrimenti verrà eliminata il %(date)s."
 
-msgid "Your deregistration continues. The metering points end on the confirmed date."
-msgstr "La Sua uscita prosegue. I punti di misura terminano alla data confermata."
+msgid "Your deregistration continues. The metering points end on the date that the LEG confirms."
+msgstr "La Sua uscita prosegue. I punti di misura terminano alla data confermata dalla CEL."
+
+# Second designer walkthrough, customer part (N-01 to N-15).
+msgid "Check your details"
+msgstr "Verifichi i Suoi dati"
+
+msgid "Please correct what the LEG described. Then submit the application again."
+msgstr "Corregga quanto descritto dalla CEL. Poi inoltri di nuovo la richiesta."
+
+msgid "Your deregistration was submitted."
+msgstr "La Sua uscita è stata inoltrata."
+
+msgid "Deregister metering points"
+msgstr "Richiedi l'uscita dei punti di misura"
+
+msgid "The EGID is the number of your building in the federal register of buildings."
+msgstr "L'EGID è il numero del Suo edificio nel registro federale degli edifici."
+
+msgid "opens in a new tab"
+msgstr "si apre in una nuova scheda"
+
+msgid "Registration at the grid operator"
+msgstr "Registrazione presso il gestore di rete"
+
+msgid "You confirm the request in the email from the grid operator"
+msgstr "Conferma la richiesta nell'e-mail del gestore di rete"
+
+msgid "Set by the grid operator"
+msgstr "Stabilito dal gestore di rete"
+
+msgid "Your desired date"
+msgstr "La Sua data desiderata"

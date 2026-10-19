@@ -68,7 +68,7 @@ count; the server checks everything again.
           <h2 id="date-title">{% translate "When should the deregistration take effect?" %}</h2>
           <fieldset class="question" aria-labelledby="date-title">
             {% for radio in form.termination %}
-              <label class="entry-check" for="{{ radio.id_for_label }}"><input class="entry-check-input" type="radio" id="{{ radio.id_for_label }}" name="termination" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}{% if radio.data.value == "earliest" and earliest %}<span class="meta">{% blocktranslate with date=earliest|date:"d.m.Y" %}Earliest on {{ date }}{% endblocktranslate %}</span>{% endif %}</span></label>
+              <label class="entry-check" for="{{ radio.id_for_label }}"><input class="entry-check-input" type="radio" id="{{ radio.id_for_label }}" name="termination" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}{% if radio.data.value == "earliest" and earliest %}<span class="meta">{% blocktranslate with date=earliest|date:"d.m.Y" %}Earliest on {{ date }}. The LEG confirms the date.{% endblocktranslate %}</span>{% endif %}</span></label>
             {% endfor %}
           </fieldset>
           <div class="reveal{% if form.termination.value == 'date' %} is-open{% endif %}" data-reveal-name="termination" data-reveal-value="date">

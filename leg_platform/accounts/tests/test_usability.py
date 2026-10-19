@@ -419,7 +419,7 @@ class LogoutTests(TestCase):
         )
 
         self.assertRedirects(response, LOGIN_URL)
-        self.assertContains(response, "Sie wurden abgemeldet.")
+        self.assertContains(response, "Sie wurden ausgeloggt.")
         self.assertNotIn("_auth_user_id", browser.session)
 
 

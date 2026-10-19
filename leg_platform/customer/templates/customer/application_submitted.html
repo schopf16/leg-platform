@@ -5,7 +5,6 @@
   <div class="wizard">
     <div class="progress-block">
       <p class="page-label">{% translate "My participation · Application" %}</p>
-      <progress class="path-bar" max="{{ total }}" value="{{ done }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} done{% endblocktranslate %}">{{ done }}/{{ total }}</progress>
     </div>
     <div>
       <h1 class="start-title">{% translate "Your application was submitted" %}</h1>
@@ -30,8 +29,8 @@
             <div><dt>{% translate "Building" %}</dt><dd>{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}{% if building.egid %}<span class="mp-note">{% translate "EGID" %} {{ building.egid }}</span>{% endif %}</dd></div>
           {% endwith %}
         {% endif %}
-        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}{{ point.get_direction_display }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>
-        <div><dt>{% translate "Start date" %}</dt><dd>{% if application.start_choice == "date" %}{{ application.desired_start_date|date:"d.m.Y" }}{% else %}{% translate "As soon as possible" %}{% endif %}</dd></div>
+        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number }}</span><span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
+        <div><dt>{% if application.start_choice == "date" %}{% translate "Your desired date" %}{% else %}{% translate "Start date" %}{% endif %}</dt><dd>{% if application.start_choice == "date" %}{{ application.desired_start_date|date:"d.m.Y" }}{% else %}{% translate "As soon as possible" %}{% endif %}</dd></div>
       </dl>
       <p class="muted">{% translate "Changes are now only possible through the LEG." %}</p>
     </section>

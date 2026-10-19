@@ -6,7 +6,7 @@ means the wizard skips the step; "Change" leads to where the detail is kept. A s
   <ol class="overview-rows">
     {% for row in rows %}
       <li class="overview-row{% if row.state == 'known' %} is-known{% endif %}">
-        <span class="overview-number" aria-hidden="true">{{ row.number }}</span>
+        <span class="overview-number" aria-hidden="true">{% if row.number %}{{ row.number }}{% else %}–{% endif %}</span>
         <div class="overview-text">
           <p class="overview-name">{{ row.name }}{% if row.tag %} <span class="row-tag">{% translate "only with feed-in" %}</span>{% endif %}</p>
           <p class="muted">{{ row.text }}</p>

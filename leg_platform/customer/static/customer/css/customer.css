@@ -500,6 +500,26 @@ fieldset.question {
   border: 0;
 }
 
+/* The result fieldset that takes the focus after a search (W1-09): the portal's own focus ring, with room between the
+   ring and the text (N-14). */
+fieldset.question[tabindex="-1"]:focus,
+fieldset.question[tabindex="-1"]:focus-visible,
+.suggest[tabindex="-1"]:focus,
+.note-bad[tabindex="-1"]:focus {
+  padding: 12px;
+  border-radius: 8px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.entry-check .meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 fieldset.question legend {
   float: none;
   width: auto;
@@ -517,6 +537,15 @@ fieldset.question legend {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* A note that is one paragraph of text with inline parts (a link in a sentence) must not become a grid: every text
+   and the link would be a row of its own (N-02). */
+p.note-bad,
+p.note-warn,
+p.note-info,
+span.note-warn {
+  display: block;
 }
 
 .note-bad { color: var(--bad); }
@@ -764,6 +793,30 @@ fieldset.question legend {
 
 .status-details {
   margin: 0 0 24px;
+}
+
+.building-card > .mp-progress {
+  margin-top: 16px;
+}
+
+/* The way back to the step before (N-01): a link with a 44 px target above the progress. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 4px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back-link::before {
+  content: "←";
+  margin-right: 6px;
+}
+
+.back-link:hover {
+  color: var(--fg);
+  text-decoration: underline;
 }
 
 .block-title {

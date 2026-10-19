@@ -10,7 +10,7 @@
 
     {% if draw_needed %}
       <div class="mb-3">
-        <label class="form-label" for="{{ form.draw_number.id_for_label }}">{% translate "Metering point number for the draw" %}</label>
+        <label class="form-label" for="{{ form.draw_number.id_for_label }}">{% translate "Metering point number for consumption" %}</label>
         <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.draw_number }}</span>
         {% if form.draw_number.errors %}<div class="invalid-feedback d-block" id="{{ form.draw_number.auto_id }}_error">{% for error in form.draw_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
         <div class="form-hint" id="{{ form.draw_number.auto_id }}_helptext">{{ form.draw_number.help_text }}</div>

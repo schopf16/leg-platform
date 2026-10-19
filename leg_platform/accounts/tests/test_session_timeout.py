@@ -122,7 +122,7 @@ class SessionTimeoutTests(TestCase):
         response = self.get(31 * MINUTE)
         self.assertEqual(response["Location"], f"{LOGIN_URL}?next={PROFILE_URL}")
         page = self.client.get(response["Location"])
-        self.assertContains(page, "Sie wurden aus Sicherheitsgründen abgemeldet")
+        self.assertContains(page, "Sie wurden aus Sicherheitsgründen ausgeloggt")
 
     def test_a_post_after_the_timeout_changes_nothing(self):
         self.open_session(self.user)

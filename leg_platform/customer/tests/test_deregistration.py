@@ -277,11 +277,11 @@ class SubmitTests(DeregistrationCase):
         self.assertEqual(page.status_code, 200)
         for text in (
             "Ihre Abmeldung ist abgeschickt", "So geht es weiter", "Abmeldung eingereicht", "Termin durch die LEG bestätigt",
-            "Abgemeldet", "Termin offen: wird von der LEG bestätigt.", EARLIEST_TEXT, self.draw.number,
+            "Abgemeldet", "Die LEG bestätigt den Termin.", self.draw.number,
             "Bis zum Termin bleiben die Messpunkte aktiv.", "Eine Bestätigung wurde an Ihre E-Mail-Adressen gesendet.",
         ):
             self.assertIn(text, html)
-        self.assertNotIn(self.earliest().strftime("%d.%m.%Y"), html)
+        self.assertIn(f"Frühestens am {self.earliest().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
         self.assertNotIn("Konto löschen", html)
         for directive in ("no-cache", "no-store", "private"):
             self.assertIn(directive, page["Cache-Control"])
@@ -493,11 +493,11 @@ class ResultAndAccessTests(DeregistrationCase):
         deregistrations.confirm(self.dereg, self.staff, month_end(add_months(timezone.localdate(), 5)))
         html = self.client.get(self.done).content.decode()
         self.assertIn("Gekündigt zum", html)
-        self.assertNotIn("Termin offen", html)
+        self.assertNotIn("Die LEG bestätigt den Termin.", html)
 
     def test_after_the_start_of_the_deregistration_the_buildings_page_says_in_deregistration_and_shows_the_note(self):
         html = self.client.get(BUILDINGS).content.decode()
-        self.assertIn("Termin offen: wird von der LEG bestätigt.", html)
+        self.assertIn(f"Frühestens am {deregistrations.earliest_date_preview().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
 
     def test_from_the_account_deletion_the_deletion_is_offered_when_it_is_released(self):
         deregistrations.request_deregistration(self.mine, metering_point_ids=[self.feed_in.pk])

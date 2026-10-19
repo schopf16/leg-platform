@@ -82,10 +82,22 @@ HANDLERS = {
     MailJob.Kind.APPLICATION_REJECTED_OPERATOR: _notification(emails.send_application_rejected_operator),
 }
 
+def _application_reminder(account_id, address, greeting_name=""):
+    """The reminder "not completed yet" names the day on which the paused application is deleted. The job has no
+    payload, so the day is read here, when the mail is made (``applications.next_deletion_date``); without a paused
+    draft or a day the text says "after some time"."""
+    # Imported here: ``community`` imports this package.
+    from leg_platform.community import applications
+
+    deletion_date = applications.next_deletion_date(account_id) if account_id is not None else None
+    return lambda: emails.send_application_reminder(address, greeting_name, deletion_date)
+
+
 # Handlers of jobs about an account get the account key and the address (D-044).
 ACCOUNT_HANDLERS = {
     MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
     MailJob.Kind.INVITATION: invitations.process_invitation,
+    MailJob.Kind.APPLICATION_REMINDER: _application_reminder,
 }
 
 DONE = "done"
@@ -175,7 +187,12 @@ def enqueue(kind, address, account=None, greeting_name=""):
 
 
 # The jobs that keep the account key, because the worker makes a personal link for them.
-ACCOUNT_KEY_KINDS = (MailJob.Kind.EMAIL_CHANGE_NOTICE, MailJob.Kind.TWO_FACTOR_RESET_LINK)
+ACCOUNT_KEY_KINDS = (
+    MailJob.Kind.EMAIL_CHANGE_NOTICE,
+    MailJob.Kind.TWO_FACTOR_RESET_LINK,
+    # The reminder names the deletion day, which the worker reads from the account's paused drafts.
+    MailJob.Kind.APPLICATION_REMINDER,
+)
 
 
 def enqueue_for_account(kind, user, addresses=None):

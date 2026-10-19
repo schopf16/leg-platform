@@ -14,7 +14,7 @@
             <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "To be checked by the LEG" %}</p>
           {% endif %}
           <p class="found-address">{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}</p>
-          {% if chosen.egid %}<p class="muted">{% translate "EGID" %} {{ chosen.egid }}</p>{% else %}<p class="note-warn" id="address-review-note">{% blocktranslate %}This address could not be found in the building register yet. The {{ leg }} will check it. You can continue.{% endblocktranslate %}</p>{% endif %}
+          {% if chosen.egid %}<p class="muted">{% translate "EGID" %} {{ chosen.egid }}</p><p class="muted">{% translate "The EGID is the number of your building in the federal register of buildings." %}</p>{% else %}<p class="note-warn" id="address-review-note">{% blocktranslate %}This address could not be found in the building register yet. The {{ leg }} will check it. You can continue.{% endblocktranslate %}</p>{% endif %}
           {% if chosen.name %}<p class="muted">{{ chosen.name }}</p>{% endif %}
           {% if chosen.location_id %}<p class="note-info">{% translate "This building is already created. Your metering points are assigned to it." %}</p>{% endif %}
         </div>
@@ -54,13 +54,14 @@
             {% endfor %}
           </ul>
           <button type="submit" name="confirm_typed" value="1" class="btn btn-secondary-action">{% translate "My entry is correct" %}</button>
+          <p class="muted">{% translate "The EGID is the number of your building in the federal register of buildings." %}</p>
         </div>
       {% endif %}
 
       {% if options %}
         <fieldset class="question" id="options-fieldset" tabindex="-1" autofocus aria-describedby="options-help">
           <legend>{% translate "There are several buildings at this address. Which one is yours?" %}</legend>
-          <p class="muted" id="options-help">{% blocktranslate %}Choose the building where your electricity meter is. Not sure? Contact the {{ leg }}.{% endblocktranslate %}</p>
+          <p class="muted" id="options-help">{% blocktranslate %}Choose the building where your electricity meter is. Not sure? Contact the {{ leg }}.{% endblocktranslate %} {% translate "The EGID is the number of your building in the federal register of buildings." %}</p>
           {% for option in options %}
             <label class="entry-check"><input class="entry-check-input" type="radio" name="egid" value="{{ option.egid }}" required><span>{{ option.label }}{% if option.entrance %} · {% blocktranslate with entrance=option.entrance %}Entrance {{ entrance }}{% endblocktranslate %}{% endif %} · {% translate "EGID" %} {{ option.egid }}</span></label>
           {% endfor %}

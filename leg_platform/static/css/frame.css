@@ -235,9 +235,13 @@
 }
 
 .frame-menu-foot {
+  /* "Ausloggen" and the legal links stay in view at the bottom of the menu, however long the menu is (N-04). */
+  position: sticky;
+  bottom: 0;
   margin-top: auto;
-  padding-top: 12px;
+  padding: 12px 0 8px;
   border-top: 1px solid var(--line);
+  background: var(--panel);
 }
 
 /* A customer's menu (MENU-STANDARD.md): a parent entry (no link) with its entries always open below it, indented under a line. */

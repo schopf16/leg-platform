@@ -268,6 +268,7 @@ class DeregistrationDoneView(DeregistrationBase):
         context = {
             "deregistration": deregistration, "progress": overview._deregistration_block(deregistration),
             "points": [item.metering_point for item in items], "operator": operator_name(),
+            "date_text": overview.date_note(deregistration),
             "deletion": deletion, "released": deletion and deregistrations.deletion_released(request.user),
         }
         return render(request, "customer/deregistration_done.html", context)

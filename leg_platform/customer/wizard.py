@@ -48,7 +48,7 @@ STEP_SENTENCES = {
     ),
     applications.BANK_CONNECTION: _lazy("This is how we pay you the compensation for the electricity you feed in."),
     applications.CONTRACT: _lazy("You have to agree to the articles of association."),
-    applications.START: _lazy("Choice of the start date"),
+    applications.START: _lazy("You choose when your participation starts."),
 }
 # The sentence of the metering point row when a metering point is added and only the feed-in is missing (W2-06).
 FEED_IN_ADD_SENTENCE = _lazy("You enter the feed-in metering point.")
@@ -185,17 +185,22 @@ def overview_rows(person, application=None, location=None):
         address = _address_text(first.current_address()) if first is not None else ""
         feed_in_add = first is not None and _feed_in_add_case(person, first.location)
     rows = []
-    for number, key in enumerate(applications.STEPS, start=1):
+    number = 0
+    for key in applications.STEPS:
         if key not in shown:
             continue
         state = states[key]
+        tag = key == applications.BANK_CONNECTION and optional_bank
+        # The optional bank row ("only with feed-in") has no number: the numbers and the count are the steps that apply (N-08).
+        if not tag:
+            number += 1
         text = STEP_SENTENCES[key]
         if key == applications.BUILDING and state != applications.OPEN and address:
             text = address
         elif key == applications.METERING_POINTS and feed_in_add:
             text = FEED_IN_ADD_SENTENCE
         rows.append(OverviewRow(
-            key, number, STEP_NAMES[key], text, state, tag=key == applications.BANK_CONNECTION and optional_bank,
+            key, None if tag else number, STEP_NAMES[key], text, state, tag=tag,
             change_url=change.get(key, "") if state != applications.OPEN else "",
             view_only=application is None and key in (applications.BUILDING, applications.CONTRACT),
         ))
@@ -224,6 +229,7 @@ class ApplicationStartView(CustomerAccessMixin, View):
                 remaining=current.total - current.done, paused=paused,
                 paused_date=applications.rollback_date(draft) if paused else None,
                 reason=applications.returned_reason(draft), returned=draft.returned_at is not None,
+                checking=draft.returned_at is not None and current.next_step is None,
                 next_url=next_url(draft),
                 next_name=NEXT_STEP_NAMES[current.next_step] if current.next_step else _("Submit application"),
             )
@@ -310,10 +316,19 @@ class StepView(CustomerAccessMixin, View):
             "returned": application.returned_at is not None,
             "returned_reason": applications.returned_reason(application),
             "has_iban": own_iban.has_iban(request.user),
+            "back_url": self.back_url(application, current),
             "confirm_cancel": request.GET.get("cancel") == "1",
             "operator": operator_name(),
             **extra,
         }
+
+    def back_url(self, application, current):
+        """The page before this step (an applicable step that can be opened), else the overview with every step (N-01)."""
+        before = [step for step in current.steps if step.applicable and step.available]
+        keys = [step.key for step in before]
+        if self.step in keys and keys.index(self.step) > 0:
+            return step_url(application, keys[keys.index(self.step) - 1])
+        return reverse("customer:application_start")
 
     def get(self, request, pk):
         application, current, redirected = self.load(request, pk)
@@ -790,7 +805,7 @@ class ApplicationSubmittedView(CustomerAccessMixin, View):
         ):
             return redirect("customer:buildings")
         del request.session[SUBMITTED_SESSION_KEY]
-        order = steps_module.post_submit_steps(application, operator_name())
+        order = steps_module.post_submit_steps(application, operator_name(), named=False)
         building = application.buildings.select_related("location").first()
         points = list(building.metering_points.all()) if building else []
         steps = [{"key": key, "state": state, "name": label, "word": word} for key, state, label, word in order]

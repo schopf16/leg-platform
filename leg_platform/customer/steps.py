@@ -24,24 +24,35 @@ def state_word(state):
     return {applications.DONE: _("Finished"), "next": _("Next up")}.get(state, _("Open"))
 
 
-def post_submit_steps(application, operator):
+def post_submit_steps(application, operator, named=True):
     """``[(key, state, label, word)]`` of the five steps after the submission, with the grid operator's name.
 
     The fourth step is the customer's own (the confirmation in the email of the grid operator: "Open" until it is
-    done); the fifth is the start date, which the grid operator sets."""
-    labels = {
+    done); the fifth is the start date, which the grid operator sets. ``named=False`` says "the grid operator" instead
+    of the name (the page "submitted" names it once in its first sentence, N-09)."""
+    if named:
+        labels = {
+            "operator_registration": _("Registration at %(operator)s") % {"operator": operator},
+            "operator_confirmation": _("You confirm the request in the email from %(operator)s") % {"operator": operator},
+        }
+        start_word = _("Set by %(operator)s") % {"operator": operator}
+    else:
+        labels = {
+            "operator_registration": _("Registration at the grid operator"),
+            "operator_confirmation": _("You confirm the request in the email from the grid operator"),
+        }
+        start_word = _("Set by the grid operator")
+    labels.update({
         "submitted": _("Details submitted"),
         "review": _("Check by the LEG"),
-        "operator_registration": _("Registration at %(operator)s") % {"operator": operator},
-        "operator_confirmation": _("You confirm the request in the email from %(operator)s") % {"operator": operator},
         "start": _("Start date"),
-    }
+    })
     rows = []
     for key, state in applications.post_submit_progress(application):
         word = state_word(state)
         if key == "operator_confirmation" and state != applications.DONE:
             word = _("Open")
         elif key == "start" and state != applications.DONE:
-            word = _("Set by %(operator)s") % {"operator": operator}
+            word = start_word
         rows.append((key, state, labels[key], word))
     return rows

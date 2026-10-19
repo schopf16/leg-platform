@@ -70,6 +70,11 @@ BSD 3-Clause License (`LICENSE`), the same as Django (D-029). Dependencies are i
 * **Owner:**
   * the AGOV answer (waiting; D-004);
   * the own human review of the security-critical changes (D-019): second factor, reset, account lifecycle, administration, stage equal to production (D-070), logo upload and the right to change the portal settings (D-073), the access rule of the management area (D-086).
+* **Owner decisions open (from the onboarding work, D-103 to D-105):**
+  * buildings are shared by all customers of one EGID, each sees only the own metering points; staff who also take part as customers need a separate account (staff get no customer pages);
+  * "Frühestens am <date>" on the deregistration page (deviates from `ABMELDUNG.md` section 3), contract re-acceptance after a new version, mails for completion and confirmed dates (none are sent), the terms "Anmeldung"/"Abmeldung" in French and Italian ("demande", "richiesta", "désinscription", "uscita"), the two menu entries "Vertrag" and "Gesellschaftsvertrag" for one page;
+  * the legal reading of "four months to month end" and of the click acceptance of the contract (`RECHERCHE-VERTRAG-DIGITAL.md`, Frage 22);
+  * the privacy notice of the operator must name the swisstopo request (S-4 in `docs/SERVICES.md`).
 * **Operator (Infomaniak, D-074):**
   * confirm the legal points of the retention flag that could not be verified with the tools: version of the OR in force, that the instance operator is obliged under Art. 957, the date from which an account may be deleted again (D-086 item 2);
   * the verification on a real system (below; not possible on the development machine).

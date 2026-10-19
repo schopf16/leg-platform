@@ -122,6 +122,7 @@ class HomeView(NeverCacheMixin, TemplateView):
         journey = None
         banners = []
         status_lines = []
+        requested_note = ""
         if not user.is_staff:
             # The card "Your way into the LEG" (D-103): only while an application of the account is open.
             from leg_platform.community import participation
@@ -134,6 +135,15 @@ class HomeView(NeverCacheMixin, TemplateView):
             if journey is None:
                 # A status line under the greeting where no card is shown (W1-18): the participation or a deregistration.
                 status_lines = [line for line in participation.status_lines(user) if line.kind in self.STATUS_KINDS]
+                if any(line.kind == "deregistration_requested" for line in status_lines):
+                    from leg_platform.community.models import Deregistration
+                    from leg_platform.customer import overview as customer_overview
+
+                    waiting = (
+                        Deregistration.objects.filter(person=user, state=Deregistration.State.SUBMITTED)
+                        .order_by("earliest_date").first()
+                    )
+                    requested_note = customer_overview.date_note(waiting) if waiting is not None else ""
         return super().get_context_data(
             account=user,
             tasks=tasks.open_tasks(user),
@@ -141,7 +151,7 @@ class HomeView(NeverCacheMixin, TemplateView):
             journey=journey,
             banners=banners,
             status_lines=status_lines,
-            **kwargs,
+            requested_note=requested_note,
         )
 
 

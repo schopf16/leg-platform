@@ -10,7 +10,7 @@
     </div>
     {% if overview.cards %}
       <div class="head-actions">
-        <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Start registration" %}</button></form>
+        <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Start application" %}</button></form>
         {% if can_deregister %}<a class="btn btn-danger-outline" href="{{ deregistration_url }}">{% translate "Start deregistration" %}</a>{% endif %}
       </div>
     {% endif %}
@@ -25,7 +25,7 @@
       <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-building"/></svg></span>
       <h2>{% translate "No building registered yet" %}</h2>
       <p>{% translate "Register your building to take part in the LEG." %}</p>
-      <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Start registration" %}</button></form>
+      <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Start application" %}</button></form>
     </div>
   {% endif %}
 {% endblock %}

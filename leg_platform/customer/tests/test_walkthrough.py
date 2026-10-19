@@ -302,7 +302,7 @@ class ContactLinkTests(TestCase):
     def test_the_menu_has_the_link_for_a_customer_where_the_instance_has_a_website(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         html = text(login(self.mine).get(HOME))
-        self.assertIn('href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">Kontakt zur LEG</a>', html)
+        self.assertIn('href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">Kontakt zur LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>', html)
 
     def test_without_a_website_there_is_no_link_and_no_dead_entry(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": ""})
@@ -322,7 +322,7 @@ class LegLinkTagTests(SimpleTestCase):
     def test_a_link_with_the_address_escaped_where_a_website_is_configured(self):
         with translation.override("de-ch"):
             html = self.render('https://leg.example.org/?a="b"')
-        self.assertIn('<a href="https://leg.example.org/?a=&quot;b&quot;" target="_blank" rel="noopener noreferrer">LEG</a>', html)
+        self.assertIn('<a href="https://leg.example.org/?a=&quot;b&quot;" target="_blank" rel="noopener noreferrer">LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>', html)
 
     def test_the_plain_word_without_a_website(self):
         with translation.override("de-ch"):
@@ -382,7 +382,7 @@ class StepPagesTests(TestCase):
             })
         html = text(response)
         self.assertIn("Nicht eindeutig gefunden", html)
-        self.assertIn('<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG</a>', html)
+        self.assertIn('<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>', html)
         self.assertIn("autofocus", html)
 
     def test_the_error_summary_lists_the_short_name_of_the_field_not_the_message(self):
@@ -524,7 +524,7 @@ class DeregistrationWalkthroughTests(TestCase):
         self.assertEqual(label.count("Bezug"), 1)
 
     def test_the_word_leg_is_a_link_only_where_the_instance_has_a_website(self):
-        link = '<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG</a>'
+        link = '<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>'
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": ""})
         self.assertNotIn(link, text(self.client.get(DEREGISTRATION)))
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
@@ -584,7 +584,7 @@ class ProfileWalkthroughTests(TestCase):
         deregistrations.request_deregistration(self.mine, metering_point_ids=[active.pk], desired_date=None)
         html = flat(text(self.client.get(self.profile)))
         self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", html)
-        self.assertIn("Ihre Abmeldung läuft weiter. Die Messpunkte enden am bestätigten Termin.", html)
+        self.assertIn("Ihre Abmeldung läuft weiter. Die Messpunkte enden zum Termin, den die LEG bestätigt.", html)
         self.assertNotIn("Ihr Konto und Ihre persönlichen Angaben werden gelöscht", html)
 
 

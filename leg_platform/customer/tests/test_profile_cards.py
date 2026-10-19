@@ -289,7 +289,7 @@ class EmailAndTwoFactorCardTests(TestCase):
     def test_the_email_card_has_the_statuses_and_the_button_change(self):
         email = card(self.get(), "email")
 
-        self.assertIn("Anmeldung (Benutzername)", email)
+        self.assertIn("Login (Benutzername)", email)
         self.assertIn("Bestätigt", email)
         self.assertIn("nicht hinterlegt", email)
         self.assertIn("Erhält Informationen, nicht für die Anmeldung.", email)

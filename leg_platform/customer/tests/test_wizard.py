@@ -115,7 +115,7 @@ class StartPageTests(WizardCase):
         html = text(self.client.get(START))
         self.assertIn("Sie haben eine Anmeldung begonnen. Sie können dort weitermachen, wo Sie aufgehört haben.", html)
         self.assertIn("Noch nicht abgeschlossen", html)
-        self.assertIn(">Weitermachen<", html)
+        self.assertIn(">Weiter anmelden<", html)
         self.assertIn(">Neu beginnen<", html)
         self.assertIn("Wenn Sie neu beginnen, werden die bisherigen Angaben dieser Anmeldung gelöscht.", html)
         self.assertIn(step_url(draft, "contract"), html)
@@ -747,15 +747,19 @@ class SubmittedAndWithdrawTests(WizardCase):
         for marker in (
             "Ihre Anmeldung ist abgeschickt",
             "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei Netzbetreiber an. Danach erhalten Sie eine E-Mail vom Netzbetreiber. Bitte bestätigen Sie die Anmeldung dort.",
-            "So geht es weiter", "Angaben abgeschickt", "Prüfung durch die LEG", "Anmeldung bei Netzbetreiber",
-            "Sie bestätigen die Anfrage in der E-Mail von Netzbetreiber", "Wird von Netzbetreiber festgelegt",
+            "So geht es weiter", "Angaben abgeschickt", "Prüfung durch die LEG", "Anmeldung beim Netzbetreiber",
+            "Sie bestätigen die Anfrage in der E-Mail vom Netzbetreiber", "Wird vom Netzbetreiber festgelegt",
             "Bitte bestätigen Sie die Anmeldung innerhalb von 14 Tagen nach der E-Mail vom Netzbetreiber.",
             "Ihre Angaben", "Ittigenstrasse 51", "EGID 90004269",
-            "Bezug, Einspeisung", "So bald wie möglich", "Änderungen sind jetzt nur noch über die LEG möglich.",
+            "Bezug", "Einspeisung", "Startdatum", "So bald wie möglich", "Änderungen sind jetzt nur noch über die LEG möglich.",
             ">Zur Startseite<", ">Anmeldung zurückziehen<",
             "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim Netzbetreiber eingereicht hat.",
         ):
             self.assertIn(marker, html)
+        # N-09: every point with its number (the customer can check what was typed), the operator named once, no bar.
+        for point in self.building.metering_points.all():
+            self.assertIn(point.number, html)
+        self.assertNotIn("<progress", html)
         # One list, no second count (W1-14): the bar only; the old words are gone.
         self.assertNotIn("step-note", html)
         for gone in ("Kundenanfrage durch", "Warten auf Startdatum", "Bestätigung durch Netzbetreiber offen"):

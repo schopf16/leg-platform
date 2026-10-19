@@ -1,8 +1,8 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}Your application at {{ instance_name }} needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you sign in:{% endblocktranslate %}
+{% blocktranslate %}Your application at {{ instance_name }} needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you log in:{% endblocktranslate %}
 
 {{ login_url }}{% if contact_url %}
 
-{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

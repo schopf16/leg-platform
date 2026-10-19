@@ -34,6 +34,7 @@ without a script.
       {% endfor %}
     </ul>
   {% endif %}
+  {% for extra in card.extra_blocks %}{% include "customer/_progress_block.html" with block=extra footer_withdraw=card.withdraw_in_footer %}{% endfor %}
 
   {% if card.can_add_point or card.removal %}
     <div class="card-foot">

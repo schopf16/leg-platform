@@ -58,7 +58,7 @@ CODES_URL = reverse("accounts:recovery_codes")
 DISABLE_URL = reverse("accounts:two_factor_disable")
 LOST_URL = reverse("accounts:two_factor_lost_phone")
 LIMIT = second_factor.SESSION_CODE_LIMIT
-ENDED = "Aus Sicherheitsgründen wurden Sie abgemeldet"
+ENDED = "Aus Sicherheitsgründen wurden Sie ausgeloggt"
 WRONG = "000001"
 SECOND = "second.session.limit@example.org"
 
@@ -143,7 +143,7 @@ class TheSessionEndsTests(Base):
         page = self.client.get(LOGIN)
 
         self.assertContains(page, ENDED)
-        self.assertContains(page, "Bitte melden Sie sich erneut an.")
+        self.assertContains(page, "Bitte loggen Sie sich erneut ein.")
         # The account was neither paused nor locked out: the password and the right code log in.
         stepper = Client()
         log_in(stepper, self.user.email, address="10.93.1.3")

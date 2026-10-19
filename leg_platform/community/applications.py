@@ -164,6 +164,17 @@ def rollback_date(application, now=None):
     return timezone.localdate(min(moments)) if moments else None
 
 
+def next_deletion_date(person_id):
+    """The earliest ``rollback_date`` of the account's paused drafts, or ``None`` (no paused draft, or no date). The
+    mail worker asks for it when the reminder "not completed yet" is sent: the job carries no payload."""
+    dates = [
+        rollback_date(application)
+        for application in Application.objects.filter(person_id=person_id, state=Application.State.PAUSED)
+    ]
+    dates = [day for day in dates if day is not None]
+    return min(dates) if dates else None
+
+
 def _draw_present(building, today):
     rows = list(building.metering_points.all())
     if any(row.direction == Direction.CONSUMPTION for row in rows):

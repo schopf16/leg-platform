@@ -489,7 +489,7 @@ class NotificationGreetingTests(TestCase):
             MailJob.Kind.TWO_FACTOR_ENABLED: "Für Ihr Konto bei",
             MailJob.Kind.TWO_FACTOR_DISABLED: "Für Ihr Konto bei",
             MailJob.Kind.RECOVERY_CODES_RENEWED: "Für Ihr Konto bei",
-            MailJob.Kind.RECOVERY_CODE_USED: "Für die Anmeldung bei Ihrem Konto",
+            MailJob.Kind.RECOVERY_CODE_USED: "Zum Einloggen in Ihr Konto",
             MailJob.Kind.CODE_ATTEMPTS_WARNING: "Für Ihr Konto bei",
             MailJob.Kind.TWO_FACTOR_RESET: "Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos",
         }

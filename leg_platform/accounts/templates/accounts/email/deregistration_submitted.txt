@@ -1,8 +1,8 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}Your deregistration at {{ instance_name }} was received. The LEG confirms the date. You can follow the progress after you sign in:{% endblocktranslate %}
+{% blocktranslate %}Your deregistration at {{ instance_name }} was received. The LEG confirms the date. You cannot withdraw the termination yourself. You can follow the progress after you log in to the portal:{% endblocktranslate %}
 
 {{ login_url }}{% if contact_url %}
 
-{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

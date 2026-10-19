@@ -31,7 +31,7 @@ only when the LEG confirmed it or the customer chose one.
       <h2 id="your-details">{% translate "Your submitted details" %}</h2>
       <dl class="facts">
         <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number }}</span>{% if point.name %}<span class="mp-note">{{ point.name }}</span>{% endif %}<span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
-        <div><dt>{% translate "Date" %}</dt><dd>{% if deregistration.confirmed_date %}{% blocktranslate with date=deregistration.confirmed_date|date:"d.m.Y" %}Terminated on {{ date }}{% endblocktranslate %}{% elif deregistration.wants_earliest %}{% translate "Earliest possible date" %}{% else %}{{ deregistration.desired_date|date:"d.m.Y" }}{% endif %}{% if not deregistration.confirmed_date %}<span class="mp-note">{% translate "Date open: the LEG confirms it." %}</span>{% endif %}</dd></div>
+        <div><dt>{% translate "Date" %}</dt><dd>{% if deregistration.confirmed_date %}{% blocktranslate with date=deregistration.confirmed_date|date:"d.m.Y" %}Terminated on {{ date }}{% endblocktranslate %}{% else %}{{ date_text }}{% endif %}</dd></div>
       </dl>
     </section>
 
