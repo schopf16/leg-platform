@@ -1,0 +1,19 @@
+{% extends "admin/change_list.html" %}
+{% load i18n raw_tables %}
+{# The list of a raw table (D-091). A system administrator gets the new row; everybody else the plain list. #}
+{% block object-tools %}
+{{ block.super }}
+{% if raw_new_row %}
+{# The form of the new row is empty: its inputs sit in the table and name this form with the HTML "form" attribute. #}
+<form id="{{ raw_new_row.form_id }}" method="post" action="{{ raw_new_row.url }}" novalidate>{% csrf_token %}<input type="hidden" name="next" value="{{ raw_new_row.next }}"></form>
+{% endif %}
+{% endblock %}
+{% block search %}
+{{ block.super }}
+{% if raw_new_row %}
+<p class="help raw-table-notice" role="note">{% translate "System administrator: you edit the rows of the table as they are. Nothing is checked against the rules of the management area, and no history entry is written. Change the cells and press “Save”, or fill in the new row and press “Add row”." %}</p>
+{% endif %}
+{% endblock %}
+{% block result_list %}
+{% if raw_new_row %}{% raw_result_list cl raw_new_row %}{% else %}{{ block.super }}{% endif %}
+{% endblock %}

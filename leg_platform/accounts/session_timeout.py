@@ -13,7 +13,6 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.views import redirect_to_login
-from django.db import transaction
 from django.dispatch import receiver
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -21,8 +20,7 @@ from django.urls import Resolver404, resolve
 from django.utils.translation import gettext
 
 from leg_platform.accounts import security_log
-from leg_platform.accounts.mail_queue import enqueue_for_account
-from leg_platform.accounts.models import MailJob, SecurityEvent
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.second_factor import (
     STAY_WISH_ATTRIBUTE,
     has_second_factor,
@@ -56,12 +54,12 @@ def is_passive(request):
 
 
 def announce_persistent_session(user):
-    """A long session of a staff or administrator account was started (H-2 of the review of 2026-10-17): the security
-    log and an email to every address of the account say so, so that a stolen long session does not stay unnoticed.
-    The second factor is checked once per login and a long session needs none again (D-100)."""
-    with transaction.atomic():
-        security_log.record(SecurityEvent.Event.PERSISTENT_SESSION_STARTED, account=user)
-        enqueue_for_account(MailJob.Kind.PERSISTENT_SESSION_STARTED, user)
+    """A long session of a staff or administrator account was started: the security log records it (long retention).
+
+    No email: the owner decision of 2026-10-19 sets the portal to normal security, and a mail per login on a
+    device the person chose to stay signed in on trains people to ignore mails (D-100).
+    The second factor is checked once per login and a long session needs none again."""
+    security_log.record(SecurityEvent.Event.PERSISTENT_SESSION_STARTED, account=user)
 
 
 @receiver(user_logged_in)

@@ -174,7 +174,13 @@ class LoginProtectionSettingsTests(SimpleTestCase):
 class InternationalizationTests(SimpleTestCase):
     def test_language_and_time_zone(self):
         self.assertEqual(settings.LANGUAGE_CODE, "de-ch")
-        self.assertEqual([code for code, _name in settings.LANGUAGES], ["de-ch"])
+        self.assertEqual(
+            [code for code, _name in settings.LANGUAGES], ["de-ch", "fr", "it", "en"]
+        )
+        # The names are written in their own language (not translated).
+        self.assertEqual(
+            [name for _code, name in settings.LANGUAGES], ["Deutsch", "Français", "Italiano", "English"]
+        )
         self.assertIs(settings.USE_I18N, True)
         self.assertEqual(settings.TIME_ZONE, "Europe/Zurich")
         self.assertIs(settings.USE_TZ, True)

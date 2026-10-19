@@ -112,7 +112,7 @@ class PresentationTests(TestCase):
         self.assertNotContains(response, "prefers-color-scheme")
 
     def test_the_colour_mode_has_no_server_side_endpoint_and_no_cookie(self):
-        # K3 (D-056): nothing about the colour mode or the language goes to the server.
+        # K3 (D-056): nothing about the colour mode goes to the server (the language does, D-056).
         from django.urls import NoReverseMatch
         with self.assertRaises(NoReverseMatch):
             reverse("colour_mode")

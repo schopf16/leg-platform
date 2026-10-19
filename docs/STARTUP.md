@@ -335,7 +335,7 @@ Remove-Item Env:DJANGO_DEBUG, Env:EMAIL_ALLOWED_RECIPIENTS -ErrorAction Silently
 
 Expected: `System check identified no issues (3 silenced).` (`security.W005`, `security.W021`, `axes.W006`; D-028).
 
-Translations (the `.po` file is maintained by hand, the `.mo` file is committed, D-034; GNU gettext is in `C:\Program Files\gettext-iconv\bin`, on `PATH`):
+Translations (the `.po` files are maintained by hand, the `.mo` files are committed, D-034; GNU gettext is in `C:\Program Files\gettext-iconv\bin`, on `PATH`). Swiss German shown; `locale\fr` and `locale\it` (`django.po`, `djangojs.po`) are checked the same way by `accounts/tests/test_translations.py` (`LanguageCatalogueTests`, also when `msgfmt` is installed):
 
 ```powershell
 $po = 'locale\de_CH\LC_MESSAGES\django.po'; $mo = 'locale\de_CH\LC_MESSAGES\django.mo'

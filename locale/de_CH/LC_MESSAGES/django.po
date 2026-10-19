@@ -13,10 +13,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: leg_platform/settings.py
-msgid "Swiss German"
-msgstr "Schweizerdeutsch"
-
 msgid "Menu"
 msgstr "Menü"
 
@@ -27,8 +23,9 @@ msgstr "Hauptnavigation"
 msgid "Language"
 msgstr "Sprache"
 
-msgid "Language: German"
-msgstr "Sprache: Deutsch"
+#, python-format
+msgid "Language: %(language)s"
+msgstr "Sprache: %(language)s"
 
 msgid "Display: light. Switch to dark."
 msgstr "Darstellung: hell. Zu dunkel wechseln."
@@ -2725,6 +2722,18 @@ msgstr "Zum Schutz dessen, was alle Besucher sehen, bestätigen Sie die Änderun
 msgid "Choose either new logos or the removal of the uploaded logos, not both."
 msgstr "Wählen Sie entweder neue Logos oder das Entfernen der hochgeladenen Logos, nicht beides."
 
+msgid "Choose either a new icon or the removal of the uploaded icon, not both."
+msgstr "Wählen Sie entweder ein neues Symbol oder das Entfernen des hochgeladenen Symbols, nicht beides."
+
+msgid "PNG or SVG, up to 128 KB (PNG) or 64 KB (SVG). A PNG should be square and at least 192 px wide. It is shown in the tab of the browser, for light and dark mode alike. Leave empty to use the built-in icon."
+msgstr "PNG oder SVG, bis 128 KB (PNG) oder 64 KB (SVG). Ein PNG sollte quadratisch und mindestens 192 px breit sein. Es erscheint im Tab des Browsers, für den hellen und den dunklen Modus gleich. Leer lassen, um das eingebaute Symbol zu verwenden."
+
+msgid "icon of the browser tab"
+msgstr "Symbol des Browser-Tabs"
+
+msgid "Remove the uploaded icon and use the built-in icon. The file is deleted and cannot be restored."
+msgstr "Hochgeladenes Symbol entfernen und das eingebaute Symbol verwenden. Die Datei wird gelöscht und kann nicht wiederhergestellt werden."
+
 msgid "Only PNG and SVG files are accepted."
 msgstr "Es sind nur PNG- und SVG-Dateien erlaubt."
 
@@ -2748,8 +2757,8 @@ msgid "The SVG needs a viewBox so that it can be scaled."
 msgstr "Das SVG braucht eine viewBox, damit es skaliert werden kann."
 
 #, python-format
-msgid "This SVG contains content that the portal does not accept (%(what)s). Save the logo as \"plain SVG\" without scripts, images, styles or editor data and upload it again."
-msgstr "Diese SVG-Datei enthält Inhalte, die das Portal nicht annimmt (%(what)s). Speichern Sie das Logo als «einfaches SVG» ohne Skripte, Bilder, Stile und Editor-Daten und laden Sie es erneut hoch."
+msgid "This SVG contains content that the portal does not accept (%(what)s). Save the file as \"plain SVG\" without scripts, images, styles or editor data and upload it again."
+msgstr "Diese SVG-Datei enthält Inhalte, die das Portal nicht annimmt (%(what)s). Speichern Sie die Datei als «einfaches SVG» ohne Skripte, Bilder, Stile und Editor-Daten und laden Sie sie erneut hoch."
 
 #, python-format
 msgid "This accent colour is too weak on the light background (contrast %(ratio)s:1, required 4.5:1). Choose a darker colour."
@@ -2783,6 +2792,9 @@ msgstr "Datenschutz und Impressum"
 msgid "Logo"
 msgstr "Logo"
 
+msgid "Browser tab icon"
+msgstr "Symbol des Browser-Tabs"
+
 msgid "Colours"
 msgstr "Farben"
 
@@ -2794,6 +2806,12 @@ msgstr "Diese Werte legt der Betrieb in der Serverkonfiguration fest, und sie k�
 
 msgid "uploaded logos"
 msgstr "Hochgeladene Logos"
+
+msgid "uploaded icon"
+msgstr "Hochgeladenes Symbol"
+
+msgid "Not uploaded. The built-in icon is used."
+msgstr "Nicht hochgeladen. Das eingebaute Symbol wird verwendet."
 
 msgid "Light mode"
 msgstr "Heller Modus"
@@ -2869,8 +2887,11 @@ msgstr "Schaltfläche"
 msgid "Highlight"
 msgstr "Hervorhebung"
 
-msgid "The preview shows the saved logos. The colours change while you type."
-msgstr "Die Vorschau zeigt die gespeicherten Logos. Die Farben ändern sich beim Tippen."
+msgid "The preview shows the saved logos and the saved icon. The colours change while you type."
+msgstr "Die Vorschau zeigt die gespeicherten Logos und das gespeicherte Symbol. Die Farben ändern sich beim Tippen."
+
+msgid "Icon of the browser tab"
+msgstr "Symbol des Browser-Tabs"
 
 msgid "See the settings of the portal"
 msgstr "Die Einstellungen des Portals ansehen"
@@ -4637,29 +4658,6 @@ msgstr "Lange Sitzung (angemeldet bleiben) für ein Mitarbeitenden- oder Adminis
 msgid "All sessions of an account ended by a system administrator"
 msgstr "Alle Sitzungen eines Kontos durch einen Systemadministrator beendet"
 
-msgid "Notification: long session (stay signed in) started"
-msgstr "Benachrichtigung: Lange Sitzung (angemeldet bleiben) gestartet"
-
-msgid "A long session was started for your account at %(instance_name)s"
-msgstr "Für Ihr Konto bei %(instance_name)s wurde eine lange Sitzung gestartet"
-
-#, python-format
-msgid "A long session (\"Stay signed in\") was started for your account at %(instance_name)s. On that device you stay logged in for several days, without a new code, until you log out."
-msgstr "Für Ihr Konto bei %(instance_name)s wurde eine lange Sitzung («Angemeldet bleiben») gestartet. Auf diesem Gerät bleiben Sie mehrere Tage angemeldet, ohne neuen Code, bis Sie sich abmelden."
-
-#, python-format
-msgid ""
-"If this was not you, contact the operator immediately and choose a new password with \"Forgot password\" on the login page. You will find contact information here:\n"
-"\n"
-"%(contact_url)s"
-msgstr ""
-"Wenn Sie das nicht waren, wenden Sie sich sofort an die Betreiber und wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort. Kontaktangaben finden Sie hier:\n"
-"\n"
-"%(contact_url)s"
-
-msgid "If this was not you, contact the operator of this portal immediately and choose a new password with \"Forgot password\" on the login page."
-msgstr "Wenn Sie das nicht waren, wenden Sie sich sofort an die Betreiber dieses Portals und wählen Sie mit «Passwort vergessen» auf der Anmeldeseite ein neues Passwort."
-
 msgid "End all sessions"
 msgstr "Alle Sitzungen beenden"
 
@@ -4677,3 +4675,64 @@ msgstr "Zurück"
 
 msgid "This entry does not exist any more."
 msgstr "Diesen Eintrag gibt es nicht mehr."
+
+# Raw tables of the management data for system administrators (D-091)
+msgid "Management data edited in the administration"
+msgstr "Verwaltungsdaten in der Administration bearbeitet"
+
+msgid "New row"
+msgstr "Neue Zeile"
+
+msgid "Add row"
+msgstr "Zeile hinzufügen"
+
+msgid "System administrator: you edit the rows of the table as they are. Nothing is checked against the rules of the management area, and no history entry is written. Change the cells and press “Save”, or fill in the new row and press “Add row”."
+msgstr "Systemadministrator: Sie bearbeiten die Zeilen der Tabelle unverändert. Es wird nichts gegen die Regeln des Verwaltungsbereichs geprüft, und es wird kein Verlaufseintrag geschrieben. Ändern Sie die Zellen und drücken Sie «Speichern», oder füllen Sie die neue Zeile aus und drücken Sie «Zeile hinzufügen»."
+
+msgid "Row added (ID %(id)s)."
+msgstr "Zeile hinzugefügt (ID %(id)s)."
+
+msgid "The row was not added. Check the marked fields of the new row."
+msgstr "Die Zeile wurde nicht hinzugefügt. Prüfen Sie die markierten Felder der neuen Zeile."
+
+msgid "The database refused the row or the change (for example a value that exists already, a missing related row or a value that does not fit). Nothing was saved."
+msgstr "Die Datenbank hat die Zeile oder die Änderung abgelehnt (zum Beispiel ein Wert, der schon vorhanden ist, eine fehlende verknüpfte Zeile oder ein Wert, der nicht passt). Es wurde nichts gespeichert."
+
+msgid "suggested street"
+msgstr "Vorgeschlagene Strasse"
+
+msgid "suggested house number"
+msgstr "Vorgeschlagene Hausnummer"
+
+msgid "suggested postal code"
+msgstr "Vorgeschlagene Postleitzahl"
+
+msgid "suggested town"
+msgstr "Vorgeschlagener Ort"
+
+msgid "suggestion dismissed for"
+msgstr "Vorschlag abgelehnt für"
+
+msgid "address correction open"
+msgstr "Adresskorrektur offen"
+
+msgid "previous assignment"
+msgstr "Vorherige Zuordnung"
+
+msgid "previous valid to"
+msgstr "Vorher gültig bis"
+
+msgid "subject type"
+msgstr "Objektart"
+
+msgid "subject ID"
+msgstr "Objekt-ID"
+
+msgid "detail"
+msgstr "Einzelheiten"
+
+msgid "sender suggestion dismissed for"
+msgstr "Absendervorschlag abgelehnt für"
+
+msgid "person data"
+msgstr "Personendaten"

@@ -52,8 +52,9 @@ CHUNK_ROWS = 20_000
 # Old generations are deleted in batches of primary keys; at most 900 (SQLite < 3.32 allows 999
 # host parameters per statement, D-075).
 PRUNE_BATCH_SIZE = 900
-# Import refused below this free space (about 1 GB per generation, up to three on disk; the disk
-# is shared with the instance database).
+# Import refused below this free space on the disk of the directory file: the downloaded archive
+# (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1 GB
+# per generation, up to three on disk; the disk is shared with the instance database.
 MIN_FREE_DISK_BYTES = 4 * 1024**3
 # Lease on the ``Directory`` row against concurrent imports; expires so a killed importer does not
 # block forever, renewed with every chunk.
@@ -325,20 +326,23 @@ def _free_bytes(folder):
         raise ImportFailure("The free disk space could not be checked.") from None
 
 
+def _directory_folder():
+    """The folder of the directory file: disk-backed and writable by the service (the system temporary folder can be small and memory-backed)."""
+    return Path(str(connections[DIRECTORY_ALIAS].settings_dict["NAME"])).parent
+
+
 def _require_free_disk():
-    """Refuse the import before the download when the directory or temporary disk is nearly full (D-075)."""
-    directory_folder = Path(str(connections[DIRECTORY_ALIAS].settings_dict["NAME"])).parent
-    try:
-        temporary_folder = Path(tempfile.gettempdir())
-    except OSError:
-        raise ImportFailure("The free disk space could not be checked.") from None
-    for folder, purpose in ((directory_folder, "the directory file"), (temporary_folder, "the temporary download")):
-        if _free_bytes(folder) < MIN_FREE_DISK_BYTES:
-            logger.warning(
-                "Address directory import refused: less than %d GB free on the disk of %s.",
-                MIN_FREE_DISK_BYTES // 1024**3, purpose,
-            )
-            raise ImportFailure("Not enough free disk space for an import.")
+    """Refuse the import before the download when the disk of the directory file is nearly full (D-075).
+
+    This one disk holds the archive (temporary file next to the directory file), the generations and the
+    SQLite temporary files (``SQLITE_TMPDIR``, see ``sqlite.base``); the system temporary folder is not used.
+    """
+    if _free_bytes(_directory_folder()) < MIN_FREE_DISK_BYTES:
+        logger.warning(
+            "Address directory import refused: less than %d GB free on the disk of the directory file.",
+            MIN_FREE_DISK_BYTES // 1024**3,
+        )
+        raise ImportFailure("Not enough free disk space for an import.")
 
 
 def _publish(archive, checksum, data_date, *, repair=False, progress=None):
@@ -469,8 +473,14 @@ def import_directory(*, repair=False, progress=None):
     receives the phase and the counters for the status page.
     """
     try:
-        # Ignore netrc/proxy credentials inherited from an operator environment.
-        with requests.Session() as session, tempfile.TemporaryFile() as archive:
+        # The first connection creates the folder of the directory file, where the archive goes.
+        try:
+            connections[DIRECTORY_ALIAS].ensure_connection()
+        except DatabaseError as exc:
+            raise ImportFailure("The official directory could not be imported.") from exc
+        # Ignore netrc/proxy credentials inherited from an operator environment. The archive goes next to
+        # the directory file (unnamed, removed on close), not to the system temporary folder.
+        with requests.Session() as session, tempfile.TemporaryFile(dir=_directory_folder()) as archive:
             session.trust_env = False
             if progress is not None:
                 progress.phase("catalogue")

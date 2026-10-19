@@ -632,6 +632,7 @@ def security_settings(config: EnvironmentConfig) -> dict[str, object]:
     settings: dict[str, object] = {
         "SESSION_COOKIE_SECURE": secure,
         "CSRF_COOKIE_SECURE": secure,
+        "LANGUAGE_COOKIE_SECURE": secure,
         "SECURE_SSL_REDIRECT": secure,
         "SECURE_HSTS_SECONDS": config.hsts_seconds if secure else 0,
         # includeSubDomains would also cover every host below the application's host name; it
@@ -647,9 +648,11 @@ def security_settings(config: EnvironmentConfig) -> dict[str, object]:
         # Domain attribute (draft-ietf-httpbis-rfc6265bis; D-025).
         settings["SESSION_COOKIE_NAME"] = "__Host-sessionid"
         settings["CSRF_COOKIE_NAME"] = "__Host-csrftoken"
+        settings["LANGUAGE_COOKIE_NAME"] = "__Host-language"
     else:
         settings["SESSION_COOKIE_NAME"] = "sessionid"
         settings["CSRF_COOKIE_NAME"] = "csrftoken"
+        settings["LANGUAGE_COOKIE_NAME"] = "language"
     return settings
 
 

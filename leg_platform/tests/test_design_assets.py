@@ -171,9 +171,9 @@ class StyleSheetTests(SimpleTestCase):
 
 class ScriptTests(SimpleTestCase):
     SCRIPTS = ("password-toggle.js", "recovery-codes.js", "postal-code-input.js")
-    # The scripts of the colour mode and the language use the storage of the tab (D-056) and
-    # nothing else that leaves the page.
-    CHROME_SCRIPTS = ("theme-init.js", "corner-controls.js", "login-texts.js")
+    # The scripts of the colour mode use the storage of the tab (D-056) and nothing else that
+    # leaves the page. The language is chosen on the server (leg_platform/language.py).
+    CHROME_SCRIPTS = ("theme-init.js", "corner-controls.js")
 
     def test_the_scripts_exist_and_use_no_dynamic_code_or_network(self):
         for name in self.SCRIPTS:
@@ -197,6 +197,12 @@ class ScriptTests(SimpleTestCase):
             text = (STATIC / "js" / name).read_text(encoding="utf-8")
             self.assertIn("sessionStorage", text)
             self.assertIn('"use strict"', text)
+            # The language is not kept in the browser any more (no dictionary, no stored choice).
+            self.assertNotIn("leg-lang", text)
+            self.assertNotIn("LEG_PAGE_TEXTS", text)
+
+    def test_the_client_side_dictionary_is_gone(self):
+        self.assertFalse((STATIC / "js" / "login-texts.js").exists())
 
     def test_the_scripts_do_not_log_or_send_the_codes(self):
         text = (STATIC / "js" / "recovery-codes.js").read_text(encoding="utf-8")

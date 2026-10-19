@@ -132,14 +132,28 @@ AREAS: dict[str, Area] = {
         tests=(),
     ),
     "translations": Area(
-        "Swiss German catalogue: translation, wording and the ban of the letter that Swiss "
-        "German does not use.",
+        "Catalogues (Swiss German, French, Italian): translation, wording, placeholders and the ban "
+        "of the letter that Swiss German does not use.",
         paths=("locale/",),
         tests=(
             _labels(A, "test_translations", "test_usability", "test_acceptance_final",
                     "test_acceptance_owner_decisions", "test_admin_acceptance",
-                    "test_portal_branding")
-            + _labels(T, "test_error_pages", "test_presentation")
+                    "test_portal_branding", "test_portal_favicon")
+            + _labels(T, "test_error_pages", "test_presentation", "test_language")
+        ),
+    ),
+    "language": Area(
+        "The language of the pages (D-056): the language cookie, the middleware, the view, the "
+        "English fallback, the language menu and its script.",
+        paths=(
+            "leg_platform/language.py", "leg_platform/accounts/templatetags/language_menu.py",
+            "leg_platform/templates/_corner_controls.html", "leg_platform/static/js/corner-controls.js",
+        ),
+        tests=(
+            _labels(T, "test_language", "test_settings", "test_request_body_limit", "test_design_assets",
+                    "test_error_pages")
+            + _labels(A, "test_entry_shell", "test_translations", "test_frame", "test_second_factor",
+                      "test_invalid_link_redirect")
         ),
     ),
     "templates": Area(
@@ -152,7 +166,8 @@ AREAS: dict[str, Area] = {
                     "test_translations", "test_token_page_forms", "test_portal_views",
                     "test_profile", "test_profile_acceptance", "test_address_notice",
                     "test_admin_acceptance", "test_admin_spotcheck", "test_registration",
-                    "test_password_reset", "test_phase4_review", "test_portal_branding")
+                    "test_password_reset", "test_phase4_review", "test_portal_branding",
+                    "test_portal_favicon")
             + _FLOW_REVIEWS
             + _labels(T, "test_error_pages", "test_presentation", "test_sizes", "test_design_assets")
             + _labels(M, "test_access", "test_settings_page", "test_components")
@@ -164,13 +179,13 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(T, "test_design_assets", "test_sizes", "test_presentation", "test_error_pages")
             + _labels(A, "test_entry_shell", "test_frame", "test_usability", "test_address_notice",
-                      "test_portal_branding")
+                      "test_portal_branding", "test_portal_favicon")
             + _labels(M, "test_components")
         ),
     ),
     "branding": Area(
         "Instance presentation: branding, colour mode, instance settings, the uploaded logos and "
-        "the portal legal links.",
+        "favicon and the portal legal links.",
         paths=(
             "leg_platform/branding.py", "leg_platform/presentation.py",
             "leg_platform/context_processors.py", "leg_platform/accounts/portal_settings.py",
@@ -181,7 +196,7 @@ AREAS: dict[str, Area] = {
             _labels(T, "test_presentation", "test_instance_configuration", "test_design_assets",
                     "test_sizes", "test_request_body_limit")
             + _labels(A, "test_entry_shell", "test_portal_settings", "test_frame",
-                      "test_logo_images", "test_portal_branding")
+                      "test_logo_images", "test_portal_branding", "test_portal_favicon")
         ),
     ),
     "environment": Area(
@@ -289,6 +304,7 @@ AREAS: dict[str, Area] = {
     "admin": Area(
         "The administration: users, rights, email texts, Graph configuration and portal settings.",
         paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py", "leg_platform/community/admin.py",
+               "leg_platform/community/raw_tables.py", "leg_platform/community/templatetags/",
                "leg_platform/log_views.py", "leg_platform/logfiles.py",
                "leg_platform/addresses/admin.py", "leg_platform/accounts/permission_names.py",
                "leg_platform/accounts/forms.py", "leg_platform/templates/admin/",
@@ -297,9 +313,9 @@ AREAS: dict[str, Area] = {
             _labels(A, "test_admin", "test_admin_acceptance", "test_admin_exposure",
                     "test_admin_spotcheck", "test_portal_settings", "test_graph_test_email_limits",
                     "test_email_texts", "test_translations", "test_acceptance_negative_authorization",
-                    "test_portal_branding")
+                    "test_portal_branding", "test_portal_favicon")
             + _labels(T, "test_mail_graph", "test_logs")
-            + _labels(C, "test_rights", "test_admin_tables")
+            + _labels(C, "test_rights", "test_admin_tables", "test_admin_raw_tables")
         ),
     ),
     "mail": Area(

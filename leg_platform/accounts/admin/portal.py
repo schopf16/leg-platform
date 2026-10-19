@@ -39,6 +39,7 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         "privacy_preview",
         "imprint_preview",
         "logo_status",
+        "favicon_status",
         "preview",
         "server_configuration",
     )
@@ -69,6 +70,15 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                     "fields": (
                         "logo_status",
                         *(("logo_light_file", "logo_dark_file", "remove_logos") if can_change else ()),
+                    )
+                },
+            ),
+            (
+                _("Browser tab icon"),
+                {
+                    "fields": (
+                        "favicon_status",
+                        *(("favicon_file", "remove_favicon") if can_change else ()),
                     )
                 },
             ),
@@ -162,6 +172,17 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                 }
             rows.append((title, state))
         return format_html_join("", "<p>{}: {}</p>", rows)
+
+    @admin.display(description=_("uploaded icon"))
+    def favicon_status(self, obj):
+        if obj.favicon_type and obj.favicon_sha256:
+            state = gettext("Uploaded (%(type)s, fingerprint %(digest)s).") % {
+                "type": obj.favicon_type.upper(),
+                "digest": obj.favicon_sha256[:12],
+            }
+        else:
+            state = gettext("Not uploaded. The built-in icon is used.")
+        return format_html("<p>{}</p>", state)
 
     @admin.display(description=_("preview of the portal"))
     def preview(self, obj):
@@ -308,6 +329,14 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                 )
             else:
                 lines.append(f"logo_{variant} removed")
+        if stored.favicon_sha256 != obj.favicon_sha256:
+            if obj.favicon_sha256:
+                lines.append(
+                    f"favicon replaced ({obj.favicon_type}, {len(obj.favicon_data)} bytes, "
+                    f"sha256 {obj.favicon_sha256[:12]})"
+                )
+            else:
+                lines.append("favicon removed")
         return lines
 
     def save_model(self, request, obj, form, change):

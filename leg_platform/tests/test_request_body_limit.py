@@ -108,8 +108,8 @@ class RequestBodyLimitTests(SimpleTestCase):
             self.assertEqual(body_limit("/a/b/x"), 100)
             self.assertEqual(body_limit("/c/"), 5)
             self.assertIsNone(body_limit("/d/"))
-        # The real list: the lookup and the portal settings only; the login page has none.
-        self.assertEqual(sorted(limit for _prefix, limit in BODY_LIMITS), [4096, 3 * 1024 * 1024])
+        # The real list: the lookup, the language menu and the portal settings only; the login page has none.
+        self.assertEqual(sorted(limit for _prefix, limit in BODY_LIMITS), [4096, 8192, 3 * 1024 * 1024])
         self.assertIsNone(body_limit("/login/"))
         self.assertIsNone(body_limit("/admin/accounts/user/1/change/"))
 

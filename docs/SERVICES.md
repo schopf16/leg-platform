@@ -32,7 +32,7 @@ Each entry gives: service, provider, purpose, data categories, country or region
 | N-3 | **Scripts and styles**: Tabler (stylesheet), the own scripts | Own origin only (`script-src 'self'`); no CDN, no analytics, no tag manager | No external script host |
 | N-4 | **Logos of the instance** | Static files of the instance (`INSTANCE_STATIC_DIRECTORY`), embedded as images | Own origin |
 | N-5 | **Address check** (swisstopo address directory, D-033, D-049, D-052, D-075) | A **local copy** of the public directory in an own SQLite file on the server (not part of any backup); suggestions query only the local copy | Profile addresses are never sent to an external service. The copy is imported by the worker of the instance from the public source of the Federal Office of Topography (public data, no personal data of the visitors) |
-| N-6 | **Language and colour mode of the page** | `sessionStorage` of the browser tab (D-056, K3) | Nothing is stored in a cookie and nothing is sent to the server |
+| N-6 | **Language and colour mode of the page** | Language: the functional cookie `language` (code only, D-056); colour mode: `sessionStorage` of the browser tab (K3) | The language code is sent to the portal with every request (no personal data); the colour mode is not sent |
 | N-7 | **Error tracker, log service, analytics, bot check** | **None are used** in the code of this repository | – |
 
 ## 3. Links to other websites (the portal sends no data)

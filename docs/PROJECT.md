@@ -151,7 +151,7 @@ Local; stage (identical to production in behaviour and configuration, sends real
 * billing, invoicing, electricity cost distribution, productive financial processes, bank file import, payouts
 * AGOV integration (only prepared), passkeys, final hosting decision, multi-tenancy
 * predefined roles other than system administrator, staff user and authenticated user
-* additional user interface languages and language selection
+* user interface languages beyond Swiss German, French, Italian and English (D-056)
 * a public home page and information about the LEG (the instance's website, D-025); publication of aggregated figures (minimum number of participants decided per instance, D-025)
 * the content of the privacy notice and imprint: written by the operator elsewhere; the portal only links the two addresses entered in the portal settings (D-022, D-025, D-073, D-074)
 

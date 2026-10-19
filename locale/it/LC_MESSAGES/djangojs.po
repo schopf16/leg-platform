@@ -1,0 +1,47 @@
+# Italian translations of the JavaScript of the Django administration and the portal (AGENTS.md, section 2; docs/DECISIONS.md, D-010, D-056).
+# Source texts are English. The entries are the ones of locale/de_CH; translate every msgstr.
+# A text without a translation is shown in English (leg_platform/language.py), never in German.
+msgid ""
+msgstr ""
+"Project-Id-Version: LEG-Platform\n"
+"PO-Revision-Date: 2026-10-19 13:00+0200\n"
+"Last-Translator: LEG-Platform contributors\n"
+"Language-Team: Italian\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, javascript-format
+msgid "Choose %s by selecting them and then select the \"Choose\" arrow button."
+msgstr "Scelga %s selezionandoli e poi selezioni il pulsante freccia «Scegli»."
+
+#, javascript-format
+msgid "Remove %s by selecting them and then select the \"Remove\" arrow button."
+msgstr "Rimuova %s selezionandoli e poi selezioni il pulsante freccia «Rimuovi»."
+
+#, javascript-format
+msgid "Choose all %s"
+msgstr "Scegli tutti i %s"
+
+#, javascript-format
+msgid "Choose selected %s"
+msgstr "Scegli i %s selezionati"
+
+#, javascript-format
+msgid "Remove selected %s"
+msgstr "Rimuovi i %s selezionati"
+
+#, javascript-format
+msgid "Remove all %s"
+msgstr "Rimuovi tutti i %s"
+
+# The advisory contrast text of the preview of the portal settings (D-073).
+#, javascript-format
+msgid "Contrast %s:1 – sufficient"
+msgstr "Contrasto %s:1 – sufficiente"
+
+#, javascript-format
+msgid "Contrast %s:1 – too weak"
+msgstr "Contrasto %s:1 – troppo debole"

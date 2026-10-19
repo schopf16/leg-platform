@@ -10,7 +10,6 @@ from pathlib import Path
 
 import django
 from django.utils.csp import CSP
-from django.utils.translation import gettext_lazy as _
 
 from leg_platform.environment import (
     email_backend,
@@ -122,6 +121,9 @@ MIDDLEWARE = [
     # Before anything reads a request body (sessions, CSRF): bounded bodies for open endpoints.
     "leg_platform.middleware.RequestBodyLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # The language comes from the language cookie only, never from Accept-Language (D-010, D-056).
+    # After the session middleware, before the common middleware (Django's documented place).
+    "leg_platform.language.ChosenLanguageMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -145,6 +147,8 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                # LANGUAGE_CODE and LANGUAGE_BIDI for the administration's <html lang> and dir.
+                "django.template.context_processors.i18n",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "leg_platform.context_processors.instance",
@@ -266,12 +270,29 @@ SECURE_CSP = {
 # failures in LoginIpAttempt so account resets cannot weaken IP lockouts.
 SILENCED_SYSTEM_CHECKS = [*silenced_system_checks(ENVIRONMENT), "axes.W006"]
 
-# Internationalization (D-010)
+# Internationalization (D-010, D-056). The default language of an instance is Swiss German; the
+# person chooses another one with the language menu (the language cookie, leg_platform.language).
+# The names are written in their own language and are not translated. English is the language of the
+# source texts and needs no catalogue.
 
 LANGUAGE_CODE = "de-ch"
-LANGUAGES = [("de-ch", _("Swiss German"))]
+LANGUAGES = [
+    ("de-ch", "Deutsch"),
+    ("fr", "Français"),
+    ("it", "Italiano"),
+    ("en", "English"),
+]
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
+# The language cookie holds the code of the chosen language and nothing else. Name and Secure flag
+# follow the other cookies (``__Host-`` prefix outside local, D-025); no Domain, Path "/". JavaScript
+# does not read it (the server renders the language); it is sent with a link from another site
+# only as a top-level GET (SameSite=Lax); it lives one year, so the choice outlasts the session.
+LANGUAGE_COOKIE_NAME = _security["LANGUAGE_COOKIE_NAME"]
+LANGUAGE_COOKIE_SECURE = _security["LANGUAGE_COOKIE_SECURE"]
+LANGUAGE_COOKIE_HTTPONLY = True
+LANGUAGE_COOKIE_SAMESITE = "Lax"
+LANGUAGE_COOKIE_AGE = int(timedelta(days=365).total_seconds())
 TIME_ZONE = "Europe/Zurich"
 USE_TZ = True
 

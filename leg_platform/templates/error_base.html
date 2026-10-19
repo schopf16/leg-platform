@@ -1,4 +1,4 @@
-{% load i18n static instance_branding %}{% get_current_language as LANGUAGE_CODE %}{% instance_branding as brand %}<!doctype html>
+{% load i18n static instance_branding language_menu %}{% instance_branding as brand %}<!doctype html>
 {# Layout of the error pages (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 8a). It does not #}
 {# extend base.html and reads nothing itself from the session or the database: the name and the #}
 {# logos come from the settings through a tag, and the links fall back to fixed paths. The 500 #}
@@ -7,13 +7,13 @@
 {# logged-in account for the frame state); if that fails, for example when the database is not #}
 {# reachable, Django answers with the 500 page. Django passes no technical detail to these #}
 {# templates that is used here, and none must be shown (D-054). #}
-<html lang="{{ LANGUAGE_CODE }}" data-theme="light" data-bs-theme="light">
+<html lang="{% html_language %}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}{% endblock %} – {{ brand.name }}</title>
-  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  {% include "_favicon.html" with address=brand.favicon kind=brand.favicon_type %}
   <script src="{% static 'js/theme-init.js' %}"></script>
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/portal.css' %}">

@@ -1,0 +1,4 @@
+{% load static %}{% comment %}
+The browser tab icon (D-073): the uploaded favicon (address with the digest of the file, so a cache never
+shows an old icon) or the built-in one of the server. Parameters: address, kind (the content type).
+{% endcomment %}{% if address %}<link rel="icon" href="{{ address }}" type="{{ kind }}">{% else %}<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">{% endif %}

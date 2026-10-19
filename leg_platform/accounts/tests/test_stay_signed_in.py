@@ -16,7 +16,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts import session_timeout
+from leg_platform.accounts import mail_queue, session_timeout
 from leg_platform.accounts.models import MailJob, SecurityEvent, VerificationToken
 from leg_platform.accounts.second_factor import PENDING_SESSION_KEY
 from leg_platform.accounts.tests.helpers import (
@@ -24,6 +24,7 @@ from leg_platform.accounts.tests.helpers import (
     code_for,
     create_active_user,
     finish_registration,
+    run_mail_queue,
     verification_path,
 )
 from leg_platform.accounts.tests.test_registration import register
@@ -253,29 +254,66 @@ class StaySignedInWithSecondFactorTests(TestCase):
         self.assertEqual(ended.status_code, 302)
         self.assertTrue(ended["Location"].startswith(LOGIN_URL))
 
-    def test_a_long_session_of_a_staff_user_is_logged_and_announced_by_email_but_not_that_of_a_person(self):
-        # H-2 of the review of 2026-10-17: the second factor is checked once per login; a stolen long session is
-        # noticed through the security log and the email to the account's addresses (D-100).
+    def test_a_long_session_of_a_staff_user_is_logged_without_any_email_but_not_that_of_a_person(self):
+        # The second factor is checked once per login; a long session of a privileged account stays in the
+        # security log (long retention), without an email (owner decision 2026-10-19: normal security, D-100).
         promote(self.user)
         log_in(self.client, self.user.email, remember=False)
         send_code(self.client, code_for(self.device), address="10.9.0.1")
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED).exists())
-        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED).exists())
         self.client.post(reverse("accounts:logout"))
         log_in(self.client, self.user.email, remember=True)
         send_code(self.client, code_for(self.device), address="10.9.0.1")
         event = SecurityEvent.objects.get(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED)
         self.assertEqual(event.account_id, self.user.pk)
         self.assertTrue(event.long_retention)
-        job = MailJob.objects.get(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED)
-        self.assertEqual((job.address, job.account_id), (self.user.email, None))
+        # No job, nothing sent.
+        self.assertFalse(MailJob.objects.exists())
+        run_mail_queue()
+        self.assertEqual(mail.outbox, [])
+
+    def test_a_leftover_job_of_the_removed_long_session_mail_is_given_up_without_a_crash(self):
+        job = MailJob.objects.create(
+            kind="persistent_session_started", address=self.user.email, next_attempt_at=timezone.now(),
+        )
+        with self.assertLogs("leg_platform.accounts.mail_queue", level="ERROR"):
+            self.assertEqual(mail_queue.process_pending(), (0, 1))
+        self.assertEqual(mail.outbox, [])
+        self.assertTrue(MailJob.objects.filter(pk=job.pk).exists())
+        # Stale jobs of an unknown kind are deleted like any other request after an hour.
+        MailJob.objects.filter(pk=job.pk).update(created_at=timezone.now() - timedelta(hours=2))
+        mail_queue.delete_stale_jobs()
+        self.assertFalse(MailJob.objects.filter(pk=job.pk).exists())
+
+    def test_the_data_migration_deletes_the_jobs_and_the_text_of_the_removed_mail_and_nothing_else(self):
+        import importlib
+
+        from django.apps import apps
+
+        from leg_platform.accounts.models import EmailText, EmailTextVersion
+
+        migration = importlib.import_module("leg_platform.accounts.migrations.0033_remove_persistent_session_mail")
+        now = timezone.now()
+        MailJob.objects.create(kind="persistent_session_started", address="a@example.org", next_attempt_at=now)
+        kept_job = MailJob.objects.create(kind=MailJob.Kind.PASSWORD_CHANGED, address="b@example.org", next_attempt_at=now)
+        text = EmailText.objects.create(key="persistent_session_started", subject="Old")
+        EmailTextVersion.objects.create(email_text=text, subject="Older", body="")
+        kept_text = EmailText.objects.create(key=EmailText.Key.PASSWORD_RESET, subject="Kept")
+
+        migration.delete_removed_mail(apps, None)
+
+        self.assertEqual(list(MailJob.objects.values_list("pk", flat=True)), [kept_job.pk])
+        self.assertEqual(list(EmailText.objects.values_list("pk", flat=True)), [kept_text.pk])
+        self.assertFalse(EmailTextVersion.objects.exists())
+        # Safe to run again.
+        migration.delete_removed_mail(apps, None)
 
     def test_a_person_without_staff_rights_gets_no_notice_for_a_long_session(self):
         log_in(self.client, self.user.email, remember=True)
         send_code(self.client, code_for(self.device), address="10.9.0.1")
         self.assertIs(self.client.session[session_timeout.STAYING_KEY], True)
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.PERSISTENT_SESSION_STARTED).exists())
-        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.PERSISTENT_SESSION_STARTED).exists())
+        self.assertFalse(MailJob.objects.exists())
 
     def test_a_staff_user_without_a_second_factor_gets_no_long_session_and_no_notice(self):
         user = create_active_user("nofactor.staff@example.org")

@@ -1,4 +1,4 @@
-"""Validation of uploaded logo files (D-073). Files are accepted exactly as they are or rejected, never rewritten.
+"""Validation of uploaded logo and favicon files (D-073). Files are accepted exactly as they are or rejected, never rewritten.
 
 The type is decided from the content. PNG: signature, every chunk's length and CRC-32, header,
 palette, data chunks as one zlib stream inflating to exactly the stated size, end chunk last; no
@@ -21,6 +21,10 @@ from django.utils.translation import gettext_lazy as _
 
 PNG_MAX_BYTES = 1024 * 1024
 SVG_MAX_BYTES = 200 * 1024
+# The browser tab icon is small: smaller limits than a logo (it also keeps the upload body of the
+# portal settings below the limit of ``middleware.BODY_LIMITS``: two logos plus the favicon).
+FAVICON_PNG_MAX_BYTES = 128 * 1024
+FAVICON_SVG_MAX_BYTES = 64 * 1024
 PNG_MIN_SIDE = 64
 PNG_MAX_SIDE = 4000
 SVG_MAX_DEPTH = 20
@@ -28,6 +32,7 @@ SVG_MAX_ELEMENTS = 2000
 SVG_MAX_TEXT = 500
 # The most that is ever read from an upload.
 MAX_UPLOAD_BYTES = PNG_MAX_BYTES + 1
+FAVICON_MAX_UPLOAD_BYTES = max(FAVICON_PNG_MAX_BYTES, FAVICON_SVG_MAX_BYTES) + 1
 
 WRONG_TYPE = _("Only PNG and SVG files are accepted.")
 TOO_LARGE = _("The file is too large (maximum %(max)s).")
@@ -43,7 +48,7 @@ PNG_METADATA = _(
 )
 SVG_NO_VIEWBOX = _("The SVG needs a viewBox so that it can be scaled.")
 SVG_REJECTED = _(
-    "This SVG contains content that the portal does not accept (%(what)s). Save the logo as "
+    "This SVG contains content that the portal does not accept (%(what)s). Save the file as "
     "\"plain SVG\" without scripts, images, styles or editor data and upload it again."
 )
 
@@ -75,21 +80,35 @@ class Logo:
         return len(self.data)
 
 
-def validate_logo(data):
-    """Return the ``Logo`` for the bytes or raise ``LogoRejected``."""
+def _size_text(limit):
+    """The limit as shown in the message: "1 MB", "200 KB", "128 KB"."""
+    return "1 MB" if limit == 1024 * 1024 else f"{limit // 1024} KB"
+
+
+def validate_logo(data, *, png_max_bytes=PNG_MAX_BYTES, svg_max_bytes=SVG_MAX_BYTES):
+    """Return the ``Logo`` for the bytes or raise ``LogoRejected``; the byte limits are those of a logo unless given."""
     if data.startswith(_PNG_SIGNATURE):
-        if len(data) > PNG_MAX_BYTES:
-            raise LogoRejected(TOO_LARGE, "png: too large", {"max": "1 MB"})
+        if len(data) > png_max_bytes:
+            raise LogoRejected(TOO_LARGE, "png: too large", {"max": _size_text(png_max_bytes)})
         _check_png(data)
         kind = "png"
     elif _looks_like_svg(data):
-        if len(data) > SVG_MAX_BYTES:
-            raise LogoRejected(TOO_LARGE, "svg: too large", {"max": "200 KB"})
+        if len(data) > svg_max_bytes:
+            raise LogoRejected(TOO_LARGE, "svg: too large", {"max": _size_text(svg_max_bytes)})
         _check_svg(data)
         kind = "svg"
     else:
         raise LogoRejected(WRONG_TYPE, "file: not a PNG or SVG file")
     return Logo(kind, bytes(data), hashlib.sha256(data).hexdigest())
+
+
+def validate_favicon(data):
+    """The same checks for the browser tab icon (PNG or SVG, nothing else), with smaller size limits.
+
+    ICO is not accepted: there is no validator for it (a container of several images), and every current
+    browser shows a PNG or SVG icon.
+    """
+    return validate_logo(data, png_max_bytes=FAVICON_PNG_MAX_BYTES, svg_max_bytes=FAVICON_SVG_MAX_BYTES)
 
 
 # --- PNG ---

@@ -16,19 +16,19 @@ from leg_platform.environment import INSTANCE_NAME_MAX_LENGTH
 class PortalSettings(models.Model):
     """The portal settings that the administrator maintains. The table holds exactly one row (id 1).
 
-    Name, website, privacy notice, legal notice, the two logos and the colours (D-073). An empty
+    Name, website, privacy notice, legal notice, the two logos, the favicon and the colours (D-073). An empty
     text or colour means "use the server configuration": the precedence is decided per field by
-    ``leg_platform.accounts.portal_settings.portal_values``, the one accessor. The logos are
+    ``leg_platform.accounts.portal_settings.portal_values``, the one accessor. The logos and the favicon are
     stored in the table (validated file, type, SHA-256 digest), written only by the form of the
-    administration (``logo_images``) and served by ``presentation.instance_logo``; queries that
-    do not need the files must not load them (``LOGO_DATA_FIELDS``).
+    administration (``logo_images``) and served by ``presentation.instance_logo`` and ``instance_favicon``;
+    queries that do not need the files must not load them (``LOGO_DATA_FIELDS``).
     """
 
     class LogoType(models.TextChoices):
         PNG = "png", "PNG"
         SVG = "svg", "SVG"
 
-    LOGO_DATA_FIELDS = ("logo_light_data", "logo_dark_data")
+    LOGO_DATA_FIELDS = ("logo_light_data", "logo_dark_data", "favicon_data")
     COLOUR_FIELDS = ("accent_light", "text_light", "accent_dark", "text_dark", "highlight")
 
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
@@ -108,6 +108,10 @@ class PortalSettings(models.Model):
     logo_dark_data = models.BinaryField(null=True, editable=False)
     logo_dark_type = models.CharField(max_length=3, choices=LogoType, blank=True, editable=False)
     logo_dark_sha256 = models.CharField(max_length=64, blank=True, editable=False)
+    # The browser tab icon: the same storage and checks as a logo, one file for both colour modes.
+    favicon_data = models.BinaryField(null=True, editable=False)
+    favicon_type = models.CharField(max_length=3, choices=LogoType, blank=True, editable=False)
+    favicon_sha256 = models.CharField(max_length=64, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
     class Meta:

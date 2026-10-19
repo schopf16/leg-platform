@@ -322,7 +322,7 @@ class PlaceholderOfferTests(SimpleTestCase):
             )
         }
         self.assertEqual(offered, {str(kind) for kind in MailJob.NOTIFICATION_KINDS})
-        self.assertEqual(len(offered), 15)  # the 14 notifications and the long session notice (D-100)
+        self.assertEqual(len(offered), 14)  # the 14 notifications to the addresses of an account
 
     def test_the_deleted_account_notice_offers_the_neutral_variant_of_the_placeholder(self):
         offered = email_texts.placeholders_of(Key.ACCOUNT_DELETED)
@@ -335,7 +335,7 @@ class PlaceholderOfferTests(SimpleTestCase):
                 email_texts.GREETING in email_texts.placeholders_of(kind)
                 for kind in MailJob.NOTIFICATION_KINDS
             ),
-            14,
+            13,
         )
 
     def test_the_placeholder_is_refused_for_every_other_email(self):

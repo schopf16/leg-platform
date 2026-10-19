@@ -102,16 +102,31 @@ input.portal-colour {
 
 /* Targets of at least 24 x 24 px (WCAG 2.5.8). */
 .field-logo_light_file input[type="file"],
-.field-logo_dark_file input[type="file"] {
+.field-logo_dark_file input[type="file"],
+.field-favicon_file input[type="file"] {
   max-width: 100%;
   min-height: 32px;
 }
 
 .field-remove_logos input[type="checkbox"],
+.field-remove_favicon input[type="checkbox"],
 .field-reset_colours input[type="checkbox"] {
   width: 24px;
   height: 24px;
   vertical-align: middle;
+}
+
+.portal-preview-favicon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.portal-preview-favicon img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .portal-hint {
@@ -433,4 +448,56 @@ input.portal-colour {
   line-height: 1.4;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Raw tables of the management data for system administrators (D-091): the list is a row of inputs per row, the new
+   row sits on top. The widths override the single-column rules above (``.field-name input``). */
+.raw-table-notice {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-left: 4px solid var(--primary, #79aec8);
+  border-radius: 4px;
+}
+
+#changelist #result_list td input:not([type="checkbox"]):not([type="hidden"]),
+#changelist #result_list td select,
+#changelist #result_list td textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 7em;
+  max-width: 16em;
+}
+
+#changelist #result_list td input[type="date"],
+#changelist #result_list td input[type="datetime-local"] {
+  min-width: 11em;
+}
+
+#changelist #result_list td input[type="number"] {
+  min-width: 6em;
+}
+
+#changelist #result_list td .errorlist {
+  margin: 0 0 4px;
+}
+
+#changelist #result_list tr.raw-new-row > td {
+  vertical-align: top;
+  background: var(--selected-bg, #e8f2fb);
+  border-bottom: 2px solid var(--primary, #79aec8);
+}
+
+#changelist #result_list tr.raw-new-row > td:first-child {
+  min-width: 7em;
+}
+
+.raw-new-row-label {
+  display: block;
+  font-weight: 600;
+}
+
+#changelist #result_list tr.raw-new-row button {
+  min-height: 24px;
+  margin-top: 4px;
 }

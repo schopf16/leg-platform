@@ -1,9 +1,12 @@
 /* The two corner buttons: language menu and light/dark button (D-056).
 
-   They are the same on every page. The choice is kept in the sessionStorage of the tab only
-   (team lead decision K3): nothing is stored in a cookie or sent to the server, and a new tab
-   starts light and German. Only the pages that load login-texts.js have translated texts; on
-   every other page the language button stores the choice but the page stays German.
+   They are the same on every page. The language is chosen on the server: every language of the
+   menu is a submit button of a form that posts to the view set_language, which sets the language
+   cookie and renders the page again (no JavaScript is needed for that, and this script stores or
+   sends nothing about the language). This script only adds the behaviour of the menu (a tap opens
+   it, Escape closes it, the arrow keys move) and the light/dark button. The colour mode is kept in
+   the sessionStorage of the tab only (team lead decision K3): no cookie, nothing sent to the
+   server, a new tab starts light.
    No request, no inline script, no eval (CSP: script-src 'self'). */
 (() => {
   "use strict";
@@ -11,14 +14,7 @@
   const wrap = document.getElementById("lang");
   const languageButton = document.getElementById("lang-btn");
   const themeButton = document.getElementById("theme-btn");
-  if (!wrap || !languageButton || !themeButton) return;
-
-  const texts = window.LEG_PAGE_TEXTS || null;
-  const LANGUAGES = ["de", "fr", "it", "en"];
-  const NAMES = { de: "Deutsch", fr: "Français", it: "Italiano", en: "English" };
   const THEMES = ["light", "dark"];
-  const items = Array.from(wrap.querySelectorAll("[data-lang]"));
-  let currentLanguage = "de";
 
   const read = (key, allowed, fallback) => {
     try {
@@ -37,46 +33,26 @@
   };
 
   /* ---- Theme ---- */
-  const applyTheme = (theme) => {
-    root.setAttribute("data-theme", theme);
-    root.setAttribute("data-bs-theme", theme);
-    themeButton.dataset.state = theme;
-    const dictionary = texts && texts[currentLanguage];
-    const label = dictionary
-      ? (theme === "dark" ? dictionary.themeLabelDark : dictionary.themeLabelLight)
-      : (theme === "dark" ? themeButton.dataset.labelDark : themeButton.dataset.labelLight);
-    themeButton.setAttribute("aria-label", label);
-    themeButton.title = label;
-  };
-
-  /* ---- Language ---- */
-  const translate = (code) => {
-    const dictionary = texts && texts[code];
-    if (!dictionary) return;
-    root.lang = dictionary.lang;
-    document.querySelectorAll("[data-i18n]").forEach((element) => {
-      const text = dictionary[element.getAttribute("data-i18n")];
-      if (typeof text === "string") element.textContent = text;
+  if (themeButton) {
+    const applyTheme = (theme) => {
+      root.setAttribute("data-theme", theme);
+      root.setAttribute("data-bs-theme", theme);
+      themeButton.dataset.state = theme;
+      const label = theme === "dark" ? themeButton.dataset.labelDark : themeButton.dataset.labelLight;
+      themeButton.setAttribute("aria-label", label);
+      themeButton.title = label;
+    };
+    themeButton.addEventListener("click", () => {
+      const next = themeButton.dataset.state === "dark" ? "light" : "dark";
+      write("leg-theme", next);
+      applyTheme(next);
     });
-    document.dispatchEvent(new CustomEvent("leg:language", { detail: dictionary }));
-  };
-  const applyLanguage = (code, announce) => {
-    // A page without a dictionary has German texts only: its button must not show a language
-    // that the text does not have. The choice is still remembered (the login page takes it up).
-    const shown = texts ? code : "de";
-    currentLanguage = shown;
-    languageButton.textContent = shown.toUpperCase();
-    const dictionary = texts && texts[shown];
-    languageButton.setAttribute(
-      "aria-label",
-      dictionary ? dictionary.langLabel : `${languageButton.dataset.labelPrefix}: ${NAMES[shown]}`
-    );
-    items.forEach((item) => item.setAttribute("aria-current", String(item.dataset.lang === shown)));
-    if (texts && (announce || shown !== "de")) translate(shown);
-    applyTheme(themeButton.dataset.state);
-  };
+    applyTheme(read("leg-theme", THEMES, "light"));
+  }
 
-  /* ---- Menu: opens on hover, on focus and on a tap; Escape closes it ---- */
+  /* ---- Language menu: opens on hover, on focus and on a tap; Escape closes it ---- */
+  if (!wrap || !languageButton) return;
+  const items = Array.from(wrap.querySelectorAll(".lang-menu button"));
   const isOpen = () =>
     !wrap.classList.contains("dismissed") &&
     (wrap.matches(":hover") || wrap.matches(":focus-within") || wrap.classList.contains("open"));
@@ -120,7 +96,7 @@
       event.stopPropagation();
       close();
       languageButton.focus();
-    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && items.length > 0) {
       event.preventDefault();
       wrap.classList.remove("dismissed");
       const position = items.indexOf(document.activeElement);
@@ -132,25 +108,5 @@
       sync();
     }
   });
-  items.forEach((item) => {
-    item.addEventListener("click", () => {
-      const code = item.dataset.lang;
-      if (!LANGUAGES.includes(code)) return;
-      write("leg-lang", code);
-      applyLanguage(code, true);
-      close();
-      languageButton.focus();
-    });
-  });
-
-  themeButton.addEventListener("click", () => {
-    const next = themeButton.dataset.state === "dark" ? "light" : "dark";
-    write("leg-theme", next);
-    applyTheme(next);
-  });
-
-  /* ---- Start: the stored choice of this tab, otherwise light and German ---- */
-  themeButton.dataset.state = read("leg-theme", THEMES, "light");
-  applyLanguage(read("leg-lang", LANGUAGES, "de"), false);
   sync();
 })();

@@ -76,16 +76,26 @@ UNRESTRICTED_VIEWS = frozenset(
         # Public endpoints used before authentication; they do not expose account data.
         "instance_stylesheet",
         "instance_logo",
+        "instance_favicon",
+        "set_language",
         "addresses:lookup",
     }
 )
 # The same for an account that must replace its password first (D-005, D-041).
 PASSWORD_CHANGE_VIEWS = frozenset(
-    {"accounts:logout", "accounts:password_change", "instance_stylesheet", "instance_logo"}
+    {
+        "accounts:logout",
+        "accounts:password_change",
+        "instance_stylesheet",
+        "instance_logo",
+        "instance_favicon",
+        "set_language",
+    }
 )
-# Public presentation files: the middlewares do not read ``request.user`` for them, so no
-# ``Set-Cookie``/``Vary: Cookie`` and nothing from the session reaches a cache (D-073).
-SESSION_FREE_VIEWS = frozenset({"instance_logo"})
+# Public views without a session: the middlewares do not read ``request.user`` for them, so no
+# session or account data reaches them and nothing from the session reaches a cache (D-073). The
+# presentation files set no cookie; the language menu sets only the language cookie (D-056).
+SESSION_FREE_VIEWS = frozenset({"instance_logo", "instance_favicon", "set_language"})
 
 
 def is_session_free(request):

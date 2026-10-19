@@ -40,9 +40,13 @@ _ROW_FIELDS = (
     "logo_light_sha256",
     "logo_dark_type",
     "logo_dark_sha256",
+    "favicon_type",
+    "favicon_sha256",
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _LOGO_TYPES = ("png", "svg")
+# The content type of an uploaded image by its stored type: the one fixed table (served by ``presentation``).
+IMAGE_CONTENT_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 # Digest length in a logo address: the address changes with the file.
 LOGO_VERSION_LENGTH = 16
 
@@ -68,7 +72,9 @@ class PortalValues(NamedTuple):
     logo_dark: str
     # Whether the logos are the uploaded ones.
     uploaded_logos: bool
-
+    # The uploaded favicon: its address and content type; "" = none, the pages use the built-in icon.
+    favicon: str = ""
+    favicon_type: str = ""
     @property
     def website_host(self):
         """The host of the website (the footer link text), "" without a website."""
@@ -104,6 +110,11 @@ def logo_url(variant, digest):
     return reverse("instance_logo", kwargs={"variant": variant}) + (
         f"?v={digest[:LOGO_VERSION_LENGTH]}"
     )
+
+
+def favicon_url(digest):
+    """The address of the uploaded favicon with the digest prefix, so a cache never shows an old icon."""
+    return reverse("instance_favicon") + f"?v={digest[:LOGO_VERSION_LENGTH]}"
 
 
 def effective_colours(stored, branding=None):
@@ -160,6 +171,16 @@ def _stored_logos(row):
         return None
 
 
+def _stored_favicon(row):
+    """(address, content type) of the uploaded favicon, or None if there is none (independent of the logos)."""
+    if row["favicon_type"] not in _LOGO_TYPES or _SHA256.fullmatch(row["favicon_sha256"] or "") is None:
+        return None
+    try:
+        return favicon_url(row["favicon_sha256"]), IMAGE_CONTENT_TYPES[row["favicon_type"]]
+    except NoReverseMatch:
+        return None
+
+
 def _resolve(row):
     values = environment_values()
     if not row:
@@ -186,6 +207,9 @@ def _resolve(row):
     logos = _stored_logos(row)
     if logos is not None:
         changes.update(logo_light=logos[0], logo_dark=logos[1], uploaded_logos=True)
+    favicon = _stored_favicon(row)
+    if favicon is not None:
+        changes.update(favicon=favicon[0], favicon_type=favicon[1])
     return values._replace(**changes)
 
 

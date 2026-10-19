@@ -13,7 +13,14 @@ class DatabaseWrapper(base.DatabaseWrapper):
     def get_new_connection(self, conn_params):
         database = str(conn_params["database"])
         if not database.startswith(("file:", ":memory:")):
-            self._prepare_file(Path(database))
+            path = Path(database)
+            self._prepare_file(path)
+            # SQLite writes large temporary files (sorter, transient indexes, VACUUM) to the first folder of
+            # PRAGMA temp_store_directory, SQLITE_TMPDIR, TMPDIR, /var/tmp, /usr/tmp, /tmp. Point them to the disk
+            # of the directory file unless the operator set SQLITE_TMPDIR; the variable is read on the first temporary
+            # file, so it must be set before the first connection (https://www.sqlite.org/tempfiles.html, section 5;
+            # Unix only: Windows uses GetTempPath()).
+            os.environ.setdefault("SQLITE_TMPDIR", str(path.parent))
         return super().get_new_connection(conn_params)
 
     @staticmethod

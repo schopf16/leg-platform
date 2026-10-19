@@ -1,13 +1,12 @@
-{% load i18n static %}<!doctype html>
-{% get_current_language as LANGUAGE_CODE %}
-<html lang="{{ LANGUAGE_CODE }}" data-theme="light" data-bs-theme="light">
+{% load i18n static language_menu %}<!doctype html>
+<html lang="{% html_language %}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {# The portal is not a public page (docs/PROJECT.md, "Instances"). #}
   <meta name="robots" content="noindex, nofollow">
   <title>{% block title %}{% endblock %} – {{ instance_name }}</title>
-  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  {% include "_favicon.html" with address=instance_favicon kind=instance_favicon_type %}
   {# Not deferred: sets the colour mode of this tab before the page is painted (D-056). #}
   <script src="{% static 'js/theme-init.js' %}"></script>
   <link rel="stylesheet" href="{% static 'vendor/tabler/css/tabler.min.css' %}">
@@ -103,7 +102,6 @@
       </main>
     </div>
   {% endblock %}
-  {% block scripts_before %}{% endblock %}
   <script defer src="{% static 'js/corner-controls.js' %}"></script>
   <script defer src="{% static 'js/frame-menu.js' %}"></script>
   <script defer src="{% static 'js/password-toggle.js' %}"></script>

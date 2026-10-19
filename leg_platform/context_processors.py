@@ -68,6 +68,9 @@ def instance(request):
         # The addresses of the logos (uploaded or static files of the server; "" without a logo).
         "instance_logo_light": SimpleLazyObject(lambda: values.logo_light),
         "instance_logo_dark": SimpleLazyObject(lambda: values.logo_dark),
+        # The uploaded favicon ("" = the built-in one) and its content type.
+        "instance_favicon": SimpleLazyObject(lambda: values.favicon),
+        "instance_favicon_type": SimpleLazyObject(lambda: values.favicon_type),
         "print_date": timezone.localdate(),
         # The duration of a temporary lockout, for the lockout page (the same value the abuse
         # protection uses, docs/SECURITY.md, section 3).

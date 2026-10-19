@@ -3,7 +3,7 @@ from django.utils.cache import add_never_cache_headers
 
 # Maximum request body in bytes by path prefix (D-052, D-073); the longest matching prefix decides.
 # Checked before the CSRF middleware, which reads the form body of a POST request. The portal
-# settings also take uploads (two logos of at most 1 MB each): the limit keeps a request without a
+# settings also take uploads (two logos of at most 1 MB each and a favicon of at most 128 KB): the limit keeps a request without a
 # login from making Django write a large body to a temporary file before the CSRF check. It is a
 # prefix and not one path because the admin routes the object id as ``<path:object_id>``, so
 # spellings such as ``01``, ``+1``, ``%201`` or ``_31`` (the admin's own ``_XX`` escape) and the
@@ -11,6 +11,8 @@ from django.utils.cache import add_never_cache_headers
 # prefix has no trailing slash, so that the spelling without it is covered too.
 BODY_LIMITS = (
     ("/addresses/lookup/", 4096),
+    # The language menu: two short fields and the CSRF token (the address of the page can be long).
+    ("/language/", 8192),
     ("/admin/accounts/portalsettings", 3 * 1024 * 1024),
 )
 

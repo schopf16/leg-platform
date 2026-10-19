@@ -1,4 +1,4 @@
-"""Public presentation of the instance: the branding stylesheet and the uploaded logos.
+"""Public presentation of the instance: the branding stylesheet, the uploaded logos and the uploaded favicon.
 
 The colour mode (light or dark) is not handled on the server: it is a choice of the person that
 is neither stored in a cookie nor sent to the server (docs/DECISIONS.md, D-056). The browser keeps
@@ -14,11 +14,11 @@ from django.utils.cache import get_conditional_response, patch_cache_control
 from django.utils.http import quote_etag
 from django.views.decorators.http import require_safe
 
-from leg_platform.accounts.portal_settings import LOGO_VERSION_LENGTH, portal_values
+from leg_platform.accounts.portal_settings import IMAGE_CONTENT_TYPES, LOGO_VERSION_LENGTH, portal_values
 
 logger = logging.getLogger(__name__)
 
-LOGO_CONTENT_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
+LOGO_CONTENT_TYPES = IMAGE_CONTENT_TYPES
 # An uploaded file is an image and nothing else: it is shown through <img>, and if someone opens its
 # address directly the browser may not run or load anything from it (docs/SECURITY.md, section 6).
 LOGO_CONTENT_SECURITY_POLICY = "sandbox; default-src 'none'"
@@ -76,48 +76,57 @@ def instance_stylesheet(request):
     return response
 
 
-def _logo_row(variant):
-    """The type and the digest of a logo, without the file (up to 1 MB): enough to answer a wrong
-    ``?v=`` and a conditional request."""
+def _image_row(prefix):
+    """The type and the digest of an uploaded image (``logo_light``, ``logo_dark``, ``favicon``), without the
+    file (up to 1 MB): enough to answer a wrong ``?v=`` and a conditional request."""
     from leg_platform.accounts.models import PortalSettings
 
-    columns = (f"logo_{variant}_type", f"logo_{variant}_sha256")
+    columns = (f"{prefix}_type", f"{prefix}_sha256")
     return PortalSettings.objects.filter(pk=1).values(*columns).first()
 
 
-def _logo_data(variant):
-    """The file of a logo; only read when a body is served."""
+def _image_data(prefix):
+    """The file of an uploaded image; only read when a body is served."""
     from leg_platform.accounts.models import PortalSettings
 
-    row = PortalSettings.objects.filter(pk=1).values(f"logo_{variant}_data").first()
-    return row[f"logo_{variant}_data"] if row else None
+    row = PortalSettings.objects.filter(pk=1).values(f"{prefix}_data").first()
+    return row[f"{prefix}_data"] if row else None
 
 
-@require_safe
-def instance_logo(request, variant):
-    """An uploaded logo, from the database: a public view without a session, because the logo is
-    on every page, also the pages before the login (D-073).
+def _logo_row(variant):
+    return _image_row(f"logo_{variant}")
 
-    The file is never chosen by the visitor: only the variant ("light" or "dark") is routed, the
-    content comes from the validated column and its type from the stored type. The content type is
-    fixed, ``nosniff`` and a sandboxing policy are set, and the digest of the file is checked
-    again before a body is served. ``?v=`` must be the start of the digest if it is given (a stale
-    address is not found). Without an uploaded logo the answer is 404 (the pages then use the logo
-    of the server configuration, which is a static file).
+
+def _logo_data(variant):
+    return _image_data(f"logo_{variant}")
+
+
+def _favicon_row():
+    return _image_row("favicon")
+
+
+def _favicon_data():
+    return _image_data("favicon")
+
+
+def _serve_image(request, prefix, read_row, read_data, label):
+    """The stored image of the column group ``prefix`` as a response, or 404 (the one code of the logos and the favicon).
+
+    The file is never chosen by the visitor: the group is fixed by the route, the content comes from the
+    validated column and its type from the stored type. The content type is fixed, ``nosniff`` and a
+    sandboxing policy are set, and the digest of the file is checked again before a body is served.
+    ``?v=`` must be the start of the digest if it is given (a stale address is not found).
 
     A wrong ``?v=`` and a conditional request that matches the ETag are answered from the type and
     the digest alone: the file is neither read nor hashed (security review of D-073, L-1).
-    Neither the session nor the second-factor middleware touches the session for this view
-    (``second_factor.is_session_free``), so the response carries no ``Set-Cookie`` and no
-    ``Vary: Cookie`` (L-2).
     """
     try:
-        row = _logo_row(variant)
-    except Exception:  # noqa: BLE001 - the same fail-safe as the accessor: no logo, no exception
-        logger.warning("An uploaded logo could not be read.")
+        row = read_row()
+    except Exception:  # noqa: BLE001 - the same fail-safe as the accessor: no image, no exception
+        logger.warning("An uploaded %s could not be read.", label)
         raise Http404 from None
-    kind = row[f"logo_{variant}_type"] if row else ""
-    digest = row[f"logo_{variant}_sha256"] if row else ""
+    kind = row[f"{prefix}_type"] if row else ""
+    digest = row[f"{prefix}_sha256"] if row else ""
     if kind not in LOGO_CONTENT_TYPES or not digest:
         raise Http404
     version = request.GET.get("v")
@@ -130,15 +139,15 @@ def instance_logo(request, variant):
     if response is None:
         # A body is needed: only now the file is read and checked against its digest.
         try:
-            data = _logo_data(variant)
+            data = read_data()
         except Exception:  # noqa: BLE001 - as above
-            logger.warning("An uploaded logo could not be read.")
+            logger.warning("An uploaded %s could not be read.", label)
             raise Http404 from None
         data = bytes(data) if data else b""
         if not data:
             raise Http404
         if hashlib.sha256(data).hexdigest() != digest:
-            logger.warning("The stored logo does not match its digest; it is not served.")
+            logger.warning("The stored %s does not match its digest; it is not served.", label)
             raise Http404
         response = HttpResponse(data, content_type=LOGO_CONTENT_TYPES[kind])
     response["ETag"] = etag
@@ -151,3 +160,27 @@ def instance_logo(request, variant):
         # Not "public": the cache of the browser is enough, and the address changes with the file.
         patch_cache_control(response, max_age=LOGO_MAX_AGE)
     return response
+
+
+@require_safe
+def instance_logo(request, variant):
+    """An uploaded logo, from the database: a public view without a session, because the logo is
+    on every page, also the pages before the login (D-073).
+
+    Only the variant ("light" or "dark") is routed (``_serve_image`` has the rules). Without an uploaded logo
+    the answer is 404 (the pages then use the logo of the server configuration, which is a static file).
+    Neither the session nor the second-factor middleware touches the session for this view
+    (``second_factor.is_session_free``), so the response carries no ``Set-Cookie`` and no
+    ``Vary: Cookie`` (L-2).
+    """
+    return _serve_image(
+        request, f"logo_{variant}", lambda: _logo_row(variant), lambda: _logo_data(variant), "logo"
+    )
+
+
+@require_safe
+def instance_favicon(request):
+    """The uploaded favicon (browser tab icon), served like a logo: public, without a session, from the
+    database with its content hash (D-073). Without an uploaded favicon the answer is 404 (the pages then
+    use the built-in static icon)."""
+    return _serve_image(request, "favicon", lambda: _favicon_row(), lambda: _favicon_data(), "favicon")

@@ -1,0 +1,4656 @@
+# Italian translations of the user interface of LEG-Platform (AGENTS.md, section 2; docs/DECISIONS.md, D-010, D-056).
+# Source texts are English. The entries are the ones of locale/de_CH; translate every msgstr.
+# A text without a translation is shown in English (leg_platform/language.py), never in German.
+msgid ""
+msgstr ""
+"Project-Id-Version: LEG-Platform\n"
+"PO-Revision-Date: 2026-10-19 13:00+0200\n"
+"Last-Translator: LEG-Platform contributors\n"
+"Language-Team: Italian\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# The management area (D-077). The texts of the pages are the final texts of the owner's design
+# specification (LEG-Design-Vorgaben/verwaltung); a text that the specification does not contain is
+# the smallest neutral wording and is listed as an open point in D-077.
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Main navigation"
+msgstr "Navigazione principale"
+
+# Corner buttons: language menu and light/dark button (D-056)
+msgid "Language"
+msgstr "Lingua"
+
+#, python-format
+msgid "Language: %(language)s"
+msgstr "Lingua: %(language)s"
+
+msgid "Display: light. Switch to dark."
+msgstr "Aspetto: chiaro. Passa a scuro."
+
+msgid "Display: dark. Switch to light."
+msgstr "Aspetto: scuro. Passa a chiaro."
+
+# Entry shell: panel texts of the login and of the registration (LEG-Design-Vorgaben)
+msgid "Welcome to the LEG portal"
+msgstr "Benvenuti nel portale della comunità elettrica locale"
+
+msgid "Solar power from the neighbourhood"
+msgstr "Energia solare dal quartiere"
+
+msgid "Produced locally, shared together"
+msgstr "Prodotta localmente, condivisa insieme"
+
+msgid "Stay signed in"
+msgstr "Rimani connesso"
+
+msgid "Legal notice"
+msgstr "Note legali"
+
+msgid "Create account"
+msgstr "Crea conto"
+
+msgid "First we confirm your email address. After that you fill in the remaining details."
+msgstr "Per prima cosa confermiamo il Suo indirizzo e-mail. Dopodiché completerà i dati mancanti."
+
+msgid "First we confirm your email address. After that you set your password and add your details."
+msgstr "Per prima cosa confermiamo il Suo indirizzo e-mail. Dopodiché imposterà la Sua password e aggiungerà i Suoi dati."
+
+msgid "One login for all sites"
+msgstr "Un unico accesso per tutte le ubicazioni"
+
+msgid "Invoices and messages available at any time"
+msgstr "Fatture e messaggi sempre disponibili"
+
+# Portal settings in the administration (D-056)
+msgid "portal settings"
+msgstr "impostazioni del portale"
+
+msgid "address of the privacy notice"
+msgstr "indirizzo dell'informativa sulla protezione dei dati"
+
+msgid "address of the legal notice"
+msgstr "indirizzo delle note legali"
+
+msgid "Linked in the footer, at the registration and when deleting the account. Leave empty to show the text without a link."
+msgstr "Collegato nel piè di pagina, alla registrazione e all'eliminazione del conto. Lasciare vuoto per mostrare il testo senza collegamento."
+
+msgid "Linked in the footer. Leave empty to show the text without a link."
+msgstr "Collegato nel piè di pagina. Lasciare vuoto per mostrare il testo senza collegamento."
+
+msgid "Enter a complete address that starts with https://."
+msgstr "Inserire un indirizzo completo che inizi con https://."
+
+msgid "The texts are maintained on your website. Enter only the addresses here."
+msgstr "I testi sono gestiti sul Suo sito web. Qui vanno inseriti solo gli indirizzi."
+
+msgid "preview of the privacy notice"
+msgstr "anteprima dell'informativa sulla protezione dei dati"
+
+msgid "preview of the legal notice"
+msgstr "anteprima delle note legali"
+
+msgid "Open page"
+msgstr "Apri pagina"
+
+# Frame after the login, start page and tasks (D-057)
+msgid "Open menu"
+msgstr "Apri menu"
+
+msgid "Close menu"
+msgstr "Chiudi menu"
+
+msgid "Quick access"
+msgstr "Accesso rapido"
+
+msgid "My area"
+msgstr "La mia area"
+
+msgid "Coming next"
+msgstr "Prossimamente"
+
+msgid "Start"
+msgstr "Inizio"
+
+msgid "Locations"
+msgstr "Ubicazioni"
+
+msgid "Invoices"
+msgstr "Fatture"
+
+msgid "Energy"
+msgstr "Energia"
+
+msgid "Messages"
+msgstr "Messaggi"
+
+msgid "later"
+msgstr "più tardi"
+
+msgid "not yet available"
+msgstr "non ancora disponibile"
+
+#, python-format
+msgid "Hello, %(name)s"
+msgstr "Buongiorno, %(name)s"
+
+msgid "Open"
+msgstr "Apri"
+
+msgid "Hide"
+msgstr "Nascondi"
+
+#, python-format
+msgid "Hide task: %(title)s"
+msgstr "Nascondi attività: %(title)s"
+
+msgid "No open tasks"
+msgstr "Nessuna attività aperta"
+
+msgid "Tasks appear here as soon as there is something to do."
+msgstr "Le attività compaiono qui non appena c'è qualcosa da fare."
+
+msgid "Add your address"
+msgstr "Aggiunga il Suo indirizzo"
+
+msgid "Your address is still missing."
+msgstr "Il Suo indirizzo manca ancora."
+
+msgid "Add address"
+msgstr "Aggiungi indirizzo"
+
+msgid "Two-factor sign-in"
+msgstr "Accesso a due fattori"
+
+msgid "Protects your account additionally with a code from an app."
+msgstr "Protegge ulteriormente il Suo conto con un codice generato da un'app."
+
+msgid "Set up 2FA"
+msgstr "Configura 2FA"
+
+msgid "hidden tasks"
+msgstr "attività nascoste"
+
+msgid "Portal settings changed"
+msgstr "Impostazioni del portale modificate"
+
+msgid "Address count"
+msgstr "Numero di indirizzi"
+
+msgid "Address directory"
+msgstr "Elenco degli indirizzi"
+
+msgid "Address directory import"
+msgstr "Importazione dell'elenco degli indirizzi"
+
+msgid "Address directory imports"
+msgstr "Importazioni dell'elenco degli indirizzi"
+
+msgid "Matching addresses"
+msgstr "Indirizzi corrispondenti"
+
+msgid "Did you mean this address?"
+msgid_plural "Did you mean one of these addresses?"
+msgstr[0] "Intendeva questo indirizzo?"
+msgstr[1] "Intendeva uno di questi indirizzi?"
+
+msgid "Choose an address to fill in the fields."
+msgstr "Scelga un indirizzo per compilare i campi."
+
+#, python-format
+msgid "No street starting with “%(street)s” was found in %(postal_code)s. Choose an address to fill in the fields."
+msgstr "Nessuna via che inizia con «%(street)s» è stata trovata in %(postal_code)s. Scelga un indirizzo per compilare i campi."
+
+msgid "More addresses match. Keep typing to narrow the list."
+msgstr "Corrispondono più indirizzi. Continui a digitare per restringere l'elenco."
+
+#, python-format
+msgid "%(count)s address suggestion available. Press the down arrow key to choose one."
+msgid_plural "%(count)s address suggestions available. Press the down arrow key to choose one."
+msgstr[0] "%(count)s suggerimento di indirizzo disponibile. Premere il tasto freccia giù per sceglierlo."
+msgstr[1] "%(count)s suggerimenti di indirizzo disponibili. Premere il tasto freccia giù per sceglierne uno."
+
+#, python-format
+msgid "No exact match. %(count)s similar address available. Press the down arrow key to choose it."
+msgid_plural "No exact match. %(count)s similar addresses available. Press the down arrow key to choose one."
+msgstr[0] "Nessuna corrispondenza esatta. %(count)s indirizzo simile disponibile. Premere il tasto freccia giù per sceglierlo."
+msgstr[1] "Nessuna corrispondenza esatta. %(count)s indirizzi simili disponibili. Premere il tasto freccia giù per sceglierne uno."
+
+#, python-format
+msgid "Address filled in: %(address)s."
+msgstr "Indirizzo compilato: %(address)s."
+
+msgid "Can request an address directory import"
+msgstr "Può richiedere un'importazione dell'elenco degli indirizzi"
+
+msgid "Completed"
+msgstr "Completata"
+
+msgid "Data date"
+msgstr "Data dei dati"
+
+msgid "Failed"
+msgstr "Non riuscita"
+
+msgid "Finished at"
+msgstr "Terminata il"
+
+msgid "Imported at"
+msgstr "Importata il"
+
+msgid "Last automatic attempt at"
+msgstr "Ultimo tentativo automatico il"
+
+msgid "An import is already queued or running."
+msgstr "Un'importazione è già in coda o in corso."
+
+msgid "Account blocked"
+msgstr "Conto bloccato"
+
+msgid "Account deleted"
+msgstr "Conto eliminato"
+
+msgid "Account unblocked"
+msgstr "Conto sbloccato"
+
+msgid "An email address change was attempted at %(instance_name)s"
+msgstr "È stata tentata una modifica dell'indirizzo e-mail presso %(instance_name)s"
+
+msgid "Block account"
+msgstr "Blocca conto"
+
+msgid "Blocked the account."
+msgstr "Conto bloccato."
+
+msgid "Confirm email address change"
+msgstr "Conferma la modifica dell'indirizzo e-mail"
+
+msgid "Confirm new email address"
+msgstr "Conferma il nuovo indirizzo e-mail"
+
+msgid "Confirm your new email address at %(instance_name)s"
+msgstr "Confermi il Suo nuovo indirizzo e-mail presso %(instance_name)s"
+
+msgid "Contact information for the operator:\n\n%(contact_url)s"
+msgstr "Informazioni di contatto del gestore:\n\n%(contact_url)s"
+
+msgid "Delete account"
+msgstr "Elimina conto"
+
+msgid "Deleted the account."
+msgstr "Conto eliminato."
+
+msgid "Email address change requested"
+msgstr "Modifica dell'indirizzo e-mail richiesta"
+
+msgid "Email address change: link to confirm the new address"
+msgstr "Modifica dell'indirizzo e-mail: collegamento per confermare il nuovo indirizzo"
+
+msgid "Email address change: the new address already has an account"
+msgstr "Modifica dell'indirizzo e-mail: il nuovo indirizzo ha già un conto"
+
+msgid "Email address changed"
+msgstr "Indirizzo e-mail modificato"
+
+msgid "Hello\n\nSomeone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n\n%(email_change_url)s\n\nThe link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
+msgstr "Buongiorno\n\nQualcuno ha richiesto la modifica del Suo indirizzo e-mail presso %(instance_name)s. Per confermare il nuovo indirizzo, apra questo collegamento:\n\n%(email_change_url)s\n\nIl collegamento scade tra %(lifetime_hours)s ore. Il nuovo indirizzo non viene utilizzato finché non lo conferma."
+
+msgid "Hello\n\nSomeone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
+msgstr "Buongiorno\n\nQualcuno ha tentato di modificare l'indirizzo e-mail di un conto in questo indirizzo presso %(instance_name)s. Non è stata apportata alcuna modifica. Se è stato Lei, per accedere utilizzi l'indirizzo e-mail già registrato oppure contatti il gestore."
+
+msgid "Home"
+msgstr "Home"
+
+msgid "I confirm this account change."
+msgstr "Confermo questa modifica del conto."
+
+msgid "Notification: email address changed"
+msgstr "Notifica: indirizzo e-mail modificato"
+
+msgid "Personal link to confirm the new email address."
+msgstr "Collegamento personale per confermare il nuovo indirizzo e-mail."
+
+msgid "The account change could not be made. It may be the last system administrator or its email address may be in use."
+msgstr "La modifica del conto non è stata possibile. Potrebbe trattarsi dell'ultimo amministratore di sistema oppure il relativo indirizzo e-mail potrebbe essere già in uso."
+
+msgid "The account could not be deleted."
+msgstr "Non è stato possibile eliminare il conto."
+
+msgid "The account will be able to log in and reset its password again."
+msgstr "Il conto potrà di nuovo accedere e reimpostare la propria password."
+
+msgid "The account will be restored if no active, temporarily locked, or blocked account uses its email address. Any pending registration at that address will be removed."
+msgstr "Il conto verrà ripristinato se nessun conto attivo, temporaneamente bloccato o bloccato utilizza il relativo indirizzo e-mail. Un'eventuale registrazione in sospeso con tale indirizzo verrà rimossa."
+
+msgid "The account will not be able to log in or reset its password."
+msgstr "Il conto non potrà accedere né reimpostare la propria password."
+
+msgid "The test email limit has been reached. Try again later."
+msgstr "Il limite di e-mail di prova è stato raggiunto. Riprovi più tardi."
+
+msgid "Unblock account"
+msgstr "Sblocca conto"
+
+msgid "Unblocked the account."
+msgstr "Conto sbloccato."
+
+msgid "Your email address at %(instance_name)s was changed"
+msgstr "Il Suo indirizzo e-mail presso %(instance_name)s è stato modificato"
+
+msgid "No import requested"
+msgstr "Nessuna importazione richiesta"
+
+msgid "Queued"
+msgstr "In coda"
+
+msgid "Request directory update"
+msgstr "Richiedi aggiornamento dell'elenco"
+
+msgid "Requested at"
+msgstr "Richiesta il"
+
+msgid "Running"
+msgstr "In corso"
+
+msgid "Started at"
+msgstr "Avviata il"
+
+msgid "The address directory import has started. This page shows the progress."
+msgstr "L'importazione dell'elenco degli indirizzi è stata avviata. Questa pagina mostra lo stato di avanzamento."
+
+msgid "The address directory is more than 92 days old."
+msgstr "L'elenco degli indirizzi ha più di 92 giorni."
+
+msgid "The address directory is unavailable."
+msgstr "L'elenco degli indirizzi non è disponibile."
+
+msgid "The import runs in the portal itself, you do not need to set up anything else. Addresses already entered are not changed. The result is also written to the application log and to the security log."
+msgstr "L'importazione viene eseguita nel portale stesso, non è necessario configurare altro. Gli indirizzi già inseriti non vengono modificati. Il risultato viene registrato anche nel log dell'applicazione e nel log di sicurezza."
+
+msgid "This address was not found. Please check street, house number, postal code and town. You can still save it as entered."
+msgstr "Questo indirizzo non è stato trovato. Verifichi via, numero civico, NPA e località. Può comunque salvarlo così come inserito."
+
+msgid "Too many import requests. Please try again later."
+msgstr "Troppe richieste di importazione. Riprovi più tardi."
+
+# D-090: the import of the address directory in the portal itself, its status page and its failure reasons.
+msgid "Interrupted"
+msgstr "Interrotta"
+
+msgid "Reason"
+msgstr "Motivo"
+
+msgid "Directory in use"
+msgstr "Elenco in uso"
+
+msgid "File size"
+msgstr "Dimensione del file"
+
+msgid "Download progress"
+msgstr "Avanzamento del download"
+
+msgid "Starting"
+msgstr "Avvio"
+
+msgid "Checking the official catalogue"
+msgstr "Verifica del catalogo ufficiale"
+
+msgid "Downloading the official file"
+msgstr "Download del file ufficiale"
+
+msgid "Importing the addresses"
+msgstr "Importazione degli indirizzi"
+
+msgid "Publishing the new directory"
+msgstr "Pubblicazione del nuovo elenco"
+
+msgid "Finishing up"
+msgstr "Completamento"
+
+msgid "Use the button below to load or update the directory."
+msgstr "Utilizzi il pulsante qui sotto per caricare o aggiornare l'elenco."
+
+msgid "The import did not finish."
+msgstr "L'importazione non è stata completata."
+
+msgid "You can leave this page; the import goes on. A restart of the portal interrupts it."
+msgstr "Può lasciare questa pagina; l'importazione prosegue. Un riavvio del portale la interrompe."
+
+msgid "Try again"
+msgstr "Riprova"
+
+msgid "The import is queued and waits to be started."
+msgstr "L'importazione è in coda e attende di essere avviata."
+
+msgid "The import is running."
+msgstr "L'importazione è in corso."
+
+msgid "The directory was already up to date. Nothing was downloaded."
+msgstr "L'elenco era già aggiornato. Non è stato scaricato nulla."
+
+msgid "The import completed."
+msgstr "L'importazione è stata completata."
+
+msgid "The import failed."
+msgstr "L'importazione non è riuscita."
+
+#, python-format
+msgid "%(done)s of %(total)s MB downloaded"
+msgstr "%(done)s di %(total)s MB scaricati"
+
+#, python-format
+msgid "%(count)s addresses read"
+msgstr "%(count)s indirizzi letti"
+
+msgid "The automatic refresh is turned off on this server. The directory is only updated when you request it here or when the operator starts the import on the server."
+msgstr "L'aggiornamento automatico è disattivato su questo server. L'elenco viene aggiornato solo quando lo richiede qui oppure quando il gestore avvia l'importazione sul server."
+
+msgid "The portal refreshes the directory by itself: the first time a staff member opens the administration or the management area after the due time. It needs no scheduler, but nothing happens while nobody uses the portal."
+msgstr "Il portale aggiorna l'elenco autonomamente: la prima volta che un membro del personale apre l'amministrazione o la gestione dopo la scadenza. Non richiede alcuno scheduler, ma non succede nulla finché nessuno utilizza il portale."
+
+msgid "The first refresh is due now."
+msgstr "Il primo aggiornamento è in scadenza ora."
+
+msgid "The next refresh is due now."
+msgstr "Il prossimo aggiornamento è in scadenza ora."
+
+#, python-format
+msgid "The next refresh is due after %(date)s."
+msgstr "Il prossimo aggiornamento è previsto dopo il %(date)s."
+
+msgid "The status can no longer be updated. Reload the page; you may have to sign in again."
+msgstr "Lo stato non può più essere aggiornato. Ricarichi la pagina; potrebbe dover accedere di nuovo."
+
+msgid "The status could not be loaded. Trying again."
+msgstr "Non è stato possibile caricare lo stato. Nuovo tentativo in corso."
+
+msgid "The download address is not an approved one."
+msgstr "L'indirizzo di download non è tra quelli approvati."
+
+msgid "The official server did not deliver the file. Check that this server can reach data.geo.admin.ch."
+msgstr "Il server ufficiale non ha fornito il file. Verifichi che questo server possa raggiungere data.geo.admin.ch."
+
+msgid "The official server answered in an unexpected format."
+msgstr "Il server ufficiale ha risposto in un formato inatteso."
+
+msgid "The official file is larger than allowed."
+msgstr "Il file ufficiale è più grande del consentito."
+
+msgid "The download was larger or slower than allowed."
+msgstr "Il download è stato più grande o più lento del consentito."
+
+msgid "The download was incomplete. Try again later."
+msgstr "Il download era incompleto. Riprovi più tardi."
+
+msgid "The catalogue of the official server could not be understood."
+msgstr "Non è stato possibile interpretare il catalogo del server ufficiale."
+
+msgid "The official file contains an address that is too long."
+msgstr "Il file ufficiale contiene un indirizzo troppo lungo."
+
+msgid "The official file contains an invalid address."
+msgstr "Il file ufficiale contiene un indirizzo non valido."
+
+msgid "The official file does not have the expected content."
+msgstr "Il file ufficiale non ha il contenuto previsto."
+
+msgid "The official file contains an invalid postal code."
+msgstr "Il file ufficiale contiene un NPA non valido."
+
+msgid "The official file contains no addresses."
+msgstr "Il file ufficiale non contiene indirizzi."
+
+msgid "The official file could not be read."
+msgstr "Non è stato possibile leggere il file ufficiale."
+
+msgid "Another import is running."
+msgstr "È in corso un'altra importazione."
+
+msgid "The import was taken over by another process."
+msgstr "L'importazione è stata rilevata da un altro processo."
+
+msgid "The free disk space could not be checked."
+msgstr "Non è stato possibile verificare lo spazio libero su disco."
+
+msgid "There is not enough free disk space for the import (at least 4 GB are needed)."
+msgstr "Lo spazio libero su disco non è sufficiente per l'importazione (sono necessari almeno 4 GB)."
+
+msgid "The official file is older than the directory in use. Nothing was changed."
+msgstr "Il file ufficiale è più vecchio dell'elenco in uso. Non è stato modificato nulla."
+
+msgid "A repair was tried a short time ago and did not succeed. Try again in a few hours."
+msgstr "Poco tempo fa è stata tentata una riparazione che non è riuscita. Riprovi tra qualche ora."
+
+msgid "The downloaded file does not match its checksum and was discarded."
+msgstr "Il file scaricato non corrisponde alla propria somma di controllo ed è stato scartato."
+
+msgid "The official directory could not be downloaded or read. Check the network connection and try again."
+msgstr "Non è stato possibile scaricare o leggere l'elenco ufficiale. Verifichi la connessione di rete e riprovi."
+
+msgid "The import failed unexpectedly. The application log has the details."
+msgstr "L'importazione non è riuscita in modo inatteso. I dettagli si trovano nel log dell'applicazione."
+
+msgid "The import was interrupted because the application stopped or restarted. Request it again."
+msgstr "L'importazione è stata interrotta perché l'applicazione si è fermata o è stata riavviata. La richieda di nuovo."
+
+msgid "Address directory import completed"
+msgstr "Importazione dell'elenco degli indirizzi completata"
+
+msgid "Address directory import failed"
+msgstr "Importazione dell'elenco degli indirizzi non riuscita"
+
+# D-092: the log files and the log pages of the administration.
+msgid "Log file viewed"
+msgstr "File di log visualizzato"
+
+msgid "Log file downloaded"
+msgstr "File di log scaricato"
+
+msgid "Log files"
+msgstr "File di log"
+
+msgid "Application log"
+msgstr "Log dell'applicazione"
+
+msgid "Security log (file)"
+msgstr "Log di sicurezza (file)"
+
+msgid "File"
+msgstr "File"
+
+msgid "Size"
+msgstr "Dimensione"
+
+msgid "Last change"
+msgstr "Ultima modifica"
+
+msgid "Live view"
+msgstr "Visualizzazione in tempo reale"
+
+msgid "Download"
+msgstr "Scarica"
+
+msgid "older file"
+msgstr "file meno recente"
+
+msgid "Show"
+msgstr "Mostra"
+
+msgid "Watch live"
+msgstr "Segui in tempo reale"
+
+msgid "Nothing was logged to a file yet."
+msgstr "Finora non è stato registrato nulla in un file."
+
+#, python-format
+msgid "The portal writes its application log and its security log to files. Each file is at most %(size)s MB; when it is full it is renamed and up to %(files)s older files are kept. The lines are cleaned of links with tokens, email addresses and IBANs. Opening a page or downloading a file is written to the security log."
+msgstr "Il portale scrive il proprio log dell'applicazione e il proprio log di sicurezza in file. Ogni file è grande al massimo %(size)s MB; quando è pieno viene rinominato e vengono conservati fino a %(files)s file meno recenti. Dalle righe vengono rimossi i collegamenti con token, gli indirizzi e-mail e gli IBAN. L'apertura di una pagina o il download di un file viene registrato nel log di sicurezza."
+
+msgid "No log folder is configured on this server, so there are no log files to show. The portal then writes its log to the standard error output of its processes; on a server with systemd read it with journalctl (see the operating instructions). Set LOG_DIRECTORY on the server to write log files."
+msgstr "Su questo server non è configurata alcuna cartella di log, quindi non ci sono file di log da mostrare. In tal caso il portale scrive il proprio log sull'output di errore standard dei suoi processi; su un server con systemd lo si legge con journalctl (vedere le istruzioni operative). Per scrivere file di log, impostare LOG_DIRECTORY sul server."
+
+msgid "The log can no longer be updated. Reload the page; you may have to sign in again."
+msgstr "Il log non può più essere aggiornato. Ricarichi la pagina; potrebbe dover accedere di nuovo."
+
+msgid "The log could not be loaded. Trying again."
+msgstr "Non è stato possibile caricare il log. Nuovo tentativo in corso."
+
+msgid "Paused. New lines are not shown until you continue."
+msgstr "In pausa. Le nuove righe non vengono mostrate finché non riprende."
+
+msgid "Live: new lines appear by themselves."
+msgstr "In tempo reale: le nuove righe compaiono automaticamente."
+
+msgid "This older file does not change."
+msgstr "Questo file meno recente non cambia."
+
+msgid "Nothing was logged to this file yet."
+msgstr "Finora non è stato registrato nulla in questo file."
+
+msgid "Pause"
+msgstr "Pausa"
+
+msgid "Scroll to the end automatically"
+msgstr "Scorri automaticamente fino alla fine"
+
+msgid "All log files"
+msgstr "Tutti i file di log"
+
+msgid "Log lines"
+msgstr "Righe di log"
+
+msgid "Without JavaScript the log cannot be shown live. Use the download."
+msgstr "Senza JavaScript il log non può essere mostrato in tempo reale. Utilizzi il download."
+
+# D-091: plain, read-only tables of the management data in the administration.
+msgid "Management data"
+msgstr "Dati di gestione"
+
+#, python-format
+msgid "See the table of %(name)s (read only)"
+msgstr "Vedi la tabella di %(name)s (sola lettura)"
+
+#: leg_platform/accounts/models.py
+msgid "customer number"
+msgstr "numero cliente"
+
+msgid "issued customer number"
+msgstr "numero cliente assegnato"
+
+msgid "issued customer numbers"
+msgstr "numeri cliente assegnati"
+
+#, python-format
+msgid "Account %(customer_number)s"
+msgstr "Conto %(customer_number)s"
+
+msgid "Unconfirmed account"
+msgstr "Conto non confermato"
+
+#. Stored in admin log entries; never the customer number (D-018, D-036).
+#, python-format
+msgid "Account with internal number %(number)s"
+msgstr "Conto con numero interno %(number)s"
+
+msgid "internal number"
+msgstr "numero interno"
+
+msgid "account"
+msgstr "conto"
+
+msgid "accounts"
+msgstr "conti"
+
+msgid "Administration"
+msgstr "Amministrazione"
+
+msgid "A system administrator also needs access to the administration."
+msgstr "Un amministratore di sistema necessita inoltre dell'accesso all'amministrazione."
+
+msgid "Only active accounts can receive access to the administration."
+msgstr "Solo i conti attivi possono ricevere l'accesso all'amministrazione."
+
+msgid ""
+"Only accounts that have set up two-factor authentication can receive these "
+"rights. The person must first set up two-factor authentication in their "
+"profile."
+msgstr "Solo i conti che hanno configurato l'autenticazione a due fattori possono ricevere questi diritti. La persona deve prima configurare l'autenticazione a due fattori nel proprio profilo."
+
+#, python-format
+msgid ""
+"Customer numbers are running out: %(issued)d of %(total)d have been issued "
+"(%(percent)d%%). Once all are issued, no registration can be completed."
+msgstr "I numeri cliente stanno per esaurirsi: ne sono stati assegnati %(issued)d su %(total)d (%(percent)d%%). Una volta assegnati tutti, non è più possibile completare alcuna registrazione."
+
+#: leg_platform/accounts/models.py
+msgid "This email address is already in use."
+msgstr "Questo indirizzo e-mail è già in uso."
+
+msgid "Enter an email address of at most 254 characters."
+msgstr "Inserisca un indirizzo e-mail di al massimo 254 caratteri."
+
+msgid "Enter a valid email address."
+msgstr "Inserisca un indirizzo e-mail valido."
+
+msgid "Unverified"
+msgstr "Non verificato"
+
+msgid "Active"
+msgstr "Attivo"
+
+msgid "Blocked"
+msgstr "Bloccato"
+
+msgid "Mrs"
+msgstr "Signora"
+
+msgid "Mr"
+msgstr "Signor"
+
+msgid "Family"
+msgstr "Famiglia"
+
+msgid "email address"
+msgstr "indirizzo e-mail"
+
+#. Overrides Django's generic unique message with plain wording that fits every field.
+#, python-format
+msgid "%(model_name)s with this %(field_label)s already exists."
+msgstr "%(model_name)s con questo valore per %(field_label)s esiste già."
+
+msgid "status"
+msgstr "stato"
+
+msgid "active"
+msgstr "attivo"
+
+msgid "access to administration"
+msgstr "accesso all'amministrazione"
+
+msgid "retention obligation"
+msgstr "obbligo di conservazione"
+
+#. Verbose names that Django derives from the field names (privacy_accepted_at/url); the
+#. catalogue test requires a translation for every field of the account.
+msgid "privacy accepted at"
+msgstr "privacy accettata il"
+
+msgid "privacy accepted url"
+msgstr "URL della privacy accettata"
+
+msgid "salutation"
+msgstr "appellativo"
+
+msgid "title"
+msgstr "titolo"
+
+msgid "first name"
+msgstr "nome"
+
+msgid "last name"
+msgstr "cognome"
+
+msgid "company name"
+msgstr "nome dell'azienda"
+
+#. eCH-0010 fields that are kept but not shown (D-036).
+msgid "organisation name add-on 1"
+msgstr "aggiunta 1 al nome dell'organizzazione"
+
+msgid "organisation name add-on 2"
+msgstr "aggiunta 2 al nome dell'organizzazione"
+
+msgid "address line 2"
+msgstr "riga d'indirizzo 2"
+
+msgid "dwelling number"
+msgstr "numero dell'appartamento"
+
+msgid "post office box text"
+msgstr "testo della casella postale"
+
+msgid "locality"
+msgstr "frazione o località"
+
+msgid "Swiss postal code"
+msgstr "NPA svizzero"
+
+msgid "foreign postal code"
+msgstr "codice postale estero"
+
+msgid "Leave the foreign postal code empty for an address in Switzerland."
+msgstr "Lasci vuoto il codice postale estero per un indirizzo in Svizzera."
+
+msgid "Leave the Swiss postal code empty for an address outside Switzerland."
+msgstr "Lasci vuoto l'NPA svizzero per un indirizzo al di fuori della Svizzera."
+
+msgid "address addition"
+msgstr "complemento d'indirizzo"
+
+msgid "For example a second person or c/o."
+msgstr "Ad esempio una seconda persona o c/o."
+
+msgid "street"
+msgstr "via"
+
+msgid "house number"
+msgstr "numero civico"
+
+msgid "post office box"
+msgstr "casella postale"
+
+msgid "Enter a post office box of at most 8 digits."
+msgstr "Inserisca una casella postale di al massimo 8 cifre."
+
+msgid "town"
+msgstr "località"
+
+msgid "postal code"
+msgstr "NPA"
+
+msgid "country"
+msgstr "paese"
+
+msgid "phone number"
+msgstr "numero di telefono"
+
+#: leg_platform/accounts/models.py
+msgid "Registration: link to confirm the address"
+msgstr "Registrazione: collegamento per confermare l'indirizzo"
+
+msgid "Registration: the address already has an account"
+msgstr "Registrazione: l'indirizzo ha già un conto"
+
+msgid "Password reset: link to choose a new password"
+msgstr "Reimpostazione della password: collegamento per scegliere una nuova password"
+
+msgid "Notification: password changed"
+msgstr "Notifica: password modificata"
+
+msgid "email"
+msgstr "e-mail"
+
+msgid "subject"
+msgstr "oggetto"
+
+msgid "text"
+msgstr "testo"
+
+msgid "last changed"
+msgstr "ultima modifica"
+
+msgid "email text"
+msgstr "testo e-mail"
+
+msgid "email texts"
+msgstr "testi e-mail"
+
+#: leg_platform/accounts/admin.py
+msgid "Use the default text again"
+msgstr "Utilizza di nuovo il testo predefinito"
+
+msgid "Discards the subject and the text written here."
+msgstr "Scarta l'oggetto e il testo scritti qui."
+
+msgid "Placeholders"
+msgstr "Segnaposto"
+
+msgid "yes"
+msgstr "sì"
+
+msgid "Write a placeholder in curly brackets. It is replaced when the email is sent."
+msgstr "Scriva un segnaposto tra parentesi graffe. Viene sostituito al momento dell'invio dell'e-mail."
+
+msgid ""
+"Web and email addresses cannot be typed; use the placeholders for addresses. "
+"The subject can only use the name of the portal."
+msgstr "Gli indirizzi web ed e-mail non possono essere digitati; per gli indirizzi utilizzi i segnaposto. L'oggetto può utilizzare soltanto il nome del portale."
+
+msgid "Placeholder"
+msgstr "Segnaposto"
+
+msgid "Meaning"
+msgstr "Significato"
+
+msgid "Required"
+msgstr "Obbligatorio"
+
+msgid "An empty subject or text, or the default text itself, means the default text."
+msgstr "Un oggetto o un testo vuoto, oppure il testo predefinito stesso, significa il testo predefinito."
+
+#: leg_platform/accounts/email_texts.py
+msgid "Name of this portal."
+msgstr "Nome di questo portale."
+
+msgid "Address of the website with the contact information; empty if the instance has none."
+msgstr "Indirizzo del sito web con le informazioni di contatto; vuoto se l'istanza non ne ha."
+
+msgid "Address of the privacy notice."
+msgstr "Indirizzo dell'informativa sulla protezione dei dati."
+
+msgid "Address of the login page."
+msgstr "Indirizzo della pagina di accesso."
+
+msgid "Personal link to confirm the email address and to choose a password."
+msgstr "Collegamento personale per confermare l'indirizzo e-mail e scegliere una password."
+
+msgid "Personal link to choose a new password."
+msgstr "Collegamento personale per scegliere una nuova password."
+
+msgid "Number of hours for which the personal link can be used."
+msgstr "Numero di ore per cui il collegamento personale può essere utilizzato."
+
+#, python-format
+msgid "The placeholder {%(name)s} does not exist or cannot be used here."
+msgstr "Il segnaposto {%(name)s} non esiste o non può essere utilizzato qui."
+
+msgid "The text contains a curly bracket that is not part of a placeholder."
+msgstr "Il testo contiene una parentesi graffa che non fa parte di un segnaposto."
+
+msgid "The subject must be a single line."
+msgstr "L'oggetto deve essere costituito da una sola riga."
+
+#, python-format
+msgid "The text must not be longer than %(limit)d characters."
+msgstr "Il testo non deve superare i %(limit)d caratteri."
+
+msgid "The text contains control characters."
+msgstr "Il testo contiene caratteri di controllo."
+
+msgid "Do not type web or email addresses. Use a placeholder such as {login_url} instead."
+msgstr "Non digiti indirizzi web o e-mail. Utilizzi invece un segnaposto come {login_url}."
+
+#, python-format
+msgid "The placeholder {%(name)s} is required, otherwise the email is useless."
+msgstr "Il segnaposto {%(name)s} è obbligatorio, altrimenti l'e-mail è inutile."
+
+#: leg_platform/accounts/emails.py
+msgid "This is a test email. The personal link in it does not work."
+msgstr "Questa è un'e-mail di prova. Il collegamento personale in essa contenuto non funziona."
+
+msgid "Test"
+msgstr "Prova"
+
+#: leg_platform/accounts/admin.py
+#, python-format
+msgid "Preview: %(name)s"
+msgstr "Anteprima: %(name)s"
+
+msgid "The test email could not be sent."
+msgstr "Non è stato possibile inviare l'e-mail di prova."
+
+#, python-format
+msgid "A test email was sent to %(address)s."
+msgstr "Un'e-mail di prova è stata inviata a %(address)s."
+
+#, python-format
+msgid "Versions: %(name)s"
+msgstr "Versioni: %(name)s"
+
+msgid "This version cannot be restored because it is no longer valid."
+msgstr "Questa versione non può essere ripristinata perché non è più valida."
+
+msgid "Restored an earlier version."
+msgstr "Ripristinata una versione precedente."
+
+msgid "The version was restored."
+msgstr "La versione è stata ripristinata."
+
+#: leg_platform/accounts/templates/admin/accounts/emailtext/
+msgid "Preview"
+msgstr "Anteprima"
+
+msgid "The preview shows the text as it would be sent, with example links. Nothing has been saved yet."
+msgstr "L'anteprima mostra il testo così come verrebbe inviato, con collegamenti di esempio. Non è ancora stato salvato nulla."
+
+msgid "Subject"
+msgstr "Oggetto"
+
+msgid "Text"
+msgstr "Testo"
+
+msgid "Save this text"
+msgstr "Salva questo testo"
+
+#, python-format
+msgid "Send a test email to %(address)s"
+msgstr "Invia un'e-mail di prova a %(address)s"
+
+msgid "Back to the email"
+msgstr "Torna all'e-mail"
+
+msgid "Versions"
+msgstr "Versioni"
+
+msgid "Current"
+msgstr "Attuale"
+
+msgid "The default text of the application is used."
+msgstr "Viene utilizzato il testo predefinito dell'applicazione."
+
+msgid "Restore this version"
+msgstr "Ripristina questa versione"
+
+msgid "No version has been saved yet."
+msgstr "Non è ancora stata salvata alcuna versione."
+
+msgid "Default text"
+msgstr "Testo predefinito"
+
+msgid "Enter a first name or a company name."
+msgstr "Inserisca un nome o il nome di un'azienda."
+
+msgid "Enter a last name or a company name."
+msgstr "Inserisca un cognome o il nome di un'azienda."
+
+msgid "Enter a street or a post office box."
+msgstr "Inserisca una via o una casella postale."
+
+msgid "This field is required."
+msgstr "Questo campo è obbligatorio."
+
+msgid "Enter a postal code with 4 digits from 1000 to 9999."
+msgstr "Inserisca un NPA di 4 cifre da 1000 a 9999."
+
+#. Overrides Django's German text (django/conf/locale/de), which contains a sharp s; shown
+#. e.g. for negative values in positive integer fields.
+#, python-format
+msgid "Ensure this value is greater than or equal to %(limit_value)s."
+msgstr "Il valore deve essere maggiore o uguale a %(limit_value)s."
+
+#. Field labels as Django stores them in admin change messages (capitalised English form
+#. labels, translated only when the history is shown: LogEntry.get_change_message()).
+msgid "Salutation"
+msgstr "Appellativo"
+
+msgid "First name"
+msgstr "Nome"
+
+msgid "Last name"
+msgstr "Cognome"
+
+msgid "Company name"
+msgstr "Nome dell'azienda"
+
+msgid "Address addition"
+msgstr "Complemento d'indirizzo"
+
+msgid "Street"
+msgstr "Via"
+
+msgid "House number"
+msgstr "Numero civico"
+
+msgid "Post office box"
+msgstr "Casella postale"
+
+msgid "Town"
+msgstr "Località"
+
+msgid "Access to administration"
+msgstr "Accesso all'amministrazione"
+
+msgid "Superuser status"
+msgstr "Stato di superutente"
+
+msgid "Groups"
+msgstr "Gruppi"
+
+msgid "User permissions"
+msgstr "Autorizzazioni dell'utente"
+
+msgid "Name"
+msgstr "Nome"
+
+#. Overrides Django's German texts for the fields of PermissionsMixin, so that the user form
+#. uses the project's terms ("system administrator", "account"; D-012, D-036).
+msgid "superuser status"
+msgstr "stato di amministratore di sistema"
+
+msgid "Designates that this user has all permissions without explicitly assigning them."
+msgstr "Indica che questo utente dispone di tutte le autorizzazioni senza che gli siano assegnate singolarmente."
+
+msgid "The groups this user belongs to. A user will get all permissions granted to each of their groups."
+msgstr "I gruppi a cui appartiene questo utente. Un utente riceve tutte le autorizzazioni concesse a ciascuno dei suoi gruppi."
+
+msgid "Specific permissions for this user."
+msgstr "Autorizzazioni specifiche per questo utente."
+
+#. Texts of Django 6.1 without a German translation in Django itself.
+msgid "- Select an option -"
+msgstr "- Selezionare un'opzione -"
+
+msgid "Run"
+msgstr "Esegui"
+
+#, python-format
+msgid "Search %(name)s"
+msgstr "Cerca %(name)s"
+
+#, python-format
+msgid "Pagination %(name)s"
+msgstr "Paginazione %(name)s"
+
+#. Overrides the German country name of django-countries, which contains a sharp s.
+msgid "United Kingdom of Great Britain and Northern Ireland"
+msgstr "Regno Unito di Gran Bretagna e Irlanda del Nord"
+
+#, python-format
+msgid "Your account at %(instance_name)s"
+msgstr "Il Suo conto presso %(instance_name)s"
+
+#, python-format
+msgid ""
+"If that does not help, you will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr "Se ciò non dovesse aiutare, qui trova le informazioni di contatto:\n\n%(contact_url)s"
+
+#: leg_platform/accounts/templates/accounts/email/password_reset.txt
+#, python-format
+msgid ""
+"Hello\n"
+"\n"
+"A new password was requested for your account at %(instance_name)s.\n"
+"\n"
+"To choose a new password, open this link within %(lifetime_hours)s hours:\n"
+"\n"
+"%(reset_url)s\n"
+"\n"
+"The link can be used once. If you did not request a new password, you can ignore this email; your password stays unchanged."
+msgstr "Buongiorno\n\nÈ stata richiesta una nuova password per il Suo conto presso %(instance_name)s.\n\nPer scegliere una nuova password, apra questo collegamento entro %(lifetime_hours)s ore:\n\n%(reset_url)s\n\nIl collegamento può essere utilizzato una sola volta. Se non ha richiesto una nuova password, può ignorare questa e-mail; la Sua password rimane invariata."
+
+#: leg_platform/accounts/templates/accounts/email/password_changed.txt
+#, python-format
+msgid "The password of your account at %(instance_name)s was changed. All other sessions were ended."
+msgstr "La password del Suo conto presso %(instance_name)s è stata modificata. Tutte le altre sessioni sono state terminate."
+
+#, python-format
+msgid ""
+"If you did not request this change, contact the operator immediately. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr "Se non è stato Lei a richiedere questa modifica, contatti immediatamente il gestore. Le informazioni di contatto si trovano qui:\n\n%(contact_url)s"
+
+msgid "If you did not request this change, contact the operator of this portal immediately."
+msgstr "Se non è stato Lei a richiedere questa modifica, contatti immediatamente il gestore di questo portale."
+
+#: leg_platform/accounts/emails.py
+#, python-format
+msgid "Choose a new password for %(instance_name)s"
+msgstr "Scelga una nuova password per %(instance_name)s"
+
+#, python-format
+msgid "Your password at %(instance_name)s was changed"
+msgstr "La Sua password presso %(instance_name)s è stata modificata"
+
+#: leg_platform/accounts/templates/accounts/login.html
+msgid "Forgot password?"
+msgstr "Password dimenticata?"
+
+msgid "Send link"
+msgstr "Invia collegamento"
+
+#, python-format
+msgid "Choose at least %(min_length)d characters. A sentence of several words is easy to remember and hard to guess."
+msgstr "Scelga almeno %(min_length)d caratteri. Una frase composta da più parole è facile da ricordare e difficile da indovinare."
+
+msgid "Save password"
+msgstr "Salva password"
+
+#: leg_platform/accounts/views.py
+msgid "Your password was changed. You can now log in."
+msgstr "La Sua password è stata modificata. Ora può accedere."
+
+#: leg_platform/accounts/forms.py
+msgid "The email address or the password is incorrect."
+msgstr "L'indirizzo e-mail o la password non sono corretti."
+
+msgid "Email address"
+msgstr "Indirizzo e-mail"
+
+#: leg_platform/templates/base.html
+msgid "Profile"
+msgstr "Profilo"
+
+msgid "Log out"
+msgstr "Esci"
+
+msgid "Privacy notice"
+msgstr "Informativa sulla protezione dei dati"
+
+msgid "optional"
+msgstr "facoltativo"
+
+#: leg_platform/accounts/templates/accounts/login.html
+msgid "Log in"
+msgstr "Accedi"
+
+msgid "No account yet?"
+msgstr "Non ha ancora un conto?"
+
+msgid "Register as a new user"
+msgstr "Registrati come nuovo utente"
+
+msgid "Here you manage your account and, later, your locations, energy data and invoices."
+msgstr "Qui gestisce il Suo conto e, in seguito, le Sue ubicazioni, i dati energetici e le fatture."
+
+#, python-format
+msgid "There were too many failed login attempts. Please wait about %(counter)s minute and try again."
+msgid_plural "There were too many failed login attempts. Please wait about %(counter)s minutes and try again."
+msgstr[0] "Ci sono stati troppi tentativi di accesso non riusciti. Attenda circa %(counter)s minuto e riprovi."
+msgstr[1] "Ci sono stati troppi tentativi di accesso non riusciti. Attenda circa %(counter)s minuti e riprovi."
+
+msgid "Back to the login page"
+msgstr "Torna alla pagina di accesso"
+
+#: leg_platform/accounts/templates/accounts/registration_sent.html
+msgid "Check your email"
+msgstr "Controlli la Sua e-mail"
+
+#: leg_platform/accounts/templates/accounts/profile.html
+msgid "Customer number"
+msgstr "Numero cliente"
+
+msgid "Status"
+msgstr "Stato"
+
+msgid "Address"
+msgstr "Indirizzo"
+
+msgid "Phone number"
+msgstr "Numero di telefono"
+
+#: leg_platform/accounts/templates/accounts/profile.html
+msgid "Two-factor authentication"
+msgstr "Autenticazione a due fattori"
+
+msgid "On"
+msgstr "Attivata"
+
+msgid "Off"
+msgstr "Disattivata"
+
+msgid "Change password"
+msgstr "Cambia password"
+
+#: leg_platform/accounts/templates/accounts/password_change.html
+msgid "Back to the profile"
+msgstr "Torna al profilo"
+
+#: leg_platform/accounts/forms.py
+msgid "Code"
+msgstr "Codice"
+
+msgid "Current password"
+msgstr "Password attuale"
+
+#: leg_platform/accounts/views.py
+msgid "Your password was changed."
+msgstr "La Sua password è stata modificata."
+
+msgid "The change could not be made."
+msgstr "Non è stato possibile apportare la modifica."
+
+#: leg_platform/accounts/second_factor.py
+msgid "Please log in again."
+msgstr "Acceda di nuovo."
+
+msgid "Your account needs two-factor authentication. Set it up to continue."
+msgstr "Il Suo conto richiede l'autenticazione a due fattori. La configuri per continuare."
+
+#: leg_platform/accounts/models.py
+msgid "Notification: two-factor authentication set up"
+msgstr "Notifica: autenticazione a due fattori configurata"
+
+msgid "Notification: two-factor authentication turned off"
+msgstr "Notifica: autenticazione a due fattori disattivata"
+
+msgid "Notification: recovery codes renewed"
+msgstr "Notifica: codici di recupero rinnovati"
+
+msgid "Notification: recovery code used"
+msgstr "Notifica: codice di recupero utilizzato"
+
+msgid "Notification: many wrong codes entered"
+msgstr "Notifica: molti codici errati inseriti"
+
+#, python-format
+msgid "Wrong codes were entered for your account at %(instance_name)s"
+msgstr "Sono stati inseriti codici errati per il Suo conto presso %(instance_name)s"
+
+#: leg_platform/accounts/templates/accounts/email/code_attempts_warning.txt
+#, python-format
+msgid ""
+"Several wrong codes were entered for your account at %(instance_name)s after the correct password was given. Code entry is paused if this continues.\n"
+"\n"
+"If this was you, check that the clock of your phone is set automatically. If it was not you, someone may know your password: choose a new password with \"Forgot password\" on the login page."
+msgstr "Dopo l'inserimento della password corretta, per il Suo conto presso %(instance_name)s sono stati inseriti più codici errati. Se la situazione continua, l'inserimento del codice viene sospeso.\n\nSe è stato Lei, verifichi che l'orologio del Suo telefono sia impostato automaticamente. Se non è stato Lei, qualcuno potrebbe conoscere la Sua password: scelga una nuova password con «Password dimenticata» nella pagina di accesso."
+
+#, python-format
+msgid ""
+"If you need help, contact the operator. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr "Se ha bisogno di aiuto, contatti il gestore. Le informazioni di contatto si trovano qui:\n\n%(contact_url)s"
+
+msgid "If you need help, contact the operator of this portal."
+msgstr "Se ha bisogno di aiuto, contatti il gestore di questo portale."
+
+#: leg_platform/accounts/templates/accounts/lockout.html
+msgid "Too many wrong codes were entered for this account. Code entry is paused. The pause ends within 24 hours, or when a new password has been chosen."
+msgstr "Per questo conto sono stati inseriti troppi codici errati. L'inserimento del codice è sospeso. La sospensione termina entro 24 ore oppure quando è stata scelta una nuova password."
+
+#: leg_platform/accounts/email_texts.py
+#, python-format
+msgid "Two-factor authentication was set up at %(instance_name)s"
+msgstr "L'autenticazione a due fattori è stata configurata presso %(instance_name)s"
+
+#, python-format
+msgid "Two-factor authentication was turned off at %(instance_name)s"
+msgstr "L'autenticazione a due fattori è stata disattivata presso %(instance_name)s"
+
+#, python-format
+msgid "New recovery codes were created at %(instance_name)s"
+msgstr "Sono stati creati nuovi codici di recupero presso %(instance_name)s"
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_enabled.txt
+#, python-format
+msgid "Two-factor authentication was set up for your account at %(instance_name)s. From now on you need a code from your authenticator app, or a recovery code, to log in."
+msgstr "Per il Suo conto presso %(instance_name)s è stata configurata l'autenticazione a due fattori. D'ora in poi, per accedere, Le serve un codice della Sua app di autenticazione oppure un codice di recupero."
+
+#, python-format
+msgid ""
+"If you did not do this, contact the operator immediately. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr "Se non è stato Lei, contatti immediatamente il gestore. Le informazioni di contatto si trovano qui:\n\n%(contact_url)s"
+
+msgid "If you did not do this, contact the operator of this portal immediately."
+msgstr "Se non è stato Lei, contatti immediatamente il gestore di questo portale."
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_disabled.txt
+#, python-format
+msgid "Two-factor authentication was turned off for your account at %(instance_name)s. All recovery codes became invalid."
+msgstr "Per il Suo conto presso %(instance_name)s è stata disattivata l'autenticazione a due fattori. Tutti i codici di recupero sono diventati non validi."
+
+#, python-format
+msgid "A recovery code was used at %(instance_name)s"
+msgstr "È stato utilizzato un codice di recupero presso %(instance_name)s"
+
+#: leg_platform/accounts/templates/accounts/email/recovery_code_used.txt
+#, python-format
+msgid "A recovery code was used to log in to your account at %(instance_name)s. This code cannot be used again."
+msgstr "Per accedere al Suo conto presso %(instance_name)s è stato utilizzato un codice di recupero. Questo codice non può essere utilizzato di nuovo."
+
+#: leg_platform/accounts/templates/accounts/email/recovery_codes_renewed.txt
+#, python-format
+msgid "New recovery codes were created for your account at %(instance_name)s. The earlier recovery codes became invalid."
+msgstr "Per il Suo conto presso %(instance_name)s sono stati creati nuovi codici di recupero. I codici di recupero precedenti sono diventati non validi."
+
+msgid "Confirm sign-in"
+msgstr "Conferma l'accesso"
+
+msgid "Start again"
+msgstr "Ricomincia"
+
+#, python-format
+msgid "You have %(counter)s unused recovery code."
+msgid_plural "You have %(counter)s unused recovery codes."
+msgstr[0] "Ha %(counter)s codice di recupero non utilizzato."
+msgstr[1] "Ha %(counter)s codici di recupero non utilizzati."
+
+msgid "Your account must use two-factor authentication. It cannot be turned off."
+msgstr "Il Suo conto deve utilizzare l'autenticazione a due fattori. Non può essere disattivata."
+
+msgid "Continue"
+msgstr "Continua"
+
+msgid "Cancel"
+msgstr "Annulla"
+
+msgid "QR code for the authenticator app"
+msgstr "Codice QR per l'app di autenticazione"
+
+#: leg_platform/accounts/templates/accounts/recovery_codes.html
+msgid "Recovery codes"
+msgstr "Codici di recupero"
+
+msgid "Copy codes"
+msgstr "Copia i codici"
+
+#: leg_platform/accounts/session_timeout.py
+msgid "You were logged out for security reasons. Please log in again."
+msgstr "È stato disconnesso per motivi di sicurezza. Acceda di nuovo."
+
+#: leg_platform/accounts/models.py (security log, D-041)
+msgid "Password changed"
+msgstr "Password modificata"
+
+msgid "Password reset by link"
+msgstr "Password reimpostata tramite collegamento"
+
+msgid "Two-factor authentication set up"
+msgstr "Autenticazione a due fattori configurata"
+
+msgid "Two-factor authentication removed by the account itself"
+msgstr "Autenticazione a due fattori rimossa dal conto stesso"
+
+msgid "Two-factor authentication reset by link or by a system administrator"
+msgstr "Autenticazione a due fattori reimpostata tramite collegamento o da un amministratore di sistema"
+
+msgid "Recovery codes renewed"
+msgstr "Codici di recupero rinnovati"
+
+msgid "Recovery code used"
+msgstr "Codice di recupero utilizzato"
+
+msgid "Many wrong codes entered"
+msgstr "Molti codici errati inseriti"
+
+msgid "Code entry paused"
+msgstr "Inserimento del codice sospeso"
+
+msgid "Account locked after failed logins"
+msgstr "Conto bloccato dopo accessi non riusciti"
+
+msgid "Access to the administration changed"
+msgstr "Accesso all'amministrazione modificato"
+
+msgid "Roles or permissions changed"
+msgstr "Ruoli o autorizzazioni modificati"
+
+msgid "Initial system administrator created"
+msgstr "Amministratore di sistema iniziale creato"
+
+msgid "Link for removing two-factor authentication requested"
+msgstr "Collegamento per la rimozione dell'autenticazione a due fattori richiesto"
+
+msgid "Two-factor authentication reset by the emergency command"
+msgstr "Autenticazione a due fattori reimpostata tramite il comando di emergenza"
+
+msgid "Account unblocked by the emergency command"
+msgstr "Conto sbloccato tramite il comando di emergenza"
+
+msgid "Second factor keys encrypted again by the emergency command"
+msgstr "Chiavi del secondo fattore cifrate di nuovo tramite il comando di emergenza"
+
+msgid "time"
+msgstr "ora"
+
+msgid "password change required"
+msgstr "cambio password richiesto"
+
+msgid "kept for the long period"
+msgstr "conservato a lungo termine"
+
+msgid "session version"
+msgstr "versione della sessione"
+
+msgid "event"
+msgstr "evento"
+
+msgid "performed by"
+msgstr "eseguito da"
+
+msgid "security log entry"
+msgstr "voce del log di sicurezza"
+
+msgid "security log"
+msgstr "log di sicurezza"
+
+#: leg_platform/accounts/admin.py
+msgid "account (internal number)"
+msgstr "conto (numero interno)"
+
+msgid "performed by (internal number)"
+msgstr "eseguito da (numero interno)"
+
+msgid "kept"
+msgstr "conservato"
+
+#, python-format
+msgid "%(days)d days"
+msgstr "%(days)d giorni"
+
+#: leg_platform/accounts/models.py (second factor reset, D-004, D-041)
+msgid "Lost second factor: link to remove it"
+msgstr "Secondo fattore perso: collegamento per rimuoverlo"
+
+msgid "Notification: two-factor authentication reset"
+msgstr "Notifica: autenticazione a due fattori reimpostata"
+
+#: leg_platform/accounts/email_texts.py
+msgid "Personal link to remove two-factor authentication."
+msgstr "Collegamento personale per rimuovere l'autenticazione a due fattori."
+
+#, python-format
+msgid "Remove two-factor authentication at %(instance_name)s"
+msgstr "Rimuova l'autenticazione a due fattori presso %(instance_name)s"
+
+#, python-format
+msgid "Two-factor authentication was reset at %(instance_name)s"
+msgstr "L'autenticazione a due fattori è stata reimpostata presso %(instance_name)s"
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_reset_link.txt
+#, python-format
+msgid ""
+"The operator started the removal of two-factor authentication for your account at %(instance_name)s.\n"
+"\n"
+"To remove it, open this link within %(lifetime_hours)s hours:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged."
+msgstr "Il gestore ha avviato la rimozione dell'autenticazione a due fattori per il Suo conto presso %(instance_name)s.\n\nPer rimuoverla, apra questo collegamento entro %(lifetime_hours)s ore:\n\n%(two_factor_reset_url)s\n\nIl collegamento può essere utilizzato una sola volta. Se non l'ha richiesto, non apra il collegamento; la Sua autenticazione a due fattori rimane invariata."
+
+#: leg_platform/accounts/templates/accounts/email/two_factor_reset.txt
+#, python-format
+msgid "Two-factor authentication of your account at %(instance_name)s was reset. The earlier authenticator app and recovery codes no longer work, and all sessions were ended. You can set up two-factor authentication again after you log in."
+msgstr "L'autenticazione a due fattori del Suo conto presso %(instance_name)s è stata reimpostata. L'app di autenticazione e i codici di recupero precedenti non funzionano più e tutte le sessioni sono state terminate. Dopo l'accesso può configurare di nuovo l'autenticazione a due fattori."
+
+#, python-format
+msgid ""
+"If you did not expect this, contact the operator immediately. You will find contact information here:\n"
+"\n"
+"%(contact_url)s"
+msgstr "Se non se lo aspettava, contatti immediatamente il gestore. Le informazioni di contatto si trovano qui:\n\n%(contact_url)s"
+
+msgid "If you did not expect this, contact the operator of this portal immediately."
+msgstr "Se non se lo aspettava, contatti immediatamente il gestore di questo portale."
+
+#: leg_platform/accounts/views.py
+msgid "Two-factor authentication was removed. You can now log in with your password."
+msgstr "L'autenticazione a due fattori è stata rimossa. Ora può accedere con la Sua password."
+
+#: leg_platform/accounts/templates/accounts/two_factor_reset_confirm.html
+msgid "Remove two-factor authentication"
+msgstr "Rimuovi l'autenticazione a due fattori"
+
+#, python-format
+msgid "%(instance_name)s started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile."
+msgstr "%(instance_name)s ha avviato la rimozione dell'autenticazione a due fattori per il Suo conto. Dopodiché, per accedere Le basterà la Sua password. La Sua app di autenticazione e i Suoi codici di recupero smettono di funzionare e tutte le sessioni del Suo conto terminano. Può configurare di nuovo l'autenticazione a due fattori nel Suo profilo."
+
+msgid "Did you not expect this? Then close this page. Nothing changes."
+msgstr "Non se lo aspettava? Allora chiuda questa pagina. Non cambia nulla."
+
+msgid "Remove now"
+msgstr "Rimuovi ora"
+
+#: leg_platform/accounts/templates/accounts/password_change.html
+msgid "You must choose a new password before you can continue. The current password was only meant for the first login."
+msgstr "Prima di continuare deve scegliere una nuova password. La password attuale era prevista solo per il primo accesso."
+
+#: leg_platform/accounts/forms.py
+msgid "Choose a password that is different from the current one."
+msgstr "Scelga una password diversa da quella attuale."
+
+#: leg_platform/accounts/admin.py
+msgid "I have verified the identity of this person in person, or by calling back a phone number that I know independently of the account."
+msgstr "Ho verificato di persona l'identità di questa persona, oppure richiamando un numero di telefono che conosco indipendentemente dal conto."
+
+msgid "Two-factor authentication was reset."
+msgstr "L'autenticazione a due fattori è stata reimpostata."
+
+msgid "The link for removing two-factor authentication was requested."
+msgstr "Il collegamento per la rimozione dell'autenticazione a due fattori è stato richiesto."
+
+msgid "Reset two-factor authentication"
+msgstr "Reimposta l'autenticazione a due fattori"
+
+#: leg_platform/accounts/templates/admin/accounts/user/reset_second_factor.html
+msgid "This account has no two-factor authentication."
+msgstr "Questo conto non ha l'autenticazione a due fattori."
+
+msgid "The second factor of this account is removed at once. The authenticator app and the recovery codes stop working and all sessions of the account end. The person sets up two-factor authentication again at the next login. Do this only after you have verified the identity of the person."
+msgstr "Il secondo fattore di questo conto viene rimosso subito. L'app di autenticazione e i codici di recupero smettono di funzionare e tutte le sessioni del conto terminano. La persona configura di nuovo l'autenticazione a due fattori al prossimo accesso. Lo faccia soltanto dopo aver verificato l'identità della persona."
+
+msgid "A link for removing two-factor authentication is sent to the email address of this account. The second factor is removed only when the person opens the link and confirms it. Nothing changes until then."
+msgstr "Un collegamento per la rimozione dell'autenticazione a due fattori viene inviato all'indirizzo e-mail di questo conto. Il secondo fattore viene rimosso solo quando la persona apre il collegamento e lo conferma. Fino ad allora non cambia nulla."
+
+msgid "Send the link"
+msgstr "Invia il collegamento"
+
+msgid "Back to the account"
+msgstr "Torna al conto"
+
+msgid "tenant ID"
+msgstr "ID tenant"
+
+msgid "client ID"
+msgstr "ID client"
+
+msgid "sender mailbox"
+msgstr "casella del mittente"
+
+msgid "Microsoft Graph configuration"
+msgstr "Configurazione di Microsoft Graph"
+
+msgid "Microsoft Graph configuration changed"
+msgstr "Configurazione di Microsoft Graph modificata"
+
+msgid "Microsoft Graph certificate uploaded"
+msgstr "Certificato di Microsoft Graph caricato"
+
+msgid "Microsoft Graph test email requested"
+msgstr "E-mail di prova di Microsoft Graph richiesta"
+
+msgid "Address directory import requested"
+msgstr "Importazione dell'elenco degli indirizzi richiesta"
+
+msgid "The certificate or the private key cannot be read (PEM, no password)."
+msgstr "Il certificato o la chiave privata non possono essere letti (PEM, senza password)."
+
+msgid "The private key must be an RSA key with at least 2048 bits."
+msgstr "La chiave privata deve essere una chiave RSA di almeno 2048 bit."
+
+msgid "The private key does not belong to the certificate."
+msgstr "La chiave privata non appartiene al certificato."
+
+msgid "The certificate has expired."
+msgstr "Il certificato è scaduto."
+
+msgid "Certificate file (PEM)"
+msgstr "File del certificato (PEM)"
+
+msgid "The public certificate. Upload it together with the private key."
+msgstr "Il certificato pubblico. Lo carichi insieme alla chiave privata."
+
+msgid "Private key file (PEM)"
+msgstr "File della chiave privata (PEM)"
+
+msgid "Stored encrypted and never shown again. Upload it together with the certificate."
+msgstr "Memorizzata cifrata e mai più visualizzata. La carichi insieme al certificato."
+
+msgid "Upload the certificate and the private key together."
+msgstr "Carichi il certificato e la chiave privata insieme."
+
+msgid "The file is too large."
+msgstr "Il file è troppo grande."
+
+msgid "Certificate"
+msgstr "Certificato"
+
+msgid "ready to send"
+msgstr "pronto per l'invio"
+
+msgid "certificate subject"
+msgstr "soggetto del certificato"
+
+msgid "No certificate stored."
+msgstr "Nessun certificato memorizzato."
+
+msgid "SHA-1 thumbprint"
+msgstr "Impronta SHA-1"
+
+msgid "SHA-256 thumbprint"
+msgstr "Impronta SHA-256"
+
+msgid "expires on"
+msgstr "scade il"
+
+msgid "The certificate has expired. Upload a new certificate."
+msgstr "Il certificato è scaduto. Carichi un nuovo certificato."
+
+msgid "The certificate expires within %(days)d days. Upload a new certificate before it expires."
+msgstr "Il certificato scade entro %(days)d giorni. Carichi un nuovo certificato prima della scadenza."
+
+msgid "Send test email"
+msgstr "Invia e-mail di prova"
+
+msgid "The Microsoft Graph configuration is incomplete. Save the settings and upload a certificate first."
+msgstr "La configurazione di Microsoft Graph è incompleta. Salvi prima le impostazioni e carichi un certificato."
+
+msgid "In this mode, email goes only to the allowed recipients. Your address is not one of them, so no test email was sent."
+msgstr "In questa modalità le e-mail vengono inviate solo ai destinatari consentiti. Il Suo indirizzo non è tra questi, perciò non è stata inviata alcuna e-mail di prova."
+
+msgid "In console mode, no test email is sent, so the Microsoft Graph delivery is not tested."
+msgstr "In modalità console non viene inviata alcuna e-mail di prova, quindi l'invio tramite Microsoft Graph non viene verificato."
+
+msgid "The test email could not be sent. The reason is in the server log."
+msgstr "Non è stato possibile inviare l'e-mail di prova. Il motivo è indicato nel log del server."
+
+msgid "Test email of the Microsoft Graph configuration"
+msgstr "E-mail di prova della configurazione di Microsoft Graph"
+
+msgid "This is a test email of the Microsoft Graph email delivery. No action is needed."
+msgstr "Questa è un'e-mail di prova dell'invio e-mail tramite Microsoft Graph. Non è necessaria alcuna azione."
+
+msgid "Back to the configuration"
+msgstr "Torna alla configurazione"
+
+msgid "The test email is sent through Microsoft Graph to your own address:"
+msgstr "L'e-mail di prova viene inviata tramite Microsoft Graph al Suo indirizzo:"
+
+msgid "A successful send confirms only that Microsoft Graph accepted the email. Check the inbox to confirm that it arrived."
+msgstr "Un invio riuscito conferma soltanto che Microsoft Graph ha accettato l'e-mail. Controlli la posta in arrivo per verificare che sia arrivata."
+
+msgid "Enter a town."
+msgstr "Inserisca una località."
+
+msgid "Select a country."
+msgstr "Selezioni un paese."
+
+msgid "Enter a postal code."
+msgstr "Inserisca un NPA."
+
+msgid "Enter your email address."
+msgstr "Inserisca il Suo indirizzo e-mail."
+
+msgid "Enter the new email address."
+msgstr "Inserisca il nuovo indirizzo e-mail."
+
+msgid "Enter a password."
+msgstr "Inserisca una password."
+
+msgid "Enter the password again."
+msgstr "Inserisca di nuovo la password."
+
+msgid "Enter your password."
+msgstr "Inserisca la Sua password."
+
+msgid "Enter your current password."
+msgstr "Inserisca la Sua password attuale."
+
+msgid "Enter the code."
+msgstr "Inserisca il codice."
+
+msgid "The code is wrong, expired or was already used. The app shows a new code every 30 seconds: wait for the next one and try again."
+msgstr "Il codice è errato, scaduto o è già stato utilizzato. L'app mostra un nuovo codice ogni 30 secondi: attenda il successivo e riprovi."
+
+#, python-format
+msgid "Questions or problems: %(contact_url)s"
+msgstr "Domande o problemi: %(contact_url)s"
+
+msgid "Please check your entries"
+msgstr "Verifichi i Suoi dati"
+
+msgid "Show password"
+msgstr "Mostra password"
+
+msgid "Hide password"
+msgstr "Nascondi password"
+
+msgid "Company"
+msgstr "Azienda"
+
+msgid "Only if you have no street address."
+msgstr "Solo se non ha un indirizzo con via."
+
+msgid "Phone"
+msgstr "Telefono"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "You have been logged out."
+msgstr "La Sua sessione è stata chiusa."
+
+msgid "If you forgot your password, you can choose a new one."
+msgstr "Se ha dimenticato la password, può sceglierne una nuova."
+
+msgid "You have no unused recovery codes left. Create new ones."
+msgstr "Non Le restano codici di recupero inutilizzati. Ne crei di nuovi."
+
+msgid "Two-factor authentication is mandatory for your role."
+msgstr "L'autenticazione a due fattori è obbligatoria per il Suo ruolo."
+
+msgid "Two-factor authentication was turned off."
+msgstr "L'autenticazione a due fattori è stata disattivata."
+
+msgid "The codes were copied."
+msgstr "I codici sono stati copiati."
+
+msgid "The codes could not be copied. Please write them down."
+msgstr "Non è stato possibile copiare i codici. Li annoti."
+
+#, python-format
+msgid "You used a recovery code. %(count)d code is left. You can create new codes in your profile."
+msgid_plural "You used a recovery code. %(count)d codes are left. You can create new codes in your profile."
+msgstr[0] "Ha utilizzato un codice di recupero. Rimane %(count)d codice. Può creare nuovi codici nel Suo profilo."
+msgstr[1] "Ha utilizzato un codice di recupero. Rimangono %(count)d codici. Può creare nuovi codici nel Suo profilo."
+
+msgid "You used a recovery code. You have no recovery codes left. Create new codes in your profile."
+msgstr "Ha utilizzato un codice di recupero. Non Le restano più codici di recupero. Crei nuovi codici nel Suo profilo."
+
+msgid "Please tick the box to confirm that you want to delete your account."
+msgstr "Spunti la casella per confermare che desidera eliminare il Suo conto."
+
+msgid "Page not found"
+msgstr "Pagina non trovata"
+
+msgid "Go to the start page"
+msgstr "Vai alla pagina iniziale"
+
+msgid "Deleted (retention obligation)"
+msgstr "Eliminato (obbligo di conservazione)"
+
+msgid "Account deleted (retention obligation)"
+msgstr "Conto eliminato (obbligo di conservazione)"
+
+msgid "Account restored"
+msgstr "Conto ripristinato"
+
+msgid "Restore account"
+msgstr "Ripristina conto"
+
+msgid "Restored the account."
+msgstr "Conto ripristinato."
+
+msgid "Deleted the account; it is kept under the retention obligation."
+msgstr "Conto eliminato; viene conservato in virtù dell'obbligo di conservazione."
+
+msgid "The account is deleted if no retention obligation applies. Otherwise it is kept as \"Deleted (retention obligation)\" and its email address becomes available for a new registration."
+msgstr "Il conto viene eliminato se non si applica alcun obbligo di conservazione. In caso contrario viene conservato come «Eliminato (obbligo di conservazione)» e il suo indirizzo e-mail diventa disponibile per una nuova registrazione."
+
+# Registration in three steps, result pages and the entry pages (D-058)
+msgid "Your registration at %(instance_name)s"
+msgstr "La Sua registrazione presso %(instance_name)s"
+
+msgid "At least %(min_length)d characters."
+msgstr "Almeno %(min_length)d caratteri."
+
+msgid "A sentence of several words is easy to remember and hard to guess."
+msgstr "Una frase composta da più parole è facile da ricordare e difficile da indovinare."
+
+msgid "All characters are allowed; upper-case letters, digits and special characters are not required."
+msgstr "Sono consentiti tutti i caratteri; maiuscole, cifre e caratteri speciali non sono obbligatori."
+
+msgid "No known or easily guessed passwords, no number-only passwords."
+msgstr "Nessuna password nota o facile da indovinare, nessuna password composta solo da numeri."
+
+msgid "Not similar to your email address."
+msgstr "Non simile al Suo indirizzo e-mail."
+
+msgid "Email address (username)"
+msgstr "Indirizzo e-mail (nome utente)"
+
+msgid "Repeat password"
+msgstr "Ripeti la password"
+
+msgid "I have read the privacy notice and accept it."
+msgstr "Ho letto l'informativa sulla protezione dei dati e la accetto."
+
+msgid "I have read the <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">privacy notice</a> and accept it."
+msgstr "Ho letto l'<a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">informativa sulla protezione dei dati</a> e la accetto."
+
+msgid "Please confirm that you accept the privacy notice."
+msgstr "Confermi di accettare l'informativa sulla protezione dei dati."
+
+msgid "Enter your first name."
+msgstr "Inserisca il Suo nome."
+
+msgid "Enter your last name."
+msgstr "Inserisca il Suo cognome."
+
+msgid "Enter your street."
+msgstr "Inserisca la Sua via."
+
+msgid "Postal code"
+msgstr "NPA"
+
+msgid "My account"
+msgstr "Il mio conto"
+
+msgid "Your details in the LEG portal."
+msgstr "I Suoi dati nel portale della CEL."
+
+msgid "Password rules"
+msgstr "Regole per la password"
+
+msgid "Step %(step)s of 3"
+msgstr "Passaggio %(step)s di 3"
+
+msgid ""
+"Hello\n"
+"\n"
+"Please confirm your email address with this link. The link is valid for %(lifetime_hours)s hours.\n"
+"\n"
+"Continue registration:\n"
+"\n"
+"%(verification_url)s"
+msgstr "Buongiorno\n\nConfermi il Suo indirizzo e-mail con questo collegamento. Il collegamento è valido per %(lifetime_hours)s ore.\n\nContinui la registrazione:\n\n%(verification_url)s"
+
+msgid ""
+"Hello\n"
+"\n"
+"There is already an account for this address. You can log in here. If you did not create an account, you can ignore this email.\n"
+"\n"
+"To the login:\n"
+"\n"
+"%(login_url)s\n"
+"\n"
+"If you do not know the password, you can request a new one on the login page."
+msgstr "Buongiorno\n\nPer questo indirizzo esiste già un conto. Può accedere qui. Se non ha creato un conto, può ignorare questa e-mail.\n\nAlla pagina di accesso:\n\n%(login_url)s\n\nSe non conosce la password, può richiederne una nuova nella pagina di accesso."
+
+msgid "Confirm that <strong class=\"address-text\">%(email)s</strong> should become the email address for your account."
+msgstr "Confermi che <strong class=\"address-text\">%(email)s</strong> deve diventare l'indirizzo e-mail del Suo conto."
+
+msgid "Your new email address <strong class=\"address-text\">%(email)s</strong> is confirmed. From now on you sign in with this address."
+msgstr "Il Suo nuovo indirizzo e-mail <strong class=\"address-text\">%(email)s</strong> è confermato. D'ora in poi accede con questo indirizzo."
+
+msgid "To the login"
+msgstr "Alla pagina di accesso"
+
+msgid "Link no longer valid"
+msgstr "Collegamento non più valido"
+
+msgid "Change stopped"
+msgstr "Modifica interrotta"
+
+msgid "The change of your email address was stopped. Your previous addresses stay valid. All sessions of your account were ended."
+msgstr "La modifica del Suo indirizzo e-mail è stata interrotta. I Suoi indirizzi precedenti rimangono validi. Tutte le sessioni del Suo conto sono state terminate."
+
+msgid "If you did not request the change, choose a new password now."
+msgstr "Se non è stato Lei a richiedere la modifica, scelga subito una nuova password."
+
+msgid "Choose a new password"
+msgstr "Scegli una nuova password"
+
+msgid "Notification: second email address changed"
+msgstr "Notifica: secondo indirizzo e-mail modificato"
+
+msgid "The second email address at %(instance_name)s was changed"
+msgstr "Il secondo indirizzo e-mail presso %(instance_name)s è stato modificato"
+
+msgid "The second email address for your account at %(instance_name)s was changed."
+msgstr "Il secondo indirizzo e-mail del Suo conto presso %(instance_name)s è stato modificato."
+
+msgid "Second address confirmed"
+msgstr "Secondo indirizzo confermato"
+
+msgid "Your second email address <strong class=\"address-text\">%(email)s</strong> is confirmed. It receives information. You do not sign in with it."
+msgstr "Il Suo secondo indirizzo e-mail <strong class=\"address-text\">%(email)s</strong> è confermato. Riceve informazioni. Non lo utilizza per accedere."
+
+msgid "We have sent an email to <strong class=\"address-text\">%(address)s</strong>. Please check your mailbox."
+msgstr "Abbiamo inviato un'e-mail a <strong class=\"address-text\">%(address)s</strong>. Controlli la Sua casella di posta."
+
+msgid "We have sent an email. Please check your mailbox."
+msgstr "Abbiamo inviato un'e-mail. Controlli la Sua casella di posta."
+
+msgid "No email received? It is worth looking in the spam folder."
+msgstr "Nessuna e-mail ricevuta? Vale la pena controllare la cartella dello spam."
+
+msgid "Send email again"
+msgstr "Invia di nuovo l'e-mail"
+
+msgid "Sending again is possible after <span data-resend-seconds>%(seconds)s</span> seconds."
+msgstr "Un nuovo invio è possibile dopo <span data-resend-seconds>%(seconds)s</span> secondi."
+
+msgid "Wrong address?"
+msgstr "Indirizzo errato?"
+
+msgid "Use another email address"
+msgstr "Utilizza un altro indirizzo e-mail"
+
+msgid "Login temporarily blocked"
+msgstr "Accesso temporaneamente bloccato"
+
+msgid "Code from the app"
+msgstr "Codice dall'app"
+
+msgid "Do you not have the app at hand? Enter a recovery code."
+msgstr "Non ha l'app a portata di mano? Inserisca un codice di recupero."
+
+msgid "Confirm"
+msgstr "Conferma"
+
+msgid "Reset password"
+msgstr "Reimposta password"
+
+msgid "We send you a link. It is valid for %(counter)s hour."
+msgid_plural "We send you a link. It is valid for %(counter)s hours."
+msgstr[0] "Le inviamo un collegamento. È valido per %(counter)s ora."
+msgstr[1] "Le inviamo un collegamento. È valido per %(counter)s ore."
+
+msgid "The link has expired or was already used. If you have already registered, go to the login. Otherwise request a new link."
+msgstr "Il collegamento è scaduto o è già stato utilizzato. Se si è già registrato, vada alla pagina di accesso. Altrimenti richieda un nuovo collegamento."
+
+msgid "The link has expired or was already used. If you have already chosen a new password, go to the login. Otherwise request a new link."
+msgstr "Il collegamento è scaduto o è già stato utilizzato. Se ha già scelto una nuova password, vada alla pagina di accesso. Altrimenti richieda un nuovo collegamento."
+
+msgid "Send new link"
+msgstr "Invia nuovo collegamento"
+
+msgid "You will sign in with this email address and this password."
+msgstr "Accederà con questo indirizzo e-mail e questa password."
+
+msgid "Confirm email address"
+msgstr "Conferma indirizzo e-mail"
+
+msgid "Already have an account?"
+msgstr "Ha già un conto?"
+
+msgid "Your details"
+msgstr "I Suoi dati"
+
+msgid "Confirmed"
+msgstr "Confermato"
+
+msgid "Set password"
+msgstr "Imposta password"
+
+# The profile in cards and the second address (D-059)
+msgid "Personal link that stops the requested change of an email address."
+msgstr "Collegamento personale che interrompe la modifica richiesta di un indirizzo e-mail."
+
+msgid "Greeting with the name of the person the account belongs to, or a neutral greeting if no suitable name is known. Best written on a line of its own at the start."
+msgstr "Saluto con il nome della persona a cui appartiene il conto, oppure un saluto neutro se non è noto un nome adatto. Meglio scriverlo su una riga a sé all'inizio."
+
+msgid "Neutral greeting without a name: the name of a deleted account is not kept. The preview and the test email show the same. Best written on a line of its own at the start."
+msgstr "Saluto neutro senza nome: il nome di un conto eliminato non viene conservato. L'anteprima e l'e-mail di prova mostrano lo stesso. Meglio scriverlo su una riga a sé all'inizio."
+
+#: leg_platform/accounts/greeting.py
+msgid "Hello"
+msgstr "Buongiorno"
+
+#, python-format
+msgid "Hello %(name)s"
+msgstr "Buongiorno %(name)s"
+
+msgid "Confirm your second email address at %(instance_name)s"
+msgstr "Confermi il Suo secondo indirizzo e-mail presso %(instance_name)s"
+
+msgid "An email address change was requested at %(instance_name)s"
+msgstr "È stata richiesta una modifica dell'indirizzo e-mail presso %(instance_name)s"
+
+msgid "Your account at %(instance_name)s was deleted"
+msgstr "Il Suo conto presso %(instance_name)s è stato eliminato"
+
+msgid "The password is not correct. Please try again."
+msgstr "La password non è corretta. Riprovi."
+
+msgid "Email address for login (username)"
+msgstr "Indirizzo e-mail per l'accesso (nome utente)"
+
+msgid "Second email address"
+msgstr "Secondo indirizzo e-mail"
+
+msgid "The second address receives information. You do not log in with it. Leave the field empty if you do not want one."
+msgstr "Il secondo indirizzo riceve informazioni. Non lo utilizza per accedere. Lasci vuoto il campo se non ne desidera uno."
+
+msgid "You confirm new addresses with a link. The confirmation is valid for 24 hours. Otherwise the current address stays valid."
+msgstr "I nuovi indirizzi vengono confermati con un collegamento. La conferma è valida per 24 ore. In caso contrario rimane valido l'indirizzo attuale."
+
+msgid "The second address must differ from the address for login."
+msgstr "Il secondo indirizzo deve essere diverso dall'indirizzo per l'accesso."
+
+msgid "Nothing was changed."
+msgstr "Non è stato modificato nulla."
+
+msgid "I know that my account and my details will be deleted and that this cannot be undone."
+msgstr "So che il mio conto e i miei dati verranno eliminati e che ciò non può essere annullato."
+
+msgid "second email address"
+msgstr "secondo indirizzo e-mail"
+
+msgid "Second email address: link to confirm the address"
+msgstr "Secondo indirizzo e-mail: collegamento per confermare l'indirizzo"
+
+msgid "Notification: email address change requested (with the link to stop it)"
+msgstr "Notifica: modifica dell'indirizzo e-mail richiesta (con il collegamento per interromperla)"
+
+msgid "Notification: account deleted"
+msgstr "Notifica: conto eliminato"
+
+msgid "Requested email address change cancelled by the account"
+msgstr "Modifica dell'indirizzo e-mail richiesta annullata dal conto"
+
+msgid "Requested email address change stopped with the link of the notice"
+msgstr "Modifica dell'indirizzo e-mail richiesta interrotta con il collegamento della notifica"
+
+msgid "Second email address changed"
+msgstr "Secondo indirizzo e-mail modificato"
+
+msgid "Saved."
+msgstr "Salvato."
+
+msgid "We sent a confirmation link to the new address. It is valid for 24 hours."
+msgstr "Abbiamo inviato un collegamento di conferma al nuovo indirizzo. È valido per 24 ore."
+
+msgid "The request was cancelled."
+msgstr "La richiesta è stata annullata."
+
+msgid "The recovery codes are saved."
+msgstr "I codici di recupero sono stati salvati."
+
+msgid "Please confirm that you saved the codes. They are not shown again; if you did not save them, create new codes."
+msgstr "Confermi di aver salvato i codici. Non vengono mostrati di nuovo; se non li ha salvati, crei nuovi codici."
+
+msgid "Your account was deleted"
+msgstr "Il Suo conto è stato eliminato"
+
+msgid "Your details are removed. You are logged out. If you want to take part again, you can register anew at any time."
+msgstr "I Suoi dati vengono rimossi. È stato disconnesso. Se desidera partecipare di nuovo, può registrarsi nuovamente in qualsiasi momento."
+
+msgid "To the start page"
+msgstr "Alla pagina iniziale"
+
+msgid "Your account at %(instance_name)s and your personal details were deleted. Invoices and booking records are kept for as long as the law requires."
+msgstr "Il Suo conto presso %(instance_name)s e i Suoi dati personali sono stati eliminati. Le fatture e i giustificativi contabili vengono conservati per tutto il tempo richiesto dalla legge."
+
+msgid ""
+"A change of an email address was requested for your account at %(instance_name)s. Until the new address is confirmed, which is possible for %(lifetime_hours)s hours, your current addresses stay valid.\n"
+"\n"
+"Did you not request this change? Then click here to stop it at once:\n"
+"\n"
+"%(stop_url)s"
+msgstr "È stata richiesta una modifica di un indirizzo e-mail per il Suo conto presso %(instance_name)s. Finché il nuovo indirizzo non viene confermato, cosa possibile per %(lifetime_hours)s ore, i Suoi indirizzi attuali rimangono validi.\n\nNon è stato Lei a richiedere questa modifica? Allora faccia clic qui per interromperla subito:\n\n%(stop_url)s"
+
+msgid "The email address for your account at %(instance_name)s was changed. You have to log in again."
+msgstr "L'indirizzo e-mail del Suo conto presso %(instance_name)s è stato modificato. Deve accedere di nuovo."
+
+msgid ""
+"Hello\n"
+"\n"
+"Someone asked at %(instance_name)s to add this address as the second email address of an account. The second address only receives information; it is not used to log in. To confirm it, open this link:\n"
+"\n"
+"%(email_change_url)s\n"
+"\n"
+"The link expires in %(lifetime_hours)s hours. The address is not used until you confirm it. If you did not expect this, you can ignore this email; nothing will happen."
+msgstr "Buongiorno\n\nQualcuno ha richiesto presso %(instance_name)s di aggiungere questo indirizzo come secondo indirizzo e-mail di un conto. Il secondo indirizzo riceve soltanto informazioni; non viene utilizzato per accedere. Per confermarlo, apra questo collegamento:\n\n%(email_change_url)s\n\nIl collegamento scade tra %(lifetime_hours)s ore. L'indirizzo non viene utilizzato finché non lo conferma. Se non se lo aspettava, può ignorare questa e-mail; non succederà nulla."
+
+msgid "Confirm second email address"
+msgstr "Conferma secondo indirizzo e-mail"
+
+msgid "Confirm that <strong class=\"address-text\">%(email)s</strong> should be the second email address of your account. It receives information. You do not log in with it."
+msgstr "Confermi che <strong class=\"address-text\">%(email)s</strong> deve essere il secondo indirizzo e-mail del Suo conto. Riceve informazioni. Non lo utilizza per accedere."
+
+msgid "Confirm second address"
+msgstr "Conferma secondo indirizzo"
+
+msgid "This link can no longer be used. If you have just confirmed the change, log in with the new address."
+msgstr "Questo collegamento non può più essere utilizzato. Se ha appena confermato la modifica, acceda con il nuovo indirizzo."
+
+msgid "Stop the change"
+msgstr "Interrompi la modifica"
+
+msgid "A change of an email address of your account was requested. If you did not request it, stop it here. Your current addresses stay valid, and all sessions of your account end."
+msgstr "È stata richiesta una modifica di un indirizzo e-mail del Suo conto. Se non l'ha richiesta, la interrompa qui. I Suoi indirizzi attuali rimangono validi e tutte le sessioni del Suo conto terminano."
+
+msgid "Stop the change now"
+msgstr "Interrompi la modifica ora"
+
+msgid "The link has expired or was already used. A change that was already confirmed cannot be stopped with it any more. Log in and check your details in the profile."
+msgstr "Il collegamento è scaduto o è già stato utilizzato. Una modifica già confermata non può più essere interrotta con esso. Acceda e verifichi i Suoi dati nel profilo."
+
+msgid "Your details and security settings."
+msgstr "I Suoi dati e le impostazioni di sicurezza."
+
+msgid "Really delete the account?"
+msgstr "Eliminare davvero il conto?"
+
+msgid "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted."
+msgstr "Con l'eliminazione perde l'accesso al portale. I Suoi dati personali, le Sue ubicazioni e i Suoi messaggi vengono eliminati."
+
+msgid "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">privacy notice</a>."
+msgstr "I Suoi dati vengono eliminati. Conserviamo le fatture e i giustificativi contabili per tutto il tempo richiesto dalla legge. Maggiori informazioni nell'<a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">informativa sulla protezione dei dati</a>."
+
+msgid "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the privacy notice."
+msgstr "I Suoi dati vengono eliminati. Conserviamo le fatture e i giustificativi contabili per tutto il tempo richiesto dalla legge. Maggiori informazioni nell'informativa sulla protezione dei dati."
+
+msgid "Delete account permanently"
+msgstr "Elimina definitivamente il conto"
+
+msgid "Your account and your personal details are deleted. This cannot be undone."
+msgstr "Il Suo conto e i Suoi dati personali vengono eliminati. Ciò non può essere annullato."
+
+msgid "Email addresses"
+msgstr "Indirizzi e-mail"
+
+msgid "Edit"
+msgstr "Modifica"
+
+msgid "Save"
+msgstr "Salva"
+
+msgid "Login (username)"
+msgstr "Accesso (nome utente)"
+
+msgid "Pending"
+msgstr "In attesa"
+
+msgid "Cancel request"
+msgstr "Annulla richiesta"
+
+msgid "Please confirm by %(deadline)s. Until then %(old)s stays valid."
+msgstr "Confermi entro il %(deadline)s. Fino ad allora %(old)s rimane valido."
+
+msgid "Second address"
+msgstr "Secondo indirizzo"
+
+msgid "not set"
+msgstr "non impostato"
+
+msgid "Please confirm by %(deadline)s. Until then no second address is used."
+msgstr "Confermi entro il %(deadline)s. Fino ad allora non viene utilizzato alcun secondo indirizzo."
+
+msgid "not shown"
+msgstr "non visualizzato"
+
+msgid "Personal details"
+msgstr "Dati personali"
+
+msgid "Further details (optional)"
+msgstr "Altri dati (facoltativi)"
+
+msgid "Two-factor authentication (2FA)"
+msgstr "Autenticazione a due fattori (2FA)"
+
+msgid "Not set up"
+msgstr "Non configurata"
+
+msgid "You need a code from your app at every login, in addition to your password."
+msgstr "A ogni accesso, oltre alla password, Le serve un codice dalla Sua app."
+
+msgid "Create new codes"
+msgstr "Crea nuovi codici"
+
+msgid "Turn off 2FA"
+msgstr "Disattiva 2FA"
+
+msgid "New codes replace the old ones. The old codes no longer work afterwards."
+msgstr "I nuovi codici sostituiscono quelli vecchi. In seguito i vecchi codici non funzionano più."
+
+msgid "With a code from an app you protect your account additionally. This is voluntary."
+msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto. È facoltativo."
+
+msgid "With a code from an app you protect your account additionally."
+msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto."
+
+msgid "Set up the app"
+msgstr "Configura l'app"
+
+msgid "Step 1 of 2"
+msgstr "Passaggio 1 di 2"
+
+msgid "Scan this code with your authenticator app."
+msgstr "Scansioni questo codice con la Sua app di autenticazione."
+
+msgid "Cannot scan? Enter this key in the app:"
+msgstr "Non riesce a scansionarlo? Inserisca questa chiave nell'app:"
+
+msgid "Step 2 of 2"
+msgstr "Passaggio 2 di 2"
+
+msgid "You need these codes if you have no access to the app. Each code works only once. They are shown only now."
+msgstr "Questi codici Le servono se non ha accesso all'app. Ogni codice funziona una sola volta. Vengono mostrati solo ora."
+
+msgid "I saved the codes."
+msgstr "Ho salvato i codici."
+
+msgid "Done"
+msgstr "Fatto"
+
+msgid "The previous codes no longer work afterwards."
+msgstr "In seguito i codici precedenti non funzionano più."
+
+msgid "Afterwards only your password protects the account. You can set up 2FA again at any time."
+msgstr "In seguito il conto è protetto soltanto dalla Sua password. Può configurare di nuovo la 2FA in qualsiasi momento."
+
+msgid "Registration completed"
+msgstr "Registrazione completata"
+
+msgid "Privacy policy"
+msgstr "Protezione dei dati"
+
+msgid "Too many requests, please try again later."
+msgstr "Troppe richieste, riprovi più tardi."
+
+msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator: you find the contact details on <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. The removal can be started again there."
+msgstr "Questo collegamento non è più valido o è scaduto. Se deve ancora rimuovere l'autenticazione a due fattori, contatti il gestore: i dati di contatto si trovano su <a href=\"%(url)s\" target=\"_blank\" rel=\"noopener noreferrer\">%(host)s</a>. La rimozione può essere avviata di nuovo da lì."
+
+msgid "This link is not valid any more or has expired. If you still need to remove two-factor authentication, contact the operator of this portal. The removal can be started again there."
+msgstr "Questo collegamento non è più valido o è scaduto. Se deve ancora rimuovere l'autenticazione a due fattori, contatti il gestore di questo portale. La rimozione può essere avviata di nuovo da lì."
+
+msgid "This page no longer exists."
+msgstr "Questa pagina non esiste più."
+
+msgid "Back to the start page?"
+msgstr "Tornare alla pagina iniziale?"
+
+msgid "Oops, something went wrong."
+msgstr "Ops, qualcosa è andato storto."
+
+msgid "Please try again in a moment."
+msgstr "Riprovi tra un momento."
+
+msgid "You have no access here."
+msgstr "Qui non ha accesso."
+
+msgid "This page is not available to you."
+msgstr "Questa pagina non è disponibile per Lei."
+
+msgid "The page has expired."
+msgstr "La pagina è scaduta."
+
+msgid "Please reload the page and try again. Nothing has been saved."
+msgstr "Ricarichi la pagina e riprovi. Non è stato salvato nulla."
+
+msgid "Users"
+msgstr "Utenti"
+
+msgid "Change"
+msgstr "Modifica"
+
+msgid "ZIP code"
+msgstr "NPA"
+
+msgid "Confirmation"
+msgstr "Conferma"
+
+msgid "Cancel request: %(address)s"
+msgstr "Annulla richiesta: %(address)s"
+
+msgid "Receives information, not for logging in."
+msgstr "Riceve informazioni, non serve per accedere."
+
+msgid "To the profile"
+msgstr "Al profilo"
+
+msgid "Content"
+msgstr "Contenuti"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "You maintain the name, the logo, the colours and the addresses of the portal and the texts of the emails under Content."
+msgstr "Alla voce «Contenuti» gestisce il nome, il logo, i colori e gli indirizzi del portale e i testi delle e-mail."
+
+msgid "blocked or failed login"
+msgstr "accesso bloccato o non riuscito"
+
+msgid "blocked and failed logins"
+msgstr "accessi bloccati e non riusciti"
+
+msgid "failed login in the log"
+msgstr "accesso non riuscito nel log"
+
+msgid "log of failed logins"
+msgstr "log degli accessi non riusciti"
+
+# Administration, final acceptance (blocks 5c): email text list, start page, rights, portal settings.
+msgid "Registration"
+msgstr "Registrazione"
+
+msgid "Login and password"
+msgstr "Accesso e password"
+
+msgid "Account"
+msgstr "Conto"
+
+msgid "process"
+msgstr "procedura"
+
+msgid "Customised"
+msgstr "Personalizzato"
+
+msgid "https://www.example.org/privacy"
+msgstr "https://www.example.org/privacy"
+
+msgid "https://www.example.org/imprint"
+msgstr "https://www.example.org/imprint"
+
+msgid "It must start with https://. It opens in a new tab."
+msgstr "Deve iniziare con https://. Si apre in una nuova scheda."
+
+msgid "Saved. The changes are now visible on all pages."
+msgstr "Salvato. Le modifiche sono ora visibili su tutte le pagine."
+
+msgctxt "right"
+msgid "view"
+msgstr "visualizzare"
+
+msgctxt "right"
+msgid "add"
+msgstr "aggiungere"
+
+msgctxt "right"
+msgid "change"
+msgstr "modificare"
+
+msgctxt "right"
+msgid "delete"
+msgstr "eliminare"
+
+msgid "See accounts"
+msgstr "Visualizzare i conti"
+
+msgid "Change the details of accounts"
+msgstr "Modificare i dati dei conti"
+
+msgid "Read the email texts"
+msgstr "Leggere i testi delle e-mail"
+
+msgid "Change the email texts"
+msgstr "Modificare i testi delle e-mail"
+
+msgid "Every email of the portal has a default text. Open an email to see its text, to change it or to use the default text again. Which placeholders an email can use is shown when the email is edited."
+msgstr "Ogni e-mail del portale ha un testo predefinito. Apra un'e-mail per vederne il testo, modificarlo o utilizzare di nuovo il testo predefinito. I segnaposto utilizzabili da un'e-mail vengono mostrati durante la modifica."
+
+msgid "Address of the privacy notice"
+msgstr "Indirizzo dell'informativa sulla protezione dei dati"
+
+msgid "Address of the legal notice"
+msgstr "Indirizzo delle note legali"
+
+msgid "set"
+msgstr "impostato"
+
+msgid "not set yet"
+msgstr "non ancora impostato"
+
+msgid "Texts of the emails"
+msgstr "Testi delle e-mail"
+
+#, python-format
+msgid "%(total)d texts, %(customised)d customised"
+msgstr "%(total)d testi, %(customised)d personalizzati"
+
+msgid "Sending of emails (Microsoft Graph)"
+msgstr "Invio di e-mail (Microsoft Graph)"
+
+msgid "ready"
+msgstr "pronto"
+
+msgid "not ready"
+msgstr "non pronto"
+
+msgid "Which rights do I need for what?"
+msgstr "Di quali diritti ho bisogno per cosa?"
+
+msgid "The portal has no ready-made groups. Make a group, choose the rights below and add the group to the account of a staff member."
+msgstr "Il portale non ha gruppi predefiniti. Crei un gruppo, scelga qui sotto i diritti e aggiunga il gruppo al conto di un membro del personale."
+
+msgid "To do this"
+msgstr "Per fare questo"
+
+msgid "Choose this right"
+msgstr "Scelga questo diritto"
+
+msgid "Only system administrators can do the following, and no right gives it to a staff member: change the email delivery, read the security log and the blocked logins, manage groups and rights, block, unblock and delete accounts, and reset two-factor authentication."
+msgstr "Solo gli amministratori di sistema possono fare quanto segue, e nessun diritto lo assegna a un membro del personale: modificare l'invio delle e-mail, leggere il log di sicurezza e gli accessi bloccati, gestire gruppi e diritti, bloccare, sbloccare ed eliminare conti e reimpostare l'autenticazione a due fattori."
+
+msgid "This right changes what every visitor sees and which links the portal shows. Give it only to people who are responsible for the portal."
+msgstr "Questo diritto modifica ciò che vede ogni visitatore e quali collegamenti mostra il portale. Lo assegni soltanto alle persone responsabili del portale."
+
+#, python-format
+msgid "These lists show failed and blocked logins. The \"username\" is a code, not an address: the portal does not show who tried to log in. A temporary lockout ends by itself after %(lockout_minutes)s minutes."
+msgstr "Questi elenchi mostrano gli accessi non riusciti e bloccati. Il «nome utente» è un codice, non un indirizzo: il portale non mostra chi ha tentato di accedere. Un blocco temporaneo termina da solo dopo %(lockout_minutes)s minuti."
+
+msgid "If a person cannot log in because an administrator blocked the account, open the account under Users, Accounts and choose Unblock account."
+msgstr "Se una persona non può accedere perché un amministratore ha bloccato il conto, apra il conto alla voce Utenti, Conti e scelga Sblocca conto."
+
+msgid "First steps"
+msgstr "Primi passi"
+
+msgid "certificate expired"
+msgstr "certificato scaduto"
+
+msgid "pending email change"
+msgstr "modifica dell'indirizzo e-mail in sospeso"
+
+msgid "pending email changes"
+msgstr "modifiche dell'indirizzo e-mail in sospeso"
+
+# One proof per confirmation (D-062, block 8).
+msgid "2FA authentication code"
+msgstr "Codice di autenticazione 2FA"
+
+msgid "Enter the 2FA authentication code."
+msgstr "Inserisca il codice di autenticazione 2FA."
+
+msgid "That is not a 2FA authentication code. It has 6 digits."
+msgstr "Questo non è un codice di autenticazione 2FA. È composto da 6 cifre."
+
+msgid "The 2FA authentication code is wrong or has expired. Wait for the next code in your app and try again."
+msgstr "Il codice di autenticazione 2FA è errato o scaduto. Attenda il codice successivo nella Sua app e riprovi."
+
+msgid "Enter the 6-digit code from your authenticator app. Your password is not needed here."
+msgstr "Inserisca il codice di 6 cifre della Sua app di autenticazione. Qui non serve la Sua password."
+
+msgid "Recovery code"
+msgstr "Codice di recupero"
+
+msgid "One of your recovery codes, for example abcd-efgh. Each code works only once."
+msgstr "Uno dei Suoi codici di recupero, ad esempio abcd-efgh. Ogni codice funziona una sola volta."
+
+msgid "Enter a recovery code."
+msgstr "Inserisca un codice di recupero."
+
+msgid "That is not a recovery code. It has 8 letters and digits, for example abcd-efgh."
+msgstr "Questo non è un codice di recupero. È composto da 8 lettere e cifre, ad esempio abcd-efgh."
+
+msgid "The password or the recovery code is wrong. Check both and try again."
+msgstr "La password o il codice di recupero sono errati. Verifichi entrambi e riprovi."
+
+msgid "Phone lost?"
+msgstr "Telefono perso?"
+
+msgid "If you cannot use your authenticator app, you can turn off 2FA with your password and one of your recovery codes. Afterwards only your password protects the account. You can set up 2FA again at any time."
+msgstr "Se non può utilizzare la Sua app di autenticazione, può disattivare la 2FA con la Sua password e uno dei Suoi codici di recupero. In seguito il conto è protetto soltanto dalla Sua password. Può configurare di nuovo la 2FA in qualsiasi momento."
+
+msgid "You have neither the app nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of 2FA, and you confirm it with a link that is sent to your email address."
+msgstr "Non ha né l'app né un codice di recupero? Allora contatti il gestore del portale. Un amministratore può avviare la rimozione della 2FA e Lei la conferma con un collegamento inviato al Suo indirizzo e-mail."
+
+msgid "For your safety you were logged out: wrong codes or passwords were entered several times. Please log in again."
+msgstr "Per la Sua sicurezza è stato disconnesso: sono stati inseriti più volte codici o password errati. Acceda di nuovo."
+
+msgid "A session at %(instance_name)s was ended"
+msgstr "Una sessione presso %(instance_name)s è stata terminata"
+
+#, python-format
+msgid ""
+"Unusual entries were made in a session of your account at %(instance_name)s: several wrong codes or passwords were entered where a confirmation asks for them. For your safety the session was ended.\n"
+"\n"
+"If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with \"Forgot password\" on the login page."
+msgstr "In una sessione del Suo conto presso %(instance_name)s sono stati effettuati inserimenti insoliti: più codici o password errati sono stati inseriti dove una conferma li richiede. Per la Sua sicurezza la sessione è stata terminata.\n\nSe è stato Lei, può accedere di nuovo. Se non è stato Lei, qualcuno potrebbe avere accesso a un dispositivo su cui ha effettuato l'accesso: scelga una nuova password con «Password dimenticata» nella pagina di accesso."
+
+#, python-format
+msgid ""
+"Several wrong codes or passwords were entered in the confirmations of your account at %(instance_name)s within a short time. For your safety all sessions of your account were ended, on every device.\n"
+"\n"
+"If this was you, you can log in again. If it was not you, someone may have access to a device where you are logged in: choose a new password with \"Forgot password\" on the login page."
+msgstr "Nelle conferme del Suo conto presso %(instance_name)s sono stati inseriti più codici o password errati in breve tempo. Per la Sua sicurezza tutte le sessioni del Suo conto sono state terminate, su ogni dispositivo.\n\nSe è stato Lei, può accedere di nuovo. Se non è stato Lei, qualcuno potrebbe avere accesso a un dispositivo su cui ha effettuato l'accesso: scelga una nuova password con «Password dimenticata» nella pagina di accesso."
+
+msgid "All sessions at %(instance_name)s were ended"
+msgstr "Tutte le sessioni presso %(instance_name)s sono state terminate"
+
+msgid "Notification: all sessions ended after wrong entries"
+msgstr "Notifica: tutte le sessioni terminate dopo inserimenti errati"
+
+msgid "All sessions ended after wrong entries"
+msgstr "Tutte le sessioni terminate dopo inserimenti errati"
+
+msgid "Notification: session ended after wrong codes"
+msgstr "Notifica: sessione terminata dopo codici errati"
+
+msgid "Session ended after wrong codes"
+msgstr "Sessione terminata dopo codici errati"
+
+msgid "Two-factor authentication removed with a recovery code (phone lost)"
+msgstr "Autenticazione a due fattori rimossa con un codice di recupero (telefono perso)"
+
+msgid "Your account was changed in the meantime. Please try again."
+msgstr "Nel frattempo il Suo conto è stato modificato. Riprovi."
+
+msgid "Default text restored."
+msgstr "Testo predefinito ripristinato."
+
+msgid "The addresses were removed. The footer shows the privacy notice and the legal notice without a link."
+msgstr "Gli indirizzi sono stati rimossi. Il piè di pagina mostra l'informativa sulla protezione dei dati e le note legali senza collegamento."
+
+msgid "Earlier versions show the wording of earlier texts."
+msgstr "Le versioni precedenti mostrano la formulazione dei testi precedenti."
+
+msgid "The change history shows who changed what and when."
+msgstr "La cronologia delle modifiche mostra chi ha modificato cosa e quando."
+
+# Portal settings: name, website, logos, colours and the server configuration (D-073)
+msgid "Name, logo and colours"
+msgstr "Nome, logo e colori"
+
+msgid "own settings"
+msgstr "impostazioni proprie"
+
+msgid "server configuration"
+msgstr "configurazione del server"
+
+# Terms of Django's administration that are replaced by the words of the portal (P2-7, P2-4, P2-8).
+msgid "View site"
+msgstr "Al portale"
+
+msgid "History"
+msgstr "Cronologia"
+
+#, python-format
+msgid "Change history: %s"
+msgstr "Cronologia delle modifiche: %s"
+
+msgid "You don’t have permission to view or edit anything."
+msgstr "Il Suo conto non dispone ancora di diritti nell'amministrazione. Si rivolga a un amministratore di sistema."
+
+# Portal settings: fields, help texts and messages (D-073)
+msgid "name of the portal"
+msgstr "nome del portale"
+
+msgid "Shown in the header, in page titles, in the subject of emails and in the administration. At most 100 characters. Leave empty to use the name from the server configuration."
+msgstr "Mostrato nell'intestazione, nei titoli delle pagine, nell'oggetto delle e-mail e nell'amministrazione. Al massimo 100 caratteri. Lasciare vuoto per utilizzare il nome della configurazione del server."
+
+msgid "address of the website"
+msgstr "indirizzo del sito web"
+
+msgid "The website of your community with the contact information. It is linked in the footer and used as the contact address in emails. It must start with https://. Leave empty to use the server configuration."
+msgstr "Il sito web della Sua comunità con le informazioni di contatto. È collegato nel piè di pagina e utilizzato come indirizzo di contatto nelle e-mail. Deve iniziare con https://. Lasciare vuoto per utilizzare la configurazione del server."
+
+msgid "https://www.example.org"
+msgstr "https://www.example.org"
+
+msgid "accent colour, light mode"
+msgstr "colore d'accento, modalità chiara"
+
+msgid "text colour on the accent colour, light mode"
+msgstr "colore del testo sul colore d'accento, modalità chiara"
+
+msgid "accent colour, dark mode"
+msgstr "colore d'accento, modalità scura"
+
+msgid "text colour on the accent colour, dark mode"
+msgstr "colore del testo sul colore d'accento, modalità scura"
+
+msgid "highlight colour"
+msgstr "colore di evidenziazione"
+
+msgid "Leave empty to choose white or dark text automatically."
+msgstr "Lasciare vuoto per scegliere automaticamente testo bianco o scuro."
+
+msgid "Used only for the small dots in the lists of the login page, never for text."
+msgstr "Utilizzato solo per i piccoli punti negli elenchi della pagina di accesso, mai per il testo."
+
+#, python-format
+msgid "The name must have at most %(max)d characters and no control characters."
+msgstr "Il nome deve contenere al massimo %(max)d caratteri e nessun carattere di controllo."
+
+msgid "Enter the colour as # followed by six digits or letters from A to F, for example #005BA2."
+msgstr "Inserisca il colore come # seguito da sei cifre o lettere da A a F, ad esempio #005BA2."
+
+msgid "Portal upload rejected"
+msgstr "Caricamento del portale rifiutato"
+
+msgid "logo for light mode"
+msgstr "logo per la modalità chiara"
+
+msgid "logo for dark mode"
+msgstr "logo per la modalità scura"
+
+msgid "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. Use the version with dark lettering."
+msgstr "PNG o SVG, fino a 1 MB (PNG) o 200 KB (SVG). Un PNG dovrebbe essere largo almeno 720 px. Utilizzi la versione con la scritta scura."
+
+msgid "PNG or SVG, up to 1 MB (PNG) or 200 KB (SVG). A PNG should be at least 720 px wide. Use the version with light lettering."
+msgstr "PNG o SVG, fino a 1 MB (PNG) o 200 KB (SVG). Un PNG dovrebbe essere largo almeno 720 px. Utilizzi la versione con la scritta chiara."
+
+msgid "Remove the uploaded logos and use the server configuration. The files are deleted and cannot be restored."
+msgstr "Rimuove i loghi caricati e utilizza la configurazione del server. I file vengono eliminati e non possono essere ripristinati."
+
+msgid "Use the server colours again"
+msgstr "Utilizza di nuovo i colori del server"
+
+msgid "Upload both logos or none. The portal needs one version for light and one for dark mode."
+msgstr "Carichi entrambi i loghi oppure nessuno. Il portale necessita di una versione per la modalità chiara e una per la modalità scura."
+
+msgid "The identity cannot be checked. Nothing was saved."
+msgstr "Non è possibile verificare l'identità. Non è stato salvato nulla."
+
+msgid "To protect what every visitor sees, confirm the change with the code from your authenticator app or, if you have none, with your password."
+msgstr "Per proteggere ciò che vede ogni visitatore, confermi la modifica con il codice della Sua app di autenticazione o, se non ne ha una, con la Sua password."
+
+msgid "Choose either new logos or the removal of the uploaded logos, not both."
+msgstr "Scelga nuovi loghi oppure la rimozione dei loghi caricati, non entrambi."
+
+msgid "Choose either a new icon or the removal of the uploaded icon, not both."
+msgstr "Scelga una nuova icona oppure la rimozione dell'icona caricata, non entrambe."
+
+msgid "PNG or SVG, up to 128 KB (PNG) or 64 KB (SVG). A PNG should be square and at least 192 px wide. It is shown in the tab of the browser, for light and dark mode alike. Leave empty to use the built-in icon."
+msgstr "PNG o SVG, fino a 128 KB (PNG) o 64 KB (SVG). Un PNG dovrebbe essere quadrato e largo almeno 192 px. Viene mostrata nella scheda del browser, sia per la modalità chiara sia per quella scura. Lasciare vuoto per utilizzare l'icona integrata."
+
+msgid "icon of the browser tab"
+msgstr "icona della scheda del browser"
+
+msgid "Remove the uploaded icon and use the built-in icon. The file is deleted and cannot be restored."
+msgstr "Rimuove l'icona caricata e utilizza l'icona integrata. Il file viene eliminato e non può essere ripristinato."
+
+msgid "Only PNG and SVG files are accepted."
+msgstr "Sono accettati solo file PNG e SVG."
+
+#, python-format
+msgid "The file is too large (maximum %(max)s)."
+msgstr "Il file è troppo grande (massimo %(max)s)."
+
+msgid "The file is not a valid PNG image."
+msgstr "Il file non è un'immagine PNG valida."
+
+msgid "The image must be between 64 and 4000 pixels wide and high."
+msgstr "L'immagine deve essere larga e alta tra 64 e 4000 pixel."
+
+msgid "The image has too many pixels (at most 4 million in total, for example 2000 by 2000). Scale it down and upload it again."
+msgstr "L'immagine ha troppi pixel (al massimo 4 milioni in totale, ad esempio 2000 per 2000). La riduca e la carichi di nuovo."
+
+msgid "The PNG contains extra data that the portal does not accept (text, a colour profile or similar). Export it again without metadata."
+msgstr "Il PNG contiene dati aggiuntivi che il portale non accetta (testo, un profilo colore o simili). Lo esporti di nuovo senza metadati."
+
+msgid "The SVG needs a viewBox so that it can be scaled."
+msgstr "L'SVG necessita di un viewBox per poter essere ridimensionato."
+
+#, python-format
+msgid "This SVG contains content that the portal does not accept (%(what)s). Save the file as \"plain SVG\" without scripts, images, styles or editor data and upload it again."
+msgstr "Questo SVG contiene contenuti che il portale non accetta (%(what)s). Salvi il file come «SVG semplice» senza script, immagini, stili o dati dell'editor e lo carichi di nuovo."
+
+#, python-format
+msgid "This accent colour is too weak on the light background (contrast %(ratio)s:1, required 4.5:1). Choose a darker colour."
+msgstr "Questo colore d'accento è troppo debole sullo sfondo chiaro (contrasto %(ratio)s:1, richiesto 4,5:1). Scelga un colore più scuro."
+
+#, python-format
+msgid "This accent colour is too weak on the dark background (contrast %(ratio)s:1, required 4.5:1). Choose a lighter colour."
+msgstr "Questo colore d'accento è troppo debole sullo sfondo scuro (contrasto %(ratio)s:1, richiesto 4,5:1). Scelga un colore più chiaro."
+
+#, python-format
+msgid "The text colour on the accent colour is too weak (contrast %(ratio)s:1, required 4.5:1)."
+msgstr "Il colore del testo sul colore d'accento è troppo debole (contrasto %(ratio)s:1, richiesto 4,5:1)."
+
+#, python-format
+msgid "The highlight colour is too weak with dark text (contrast %(ratio)s:1, required 4.5:1)."
+msgstr "Il colore di evidenziazione è troppo debole con il testo scuro (contrasto %(ratio)s:1, richiesto 4,5:1)."
+
+#, python-format
+msgid "Server configuration: %(value)s"
+msgstr "Configurazione del server: %(value)s"
+
+msgid "logo files set"
+msgstr "file dei loghi impostati"
+
+msgid "Name and website"
+msgstr "Nome e sito web"
+
+msgid "Legal notices"
+msgstr "Note legali"
+
+msgid "Logo"
+msgstr "Logo"
+
+msgid "Browser tab icon"
+msgstr "Icona della scheda del browser"
+
+msgid "Colours"
+msgstr "Colori"
+
+msgid "Server configuration (read only)"
+msgstr "Configurazione del server (sola lettura)"
+
+msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the base address decide where the links in emails and the security settings point, so they are not stored where the portal settings can change them."
+msgstr "Questi valori sono impostati dal gestore nella configurazione del server e non possono essere modificati qui: il nome host, gli host consentiti e l'indirizzo di base determinano dove puntano i collegamenti nelle e-mail e le impostazioni di sicurezza, perciò non sono memorizzati dove le impostazioni del portale possono modificarli."
+
+msgid "uploaded logos"
+msgstr "loghi caricati"
+
+msgid "uploaded icon"
+msgstr "icona caricata"
+
+msgid "Not uploaded. The built-in icon is used."
+msgstr "Non caricata. Viene utilizzata l'icona integrata."
+
+msgid "Light mode"
+msgstr "Modalità chiara"
+
+msgid "Dark mode"
+msgstr "Modalità scura"
+
+#, python-format
+msgid "Uploaded (%(type)s, fingerprint %(digest)s)."
+msgstr "Caricato (%(type)s, impronta %(digest)s)."
+
+#, python-format
+msgid "Not uploaded. Server configuration: %(value)s."
+msgstr "Non caricato. Configurazione del server: %(value)s."
+
+msgid "preview of the portal"
+msgstr "anteprima del portale"
+
+msgid "values of the server"
+msgstr "valori del server"
+
+msgid "on"
+msgstr "attivo"
+
+msgid "off"
+msgstr "disattivato"
+
+msgid "Environment"
+msgstr "Ambiente"
+
+msgid "Debug mode"
+msgstr "Modalità di debug"
+
+msgid "Base address of the portal (links in emails)"
+msgstr "Indirizzo di base del portale (collegamenti nelle e-mail)"
+
+msgid "Allowed host names"
+msgstr "Nomi host consentiti"
+
+msgid "Trusted origins of forms"
+msgstr "Origini attendibili dei moduli"
+
+msgid "Email delivery"
+msgstr "Invio delle e-mail"
+
+msgid "Sender address of emails"
+msgstr "Indirizzo mittente delle e-mail"
+
+msgid "Number of allowed recipients (development only)"
+msgstr "Numero di destinatari consentiti (solo sviluppo)"
+
+msgid "Security log: days kept (usual, long)"
+msgstr "Log di sicurezza: giorni di conservazione (normale, lungo)"
+
+msgid "Header of the reverse proxy for HTTPS"
+msgstr "Intestazione del reverse proxy per HTTPS"
+
+msgid "Number of proxies in front of the portal"
+msgstr "Numero di proxy davanti al portale"
+
+msgid "HSTS, seconds"
+msgstr "HSTS, secondi"
+
+msgid "Here you set how this portal presents itself. Changes are visible to all visitors immediately."
+msgstr "Qui imposta come si presenta questo portale. Le modifiche sono subito visibili a tutti i visitatori."
+
+msgid "Link"
+msgstr "Collegamento"
+
+msgid "Button"
+msgstr "Pulsante"
+
+msgid "Highlight"
+msgstr "Evidenziazione"
+
+msgid "The preview shows the saved logos and the saved icon. The colours change while you type."
+msgstr "L'anteprima mostra i loghi salvati e l'icona salvata. I colori cambiano mentre digita."
+
+msgid "Icon of the browser tab"
+msgstr "Icona della scheda del browser"
+
+msgid "See the settings of the portal"
+msgstr "Visualizzare le impostazioni del portale"
+
+msgid "Change name, logo, colours and addresses of the portal"
+msgstr "Modificare nome, logo, colori e indirizzi del portale"
+
+msgid "Community"
+msgstr "Comunità"
+
+msgid "Management"
+msgstr "Gestione"
+
+msgid "Overview"
+msgstr "Panoramica"
+
+msgid "Settings"
+msgstr "Impostazioni"
+
+# The Django administration, named differently from the group "Management" (both would read
+# "Verwaltung").
+msgid "System administration"
+msgstr "Amministrazione di sistema"
+
+msgid "Invoice sender"
+msgstr "Mittente delle fatture"
+
+msgid "Metering points"
+msgstr "Punti di misura"
+
+msgid "Production quota"
+msgstr "Quota di produzione"
+
+msgid "Applies to all metering points. The %(operator)s assigns the identifier."
+msgstr "Vale per tutti i punti di misura. L'identificativo viene assegnato da %(operator)s."
+
+#, python-format
+msgid "Applies to all LEGs. The law requires at least %(minimum)d %%."
+msgstr "Vale per tutte le CEL. La legge prescrive almeno il %(minimum)d %%."
+
+msgctxt "management"
+msgid "optional"
+msgstr "facoltativo"
+
+msgctxt "unit"
+msgid "in"
+msgstr "in"
+
+msgid "Accept"
+msgstr "Accetta"
+
+msgid "Do not accept"
+msgstr "Non accettare"
+
+#, python-format
+msgid "The address differs from the address directory. Suggestion: %(address)s."
+msgstr "L'indirizzo si discosta dall'elenco degli indirizzi. Suggerimento: %(address)s."
+
+#, python-format
+msgid "Information: %(name)s"
+msgstr "Informazione: %(name)s"
+
+msgid "Enter two capital letters, for example CH."
+msgstr "Inserisca due lettere maiuscole, ad esempio CH."
+
+msgid "Enter 11 characters: capital letters and digits."
+msgstr "Inserisca 11 caratteri: lettere maiuscole e cifre."
+
+msgid "Enter a number of 33 characters: capital letters, digits and hyphens."
+msgstr "Inserisca un numero di 33 caratteri: lettere maiuscole, cifre e trattini."
+
+msgid "Enter the %(operator)s number: TRA followed by digits."
+msgstr "Inserisca il numero di %(operator)s: TRA seguito da cifre."
+
+msgid "This address already exists."
+msgstr "Questo indirizzo esiste già."
+
+# Field names and names of the models (they appear in forms and in the lists of rights)
+msgid "created"
+msgstr "creato"
+
+msgid "changed"
+msgstr "modificato"
+
+msgid "name"
+msgstr "nome"
+
+msgid "grid number"
+msgstr "numero di rete"
+
+msgid "transformer circuit"
+msgstr "circuito del trasformatore"
+
+msgid "transformer circuits"
+msgstr "circuiti del trasformatore"
+
+msgid "remark"
+msgstr "osservazione"
+
+msgid "archived"
+msgstr "archiviato"
+
+msgid "not yet confirmed"
+msgstr "non ancora confermato"
+
+msgid "location"
+msgstr "ubicazione"
+
+msgid "locations"
+msgstr "ubicazioni"
+
+msgid "metering point number"
+msgstr "numero del punto di misura"
+
+msgid "direction"
+msgstr "direzione"
+
+msgid "PV power (kWp)"
+msgstr "potenza FV (kWp)"
+
+msgid "battery (kWh)"
+msgstr "batteria (kWh)"
+
+msgid "wallbox (kW)"
+msgstr "wallbox (kW)"
+
+msgid "notified on"
+msgstr "notificato il"
+
+msgid "confirmed on"
+msgstr "confermato il"
+
+msgid "start date"
+msgstr "data di inizio"
+
+msgid "terminated on"
+msgstr "disdetto per il"
+
+msgid "metering point"
+msgstr "punto di misura"
+
+msgid "metering points"
+msgstr "punti di misura"
+
+msgid "LEG"
+msgstr "CEL"
+
+msgid "LEGs"
+msgstr "CEL"
+
+msgid "production quota (%)"
+msgstr "quota di produzione (%)"
+
+msgid "checked on"
+msgstr "verificato il"
+
+msgid "valid from"
+msgstr "valido dal"
+
+msgid "valid to"
+msgstr "valido fino al"
+
+msgid "person assignment"
+msgstr "assegnazione di persona"
+
+msgid "person assignments"
+msgstr "assegnazioni di persone"
+
+msgid "LEG assignment"
+msgstr "assegnazione alla CEL"
+
+msgid "LEG assignments"
+msgstr "assegnazioni alle CEL"
+
+msgid "history entry"
+msgstr "voce della cronologia"
+
+msgid "history entries"
+msgstr "voci della cronologia"
+
+msgid "identifier"
+msgstr "identificativo"
+
+msgid "warning threshold"
+msgstr "soglia di avviso"
+
+msgid "management settings"
+msgstr "impostazioni della gestione"
+
+msgid "note"
+msgstr "nota"
+
+msgid "customer number at the grid operator"
+msgstr "numero cliente presso il gestore di rete"
+
+msgid "number of shares"
+msgstr "numero di quote"
+
+msgid "share change"
+msgstr "modifica delle quote"
+
+msgid "share changes"
+msgstr "modifiche delle quote"
+
+msgid "grid operator"
+msgstr "gestore di rete"
+
+msgid "grid operators"
+msgstr "gestori di rete"
+
+msgid "IBAN"
+msgstr "IBAN"
+
+msgid "paper invoice"
+msgstr "fattura cartacea"
+
+msgid "person"
+msgstr "persona"
+
+msgid "persons"
+msgstr "persone"
+
+msgid "list preference"
+msgstr "impostazione dell'elenco"
+
+msgid "list preferences"
+msgstr "impostazioni degli elenchi"
+
+msgid "Consumption"
+msgstr "Prelievo"
+
+msgid "Feed-in"
+msgstr "Immissione"
+
+# The status of a metering point, in lower case as in the design specification
+msgctxt "metering point status"
+msgid "registered"
+msgstr "registrato"
+
+msgctxt "metering point status"
+msgid "notified"
+msgstr "notificato"
+
+msgctxt "metering point status"
+msgid "confirmed"
+msgstr "confermato"
+
+msgctxt "metering point status"
+msgid "active"
+msgstr "attivo"
+
+msgctxt "metering point status"
+msgid "terminated"
+msgstr "disdetto"
+
+# The discount tier of a LEG
+msgid "none"
+msgstr "nessuno"
+
+msgid "Basic discount"
+msgstr "Sconto di base"
+
+msgid "Price optimised"
+msgstr "Prezzo ottimizzato"
+
+# Problems (LISTEN-STANDARD.md, sections 9 to 12)
+msgid "Production quota below 5 % (required by law)"
+msgstr "Quota di produzione inferiore al 5 % (prescritta dalla legge)"
+
+msgid "Production quota below the warning threshold"
+msgstr "Quota di produzione inferiore alla soglia di avviso"
+
+msgid "Metering points added since the value was read, read the value again"
+msgstr "Punti di misura aggiunti dopo la lettura del valore, legga di nuovo il valore"
+
+msgid "No producer in the LEG"
+msgstr "Nessun produttore nella CEL"
+
+msgid "No consumer in the LEG"
+msgstr "Nessun consumatore nella CEL"
+
+#, python-format
+msgid "Problem: Production quota below %(threshold)s %%"
+msgstr "Problema: quota di produzione inferiore al %(threshold)s %%"
+
+#, python-format
+msgid "Problem: %(problem)s"
+msgstr "Problema: %(problem)s"
+
+msgid "Problem: Address correction open"
+msgstr "Problema: correzione dell'indirizzo aperta"
+
+msgid "This metering point is not assigned to a location."
+msgstr "Questo punto di misura non è assegnato a un'ubicazione."
+
+msgid "This metering point is not assigned to a LEG."
+msgstr "Questo punto di misura non è assegnato a una CEL."
+
+msgid "This metering point is not assigned to a person."
+msgstr "Questo punto di misura non è assegnato a una persona."
+
+# The history (the events)
+msgid "Created"
+msgstr "Creato"
+
+msgid "Address correction accepted"
+msgstr "Correzione dell'indirizzo accettata"
+
+msgid "Address correction not accepted"
+msgstr "Correzione dell'indirizzo non accettata"
+
+msgid "Person assigned"
+msgstr "Persona assegnata"
+
+msgid "Person assignment ended"
+msgstr "Assegnazione della persona terminata"
+
+msgid "Person assignment deleted"
+msgstr "Assegnazione della persona eliminata"
+
+msgid "LEG assigned"
+msgstr "CEL assegnata"
+
+msgid "LEG assignment ended"
+msgstr "Assegnazione alla CEL terminata"
+
+msgid "LEG assignment deleted"
+msgstr "Assegnazione alla CEL eliminata"
+
+msgid "Sender address changed"
+msgstr "Indirizzo del mittente modificato"
+
+msgid "Country changed"
+msgstr "Paese modificato"
+
+msgid "Identifier changed"
+msgstr "Identificativo modificato"
+
+# Management area, block 2: locations (verwaltung/standorte; texts 1:1 from the owner specification)
+msgid "Address changed"
+msgstr "Indirizzo modificato"
+
+msgid "Transformer circuit changed"
+msgstr "Circuito del trasformatore modificato"
+
+msgid "Address confirmed"
+msgstr "Indirizzo confermato"
+
+msgid "Archived"
+msgstr "Archiviato"
+
+msgid "Restored from the archive"
+msgstr "Ripristinato dall'archivio"
+
+msgid "Locations merged"
+msgstr "Ubicazioni unite"
+
+msgid "Transformer circuit"
+msgstr "Circuito del trasformatore"
+
+msgid "e.g. rear building"
+msgstr "ad es. edificio sul retro"
+
+msgid "Remark"
+msgstr "Osservazione"
+
+msgid "Direction"
+msgstr "Direzione"
+
+msgid "Metering point number"
+msgstr "Numero del punto di misura"
+
+msgid "No LEG chosen yet"
+msgstr "Nessuna CEL ancora scelta"
+
+msgid "Enter the country and the identifier in the settings first."
+msgstr "Inserisca prima il paese e l'identificativo nelle impostazioni."
+
+msgid "Location"
+msgstr "Ubicazione"
+
+msgid "Occupancy"
+msgstr "Occupazione"
+
+msgid "no metering points"
+msgstr "nessun punto di misura"
+
+msgid "1 metering point"
+msgstr "1 punto di misura"
+
+#, python-format
+msgid "%(count)d metering points"
+msgstr "%(count)d punti di misura"
+
+msgid "empty"
+msgstr "vuota"
+
+msgid "free"
+msgstr "libero"
+
+msgid "1 person"
+msgstr "1 persona"
+
+#, python-format
+msgid "%(count)d persons"
+msgstr "%(count)d persone"
+
+msgid "no transformer circuit"
+msgstr "nessun circuito del trasformatore"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d locations"
+msgstr "%(first)d–%(last)d di %(total)d ubicazioni"
+
+msgid "All locations of the LEG with their metering points."
+msgstr "Tutte le ubicazioni della CEL con i relativi punti di misura."
+
+msgid "All"
+msgstr "Tutte"
+
+msgid "occupied"
+msgstr "occupato"
+
+msgid "Collapse all"
+msgstr "Comprimi tutto"
+
+msgid "Expand all"
+msgstr "Espandi tutto"
+
+msgid "Create location"
+msgstr "Crea ubicazione"
+
+msgid "A location is an address. You create the metering points afterwards at the location."
+msgstr "Un'ubicazione è un indirizzo. I punti di misura vengono creati in seguito presso l'ubicazione."
+
+msgid "Edit address"
+msgstr "Modifica indirizzo"
+
+msgid "Transfer and save"
+msgstr "Trasferisci e salva"
+
+msgid "Edit remark"
+msgstr "Modifica osservazione"
+
+msgid "Change transformer circuit"
+msgstr "Modifica circuito del trasformatore"
+
+msgid "The change reaches 1 location."
+msgstr "La modifica riguarda 1 ubicazione."
+
+#, python-format
+msgid "The change reaches %(count)d locations."
+msgstr "La modifica riguarda %(count)d ubicazioni."
+
+msgid "This transformer circuit already exists."
+msgstr "Questo circuito del trasformatore esiste già."
+
+msgid "Create metering point"
+msgstr "Crea punto di misura"
+
+msgid "There is no suggestion to decide on."
+msgstr "Non c'è alcun suggerimento su cui decidere."
+
+msgid "Delete location"
+msgstr "Elimina ubicazione"
+
+#, python-format
+msgid "The location %(address)s is deleted for good."
+msgstr "L'ubicazione %(address)s viene eliminata definitivamente."
+
+msgid "This location has a history and cannot be deleted. Archive it instead."
+msgstr "Questa ubicazione ha una cronologia e non può essere eliminata. La archivi invece."
+
+msgid "Deleted."
+msgstr "Eliminato."
+
+msgid "Rows per page"
+msgstr "Righe per pagina"
+
+msgid "Previous"
+msgstr "Precedente"
+
+msgid "Next"
+msgstr "Successivo"
+
+msgid "Search"
+msgstr "Cerca"
+
+msgid "Change the width of the column"
+msgstr "Modifica la larghezza della colonna"
+
+msgid "Details"
+msgstr "Dettagli"
+
+msgid "Status of the metering point"
+msgstr "Stato del punto di misura"
+
+msgid "Recorded, not yet announced to the %(operator)s."
+msgstr "Registrato, non ancora notificato a %(operator)s."
+
+msgid "Announced to the %(operator)s. The person has to confirm."
+msgstr "Notificato a %(operator)s. La persona deve confermare."
+
+msgid "The person has confirmed. The start date is not reached yet."
+msgstr "La persona ha confermato. La data di inizio non è ancora stata raggiunta."
+
+msgid "Confirmed, the assignment is in effect."
+msgstr "Confermato, l'assegnazione è in vigore."
+
+msgid "The assignment has ended."
+msgstr "L'assegnazione è terminata."
+
+msgid "The transformer circuit of the %(operator)s that the location belongs to. The number is the reference for questions to the %(operator)s."
+msgstr "Il circuito del trasformatore di %(operator)s a cui appartiene l'ubicazione. Il numero è il riferimento per le richieste a %(operator)s."
+
+msgid "Street and house number. A location is an address. A click on the row opens or closes the metering points."
+msgstr "Via e numero civico. Un'ubicazione è un indirizzo. Un clic sulla riga apre o chiude i punti di misura."
+
+msgid "Number of persons:"
+msgstr "Numero di persone:"
+
+msgid "How many persons use a metering point at the location. A person with several metering points counts once."
+msgstr "Quante persone utilizzano un punto di misura presso l'ubicazione. Una persona con più punti di misura viene contata una sola volta."
+
+msgid "free:"
+msgstr "libero:"
+
+msgid "No active assignment."
+msgstr "Nessuna assegnazione attiva."
+
+msgid "empty:"
+msgstr "vuota:"
+
+msgid "No metering point has been created at the location."
+msgstr "Presso l'ubicazione non è stato creato alcun punto di misura."
+
+msgid "Number of the metering points at the location. Opened, the table below shows each metering point with direction, LEG and status. Blue is consumption, green is feed-in."
+msgstr "Numero dei punti di misura presso l'ubicazione. Aperta, la tabella sottostante mostra ogni punto di misura con direzione, CEL e stato. Il blu è prelievo, il verde è immissione."
+
+msgid "Back to locations"
+msgstr "Torna alle ubicazioni"
+
+msgid "Newly created by the customer, not confirmed yet."
+msgstr "Creata di recente dal cliente, non ancora confermata."
+
+msgid "Check the address and the metering points. If everything is correct, confirm the location."
+msgstr "Verifichi l'indirizzo e i punti di misura. Se tutto è corretto, confermi l'ubicazione."
+
+msgid "Confirm address"
+msgstr "Conferma indirizzo"
+
+msgid "Restore location"
+msgstr "Ripristina ubicazione"
+
+msgid "Archive location"
+msgstr "Archivia ubicazione"
+
+msgid "Postal code, town"
+msgstr "NPA, località"
+
+msgid "Grid"
+msgstr "Rete"
+
+msgid "Create new transformer circuit"
+msgstr "Crea nuovo circuito del trasformatore"
+
+msgid "Edit transformer circuit"
+msgstr "Modifica circuito del trasformatore"
+
+msgid "Locations in the transformer circuit"
+msgstr "Ubicazioni nel circuito del trasformatore"
+
+msgid "Metering points in the transformer circuit"
+msgstr "Punti di misura nel circuito del trasformatore"
+
+msgid "Metering point"
+msgstr "Punto di misura"
+
+msgid "Occupied by"
+msgstr "Occupato da"
+
+msgid "Go to the LEG page"
+msgstr "Vai alla pagina della CEL"
+
+msgid "no LEG"
+msgstr "nessuna CEL"
+
+msgid "Go to the person"
+msgstr "Vai alla persona"
+
+msgid "no person"
+msgstr "nessuna persona"
+
+msgid "No metering points at this location."
+msgstr "Nessun punto di misura presso questa ubicazione."
+
+msgid "The assignment to a person is changed at the person or at the metering point."
+msgstr "L'assegnazione a una persona viene modificata presso la persona o presso il punto di misura."
+
+msgid "History of the assignments"
+msgstr "Cronologia delle assegnazioni"
+
+msgid "Person"
+msgstr "Persona"
+
+msgid "From"
+msgstr "Dal"
+
+msgid "To"
+msgstr "Al"
+
+msgid "No assignments yet."
+msgstr "Ancora nessuna assegnazione."
+
+msgid "since"
+msgstr "dal"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Event"
+msgstr "Evento"
+
+msgid "By"
+msgstr "Da"
+
+msgid "This address already exists:"
+msgstr "Questo indirizzo esiste già:"
+
+#, python-format
+msgid "%(address)s with %(counter)s metering point. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone."
+msgid_plural "%(address)s with %(counter)s metering points. Saving transfers the metering points of this location to that location and deletes this location. This cannot be undone."
+msgstr[0] "%(address)s con %(counter)s punto di misura. Il salvataggio trasferisce i punti di misura di questa ubicazione a quella ubicazione ed elimina questa ubicazione. Ciò non può essere annullato."
+msgstr[1] "%(address)s con %(counter)s punti di misura. Il salvataggio trasferisce i punti di misura di questa ubicazione a quella ubicazione ed elimina questa ubicazione. Ciò non può essere annullato."
+
+#, python-format
+msgid "%(address)s with %(counter)s metering point. If it is the same place, "
+msgid_plural "%(address)s with %(counter)s metering points. If it is the same place, "
+msgstr[0] "%(address)s con %(counter)s punto di misura. Se si tratta dello stesso luogo, "
+msgstr[1] "%(address)s con %(counter)s punti di misura. Se si tratta dello stesso luogo, "
+
+msgid "go to the existing location"
+msgstr "vada all'ubicazione esistente"
+
+msgid "This metering point number already exists."
+msgstr "Questo numero di punto di misura esiste già."
+
+#, python-format
+msgid "Filter problems (%(problem_count)s)"
+msgstr "Filtra problemi (%(problem_count)s)"
+
+msgid "Street, metering point number or transformer circuit"
+msgstr "Via, numero del punto di misura o circuito del trasformatore"
+
+msgid "Apply"
+msgstr "Applica"
+
+msgid "Show or hide the metering points"
+msgstr "Mostra o nascondi i punti di misura"
+
+msgid "new"
+msgstr "nuovo"
+
+msgid "Go to the details of the location"
+msgstr "Vai ai dettagli dell'ubicazione"
+
+msgid "No locations yet. Create the first location."
+msgstr "Ancora nessuna ubicazione. Crei la prima ubicazione."
+
+# Security review corrections of block 1 (D-077)
+msgid "Retention obligation set"
+msgstr "Obbligo di conservazione impostato"
+
+msgid "Sender address correction accepted"
+msgstr "Correzione dell'indirizzo del mittente accettata"
+
+msgid "Sender address correction not accepted"
+msgstr "Correzione dell'indirizzo del mittente non accettata"
+
+# Phase 2, block 3: metering points (D-079). The texts of the specification are taken 1:1; texts that the
+# specification does not give are marked "invented" in D-079.
+msgid "Marked as notified"
+msgstr "Contrassegnato come notificato"
+
+msgid "Confirmation recorded"
+msgstr "Conferma registrata"
+
+msgid "Start date recorded"
+msgstr "Data di inizio registrata"
+
+msgid "Termination recorded"
+msgstr "Disdetta registrata"
+
+msgid "Notified on"
+msgstr "Notificato il"
+
+msgid "Confirmed on"
+msgstr "Confermato il"
+
+msgid "Start date"
+msgstr "Data di inizio"
+
+msgid "Without a start date the registration stays on standby."
+msgstr "Senza data di inizio la registrazione rimane in attesa."
+
+msgid "Terminated to"
+msgstr "Disdetto per il"
+
+msgid "The date is the end of a month."
+msgstr "La data è la fine di un mese."
+
+msgid "Enter the last day of a month."
+msgstr "Inserisca l'ultimo giorno di un mese."
+
+msgid "Search name, customer number or e-mail address"
+msgstr "Cerca nome, numero cliente o indirizzo e-mail"
+
+msgid "Applies from"
+msgstr "Valido dal"
+
+msgid "Several persons match. Type more of the name or the customer number."
+msgstr "Corrispondono più persone. Digiti una parte maggiore del nome o del numero cliente."
+
+msgid "Ends on"
+msgstr "Termina il"
+
+msgid "Afterwards the metering point has no person. The person stays visible in the history."
+msgstr "In seguito il punto di misura non ha alcuna persona. La persona rimane visibile nella cronologia."
+
+msgid "New LEG"
+msgstr "Nuova CEL"
+
+msgid "The date must be after the start of the current assignment."
+msgstr "La data deve essere successiva all'inizio dell'assegnazione attuale."
+
+msgid "The end date must not be before the start of the assignment."
+msgstr "La data di fine non deve essere precedente all'inizio dell'assegnazione."
+
+msgid "This assignment has already ended."
+msgstr "Questa assegnazione è già terminata."
+
+msgid "This assignment cannot be deleted. End it instead."
+msgstr "Questa assegnazione non può essere eliminata. La termini invece."
+
+msgid "This account cannot be assigned."
+msgstr "Questo conto non può essere assegnato."
+
+msgid "This LEG is archived."
+msgstr "Questa CEL è archiviata."
+
+msgid "A selected metering point does not belong to this one."
+msgstr "Un punto di misura selezionato non appartiene a questo."
+
+msgid "This change is not possible."
+msgstr "Questa modifica non è possibile."
+
+msgid "This metering point is archived."
+msgstr "Questo punto di misura è archiviato."
+
+msgid "This step is not possible in the current status of the metering point."
+msgstr "Questo passaggio non è possibile nello stato attuale del punto di misura."
+
+msgid "The date must not be in the future."
+msgstr "La data non deve essere nel futuro."
+
+msgid "The date must not be before the earlier step."
+msgstr "La data non deve essere anteriore al passaggio precedente."
+
+msgid "PV power"
+msgstr "Potenza FV"
+
+msgid "Battery"
+msgstr "Batteria"
+
+msgid "Wallbox"
+msgstr "Wallbox"
+
+msgid "Optional"
+msgstr "Facoltativo"
+
+msgid "Number of the smart meter at the %(operator)s, followed by the direction. Blue is consumption, green is feed-in."
+msgstr "Numero dello smart meter presso %(operator)s, seguito dalla direzione. Il blu è prelievo, il verde è immissione."
+
+msgid "The address where the metering point is installed."
+msgstr "L'indirizzo in cui è installato il punto di misura."
+
+msgid "The billing group the metering point belongs to. Required before the registration at the %(operator)s."
+msgstr "Il gruppo di fatturazione a cui appartiene il punto di misura. Necessario prima della registrazione presso %(operator)s."
+
+msgid "Next step"
+msgstr "Passaggio successivo"
+
+msgid "Mark as notified"
+msgstr "Contrassegna come notificato"
+
+msgid "Record confirmation"
+msgstr "Registra conferma"
+
+msgid "Record start date"
+msgstr "Registra data di inizio"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d metering points"
+msgstr "%(first)d–%(last)d di %(total)d punti di misura"
+
+#, python-format
+msgid "All (%(count)d)"
+msgstr "Tutti (%(count)d)"
+
+#, python-format
+msgid "Notify the %(operator)s (%(count)d)"
+msgstr "Notifica a %(operator)s (%(count)d)"
+
+#, python-format
+msgid "Confirmation pending (%(count)d)"
+msgstr "Conferma in sospeso (%(count)d)"
+
+#, python-format
+msgid "Start date pending (%(count)d)"
+msgstr "Data di inizio in sospeso (%(count)d)"
+
+#, python-format
+msgid "archived (%(count)d)"
+msgstr "archiviati (%(count)d)"
+
+msgid "All metering points with their state. Here you see what is still to do at the %(operator)s."
+msgstr "Tutti i punti di misura con il rispettivo stato. Qui vede cosa resta ancora da fare presso %(operator)s."
+
+msgid "No metering points yet. Create the first metering point."
+msgstr "Ancora nessun punto di misura. Crei il primo punto di misura."
+
+#, python-format
+msgid "until %(date)s"
+msgstr "fino al %(date)s"
+
+#, python-format
+msgid "from %(date)s"
+msgstr "dal %(date)s"
+
+msgid "former"
+msgstr "precedente"
+
+msgid "Assigned"
+msgstr "Assegnato"
+
+#, python-format
+msgid "%(label)s, start date %(date)s"
+msgstr "%(label)s, data di inizio %(date)s"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The registration at the %(operator)s has taken place."
+msgstr "Punto di misura %(number)s (%(direction)s). La registrazione presso %(operator)s è avvenuta."
+
+msgid "Mark as notified to the %(operator)s"
+msgstr "Contrassegna come notificato a %(operator)s"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The %(operator)s has confirmed the registration."
+msgstr "Punto di misura %(number)s (%(direction)s). %(operator)s ha confermato la registrazione."
+
+msgid "Save confirmation"
+msgstr "Salva conferma"
+
+msgid "Record termination"
+msgstr "Registra disdetta"
+
+msgid "Save termination"
+msgstr "Salva disdetta"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). Enter the date that the %(operator)s gives."
+msgstr "Punto di misura %(number)s (%(direction)s). Inserisca la data indicata da %(operator)s."
+
+msgid "Change person"
+msgstr "Cambia persona"
+
+msgid "Assign person"
+msgstr "Assegna persona"
+
+msgid "If the metering point already has a person, the person ends on the day before \"Applies from\"."
+msgstr "Se il punto di misura ha già una persona, la persona termina il giorno prima di «Valido dal»."
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s)."
+msgstr "Punto di misura %(number)s (%(direction)s)."
+
+msgid "End assignment"
+msgstr "Termina assegnazione"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s). The assignment to %(name)s ends."
+msgstr "Punto di misura %(number)s (%(direction)s). L'assegnazione a %(name)s termina."
+
+msgid "Delete assignment"
+msgstr "Elimina assegnazione"
+
+#, python-format
+msgid "The assignment to %(name)s is deleted. This is possible only for an entry made by mistake."
+msgstr "L'assegnazione a %(name)s viene eliminata. Ciò è possibile solo per una voce inserita per errore."
+
+msgid "Change LEG"
+msgstr "Cambia CEL"
+
+msgid "Assign LEG"
+msgstr "Assegna CEL"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s) at %(location)s changes from %(leg)s to:"
+msgstr "Il punto di misura %(number)s (%(direction)s) presso %(location)s passa da %(leg)s a:"
+
+#, python-format
+msgid "Metering point %(number)s (%(direction)s) changes from %(leg)s to:"
+msgstr "Il punto di misura %(number)s (%(direction)s) passa da %(leg)s a:"
+
+#, python-format
+msgid "Also related: %(count)d more metering point"
+msgid_plural "Also related: %(count)d more metering points"
+msgstr[0] "Interessato anche: %(count)d altro punto di misura"
+msgstr[1] "Interessati anche: %(count)d altri punti di misura"
+
+msgid "A metering point belongs to a location. Choose the location before you enter the other details."
+msgstr "Un punto di misura appartiene a un'ubicazione. Scelga l'ubicazione prima di inserire gli altri dati."
+
+msgid "Go to the existing metering point"
+msgstr "Vai al punto di misura esistente"
+
+msgid "Delete metering point"
+msgstr "Elimina punto di misura"
+
+#, python-format
+msgid "The metering point %(number)s is deleted for good."
+msgstr "Il punto di misura %(number)s viene eliminato definitivamente."
+
+msgid "This metering point has a history and cannot be deleted. Archive it instead."
+msgstr "Questo punto di misura ha una cronologia e non può essere eliminato. Lo archivi invece."
+
+msgid "Metering point number, street or name"
+msgstr "Numero del punto di misura, via o nome"
+
+msgid "Go to the location"
+msgstr "Vai all'ubicazione"
+
+msgid "Go to the details of the metering point"
+msgstr "Vai ai dettagli del punto di misura"
+
+msgid "LEG missing"
+msgstr "CEL mancante"
+
+msgid "Back to metering points"
+msgstr "Torna ai punti di misura"
+
+msgctxt "metering point"
+msgid "History"
+msgstr "Cronologia"
+
+msgctxt "metering point"
+msgid "By"
+msgstr "Da"
+
+msgid "State"
+msgstr "Stato"
+
+msgid "missing"
+msgstr "mancante"
+
+msgid "Registration on standby, start date missing."
+msgstr "Registrazione in attesa, data di inizio mancante."
+
+msgid "Recorded, not yet notified to the %(operator)s."
+msgstr "Registrato, non ancora notificato a %(operator)s."
+
+msgid "Terminate"
+msgstr "Disdici"
+
+msgid "The assignment is entered with a date \"Applies from\"."
+msgstr "L'assegnazione viene inserita con una data «Valido dal»."
+
+msgid "Archive metering point"
+msgstr "Archivia punto di misura"
+
+msgid "Restore metering point"
+msgstr "Ripristina punto di misura"
+
+msgid "These metering points belong to the same person at the same location. They only change along if you select them here."
+msgstr "Questi punti di misura appartengono alla stessa persona presso la stessa ubicazione. Vengono modificati insieme solo se li seleziona qui."
+
+# Block 4: the LEGs (D-080). The texts are the owner's (verwaltung/legs/referenz); the ones the specification does
+# not give are listed in D-080.
+msgid "Participants"
+msgstr "Partecipanti"
+
+msgid "Discount tier"
+msgstr "Livello di sconto"
+
+msgid "Name of the LEG. A LEG is a virtual grid association."
+msgstr "Nome della CEL. Una CEL è un raggruppamento virtuale di rete."
+
+#, python-format
+msgid "Value from the %(operator)s LEG portal. At least %(minimum)s are required by law. Below %(threshold)s a warning triangle is shown."
+msgstr "Valore del portale CEL di %(operator)s. Per legge sono richiesti almeno %(minimum)s. Sotto %(threshold)s viene mostrato un triangolo di avvertimento."
+
+msgid "Ratio of consumers to producers."
+msgstr "Rapporto tra consumatori e produttori."
+
+msgid "Number of metering points that currently belong to the LEG."
+msgstr "Numero di punti di misura che attualmente appartengono alla CEL."
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d LEGs"
+msgstr "%(first)d–%(last)d di %(total)d CEL"
+
+msgid "The local electricity communities."
+msgstr "Le comunità elettriche locali."
+
+msgid "No LEGs yet. Create the first LEG."
+msgstr "Ancora nessuna CEL. Crei la prima CEL."
+
+msgid "Name of the LEG or transformer circuit"
+msgstr "Nome della CEL o circuito del trasformatore"
+
+msgid "Display"
+msgstr "Visualizzazione"
+
+msgid "Create LEG"
+msgstr "Crea CEL"
+
+msgid "Consumers : producers"
+msgstr "Consumatori : produttori"
+
+msgid "Back to LEGs"
+msgstr "Torna alle CEL"
+
+msgid "Share"
+msgstr "Quota"
+
+msgid "Checked on"
+msgstr "Verificato il"
+
+msgid "Sufficient"
+msgstr "Sufficiente"
+
+#, python-format
+msgid "Below %(threshold)s %%"
+msgstr "Inferiore al %(threshold)s %%"
+
+#, python-format
+msgid "The quota comes from the %(operator)s LEG portal. At least %(minimum)s are required by law."
+msgstr "La quota proviene dal portale CEL di %(operator)s. Per legge sono richiesti almeno %(minimum)s."
+
+msgid "Master data"
+msgstr "Dati di base"
+
+msgid "None"
+msgstr "Nessuno"
+
+msgid "Composition"
+msgstr "Composizione"
+
+msgid "Transformer circuits"
+msgstr "Circuiti del trasformatore"
+
+msgid "Derived from the transformer circuits of the metering points."
+msgstr "Derivato dai circuiti del trasformatore dei punti di misura."
+
+msgid "Price optimised:"
+msgstr "Prezzo ottimizzato:"
+
+msgid "all metering points of the LEG lie in the same transformer circuit."
+msgstr "tutti i punti di misura della CEL si trovano nello stesso circuito del trasformatore."
+
+msgid "Basic discount:"
+msgstr "Sconto di base:"
+
+msgid "at least one metering point lies in another transformer circuit."
+msgstr "almeno un punto di misura si trova in un altro circuito del trasformatore."
+
+msgid "The %(operator)s determines the actual discount."
+msgstr "Lo sconto effettivo è stabilito da %(operator)s."
+
+msgid "Metering points of this LEG"
+msgstr "Punti di misura di questa CEL"
+
+msgid "Action"
+msgstr "Azione"
+
+msgid "No metering points belong to this LEG yet."
+msgstr "A questa CEL non appartiene ancora alcun punto di misura."
+
+msgctxt "LEG action"
+msgid "own"
+msgstr "propria"
+
+msgctxt "LEG action"
+msgid "no own"
+msgstr "nessuna propria"
+
+msgid "Green: already in the own LEG."
+msgstr "Verde: già nella propria CEL."
+
+msgid "Blue: change recommended."
+msgstr "Blu: cambio consigliato."
+
+msgid "Grey: no own LEG."
+msgstr "Grigio: nessuna CEL propria."
+
+msgid "Change the LEG of this metering point"
+msgstr "Cambia la CEL di questo punto di misura"
+
+msgid "Delete LEG"
+msgstr "Elimina CEL"
+
+msgid "Archive LEG"
+msgstr "Archivia CEL"
+
+msgid "Restore LEG"
+msgstr "Ripristina CEL"
+
+#, python-format
+msgid "The LEG %(name)s is deleted for good."
+msgstr "La CEL %(name)s viene eliminata definitivamente."
+
+msgid "This LEG has a history and cannot be deleted. Archive it instead."
+msgstr "Questa CEL ha una cronologia e non può essere eliminata. La archivi invece."
+
+msgid "A LEG is a virtual grid association. You assign metering points to the LEG afterwards."
+msgstr "Una CEL è un raggruppamento virtuale di rete. I punti di misura vengono assegnati alla CEL in seguito."
+
+msgid "Edit production quota"
+msgstr "Modifica quota di produzione"
+
+msgid "The quota is in the %(operator)s LEG portal. Enter the value and the date on which you checked it there."
+msgstr "La quota si trova nel portale CEL di %(operator)s. Inserisca il valore e la data in cui l'ha verificato lì."
+
+msgid "Edit master data"
+msgstr "Modifica dati di base"
+
+msgid "Name and remark of the LEG. The remark is internal only."
+msgstr "Nome e osservazione della CEL. L'osservazione è solo interna."
+
+msgid "e.g. 37.6"
+msgstr "ad es. 37.6"
+
+msgid "e.g. LEG Musterquartier"
+msgstr "ad es. CEL Quartiere Modello"
+
+msgid "This name is already in use."
+msgstr "Questo nome è già in uso."
+
+msgid "Production quota changed"
+msgstr "Quota di produzione modificata"
+
+msgid "Master data changed"
+msgstr "Dati di base modificati"
+
+# Persons (D-081): the texts of personen/referenz and personen/detail/referenz 1:1; the others are neutral
+# wording of the developer (listed in D-081).
+msgid "Persons"
+msgstr "Persone"
+
+msgid "All customers of the LEG."
+msgstr "Tutti i clienti della CEL."
+
+msgid "Name, customer number or e-mail"
+msgstr "Nome, numero cliente o e-mail"
+
+msgid "with metering point"
+msgstr "con punto di misura"
+
+msgid "without metering point"
+msgstr "senza punto di misura"
+
+msgid "Inactive"
+msgstr "Inattivo"
+
+msgid "No persons found."
+msgstr "Nessuna persona trovata."
+
+#, python-format
+msgid "%(first)d–%(last)d of %(total)d persons"
+msgstr "%(first)d–%(last)d di %(total)d persone"
+
+msgid "Name of the person, or of the company for property managers and companies."
+msgstr "Nome della persona oppure dell'azienda per amministrazioni immobiliari e aziende."
+
+msgid "The six-digit number under which the person is kept in the portal."
+msgstr "Il numero a sei cifre con cui la persona è registrata nel portale."
+
+msgid "Street and house number of the billing address."
+msgstr "Via e numero civico dell'indirizzo di fatturazione."
+
+msgid "Number of the metering points of the person. Behind it the state: notified, if all are notified to the %(operator)s. Recording, if at least one is still being recorded."
+msgstr "Numero dei punti di misura della persona. Dopo il numero lo stato: notificato, se tutti sono notificati a %(operator)s. In registrazione, se almeno uno è ancora in fase di registrazione."
+
+msgid "Whether the person can sign in to the portal. Blocked: temporarily blocked, for example after failed attempts. Inactive: the account is deactivated and is in the archive. Invited: the person has not completed the registration yet."
+msgstr "Indica se la persona può accedere al portale. Bloccato: bloccato temporaneamente, ad esempio dopo tentativi non riusciti. Inattivo: il conto è disattivato e si trova nell'archivio. Invitato: la persona non ha ancora completato la registrazione."
+
+msgctxt "person metering points"
+msgid "recording"
+msgstr "in registrazione"
+
+msgctxt "person metering points"
+msgid "notified"
+msgstr "notificato"
+
+msgid "Back to persons"
+msgstr "Torna alle persone"
+
+msgid "Second person"
+msgstr "Seconda persona"
+
+msgid "Contact"
+msgstr "Contatto"
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Second email"
+msgstr "Seconda e-mail"
+
+msgid "Billing address"
+msgstr "Indirizzo di fatturazione"
+
+msgid "Country"
+msgstr "Paese"
+
+msgid "Payment and customer numbers"
+msgstr "Pagamento e numeri cliente"
+
+msgid "Paper invoice"
+msgstr "Fattura cartacea"
+
+msgid "Yes"
+msgstr "Sì"
+
+msgid "No"
+msgstr "No"
+
+msgid "Cooperative"
+msgstr "Cooperativa"
+
+msgid "Shares"
+msgstr "Quote"
+
+#, python-format
+msgid "Termination on %(date)s"
+msgstr "Disdetta per il %(date)s"
+
+msgid "Grid operator"
+msgstr "Gestore di rete"
+
+msgid "Add change"
+msgstr "Aggiungi modifica"
+
+msgid "%(operator)s number"
+msgstr "Numero %(operator)s"
+
+msgid "%(operator)s customer number"
+msgstr "Numero cliente %(operator)s"
+
+msgid "No shares recorded."
+msgstr "Nessuna quota registrata."
+
+msgid "Note"
+msgstr "Nota"
+
+msgid "Metering points and assignments"
+msgstr "Punti di misura e assegnazioni"
+
+msgid "You change assignments on the page of the metering point."
+msgstr "Le assegnazioni si modificano nella pagina del punto di misura."
+
+msgid "No metering points assigned."
+msgstr "Nessun punto di misura assegnato."
+
+msgid "The location is the address where the metering point is installed. A metering point belongs to its location for good."
+msgstr "L'ubicazione è l'indirizzo in cui è installato il punto di misura. Un punto di misura appartiene definitivamente alla propria ubicazione."
+
+msgid "Number of the smart meter at the %(operator)s. If it is missing, the metering point is recorded but not yet known at the %(operator)s."
+msgstr "Numero dello smart meter presso %(operator)s. Se manca, il punto di misura è registrato ma non ancora noto a %(operator)s."
+
+msgid "The billing group the metering point belongs to."
+msgstr "Il gruppo di fatturazione a cui appartiene il punto di misura."
+
+msgid "Registration at the %(operator)s"
+msgstr "Registrazione presso %(operator)s"
+
+msgid "Consumption:"
+msgstr "Prelievo:"
+
+msgid "The person draws electricity from the grid."
+msgstr "La persona preleva elettricità dalla rete."
+
+msgid "Feed-in:"
+msgstr "Immissione:"
+
+msgid "The person feeds electricity into the grid, for example from a PV system."
+msgstr "La persona immette elettricità nella rete, ad esempio da un impianto FV."
+
+msgid "A metering point is either consumption or feed-in."
+msgstr "Un punto di misura è di prelievo oppure di immissione."
+
+msgid "from:"
+msgstr "dal:"
+
+msgid "The assignment is valid from this date."
+msgstr "L'assegnazione è valida da questa data."
+
+msgid "until:"
+msgstr "fino al:"
+
+msgid "The assignment ends on this date."
+msgstr "L'assegnazione termina in questa data."
+
+msgid "registered:"
+msgstr "registrato:"
+
+msgid "The metering point is recorded, the notification to the %(operator)s is not yet submitted."
+msgstr "Il punto di misura è registrato, la notifica a %(operator)s non è ancora stata inoltrata."
+
+msgid "notified on …:"
+msgstr "notificato il …:"
+
+msgid "The notification is submitted to the %(operator)s."
+msgstr "La notifica è stata inoltrata a %(operator)s."
+
+msgid "confirmed on …:"
+msgstr "confermato il …:"
+
+msgid "The person has confirmed the notification at the %(operator)s. The date is the day on which the LEG recorded the confirmation."
+msgstr "La persona ha confermato la notifica presso %(operator)s. La data è il giorno in cui la CEL ha registrato la conferma."
+
+#, python-format
+msgid "notified on %(date)s"
+msgstr "notificato il %(date)s"
+
+#, python-format
+msgid "confirmed on %(date)s"
+msgstr "confermato il %(date)s"
+
+msgid "Edit note"
+msgstr "Modifica nota"
+
+msgid "Number of shares"
+msgstr "Numero di quote"
+
+msgid "This value is not valid."
+msgstr "Questo valore non è valido."
+
+msgid "The shares could not be saved."
+msgstr "Non è stato possibile salvare le quote."
+
+msgid "Note changed"
+msgstr "Nota modificata"
+
+msgid "Customer number at the %(operator)s changed"
+msgstr "Numero cliente %(operator)s modificato"
+
+msgid "Shares changed"
+msgstr "Quote modificate"
+
+# Overview and printing (D-082)
+msgid "Problem"
+msgstr "Problema"
+
+msgid "Go to the list %(name)s"
+msgstr "Vai all'elenco %(name)s"
+
+msgid "%(count)d location with a problem"
+msgid_plural "%(count)d locations with a problem"
+msgstr[0] "%(count)d ubicazione con un problema"
+msgstr[1] "%(count)d ubicazioni con un problema"
+
+msgid "%(count)d LEG with a problem"
+msgid_plural "%(count)d LEGs with a problem"
+msgstr[0] "%(count)d CEL con un problema"
+msgstr[1] "%(count)d CEL con un problema"
+
+msgid "%(count)d metering point with a problem"
+msgid_plural "%(count)d metering points with a problem"
+msgstr[0] "%(count)d punto di misura con un problema"
+msgstr[1] "%(count)d punti di misura con un problema"
+
+msgid "The button \"Filter problems\" appears only when a list has a problem. It shows only the entries with a problem in each list."
+msgstr "Il pulsante «Filtra problemi» compare solo quando un elenco presenta un problema. In ogni elenco mostra solo le voci con un problema."
+
+msgid "No problems."
+msgstr "Nessun problema."
+
+msgid "Mail texts"
+msgstr "Testi delle e-mail"
+
+msgid "Print"
+msgstr "Stampa"
+
+msgid "Print list"
+msgstr "Stampa elenco"
+
+msgid "The list is printed as it is filtered and sorted. %(count)d entry will be printed."
+msgid_plural "The list is printed as it is filtered and sorted. %(count)d entries will be printed."
+msgstr[0] "L'elenco viene stampato così come è filtrato e ordinato. Verrà stampata %(count)d voce."
+msgstr[1] "L'elenco viene stampato così come è filtrato e ordinato. Verranno stampate %(count)d voci."
+
+msgid "List only"
+msgstr "Solo elenco"
+
+msgid "List and detail pages of all shown entries"
+msgstr "Elenco e pagine di dettaglio di tutte le voci visualizzate"
+
+msgid "List and detail pages of selected entries"
+msgstr "Elenco e pagine di dettaglio delle voci selezionate"
+
+msgid "The selected detail pages are printed after the list, in the order of the list, each on a new page."
+msgstr "Le pagine di dettaglio selezionate vengono stampate dopo l'elenco, nell'ordine dell'elenco, ciascuna su una nuova pagina."
+
+msgid "Create PDF"
+msgstr "Crea PDF"
+
+msgid "Select at least one entry."
+msgstr "Selezioni almeno una voce."
+
+msgid "At most %(max)d detail pages can be printed at once. Narrow the list or choose fewer entries."
+msgstr "È possibile stampare contemporaneamente al massimo %(max)d pagine di dettaglio. Restringa l'elenco o scelga meno voci."
+
+msgid "The list is too long to print. It has more than %(max)d entries. Narrow it with the search or the filters."
+msgstr "L'elenco è troppo lungo per essere stampato. Contiene più di %(max)d voci. Lo restringa con la ricerca o i filtri."
+
+msgid "The printout is too large. Choose fewer entries."
+msgstr "La stampa è troppo grande. Scelga meno voci."
+
+msgid "The PDF could not be created."
+msgstr "Non è stato possibile creare il PDF."
+
+msgid "Sorting"
+msgstr "Ordinamento"
+
+msgid "ascending"
+msgstr "crescente"
+
+msgid "descending"
+msgstr "decrescente"
+
+msgid "Filter"
+msgstr "Filtro"
+
+msgid "Problems only"
+msgstr "Solo problemi"
+
+msgid "Quick filter"
+msgstr "Filtro rapido"
+
+msgid "Notify the %(operator)s"
+msgstr "Notifica a %(operator)s"
+
+msgid "Confirmation pending"
+msgstr "Conferma in sospeso"
+
+msgid "Start date pending"
+msgstr "Data di inizio in sospeso"
+
+# Review round of D-082 (D-084)
+msgid "Skip to content"
+msgstr "Vai al contenuto"
+
+msgid "No entries yet."
+msgstr "Ancora nessuna voce."
+
+msgid "There are too many entries to select from. Narrow the list with the search or the filters."
+msgstr "Ci sono troppe voci tra cui scegliere. Restringa l'elenco con la ricerca o i filtri."
+
+msgid "The list has more than %(max)d entries; all of them cannot be shown at once. Narrow it with the search or the filters."
+msgstr "L'elenco contiene più di %(max)d voci; non è possibile mostrarle tutte insieme. Lo restringa con la ricerca o i filtri."
+
+msgctxt "person card"
+msgid "Details"
+msgstr "Dettagli"
+
+msgid "List printed"
+msgstr "Elenco stampato"
+
+msgid "Location changed"
+msgstr "Ubicazione modificata"
+
+msgid "This location is archived."
+msgstr "Questa ubicazione è archiviata."
+
+# D-087: creating a person, the invitation and the changes of the customer's data by the staff. The texts of the
+# specification stay as they are ("Person anlegen", "Einladung erneut senden", "Bearbeiten", the names of the cards
+# and fields); the others are listed in D-087 as invented.
+msgid "Invited"
+msgstr "Invitato"
+
+msgid "invited at"
+msgstr "invitato il"
+
+msgid "Create person"
+msgstr "Crea persona"
+
+msgid "Resend invitation"
+msgstr "Invia di nuovo l'invito"
+
+msgid "The invitation link is valid until %(deadline)s."
+msgstr "Il collegamento di invito è valido fino al %(deadline)s."
+
+msgid "The invitation link has expired."
+msgstr "Il collegamento di invito è scaduto."
+
+msgid "Edit details"
+msgstr "Modifica dati"
+
+msgid "Edit contact"
+msgstr "Modifica contatto"
+
+msgid "Edit billing address"
+msgstr "Modifica indirizzo di fatturazione"
+
+msgid "Edit payment and customer numbers"
+msgstr "Modifica pagamento e numeri cliente"
+
+msgid "The person receives an email with a link to confirm the email address and to choose a password."
+msgstr "La persona riceve un'e-mail con un collegamento per confermare l'indirizzo e-mail e scegliere una password."
+
+msgid "The person was created and the invitation was sent."
+msgstr "La persona è stata creata e l'invito è stato inviato."
+
+msgid "The invitation was sent."
+msgstr "L'invito è stato inviato."
+
+msgid "There is no invitation to send."
+msgstr "Non c'è alcun invito da inviare."
+
+msgid "The data could not be saved."
+msgstr "Non è stato possibile salvare i dati."
+
+msgid "Enter a valid IBAN."
+msgstr "Inserisca un IBAN valido."
+
+msgid "Invitation sent"
+msgstr "Invito inviato"
+
+msgid "Customer data changed"
+msgstr "Dati del cliente modificati"
+
+msgid "Person created and invited by staff"
+msgstr "Persona creata e invitata dal personale"
+
+msgid "Invitation sent again by staff"
+msgstr "Invito inviato di nuovo dal personale"
+
+msgid "Account data changed by staff"
+msgstr "Dati del conto modificati dal personale"
+
+msgid "Grid operator changed"
+msgstr "Gestore di rete modificato"
+
+msgid "Invitation: link to confirm the address and choose a password"
+msgstr "Invito: collegamento per confermare l'indirizzo e scegliere una password"
+
+msgid "Number of days for which the personal link can be used."
+msgstr "Numero di giorni per cui il collegamento personale può essere utilizzato."
+
+msgid ""
+"Hello\n"
+"\n"
+"An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for %(lifetime_days)s days.\n"
+"\n"
+"Continue:\n"
+"\n"
+"%(verification_url)s\n"
+"\n"
+"If you do not expect this email, you can ignore it."
+msgstr "Buongiorno\n\nÈ stato creato un conto per Lei. Confermi il Suo indirizzo e-mail con questo collegamento e scelga una password. Il collegamento è valido per %(lifetime_days)s giorni.\n\nContinui:\n\n%(verification_url)s\n\nSe non si aspettava questa e-mail, può ignorarla."
+
+# Management area, work package B (D-093 to D-096): forms, assignments, navigation.
+msgid "Enter the last characters of the number."
+msgstr "Inserisca gli ultimi caratteri del numero."
+
+msgid "Only the letters A–Z, the digits 0–9 and the hyphen are allowed."
+msgstr "Sono ammessi solo lettere A–Z, cifre 0–9 e trattino."
+
+msgid "The metering point number is invalid: it is too long. At most %(limit)s characters are allowed, and only zeros at the start can be left out (entered: %(count)s)."
+msgstr "Il numero del punto di misura non è valido: è troppo lungo. Sono ammessi al massimo %(limit)s caratteri e si possono omettere solo gli zeri iniziali (inseriti: %(count)s)."
+
+msgid "Enter a number, for example 12.5 (digits and one decimal point or comma)."
+msgstr "Inserisca un numero, ad esempio 12.5 (cifre e un punto o una virgola decimale)."
+
+msgid "At most %(places)s decimal places."
+msgstr "Al massimo %(places)s cifre decimali."
+
+msgid "The value must be between 0 and %(max)s."
+msgstr "Il valore deve essere compreso tra 0 e %(max)s."
+
+msgid "Complete number:"
+msgstr "Numero completo:"
+
+msgid "Enter a quota between 0 and %(max)s %%."
+msgstr "Inserisca una quota compresa tra 0 e %(max)s %%."
+
+msgid "As shown in the %(operator)s LEG portal. It can also be above 100 %%."
+msgstr "Come mostrato nel portale CEL di %(operator)s. Può anche superare il 100 %%."
+
+msgid "Required when a quota is entered."
+msgstr "Obbligatorio se viene inserita una quota."
+
+msgid "From this day the metering point belongs to this LEG. This can change the discount tier of the LEG."
+msgstr "Da questo giorno il punto di misura appartiene a questa CEL. Ciò può modificare il livello di sconto della CEL."
+
+msgid "No metering point chosen yet"
+msgstr "Nessun punto di misura ancora scelto"
+
+msgid "No transformer circuit"
+msgstr "Nessun circuito del trasformatore"
+
+msgid "+ Create new transformer circuit…"
+msgstr "+ Crea nuovo circuito del trasformatore…"
+
+msgid "Choose an existing transformer circuit or enter a new one, not both."
+msgstr "Scelga un circuito del trasformatore esistente oppure ne inserisca uno nuovo, non entrambi."
+
+msgid "Enter the %(operator)s number."
+msgstr "Inserisca il numero %(operator)s."
+
+msgid "This transformer circuit already exists. Choose it from the list."
+msgstr "Questo circuito del trasformatore esiste già. Lo scelga dall'elenco."
+
+msgid "TRA followed by digits, for example TRA21359."
+msgstr "TRA seguito da cifre, ad esempio TRA21359."
+
+msgid "No location chosen yet"
+msgstr "Nessuna ubicazione ancora scelta"
+
+msgid "The last 20 characters: capital letters A–Z, digits 0–9 and the hyphen (small letters become capitals). Shorter entries are filled with zeros on the left (23 becomes …0023)."
+msgstr "Gli ultimi 20 caratteri: lettere maiuscole A–Z, cifre 0–9 e trattino (le minuscole diventano maiuscole). Le voci più corte vengono completate con zeri a sinistra (23 diventa …0023)."
+
+msgid "The transformer circuit follows the location. If you change the location, the transformer circuit of the metering point changes with it. This can change the discount tier of the LEG."
+msgstr "Il circuito del trasformatore segue l'ubicazione. Se cambia l'ubicazione, cambia di conseguenza anche il circuito del trasformatore del punto di misura. Ciò può modificare il livello di sconto della CEL."
+
+msgid "1 suggestion available."
+msgstr "1 suggerimento disponibile."
+
+msgid "%(count)s suggestions available."
+msgstr "%(count)s suggerimenti disponibili."
+
+msgid "Customer no."
+msgstr "N. cliente"
+
+msgid "No person found. Only active persons with a customer number can be assigned. A person who has not yet registered cannot be assigned yet."
+msgstr "Nessuna persona trovata. Possono essere assegnate solo persone attive con un numero cliente. Una persona che non si è ancora registrata non può ancora essere assegnata."
+
+msgid "no location"
+msgstr "nessuna ubicazione"
+
+msgid "Without location"
+msgstr "Senza ubicazione"
+
+msgid "At another location"
+msgstr "Presso un'altra ubicazione"
+
+msgid "This metering point already has a LEG."
+msgstr "Questo punto di misura ha già una CEL."
+
+msgid "The metering point is created at this location."
+msgstr "Il punto di misura viene creato presso questa ubicazione."
+
+msgid "Edit metering point"
+msgstr "Modifica punto di misura"
+
+msgid "Assign existing metering point"
+msgstr "Assegna punto di misura esistente"
+
+msgid "Assign metering point"
+msgstr "Assegna punto di misura"
+
+msgid "Choose a metering point for the location %(address)s. A metering point at another location moves here. The transformer circuit of the metering point then is: %(circuit)s."
+msgstr "Scelga un punto di misura per l'ubicazione %(address)s. Un punto di misura presso un'altra ubicazione viene spostato qui. Il circuito del trasformatore del punto di misura sarà allora: %(circuit)s."
+
+msgid "This location does not exist any more."
+msgstr "Questa ubicazione non esiste più."
+
+msgid "Choose the transformer circuit of the location %(address)s or create a new one."
+msgstr "Scelga il circuito del trasformatore dell'ubicazione %(address)s oppure ne crei uno nuovo."
+
+msgid "Enter the street."
+msgstr "Inserisca la via."
+
+msgid "Choose a metering point that has no LEG yet. It is assigned to the LEG “%(name)s”."
+msgstr "Scelga un punto di misura che non ha ancora una CEL. Viene assegnato alla CEL «%(name)s»."
+
+msgid "Location missing? Create a new location"
+msgstr "Ubicazione mancante? Crei una nuova ubicazione"
+
+msgid "Person missing? Invite a new person"
+msgstr "Persona mancante? Inviti una nuova persona"
+
+msgid "Back to the metering point"
+msgstr "Torna al punto di misura"
+
+msgid "The transformer circuit changes: %(old)s → %(new)s. This can change the discount tier of the LEG."
+msgstr "Il circuito del trasformatore cambia: %(old)s → %(new)s. Ciò può modificare il livello di sconto della CEL."
+
+msgid "Without a location the metering point has no transformer circuit any more (now: %(old)s). This can change the discount tier of the LEG."
+msgstr "Senza ubicazione il punto di misura non ha più un circuito del trasformatore (ora: %(old)s). Ciò può modificare il livello di sconto della CEL."
+
+msgid "No LEG assigned"
+msgstr "Nessuna CEL assegnata"
+
+msgid "Go to the settings"
+msgstr "Vai alle impostazioni"
+
+msgid "Set location"
+msgstr "Imposta ubicazione"
+
+msgid "Derived from the location"
+msgstr "Derivato dall'ubicazione"
+
+msgid "Location created. Next: add the metering points of this location."
+msgstr "Ubicazione creata. Prossimo passo: aggiungere i punti di misura di questa ubicazione."
+
+msgid "LEG created. Next: assign metering points to the LEG."
+msgstr "CEL creata. Prossimo passo: assegnare punti di misura alla CEL."
+
+msgid "Person created. The invitation was sent. A metering point can be assigned once the person has registered and has a customer number."
+msgstr "Persona creata. L'invito è stato inviato. Un punto di misura può essere assegnato non appena la persona si è registrata e ha un numero cliente."
+
+msgid "Person created. Next: assign a metering point."
+msgstr "Persona creata. Prossimo passo: assegnare un punto di misura."
+
+msgid "All metering points already have a location."
+msgstr "Tutti i punti di misura hanno già un'ubicazione."
+
+msgid "Create a new metering point"
+msgstr "Crea un nuovo punto di misura"
+
+msgid "All metering points already belong to a LEG."
+msgstr "Tutti i punti di misura appartengono già a una CEL."
+
+msgid "Go to the metering points"
+msgstr "Vai ai punti di misura"
+
+msgid "Details changed"
+msgstr "Dati modificati"
+
+msgid "No person found. Only active persons with a customer number can be assigned."
+msgstr "Nessuna persona trovata. Possono essere assegnate solo persone attive con un numero cliente."
+
+msgid "Too many searches. Please wait a moment."
+msgstr "Troppe ricerche. Attenda un momento."
+
+msgid "Long session (stay signed in) started for a staff or administrator account"
+msgstr "Sessione lunga (resta connesso) avviata per un conto del personale o di un amministratore"
+
+msgid "All sessions of an account ended by a system administrator"
+msgstr "Tutte le sessioni di un conto terminate da un amministratore di sistema"
+
+msgid "End all sessions"
+msgstr "Termina tutte le sessioni"
+
+msgid "Every session of the account on every device ends at its next request, including sessions with \"Stay signed in\". The account can log in again (with its second factor, if it has one). Use this when a device or a session may have got into the wrong hands."
+msgstr "Ogni sessione del conto su ogni dispositivo termina alla sua prossima richiesta, comprese le sessioni con «Rimani connesso». Il conto può accedere di nuovo (con il proprio secondo fattore, se ne ha uno). Lo utilizzi quando un dispositivo o una sessione potrebbero essere finiti in mani sbagliate."
+
+msgid "Ended all sessions of the account."
+msgstr "Tutte le sessioni del conto sono state terminate."
+
+msgid "This metering point does not exist any more."
+msgstr "Questo punto di misura non esiste più."
+
+msgid "Back"
+msgstr "Indietro"
+
+msgid "This entry does not exist any more."
+msgstr "Questa voce non esiste più."
+
+# Raw tables of the management data for system administrators (D-091)
+msgid "Management data edited in the administration"
+msgstr "Dati di gestione modificati nell'amministrazione"
+
+msgid "New row"
+msgstr "Nuova riga"
+
+msgid "Add row"
+msgstr "Aggiungi riga"
+
+msgid "System administrator: you edit the rows of the table as they are. Nothing is checked against the rules of the management area, and no history entry is written. Change the cells and press “Save”, or fill in the new row and press “Add row”."
+msgstr "Amministratore di sistema: modifica le righe della tabella così come sono. Non viene verificato nulla rispetto alle regole della gestione e non viene scritta alcuna voce della cronologia. Modifichi le celle e prema «Salva», oppure compili la nuova riga e prema «Aggiungi riga»."
+
+msgid "Row added (ID %(id)s)."
+msgstr "Riga aggiunta (ID %(id)s)."
+
+msgid "The row was not added. Check the marked fields of the new row."
+msgstr "La riga non è stata aggiunta. Verifichi i campi contrassegnati della nuova riga."
+
+msgid "The database refused the row or the change (for example a value that exists already, a missing related row or a value that does not fit). Nothing was saved."
+msgstr "Il database ha rifiutato la riga o la modifica (ad esempio un valore già esistente, una riga collegata mancante o un valore non adatto). Non è stato salvato nulla."
+
+msgid "suggested street"
+msgstr "via suggerita"
+
+msgid "suggested house number"
+msgstr "numero civico suggerito"
+
+msgid "suggested postal code"
+msgstr "NPA suggerito"
+
+msgid "suggested town"
+msgstr "località suggerita"
+
+msgid "suggestion dismissed for"
+msgstr "suggerimento respinto per"
+
+msgid "address correction open"
+msgstr "correzione dell'indirizzo aperta"
+
+msgid "previous assignment"
+msgstr "assegnazione precedente"
+
+msgid "previous valid to"
+msgstr "precedentemente valido fino al"
+
+msgid "subject type"
+msgstr "tipo di oggetto"
+
+msgid "subject ID"
+msgstr "ID dell'oggetto"
+
+msgid "detail"
+msgstr "dettaglio"
+
+msgid "sender suggestion dismissed for"
+msgstr "suggerimento del mittente respinto per"
+
+msgid "person data"
+msgstr "dati della persona"

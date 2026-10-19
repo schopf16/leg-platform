@@ -622,7 +622,7 @@ server {
     }
 
     # Larger bodies: Graph certificate and private key upload (two files of at most 16 KiB each plus the form);
-    # portal settings with two logo files (at most 1 MB each plus the form, D-073).
+    # portal settings with two logo files (at most 1 MB each) and a favicon (at most 128 KB) plus the form, D-073.
     location ^~ /admin/accounts/graphconfiguration/ {
         client_max_body_size 64k;
         include snippets/leg-platform-proxy.conf;
@@ -652,7 +652,7 @@ sudo ls -l /etc/logrotate.d/nginx && sudo grep -E 'rotate|daily|weekly' /etc/log
 
 * Global `client_max_body_size 32k`.
 * `64k` only below `/admin/accounts/graphconfiguration/` (certificate upload, files of at most 16 KiB each). **UNVERIFIED:** the prefix follows Django's admin pattern `/admin/<app_label>/<model_name>/` (V33, V34).
-* `3m` only below `/admin/accounts/portalsettings/` (two logo files of at most 1 MB each, D-073; the application also refuses more than 3 MiB). **UNVERIFIED** with nginx (V35).
+* `3m` only below `/admin/accounts/portalsettings/` (two logo files of at most 1 MB each and a favicon of at most 128 KB, D-073; the application also refuses more than 3 MiB). **UNVERIFIED** with nginx (V35).
 * **UNVERIFIED:** whether Gunicorn receives a `Content-Length` for a chunked upload (V32, F-2).
 
 ### 7.4 Headers that clients cannot forge, and the client IP
@@ -791,7 +791,7 @@ WantedBy=multi-user.target
 * No Gunicorn access log (it would log token URLs).
 * `LogsDirectory=leg-platform` with `LogsDirectoryMode=0700` creates `/var/log/leg-platform`. The portal writes `application.log` and `security.log` there (`LOG_DIRECTORY`, default outside local; D-099). Units 8.2 to 8.4 keep both lines, so several processes write one file (a rotation can reorder or drop old lines; the size stays bounded).
 * `LOG_DIRECTORY=off` in `app.env`: journald only (`sudo journalctl -u leg-platform-web -u leg-platform-mail --since today`).
-* The unit also runs the **address directory import in a thread of a web worker** (D-090). It needs outbound HTTPS (`AF_INET AF_INET6` in block H), the writable `StateDirectory` and about 4 GB free in `/tmp` (`PrivateTmp=yes`) and in `/var/lib/leg-platform`.
+* The unit also runs the **address directory import in a thread of a web worker** (D-090). It needs outbound HTTPS (`AF_INET AF_INET6` in block H), the writable `StateDirectory` and about 4 GB free in `/var/lib/leg-platform` (archive, generations and SQLite temporary files; `/tmp` is not used for them).
 * A worker recycle (`--max-requests`) or a restart during the roughly 12 minutes of an import interrupts it. The page says so; the button starts it again; the directory in use stays as it was.
 * **UNVERIFIED:** the memory and CPU effect of an import on the three workers. Measure at the first import and report.
 * After the first start measure the time of one password hash on this CPU (D-008, D-023) and report it.
@@ -870,8 +870,9 @@ sudo grep -l 'block H' /etc/systemd/system/leg-*.service
 
 Import runtime rules:
 
-* Temporary download in `/tmp` (`PrivateTmp=yes`; file system **UNVERIFIED**: `df /tmp /var/tmp /var/lib/leg-platform`). Archive at most 256 MiB.
-* Before the download the importer checks the free space of **both** disks against 4 GiB each (`MIN_FREE_DISK_BYTES`, N-4) and refuses with a log line naming the disk. A small memory-backed `/tmp` refuses every import: use a disk-backed temporary folder.
+* The archive (at most 256 MiB) is an unnamed temporary file in the folder of the directory file (`StateDirectory`, `/var/lib/leg-platform`, disk-backed, writable by the service), not in `/tmp` (`PrivateTmp=yes`, can be memory-backed).
+* SQLite temporary files (sorting, transient indexes) also go to that folder: the application sets `SQLITE_TMPDIR` there unless the unit sets it (SQLite checks `temp_store_directory`, `SQLITE_TMPDIR`, `TMPDIR`, `/var/tmp`, `/usr/tmp`, `/tmp` in this order; https://www.sqlite.org/tempfiles.html, section 5). Small temporary data stays in memory (page cache) anyway; the import itself only inserts rows.
+* Before the download the importer checks the free space of **that one disk** against 4 GiB (`MIN_FREE_DISK_BYTES`; archive and generations) and refuses with a log line. The free space of `/tmp` is not checked (`df /var/lib/leg-platform`).
 * Outbound HTTPS to `data.geo.admin.ch` must work directly (proxy variables and `.netrc` are ignored).
 
 **Do not stop or restart this service while an import runs.** The worker has no signal handling: a hard-killed worker job (out-of-memory kill, power loss, stop) leaves the state `running`.
@@ -980,9 +981,9 @@ The web application (`leg_platform/addresses/importer.py`, in a thread of the we
 
 **Disk and time are not measured on a server** (**UNVERIFIED**; extrapolated about 12 minutes and 0.9 GB per generation).
 
-* Reserve **three generations** (about 2.7 GB) plus the download (about 143 MB) in `/var/lib/leg-platform` and `/tmp`. The file does not shrink.
+* Reserve **three generations** (about 2.7 GB) plus the download (about 143 MB) in `/var/lib/leg-platform` only; nothing large goes to `/tmp`. The file does not shrink.
 * Measure `du -sh /var/lib/leg-platform` after the first and second import and report (F-4).
-* Less than 4 GB free on either disk: the import is refused (job `failed`, reason on the page, nothing written). The database must never run out of space because of the directory (12.4).
+* Less than 4 GB free on the disk of `/var/lib/leg-platform`: the import is refused (job `failed`, reason on the page, nothing written). The database must never run out of space because of the directory (12.4).
 
 **Start the first import** (no extra service needed):
 
@@ -1043,7 +1044,7 @@ Run after sections 2 to 10 and after every update. Report command and observed r
 | --- | --- | --- |
 | V10 | `curl -sI http://<HOST>/login/` | `301`, `Location: https://<HOST>/login/` |
 | V11 | `curl -sI https://<HOST>/login/` | `200`; `strict-transport-security: max-age=3600` (or final value), `content-security-policy: default-src 'self'; ...` with `frame-ancestors 'none'`, `x-frame-options: DENY`, `x-content-type-options: nosniff`, `referrer-policy: same-origin` |
-| V12 | `curl -sI https://<HOST>/login/ \| grep -i '^set-cookie'` | `__Host-csrftoken=...; Path=/; Secure; HttpOnly; SameSite=Lax`, **no** `Domain`, no colour-mode cookie (D-056); after a browser login `__Host-sessionid` with the same flags |
+| V12 | `curl -sI https://<HOST>/login/ \| grep -i '^set-cookie'` | `__Host-csrftoken=...; Path=/; Secure; HttpOnly; SameSite=Lax`, **no** `Domain`, no colour-mode cookie (D-056); after a browser login `__Host-sessionid` with the same flags; after a language choice (`POST /language/`) `__Host-language=<code>; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=31536000` |
 | V13 | `curl -s -o /dev/null -w '%{http_code}\n' https://<HOST>/does-not-exist/` | `404` |
 | V14 | `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://<HOST>/admin/` | `302` to `/admin/login/`, which leads to `/login/?next=/admin/` (D-052) |
 | V15 | `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<HOST>/login/ -d 'username=x&password=y'` | `403` (CSRF) |
@@ -1107,7 +1108,7 @@ unset token
 
 ### 12.1 What to back up
 
-* **Database `leg_platform`:** accounts, tokens, security log, mail queue, encrypted Graph certificate and key, encrypted second-factor keys, portal settings with the **uploaded logos** (D-073).
+* **Database `leg_platform`:** accounts, tokens, security log, mail queue, encrypted Graph certificate and key, encrypted second-factor keys, portal settings with the **uploaded logos and favicon** (D-073).
 * **Not** the address directory (`/var/lib/leg-platform/address-directory.sqlite3`, `-wal`, `-shm`): public, rebuildable, **not part of any backup** (D-075). After a restore the setup unit recreates the file (8.0); the first import runs within 24 hours (about 12 minutes), or an administrator presses the button. Never copy the file while the importer runs. Corrupted file: 10.2.
 * **Secrets:** environment files and the owner's copy of `DJANGO_SECRET_KEY` and `DJANGO_SECRET_KEY_FALLBACKS` go to the owner's secret store, **separately from the dumps** (`docs/SECURITY.md` section 7). Without the key a restored database loses the second-factor keys; the Graph certificate must be uploaded again.
 * The environment branding files (6.3), the commit hash and the package list of the hand-over.
@@ -1277,6 +1278,6 @@ For the operator; **not a project task, not legal advice**. The portal links onl
 4. **Deletion and retention obligation:** deleting removes the data; with a retention obligation the account is deactivated (D-016). Phase 1 has no function that sets one; applicable obligations are not decided.
 5. **Logs:** entries of deleted accounts stay without personal reference. Retention: 1 year for long-lived events, 30 days for the others (`docs/SECURITY.md` section 10). nginx access log (IP addresses) and journal retention is open (O-15; proposal 14 days); the notice must match.
 6. **Backups:** deleted data stays until they expire (`docs/SECURITY.md` section 5; D-016). Retention open (O-13). Until a backup is confirmed, do not name one (`docs/SERVICES.md` S-3).
-7. **Services that receive personal data** (`docs/SERVICES.md`): Microsoft Graph (S-1), hosting (S-2), backups (S-3); several fields are open. No external fonts, scripts, analytics, error trackers or bot checks. Language and colour mode live in the tab's `sessionStorage`, in no cookie.
+7. **Services that receive personal data** (`docs/SERVICES.md`): Microsoft Graph (S-1), hosting (S-2), backups (S-3); several fields are open. No external fonts, scripts, analytics, error trackers or bot checks. The colour mode lives in the tab's `sessionStorage`; the language in the functional cookie `language` (code only).
 
 Sources: `docs/DECISIONS.md` D-016, D-022, D-049, D-066, D-068, D-073, D-074; `docs/PROJECT.md`; `docs/SECURITY.md`; `docs/SERVICES.md`.

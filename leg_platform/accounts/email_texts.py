@@ -217,12 +217,6 @@ DEFINITIONS = {
         (GREETING, CONTACT_URL),
         (),
     ),
-    Key.PERSISTENT_SESSION_STARTED: Definition(
-        "accounts/email/persistent_session_started.txt",
-        lambda: gettext("A long session was started for your account at %(instance_name)s"),
-        (GREETING, CONTACT_URL),
-        (),
-    ),
 }
 
 MAX_BODY_LENGTH = 5000

@@ -1,7 +1,6 @@
 """The entry shell of the pages without a session and the corner buttons (D-056;
 LEG-Design-Vorgaben/login/VORGABEN.md and register/VORGABEN.md)."""
 
-import json
 import re
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from django.urls import reverse
 from django.utils import translation
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.accounts.tests.test_translations import PROJECT_CATALOGUE, read_catalogue
 
 STATIC = Path(settings.BASE_DIR) / "leg_platform" / "static"
 LOGIN_URL = reverse("accounts:login")
@@ -38,7 +36,7 @@ REGISTER_PANEL = (
 
 
 def corner_controls(html):
-    return all(marker in html for marker in ('id="lang-btn"', 'id="theme-btn"', 'data-lang="fr"'))
+    return all(marker in html for marker in ('id="lang-btn"', 'id="theme-btn"', 'name="language" value="fr"'))
 
 
 @tag("mariadb")
@@ -122,9 +120,11 @@ class EntryShellTests(TestCase):
         self.assertIn('<img class="portal-logo portal-logo-light" src="/static/instance/pos.svg" alt="Beispiel">', html)
         self.assertIn('<img class="portal-logo portal-logo-dark" src="/static/instance/neg.svg" alt="Beispiel">', html)
 
-    def test_the_login_loads_the_texts_of_the_four_languages_and_no_other_page_does(self):
-        self.assertIn("js/login-texts.js", self.client.get(LOGIN_URL).content.decode())
-        self.assertNotIn("js/login-texts.js", self.client.get(ENTRY_PAGES["registration"]).content.decode())
+    def test_the_login_has_no_client_side_dictionary_and_the_texts_are_rendered_by_the_server(self):
+        for url in ENTRY_PAGES.values():
+            html = self.client.get(url).content.decode()
+            self.assertNotIn("login-texts.js", html)
+            self.assertNotIn("data-i18n", html)
 
     def test_no_page_has_an_inline_script_or_style(self):
         for name, url in ENTRY_PAGES.items():
@@ -138,65 +138,6 @@ class EntryShellTests(TestCase):
         html = self.client.get(LOGIN_URL).content.decode()
         self.assertRegex(html, r'<div class="password-field">\s*<input type="password"[^>]*>\s*<button type="button" class="password-toggle[^"]*" data-password-toggle hidden')
         self.assertIn('aria-label="Passwort anzeigen"', html)
-
-
-class LoginTextsTests(SimpleTestCase):
-    """The static dictionary of the login page (login/VORGABEN.md, section 8)."""
-
-    def texts(self):
-        source = (STATIC / "js" / "login-texts.js").read_text(encoding="utf-8")
-        match = re.search(r"window\.LEG_PAGE_TEXTS = (\{.*\});\s*$", source, re.S)
-        return json.loads(match.group(1))
-
-    def test_there_are_four_languages_with_the_same_keys(self):
-        texts = self.texts()
-        self.assertEqual(sorted(texts), ["de", "en", "fr", "it"])
-        keys = set(texts["de"])
-        for code, dictionary in texts.items():
-            with self.subTest(language=code):
-                self.assertEqual(set(dictionary), keys)
-                self.assertTrue(all(value.strip() for value in dictionary.values()))
-
-    def test_the_german_texts_are_the_ones_of_the_swiss_german_catalogue_and_the_page(self):
-        german = self.texts()["de"]
-        catalogue = read_catalogue(PROJECT_CATALOGUE)
-        sources = {
-            "welcome": "Welcome to the LEG portal",
-            "welcomeLead": "Here you manage your account and, later, your locations, energy data and invoices.",
-            "benefit1": "Solar power from the neighbourhood",
-            "benefit2": "Produced locally, shared together",
-            "signIn": "Log in",
-            "email": "Email address",
-            "password": "Password",
-            "forgot": "Forgot password?",
-            "keepSignedIn": "Stay signed in",
-            "signInButton": "Log in",
-            "noAccount": "No account yet?",
-            "register": "Register as a new user",
-            "privacy": "Privacy notice",
-            "imprint": "Legal notice",
-            "showPassword": "Show password",
-            "hidePassword": "Hide password",
-            "themeLabelLight": "Display: light. Switch to dark.",
-            "themeLabelDark": "Display: dark. Switch to light.",
-            "langLabel": "Language: German",
-        }
-        self.assertEqual(set(sources), set(german) - {"lang"})
-        for key, msgid in sources.items():
-            with self.subTest(key=key):
-                self.assertEqual(german[key], catalogue[msgid])
-
-    def test_no_text_has_the_sharp_s(self):
-        self.assertNotIn("\u00df", (STATIC / "js" / "login-texts.js").read_text(encoding="utf-8"))
-
-    def test_the_other_languages_are_the_drafts_of_the_design_package(self):
-        texts = self.texts()
-        self.assertEqual(texts["fr"]["welcome"], "Bienvenue sur le portail de la LEG")
-        self.assertEqual(texts["it"]["signIn"], "Accedi")
-        self.assertEqual(texts["en"]["register"], "Register")
-        self.assertEqual(texts["en"]["welcome"], "Welcome to the LEG portal")
-        self.assertEqual(texts["fr"]["privacy"], "Protection des données")
-        self.assertEqual(texts["it"]["imprint"], "Note legali")
 
 
 class FlagTests(SimpleTestCase):
@@ -221,13 +162,18 @@ class DesignRefinementTests(SimpleTestCase):
     CSS = (STATIC / "css" / "portal.css").read_text(encoding="utf-8")
     SCRIPT = (STATIC / "js" / "corner-controls.js").read_text(encoding="utf-8")
 
-    def test_the_language_button_shows_german_on_a_page_without_translations(self):
-        # A page without the dictionary must not show a language that its text does not have;
-        # the choice is only remembered (the login page takes it up again).
-        self.assertIn('const shown = texts ? code : "de";', self.SCRIPT)
-        self.assertIn("languageButton.textContent = shown.toUpperCase();", self.SCRIPT)
-        self.assertIn('item.dataset.lang === shown', self.SCRIPT)
-        self.assertIn('write("leg-lang", code);', self.SCRIPT)
+    def test_the_language_menu_is_a_form_and_the_script_keeps_no_language(self):
+        # The language is chosen on the server: a POST form with one submit button per language.
+        # The script only opens the menu; it neither stores nor translates anything.
+        self.assertNotIn("leg-lang", self.SCRIPT)
+        self.assertNotIn("LEG_PAGE_TEXTS", self.SCRIPT)
+        self.assertNotIn("data-lang", self.SCRIPT)
+        self.assertIn('".lang-menu button"', self.SCRIPT)
+        self.assertIn('"Escape"', self.SCRIPT)
+        self.assertRegex(self.CSS, r"\.js \.corner \.theme-btn \{[^}]*display: grid")
+        # Without JavaScript the language menu is shown, the light/dark button is not.
+        self.assertRegex(self.CSS, r"\.corner \{[^}]*display: flex")
+        self.assertRegex(self.CSS, r"\.corner \.theme-btn \{[^}]*display: none")
 
     def test_the_benefit_dot_has_a_ring_in_the_panel_colour(self):
         block = re.search(r"\.entry-benefits li::before \{(.*?)\}", self.CSS, re.S).group(1)

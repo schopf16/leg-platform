@@ -30,7 +30,7 @@ class ErrorPageTests(SimpleTestCase):
     def check_common(self, response, status):
         html = response.content.decode()
         self.assertEqual(response.status_code, status)
-        self.assertIn('lang="de-ch"', html)
+        self.assertIn('lang="de-CH"', html)
         self.assertNotIn(SHARP_S, html)
         assert_no_inline_code(self, html)
         policy = response["Content-Security-Policy"]

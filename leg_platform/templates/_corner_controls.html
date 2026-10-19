@@ -1,19 +1,32 @@
-{% load i18n static %}{% comment %}
+{% load i18n static language_menu %}{% comment %}
 The two corner buttons, the same on every page (LEG-Design-Vorgaben/login/VORGABEN.md, section 5):
-the language menu and the light/dark button. They work with static/js/corner-controls.js only and
-stay hidden without it. The names of the languages are written in their own language and are not
-translated. The flags are files of the own origin (Content Security Policy, img-src 'self').
-{% endcomment %}<div class="corner d-print-none">
+the language menu and the light/dark button. The language menu is a real form: every language is
+a submit button that posts to the view set_language (leg_platform/language.py), which sets the
+language cookie and returns to this page, so it works without JavaScript (the menu opens by hover
+and focus in CSS). static/js/corner-controls.js only adds the tap behaviour, Escape and the arrow
+keys; the light/dark button needs it and stays hidden without it. The names of the languages are
+written in their own language and are not translated. The flags are files of the own origin
+(Content Security Policy, img-src 'self'). The form has no "next": the view returns to the page
+by the Referer header (Referrer-Policy same-origin sends it with every request to the own site;
+Django checks it like "next") and to the start page without it. So the address of the page, which
+may carry search terms or an unchecked "next" of its own, is never written into the page again
+(D-054). The menu needs a CSRF token and the route: the 500 page is rendered without a request,
+so it shows only the light/dark button.
+{% endcomment %}{% language_menu as menu %}{% url 'set_language' as set_language_url %}<div class="corner d-print-none">
+  {% if csrf_token and set_language_url %}
   <div class="lang" id="lang">
     <button type="button" id="lang-btn" aria-haspopup="true" aria-expanded="false"
-            aria-label="{% translate 'Language: German' %}" data-label-prefix="{% translate 'Language' %}">DE</button>
+            aria-label="{% blocktranslate with language=menu.current.name %}Language: {{ language }}{% endblocktranslate %}">{{ menu.current.short }}</button>
     <div class="lang-menu" role="menu" aria-label="{% translate 'Language' %}">
-      <button type="button" role="menuitem" data-lang="de" aria-current="true"><img class="flag" src="{% static 'img/flags/de.svg' %}" alt="" width="20" height="14">Deutsch</button>
-      <button type="button" role="menuitem" data-lang="fr" aria-current="false"><img class="flag" src="{% static 'img/flags/fr.svg' %}" alt="" width="20" height="14">Français</button>
-      <button type="button" role="menuitem" data-lang="it" aria-current="false"><img class="flag" src="{% static 'img/flags/it.svg' %}" alt="" width="20" height="14">Italiano</button>
-      <button type="button" role="menuitem" data-lang="en" aria-current="false"><img class="flag" src="{% static 'img/flags/gb.svg' %}" alt="" width="20" height="14">English</button>
+      <form class="lang-form" method="post" action="{{ set_language_url }}" role="none">
+        {% csrf_token %}
+        {% for item in menu.items %}
+        <button type="submit" role="menuitem" name="language" value="{{ item.code }}" lang="{{ item.lang }}" aria-current="{{ item.is_current|yesno:'true,false' }}">{% if item.flag %}<img class="flag" src="{% static 'img/flags/'|add:item.flag %}" alt="" width="20" height="14">{% endif %}{{ item.name }}</button>
+        {% endfor %}
+      </form>
     </div>
   </div>
+  {% endif %}
   <button type="button" class="theme-btn" id="theme-btn" data-state="light"
           data-label-light="{% translate 'Display: light. Switch to dark.' %}"
           data-label-dark="{% translate 'Display: dark. Switch to light.' %}"

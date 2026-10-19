@@ -1,24 +1,23 @@
 {% extends "entry_base.html" %}
-{% load i18n static %}
+{% load i18n %}
 {% block title %}{% translate "Log in" %}{% endblock %}
-{% block scripts_before %}<script src="{% static 'js/login-texts.js' %}"></script>{% endblock %}
 {% block form %}
   {% for error in form.non_field_errors %}
     <div class="alert alert-danger" role="alert">{{ error }}</div>
   {% endfor %}
-  <h1 data-i18n="signIn">{% translate "Log in" %}</h1>
+  <h1>{% translate "Log in" %}</h1>
   <form method="post" novalidate>
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
     <div class="entry-field">
-      <label class="form-label" for="{{ form.username.id_for_label }}" data-i18n="email">{% translate "Email address" %}</label>
+      <label class="form-label" for="{{ form.username.id_for_label }}">{% translate "Email address" %}</label>
       {{ form.username }}
       {% if form.username.errors %}<div class="invalid-feedback d-block" id="{{ form.username.auto_id }}_error">{{ form.username.errors.0 }}</div>{% endif %}
     </div>
     <div class="entry-field">
       <div class="entry-field-row">
-        <label class="form-label" for="{{ form.password.id_for_label }}" data-i18n="password">{% translate "Password" %}</label>
-        <a href="{% url 'accounts:password_reset' %}" data-i18n="forgot">{% translate "Forgot password?" %}</a>
+        <label class="form-label" for="{{ form.password.id_for_label }}">{% translate "Password" %}</label>
+                <a href="{% url 'accounts:password_reset' %}">{% translate "Forgot password?" %}</a>
       </div>
       <div class="password-field">
         {{ form.password }}
@@ -28,10 +27,10 @@
     </div>
     <label class="entry-check" for="{{ form.remember_me.id_for_label }}">
       {{ form.remember_me }}
-      <span data-i18n="keepSignedIn">{% translate "Stay signed in" %}</span>
+      <span>{% translate "Stay signed in" %}</span>
     </label>
-    <button type="submit" class="btn btn-primary" data-i18n="signInButton">{% translate "Log in" %}</button>
+          <button type="submit" class="btn btn-primary">{% translate "Log in" %}</button>
   </form>
-  <p class="entry-divider" data-i18n="noAccount">{% translate "No account yet?" %}</p>
-  <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}" data-i18n="register">{% translate "Register as a new user" %}</a>
+        <p class="entry-divider">{% translate "No account yet?" %}</p>
+        <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}">{% translate "Register as a new user" %}</a>
 {% endblock %}

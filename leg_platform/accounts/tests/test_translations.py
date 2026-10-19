@@ -6,6 +6,9 @@ catalogue (.mo) matches it (D-034).
 
 import ast
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import django
@@ -43,7 +46,8 @@ _KEYWORD = re.compile(r'^(msgctxt|msgid_plural|msgid|msgstr(?:\[\d+\])?)\s+(".*"
 def read_catalogue(path):
     """Return {msgid: msgstr} of a .po file (header excluded).
 
-    Entries with a context are keyed "context\\x04msgid" as in gettext; plural forms are joined.
+    Entries with a context are keyed "context\\x04msgid" as in gettext; plural forms are joined with "\\x00" (the
+    separator of gettext), so that a text with line breaks stays one form.
     """
     entries = {}
     entry = {}
@@ -54,7 +58,7 @@ def read_catalogue(path):
             key = entry["msgid"]
             if "msgctxt" in entry:
                 key = f"{entry['msgctxt']}\x04{key}"
-            entries[key] = "\n".join(
+            entries[key] = "\x00".join(
                 value for name, value in entry.items() if name.startswith("msgstr")
             )
         entry.clear()
@@ -361,3 +365,146 @@ class ChangeMessageLabelTests(SimpleTestCase):
         self.assertEqual(untranslated, [])
         with translation.override("de-ch"):
             self.assertEqual(translation.gettext("First name"), "Vorname")
+
+
+# ---- French and Italian (D-056) ----
+
+# The French and Italian catalogues exist, with the same entries as the Swiss German one, but the
+# texts are translated by someone else. The check that every entry has a translation is on
+# (the translations are complete); a text without a translation would be shown in English
+# (leg_platform/language.py), never in German.
+REQUIRE_COMPLETE_CATALOGS = True
+
+LOCALE_DIRECTORY = Path(settings.BASE_DIR) / "locale"
+DOMAINS = ("django", "djangojs")
+OTHER_LANGUAGES = ("fr", "it")
+
+
+def catalogue_path(language, domain="django"):
+    return LOCALE_DIRECTORY / language / "LC_MESSAGES" / f"{domain}.po"
+
+
+def every_catalogue():
+    """``(language, domain, path)`` of the Swiss German, French and Italian catalogues."""
+    return [
+        (language, domain, catalogue_path(language, domain))
+        for language in ("de_CH", *OTHER_LANGUAGES)
+        for domain in DOMAINS
+    ]
+
+
+def read_header(path):
+    """The header of a .po file as one text (``Key: value`` lines)."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start = lines.index('msgid ""') + 2
+    header = []
+    for line in lines[start - 1 :]:
+        if not line.startswith('"') and not line.startswith("msgstr"):
+            break
+        if line.startswith('"'):
+            header.append(ast.literal_eval(line))
+    return "".join(header)
+
+
+# Placeholders and markup that a translation must keep: %s, %(name)s, {name} and HTML tags.
+_PRINTF = re.compile(r"%(?:\((\w+)\))?[#0\- +]*\d*(?:\.\d+)?([diouxXeEfFgGcrsa])")
+_BRACES = re.compile(r"\{[^{}]*\}")
+_TAGS = re.compile(r"</?[A-Za-z][^<>]*>")
+
+
+def markers(text):
+    return (
+        sorted({match.group(0) for match in _PRINTF.finditer(text)})
+        + sorted(set(_BRACES.findall(text)))
+        + sorted(set(_TAGS.findall(text)))
+    )
+
+
+class LanguageCatalogueTests(SimpleTestCase):
+    """The French and Italian catalogues: complete list of texts, valid files, the same placeholders."""
+
+    def test_the_catalogues_exist_with_the_entries_of_the_swiss_german_one(self):
+        for domain in DOMAINS:
+            german = set(read_catalogue(catalogue_path("de_CH", domain)))
+            for language in OTHER_LANGUAGES:
+                with self.subTest(language=language, domain=domain):
+                    entries = set(read_catalogue(catalogue_path(language, domain)))
+                    self.assertEqual(sorted(german - entries), [], "Missing in the catalogue; add the text to fr and it.")
+                    self.assertEqual(sorted(entries - german), [], "Not in the Swiss German catalogue.")
+
+    def test_the_headers_name_the_language_and_use_the_plural_forms_of_django(self):
+        for language in OTHER_LANGUAGES:
+            django_header = read_header(
+                Path(django.__file__).parent / "conf" / "locale" / language / "LC_MESSAGES" / "django.po"
+            )
+            django_plural = re.search(r"Plural-Forms: ([^\n]+)\n", django_header).group(1)
+            for domain in DOMAINS:
+                with self.subTest(language=language, domain=domain):
+                    header = read_header(catalogue_path(language, domain))
+                    self.assertIn(f"Language: {language}\n", header)
+                    self.assertIn("Content-Type: text/plain; charset=UTF-8\n", header)
+                    self.assertIn(f"Plural-Forms: {django_plural}\n", header)
+
+    def test_every_catalogue_passes_msgfmt_check_and_the_committed_compiled_file_matches(self):
+        msgfmt, msgunfmt = shutil.which("msgfmt"), shutil.which("msgunfmt")
+        if msgfmt is None or msgunfmt is None:
+            self.skipTest("GNU gettext is not installed (CI runs this check).")
+        for language, domain, path in every_catalogue():
+            with self.subTest(language=language, domain=domain), tempfile.TemporaryDirectory() as folder:
+                compiled = Path(folder) / "compiled.mo"
+                result = subprocess.run(
+                    [msgfmt, "--check", "-o", str(compiled), str(path)], capture_output=True, text=True
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                committed = path.with_suffix(".mo")
+                self.assertTrue(committed.is_file(), f"{committed} is not committed; run compilemessages.")
+                texts = [
+                    subprocess.run([msgunfmt, str(mo)], capture_output=True, text=True, encoding="utf-8").stdout
+                    for mo in (committed, compiled)
+                ]
+                self.assertEqual(texts[0], texts[1], f"{committed} is stale; run compilemessages.")
+
+    def test_a_translation_keeps_every_placeholder_and_tag_of_its_source(self):
+        for language in OTHER_LANGUAGES:
+            for domain in DOMAINS:
+                with self.subTest(language=language, domain=domain):
+                    mismatched = []
+                    for msgid, msgstr in read_catalogue(catalogue_path(language, domain)).items():
+                        source = msgid.split("\x04")[-1]
+                        # read_catalogue joins the forms of a plural entry with "\x00"; a form is compared as a whole.
+                        forms = msgstr.split("\x00")
+                        for form in filter(None, forms):
+                            same = markers(source) == markers(form)
+                            # A form that covers only the number 1 may leave out the number.
+                            leaves_out_number = len(forms) > 1 and set(markers(form)) < set(markers(source))
+                            if not (same or leaves_out_number):
+                                mismatched.append(msgid)
+                    self.assertEqual(mismatched, [])
+
+    def test_the_marker_check_sees_a_missing_placeholder_or_tag(self):
+        self.assertNotEqual(markers("Hello %(name)s"), markers("Bonjour"))
+        self.assertNotEqual(markers("Hello {name}"), markers("Bonjour {nom}"))
+        self.assertNotEqual(markers("<b>Hello</b>"), markers("Bonjour"))
+        self.assertEqual(markers("%s of %s"), markers("%s de %s"))
+
+    def test_every_entry_has_a_translation(self):
+        """Switched off by ``REQUIRE_COMPLETE_CATALOGS`` until the translations are written."""
+        missing = {
+            (language, domain): sorted(
+                msgid for msgid, msgstr in read_catalogue(catalogue_path(language, domain)).items()
+                if not msgstr or any(not form for form in msgstr.split("\x00"))
+            )
+            for language in OTHER_LANGUAGES
+            for domain in DOMAINS
+        }
+        # The English texts the account models use (the translation of every shown text is needed).
+        used = account_texts()
+        for language in OTHER_LANGUAGES:
+            catalogue = read_catalogue(catalogue_path(language))
+            missing[(language, "used")] = sorted(text for text in used if not catalogue.get(text))
+        if not REQUIRE_COMPLETE_CATALOGS:
+            self.skipTest(
+                "REQUIRE_COMPLETE_CATALOGS is False: untranslated entries "
+                + ", ".join(f"{key[0]}/{key[1]}: {len(value)}" for key, value in missing.items())
+            )
+        self.assertEqual({key: value for key, value in missing.items() if value}, {})

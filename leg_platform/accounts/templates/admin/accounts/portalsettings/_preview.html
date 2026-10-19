@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n static %}{% comment %}
 The preview of the portal settings (D-073): two small panels, light and dark mode. The colours come
 from variables that the style sheet "preview.css" sets for the saved values and that portal-preview.js
 changes while the administrator types; no inline style. The data attributes hold the colours of the
@@ -35,4 +35,8 @@ server configuration, which the script uses for an empty field.
     </div>
   </section>
 </div>
-<p class="help">{% translate "The preview shows the saved logos. The colours change while you type." %}</p>
+<p class="portal-preview-favicon">
+  <img src="{% if values.favicon %}{{ values.favicon }}{% else %}{% static 'img/favicon.svg' %}{% endif %}" alt="" width="32" height="32">
+  {% translate "Icon of the browser tab" %}
+</p>
+<p class="help">{% translate "The preview shows the saved logos and the saved icon. The colours change while you type." %}</p>

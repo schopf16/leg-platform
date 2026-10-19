@@ -59,12 +59,7 @@ EMAIL_TEXT_PROCESSES = (
     ),
     (
         _("Account"),
-        (
-            _Key.ACCOUNT_DELETED,
-            _Key.SESSION_ENDED_WRONG_CODES,
-            _Key.ALL_SESSIONS_ENDED,
-            _Key.PERSISTENT_SESSION_STARTED,
-        ),
+        (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES, _Key.ALL_SESSIONS_ENDED),
     ),
 )
 
@@ -130,7 +125,11 @@ class EmailTextAdmin(admin.ModelAdmin):
         )
         # Not ``super().get_queryset()``: that one orders by ``get_ordering`` before the position
         # exists.
-        queryset = self.model._default_manager.get_queryset().annotate(process_position=position)
+        # Only the emails the code still knows: a leftover row of a removed email is neither listed nor opened.
+        queryset = (
+            self.model._default_manager.filter(key__in=EmailText.Key.values)
+            .annotate(process_position=position)
+        )
         return queryset.order_by(*self.get_ordering(request))
 
     def get_ordering(self, request):

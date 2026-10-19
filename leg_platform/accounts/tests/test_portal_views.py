@@ -364,7 +364,7 @@ class PageSecurityAndLanguageTests(TestCase):
             html = response.content.decode()
             with self.subTest(name):
                 self.assertNotIn(SHARP_S, html)
-                self.assertIn('lang="de-ch"', html)
+                self.assertIn('lang="de-CH"', html)
                 for text in ENGLISH_TEXTS:
                     self.assertNotIn(f">{text}<", html)
 

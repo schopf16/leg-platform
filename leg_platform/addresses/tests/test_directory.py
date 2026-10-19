@@ -833,42 +833,38 @@ class DirectoryDatabaseTests(TestCase):
         folder = str(Path(str(connections["addresses"].settings_dict["NAME"])).parent)
         self.assertNotIn(folder, logs.output[0])
 
-    def test_exactly_the_minimum_of_free_disk_is_enough_and_both_folders_are_measured(self):
+    def test_exactly_the_minimum_of_free_disk_is_enough_and_only_the_directory_disk_is_measured(self):
         self.assertEqual(importer.MIN_FREE_DISK_BYTES, 4 * 1024**3)
         enough = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES)
         with patch.object(importer.shutil, "disk_usage", return_value=enough) as usage:
             with patch.object(importer.requests, "Session", return_value=session_for()):
                 self.assertEqual(importer.import_directory(), 1)
-        # The disk of the directory file and the disk of the temporary download (N-4).
+        # One disk: the folder of the directory file. The system temporary folder is not measured (it can be
+        # a small memory file system) because nothing is written there.
         self.assertEqual(
             [call.args[0] for call in usage.call_args_list],
-            [Path(str(connections["addresses"].settings_dict["NAME"])).parent, Path(tempfile.gettempdir())],
+            [Path(str(connections["addresses"].settings_dict["NAME"])).parent],
         )
 
-    def test_a_nearly_full_temporary_folder_refuses_the_import_before_the_download(self):
-        # N-4: the download goes to the temporary folder, which can be on another disk.
-        temporary = Path(tempfile.gettempdir())
-        enough = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES)
-        too_little = types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES - 1)
-
-        def usage(folder):
-            return too_little if Path(folder) == temporary else enough
-
+    def test_the_downloaded_archive_is_written_next_to_the_directory_file_not_to_the_system_temporary_folder(self):
         directory_folder = Path(str(connections["addresses"].settings_dict["NAME"])).parent
-        self.assertNotEqual(directory_folder, temporary)
-        session = session_for()
-        with patch.object(importer.shutil, "disk_usage", side_effect=usage):
-            with patch.object(importer.requests, "Session", return_value=session):
-                with self.assertLogs("leg_platform.addresses.importer", level="WARNING") as logs:
-                    with self.assertRaises(importer.ImportFailure):
-                        importer.import_directory()
-        self.assertEqual([call.args[0] for call in session.get.call_args_list], [importer.ITEM_URL])
-        self.assertEqual(logs.output, [
-            "WARNING:leg_platform.addresses.importer:Address directory import refused: "
-            "less than 4 GB free on the disk of the temporary download."
-        ])
-        self.assertNotIn(str(temporary), logs.output[0])
-        self.assertEqual(Directory.objects.get(pk=1).generation, self.generation)
+        created = []
+        real = tempfile.TemporaryFile
+
+        def recording(*args, **kwargs):
+            created.append(kwargs.get("dir"))
+            return real(*args, **kwargs)
+
+        with patch.object(importer.tempfile, "TemporaryFile", side_effect=recording):
+            with patch.object(importer.tempfile, "gettempdir", side_effect=AssertionError("system temporary folder")):
+                with patch.object(importer.requests, "Session", return_value=session_for()):
+                    self.assertEqual(importer.import_directory(), 1)
+        self.assertEqual(created, [directory_folder])
+        # The archive is an unnamed or self-deleting file: nothing is left in the folder.
+        self.assertEqual(
+            sorted(entry.name for entry in directory_folder.iterdir() if "sqlite" not in entry.name),
+            [],
+        )
 
     def test_the_disk_check_uses_the_nearest_existing_folder_and_fails_closed(self):
         file_in_missing_folders = Path(tempfile.gettempdir()) / "leg-missing-a" / "leg-missing-b" / "x.sqlite3"
@@ -881,10 +877,16 @@ class DirectoryDatabaseTests(TestCase):
             with self.assertRaises(importer.ImportFailure) as raised:
                 importer._require_free_disk()
         self.assertNotIn("/private/path", str(raised.exception))
-        with patch.object(importer.tempfile, "gettempdir", side_effect=FileNotFoundError("/private/path")):
+
+    def test_an_unavailable_directory_file_refuses_the_import_before_the_download(self):
+        session = session_for()
+        with patch.object(
+            connections["addresses"], "ensure_connection", side_effect=OperationalError("/private/path"),
+        ), patch.object(importer.requests, "Session", return_value=session):
             with self.assertRaises(importer.ImportFailure) as raised:
-                importer._require_free_disk()
+                importer.import_directory()
         self.assertNotIn("/private/path", str(raised.exception))
+        self.assertEqual(session.get.call_args_list, [])
 
     def test_a_refused_manual_import_marks_the_job_failed_and_keeps_the_directory(self):
         too_little = types.SimpleNamespace(total=10**12, used=0, free=0)
@@ -2254,6 +2256,28 @@ class DirectoryFileTests(SimpleTestCase):
         from leg_platform.addresses.sqlite.base import DatabaseWrapper
 
         DatabaseWrapper._prepare_file(path)
+
+    def test_sqlite_temporary_files_go_to_the_folder_of_the_file_unless_the_operator_chose_a_folder(self):
+        from django.db.backends.sqlite3 import base
+
+        from leg_platform.addresses.sqlite.base import DatabaseWrapper
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "state" / "address-directory.sqlite3"
+            wrapper = DatabaseWrapper(dict(connections["addresses"].settings_dict, NAME=str(path)), alias="x")
+            with patch.object(base.DatabaseWrapper, "get_new_connection", return_value=object()):
+                with patch.dict(os.environ):
+                    os.environ.pop("SQLITE_TMPDIR", None)
+                    wrapper.get_new_connection({"database": str(path)})
+                    self.assertEqual(os.environ["SQLITE_TMPDIR"], str(path.parent))
+                with patch.dict(os.environ, {"SQLITE_TMPDIR": "/operator/choice"}):
+                    wrapper.get_new_connection({"database": str(path)})
+                    self.assertEqual(os.environ["SQLITE_TMPDIR"], "/operator/choice")
+                # An in-memory database has no folder.
+                with patch.dict(os.environ):
+                    os.environ.pop("SQLITE_TMPDIR", None)
+                    wrapper.get_new_connection({"database": ":memory:"})
+                    self.assertNotIn("SQLITE_TMPDIR", os.environ)
 
     def test_the_file_and_its_folder_are_created_private(self):
         with tempfile.TemporaryDirectory() as folder:

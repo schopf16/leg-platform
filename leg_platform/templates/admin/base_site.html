@@ -3,3 +3,5 @@
 {# The own stylesheet of the administration: a few additions for the pages of the portal. The look #}
 {# of the administration stays Django's (docs/DESIGN.md). #}
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-portal.css' %}">{% endblock %}
+{# The browser tab icon of the portal (an uploaded favicon or the built-in one) on every administration page. #}
+{% block extrahead %}{{ block.super }}{% include "_favicon.html" with address=instance_favicon kind=instance_favicon_type %}{% endblock %}

@@ -229,6 +229,7 @@ class SecurityEvent(models.Model):
         ACCOUNT_SESSIONS_ENDED_BY_ADMIN = "account_sessions_ended_by_admin", _(
             "All sessions of an account ended by a system administrator"
         )
+        MANAGEMENT_DATA_EDITED = "management_data_edited", _("Management data edited in the administration")
 
     # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
@@ -250,6 +251,7 @@ class SecurityEvent(models.Model):
             Event.LOG_DOWNLOADED,
             Event.PERSISTENT_SESSION_STARTED,
             Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN,
+            Event.MANAGEMENT_DATA_EDITED,
         }
     )
 

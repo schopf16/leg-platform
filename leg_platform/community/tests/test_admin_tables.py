@@ -1,8 +1,8 @@
-"""The plain, read-only tables of the management data in the Django administration (D-091).
+"""The plain, read-only face of the tables of the management data in the Django administration (D-091).
 
-Who may see them: the "view" right of the table, handed out by a system administrator (never by a group
-name in code). Nobody changes anything there. Free text of the staff, the IBAN and the email address of a
-person never appear."""
+Who may see it: the "view" right of the table, handed out by a system administrator (never by a group
+name in code). A staff account with that right changes nothing there. Free text of the staff, the IBAN and the
+email address of a person never appear. System administrators edit the same tables raw: ``test_admin_raw_tables``."""
 
 from datetime import date
 
@@ -96,24 +96,29 @@ class PlainTablesTests(TestCase):
         person.groups.add(group)
         return self.client_of(person)
 
-    def test_every_table_is_registered_with_a_plain_read_only_admin(self):
+    def test_every_table_is_registered_with_a_plain_face_that_is_read_only(self):
+        staff = staff_user("plain.face@example.org")
+        request = type("Request", (), {"user": staff})()
         for model in MODELS:
             with self.subTest(model=model.__name__):
                 model_admin = admin.site._registry[model]
                 self.assertIsNone(model_admin.actions)
                 self.assertEqual(list(model_admin.inlines), [])
-                self.assertEqual(set(model_admin.get_readonly_fields(None)), set(model_admin.fields))
+                self.assertEqual(set(model_admin.get_readonly_fields(request)), set(model_admin.staff_fields))
+                self.assertEqual(list(model_admin.get_fields(request)), list(model_admin.staff_fields))
+                self.assertEqual(list(model_admin.get_list_display(request)), list(model_admin.staff_list_display))
                 for method in ("has_add_permission", "has_change_permission", "has_delete_permission"):
+                    self.assertFalse(getattr(model_admin, method)(request))
                     self.assertFalse(getattr(model_admin, method)(None))
-                self.assertTrue(model_admin.list_display)
+                self.assertTrue(model_admin.staff_list_display)
                 self.assertLessEqual(model_admin.list_per_page, 100)
         self.assertIn(GridOperator, admin.site._registry)
 
-    def test_no_column_or_field_can_show_free_text_the_iban_or_personal_data(self):
+    def test_no_column_or_field_of_the_plain_face_can_show_free_text_the_iban_or_personal_data(self):
         for model in MODELS:
             model_admin = admin.site._registry[model]
             with self.subTest(model=model.__name__):
-                shown = {*model_admin.list_display, *model_admin.fields, *model_admin.search_fields}
+                shown = {*model_admin.staff_list_display, *model_admin.staff_fields, *model_admin.search_fields}
                 shown = {name.lstrip("=^@").split("__")[-1] for name in shown}
                 self.assertFalse(shown & FORBIDDEN_COLUMNS, shown & FORBIDDEN_COLUMNS)
                 # The search reaches no personal column of the account either.
@@ -128,18 +133,20 @@ class PlainTablesTests(TestCase):
                 row = self.objects[model]
                 self.assertEqual(client.get(url(model, "change", row.pk)).status_code, 200)
 
-    def test_nothing_secret_is_in_any_page_of_any_table(self):
-        client = self.client_of(self.administrator)
+    def test_nothing_secret_is_in_any_page_of_any_table_for_a_staff_account_with_the_view_rights(self):
+        client = self.staff_with("every.view@example.org", *[f"view_{model._meta.model_name}" for model in MODELS])
         for model in MODELS:
             for page in (url(model), url(model, "change", self.objects[model].pk)):
-                html = client.get(page).content.decode()
+                response = client.get(page)
+                html = response.content.decode()
                 with self.subTest(page=page):
+                    self.assertEqual(response.status_code, 200)
                     for secret in (SECRET_NOTE, SECRET_REMARK, SECRET_EMAIL, SECRET_IBAN, "Secretia", "Customerson", "OP-1"):
                         self.assertNotIn(secret, html)
                     self.assertNotIn(self.record.iban_encrypted[:20], html)
 
     def test_the_lists_show_the_data_they_are_for(self):
-        client = self.client_of(self.administrator)
+        client = self.staff_with("every.view.two@example.org", *[f"view_{model._meta.model_name}" for model in MODELS])
         self.assertContains(client.get(url(TransformerCircuit)), "TRA4711")
         self.assertContains(client.get(url(Location)), "Examplestrasse")
         self.assertContains(client.get(url(MeteringPoint)), self.point.number)
@@ -151,23 +158,6 @@ class PlainTablesTests(TestCase):
         self.assertContains(client.get(url(PersonAssignment)), "Konto")
         self.assertContains(client.get(url(HistoryEntry)), "location")
         self.assertContains(client.get(url(ManagementSettings)), "CH")
-
-    def test_a_system_administrator_cannot_add_change_or_delete_a_row_either(self):
-        client = self.client_of(self.administrator)
-        for model in MODELS:
-            row = self.objects[model]
-            with self.subTest(model=model.__name__):
-                # The page of a row is the read-only view; everything that writes is refused.
-                self.assertEqual(client.get(url(model, "change", row.pk)).status_code, 200)
-                self.assertNotContains(client.get(url(model, "change", row.pk)), 'name="_save"')
-                self.assertEqual(client.get(url(model, "add")).status_code, 403)
-                self.assertEqual(client.get(url(model, "delete", row.pk)).status_code, 403)
-                self.assertEqual(client.post(url(model, "add"), {}).status_code, 403)
-                self.assertEqual(client.post(url(model, "change", row.pk), {"_save": "x"}).status_code, 403)
-                self.assertEqual(client.post(url(model, "delete", row.pk), {"post": "yes"}).status_code, 403)
-        # Nothing changed.
-        self.assertEqual(Location.objects.count(), 1)
-        self.assertEqual(Leg.objects.get(pk=self.leg.pk).name, "LEG Table")
 
     def test_a_staff_account_without_a_right_sees_nothing(self):
         client = self.client_of(staff_user("no.rights@example.org"))

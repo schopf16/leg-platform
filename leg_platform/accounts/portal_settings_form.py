@@ -1,6 +1,6 @@
 """The form of the portal settings in the administration (D-073).
 
-Name, website, legal notice addresses, colours and the two logos. The logos are uploads checked by
+Name, website, legal notice addresses, colours, the two logos and the favicon. The logos and the favicon are uploads checked by
 ``logo_images``; files live in the database and the upload's name is never used.
 """
 
@@ -14,7 +14,13 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import second_factor, security_log
 from leg_platform.accounts.forms import OneProofMixin
-from leg_platform.accounts.logo_images import MAX_UPLOAD_BYTES, LogoRejected, validate_logo
+from leg_platform.accounts.logo_images import (
+    FAVICON_MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_BYTES,
+    LogoRejected,
+    validate_favicon,
+    validate_logo,
+)
 from leg_platform.accounts.models import PortalSettings, SecurityEvent, validate_hex_colour
 from leg_platform.accounts.portal_settings import effective_colours, environment_values
 from leg_platform.branding import COLOUR_FIELDS, colour_problems, floor_ratio
@@ -34,6 +40,14 @@ PROOF_HELP = _(
 )
 REMOVE_AND_UPLOAD = _(
     "Choose either new logos or the removal of the uploaded logos, not both."
+)
+REMOVE_FAVICON_AND_UPLOAD = _(
+    "Choose either a new icon or the removal of the uploaded icon, not both."
+)
+FAVICON_HELP = _(
+    "PNG or SVG, up to 128 KB (PNG) or 64 KB (SVG). A PNG should be square and at least 192 px wide. "
+    "It is shown in the tab of the browser, for light and dark mode alike. "
+    "Leave empty to use the built-in icon."
 )
 ACCENT_TOO_WEAK = {
     "light": _(
@@ -112,6 +126,19 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
     reset_colours = forms.BooleanField(
         required=False, label=_("Use the server colours again")
     )
+    favicon_file = forms.FileField(
+        required=False,
+        label=_("icon of the browser tab"),
+        help_text=FAVICON_HELP,
+        widget=forms.FileInput(attrs={"accept": ".png,.svg,image/png,image/svg+xml"}),
+    )
+    remove_favicon = forms.BooleanField(
+        required=False,
+        label=_(
+            "Remove the uploaded icon and use the built-in icon. The file is deleted "
+            "and cannot be restored."
+        ),
+    )
 
     class Meta:
         model = PortalSettings
@@ -139,8 +166,9 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Accepted logos by variant, and the reasons of rejected uploads.
+        # Accepted logos by variant, the accepted favicon, and the reasons of rejected uploads.
         self.new_logos = {}
+        self.new_favicon = None
         self.rejections = []
         self._add_server_hints()
         # One proof of the acting account; without a request both fields stay and ``clean`` refuses.
@@ -191,6 +219,27 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
             self.rejections.append(rejected.reason)
             self.add_error(name, ValidationError(rejected.message, params=rejected.params, code="logo"))
 
+    def _read_favicon(self):
+        upload = self.cleaned_data.get("favicon_file")
+        if not upload:
+            return
+        # Never more than the largest allowed size is read.
+        data = upload.read(FAVICON_MAX_UPLOAD_BYTES)
+        try:
+            self.new_favicon = validate_favicon(data)
+        except LogoRejected as rejected:
+            self.rejections.append(f"favicon {rejected.reason}")
+            self.add_error(
+                "favicon_file", ValidationError(rejected.message, params=rejected.params, code="logo")
+            )
+
+    def _check_favicon(self):
+        self._read_favicon()
+        if "favicon_file" in self._errors:
+            return
+        if self.cleaned_data.get("remove_favicon") and self.new_favicon is not None:
+            raise ValidationError(REMOVE_FAVICON_AND_UPLOAD, code="remove_and_upload")
+
     def clean(self):
         cleaned = super().clean()
         if self.user is None:
@@ -219,10 +268,11 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
                 self._errors.pop(field, None)
         elif not any(field in self._errors for field in COLOUR_FIELDS):
             self._check_colours(cleaned)
-        try:
-            self._check_logos(cleaned)
-        except ValidationError as error:
-            self.add_error(None, error)
+        for check in (lambda: self._check_logos(cleaned), self._check_favicon):
+            try:
+                check()
+            except ValidationError as error:
+                self.add_error(None, error)
         if self.rejections and self.actor is not None and self._may_log_rejection():
             # One event for the whole request, with reason codes only (never the content).
             with transaction.atomic():
@@ -293,6 +343,14 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
             setattr(instance, f"logo_{variant}_data", logo.data)
             setattr(instance, f"logo_{variant}_type", logo.kind)
             setattr(instance, f"logo_{variant}_sha256", logo.sha256)
+        if self.cleaned_data.get("remove_favicon"):
+            instance.favicon_data = None
+            instance.favicon_type = ""
+            instance.favicon_sha256 = ""
+        if self.new_favicon is not None:
+            instance.favicon_data = self.new_favicon.data
+            instance.favicon_type = self.new_favicon.kind
+            instance.favicon_sha256 = self.new_favicon.sha256
         if commit:
             instance.save()
         return instance

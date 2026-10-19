@@ -107,7 +107,7 @@ The administration start page ("Verwaltung") has the box "Erste Schritte" with t
 
 | What | Who changes it | Where |
 | --- | --- | --- |
-| Name, website, privacy and legal notice addresses, the two logos, the colours (D-073; table: `docs/DESIGN.md`, section 3.2) | A system administrator, or staff with "Portal-Einstellungen: ansehen/ändern" (a role gets them at runtime) | Administration, group "Inhalte", "Portal-Einstellungen" (an empty field uses the server configuration; uploaded logos are in the database backup) |
+| Name, website, privacy and legal notice addresses, the two logos, the favicon, the colours (D-073; table: `docs/DESIGN.md`, section 3.2) | A system administrator, or staff with "Portal-Einstellungen: ansehen/ändern" (a role gets them at runtime) | Administration, group "Inhalte", "Portal-Einstellungen" (an empty field uses the server configuration; uploaded logos and favicon are in the database backup) |
 | Host name, base URL, allowed hosts, email mode and sender, database, secrets, retention, proxy settings; fallback values of the presentation | Operator only, via environment variables and the instance static directory (`docs/INSTALLATION.md`) | Read-only for system administrators in "Portal-Einstellungen", "Serverkonfiguration (nur lesen)" |
 | Texts of the emails (each of the 21 emails) | System administrator, or staff with "Mailtext: ansehen/ändern" | Administration, "Inhalte", "Mailtexte" |
 | Microsoft Graph, security log, blocked logins, groups | System administrator only | Administration, groups "System" and "Benutzer" |

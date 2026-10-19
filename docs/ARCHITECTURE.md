@@ -29,7 +29,7 @@ Simple, secure, maintainable architecture with the lowest possible operating eff
 
 * Rules: `AGENTS.md`, section 2. Default language Swiss German: `LANGUAGE_CODE = "de-ch"`. Project translations: `locale/de_CH/LC_MESSAGES/django.po` through `LOCALE_PATHS` (highest precedence).
 * Django's `de_CH` locale holds only formats. Texts fall back from `de-ch` to `de`, which contains "ß". The project files override every such text that can appear in the UI, including third-party texts. An automated check ensures no displayed text contains "ß".
-* Only Swiss German exists, without language selection. Further languages would come through translation files, `LANGUAGES` and, if needed, `LocaleMiddleware`.
+* Languages (D-056): Swiss German (`de-ch`, the instance default), French (`fr`), Italian (`it`) and English (`en`, the source texts). The person chooses with the language menu; the language cookie decides, never the browser's `Accept-Language` (`leg_platform/language.py`). Catalogues: `locale/de_CH`, `locale/fr`, `locale/it` (the last two have the entries of `de_CH`, translated separately). A text without a translation is English, not German (`install_english_fallback`). Emails and background jobs use the instance default language.
 * Stored values such as statuses are English keys shown through translated labels. User data (names, addresses, role names) is not translated.
 
 ## Users and Roles
@@ -109,8 +109,8 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 * Responsive; all user functions fully usable on a mobile phone (`docs/PROJECT.md`, "Supported Devices"). Tabler (Bootstrap 5, mobile first) needs the responsive viewport meta tag. Minimum browsers: Chrome/Edge 123, Firefox 128, Safari 17.5, Opera 109. Older devices that cannot be updated are not supported. The supported browsers are documented for operators and users.
 * Static assets (Tabler, fonts, icons) are served by the instance in fixed versions. No inline CSS, theme URL parameters or third-party assets.
 * Design language: `docs/DESIGN.md` (D-024), implemented through Tabler's CSS variables.
-* Instance branding (name, website, colours, two logos in the database) wins per field over the validated environment variables, which win over platform defaults. Resolved by `leg_platform.accounts.portal_settings.portal_values`. A same-origin generated stylesheet carries the colours (D-051, D-056, D-073). A dedicated public view serves uploaded logos (`docs/SECURITY.md`, section 6).
-* Colour mode and language are not handled by the server: the page is rendered light and external scripts keep the choice in the tab's `sessionStorage`.
+* Instance branding (name, website, colours, two logos and the favicon in the database) wins per field over the validated environment variables, which win over platform defaults. Resolved by `leg_platform.accounts.portal_settings.portal_values`. A same-origin generated stylesheet carries the colours (D-051, D-056, D-073). Dedicated public views serve the uploaded logos and the favicon (`docs/SECURITY.md`, section 6).
+* The colour mode is not handled by the server: the page is rendered light and external scripts keep the choice in the tab's `sessionStorage`. The language is chosen on the server (language cookie, `leg_platform/language.py`, `docs/SECURITY.md` section 6).
 * No public home page; the entry point is the login page.
 * The application runs on its own host name, never under a path of another website (D-025). A subdomain of the website's registrable domain is still the same site, so the cookie rules of `docs/SECURITY.md`, section 3, apply.
 
@@ -121,7 +121,7 @@ Two Django apps (D-077 to D-087):
 * **`leg_platform.community`**: the domain without pages.
   * Models: transformer circuits, locations (unique on the normalised address), metering points (status derived from dates and the day, no scheduler), LEGs, person and LEG assignments (the previous assignment ends the day before the new one), append-only `HistoryEntry`, `PersonRecord` (staff-only side record; IBAN **encrypted** via `community.iban`), `ShareChange`, `GridOperator`, list preferences.
   * The rules are plain modules tested without a browser. Identifier columns use the exact collation (D-031).
-  * Only `GridOperator` is registered in the Django administration (system administrators only). The community models have no Django permissions (D-086).
+  * Only `GridOperator` and the raw admin tables (D-091) are registered in the Django administration; the tables are read-only for staff with the `view` right and editable without checks for system administrators (`is_superuser`; owner order 2026-10-19). The community models have no Django permissions except `view` (D-086, D-091).
 * **`leg_platform.management`**: views, forms and templates under `/management/`.
   * Every view uses `access.ManagementAccessMixin` or `@management_view` (`docs/SECURITY.md`, section 4). A test walks the URL configuration and fails for a route without the access check.
   * Lists share one list framework (state parsed from the address on the server).

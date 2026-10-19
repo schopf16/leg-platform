@@ -81,14 +81,19 @@ class AddressSuggestionMixin(models.Model):
     address) so that lists can filter by it.
     """
 
-    suggested_street = models.CharField(max_length=255, blank=True, editable=False)
-    suggested_house_number = models.CharField(max_length=32, blank=True, editable=False)
-    suggested_postal_code = models.CharField(max_length=4, blank=True, editable=False)
-    suggested_town = models.CharField(max_length=255, blank=True, editable=False)
-    suggestion_dismissed_for = models.CharField(
-        max_length=ADDRESS_SIGNATURE_LENGTH, blank=True, editable=False
+    # The verbose names are shown by the raw tables of the administration (D-091).
+    suggested_street = models.CharField(_("suggested street"), max_length=255, blank=True, editable=False)
+    suggested_house_number = models.CharField(
+        _("suggested house number"), max_length=32, blank=True, editable=False
     )
-    address_correction_open = models.BooleanField(default=False, editable=False)
+    suggested_postal_code = models.CharField(
+        _("suggested postal code"), max_length=4, blank=True, editable=False
+    )
+    suggested_town = models.CharField(_("suggested town"), max_length=255, blank=True, editable=False)
+    suggestion_dismissed_for = models.CharField(
+        _("suggestion dismissed for"), max_length=ADDRESS_SIGNATURE_LENGTH, blank=True, editable=False
+    )
+    address_correction_open = models.BooleanField(_("address correction open"), default=False, editable=False)
 
     class Meta:
         abstract = True
@@ -344,9 +349,10 @@ class AssignmentBase(TimestampedModel):
     valid_from = models.DateField(_("valid from"))
     valid_to = models.DateField(_("valid to"), null=True, blank=True)
     previous_assignment = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False,
+        verbose_name=_("previous assignment"),
     )
-    previous_valid_to = models.DateField(null=True, blank=True, editable=False)
+    previous_valid_to = models.DateField(_("previous valid to"), null=True, blank=True, editable=False)
 
     objects = AssignmentQuerySet.as_manager()
 
@@ -366,10 +372,12 @@ class AssignmentBase(TimestampedModel):
 
 class PersonAssignment(AssignmentBase):
     metering_point = models.ForeignKey(
-        MeteringPoint, on_delete=models.PROTECT, related_name="person_assignments"
+        MeteringPoint, on_delete=models.PROTECT, related_name="person_assignments",
+        verbose_name=_("metering point"),
     )
     person = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="metering_point_assignments"
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="metering_point_assignments",
+        verbose_name=_("person"),
     )
 
     class Meta(AssignmentBase.Meta):
@@ -381,9 +389,10 @@ class PersonAssignment(AssignmentBase):
 
 class LegAssignment(AssignmentBase):
     metering_point = models.ForeignKey(
-        MeteringPoint, on_delete=models.PROTECT, related_name="leg_assignments"
+        MeteringPoint, on_delete=models.PROTECT, related_name="leg_assignments",
+        verbose_name=_("metering point"),
     )
-    leg = models.ForeignKey(Leg, on_delete=models.PROTECT, related_name="assignments")
+    leg = models.ForeignKey(Leg, on_delete=models.PROTECT, related_name="assignments", verbose_name=_("LEG"))
 
     class Meta(AssignmentBase.Meta):
         default_permissions = ("view",)
@@ -398,14 +407,15 @@ class HistoryEntry(models.Model):
     ``subject_type``/``subject_id`` name the object without a foreign key, so an entry outlives it.
     ``detail`` holds small facts (old/new value), never a customer name or address."""
 
-    subject_type = models.CharField(max_length=SUBJECT_MAX_LENGTH)
-    subject_id = models.PositiveBigIntegerField()
+    subject_type = models.CharField(_("subject type"), max_length=SUBJECT_MAX_LENGTH)
+    subject_id = models.PositiveBigIntegerField(_("subject ID"))
     event = models.CharField(_("event"), max_length=40)
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name=_("performed by"),
     )
     created_at = models.DateTimeField(_("time"), default=timezone.now, editable=False)
-    detail = models.JSONField(default=dict, blank=True)
+    detail = models.JSONField(_("detail"), default=dict, blank=True)
 
     class Meta:
         default_permissions = ("view",)
@@ -447,7 +457,7 @@ class ManagementSettings(models.Model):
     sender_postal_code = models.CharField(_("postal code"), max_length=4, blank=True)
     sender_town = models.CharField(_("town"), max_length=100, blank=True)
     sender_suggestion_dismissed_for = models.CharField(
-        max_length=ADDRESS_SIGNATURE_LENGTH, blank=True, editable=False
+        _("sender suggestion dismissed for"), max_length=ADDRESS_SIGNATURE_LENGTH, blank=True, editable=False
     )
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
@@ -514,7 +524,8 @@ class PersonRecord(AddressSuggestionMixin, TimestampedModel):
     wish (D-087) and address suggestion state. Created when needed; shares are ``ShareChange`` entries."""
 
     person = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="person_record"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="person_record",
+        verbose_name=_("person"),
     )
     staff_note = models.TextField(_("note"), blank=True, validators=REMARK_VALIDATORS)
     operator_customer_number = models.CharField(_("customer number at the grid operator"), max_length=30, blank=True)
@@ -554,11 +565,14 @@ class ShareChange(models.Model):
     """Cooperative shares of a person from ``valid_from`` on (D-086); the latest entry not after a day
     applies (``community.persons.current_shares``). Entries are only added; a correction is a new entry."""
 
-    record = models.ForeignKey(PersonRecord, on_delete=models.CASCADE, related_name="share_changes")
+    record = models.ForeignKey(
+        PersonRecord, on_delete=models.CASCADE, related_name="share_changes", verbose_name=_("person data")
+    )
     quantity = models.PositiveIntegerField(_("number of shares"))
     valid_from = models.DateField(_("valid from"))
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name=_("performed by"),
     )
     created_at = models.DateTimeField(_("time"), default=timezone.now, editable=False)
 

@@ -764,9 +764,11 @@ body {
 :root[data-theme="dark"] .portal-logo-dark { display: inline-block; }
 
 /* ---- Corner controls (_corner_controls.html): language menu and light/dark button ----
-   Shown only when theme-init.js has marked the page with the class "js". */
+   The language menu is a form and works without JavaScript (it opens by hover and focus). The
+   light/dark button needs the script and is shown only when theme-init.js has marked the page
+   with the class "js". */
 .corner {
-  display: none;
+  display: flex;
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 12px);
   right: 16px;
@@ -775,8 +777,12 @@ body {
   align-items: center;
 }
 
-.js .corner {
-  display: flex;
+.corner .theme-btn {
+  display: none;
+}
+
+.js .corner .theme-btn {
+  display: grid;
 }
 
 .corner button {
@@ -848,8 +854,13 @@ body {
 .lang:hover .lang-menu,
 .lang:focus-within .lang-menu,
 .lang.open .lang-menu {
+  display: block;
+}
+
+.lang-form {
   display: grid;
   gap: 2px;
+  margin: 0;
 }
 
 /* Escape closes the menu until pointer/focus leaves and returns. */

@@ -54,7 +54,7 @@ Tokens of the design package, defined in `portal.css` (light on `:root`, dark in
 * The platform is neutral. Each instance configures its own branding, never hard-coded (`AGENTS.md`, section 6): logo (positive for light, negative for dark backgrounds), accent colour for light and dark mode each with its text colour, and an optional highlight colour (`--yellow`: only the dot of the benefit list, never with text on it, R9).
 * Platform defaults are the values of the design package (D-056): accent `#005BA2` / `#6AA9E0`, text on it `#FFFFFF` / `#0B1520`, highlight `#DDDD22`. Without a logo the instance name is shown as text.
 * **Where branding is changed (D-073).**
-  * Administration, "Inhalte", "Portal-Einstellungen" (an ordinary right of a role): name, website, the two logos (PNG or SVG, both or none), accent and text colours, highlight colour, privacy and imprint addresses.
+  * Administration, "Inhalte", "Portal-Einstellungen" (an ordinary right of a role): name, website, the two logos (PNG or SVG, both or none), the favicon (PNG or SVG, optional), accent and text colours, highlight colour, privacy and imprint addresses.
   * Precedence per field: administration, then environment (`INSTANCE_*`: `docs/INSTALLATION.md`; the imprint address has none), then platform default. Email texts: "Mailtexte" (D-039). Page texts: `locale/de_CH/LC_MESSAGES/django.po`. Server settings: environment only (`docs/OPERATIONS.md`, section 5a).
   * Under every field with a server value the page shows "Serverkonfiguration: <value>".
   * The preview changes colours while typing (CSS variables through the CSSOM by an external script; the policy is not widened, so an unsaved logo has no preview). Removal and reset are checkboxes; an empty text field resets that field.
@@ -123,7 +123,7 @@ Fixed meaning, independent of the instance accent; used by the later energy page
   * Above 760 px two equal columns: the warm panel (`--warm`, padding 48 px, logo 360 px wide, title in Bricolage Grotesque 40 px, lead 18 px, two points with a yellow dot) and the form (at most 400 px wide), separated by a 1 px line.
   * At 760 px and below the panel shrinks to a top bar of at least 64 px with the logo (40 px high). The text is hidden and the login fits one screen.
   * The footer row "Datenschutz | Impressum | host of the website" sits under the form (D-056).
-* **Corner buttons on every page** (also error pages): language menu (DE, FR, IT, EN) and light/dark button, round, 40 px, fixed top right (in the header after the login, next to the name).
+* **Corner buttons on every page** (also error pages): language menu (DE, FR, IT, EN; a form, works without JavaScript) and light/dark button (needs JavaScript), round, 40 px, fixed top right (in the header after the login, next to the name).
 * **After the login (K1, D-057).**
   * Fixed header 64 px: logo 48 px high, name as text, corner buttons.
   * Desktop: fixed left menu 232 px wide. MEIN BEREICH: Start, Profil, for staff Verwaltung. DEMNÄCHST: Standorte, Rechnungen, Energie, Mitteilungen with the mark "später", no links. Below a line: "Abmelden" as a POST form, Datenschutz, Impressum.
@@ -182,10 +182,13 @@ Fixed meaning, independent of the instance accent; used by the later energy page
 ## 7. Colour Modes and Print
 
 * **Light and dark only by the button (R13 changed by the package, D-056).** No automatic mode, no `prefers-color-scheme`. The server always renders light; the person switches with the sun/moon button. The mode is set on `<html>` as `data-theme` (own tokens) and `data-bs-theme` (Tabler), always the same value.
-* **Persistence (K3).** The choice is kept in the tab's `sessionStorage` (no cookie, nothing sent to the server; a new tab starts light and German).
-  * The scripts are external files (`theme-init.js` in `<head>`, `corner-controls.js`). They read only the allowlisted values `light`, `dark`, `de`, `fr`, `it`, `en`, evaluate no URL parameters and never set branding attributes.
-  * Without JavaScript the buttons are hidden and the page stays light and German.
-* **Languages.** The menu offers Deutsch, Français, Italiano, English. Page-text translations exist for the login page only (static dictionary). Every other page stays German; the language button only remembers the choice.
+* **Persistence of the colour mode (K3).** The choice is kept in the tab's `sessionStorage` (no cookie, nothing sent to the server; a new tab starts light).
+  * The scripts are external files (`theme-init.js` in `<head>`, `corner-controls.js`). They read only the allowlisted values `light`, `dark`, evaluate no URL parameters and never set branding attributes.
+  * Without JavaScript the sun/moon button is hidden and the page stays light.
+* **Languages (D-056, changed 2026-10-19).** The menu offers Deutsch (`de-ch`, the instance default), Français, Italiano, English. The language is real and server-side: every item is a submit button in a small POST form to `set_language` (`/language/`), which sets the functional language cookie and returns to the page (Referer, checked). Every text of the page follows (templates, forms, messages, administration, JavaScript catalogue). The button shows the active language (DE, FR, IT, EN) and the item is marked `aria-current`; `<html lang>` is `de-CH`, `fr`, `it`, `en`.
+  * Without JavaScript the menu still opens (hover and focus, CSS) and switches. The script only adds the tap, Escape and the arrow keys.
+  * The language comes from the cookie only, never from the browser's `Accept-Language`. A text without a translation is English, never German. The 500 page has no language menu (no request, no CSRF token).
+  * The cookie holds only the language code (functional, no consent needed; `docs/SECURITY.md`, section 6).
 * Tabler's `tabler-theme.js` is not used: it reads URL parameters for all theme keys and persists them in `localStorage`, so a crafted link could override the instance branding persistently (Tabler `core/js/tabler-theme.ts`).
 * In dark mode the negative logo is used, on the plate of section 3.1.
 * Print: a print stylesheet hides navigation, corner buttons and controls, prints black text on white, and shows the instance name and the print date.

@@ -4,13 +4,14 @@ Local development setup and instance configuration. Stage and production: `docs/
 
 ## Instance Presentation
 
-The administrator maintains name, website, privacy and legal notice addresses, two logos and the colours in the administration ("Inhalte", "Portal-Einstellungen"; D-073). A stored value wins. An empty field falls back to the variables of `.env.example` (D-051), then to the neutral platform defaults. Environment only (read-only for system administrators): host name, `INSTANCE_BASE_URL`, allowed hosts, mail mode and sender, Graph credentials, database, secrets, retention minimums, proxy settings (an editable host name would let anyone redirect all email links).
+The administrator maintains name, website, privacy and legal notice addresses, two logos, the favicon and the colours in the administration ("Inhalte", "Portal-Einstellungen"; D-073). A stored value wins. An empty field falls back to the variables of `.env.example` (D-051), then to the neutral platform defaults. Environment only (read-only for system administrators): host name, `INSTANCE_BASE_URL`, allowed hosts, mail mode and sender, Graph credentials, database, secrets, retention minimums, proxy settings (an editable host name would let anyone redirect all email links).
 
 **Logos (D-073).**
 
 * One for light mode, one for dark mode (both or none). PNG (up to 1 MB, 64 to 4000 pixels per side) or SVG (up to 200 KB, no scripts, styles, images, links or editor data).
-* Stored **in the database** (`accounts_portalsettings`): **the logos belong to the database backup**.
-* Served publicly at `/branding/logo/light/` and `/branding/logo/dark/`. The proxy passes these paths and may cache them for a day. It allows a request body of at least 3 MiB for `/admin/accounts/portalsettings/1/change/` (larger: 413 from the application).
+* Stored **in the database** (`accounts_portalsettings`): **the logos and the favicon belong to the database backup**.
+* **Favicon** (browser tab icon): one optional file for both modes, PNG (up to 128 KB, 64 to 4000 pixels per side) or SVG (up to 64 KB), same checks as a logo; ICO is not accepted. Without an upload the built-in icon of the server is used.
+* Served publicly at `/branding/logo/light/`, `/branding/logo/dark/` and `/branding/favicon/`. The proxy passes these paths and may cache them for a day. It allows a request body of at least 3 MiB for `/admin/accounts/portalsettings/1/change/` (larger: 413 from the application; two logos, the favicon and the form fit).
 * Fallback while none is uploaded: `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` (local static `.svg` or `.png`, relative static paths, never absolute or external). `INSTANCE_STATIC_DIRECTORY`: an existing absolute directory outside the repository; its contents are public (no configuration, personal data or secrets). Check every SVG for scripts, event handlers and external references. Run `collectstatic` with the instance's static directories. The startup validation does not prove that a file exists.
 
 Colours are six-digit hexadecimal values. The application refuses to start if the accent lacks 4.5:1 contrast with its text, the page background or the surface, or highlight text lacks contrast. The administration form applies the same rules; a failing database value is not used (warning logged). Platform defaults: accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22` (D-056).
@@ -34,7 +35,7 @@ Profile addresses never leave the application; suggestions query only a local co
 **The import needs no extra service (D-090).** The web application downloads and imports in a background thread of one web worker. Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.4 and 10.2.
 
 * Triggers: an administrator with the right `addresses.request_directory_import` presses "Request directory update" (administration, "Adressverzeichnis"); or the automatic refresh is due (every 90 days; every 24 hours while the directory is missing or empty), at the first visit of a staff member to the administration start page or the management overview. No cron job or scheduler. `ADDRESS_IMPORT_AUTOMATIC=False` turns the automatic refresh off.
-* Needs: outbound HTTPS to `data.geo.admin.ch` only; about 4 GB free in the folder of the file and in the temporary folder; about 0.9 GB per generation on disk (reserve **three** generations at the peak).
+* Needs: outbound HTTPS to `data.geo.admin.ch` only; about 4 GB free on the disk of the directory file (the archive is written there as a temporary file, not to the system temporary folder); about 0.9 GB per generation on disk (reserve **three** generations at the peak).
 * Verifies the official SHA-256 multihash before parsing. One import at a time (the job row is the claim; the lease on the directory row expires after 6 hours). A web job without a sign of life for about 90 seconds counts as dead and can be requested again. A hard-killed worker job (state stays `running`) is taken over only after its 6-hour lease: never reset its state blindly.
 * Start, end and failure go to the application log (`leg_platform.addresses`) and the security log. If the published directory is the official file and passes the integrity check, a manual request ends without a download (D-076).
 

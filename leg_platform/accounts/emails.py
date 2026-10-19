@@ -209,11 +209,6 @@ def send_all_sessions_ended(address, greeting_name=""):
     _send(address, Key.ALL_SESSIONS_ENDED, {}, greeting_name)
 
 
-def send_persistent_session_started(address, greeting_name=""):
-    """Tell every address that a long session (stay signed in) was started for the account; contains no link."""
-    _send(address, Key.PERSISTENT_SESSION_STARTED, {}, greeting_name)
-
-
 def send_two_factor_enabled(address, greeting_name=""):
     """Tell the owner that two-factor authentication was set up; contains no link."""
     _send(address, Key.TWO_FACTOR_ENABLED, {}, greeting_name)

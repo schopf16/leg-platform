@@ -404,7 +404,9 @@ class AccountDeletionTests(TestCase):
             for word in ("geschlossen", "aufbewahr", "gesetzlich"):
                 self.assertNotContains(response, word)
         self.assertEqual(deleted.redirect_chain, kept.redirect_chain)
-        self.assertEqual(deleted.content, kept.content)
+        # The CSRF token of the language form is masked and differs in every response.
+        token = re.compile(rb'name="csrfmiddlewaretoken" value="[^"]+"')
+        self.assertEqual(token.sub(b"", deleted.content), token.sub(b"", kept.content))
         # Behind the same message the retained account stays in the database, deactivated.
         retained_user.refresh_from_db()
         self.assertEqual(retained_user.status, User.Status.DEACTIVATED)

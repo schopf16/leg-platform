@@ -15,7 +15,7 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 * Two-factor: authenticator app (TOTP), mandatory for staff users and system administrators. A later switch to AGOV is prepared (approval requested, answer pending).
 * Environments: local, stage, production. Hosting of the Ittigen instance: Infomaniak "VPS Lite 1" (owner, 2026-10-11, D-008); other hosting details open.
 * One independent instance per municipality. Minimum versions only: as old as possible while still receiving vendor security updates (D-015).
-* Software and documentation in English. User interface: Swiss German (`de-ch`, no "ß") by default, prepared for more languages.
+* Software and documentation in English. User interface: Swiss German (`de-ch`, no "ß") by default; French, Italian and English can be chosen (D-056).
 
 ## Binding Rules
 
@@ -46,7 +46,7 @@ Scope: `docs/PROJECT.md`. In short: login page as entry point (no public home pa
 * LEGs as entities and all domain functions (phase 2 starts with them, D-077; see "Current Status").
 * Billing, invoicing, calculation of electricity costs or energy distribution, productive financial processes, bank file processing, payout processes.
 * AGOV integration (only prepared) and passkeys.
-* Multi-tenancy. Additional UI languages and language selection. Public home page and publication of aggregated figures (D-025).
+* Multi-tenancy. User interface languages beyond Swiss German, French, Italian and English. Public home page and publication of aggregated figures (D-025).
 
 ## Licence
 

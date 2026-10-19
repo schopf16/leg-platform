@@ -8,6 +8,7 @@ the same page when no valid state exists. The fixed pages are plain pages: GET o
 stored, the same for everybody.
 """
 
+import re
 from datetime import timedelta
 
 from django.db import transaction
@@ -494,7 +495,9 @@ class FixedPagesTests(TestCase):
                 beside_state = holder.get(reverse(name))
                 logged_in = member.get(reverse(name))
 
-                self.assertEqual(fresh.content, beside_state.content)
+                # The CSRF token of the language form differs in every response (it is masked).
+                token = re.compile(rb'name="csrfmiddlewaretoken" value="[^"]+"')
+                self.assertEqual(token.sub(b"", fresh.content), token.sub(b"", beside_state.content))
                 for page in (fresh, beside_state, logged_in):
                     html = page.content.decode()
                     for marker in (user.email, "Uniquefamilyname", NEW_ADDRESS):

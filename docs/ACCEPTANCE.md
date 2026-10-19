@@ -31,6 +31,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 ## 6. Roles and Permissions
 
 * [ ] A system administrator can create, rename and delete roles (groups), link them to permissions, assign roles and grant or remove `is_staff` and `is_superuser`. No role is hard-coded (no code, migration or fixture creates, names or checks roles).
+* [ ] Administration tables of the management data work as in D-091: staff with the `view` right see read-only tables without free text, IBAN, emails and names and cannot write (403); a system administrator edits every column in the list with one "Save", adds a row in the new row and deletes one row; every write is in the admin log and in one security event without values (automated tests `community.tests.test_admin_tables`, `test_admin_raw_tables`). **Not ticked until the browser check (input widths, new row, raw-id lookup popup, date inputs, 375 px) and the security review are done.**
 
 ## 7. Instance Configuration
 
@@ -47,7 +48,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 ## 9. Security Logging
 
-* [ ] System administrators can view the security log; retention is configurable per instance (D-018). A long session ("Stay signed in") of a staff user or system administrator is written to the log and announced by email, and a system administrator can end all sessions of another account (D-100; automated tests).
+* [ ] System administrators can view the security log; retention is configurable per instance (D-018). A long session ("Stay signed in") of a staff user or system administrator is written to the security log (no email, D-100), and a system administrator can end all sessions of another account (D-100; automated tests).
 
 ## 10. Security
 
@@ -60,7 +61,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 ## 12. Design Language
 
 * [ ] All application views follow `docs/DESIGN.md`; configured instance colours are checked for contrast (documented); status is never shown by colour alone; keyboard operation and a visible focus indicator work on all phase 1 pages.
-* [ ] Light and dark mode work only through the corner button, kept for the tab only, negative logo in dark mode; the print stylesheet hides navigation and controls; fonts and icons are served by the instance with the font licence texts (D-056).
+* [ ] Light and dark mode work only through the corner button, kept for the tab only, negative logo in dark mode; the print stylesheet hides navigation and controls; fonts and icons are served by the instance with the font licence texts (D-056). The language menu is a form (D-056, section 13).
 * [ ] The error pages (404, 403, expired link, 500) are in the portal design (`navigation/VORGABEN.md`, section 8a), show no technical detail and work without session, database and context processor (D-054, D-060). The administration start page is as in D-060.
 * [ ] Forms of the management area (D-097): one form per subject, identical wherever used (`test_form_identity.py`); a locked value comes from the page's object, never from the POST; numbers are checked while typing and on the server with the same messages; the suggestion list is a white panel under the field, usable by keyboard and touch; the cursor is in the first field on a desktop (not on a phone, not after an error); "Systemverwaltung" is the last menu entry; small buttons and back links are 44 px high on touch. Browser checks (desktop, 375 px, touch, screen reader) are part of the acceptance. **Status 2026-10-17:** server side verified (full suite, independent probe of number padding, power fields, quota, inline circuit creation, forged locked fields, hostile `next`, identical controls, one menu template). **Not verified, not ticked:** the scripts in a real browser (combobox, checks while typing, cursor, 44 px targets), touch, screen reader, 375 px.
 * [ ] Corrections after the browser acceptance (D-097, designer report UX-001 to UX-016): after a tap on a suggestion the list stays closed and the keyboard does not return; a move names the change of the transformer circuit; "Person missing?" leads back to the metering point; the next-step banner is neutral and the only message after a create; the import and log pages use the admin breadcrumbs and buttons, are 44 px high on touch and fit 375 px; the failure reason is an alert; the spinner stands still under reduced motion. **Status 2026-10-17:** covered by automated tests (`test_review_corrections.py`, `test_dialog_scripts.py`, `test_import_runner.py`, `test_logs.py`). **Not verified, not ticked:** touch on a real phone, the 375 px admin layout, screen reader, stylesheets in a real browser.
@@ -70,6 +71,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 ## 13. Language
 
 * [ ] Everything technical and all documentation is English only (`AGENTS.md`, section 2).
+* [ ] The language can be chosen with the language menu on every page (entry, error, signed-in, management area, administration pages follow): Deutsch (`de-ch`, the instance default), Français, Italiano, English; the choice is kept in the language cookie (no personal data); the browser's `Accept-Language` does not change the default; a text without a translation is English, never German; emails and background jobs stay in the instance default language (D-056). **Status 2026-10-19:** server side verified by automated tests (`leg_platform/tests/test_language.py`); `locale/fr` and `locale/it` exist with the entries of the Swiss German catalogue but **no translations yet** (`REQUIRE_COMPLETE_CATALOGS = False` in `accounts/tests/test_translations.py`). **Not verified, not ticked:** every page in a browser, the menu on a phone, screen reader.
 * [ ] All user-facing texts are translatable with a complete Swiss German translation (`de-ch`); no displayed text contains "ß" (also not from Django or third-party packages; automated check); translation files can be generated and compiled reproducibly. **Status 2026-10-17:** `msgfmt --check` exit 0, the committed `.mo` equals the compiled `.po`, no "ß" in the `.po` or any source file, no fuzzy and no untranslated own text after `makemessages` in a throw-away copy. Not verified: every page in a browser. Stale texts that no source used were removed (D-101).
 
 ## 14. Fact Base
