@@ -2190,3 +2190,301 @@ a.mgmt-sort:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---- Processes, contracts, deadlines (D-103; owner design verwaltung/vorgaenge, vertraege) ---- */
+
+/* A value that is not known yet: grey, italic, the word "open" (SEITEN-TEMPLATE, section 2). */
+.mgmt-open {
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* The work queues of the overview: the head of a queue and its oldest entries. */
+.mgmt-task-row {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-task-row:first-of-type {
+  border-top: 0;
+}
+
+.mgmt-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mgmt-task-entries {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mgmt-task-entries li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 4px 0;
+  font-size: 15px;
+}
+
+/* The progress of a process: a native element, drawn with the tokens (no inline style). */
+.mgmt-progress {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: 8px;
+  appearance: none;
+  border: 0;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.mgmt-progress::-webkit-progress-bar {
+  background: var(--line);
+}
+
+.mgmt-progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.mgmt-progress::-moz-progress-bar {
+  background: var(--accent);
+}
+
+.mgmt-progress-wide {
+  max-width: none;
+  height: 10px;
+}
+
+/* The page of a process: the steps stand in a wide column, the person and the history beside them. */
+.mgmt-process-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.mgmt-process-main .mgmt-card,
+.mgmt-process-side .mgmt-card {
+  margin: 0 0 16px;
+}
+
+.mgmt-process-end {
+  justify-content: space-between;
+}
+
+.mgmt-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 12px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.mgmt-step-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.mgmt-step-buttons form {
+  margin: 0;
+}
+
+.mgmt-way {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mgmt-way li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-way-label {
+  font-weight: 600;
+}
+
+.mgmt-way .mgmt-status {
+  min-width: 90px;
+}
+
+.mgmt-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+}
+
+.mgmt-log li {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-log li:first-child {
+  border-top: 0;
+}
+
+.mgmt-log time {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mgmt-wrap {
+  overflow-wrap: anywhere;
+}
+
+.mgmt-notices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mgmt-notice {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-notice:first-child {
+  border-top: 0;
+}
+
+.mgmt-notice-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.mgmt-notice form {
+  margin: 8px 0 0;
+}
+
+/* The actions of a contract version: icon buttons of 40 px with a name and a hint, never text (VORGABEN, section 3). */
+.mgmt-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mgmt-row-actions form {
+  margin: 0;
+}
+
+.mgmt-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.mgmt-action.is-accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mgmt-action.is-danger {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.mgmt-action:hover,
+.mgmt-action:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, var(--panel));
+}
+
+.mgmt-action:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mgmt-action-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A cell whose words wrap (the status and the date of the process list) instead of being cut. */
+.mgmt-table-fixed td.mgmt-wrap-cell {
+  white-space: normal;
+}
+
+.mgmt-wrap-cell .mgmt-status {
+  white-space: normal;
+  align-items: flex-start;
+}
+
+.mgmt-wrap-cell .mgmt-status::before {
+  margin-top: 6px;
+}
+
+/* The chapter "Reminders and deadlines" of the settings page. */
+.mgmt-deadline {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-deadline h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+@media (max-width: 1099px) {
+  .mgmt-process-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .mgmt-process-end {
+    flex-direction: column-reverse;
+  }
+
+  .mgmt-step-buttons .btn {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .mgmt-step-buttons form {
+    width: 100%;
+  }
+
+  .mgmt-row-actions {
+    margin-top: 8px;
+  }
+
+  .mgmt-action {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mgmt-task-head {
+    align-items: flex-start;
+  }
+}

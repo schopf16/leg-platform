@@ -51,6 +51,7 @@ from leg_platform.accounts.views import (
 
 CARD_ANCHORS = {
     "personal": "card-personal",
+    "bank": "card-bank",
     "email": "card-email",
     "password": "card-password",
     "two_factor": "card-two-factor",
@@ -58,6 +59,8 @@ CARD_ANCHORS = {
 }
 # Steps of the two-factor card that a person can open by address; codes are only ever the answer to a form.
 TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "lost_phone")
+# The fields of the profile that make up the address: locked once the staff confirmed the building at that address.
+ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town", "country")
 
 
 def card_url(card, step=None):
@@ -69,6 +72,71 @@ def card_url(card, step=None):
 def back_to(card):
     """Redirect to the view of a card after a success."""
     return redirect(f"{reverse('accounts:profile')}#{CARD_ANCHORS[card]}")
+
+
+# What the profile takes from the customer's side (the community services, the customer pages). Imported when used: the
+# customer pages import this module, and the profile of a staff account needs none of it.
+
+
+def address_building(user):
+    """The own building at the account's address (EGID, lock), or None (``community.buildings``, PROFIL.md section 1)."""
+    from leg_platform.community import buildings
+
+    return buildings.profile_address_building(user)
+
+
+def personal_form(user, data=None):
+    """The form of the card "Personal details"; the address fields are locked once the staff confirmed the building at
+    that address (a disabled field keeps its stored value whatever the browser posts)."""
+    form = ProfileForm(data, instance=copy.copy(user)) if data is not None else ProfileForm(instance=copy.copy(user))
+    info = address_building(user)
+    if info is not None and info.locked:
+        for name in ADDRESS_FIELDS:
+            form.fields[name].disabled = True
+    return form
+
+
+def deletion_state(user):
+    """What the card "Delete account" needs: ``released`` (no running metering point without a started deregistration
+    and no registration in flight, ``community.deregistrations``), ``can_start`` (a customer with metering points that
+    can be deregistered now: the button leads to the deregistration) and ``retained`` (the account is deactivated, not
+    deleted: a retention obligation or a metering point assignment, ``User.delete_or_deactivate``)."""
+    from leg_platform.community import deregistrations
+    from leg_platform.customer import access
+
+    released = deregistrations.deletion_released(user)
+    customer = access.is_customer(user)
+    return {
+        "released": released,
+        "customer": customer,
+        "can_start": bool(customer and not released and deregistrations.eligible_points(user)),
+        "retained": bool(user.retention_obligation or user.metering_point_assignments.exists()),
+    }
+
+
+def delete_form(request, data=None, retained=False):
+    """The confirmation of the deletion; for an account that is only deactivated the box says so."""
+    form = AccountDeleteForm(data, request=request) if data is not None else AccountDeleteForm(request=request)
+    if retained:
+        form.fields["confirm"].label = _("I know that my account will be deactivated and that this cannot be undone.")
+    return form
+
+
+def bank_context(request, editing, form):
+    """The card "Bank or postal connection" (PROFIL.md section 2): the IBAN in full (shown only to the account itself),
+    its status, the form when the card is open and the way back (``next``: a page of the customer's pages only)."""
+    from leg_platform.community import own_iban
+    from leg_platform.customer import forms as customer_forms
+    from leg_platform.customer import returns
+
+    iban = own_iban.own_iban_display(request.user)
+    context = {
+        "bank_iban": iban,
+        "bank_next": returns.safe_return_path(request.POST.get("next") or request.GET.get("next") or ""),
+    }
+    if editing:
+        context["bank_form"] = form or customer_forms.BankForm(initial={"iban": iban})
+    return context
 
 
 def two_factor_state(user, edit, step, session):
@@ -101,6 +169,12 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     only_two_factor = (
         second_factor.requires_second_factor(user) and not second_factor.is_second_factor_complete(user)
     )
+    # The card "Bank or postal connection" is the customer's (a staff account has none: it takes no part).
+    from leg_platform.customer import access as customer_access
+
+    bank_card = not only_two_factor and customer_access.is_customer(user)
+    if edit == "bank" and not bank_card:
+        edit = None
     # Messages tagged "card-<name>" go into that card; the rest, and those of a hidden card, stay on top.
     shown = {"two_factor"} if only_two_factor else set(CARD_ANCHORS)
     card_messages = {card: [] for card in CARD_ANCHORS}
@@ -108,7 +182,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     for message in messages.get_messages(request):
         tags = (message.extra_tags or "").split()
         card = next((tag[len("card-"):] for tag in tags if tag.startswith("card-")), None)
-        if card in shown:
+        if card in shown and (card != "bank" or bank_card):
             card_messages[card].append(message)
         else:
             general_messages.append(message)
@@ -124,8 +198,14 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         "privacy_url": legal_links(request).privacy_url,
         "password_rules": password_rules(),
     }
+    if not only_two_factor:
+        context["address_building"] = address_building(user)
+        context["delete_info"] = deletion_state(user)
+    context["bank_card"] = bank_card
+    if bank_card:
+        context.update(bank_context(request, edit == "bank", forms.get("bank")))
     if edit == "personal":
-        context["personal_form"] = forms.get("personal") or ProfileForm(instance=copy.copy(user))
+        context["personal_form"] = forms.get("personal") or personal_form(user)
     elif edit == "email":
         context["email_form"] = forms.get("email") or EmailChangeForm(request=request)
     elif edit == "password":
@@ -133,7 +213,9 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
             user, request=request
         )
     elif edit == "delete":
-        context["delete_form"] = forms.get("delete") or AccountDeleteForm(request=request)
+        context["delete_form"] = forms.get("delete") or delete_form(
+            request, retained=context["delete_info"]["retained"]
+        )
     if edit == "two_factor" or only_two_factor:
         state = "codes" if codes is not None else two_factor_state(user, edit, step, request.session)
         context["tf_state"] = state
@@ -190,7 +272,7 @@ class ProfileEditView(ProfileCardView):
         return render_profile(request, edit="personal")
 
     def post(self, request):
-        form = ProfileForm(request.POST, instance=copy.copy(request.user))
+        form = personal_form(request.user, request.POST)
         if not form.is_valid():
             return render_profile(request, edit="personal", forms={"personal": form}, status=200)
         form.save()
@@ -539,20 +621,46 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
 class AccountDeleteView(ProfileCardView):
     """Delete the account, or keep it deactivated under the retention rule (D-016).
 
-    The page and message are the same for every account (D-055); the answer renders the result itself because the session ends.
+    The deletion is released only when no metering point is running without a started deregistration and no registration
+    is in flight (``community.deregistrations.deletion_released``; the customer starts the deregistration from this card,
+    PROFIL.md section 6). The hook is here and not in ``User.delete_or_deactivate``: the guards of the account model stay
+    as they are. The release is checked before the proof is asked (nothing is used up) and once more under the lock of the
+    account. An account that is only deactivated is told so before (owner decision 2026-10-19, amends D-055); the answer
+    renders the result itself because the session ends.
     """
 
     def get(self, request):
         return render_profile(request, edit="delete")
 
+    @staticmethod
+    def blocked(request):
+        messages.error(
+            request,
+            _(
+                "You cannot delete your account yet: a registration is still running or a metering point is not "
+                "active yet. Withdraw the registration on the page Buildings, or wait until the metering point is "
+                "active and deregister it."
+            ),
+            extra_tags="card-delete",
+        )
+        return back_to("delete")
+
     def post(self, request):
-        form = AccountDeleteForm(request.POST, request=request)
+        info = deletion_state(request.user)
+        if not info["released"]:
+            return self.blocked(request)
+        form = delete_form(request, request.POST, retained=info["retained"])
         if not form.is_valid():
             return render_profile(request, edit="delete", forms={"delete": form})
         user = request.user
         addresses = user.notification_addresses()
         try:
             with transaction.atomic():
+                from leg_platform.community import deregistrations
+
+                User._base_manager.select_for_update().get(pk=user.pk)
+                if not deregistrations.deletion_released(user):
+                    raise DeletionBlocked
                 # Also blanks the name in the account's queued notifications (D-068).
                 outcome = user.delete_or_deactivate()
                 event = (
@@ -563,11 +671,17 @@ class AccountDeleteView(ProfileCardView):
                 security_log.record(event, account=user, actor=user)
                 # Every address is told (D-059); the jobs hold no account key.
                 enqueue_for_account(MailJob.Kind.ACCOUNT_DELETED, user, addresses=addresses)
+        except DeletionBlocked:
+            return self.blocked(request)
         except AccountIntegrityError:
             messages.error(request, _("The account could not be deleted."), extra_tags="card-delete")
             return back_to("delete")
         logout(request)
-        return render(request, "accounts/account_deleted.html")
+        return render(request, "accounts/account_deleted.html", {"deactivated": outcome == "deactivated"})
+
+
+class DeletionBlocked(Exception):
+    """The release of the deletion was withdrawn between the first check and the lock (a parallel request)."""
 
 
 def refused_change(request):

@@ -38,7 +38,7 @@
   </dl>
   <p role="status" id="directory-warning"{% if not import_status.directory.warning %} hidden{% endif %}>{{ import_status.directory.warning }}</p>
 
-  <p class="help">{% translate "The import runs in the portal itself, you do not need to set up anything else. Addresses already entered are not changed. The result is also written to the application log and to the security log." %}</p>
+  <p class="help">{% translate "A request on this page runs in the portal itself. Addresses already entered are not changed. The result is also written to the application log and to the security log." %}</p>
   <p class="help" id="import-automatic">{{ import_status.automatic_text }}</p>
 
   <form method="post" class="import-form">{% csrf_token %}

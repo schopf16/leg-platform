@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "leg_platform.accounts",
     "leg_platform.addresses.apps.AddressesConfig",
     "leg_platform.community",
+    "leg_platform.customer",
     "leg_platform.management",
     # Replaces django.contrib.admin; checks the second factor (D-040).
     "leg_platform.admin_site.PortalAdminConfig",

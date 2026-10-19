@@ -77,7 +77,7 @@ PORTAL_SETTINGS_URL = reverse("admin:accounts_portalsettings_change", args=(1,))
 SECOND = "second.address@example.org"
 NEW = "new.address@example.org"
 
-CARDS = ("personal", "email", "password", "two_factor", "delete")
+CARDS = ("personal", "bank", "email", "password", "two_factor", "delete")
 TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "codes")
 # The pages and actions of a logged-in person that are addressed by name.
 LOGGED_IN_NAMES = (

@@ -11,6 +11,8 @@ LIST_KEYS = (
     "legs",
     "leg_metering_points",
     "metering_points",
+    "processes",
+    "contracts",
 )
 MIN_COLUMN_WIDTH = 90
 MAX_COLUMN_WIDTH = 2000

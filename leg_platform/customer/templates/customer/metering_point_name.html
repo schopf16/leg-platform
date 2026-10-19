@@ -1,0 +1,19 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Edit metering point" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Edit metering point" %}</h1>
+    <p class="start-sub mp-num">{{ point.number }}</p>
+    <form method="post" class="step-card" novalidate data-submit-once>
+      {% csrf_token %}
+      {% include "accounts/_error_summary.html" %}
+      {% include "accounts/_field.html" with field=form.name optional=True %}
+      <div class="step-actions">
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

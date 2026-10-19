@@ -59,8 +59,21 @@ EMAIL_TEXT_PROCESSES = (
     ),
     (
         _("Account"),
-        (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES, _Key.ALL_SESSIONS_ENDED),
+        (_Key.ACCOUNT_DELETED, _Key.SESSION_ENDED_WRONG_CODES, _Key.ALL_SESSIONS_ENDED, _Key.IBAN_CHANGED),
     ),
+    (
+        _("Application"),
+        (
+            _Key.APPLICATION_SUBMITTED,
+            _Key.APPLICATION_REMINDER,
+            _Key.CONTRACT_REMINDER,
+            _Key.BANK_CONNECTION_MISSING,
+            _Key.APPLICATION_ROLLED_BACK,
+            _Key.CONTRACT_ROLLED_BACK,
+            _Key.OPERATOR_CONFIRMATION_LAPSED,
+        ),
+    ),
+    (_("Deregistration"), (_Key.DEREGISTRATION_SUBMITTED, _Key.DEREGISTRATION_EFFECTIVE)),
 )
 
 

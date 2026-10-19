@@ -347,7 +347,7 @@ class SwitchTests(TestCase):
             "data:text/html,x",
             "https:evil.example",
             "http://testserver.evil.example/",
-            "http://testserver@evil.example/",
+            "http://testserver@evil.example.org/",
             " //evil.example",
         ):
             with self.subTest(target=target):

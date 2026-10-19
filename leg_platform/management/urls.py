@@ -3,7 +3,16 @@ URL names start with the menu key (``navigation.MENU``)."""
 
 from django.urls import path
 
-from leg_platform.management import leg_views, location_views, person_views, views
+from leg_platform.management import (
+    contract_views,
+    deadline_views,
+    leg_views,
+    location_views,
+    person_views,
+    process_actions,
+    process_views,
+    views,
+)
 from leg_platform.management import metering_point_views as mp_views
 from leg_platform.management.printing import views as print_views
 
@@ -13,8 +22,58 @@ urlpatterns = [
     path("", views.OverviewView.as_view(), name="overview"),
     path("settings/", views.SettingsView.as_view(), name="settings"),
     path("settings/check/", views.SettingsFieldCheckView.as_view(), name="settings_check"),
+    path("settings/deadlines/", deadline_views.DeadlinesView.as_view(), name="settings_deadlines"),
     # The saved column widths of the lists (any list).
     path("lists/<slug:list_key>/widths/", location_views.ListWidthsView.as_view(), name="list_widths"),
+    # Processes: the running applications and deregistrations, and the notices for the staff (D-103)
+    path("processes/", process_views.ProcessListView.as_view(), name="processes"),
+    path("processes/notices/", process_views.NoticesView.as_view(), name="processes_notices"),
+    path(
+        "processes/notices/<int:pk>/resolve/", process_views.NoticeResolveView.as_view(),
+        name="processes_notice_resolve",
+    ),
+    path(
+        "processes/applications/<int:pk>/", process_views.ApplicationDetailView.as_view(),
+        name="processes_application",
+    ),
+    path(
+        "processes/applications/<int:pk>/review/", process_actions.ApplicationReviewView.as_view(),
+        name="processes_application_review",
+    ),
+    path(
+        "processes/applications/<int:pk>/return/", process_actions.ApplicationReturnView.as_view(),
+        name="processes_application_return",
+    ),
+    path(
+        "processes/applications/<int:pk>/operator-started/",
+        process_actions.ApplicationOperatorStartedView.as_view(), name="processes_application_operator_started",
+    ),
+    path(
+        "processes/applications/<int:pk>/operator-confirmed/",
+        process_actions.ApplicationOperatorConfirmedView.as_view(), name="processes_application_operator_confirmed",
+    ),
+    path(
+        "processes/applications/<int:pk>/complete/", process_actions.ApplicationCompleteView.as_view(),
+        name="processes_application_complete",
+    ),
+    path(
+        "processes/applications/<int:pk>/reject/", process_actions.ApplicationRejectView.as_view(),
+        name="processes_application_reject",
+    ),
+    path(
+        "processes/deregistrations/<int:pk>/", process_views.DeregistrationDetailView.as_view(),
+        name="processes_deregistration",
+    ),
+    path(
+        "processes/deregistrations/<int:pk>/confirm/", process_actions.DeregistrationConfirmView.as_view(),
+        name="processes_deregistration_confirm",
+    ),
+    # Contracts: the versions of the contract file (D-103)
+    path("contracts/", contract_views.ContractListView.as_view(), name="contracts"),
+    path("contracts/upload/", contract_views.ContractUploadView.as_view(), name="contracts_upload"),
+    path("contracts/<int:pk>/download/", contract_views.ContractDownloadView.as_view(), name="contracts_download"),
+    path("contracts/<int:pk>/current/", contract_views.ContractCurrentView.as_view(), name="contracts_current"),
+    path("contracts/<int:pk>/delete/", contract_views.ContractDeleteView.as_view(), name="contracts_delete"),
     # Persons (an account with a customer number; the id is the id of the account)
     path("persons/", person_views.PersonListView.as_view(), name="persons"),
     path("persons/print/", print_views.PersonPrintView.as_view(), name="persons_print"),

@@ -1,17 +1,23 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Start" %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
 {% block inner_class %}{% endblock %}
 {% block content %}
   <h1 class="start-title">{% blocktranslate with name=account.display_name %}Hello, {{ name }}{% endblocktranslate %}</h1>
   <p class="start-sub">{% translate "Customer number" %} {{ account.customer_number_display }}{% if address_line %} · {{ address_line }}{% endif %}</p>
+  {% if journey %}{% include "customer/_journey.html" %}{% endif %}
   {% if tasks %}
     <div class="task-grid">
       {% for task in tasks %}
         <article class="task-tile" aria-labelledby="task-{{ task.key }}-title">
           <div class="task-head">
             <h2 class="task-title" id="task-{{ task.key }}-title">{{ task.title }}</h2>
-            <span class="task-status"><span class="status-dot status-open" aria-hidden="true"></span>{% translate "Open" %}</span>
+            {% if task.status == "optional" %}
+              <span class="task-status"><span class="status-dot" aria-hidden="true"></span>{% translate "Optional" %}</span>
+            {% else %}
+              <span class="task-status"><span class="status-dot status-open" aria-hidden="true"></span>{% translate "Open" %}</span>
+            {% endif %}
           </div>
           <p class="task-desc">{{ task.description }}</p>
           <div class="task-actions">
@@ -21,7 +27,7 @@
                 <button type="submit" class="btn btn-secondary-action">{{ task.button }}</button>
               </form>
             {% else %}
-              <a class="btn btn-secondary-action" href="{{ task.url }}">{{ task.button }}</a>
+              <a class="btn {% if task.button_style == 'primary' %}btn-primary{% else %}btn-secondary-action{% endif %}" href="{{ task.url }}">{{ task.button }}</a>
             {% endif %}
             <form method="post" action="{% url 'accounts:task_hide' task.key %}">
               {% csrf_token %}
@@ -31,7 +37,7 @@
         </article>
       {% endfor %}
     </div>
-  {% else %}
+  {% elif not journey %}
     <div class="empty-state">
       <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-check"/></svg></span>
       <h2>{% translate "No open tasks" %}</h2>

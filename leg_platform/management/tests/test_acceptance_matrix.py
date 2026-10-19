@@ -17,16 +17,27 @@ date with the URL configuration (that is the point: nobody adds a route without 
 
 import calendar
 from collections import namedtuple
+from datetime import date as date_type
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection, transaction
 from django.test import Client, TestCase, tag
 from django.urls import resolve, reverse
 from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.community import application_notices, application_staff, applications, contracts, deregistrations
 from leg_platform.community.models import (
+    Application,
+    ApplicationBuilding,
+    ApplicationMeteringPoint,
+    ApplicationNotice,
+    ContractAcceptance,
+    ContractVersion,
+    Deregistration,
+    DeregistrationItem,
     HistoryEntry,
     Leg,
     LegAssignment,
@@ -39,6 +50,7 @@ from leg_platform.community.models import (
     ShareChange,
     TransformerCircuit,
 )
+from leg_platform.community.tests import onboarding
 from leg_platform.community.tests.helpers import (
     assign_leg,
     assign_person,
@@ -68,6 +80,10 @@ def month_end(day):
 SNAPSHOT_MODELS = (
     Location, TransformerCircuit, MeteringPoint, Leg, LegAssignment, PersonAssignment, HistoryEntry,
     ManagementSettings, PersonRecord, ShareChange,
+    # The onboarding (D-103): applications and their draft rows, notices, contract versions and acceptances,
+    # deregistrations.
+    Application, ApplicationBuilding, ApplicationMeteringPoint, ApplicationNotice, ContractVersion,
+    ContractAcceptance, Deregistration, DeregistrationItem,
 )
 
 
@@ -100,6 +116,9 @@ SAMPLE = frozenset({
     "locations", "locations_detail", "locations_address", "locations_circuit", "locations_metering_point_assign",
     "metering_points_detail", "metering_points_notify", "metering_points_edit", "legs_metering_point_assign",
     "legs", "legs_quota", "legs_delete",
+    "settings_deadlines", "processes", "processes_application", "processes_application_complete",
+    "processes_application_review", "processes_notice_resolve", "processes_deregistration_confirm",
+    "contracts", "contracts_upload", "contracts_download", "contracts_current", "contracts_delete",
 })
 
 
@@ -152,6 +171,38 @@ class MatrixBase(TestCase):
         assign_leg(cls.point_active, cls.leg, d - timedelta(days=30))
         cls.active_assignment = assign_person(cls.point_active, cls.anna, d - timedelta(days=30))
         cls.future_assignment = assign_person(cls.point_future, cls.anna, d + timedelta(days=30))
+        cls.setup_onboarding(d)
+
+    @classmethod
+    def setup_onboarding(cls, d):
+        """The onboarding data of the process, notice and contract pages: one application per step of the staff, a
+        deregistration to confirm, an open notice and three contract versions (D-103)."""
+        onboarding.configure_numbers()
+        cls.contract_current = onboarding.publish_contract(staff=cls.staff)
+        cls.contract_extra = contracts.upload_version(cls.staff, onboarding.pdf(b"\n% extra"), date_type(2026, 1, 5))
+        cls.contract_delete = contracts.upload_version(cls.staff, onboarding.pdf(b"\n% delete"), date_type(2026, 2, 5))
+        cls.kunde = create_active_user("kunde.person@example.org", first_name="Kunde", last_name="Beispiel")
+        made = []
+        for index in range(6):
+            application, _building = onboarding.ready_draft(
+                cls.kunde, egid=90010000 + index, number=100 + 10 * index,
+                address={"house_number": str(60 + index)},
+            )
+            applications.submit(cls.kunde, application, today=onboarding.TODAY)
+            application.refresh_from_db()
+            made.append(application)
+        (cls.app_review, cls.app_return, cls.app_start, cls.app_confirm, cls.app_complete, cls.app_reject) = made
+        application_staff.mark_operator_started(cls.app_confirm, cls.staff, d - timedelta(days=20), today=d)
+        application_staff.mark_operator_started(cls.app_complete, cls.staff, date_type(2026, 6, 1), today=d)
+        application_staff.record_operator_confirmation(cls.app_complete, cls.staff, date_type(2026, 7, 1), today=d)
+        cls.notice = application_notices.record(cls.kunde, application_notices.Kind.BUILDING_UNAVAILABLE, egid=12345678)
+        cls.place_dereg = make_location("Abmeldeweg", "4", "3000", "Bern")
+        cls.point_dereg = make_metering_point(
+            80, location=cls.place_dereg, registered_with_operator_on=d - timedelta(days=40),
+            confirmed_on=d - timedelta(days=39), start_date=d - timedelta(days=30),
+        )
+        assign_person(cls.point_dereg, cls.anna, d - timedelta(days=30))
+        cls.dereg = deregistrations.request_deregistration(cls.anna, metering_point_ids=[cls.point_dereg.pk], today=d)
 
     def login(self, user, **kwargs):
         client = VerifiedClient(**kwargs)
@@ -170,7 +221,39 @@ class MatrixBase(TestCase):
                 "sender_town": "Bern",
             }, changes=True),
             Case("settings_check", query={"field": "identifier", "value": "x"}),
+            Case("settings_deadlines", data={
+                "reminder_after_days": "3", "rollback_after_days": "15", "contract_deadline_days": "15",
+                "operator_confirmation_days": "15", "iban_missing_reminder_days": "8", "run_time": "04:30",
+            }, changes=True),
             Case("list_widths", ("locations",), {"widths": {"street": 200}}, json=True),
+            # Processes and notices (D-103)
+            Case("processes"),
+            Case("processes_notices"),
+            Case("processes_notice_resolve", pk(self.notice), {}, True),
+            Case("processes_application", pk(self.app_review)),
+            Case("processes_application_review", pk(self.app_review), {}, True),
+            Case("processes_application_return", pk(self.app_return), {}, True),
+            Case("processes_application_operator_started", pk(self.app_start), {"started_on": date(0)}, True),
+            Case("processes_application_operator_confirmed", pk(self.app_confirm), {"confirmed_on": date(0)}, True),
+            Case(
+                "processes_application_complete", pk(self.app_complete),
+                {"start_date": "2026-09-01", "confirm_addresses": "0"}, True,
+            ),
+            Case("processes_application_reject", pk(self.app_reject), {"reason": "rejected"}, True),
+            Case("processes_deregistration", pk(self.dereg)),
+            Case(
+                "processes_deregistration_confirm", pk(self.dereg),
+                {"confirmed_date": month_end(d + timedelta(days=130)).isoformat()}, True,
+            ),
+            # Contracts (D-103)
+            Case("contracts"),
+            Case("contracts_upload", data={
+                "file": SimpleUploadedFile("upload.pdf", onboarding.pdf(b"\n% uploaded"), content_type="application/pdf"),
+                "version_date": date(0),
+            }, changes=True),
+            Case("contracts_download", pk(self.contract_current)),
+            Case("contracts_current", pk(self.contract_extra), {}, True),
+            Case("contracts_delete", pk(self.contract_delete), {}, True),
             # Persons
             Case("persons"),
             Case("persons_print", data={"scope": "list"}),
@@ -385,6 +468,7 @@ class NegativeAuthorizationTests(MatrixBase):
         pages = {
             "overview", "settings", "persons", "persons_detail", "locations", "locations_detail",
             "metering_points", "metering_points_detail", "legs", "legs_detail",
+            "processes", "processes_notices", "processes_application", "processes_deregistration", "contracts",
         }
         for case in self.cases():
             if case.name in pages:

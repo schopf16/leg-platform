@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}The IBAN stored for your account at {{ instance_name }} was changed.{% endblocktranslate %}
+
+{% translate "If you did not do this, sign in and check the IBAN, and contact the operator immediately." %}
+
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% endautoescape %}

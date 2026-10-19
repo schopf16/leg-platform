@@ -25,9 +25,16 @@ from django.urls import reverse
 from leg_platform.accounts.management.commands import setup_instance
 from leg_platform.accounts.models import SecurityEvent, User
 from leg_platform.accounts.tests.helpers import create_active_user
-from leg_platform.addresses.models import Directory
+from leg_platform.addresses.models import Directory, ImportRequest
 from leg_platform.addresses.storage import DIRECTORY_ALIAS
 from leg_platform.environment import parse_bootstrap_administrator
+
+
+def addresses_migration_count():
+    """The migrations of the addresses app in the migration graph (the number the setup command reports)."""
+    from django.db.migrations.loader import MigrationLoader
+
+    return len([node for node in MigrationLoader(None, ignore_no_migrations=True).graph.nodes if node[0] == "addresses"])
 
 EMAIL_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_EMAIL"
 PASSWORD_VARIABLE = "BOOTSTRAP_SYSTEM_ADMIN_PASSWORD"
@@ -98,7 +105,7 @@ class SetupInstanceTests(TransactionTestCase):
         # in the SQLite file and are created by `migrate addresses --database=addresses` (D-075).
         self.assertIn("addresses_importrequest", connection.introspection.table_names())
         self.assertNotIn("addresses_directory", connection.introspection.table_names())
-        self.assertIn("Database migrations: 3 applied.", output)
+        self.assertIn(f"Database migrations: {addresses_migration_count()} applied.", output)
         user = User.objects.get()
         self.assertTrue(user.is_superuser and user.is_staff and user.is_active)
         self.assertTrue(user.password_change_required)
@@ -207,12 +214,15 @@ class SetupInstanceTests(TransactionTestCase):
         self.assertFalse({"addresses_directory", "addresses_address"} & set(tables))
         columns = {column.name for column in connection.introspection.get_table_description(
             connection.cursor(), "addresses_importrequest")}
-        self.assertEqual(columns, {
+        # Every column of the model: the migrations 0002 to 0006 added the later ones to the queue table. The
+        # columns of the first versions are named so that a dropped one is noticed.
+        self.assertEqual(columns, {field.column for field in ImportRequest._meta.concrete_fields})
+        self.assertLessEqual({
             "id", "state", "requested_at", "started_at", "finished_at",
             "last_automatic_attempt_at", "is_automatic", "last_failed_repair_at",
             # Progress and last error of the import in the web process (migration 0003, D-090).
             "claim_token", "heartbeat_at", "phase", "bytes_done", "bytes_total", "rows_done", "last_error",
-        })
+        }, columns)
 
         output = self.run_command()
 
@@ -499,7 +509,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                     {"django_migrations", "addresses_address", "addresses_directory"},
                 )
         self.assertEqual(errors, "")
-        self.assertIn("Address directory: file prepared, 3 migration(s) applied.", output)
+        self.assertIn(f"Address directory: file prepared, {addresses_migration_count()} migration(s) applied.", output)
         self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
 
     def test_a_second_run_changes_nothing_in_the_directory(self):
@@ -525,7 +535,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
 
                 output, _errors = self.run_command()
 
-                self.assertIn("file prepared, 3 migration(s) applied", output)
+                self.assertIn(f"file prepared, {addresses_migration_count()} migration(s) applied", output)
                 self.assertIn("addresses_directory", alias.introspection.table_names())
 
     def test_a_directory_path_that_cannot_be_used_is_reported_and_does_not_stop_the_administrator(self):

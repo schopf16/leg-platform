@@ -1,0 +1,12 @@
+{% extends "customer/wizard_base.html" %}
+{% load i18n %}
+{% block heading %}{% translate "Where should we transfer your compensation?" %}{% endblock %}
+{% block lead %}{% translate "Enter your bank or postal connection. With it we pay you for the electricity you feed in." %}{% endblock %}
+{% block step %}
+  <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Bank or postal connection' %}">
+    {% csrf_token %}
+    {% include "accounts/_error_summary.html" %}
+    {% include "customer/_field.html" with field=form.iban %}
+    {% include "customer/_step_actions.html" %}
+  </form>
+{% endblock %}

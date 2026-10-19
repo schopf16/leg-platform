@@ -1,0 +1,6 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your deregistration at {{ instance_name }} was received. The date is confirmed by the operator of this portal. You can follow the progress after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+{% endautoescape %}

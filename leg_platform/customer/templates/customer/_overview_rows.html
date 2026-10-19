@@ -1,0 +1,21 @@
+{% load i18n %}{% comment %}
+The five rows of the registration (EINSTIEG.md): number, name, one sentence and the state on the right. Green ("Already on file")
+means the wizard skips the step; "Change" leads to where the detail is kept. A state is a dot plus a word. Context: ``rows``, ``title``.
+{% endcomment %}<section class="step-card" aria-labelledby="rows-title">
+  <h2 id="rows-title">{{ title }}</h2>
+  <ol class="overview-rows">
+    {% for row in rows %}
+      <li class="overview-row{% if row.state == 'known' %} is-known{% endif %}">
+        <span class="overview-number" aria-hidden="true">{{ row.number }}</span>
+        <div class="overview-text">
+          <p class="overview-name">{{ row.name }}{% if row.tag %} <span class="row-tag">{% translate "only with feed-in" %}</span>{% endif %}</p>
+          <p class="muted">{{ row.text }}</p>
+        </div>
+        <div class="overview-state">
+          <span class="dotword"><span class="dot tone-{% if row.state == 'known' or row.state == 'done' %}ok{% else %}muted{% endif %}" aria-hidden="true"></span>{% if row.state == 'known' %}{% translate "Already on file" %}{% elif row.state == 'done' %}{% translate "Finished" %}{% else %}{% translate "Open" %}{% endif %}</span>
+          {% if row.change_url %}<a class="btn btn-secondary-action btn-small" href="{{ row.change_url }}">{% translate "Change" %}<span class="visually-hidden"> – {{ row.name }}</span></a>{% endif %}
+        </div>
+      </li>
+    {% endfor %}
+  </ol>
+</section>

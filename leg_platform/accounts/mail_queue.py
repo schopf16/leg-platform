@@ -66,6 +66,17 @@ HANDLERS = {
     MailJob.Kind.CODE_ATTEMPTS_WARNING: _notification(emails.send_code_attempts_warning),
     MailJob.Kind.TWO_FACTOR_RESET: _notification(emails.send_two_factor_reset),
     MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted, greets=False),
+    # Onboarding of customers (D-103).
+    MailJob.Kind.APPLICATION_SUBMITTED: _notification(emails.send_application_submitted),
+    MailJob.Kind.APPLICATION_REMINDER: _notification(emails.send_application_reminder),
+    MailJob.Kind.APPLICATION_ROLLED_BACK: _notification(emails.send_application_rolled_back),
+    MailJob.Kind.CONTRACT_REMINDER: _notification(emails.send_contract_reminder),
+    MailJob.Kind.CONTRACT_ROLLED_BACK: _notification(emails.send_contract_rolled_back),
+    MailJob.Kind.BANK_CONNECTION_MISSING: _notification(emails.send_bank_connection_missing),
+    MailJob.Kind.DEREGISTRATION_SUBMITTED: _notification(emails.send_deregistration_submitted),
+    MailJob.Kind.DEREGISTRATION_EFFECTIVE: _notification(emails.send_deregistration_effective),
+    MailJob.Kind.IBAN_CHANGED: _notification(emails.send_iban_changed),
+    MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED: _notification(emails.send_operator_confirmation_lapsed),
 }
 
 # Handlers of jobs about an account get the account key and the address (D-044).

@@ -1,0 +1,84 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list "Contracts" (LEG-Design-Vorgaben/verwaltung/vertraege/VORGABEN.md and referenz/vertraege-liste-desktop; D-103): one row
+per uploaded file, newest first; columns file name, status (Current, Uploaded, Older), uploaded, acceptances, actions. The
+actions are icon buttons of 40 px with an accessible name and a hint: download (any version), set as current (a version that
+is not current), delete (not current, never current, no acceptance); an action that is not allowed is not drawn and the
+hint under the list says why. "Upload a new version" is a text button, blue, top right. Below the list the history (event,
+file name, who; never content). On a phone one card per version. No link column: a version has no page.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-contracts{% endblock %}
+{% block header_actions %}<a class="btn btn-primary" href="{{ upload_url }}">{% translate "Upload a new version" %}</a>{% endblock %}
+{% block page_content %}
+  {% if no_current %}
+    <div class="mgmt-banner mgmt-banner-lines" role="status"><p>{% translate "No version is current. Customers cannot accept the contract until a version is set as current." %}</p></div>
+  {% endif %}
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for row in entries %}
+            <tr>
+              <td><div class="mgmt-cut tnum" title="{{ row.file_name }}">{{ row.file_name }}</div></td>
+              <td>{% include "management/_status.html" with tone=row.state_tone label=row.state_label %}</td>
+              <td class="tnum">{{ row.uploaded }}</td>
+              <td class="tnum">{{ row.acceptances }}</td>
+              <td>{% include "management/contracts/_actions.html" %}</td>
+            </tr>
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=list_columns|length text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for row in entries %}
+        <article class="mgmt-place">
+          <div class="mgmt-place-addr tnum">{{ row.file_name }}</div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Status" %}</dt><dd>{% include "management/_status.html" with tone=row.state_tone label=row.state_label %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Uploaded" %}</dt><dd class="tnum">{{ row.uploaded }}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Acceptances" %}</dt><dd class="tnum">{{ row.acceptances }}</dd></div>
+          </dl>
+          {% include "management/contracts/_actions.html" %}
+        </article>
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+  <p class="mgmt-hint">{% translate "A version can only be deleted when it is not current and nobody has accepted it." %}</p>
+
+  <section class="mgmt-card mgmt-card-flush" aria-labelledby="history-title">
+    <div class="mgmt-card-head mgmt-card-pad"><h2 id="history-title">{% translate "History" context "contract" %}</h2></div>
+    <div class="mgmt-table-view">
+      <table class="mgmt-table mgmt-history">
+        <thead><tr><th>{% translate "Date" %}</th><th>{% translate "Event" %}</th><th>{% translate "File name" %}</th><th>{% translate "By" context "contract" %}</th></tr></thead>
+        <tbody>
+          {% for entry in history %}
+            <tr><td>{{ entry.time|date:"d.m.Y" }}</td><td>{{ entry.label }}</td><td class="tnum">{{ entry.file_name|default:"–" }}</td><td>{{ entry.actor|default:"–" }}</td></tr>
+          {% empty %}
+            {% translate "No entries yet." as empty_history %}
+            {% include "management/_empty_row.html" with colspan=4 text=empty_history %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
+      {% for entry in history %}
+        <div class="mgmt-fact"><dt>{{ entry.time|date:"d.m.Y" }}</dt><dd>{{ entry.label }}<br><span class="tnum">{{ entry.file_name|default:"–" }}</span>{% if entry.actor %}<br>{{ entry.actor }}{% endif %}</dd></div>
+      {% empty %}
+        <p class="mgmt-empty-text">{% translate "No entries yet." %}</p>
+      {% endfor %}
+    </dl>
+  </section>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

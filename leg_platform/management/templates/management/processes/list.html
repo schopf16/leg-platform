@@ -1,0 +1,84 @@
+{% extends "management/page.html" %}
+{% load i18n static management_ui %}{% comment %}
+The list "Processes" (LEG-Design-Vorgaben/verwaltung/vorgaenge/referenz/vorgaenge-liste-desktop; D-103): the running
+applications and deregistrations in one table, the kind in a column and in a filter. On a desktop a table, on a phone one card
+per process. The name is plain text (the link icon at the right opens the page of the process); the status is a dot and a
+word; missing values are the grey word "open", never a dash; the progress is a native progress element with its words.
+Drafts are never listed (KONZEPT 5.6). No warning triangle and no button "Filter problems": no problems of processes are
+defined (LISTEN-STANDARD, section 12). The button "Notices" appears only while the staff has open notices. The page works
+without a script: the filters are a GET form.
+{% endcomment %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-processes{% endblock %}
+{% block header_actions %}
+  {% if notice_count %}<a class="btn btn-warning-outline" href="{{ notices_url }}">{% blocktranslate %}Notices ({{ notice_count }}){% endblocktranslate %}</a>{% endif %}
+{% endblock %}
+{% block page_content %}
+  {% translate "Name, customer number, address or EGID" as search_placeholder %}
+  {% include "management/_list_form_start.html" %}
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Kind" %}</span>
+      <select name="kind" class="form-select" data-autosubmit>
+        {% for value, text in kind_options %}<option value="{{ value }}"{% if value == list_state.values.kind %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="mgmt-filter mgmt-filter-select">
+      <span class="mgmt-filter-label">{% translate "Status" %}</span>
+      <select name="state" class="form-select" data-autosubmit>
+        {% for value, text in state_options %}<option value="{{ value }}"{% if value == list_state.values.state %} selected{% endif %}>{{ text }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
+  </form>
+
+  <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
+    <div class="mgmt-table-view mgmt-list-card">
+      <table class="mgmt-table mgmt-table-fixed">
+        {% include "management/_list_head.html" %}
+        <tbody>
+          {% for entry in entries %}
+            {% with row=entry.row %}
+            <tr>
+              <td><div class="mgmt-cut mgmt-person-name" title="{{ row.person_name }}">{{ row.person_name }}</div><div class="mgmt-cut mgmt-person-contact tnum">{{ row.person_number }}</div></td>
+              <td>{{ entry.kind_label }}</td>
+              <td>{% if row.address %}<div class="mgmt-cut" title="{{ row.address }}">{{ row.address }}{% if entry.more_text %} <span class="mgmt-muted">{{ entry.more_text }}</span>{% endif %}</div>{% if entry.egid_text %}<div class="mgmt-cut mgmt-person-contact tnum">{{ entry.egid_text }}</div>{% endif %}{% else %}{% include "management/_open.html" %}{% endif %}</td>
+              <td class="tnum">{{ row.points }}</td>
+              <td class="mgmt-wrap-cell">{% include "management/_status.html" with tone=entry.state_tone label=entry.state_label %}</td>
+              <td><progress class="mgmt-progress" value="{{ row.progress_done }}" max="{{ row.progress_total }}" aria-label="{{ entry.progress_text }}"></progress><div class="mgmt-person-contact">{{ entry.progress_text }}</div></td>
+              <td class="tnum mgmt-wrap-cell">{% if entry.date_text %}{{ entry.date_text }}{% else %}{% include "management/_open.html" %}{% endif %}<div class="mgmt-person-contact">{{ entry.date_label }}</div></td>
+              <td class="tnum">{{ entry.changed_text }}</td>
+              <td class="mgmt-link-col">{% translate "Go to the process" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=row.person_name %}</td>
+            </tr>
+            {% endwith %}
+          {% empty %}
+            {% include "management/_empty_row.html" with colspan=list_columns|length|add:1 text=empty_text %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mgmt-cards-view">
+      {% for entry in entries %}
+        {% with row=entry.row %}
+        <article class="mgmt-place">
+          <div class="mgmt-place-addr">{{ row.person_name }}{% translate "Go to the process" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=row.person_name %}</div>
+          <div class="mgmt-place-sub">{{ entry.kind_label }} · {{ row.person_number }}</div>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Building" %}</dt><dd>{% if row.address %}{{ row.address }}{% if entry.more_text %} {{ entry.more_text }}{% endif %}{% if entry.egid_text %}<br><span class="mgmt-muted tnum">{{ entry.egid_text }}</span>{% endif %}{% else %}{% include "management/_open.html" %}{% endif %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Status" %}</dt><dd>{% include "management/_status.html" with tone=entry.state_tone label=entry.state_label %}</dd></div>
+            <div class="mgmt-fact"><dt>{% translate "Progress" %}</dt><dd>{{ entry.progress_text }}</dd></div>
+            <div class="mgmt-fact"><dt>{{ entry.date_label }}</dt><dd class="tnum">{% if entry.date_text %}{{ entry.date_text }}{% else %}{% include "management/_open.html" %}{% endif %}</dd></div>
+          </dl>
+        </article>
+        {% endwith %}
+      {% empty %}
+        <p class="mgmt-empty-text">{{ empty_text }}</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "management/_list_foot.html" %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/list.js' %}"></script>
+{% endblock %}

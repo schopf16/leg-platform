@@ -13,7 +13,12 @@ BODY_LIMITS = (
     ("/addresses/lookup/", 4096),
     # The language menu: two short fields and the CSRF token (the address of the page can be long).
     ("/language/", 8192),
+    # The customer's pages (D-103): short text fields and the CSRF token; no upload.
+    ("/participation/", 16384),
     ("/admin/accounts/portalsettings", 3 * 1024 * 1024),
+    # The upload of a contract version (D-103): the PDF is at most 10 MiB (``community.contract_pdf.MAX_SIZE``) plus
+    # the date, the token and the multipart framing. Staff only, but the limit holds before the login is checked.
+    ("/management/contracts/upload", 10 * 1024 * 1024 + 256 * 1024),
 )
 
 
@@ -24,20 +29,23 @@ def body_limit(path):
 
 
 class NoStoreForManagementMiddleware:
-    """No response of the management area is cached, whatever it is: also the 403 and 404 pages and
-    the CSRF refusal, which the view decorators never see (security review of block 1, L-3). The
-    pages show customer data and the answer to "may I see this" must not be kept by a browser or
-    a proxy. Outermost of the project's own middleware, so that every response of the prefix passes.
+    """No response of the management area or of the customer's pages is cached, whatever it is: also the 403 and
+    404 pages and the CSRF refusal, which the view decorators never see (security review of block 1, L-3; the
+    pages review of the customer pages). The pages show customer data and the answer to "may I see this" must
+    not be kept by a browser or a proxy. Outermost of the project's own middleware, so that every response of
+    a prefix passes. (The name is kept: ``settings.MIDDLEWARE`` names it.)
     """
 
-    PREFIX = "/management/"
+    PREFIXES = ("/management/", "/participation/")
+    PREFIX = PREFIXES[0]
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         response = self.get_response(request)
-        if request.path_info.startswith(self.PREFIX) or request.path_info == self.PREFIX.rstrip("/"):
+        path = request.path_info
+        if any(path.startswith(prefix) or path == prefix.rstrip("/") for prefix in self.PREFIXES):
             add_never_cache_headers(response)
         return response
 

@@ -19,7 +19,7 @@ SETUP_URL = reverse("accounts:two_factor_setup")
 HOME_URL = reverse("home")
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")
-LATER = ("Rechnungen", "Energie", "Mitteilungen")  # "Locations" is a real page of the management area (D-078)
+LATER = ("Rechnung", "Energie", "Mitteilung")  # a customer's names are singular (MENU-STANDARD.md); "Locations" is a real page of the management area (D-078)
 
 
 def login(user=None):
@@ -87,12 +87,17 @@ class FrameTests(TestCase):
         self.assertNotRegex(profile_menu, r'class="frame-item is-active" href="/"')
 
     def test_the_later_entries_are_no_links_and_say_so(self):
-        # K10: no href, aria-disabled and a hidden note, in the menu and in the bottom bar.
+        # K10: no href, aria-disabled and a hidden note, in the menu of a customer and in the menu and the bottom bar of
+        # staff (a customer's bottom bar has no entry that is "later", START-SEITE.md, section 7).
         html = self.client.get(HOME_URL).content.decode()
-        for container in (
-            part(html, '<nav class="frame-menu', "</nav>"),
-            part(html, '<nav class="frame-bottombar', "</nav>"),
-        ):
+        containers = [part(html, '<nav class="frame-menu', "</nav>")]
+        staff = create_active_user("later.staff@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        staff_client = VerifiedClient()
+        staff_client.force_login(staff)
+        staff_html = staff_client.get(HOME_URL).content.decode()
+        containers += [part(staff_html, '<nav class="frame-menu', "</nav>"), part(staff_html, '<nav class="frame-bottombar', "</nav>")]
+        for container in containers:
             later = re.findall(r'<a class="frame-(?:item|tab) is-later"[^>]*>', container)
             self.assertGreaterEqual(len(later), 3)
             for tag_text in later:
@@ -100,6 +105,7 @@ class FrameTests(TestCase):
                 self.assertNotIn("href", tag_text)
             self.assertIn("später", container)
             self.assertIn("noch nicht verfügbar", container)
+        self.assertNotIn("is-later", part(html, '<nav class="frame-bottombar', "</nav>"))
 
     def test_the_menu_logs_out_with_a_post_form_and_has_the_legal_links(self):
         html = self.client.get(HOME_URL).content.decode()
@@ -128,19 +134,35 @@ class FrameTests(TestCase):
         self.assertNotIn("<a ", menu)
         self.assertIn("<span>Datenschutz</span>", menu)
 
-    def test_the_bottom_bar_has_four_entries_and_profile_is_not_one_of_them(self):
+    def test_the_bottom_bar_of_a_customer_has_start_participation_information_and_profile(self):
+        # START-SEITE.md, section 7 (the owner, 2026-10-19): the bar of a staff account is unchanged (below).
         html = self.client.get(HOME_URL).content.decode()
         bar = part(html, '<nav class="frame-bottombar', "</nav>")
         labels = re.findall(r"<span>([^<]+)</span>", bar)
-        self.assertEqual(labels, ["Start", "Energie", "Rechnungen", "Standorte"])
-        self.assertNotIn("Profil", bar)
+        self.assertEqual(labels, ["Start", "Teilnahme", "Information", "Profil"])
         self.assertIn('class="frame-tab is-active"', bar)
 
-    def test_on_the_profile_no_entry_of_the_bottom_bar_is_active(self):
-        # K4.
+    def test_the_bottom_bar_of_a_staff_account_is_unchanged(self):
+        staff = create_active_user("bar.staff@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        client = VerifiedClient()
+        client.force_login(staff)
+        bar = part(client.get(HOME_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Energie", "Rechnungen", "Standorte"])
+        self.assertNotIn("Profil", bar)
+
+    def test_on_the_profile_only_the_profile_entry_of_the_bottom_bar_is_active(self):
+        # K4 for staff (no profile entry in the bar); a customer's bar has one and marks it.
         bar = part(self.client.get(PROFILE_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
-        self.assertNotIn("is-active", bar)
-        self.assertNotIn("aria-current", bar)
+        self.assertEqual(bar.count("is-active"), 1)
+        self.assertIn(f'<a class="frame-tab is-active" href="{PROFILE_URL}" aria-current="page">', bar)
+        staff = create_active_user("profile.staff@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        client = VerifiedClient()
+        client.force_login(staff)
+        staff_bar = part(client.get(PROFILE_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
+        self.assertNotIn("is-active", staff_bar)
+        self.assertNotIn("aria-current", staff_bar)
 
     def test_administration_is_in_the_menu_for_accounts_that_can_use_it_only(self):
         # K13, D-102: not for a member, not for staff without any right of the administration, yes for a system
@@ -294,6 +316,9 @@ class StartPageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = create_active_user()
+        # These tests are about the tiles of the account itself; the tile "Register building" (D-103) has its own tests
+        # (``customer/tests/test_start_page.py``) and is hidden here.
+        HiddenTask.objects.create(user=cls.user, task_key="register_building")
 
     def setUp(self):
         self.client, _user = login(self.user)
@@ -357,6 +382,7 @@ class StartPageTests(TestCase):
         incomplete = create_active_user(
             "no.address@example.org", street="", house_number="", town="", swiss_postal_code=None
         )
+        HiddenTask.objects.create(user=incomplete, task_key="register_building")
         client, _user = login(incomplete)
         html = client.get(HOME_URL).content.decode()
         self.assertEqual(html.count('<article class="task-tile"'), 2)
@@ -386,6 +412,7 @@ class StartPageTests(TestCase):
 
     def test_a_done_task_disappears_and_the_empty_state_shows(self):
         user, _device = create_user_with_totp("done.person@example.org")
+        HiddenTask.objects.create(user=user, task_key="register_building")
         client, _user = login(user)
         html = client.get(HOME_URL).content.decode()
         self.assertEqual(html.count('<article class="task-tile"'), 0)
@@ -422,6 +449,8 @@ class HideTaskTests(TestCase):
         self.url = reverse("accounts:task_hide", args=["two_factor"])
 
     def test_hiding_removes_the_tile_for_good_on_every_device_and_after_every_login(self):
+        # The tile "Register building" (D-103) is hidden first so that the empty state shows when the last tile is gone.
+        self.client.post(reverse("accounts:task_hide", args=["register_building"]))
         response = self.client.post(self.url)
         self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
         self.assertTrue(HiddenTask.objects.filter(user=self.user, task_key="two_factor").exists())

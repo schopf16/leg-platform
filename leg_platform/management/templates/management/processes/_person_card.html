@@ -1,0 +1,14 @@
+{% load i18n %}{% comment %}
+The card "Person" of a process page (owner design ``vorgang-detail-desktop``): name, customer number, the login address
+and the second address as they stand on the page of the person (D-086), and the link to the person (where the bank
+connection is shown, D-087). Never an IBAN. Context: ``person`` (a dict of ``process_views.person_card``).
+{% endcomment %}<section class="mgmt-card" aria-labelledby="person-title">
+  <h2 id="person-title">{% translate "Person" %}</h2>
+  <dl class="mgmt-facts">
+    <div class="mgmt-fact"><dt>{% translate "Name" %}</dt><dd>{{ person.name }}{% if person.contact %}<br><span class="mgmt-muted">{{ person.contact }}</span>{% endif %}</dd></div>
+    <div class="mgmt-fact"><dt>{% translate "Customer number" %}</dt><dd class="tnum">{{ person.number }}</dd></div>
+    <div class="mgmt-fact"><dt>{% translate "Email" %}</dt><dd class="mgmt-wrap">{{ person.email }}</dd></div>
+    {% if person.second_email %}<div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd class="mgmt-wrap">{{ person.second_email }}</dd></div>{% endif %}
+  </dl>
+  <p class="mgmt-card-action"><a href="{{ person.url }}">{% translate "Open the person" %}</a></p>
+</section>

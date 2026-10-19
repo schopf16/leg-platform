@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your application at {{ instance_name }} was not completed and has been rolled back. For privacy reasons the details you entered about buildings and metering points were deleted. Your account is kept.{% endblocktranslate %}
+
+{% translate "You can start a new application at any time after you sign in:" %}
+
+{{ login_url }}
+{% endautoescape %}

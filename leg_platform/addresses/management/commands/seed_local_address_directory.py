@@ -30,6 +30,8 @@ SYNTHETIC_ROWS = (
 )
 
 MIGRATE_HINT = "python manage.py migrate addresses --database=addresses"
+# Invented building identifiers (a development machine only; the real ones come from the import).
+SYNTHETIC_EGID_BASE = 990_000_000
 
 
 def ensure_replaceable(directory, has_addresses: bool) -> None:
@@ -61,8 +63,10 @@ def replace_directory(rows=SYNTHETIC_ROWS) -> int:
                     house_number=house_number,
                     postal_code=postal_code,
                     locality=locality,
+                    egid=SYNTHETIC_EGID_BASE + number,
+                    entrance_id=0,
                 )
-                for street, house_number, postal_code, locality in rows
+                for number, (street, house_number, postal_code, locality) in enumerate(rows, start=1)
             ]
         )
         Directory.objects.update_or_create(
@@ -73,6 +77,7 @@ def replace_directory(rows=SYNTHETIC_ROWS) -> int:
                 "imported_at": timezone.now(),
                 "checksum": SYNTHETIC_CHECKSUM,
                 "row_count": len(rows),
+                "has_egid": True,
             },
         )
     return len(rows)

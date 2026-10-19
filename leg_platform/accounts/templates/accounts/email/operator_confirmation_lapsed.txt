@@ -1,0 +1,6 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}At {{ instance_name }} an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+{% endautoescape %}

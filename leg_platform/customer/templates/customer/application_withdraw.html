@@ -1,0 +1,20 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Withdraw application" %}{% endblock %}
+{% block content %}
+  <div class="wizard">
+    <p class="page-label">{% translate "My participation · Registration" %}</p>
+    <section class="step-card cancel-card" aria-labelledby="withdraw-title">
+      <h1 id="withdraw-title" class="card-title">{% translate "Withdraw application?" %}</h1>
+      <p>{% translate "Your application becomes a draft again. You can change it and submit it again." %}</p>
+      <p class="muted">{% blocktranslate %}Withdrawing is possible as long as the LEG has not yet submitted the application to {{ operator }}.{% endblocktranslate %}</p>
+      <div class="step-actions">
+        <a class="btn btn-primary" href="{% url 'customer:buildings' %}" autofocus>{% translate "Keep application" %}</a>
+        <form method="post" class="inline-form" data-submit-once>
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger-outline">{% translate "Withdraw application" %}</button>
+        </form>
+      </div>
+    </section>
+  </div>
+{% endblock %}

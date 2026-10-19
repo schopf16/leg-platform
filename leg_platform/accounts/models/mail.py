@@ -52,6 +52,17 @@ class MailJob(models.Model):
         SESSION_ENDED_WRONG_CODES = "session_ended_wrong_codes", "Session ended after wrong codes"
         ALL_SESSIONS_ENDED = "all_sessions_ended", "All sessions ended after wrong entries"
         INVITATION = "invitation", "Invitation"
+        # Onboarding of customers (D-103): notifications to the addresses of an account.
+        APPLICATION_SUBMITTED = "application_submitted", "Application submitted"
+        APPLICATION_REMINDER = "application_reminder", "Application not completed"
+        APPLICATION_ROLLED_BACK = "application_rolled_back", "Application rolled back"
+        CONTRACT_REMINDER = "contract_reminder", "Contract not accepted"
+        CONTRACT_ROLLED_BACK = "contract_rolled_back", "Application rolled back: contract"
+        BANK_CONNECTION_MISSING = "bank_connection_missing", "Bank connection missing"
+        DEREGISTRATION_SUBMITTED = "deregistration_submitted", "Deregistration submitted"
+        DEREGISTRATION_EFFECTIVE = "deregistration_effective", "Deregistration effective"
+        IBAN_CHANGED = "iban_changed", "IBAN changed"
+        OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", "Confirmation by the grid operator missing"
 
     # Notifications about a change of the account, as opposed to the requests of a person who
     # may have no account (D-038, D-040).
@@ -70,6 +81,16 @@ class MailJob(models.Model):
         Kind.TWO_FACTOR_RESET,
         Kind.EMAIL_CHANGE_NOTICE,
         Kind.ACCOUNT_DELETED,
+        Kind.APPLICATION_SUBMITTED,
+        Kind.APPLICATION_REMINDER,
+        Kind.APPLICATION_ROLLED_BACK,
+        Kind.CONTRACT_REMINDER,
+        Kind.CONTRACT_ROLLED_BACK,
+        Kind.BANK_CONNECTION_MISSING,
+        Kind.DEREGISTRATION_SUBMITTED,
+        Kind.DEREGISTRATION_EFFECTIVE,
+        Kind.IBAN_CHANGED,
+        Kind.OPERATOR_CONFIRMATION_LAPSED,
     )
 
     kind = models.CharField(max_length=32, choices=Kind, editable=False)
@@ -163,6 +184,20 @@ class EmailText(models.Model):
             "Notification: all sessions ended after wrong entries"
         )
         INVITATION = "invitation", _("Invitation: link to confirm the address and choose a password")
+        APPLICATION_SUBMITTED = "application_submitted", _("Application: confirmation of the submission")
+        APPLICATION_REMINDER = "application_reminder", _("Application: reminder, not completed yet")
+        APPLICATION_ROLLED_BACK = "application_rolled_back", _("Application: rolled back")
+        CONTRACT_REMINDER = "contract_reminder", _("Application: reminder, contract not accepted yet")
+        CONTRACT_ROLLED_BACK = "contract_rolled_back", _(
+            "Application: rolled back because the contract was not accepted"
+        )
+        BANK_CONNECTION_MISSING = "bank_connection_missing", _("Application: bank connection missing")
+        DEREGISTRATION_SUBMITTED = "deregistration_submitted", _("Deregistration: confirmation of the request")
+        DEREGISTRATION_EFFECTIVE = "deregistration_effective", _("Deregistration: has taken effect")
+        IBAN_CHANGED = "iban_changed", _("Notification: IBAN changed")
+        OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", _(
+            "Staff: confirmation by the grid operator is missing, withdraw the registration"
+        )
 
     key = models.CharField(
         _("email"), max_length=40, choices=Key, unique=True, editable=False

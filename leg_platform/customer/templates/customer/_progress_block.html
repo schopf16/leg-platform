@@ -1,0 +1,23 @@
+{% load i18n %}{% comment %}
+The progress under a metering point that is in a running registration or deregistration (GEBAEUDE.md, section 4.1a): the
+count, a bar (a native progress element: no inline style) and the steps with a dot and a word. Context: ``block``.
+{% endcomment %}<div class="mp-progress">
+  <p class="mp-progress-head">{% if block.kind == "registration" %}{% blocktranslate with done=block.done total=block.total %}Registration: {{ done }} of {{ total }} done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} done{% endblocktranslate %}{% endif %}</p>
+  <progress class="path-bar" max="{{ block.total }}" value="{{ block.done }}" aria-label="{% if block.kind == 'registration' %}{% blocktranslate with done=block.done total=block.total %}Registration: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% endif %}">{{ block.done }}/{{ block.total }}</progress>
+  {% if block.paused %}<p class="note-warn">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</p>{% endif %}
+  {% if block.note %}<p class="muted">{{ block.note }}</p>{% endif %}
+  <details>
+    <summary>{% translate "Show details" %}</summary>
+    <ol class="step-list">
+      {% for step in block.steps %}
+        <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.label }}</span><span class="step-word step-word-{{ step.state }}">{{ step.word }}</span></li>
+      {% endfor %}
+    </ol>
+  </details>
+  {% if block.resume or block.withdrawable %}
+    <div class="mp-progress-actions">
+      {% if block.resume %}<a class="btn btn-secondary-action" href="{% url 'customer:application' block.application.pk %}">{% translate "Continue registration" %}</a>{% endif %}
+      {% if block.withdrawable %}<a class="btn btn-secondary-action" href="{% url 'customer:application_withdraw' block.application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
+    </div>
+  {% endif %}
+</div>

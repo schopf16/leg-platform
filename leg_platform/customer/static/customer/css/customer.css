@@ -1,0 +1,902 @@
+/* The customer's pages (D-103): the page Buildings, the registration wizard, the start page card. They use the
+   frame and the tokens of portal.css and frame.css (colours only through the tokens); nothing here is a second design
+   system. A state is always a dot plus a word. No shadows, no gradients. Sizes: the scale of docs/DESIGN.md. */
+
+/* ---- Building blocks ---- */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tone-ok { background: var(--ok); }
+.tone-warn { background: var(--warn); }
+.tone-bad { background: var(--bad); }
+.tone-muted { background: var(--muted); }
+.tone-accent { background: var(--accent); }
+
+.dotword {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.muted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.row-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px dashed var(--muted);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.narrow-page {
+  display: grid;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.narrow-page > p,
+.narrow-page > h1 {
+  margin: 0;
+}
+
+.inline-form {
+  display: inline-block;
+  margin: 0;
+}
+
+.btn-small {
+  min-height: 44px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* A progress bar: a native element (no inline style needed), 8 px high. */
+.path-bar {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.path-bar::-webkit-progress-bar {
+  background: var(--line);
+}
+
+.path-bar::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.path-bar::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+/* The steps with a dot and a word on the right. */
+.step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.step-list li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.step-word {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.step-word-done { color: var(--ok-text); }
+.step-word-next { color: var(--accent); }
+
+/* ---- Cards ---- */
+.step-card,
+.building-card {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.step-card.is-error {
+  border-color: var(--bad);
+}
+
+.step-card h2,
+.building-card h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.step-card p {
+  margin: 0;
+}
+
+.step-card .mb-3,
+.building-card .mb-3 {
+  display: grid;
+  gap: 8px;
+  margin: 0 !important;
+}
+
+.step-card .form-label,
+.step-card .form-hint {
+  margin: 0;
+}
+
+.step-card .form-label {
+  font-weight: 600;
+}
+
+.step-card .form-hint {
+  font-size: 14px;
+}
+
+.step-card .error-summary {
+  margin: 0;
+}
+
+/* ---- Page head and the two main buttons ---- */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.head-actions .btn,
+.card-foot .btn {
+  min-height: 48px;
+}
+
+.building-cards {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.building-card .card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sub-line {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 4px;
+  border-radius: 8px;
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+.icon-btn:hover {
+  background: var(--warm);
+  color: var(--accent);
+}
+
+.icon-btn .frame-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Facts: label left, value right. */
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  margin: 0;
+}
+
+.facts > div {
+  display: contents;
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  line-height: 24px;
+}
+
+.facts dt {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.facts dd {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* Metering points: number, direction, status in fixed columns. */
+.mp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.mp-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px 208px;
+  align-items: start;
+  gap: 12px 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mp-list > li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.mp-num {
+  font-family: var(--tblr-font-monospace);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.mp-note {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--tblr-font-sans-serif);
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.mp-dir {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mp-since {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mp-progress {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.mp-progress-head {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.mp-progress summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.mp-progress-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mp-progress-actions .btn {
+  min-height: 44px;
+}
+
+.card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.end-action {
+  margin-left: auto;
+}
+
+.card-note {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ---- The wizard ---- */
+.wizard {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+.wizard > * {
+  min-width: 0;
+}
+
+.wizard h1,
+.wizard .start-sub {
+  margin-block: 0;
+}
+
+.wizard .start-sub {
+  margin-top: 8px;
+}
+
+.progress-block {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-block .page-label {
+  margin: 0;
+}
+
+.step-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.step-actions .btn {
+  min-height: 48px;
+}
+
+.cancel-card {
+  border-color: var(--bad);
+}
+
+.cancel-card .step-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.address-row {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.address-row-street { grid-template-columns: minmax(0, 1fr) 128px; }
+.address-row-locality { grid-template-columns: 128px minmax(0, 1fr); }
+
+.address-row > * {
+  min-width: 0;
+}
+
+.found {
+  display: grid;
+  gap: 8px;
+}
+
+.found-address {
+  font-size: 18px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.suggest {
+  display: grid;
+  gap: 12px;
+}
+
+.suggest h2 {
+  font-size: 16px;
+}
+
+.suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.suggest-option {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.suggest-option:hover {
+  background: var(--warm);
+}
+
+.suggest-egid {
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+fieldset.question {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+fieldset.question legend {
+  float: none;
+  width: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.note-bad,
+.note-warn,
+.note-info {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.note-bad { color: var(--bad); }
+.note-warn { color: var(--warn); }
+.note-info { color: var(--fg); font-weight: 400; }
+
+.note-bad p,
+.note-warn p {
+  margin: 0;
+}
+
+/* A fixed beginning in the same frame as the field (country and identifier), the person types the rest. */
+.prefix-input {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.prefix-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.prefix {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 4px 0 12px;
+  font-family: var(--tblr-font-monospace);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.prefix-input .form-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: 8px;
+  border: 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
+  font-family: var(--tblr-font-monospace);
+  font-size: 14px;
+}
+
+.prefix-input .form-control:focus {
+  box-shadow: none;
+}
+
+.prefix-input .form-control[aria-invalid="true"] {
+  border: 0;
+}
+
+.prefix-input:has(.form-control[aria-invalid="true"]) {
+  border: 2px solid var(--bad);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.iban-input {
+  font-family: var(--tblr-font-monospace);
+  letter-spacing: 0.04em;
+}
+
+.checks {
+  display: grid;
+  gap: 8px;
+}
+
+/* A part of a form that a script shows or hides; without a script it is always visible. */
+.js .reveal:not(.is-open) {
+  display: none;
+}
+
+.reveal {
+  display: grid;
+  gap: 16px;
+}
+
+/* ---- "What do we still need to know?" ---- */
+.overview-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.overview-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.overview-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.overview-number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.overview-row.is-known .overview-number {
+  border-color: var(--ok);
+  color: var(--ok-text);
+}
+
+.overview-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.overview-text {
+  display: grid;
+  gap: 4px;
+}
+
+.overview-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+.next-up {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- Contract page ---- */
+.contract-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.contract-version {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+/* ---- The card "Your way into the LEG" on the start page ---- */
+.journey {
+  display: grid;
+  gap: 16px;
+  margin-top: 32px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.journey-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.journey-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.journey .step-list li.is-muted {
+  opacity: 0.6;
+}
+
+.journey-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.journey-next p {
+  margin: 0;
+}
+
+.journey-next .btn {
+  min-height: 48px;
+}
+
+.journey + .task-grid {
+  margin-top: 32px;
+}
+
+/* ---- The deregistration (ABMELDUNG.md): three cards in one form ---- */
+.dereg-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.point-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.point-group legend {
+  float: none;
+  width: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.point-check {
+  align-items: flex-start;
+  padding: 8px 0;
+}
+
+.point-check .entry-check-input {
+  margin-top: 2px;
+}
+
+.point-check .meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.dereg-summary {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.mp-line {
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* ---- Phone ---- */
+@media (max-width: 760px) {
+  .page-head {
+    align-items: stretch;
+  }
+
+  .head-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .head-actions .btn,
+  .card-foot .btn,
+  .step-actions .btn,
+  .step-actions .inline-form,
+  .step-actions .inline-form .btn,
+  .journey-next .btn {
+    width: 100%;
+  }
+
+  .step-card,
+  .building-card,
+  .journey {
+    padding: 16px;
+  }
+
+  .building-cards {
+    gap: 16px;
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .facts dt {
+    padding-bottom: 0;
+  }
+
+  .facts dd {
+    padding-top: 4px;
+  }
+
+  .mp-list > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mp-list > li > .mp-num {
+    grid-column: 1 / -1;
+  }
+
+  .card-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .end-action {
+    margin-left: 0;
+  }
+
+  .step-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .overview-state {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .contract-version {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contract-version .btn,
+  .mp-progress-actions .btn {
+    width: 100%;
+  }
+
+  .mp-progress-actions {
+    flex-direction: column;
+  }
+
+  .journey {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .address-row-street,
+  .address-row-locality {
+    grid-template-columns: minmax(0, 1fr) 112px;
+  }
+
+  .address-row-locality {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+}
+
+@media print {
+  .step-actions,
+  .head-actions,
+  .card-foot,
+  .mp-progress-actions {
+    display: none !important;
+  }
+}

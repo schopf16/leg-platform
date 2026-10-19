@@ -1,0 +1,40 @@
+{% load i18n %}{% comment %}
+The card "Bank or postal connection" (owner design kundenprofil/PROFIL.md, section 2), directly after "Personal details" and only for a
+customer: the IBAN in full (shown only to the account itself, the page is never cached) with its status, and "Change", which
+opens the field in this card. Saving needs no password and no code (KONZEPT 7.2); the form posts to the customer pages
+(``customer:bank_connection``: the budget of the account, the body limit). ``bank_next`` is the way back (a page of the
+customer's pages) when the wizard or the deregistration sent the customer here.
+{% endcomment %}<section class="profile-card" id="card-bank" aria-labelledby="card-bank-title"{% if edit == "bank" %} data-state="edit"{% endif %}>
+  <div class="profile-card-head has-action">
+    <h2 id="card-bank-title">{% translate "Bank or postal connection" %}</h2>
+    {% if edit != "bank" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=bank{% if bank_next %}&amp;next={{ bank_next|urlencode:'' }}{% endif %}#card-bank">{% translate "Change" %}</a>{% endif %}
+  </div>
+  {% include "accounts/profile/_card_messages.html" with items=messages_bank %}
+  {% if edit == "bank" %}
+    {% with form=bank_form %}
+      <form method="post" action="{% url 'customer:bank_connection' %}" class="profile-form" novalidate>
+        {% csrf_token %}
+        {% if bank_next %}<input type="hidden" name="next" value="{{ bank_next }}">{% endif %}
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/_field.html" with field=form.iban %}
+        <div class="profile-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+          <a class="btn btn-secondary-action" href="{% if bank_next %}{{ bank_next }}{% else %}{% url 'accounts:profile' %}#card-bank{% endif %}">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    {% endwith %}
+  {% else %}
+    <dl class="profile-rows">
+      <div class="profile-row profile-row-status">
+        <dt>{% translate "IBAN" %}</dt>
+        {% if bank_iban %}
+          <dd><span class="profile-iban">{{ bank_iban }}</span></dd>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "On file" %}</span></dd>
+        {% else %}
+          <dd></dd>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-unverified" aria-hidden="true"></span>{% translate "Not on file" %}</span></dd>
+        {% endif %}
+      </div>
+    </dl>
+  {% endif %}
+</section>

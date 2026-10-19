@@ -2,7 +2,8 @@
 
 Every active staff account sees every entry, except "Mail texts" (admin, own permissions).
 To add a page, add one ``MENU`` line; its URL names start with ``key`` (``management:<key>``,
-``management:<key>_detail``) to mark the entry active.
+``management:<key>_detail``) to mark the entry active. Note: the key ``processes`` also marks the
+detail pages ``processes_application`` and ``processes_deregistration`` active.
 """
 
 from dataclasses import dataclass
@@ -21,6 +22,10 @@ class MenuEntry:
     key: str
     label: object  # lazy translated text
     icon: str  # id of a symbol in templates/_frame_icons.html, without "#"
+    # Owner design (``vertraege/VORGABEN.md``): the entry "Contracts" stands after "Mail texts". That link (a page of
+    # the administration with its own rights) exists only for an account that may open it, so such an entry follows it
+    # when it is there and the last other entry when it is not.
+    after_mail_texts: bool = False
 
     @property
     def url_name(self):
@@ -32,11 +37,13 @@ EMAIL_TEXT_PERMISSIONS = ("accounts.view_emailtext", "accounts.change_emailtext"
 
 MENU = (
     MenuEntry("overview", _("Overview"), "i-overview"),
+    MenuEntry("processes", _("Processes"), "i-processes"),
     MenuEntry("persons", _("Persons"), "i-persons"),
     MenuEntry("locations", _("Locations"), "i-building"),
     MenuEntry("legs", _("LEGs"), "i-network"),
     MenuEntry("metering_points", _("Metering points"), "i-metering"),
     MenuEntry("settings", _("Settings"), "i-settings"),
+    MenuEntry("contracts", _("Contracts"), "i-document", after_mail_texts=True),
 )
 
 
@@ -66,28 +73,34 @@ def system_administration_visible(request):
 def menu_entries(user, view_name=""):
     """Menu dicts (``key``, ``label``, ``url``, ``icon``, ``active``); empty for a non-staff account.
 
-    The last entry links to the admin email texts for an account with a right on them (the admin checks again, D-082).
+    The link to the admin email texts is shown for an account with a right on them (the admin checks again, D-082);
+    it stands after the entries of ``MENU`` and in front of the entries marked ``after_mail_texts`` (owner design).
     """
     if not is_management_user(user):
         return []
-    entries = [
-        {
-            "key": entry.key,
-            "label": entry.label,
-            "url": reverse(entry.url_name),
-            "icon": entry.icon,
-            "active": is_active_entry(entry, view_name),
-        }
-        for entry in MENU
-    ]
-    if any(user.has_perm(permission) for permission in EMAIL_TEXT_PERMISSIONS):
+    mail_texts = any(user.has_perm(permission) for permission in EMAIL_TEXT_PERMISSIONS)
+    mail_texts_entry = {
+        "key": "email_texts",
+        "label": _("Mail texts"),
+        "url": reverse("admin:accounts_emailtext_changelist"),
+        "icon": "i-mail",
+        "active": False,
+    }
+    entries = []
+    placed = False
+    for entry in MENU:
+        if entry.after_mail_texts and mail_texts and not placed:
+            entries.append(mail_texts_entry)
+            placed = True
         entries.append(
             {
-                "key": "email_texts",
-                "label": _("Mail texts"),
-                "url": reverse("admin:accounts_emailtext_changelist"),
-                "icon": "i-mail",
-                "active": False,
+                "key": entry.key,
+                "label": entry.label,
+                "url": reverse(entry.url_name),
+                "icon": entry.icon,
+                "active": is_active_entry(entry, view_name),
             }
         )
+    if mail_texts and not placed:
+        entries.append(mail_texts_entry)
     return entries

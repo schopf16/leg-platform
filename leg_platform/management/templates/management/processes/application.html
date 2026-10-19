@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load i18n static management_ui %}{% comment %}
+The page of one application (owner design ``vorgaenge/referenz/vorgang-detail-desktop``, ``VORGABEN.md`` section 8; D-103).
+No wizard: what the customer entered stands one under the other (the five steps of the application), above them the way the
+application goes (submitted, review, registration at the grid operator, confirmation, completed) and the next step of the
+staff with its buttons. The side column holds the person, the notices of the person and the history. The buttons open
+dialogs (normal pages). The bank connection shows only whether one is on file (D-087); the proof of a confirmation is never
+shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state are not drawn; the service checks again.
+{% endcomment %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
+{% block inner_class %}mgmt-page mgmt-wide mgmt-process{% endblock %}
+{% block content %}
+  {% include "management/_icons.html" %}
+  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to processes" %}</a>
+
+  <div class="mgmt-header mgmt-detail-header">
+    <div>
+      <p class="page-label">{% translate "Management" %} · {% translate "Application" %}</p>
+      <h1 class="start-title">{{ page_title }}</h1>
+      <p class="mgmt-subtitle">{{ subtitle }}</p>
+    </div>
+    <div class="mgmt-header-actions">{% include "management/_status.html" with tone=state_tone label=state_label %}</div>
+  </div>
+
+  <section class="mgmt-card" aria-labelledby="way-title">
+    <h2 id="way-title">{% translate "Progress" %}</h2>
+    <progress class="mgmt-progress mgmt-progress-wide" value="{{ done }}" max="{{ total }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}"></progress>
+    <p class="mgmt-note">{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}</p>
+    <ol class="mgmt-way">
+      {% for step in way %}
+        <li>{% include "management/_status.html" with tone=step.tone label=step.state_label %}<span class="mgmt-way-label">{{ step.label }}</span>{% if step.note %}<span class="mgmt-muted tnum">{{ step.note }}</span>{% endif %}</li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="mgmt-card" aria-labelledby="next-title">
+    <h2 id="next-title">{% translate "Next step" %}</h2>
+    {% if can_review %}
+      <p>{% blocktranslate %}The application is waiting. Take it into review, or start the registration at the {{ operator }} directly.{% endblocktranslate %}</p>
+    {% elif application.state == "in_review" %}
+      <p>{% blocktranslate %}Check the details. Then start the registration at the {{ operator }}, or return the application to the customer for correction.{% endblocktranslate %}</p>
+    {% elif can_confirm %}
+      <p>{% blocktranslate with date=operator_started %}The registration at the {{ operator }} started on {{ date }}. Record the confirmation when the {{ operator }} has confirmed it.{% endblocktranslate %}</p>
+    {% elif can_complete %}
+      <p>{% blocktranslate with date=operator_confirmed %}The {{ operator }} confirmed on {{ date }}. Complete the application: this creates the buildings and metering points and assigns them to the customer.{% endblocktranslate %}</p>
+    {% else %}
+      <p>{% translate "The application is completed. The metering points were created." %}</p>
+    {% endif %}
+    <div class="mgmt-step-buttons">
+      {% if can_review %}
+        <form method="post" action="{{ review_url }}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ current_url }}">
+          <button type="submit" class="btn btn-primary">{% translate "Take into review" %}</button>
+        </form>
+      {% endif %}
+      {% if can_start_operator %}<a class="btn {% if application.state == 'in_review' %}btn-primary{% else %}btn-accent-outline{% endif %}" href="{{ operator_started_url }}">{% blocktranslate %}Registration at the {{ operator }} started{% endblocktranslate %}</a>{% endif %}
+      {% if can_confirm %}<a class="btn btn-primary" href="{{ operator_confirmed_url }}">{% translate "Record confirmation" %}</a>{% endif %}
+      {% if can_complete %}<a class="btn btn-primary" href="{{ complete_url }}">{% translate "Complete application" %}</a>{% endif %}
+      {% if can_return %}<a class="btn btn-secondary-action" href="{{ return_url }}">{% translate "Return for correction" %}</a>{% endif %}
+    </div>
+  </section>
+
+  <div class="mgmt-process-layout">
+    <div class="mgmt-process-main">
+      <section class="mgmt-card" aria-labelledby="step1-title">
+        <h2 id="step1-title"><span class="mgmt-step-number" aria-hidden="true">1</span>{% translate "Building" %}</h2>
+        {% for building in buildings %}
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "Address" %}</dt><dd>{{ building.address }}{% if building.town %}, {{ building.town }}{% endif %}{% if building.url %}{% translate "Go to the location" as goto_label %}{% include "management/_goto.html" with url=building.url label=goto_label subject=building.address %}{% endif %}<br><span class="mgmt-muted tnum">{% if building.egid %}{% blocktranslate with egid=building.egid %}EGID {{ egid }}{% endblocktranslate %}{% endif %}{% if building.existing %} · {% translate "The building was stored before." %}{% endif %}</span></dd></div>
+            {% if building.name %}<div class="mgmt-fact"><dt>{% translate "Name of the building" %}</dt><dd>{{ building.name }}<br><span class="mgmt-muted">{% translate "Given by the customer" %}</span></dd></div>{% endif %}
+            {% if building.description %}<div class="mgmt-fact"><dt>{% translate "Description" %}</dt><dd>{{ building.description }}</dd></div>{% endif %}
+          </dl>
+        {% empty %}
+          <p>{% include "management/_open.html" %}</p>
+        {% endfor %}
+      </section>
+
+      <section class="mgmt-card mgmt-card-flush" aria-labelledby="step2-title">
+        <div class="mgmt-card-head mgmt-card-pad"><h2 id="step2-title"><span class="mgmt-step-number" aria-hidden="true">2</span>{% translate "Metering points" %}</h2></div>
+        <div class="mgmt-table-view">
+          <table class="mgmt-table">
+            <thead><tr><th>{% translate "Number" %}</th><th>{% translate "Direction" %}</th><th>{% translate "Name" %}</th><th>{% translate "Plant" %}</th><th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th></tr></thead>
+            <tbody>
+              {% for building in buildings %}
+                {% for point in building.points %}
+                  <tr>
+                    <td class="tnum">{{ point.number }}</td>
+                    <td>{{ point.direction }}</td>
+                    <td>{{ point.name|default:"" }}</td>
+                    <td class="tnum">{% include "management/processes/_plant.html" %}</td>
+                    <td class="mgmt-link-col">{% if point.url %}{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=point.url label=goto_label subject=point.number %}{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              {% empty %}
+                {% include "management/_empty_row.html" with colspan=5 text=empty_points %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
+          {% for building in buildings %}
+            {% for point in building.points %}
+              <div class="mgmt-fact"><dt>{{ point.direction }}</dt><dd class="tnum">{{ point.number }}{% if point.name %}<br>{{ point.name }}{% endif %}<br>{% include "management/processes/_plant.html" %}{% if point.url %}{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=point.url label=goto_label subject=point.number %}{% endif %}</dd></div>
+            {% endfor %}
+          {% empty %}
+            <p class="mgmt-empty-text">{{ empty_points }}</p>
+          {% endfor %}
+        </dl>
+      </section>
+
+      {% if has_feed_in %}
+        <section class="mgmt-card" aria-labelledby="step3-title">
+          <h2 id="step3-title"><span class="mgmt-step-number" aria-hidden="true">{{ step_numbers.bank }}</span>{% translate "Bank connection" %}</h2>
+          <dl class="mgmt-facts">
+            <div class="mgmt-fact"><dt>{% translate "IBAN" %}</dt><dd>{% if iban_on_file %}{% translate "On file" %}{% else %}{% include "management/_open.html" %}{% endif %}<br><span class="mgmt-muted">{% translate "The bank connection belongs to the person and is shown on the page of the person." %}</span></dd></div>
+          </dl>
+        </section>
+      {% endif %}
+
+      <section class="mgmt-card" aria-labelledby="step4-title">
+        <h2 id="step4-title"><span class="mgmt-step-number" aria-hidden="true">{{ step_numbers.contract }}</span>{% translate "Contract" %}</h2>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Acceptance" %}</dt><dd>{% if acceptance %}{% blocktranslate with date=acceptance_date version=acceptance_version %}Accepted on {{ date }} (version of {{ version }}){% endblocktranslate %}{% else %}{% include "management/_open.html" %}{% endif %}<br><span class="mgmt-muted">{% translate "Only the customer accepts the contract." %}</span></dd></div>
+        </dl>
+      </section>
+
+      <section class="mgmt-card" aria-labelledby="step5-title">
+        <h2 id="step5-title"><span class="mgmt-step-number" aria-hidden="true">{{ step_numbers.start }}</span>{% translate "Switch-on" %}</h2>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Start date" %}</dt><dd class="tnum">{% if start_text %}{{ start_text }}{% else %}{% include "management/_open.html" %}{% endif %}<br><span class="mgmt-muted">{% blocktranslate %}The wish of the customer; the {{ operator }} decides.{% endblocktranslate %}</span></dd></div>
+        </dl>
+      </section>
+
+      <div class="mgmt-actions mgmt-process-end">
+        <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Back to the list" %}</a>
+        {% if can_reject %}<a class="btn btn-danger-outline" href="{{ reject_url }}">{% translate "Roll back application" %}</a>{% endif %}
+      </div>
+    </div>
+
+    <aside class="mgmt-process-side" aria-label="{% translate 'Side column' %}">
+      {% include "management/processes/_person_card.html" %}
+      {% if notices %}
+        <section class="mgmt-card" aria-labelledby="notices-title">
+          <h2 id="notices-title">{% translate "Notices" %}</h2>
+          {% include "management/processes/_notices.html" with show_person=False %}
+        </section>
+      {% endif %}
+      {% include "management/processes/_history.html" %}
+    </aside>
+  </div>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'management/js/info-bubble.js' %}"></script>
+  <script defer src="{% static 'management/js/table-fit.js' %}"></script>
+{% endblock %}

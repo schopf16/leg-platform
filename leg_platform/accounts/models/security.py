@@ -230,10 +230,14 @@ class SecurityEvent(models.Model):
             "All sessions of an account ended by a system administrator"
         )
         MANAGEMENT_DATA_EDITED = "management_data_edited", _("Management data edited in the administration")
+        IBAN_CHANGED = "iban_changed", _("IBAN changed by the account")
+        CONTRACT_VERSION_CHANGED = "contract_version_changed", _("Contract version uploaded, made current or deleted")
 
     # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
         {
+            Event.IBAN_CHANGED,
+            Event.CONTRACT_VERSION_CHANGED,
             Event.PRIVILEGES_CHANGED,
             Event.ACCESS_RELATIONS_CHANGED,
             Event.INITIAL_ADMINISTRATOR_CREATED,

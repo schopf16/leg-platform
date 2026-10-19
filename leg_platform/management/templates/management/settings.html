@@ -44,6 +44,8 @@ administrator the name is a link to its form in the administration (D-086).
 
     <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
   </form>
+
+  {% include "management/_deadlines.html" %}
 {% endblock %}
 {% block scripts %}
   {{ block.super }}

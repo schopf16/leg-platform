@@ -8,6 +8,8 @@ and the live directory stays as it was (a new generation is invisible until it i
 
 Only this thread writes the directory file (``storage.mark_thread_writer``); the request threads of
 the process stay read-only. The thread has its own database connections and closes them at the end.
+It is started only by the administrator's button (``start_manual``); the automatic refresh is the daily
+run of ``schedule`` in the scheduled tasks (KONZEPT 3a), no longer a visit of a staff member.
 """
 
 import atexit
@@ -15,7 +17,6 @@ import logging
 import threading
 import time
 
-from django.conf import settings
 from django.db import DatabaseError, connections
 from django.utils import timezone
 
@@ -27,12 +28,9 @@ logger = logging.getLogger(__name__)
 
 # How often the heartbeat writes the progress; the page polls about as often.
 HEARTBEAT_INTERVAL = 2.0
-# The automatic check runs at most this often per web process (one claim attempt, a row lock).
-AUTOMATIC_CHECK_INTERVAL = 300.0
 
 _lock = threading.Lock()
 _running = {}  # claim token -> Thread, of this process only (tests and ``atexit``)
-_next_automatic_check = 0.0
 
 
 class Heartbeat(threading.Thread):
@@ -94,11 +92,6 @@ def _run(claimed):
     heartbeat = Heartbeat(claimed.token, progress)
     try:
         heartbeat.start()
-        if claimed.took_over:
-            # The process that held the lease is gone (its heartbeat stopped): free it (D-090).
-            from .importer import clear_stale_lease
-
-            clear_stale_lease()
         jobs.execute(claimed, progress)
     except Exception:  # noqa: BLE001 - recorded by ``jobs.execute``; here only the log line with the trace
         logger.exception("The address directory import thread ended with an error.")
@@ -132,31 +125,6 @@ def start_manual():
     if claimed is None:
         return False
     return _start(claimed)
-
-
-def maybe_start_automatic():
-    """Start the automatic refresh if it is due (D-090); cheap and safe to call on every authenticated page.
-
-    A scheduler is not needed: the first request of a signed-in person after the interval has passed
-    starts it (90 days, 24 hours while the directory is missing or empty; the attempt is stored before
-    the download, so a failed one is not repeated early). Turned off with ``ADDRESS_IMPORT_AUTOMATIC``.
-    """
-    global _next_automatic_check
-    if not settings.ADDRESS_IMPORT_AUTOMATIC:
-        return False
-    now = time.monotonic()
-    with _lock:
-        if now < _next_automatic_check:
-            return False
-        _next_automatic_check = now + AUTOMATIC_CHECK_INTERVAL
-    try:
-        claimed = jobs.claim(schedule_automatic=True, web=True)
-        if claimed is None:
-            return False
-        return _start(claimed)
-    except Exception:  # noqa: BLE001 - a page must never fail because of the refresh
-        logger.warning("The automatic address directory import check failed.", exc_info=True)
-        return False
 
 
 def is_running_here():

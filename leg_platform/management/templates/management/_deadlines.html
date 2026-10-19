@@ -1,0 +1,32 @@
+{% load i18n %}{% comment %}
+The chapter "Reminders and deadlines" of the settings page (KONZEPT 5.8, D-103): one block per deadline with its name, the
+trigger, the number of days, the recipients, the mail texts ("Mail texts" of the administration: a link only for an account
+that may open them) and one sentence of effect; then the time of the daily address directory run. Whole days from 1. This
+chapter has its own form and button: a change that would delete drafts is asked once more with the number of drafts. Context:
+``deadline_form``, ``deadline_rows``, ``mail_text_link``.
+{% endcomment %}<form method="post" action="{% url 'management:settings_deadlines' %}" novalidate>
+  {% csrf_token %}
+  <section class="mgmt-card mgmt-deadlines" aria-labelledby="deadlines-title">
+    <h2 id="deadlines-title">{% translate "Reminders and deadlines" %}</h2>
+    <p class="mgmt-hint">{% translate "Whole days, at least 1. The texts of the emails are edited under Mail texts." %}</p>
+    {% if deadline_form.errors %}{% with form=deadline_form %}{% include "accounts/_error_summary.html" %}{% endwith %}{% endif %}
+    {% for row in deadline_rows %}
+      <div class="mgmt-deadline">
+        <h3>{{ row.name }}</h3>
+        <dl class="mgmt-facts">
+          <div class="mgmt-fact"><dt>{% translate "Trigger" %}</dt><dd>{{ row.trigger }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Recipient" %}</dt><dd>{{ row.recipient }}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Mail text" %}</dt><dd>{% for text in row.mail_texts %}{% if mail_text_link %}<a href="{{ mail_text_link }}">{{ text }}</a>{% else %}{{ text }}{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd></div>
+          <div class="mgmt-fact"><dt>{% translate "Effect" %}</dt><dd>{{ row.effect }}</dd></div>
+        </dl>
+        {% include "management/_field_row.html" with field=row.field %}
+      </div>
+    {% endfor %}
+    <div class="mgmt-deadline">
+      <h3>{% translate "Address directory" %}</h3>
+      <p class="mgmt-hint">{% translate "From this time of day the daily run checks whether the address directory must be updated. At most one download per day." %}</p>
+      {% include "management/_field_row.html" with field=deadline_form.run_time %}
+    </div>
+    <div class="mgmt-actions"><button type="submit" class="btn btn-primary">{% translate "Save reminders and deadlines" %}</button></div>
+  </section>
+</form>

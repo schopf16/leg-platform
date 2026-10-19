@@ -1,0 +1,11 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Too many requests" %}{% endblock %}
+{% block content %}
+  {# The answer to a POST beyond the request budget of the account (status 429, Retry-After): the same words for every cause. #}
+  <div class="narrow-page">
+    <h1 class="start-title">{% translate "Too many requests" %}</h1>
+    <div class="alert alert-warning" role="alert">{% translate "Please wait a moment and try again." %}</div>
+    <p><a class="btn btn-secondary-action" href="{% url 'home' %}">{% translate "To the start page" %}</a></p>
+  </div>
+{% endblock %}

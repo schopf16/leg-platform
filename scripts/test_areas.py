@@ -140,6 +140,7 @@ AREAS: dict[str, Area] = {
                     "test_acceptance_owner_decisions", "test_admin_acceptance",
                     "test_portal_branding", "test_portal_favicon")
             + _labels(T, "test_error_pages", "test_presentation", "test_language")
+            + ("leg_platform.customer.tests.test_translations",)
         ),
     ),
     "language": Area(
@@ -170,7 +171,8 @@ AREAS: dict[str, Area] = {
                     "test_portal_favicon")
             + _FLOW_REVIEWS
             + _labels(T, "test_error_pages", "test_presentation", "test_sizes", "test_design_assets")
-            + _labels(M, "test_access", "test_settings_page", "test_components")
+            + _labels(M, "test_access", "test_settings_page", "test_components", "test_onboarding_assets")
+            + ("leg_platform.customer.tests",)
         ),
     ),
     "static": Area(
@@ -180,7 +182,8 @@ AREAS: dict[str, Area] = {
             _labels(T, "test_design_assets", "test_sizes", "test_presentation", "test_error_pages")
             + _labels(A, "test_entry_shell", "test_frame", "test_usability", "test_address_notice",
                       "test_portal_branding", "test_portal_favicon")
-            + _labels(M, "test_components")
+            + _labels(M, "test_components", "test_onboarding_assets")
+            + ("leg_platform.customer.tests.test_templates",)
         ),
     ),
     "branding": Area(
@@ -229,8 +232,20 @@ AREAS: dict[str, Area] = {
     "management": Area(
         "The management area for staff users (D-077): the access check and the route walk, the menu, "
         "the pages, the shared building blocks, the stylesheet and the script.",
-        paths=("leg_platform/management/",),
-        tests=("leg_platform.management.tests", C + "test_rights"),
+        paths=("leg_platform/management/", "leg_platform/downloads.py"),
+        tests=("leg_platform.management.tests", C + "test_rights", T + "test_downloads"),
+    ),
+    "customer": Area(
+        "The customer's participation (D-103): the pages Buildings and the registration wizard, the contract download, "
+        "the card on the start page and the customer menu; the route walk of the access check.",
+        paths=("leg_platform/customer/", "leg_platform/accounts/tasks.py", "leg_platform/downloads.py"),
+        tests=(
+            "leg_platform.customer.tests",
+            A + "test_frame",
+            C + "test_contracts",
+            C + "test_building_review",
+            T + "test_downloads",
+        ),
     ),
     "registration": Area(
         "Registration, verification links, entry pages and the abuse protection of the forms.",
@@ -299,6 +314,7 @@ AREAS: dict[str, Area] = {
             _labels(A, "test_profile", "test_profile_acceptance", "test_account_lifecycle",
                     "test_phase4_review", "test_address_notice", "test_recent_authentication")
             + _FLOW_REVIEWS
+            + ("leg_platform.customer.tests.test_profile_cards", C + "test_profile_address")
         ),
     ),
     "admin": Area(
@@ -331,11 +347,13 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/management/commands/process_mail_queue.py",
             "leg_platform/accounts/management/commands/cleanup_mail_requests.py",
             "leg_platform/accounts/management/commands/run_scheduled_tasks.py",
+            "leg_platform/community/management/commands/process_application_deadlines.py",
         ),
         tests=(
             _labels(A, "test_mail_queue", "test_email_texts", "test_greeting", "test_scheduled_tasks",
                     "test_graph_test_email_limits", "test_invalid_link_redirect", "test_invitations")
             + _labels(T, "test_mail_graph", "test_instance_configuration")
+            + _labels(C, "test_application_mail", "test_application_deadlines", "test_own_iban")
         ),
     ),
     "migrations": Area(
@@ -345,7 +363,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue")
             + _labels(T, "test_database")
-            + _labels(C, "test_models", "test_migration_0004", "test_iban")
+            + _labels(C, "test_models", "test_migration_0004", "test_iban", "test_onboarding_models")
             + ("leg_platform.addresses.tests",)
         ),
         fresh_db=True,

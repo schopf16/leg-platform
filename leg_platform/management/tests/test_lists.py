@@ -58,6 +58,28 @@ class ListStateTests(SimpleTestCase):
         self.assertEqual(state(sort="circuit").url(sort="address"), "/management/x/")
         self.assertEqual(current.hidden(), [("sort", "circuit"), ("dir", "desc"), ("problems", "1")])
 
+    def test_a_list_that_shows_the_newest_first_has_a_default_direction(self):
+        """``default_descending`` (the contract versions): the direction when the address names none; "dir" is in the
+        address only when it differs, so every link round-trips."""
+
+        def newest_first(**params):
+            return lists.parse(params, path="/management/x/", columns=COLUMNS, default_sort="address",
+                               default_descending=True)
+
+        current = newest_first()
+        self.assertEqual((current.sort, current.descending), ("address", True))
+        self.assertEqual(current.url(), "/management/x/")
+        # The other direction is named, and reading it back gives the same state.
+        ascending = newest_first(sort="address", dir="asc")
+        self.assertFalse(ascending.descending)
+        self.assertEqual(ascending.url(), "/management/x/?sort=address&dir=asc")
+        self.assertEqual(current.url(sort="address", dir="asc"), ascending.url())
+        self.assertTrue(newest_first(sort="address", dir="desc").descending)
+        self.assertEqual(newest_first(sort="address", dir="desc").url(), "/management/x/")
+        # A hostile value is the default direction; the lists without the option are unchanged.
+        self.assertTrue(newest_first(dir="up").descending)
+        self.assertFalse(state(dir="up").descending)
+
     def test_the_head_cells_toggle_ascending_descending_ascending(self):
         cells = {cell["key"]: cell for cell in lists.header_cells(COLUMNS, state(), {"circuit": 222}, "t")}
         self.assertEqual(cells["address"]["url"], "/management/x/?sort=address&dir=desc")

@@ -17,6 +17,7 @@ office box, country, phone) are under "Weitere Angaben (optional)" (K15).
           {% include "accounts/_field.html" with field=form.first_name %}
           {% include "accounts/_field.html" with field=form.last_name %}
         </div>
+        {% if address_building.locked %}<p class="profile-note" id="address-locked-note">{% translate "The address is confirmed and cannot be changed. Please contact the LEG for a change." %}</p>{% endif %}
         <div class="field-pair field-pair-street">
           {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" %}
           {% include "accounts/_field.html" with field=form.house_number %}
@@ -46,7 +47,7 @@ office box, country, phone) are under "Weitere Angaben (optional)" (K15).
   {% else %}
     <dl class="profile-rows">
       <div class="profile-row"><dt>{% translate "Name" %}</dt><dd>{{ account.display_name }}</dd></div>
-      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}</dd></div>
+      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}{% if address_building.egid %} · {% translate "EGID" %} {{ address_building.egid }}{% endif %}{% if address_building.locked %}<span class="profile-note d-block" id="address-locked-note">{% translate "The address is confirmed and cannot be changed. Please contact the LEG for a change." %}</span>{% endif %}</dd></div>
       {% if account.organisation_name and account.first_name %}<div class="profile-row"><dt>{% translate "Company" %}</dt><dd>{{ account.organisation_name }}</dd></div>{% endif %}
       {% if account.phone_number %}<div class="profile-row"><dt>{% translate "Phone" %}</dt><dd>{{ account.phone_number_display }}</dd></div>{% endif %}
     </dl>

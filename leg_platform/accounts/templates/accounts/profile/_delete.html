@@ -1,13 +1,20 @@
 {% load i18n %}{% comment %}
-The card "Konto löschen" (navigation/VORGABEN.md, section 3.3, item 4): the red start state, then
-the confirmation with the notice of the legal text (legal/VORGABEN.md, section 7), the password,
-the box and the red button.
-{% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title"{% if edit == "delete" %} data-state="edit"{% endif %}>
+The card "Delete account" (navigation/VORGABEN.md, section 3.3, item 4; kundenprofil/PROFIL.md, section 6): the red start state,
+then the confirmation with the notice of the legal text (legal/VORGABEN.md, section 7), the proof, the box and the red button.
+``delete_info`` (``profile_views.deletion_state``): ``released`` (nothing stops the deletion), ``customer``, ``can_start``
+(the button leads to the deregistration of the running metering points, all of them chosen) and ``retained`` (the account is
+only deactivated: the notice says so, ``User.delete_or_deactivate``). While the deletion is not released no form is shown.
+{% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title"{% if edit == "delete" and delete_info.released %} data-state="edit"{% endif %}>
   {% include "accounts/profile/_card_messages.html" with items=messages_delete %}
-  {% if edit == "delete" %}
+  {% if edit == "delete" and delete_info.released %}
     <h2 id="card-delete-title">{% translate "Really delete the account?" %}</h2>
-    <p class="profile-text">{% translate "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted." %}</p>
-    <div class="profile-notice">{% if privacy_url %}{% blocktranslate with url=privacy_url %}Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the <a href="{{ url }}" target="_blank" rel="noopener noreferrer">privacy notice</a>.{% endblocktranslate %}{% else %}{% translate "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the privacy notice." %}{% endif %}</div>
+    {% if delete_info.retained %}
+      <p class="profile-text">{% translate "With the deletion you lose access to the portal." %}</p>
+      <div class="profile-notice">{% translate "Your account will be deactivated. Your details are kept for retention reasons." %}</div>
+    {% else %}
+      <p class="profile-text">{% translate "With the deletion you lose access to the portal. Your personal details, your locations and your messages are deleted." %}</p>
+      <div class="profile-notice">{% if privacy_url %}{% blocktranslate with url=privacy_url %}Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the <a href="{{ url }}" target="_blank" rel="noopener noreferrer">privacy notice</a>.{% endblocktranslate %}{% else %}{% translate "Your details are deleted. We keep invoices and booking records for as long as the law requires. More in the privacy notice." %}{% endif %}</div>
+    {% endif %}
     {% with form=delete_form %}
       <form method="post" action="{% url 'accounts:account_delete' %}" class="profile-form profile-form-inset" novalidate>
         {% csrf_token %}
@@ -22,7 +29,17 @@ the box and the red button.
     {% endwith %}
   {% else %}
     <h2 id="card-delete-title">{% translate "Delete account" %}</h2>
-    <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
-    <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></div>
+    {% if not delete_info.released %}
+      {% if delete_info.can_start %}
+        <p class="profile-text">{% translate "You still have metering points. Deregister them first. Then you can delete your account." %}</p>
+        <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'customer:deregistration_start' %}?for=account_deletion">{% translate "Delete account" %}</a></div>
+      {% else %}
+        <p class="profile-text">{% translate "You cannot delete your account yet: a registration is still running or a metering point is not active yet. Withdraw the registration on the page Buildings, or wait until the metering point is active and deregister it." %}</p>
+        {% if delete_info.customer %}<div class="profile-actions"><a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "To the buildings" %}</a></div>{% endif %}
+      {% endif %}
+    {% else %}
+      <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
+      <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></div>
+    {% endif %}
   {% endif %}
 </section>

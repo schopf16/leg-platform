@@ -1,19 +1,42 @@
 {% extends "management/page.html" %}
 {% load i18n %}{% comment %}
 The overview, the start page of the management area (LEG-Design-Vorgaben/verwaltung/uebersicht/referenz/uebersicht-desktop and
--handy; D-082). The button "Filter problems (n)" with the border of the warning colour stands in the head, only
-while at least one list has a problem; below it a row for each list with a problem (the name, "N ... with a
-problem", the count behind the warning triangle, the link to the list with the problem filter on); lists without a
-problem do not appear. Every staff account sees the counts of all three lists. On a phone the button is
-as wide as the page and the rows are the same card; there is no button "Print" on this page.
+-handy; D-082, D-103). Two cards, never added up: "To do" (only when the onboarding has work: the queues of
+``application_queue``, each with a count that equals the rows of the list it links to, the oldest few entries, the
+notices and a missing contract) and "Problems". The button "Filter problems (n)" with the border of the warning colour
+stands in the head, only while at least one list has a problem; below it a row for each list with a problem (the name,
+"N ... with a problem", the count behind the warning triangle, the link to the list with the problem filter on); lists
+without a problem do not appear. Drafts of the customers are never shown. Every staff account sees all counts. On a
+phone the button is as wide as the page and the rows are the same card; there is no button "Print" on this page.
 {% endcomment %}
 {% block inner_class %}mgmt-page mgmt-wide{% endblock %}
 {% block header_actions %}
   {% if problem_count %}<a class="btn btn-warning-outline" href="{{ filter_url }}">{% blocktranslate %}Filter problems ({{ problem_count }}){% endblocktranslate %}</a>{% endif %}
 {% endblock %}
 {% block page_content %}
+  {% if task_rows %}
+    <section class="mgmt-card mgmt-overview" aria-labelledby="todo-title">
+      <h2 id="todo-title">{% translate "To do" %}</h2>
+      {% for task in task_rows %}
+        <div class="mgmt-task-row">
+          <div class="mgmt-task-head">
+            <div class="mgmt-overview-name">{{ task.text }}</div>
+            {% include "management/_goto.html" with url=task.url label=task.label %}
+          </div>
+          {% if task.entries %}
+            <ul class="mgmt-task-entries">
+              {% for entry in task.entries %}
+                <li><a class="mgmt-row-link" href="{{ entry.url }}">{{ entry.label }}</a><span class="mgmt-muted">{{ entry.sub }}</span></li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </section>
+  {% endif %}
   {% if problem_lists %}
-    <section class="mgmt-card mgmt-overview">
+    <section class="mgmt-card mgmt-overview" aria-labelledby="problems-title">
+      <h2 id="problems-title">{% translate "Problems" %}</h2>
       {% for entry in problem_lists %}
         <div class="mgmt-overview-row">
           <div>
@@ -27,7 +50,8 @@ as wide as the page and the rows are the same card; there is no button "Print" o
     </section>
     <p class="mgmt-hint mgmt-overview-hint">{% translate 'The button "Filter problems" appears only when a list has a problem. It shows only the entries with a problem in each list.' %}</p>
   {% else %}
-    <section class="mgmt-card mgmt-overview">
+    <section class="mgmt-card mgmt-overview" aria-labelledby="problems-title">
+      <h2 id="problems-title">{% translate "Problems" %}</h2>
       <p class="mgmt-empty-text">{% translate "No problems." %}</p>
     </section>
   {% endif %}

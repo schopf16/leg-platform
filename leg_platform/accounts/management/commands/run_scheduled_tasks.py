@@ -10,12 +10,18 @@ from django.core.management.base import BaseCommand, CommandError
 # A test checks that every cleanup command of the accounts app is listed here.
 TASKS = (
     "delete_expired_registrations",
+    # The reminders and deadlines of the customers' applications (community app, D-103).
+    "process_application_deadlines",
     "cleanup_mail_requests",
     "cleanup_login_ip_attempts",
     "cleanup_security_log",
     "cleanup_confirmation_failures",
     # Django's own command: removes the expired sessions of the database session store.
     "clearsessions",
+    # Address app: expired stored building searches, then the daily address directory run (the import itself runs
+    # last: it can take minutes and the cleanups must not wait for it).
+    "cleanup_address_lookups",
+    "scheduled_address_import",
 )
 
 

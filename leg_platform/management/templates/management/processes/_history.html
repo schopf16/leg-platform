@@ -1,0 +1,15 @@
+{% load i18n %}{% comment %}
+The card "History" of a process page: when, what and who; only the events (field names, ids and dates are stored, never a
+value, D-077). Newest first. Context: ``history``.
+{% endcomment %}<section class="mgmt-card" aria-labelledby="history-title">
+  <h2 id="history-title">{% translate "History" context "process" %}</h2>
+  {% if history %}
+    <ol class="mgmt-log">
+      {% for entry in history %}
+        <li><time datetime="{{ entry.time|date:'c' }}">{{ entry.time|date:"d.m.Y, H:i" }}</time> {{ entry.actor }}: {{ entry.label }}</li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="mgmt-empty-text">{% translate "No entries yet." %}</p>
+  {% endif %}
+</section>

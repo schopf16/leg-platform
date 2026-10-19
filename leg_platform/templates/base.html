@@ -1,4 +1,4 @@
-{% load i18n static language_menu %}<!doctype html>
+{% load i18n static language_menu customer_ui %}<!doctype html>
 <html lang="{% html_language %}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
@@ -68,6 +68,7 @@
           </div>
         </div>
         <nav class="frame-bottombar d-print-none" aria-label="{% translate 'Quick access' %}">
+          {% if user.is_staff %}
           <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span>{% translate "Start" %}</span>
@@ -87,6 +88,25 @@
             <span>{% translate "Locations" %}</span>
             <span class="frame-tab-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
           </a>
+          {% else %}{% customer_menu as customer_state %}
+          {# A customer (START-SEITE.md, section 7): Start, Participation, Information, Profile. #}
+          <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
+            <span>{% translate "Start" %}</span>
+          </a>
+          <a class="frame-tab{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg>
+            <span>{% translate "Participation" %}</span>
+          </a>
+          <a class="frame-tab{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg>
+            <span>{% translate "Information" %}</span>
+          </a>
+          <a class="frame-tab{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg>
+            <span>{% translate "Profile" %}</span>
+          </a>
+          {% endif %}
         </nav>
       {% endif %}
       <main class="frame-main" id="main-content" tabindex="-1">

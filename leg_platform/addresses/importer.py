@@ -39,6 +39,11 @@ ASSET_URL = (
     "amtliches-gebaeudeadressverzeichnis_ch/" + ASSET_NAME
 )
 CSV_NAME = ASSET_NAME.removesuffix(".zip")
+# Column of the federal building identifier in the official CSV (verified against the product information of
+# swisstopo, table 1, and the header of the published file, 2026-10-19). KONZEPT 3a calls it "EGID".
+EGID_COLUMN = "BDG_EGID"
+# Column of the entrance identifier (product information table 1: ADR_EDID, SHORT, in the CSV; same header).
+ENTRANCE_COLUMN = "ADR_EDID"
 MAX_METADATA_BYTES = 128 * 1024
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_CSV_BYTES = 1024 * 1024 * 1024
@@ -135,8 +140,26 @@ def _text(value, limit, *, allow_empty=False):
     return value
 
 
+def _egid(value):
+    """The federal building identifier of a row: 1 to 999,999,999 (nine digits at most), or None if the file gives none."""
+    if not value:
+        return None
+    if not re.fullmatch(r"[1-9][0-9]{0,8}", value):
+        raise ImportFailure("Invalid address field.")
+    return int(value)
+
+
+def _entrance(value):
+    """The entrance identifier of a row: 0 to 32767 (a SHORT of the official model), or None if the file gives none."""
+    if not value:
+        return None
+    if not re.fullmatch(r"0|[1-9][0-9]{0,4}", value) or int(value) > 32767:
+        raise ImportFailure("Invalid address field.")
+    return int(value)
+
+
 def _address_rows(archive):
-    """Yield only the three approved source columns, split into four values."""
+    """Yield only the five approved source columns, split into six values."""
     with zipfile.ZipFile(archive) as zipped:
         members = zipped.infolist()
         if len(members) != 1:
@@ -159,13 +182,19 @@ def _address_rows(archive):
             required = ("STN_LABEL", "ADR_NUMBER", "ZIP_LABEL")
             if not all(column in header for column in required):
                 raise ImportFailure("Missing approved CSV columns.")
-            indexes = [header.index(column) for column in required]
+            # Official name of the building identifier column (swisstopo, "Amtliches Verzeichnis der
+            # Gebaeudeadressen", product information, table 1: BDG_EGID, in the CSV). Without it nothing is imported.
+            if EGID_COLUMN not in header:
+                raise ImportFailure("Missing EGID column.")
+            if ENTRANCE_COLUMN not in header:
+                raise ImportFailure("Missing entrance column.")
+            indexes = [header.index(column) for column in (*required, EGID_COLUMN, ENTRANCE_COLUMN)]
             count = 0
             for row in reader:
                 count += 1
                 if count > MAX_ROWS or len(row) != len(header):
                     raise ImportFailure("Invalid CSV row count or width.")
-                street, house_number, zip_label = (row[index] for index in indexes)
+                street, house_number, zip_label, egid, entrance = (row[index] for index in indexes)
                 postal_code, separator, locality = zip_label.partition(" ")
                 if not separator or not re.fullmatch(r"[1-9][0-9]{3}", postal_code):
                     raise ImportFailure("Invalid postal label.")
@@ -174,6 +203,8 @@ def _address_rows(archive):
                     "house_number": _text(house_number, 32, allow_empty=True),
                     "postal_code": postal_code,
                     "locality": _text(locality, 255),
+                    "egid": _egid(egid),
+                    "entrance_id": _entrance(entrance),
                 }
             if count == 0:
                 raise ImportFailure("Empty directory.")
@@ -311,6 +342,8 @@ def _is_published(directory, checksum, *, repair):
     if (
         directory is None or not directory.imported_at or directory.row_count <= 0
         or directory.checksum != checksum
+        # A generation without building identifiers is replaced even if it is the current official file.
+        or not directory.has_egid
     ):
         return False
     return not repair or _is_intact(directory)
@@ -365,7 +398,7 @@ def _publish(archive, checksum, data_date, *, repair=False, progress=None):
             with transaction.atomic(using=DIRECTORY_ALIAS):
                 switched = Directory.objects.filter(pk=1, import_token=token).update(
                     generation=generation, data_date=data_date, imported_at=timezone.now(),
-                    checksum=checksum, row_count=count,
+                    checksum=checksum, row_count=count, has_egid=True,
                 )
                 if not switched:
                     raise ImportFailure("The import lease was lost.")

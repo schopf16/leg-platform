@@ -259,7 +259,10 @@ class SystemAdministrationMenuTests(TestCase):
     def test_the_menu_template_is_the_one_of_the_desktop_and_the_phone(self):
         template = (ROOT / "templates" / "_frame_menu.html").read_text(encoding="utf-8")
         self.assertEqual(template.count("system_administration as show_system"), 1)
-        self.assertNotIn("user.is_staff", template)
+        # D-102: the entry "System administration" is decided by the tag alone, never by ``user.is_staff``. The
+        # customer menu (D-105) separates a customer from a staff account above this block; that is not the entry.
+        block = template.split("system_administration as show_system", 1)[1]
+        self.assertNotIn("is_staff", block)
 
 
 @tag("mariadb")

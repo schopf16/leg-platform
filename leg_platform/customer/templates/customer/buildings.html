@@ -1,0 +1,30 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Buildings" %}{% endblock %}
+{% block content %}
+  <div class="page-head">
+    <div>
+      <p class="page-label">{% translate "My participation" %}</p>
+      <h1 class="start-title">{% translate "Buildings" %}</h1>
+      <p class="start-sub">{% translate "Your buildings and the metering points that belong to them." %}</p>
+    </div>
+    {% if overview.cards %}
+      <div class="head-actions">
+        <a class="btn btn-primary" href="{% url 'customer:application_start' %}">{% translate "Start registration" %}</a>
+        {% if can_deregister %}<a class="btn btn-danger-outline" href="{{ deregistration_url }}">{% translate "Start deregistration" %}</a>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+  {% if overview.cards %}
+    <div class="building-cards">
+      {% for card in overview.cards %}{% include "customer/_building_card.html" %}{% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-building"/></svg></span>
+      <h2>{% translate "No building registered yet" %}</h2>
+      <p>{% translate "Register your building to take part in the LEG." %}</p>
+      <a class="btn btn-primary" href="{% url 'customer:application_start' %}">{% translate "Start registration" %}</a>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -116,17 +116,20 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 ## Management Area and the Community Domain
 
-Two Django apps (D-077 to D-087):
+Three Django apps (D-077 to D-087, D-105):
 
 * **`leg_platform.community`**: the domain without pages.
-  * Models: transformer circuits, locations (unique on the normalised address), metering points (status derived from dates and the day, no scheduler), LEGs, person and LEG assignments (the previous assignment ends the day before the new one), append-only `HistoryEntry`, `PersonRecord` (staff-only side record; IBAN **encrypted** via `community.iban`), `ShareChange`, `GridOperator`, list preferences.
+  * Models: transformer circuits, locations (unique on the normalised address and, where known, on the EGID), metering points (status derived from dates and the day, no scheduler), LEGs, person and LEG assignments (the previous assignment ends the day before the new one), append-only `HistoryEntry`, `PersonRecord` (staff-only side record; IBAN **encrypted** via `community.iban`), `ShareChange`, `GridOperator`, list preferences.
+  * Onboarding (D-103): customer applications with draft rows (`Application`, `ApplicationBuilding`, `ApplicationMeteringPoint`), staff notices, per-customer building labels (`CustomerBuilding`; a location is shared by all customers of a building), contract versions and acceptances, deregistrations. The real `Location` and `MeteringPoint` rows exist only after the staff completed an application. Services only; the pages are built on them.
   * The rules are plain modules tested without a browser. Identifier columns use the exact collation (D-031).
   * Only `GridOperator` and the raw admin tables (D-091) are registered in the Django administration; the tables are read-only for staff with the `view` right and editable without checks for system administrators (`is_superuser`; owner order 2026-10-19). The community models have no Django permissions except `view` (D-086, D-091).
 * **`leg_platform.management`**: views, forms and templates under `/management/`.
   * Every view uses `access.ManagementAccessMixin` or `@management_view` (`docs/SECURITY.md`, section 4). A test walks the URL configuration and fails for a route without the access check.
   * Lists share one list framework (state parsed from the address on the server).
   * Printing builds PDFs with ReportLab in memory from the same list functions as the pages. One module knows ReportLab markup and escapes every text.
+  * Onboarding pages (D-104): the list "Processes" (`community.process_list`: applications that were submitted and deregistrations that are running, never a draft), the page of an application or a deregistration, the staff's steps as dialogs, notices, the list "Contracts" with upload and download, and the chapter "Reminders and deadlines" of the settings page. They show and call; every rule is in `community` (`application_staff`, `application_queue`, `deregistrations`, `contracts`, `deadline_settings`).
 * Every active staff account may use every page of the area (D-086, approved deviation from D-012). The Django administration keeps its permission model.
+* **`leg_platform.customer`** (D-105; no models): the pages of the customer's participation under `/participation/` (the page "Buildings", the registration wizard with its server-held draft, the contract page and download, a placeholder for the deregistration) and the card and tiles of the start page. Every view uses `access.CustomerAccessMixin` (logged in, active, customer number, not staff; a route walk test fails for a route without it). Pages call the `community` services only; every id is resolved through the account; POSTs have a request budget per account (`customer.limits`).
 * The address directory is advisory (D-066). A suggestion is stored on the location so lists can filter without asking the directory per row.
 * The grid operator's name is never in code: texts use `%(operator)s` in the message id and the name from `GridOperator` (neutral fallback "Netzbetreiber"). Templates use `{% operator_name as operator %}`.
 
@@ -134,6 +137,7 @@ Two Django apps (D-077 to D-087):
 
 * MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the source for schema changes.
 * Documents and receipts must not live only in an ephemeral container file system. Storage is decided once such functions are planned.
+* **Contract PDFs (D-103)** are stored in the database (`ContractVersion.pdf`, like the logos; at most 10 MiB each), with SHA-256 and size; the file name is never stored. They are part of every database backup, and the MariaDB `max_allowed_packet` must be larger than 10 MiB. Acceptances (`ContractAcceptance`) are append-only evidence.
 * **Address directory (D-033, D-049, D-052, D-075, D-090).**
   * The public directory of building addresses is an own SQLite file (alias `addresses`; `ADDRESS_DIRECTORY_FILE`, default `/var/lib/leg-platform/address-directory.sqlite3`), **not part of any backup**. The import job row (`ImportRequest`: claim, progress, last error) stays in MariaDB. A router keeps the two apart; no foreign key to profile data.
   * Connections are read-only (`PRAGMA query_only`) unless the process called `storage.mark_writer()` (optional worker, commands `import_address_directory` and `seed_local_address_directory`, `setup_instance`, `migrate`; never `wsgi.py` or `asgi.py`) or the import thread of the web process called `storage.mark_thread_writer()` (`addresses/runner.py`).

@@ -41,13 +41,28 @@ from leg_platform.addresses.router import AddressRouter
 from leg_platform.addresses.services import approximate_matches, clean_input, directory_status, lookup
 
 HEADER = "STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_NAME;COM_NAME\n"
+EGID_HEADER = HEADER.rstrip("\n") + ";BDG_EGID;ADR_EDID\n"
 SYNTHETIC_CSV = HEADER + "Example Street;12a;9999 Example Town;Discarded synthetic building;Discarded municipality\n"
+
+
+def with_egid(text):
+    """A test table written with ``HEADER`` gets the columns BDG_EGID and ADR_EDID last: every row its own EGID
+    (1001, 1002, ...) and entrance 0.
+
+    A text that does not start with ``HEADER`` (a broken header, an empty file) stays as it is.
+    """
+    if not text.startswith(HEADER):
+        return text
+    rows = text[len(HEADER):].split("\n")
+    lines = [EGID_HEADER.rstrip("\n")]
+    lines.extend(f"{row};{1000 + number};0" if row else row for number, row in enumerate(rows, start=1))
+    return "\n".join(lines)
 
 
 def archive_bytes(csv_text=SYNTHETIC_CSV, name=importer.CSV_NAME):
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(name, csv_text.encode("utf-8-sig"))
+        archive.writestr(name, with_egid(csv_text).encode("utf-8-sig"))
     return output.getvalue()
 
 
@@ -92,8 +107,57 @@ class ParserTests(SimpleTestCase):
     def test_only_approved_columns_are_returned_and_postal_locality_is_used(self):
         self.assertEqual(list(importer.address_rows(io.BytesIO(archive_bytes()))), [{
             "street": "Example Street", "house_number": "12a",
-            "postal_code": "9999", "locality": "Example Town",
+            "postal_code": "9999", "locality": "Example Town", "egid": 1001, "entrance_id": 0,
         }])
+
+    def test_the_official_names_of_the_building_and_entrance_columns(self):
+        # Verified against the published file and the product information of swisstopo (2026-10-19).
+        self.assertEqual((importer.EGID_COLUMN, importer.ENTRANCE_COLUMN), ("BDG_EGID", "ADR_EDID"))
+
+    def test_the_egid_and_the_entrance_are_read_from_their_columns_wherever_the_columns_are(self):
+        text = (
+            "ADR_EGAID;BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
+            "1;123456789;3;Example Street;1;9999 Example Town\n"
+            "2;7;32767;Example Street;2;9999 Example Town\n"
+        )
+        rows = list(importer.address_rows(io.BytesIO(archive_bytes(text))))
+        self.assertEqual([(row["egid"], row["entrance_id"]) for row in rows], [(123456789, 3), (7, 32767)])
+
+    def test_several_addresses_may_share_an_egid_and_one_address_may_have_several(self):
+        text = (
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
+            "500;0;Example Street;1;9999 Example Town\n"
+            "500;1;Example Street;1a;9999 Example Town\n"
+            "501;0;Example Street;1;9999 Example Town\n"
+        )
+        rows = list(importer.address_rows(io.BytesIO(archive_bytes(text))))
+        self.assertEqual(
+            [(row["house_number"], row["egid"], row["entrance_id"]) for row in rows],
+            [("1", 500, 0), ("1a", 500, 1), ("1", 501, 0)],
+        )
+
+    def test_a_file_without_the_egid_or_the_entrance_column_is_refused_with_a_fixed_sentence(self):
+        for csv_text, message in (
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EDID;EGID\nExample;1;9999 Town;0;5\n", "Missing EGID column."),
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL\nExample;1;9999 Town\n", "Missing EGID column."),
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_EGID\nExample;1;9999 Town;5\n", "Missing entrance column."),
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_EGID;EDID\nExample;1;9999 Town;5;0\n", "Missing entrance column."),
+        ):
+            with self.subTest(csv_text=csv_text[:50]):
+                with self.assertRaisesMessage(importer.ImportFailure, message) as raised:
+                    list(importer.address_rows(io.BytesIO(archive_bytes(csv_text))))
+                self.assertIn(str(raised.exception), jobs.SAFE_FAILURES)
+
+    def test_an_empty_egid_or_entrance_is_stored_as_none_and_an_invalid_one_refuses_the_file(self):
+        head = "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
+        rows = list(importer.address_rows(io.BytesIO(archive_bytes(head + ";;Example;1;9999 Town\n"))))
+        self.assertEqual((rows[0]["egid"], rows[0]["entrance_id"]), (None, None))
+        for value in ("0", "012", "1000000000", "-5", "12.0", "1e3", "abc", " 5", "5 ", "\u0663"):
+            with self.subTest(egid=value), self.assertRaisesMessage(importer.ImportFailure, "Invalid address field."):
+                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"{value};0;Example;1;9999 Town\n"))))
+        for value in ("00", "01", "32768", "100000", "-1", "1.0", "x", " 1", "\u0663"):
+            with self.subTest(entrance=value), self.assertRaisesMessage(importer.ImportFailure, "Invalid address field."):
+                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"5;{value};Example;1;9999 Town\n"))))
 
     def test_dangerous_or_unexpected_zip_members_rejected(self):
         for name in ("../escape.csv", "/escape.csv", "other.csv", "sub/" + importer.CSV_NAME):
@@ -295,6 +359,17 @@ class DirectoryFileSettingsTests(SimpleTestCase):
             "addresses/management/commands/import_address_directory.py",
             "addresses/management/commands/process_address_imports.py",
         ])
+        # The one outbound door of a request (KONZEPT 3a, D-066): only ``swisstopo.py`` talks to a third party
+        # about an address, and only ``buildings.py`` (signed-in accounts, rate limits) calls it.
+        sources = {path.name: path.read_text(encoding="utf-8") for path in directory.glob("*.py")}
+        self.assertEqual(
+            sorted(name for name, text in sources.items() if re.search(r"^\s*(import|from) requests\b", text, re.M)),
+            ["importer.py", "swisstopo.py"],
+        )
+        self.assertEqual(
+            sorted(name for name, text in sources.items() if re.search(r"^\s*(from \. import .*\bswisstopo\b|from \.swisstopo)", text, re.M)),
+            ["buildings.py"],
+        )
         # The running thread is the only web-side code that may write the file, and only its own connection.
         runner_text = (directory / "runner.py").read_text(encoding="utf-8")
         self.assertIn("mark_thread_writer", runner_text)
@@ -429,7 +504,7 @@ class DirectoryDatabaseTests(TestCase):
         self.generation = uuid.uuid4()
         Directory.objects.create(
             pk=1, generation=self.generation, data_date=timezone.localdate(),
-            imported_at=timezone.now(), checksum="0" * 64, row_count=1,
+            imported_at=timezone.now(), checksum="0" * 64, row_count=1, has_egid=True,
         )
         Address.objects.create(
             generation=self.generation, street="Previous Street", house_number="1",
@@ -562,6 +637,68 @@ class DirectoryDatabaseTests(TestCase):
         with patch.object(importer, "prune_old_generations") as prune:
             importer._publish(io.BytesIO(b"not parsed"), "0" * 64, timezone.localdate())
         prune.assert_not_called()
+
+    def test_an_import_stores_the_egid_and_the_entrance_per_address_and_marks_the_generation(self):
+        text = (
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
+            "500;0;Example Street;1;9999 Example Town\n"
+            "501;1;Example Street;1;9999 Example Town\n"
+            "500;2;Example Street;1a;9999 Example Town\n"
+        )
+        self.assertEqual(importer._publish(io.BytesIO(archive_bytes(text)), "1" * 64, timezone.localdate()), 3)
+        directory = Directory.objects.get(pk=1)
+        self.assertTrue(directory.has_egid)
+        rows = Address.objects.filter(generation=directory.generation)
+        # One address with two buildings, one building with two addresses: both are kept.
+        self.assertEqual(sorted(rows.filter(house_number="1").values_list("egid", "entrance_id")), [(500, 0), (501, 1)])
+        self.assertEqual(sorted(rows.filter(egid=500).values_list("house_number", "entrance_id")), [("1", 0), ("1a", 2)])
+        # The suggestions do not show an address twice because of its buildings.
+        self.assertEqual(len(lookup({"street": "Example Street", "house_number": "1"})["results"]), 2)
+
+    def test_a_file_without_the_egid_or_entrance_column_keeps_the_old_data_and_leaves_no_rows(self):
+        old_rows = list(Address.objects.values_list("pk", "street", "egid"))
+        for text, message in (
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL\nNew Street;1;9999 Town\n", "Missing EGID column."),
+            ("STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_EGID\nNew Street;1;9999 Town;5\n", "Missing entrance column."),
+        ):
+            with self.subTest(message=message), self.assertRaisesMessage(importer.ImportFailure, message):
+                importer._publish(io.BytesIO(archive_bytes(text)), "1" * 64, timezone.localdate())
+            directory = Directory.objects.get(pk=1)
+            self.assertEqual(
+                (directory.generation, directory.checksum, directory.has_egid), (self.generation, "0" * 64, True),
+            )
+            self.assertEqual(list(Address.objects.values_list("pk", "street", "egid")), old_rows)
+            self.assertIsNone(directory.import_token)
+
+    def test_the_failure_of_a_missing_column_is_recorded_with_its_fixed_sentence(self):
+        claimed = jobs.Claim(uuid.uuid4(), manual=False, took_over=False)
+        ImportRequest.objects.create(pk=1, state=ImportRequest.State.RUNNING, claim_token=claimed.token)
+        text = "STN_LABEL;ADR_NUMBER;ZIP_LABEL\nNew Street;1;9999 Town\n"
+        session = session_for(archive_bytes(text))
+        with patch.object(importer.requests, "Session", return_value=session), \
+                self.assertLogs("leg_platform.addresses.jobs", "ERROR"):
+            with self.assertRaises(importer.ImportFailure) as raised:
+                importer.import_directory()
+            jobs.record_failure(claimed, raised.exception)
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.state, job.last_error), (ImportRequest.State.FAILED, "Missing EGID column."))
+        self.assertEqual(Address.objects.count(), 1)
+
+    def test_a_directory_without_identifiers_is_replaced_although_the_checksum_is_unchanged(self):
+        # A generation imported before the EGID was read (migration 0004 sets has_egid False).
+        Directory.objects.filter(pk=1).update(has_egid=False)
+        directory = Directory.objects.get(pk=1)
+        self.assertFalse(importer._is_published(directory, "0" * 64, repair=False))
+        self.assertFalse(importer._is_published(directory, "0" * 64, repair=True))
+        count = importer._publish(io.BytesIO(archive_bytes()), "0" * 64, timezone.localdate())
+        self.assertEqual(count, 1)
+        directory = Directory.objects.get(pk=1)
+        self.assertTrue(directory.has_egid)
+        self.assertNotEqual(directory.generation, self.generation)
+        self.assertEqual(Address.objects.filter(generation=directory.generation).get().egid, 1001)
+        self.assertEqual(Address.objects.filter(generation=directory.generation).get().entrance_id, 0)
+        # Now the same checksum is "published" again.
+        self.assertTrue(importer._is_published(directory, "0" * 64, repair=False))
 
     def test_checksum_failure_keeps_published_directory(self):
         session = session_for(metadata=item_bytes(archive_bytes(), **{"checksum:multihash": "1220" + "f" * 64}))
@@ -2156,6 +2293,7 @@ class ReadOnlyDefaultTests(TransactionTestCase):
     WRITER_COMMANDS = {
         "addresses/management/commands/process_address_imports.py",
         "addresses/management/commands/import_address_directory.py",
+        "addresses/management/commands/scheduled_address_import.py",
         "addresses/management/commands/seed_local_address_directory.py",
         "addresses/management/commands/migrate.py",
         "accounts/management/commands/setup_instance.py",
@@ -2408,6 +2546,11 @@ class MigrateTests(SimpleTestCase):
             # 0002 only changes the queue table, which is not in the file: recorded, nothing else.
             self.assertIn("Applying addresses.0002_importrequest_last_failed_repair_at... OK", first.stdout)
             self.assertIn("Applying addresses.0003_import_progress_and_error... OK", first.stdout)
+            # 0004 adds the building number and the flag of the directory in the file; the queue and the stored
+            # building searches are in the application database.
+            self.assertIn("Applying addresses.0004_building_identifier_update_flag_and_lookups... OK", first.stdout)
+            self.assertIn("Applying addresses.0005_entrance_identifier... OK", first.stdout)
+            self.assertIn("Applying addresses.0006_columns_missing_backoff... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2418,17 +2561,54 @@ class MigrateTests(SimpleTestCase):
                 tables = {row[0] for row in database.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
                 recorded = {row for row in database.execute("SELECT app, name FROM django_migrations")}
                 journal_mode = database.execute("PRAGMA journal_mode").fetchone()[0]
+                address_columns = {row[1] for row in database.execute("PRAGMA table_info(addresses_address)")}
+                directory_columns = {row[1] for row in database.execute("PRAGMA table_info(addresses_directory)")}
             finally:
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory"})
+            self.assertIn("egid", address_columns)
+            self.assertIn("entrance_id", address_columns)
+            self.assertIn("has_egid", directory_columns)
             self.assertEqual(recorded, {
                 ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
                 ("addresses", "0003_import_progress_and_error"),
+                ("addresses", "0004_building_identifier_update_flag_and_lookups"),
+                ("addresses", "0005_entrance_identifier"),
+                ("addresses", "0006_columns_missing_backoff"),
             })
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_migration_0005_makes_a_generation_without_entrances_due_for_a_new_import(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "state" / "address-directory.sqlite3"
+            environment = {**os.environ, "ADDRESS_DIRECTORY_FILE": str(path)}
+            manage = [sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), "migrate", "addresses"]
+            options = ["--database=addresses", "--noinput"]
+            before = subprocess.run(
+                [*manage, "0004", *options], env=environment, capture_output=True, text=True, timeout=120, check=False,
+            )
+            self.assertEqual(before.returncode, 0, before.stderr[-500:])
+            database = sqlite3.connect(path)
+            try:
+                database.execute(
+                    "INSERT INTO addresses_directory (id, generation, checksum, row_count, has_egid) "
+                    "VALUES (1, 'a', 'x', 1, 1)"
+                )
+                database.commit()
+            finally:
+                database.close()
+            after = subprocess.run(
+                [*manage, *options], env=environment, capture_output=True, text=True, timeout=120, check=False,
+            )
+            self.assertEqual(after.returncode, 0, after.stderr[-500:])
+            database = sqlite3.connect(path)
+            try:
+                self.assertEqual(database.execute("SELECT has_egid FROM addresses_directory").fetchone(), (0,))
+            finally:
+                database.close()
 
     def test_the_whole_migrate_of_the_file_still_creates_nothing_but_the_directory_tables(self):
         with tempfile.TemporaryDirectory() as folder:

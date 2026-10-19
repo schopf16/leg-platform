@@ -6,7 +6,7 @@ The thread uses its own database connections, so the tests that run it are trans
 import ast
 import threading
 import uuid
-from datetime import timedelta
+from datetime import time, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -320,59 +320,43 @@ class RunnerTests(TransactionTestCase):
 
 
 @tag("mariadb")
-class AutomaticRefreshTests(TestCase):
+class AutomaticRefreshTextTests(TestCase):
+    """The refresh is the daily run of the scheduled tasks (KONZEPT 3a); the page says so."""
+
     databases = {"default", "addresses"}
 
-    def setUp(self):
-        patcher = patch.object(runner, "_next_automatic_check", 0.0)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    @override_settings(ADDRESS_IMPORT_AUTOMATIC=False)
-    def test_it_does_nothing_when_it_is_turned_off(self):
-        with patch.object(runner, "_start") as start:
-            self.assertFalse(runner.maybe_start_automatic())
-        start.assert_not_called()
-        self.assertFalse(ImportRequest.objects.exists())
-
     @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
-    def test_a_missing_directory_makes_it_due_at_once_and_it_is_started_as_automatic(self):
-        with patch.object(runner, "_start", return_value=True) as start:
-            self.assertTrue(runner.maybe_start_automatic())
-        claimed = start.call_args.args[0]
-        self.assertFalse(claimed.manual)
-        job = ImportRequest.objects.get(pk=1)
-        self.assertEqual((job.state, job.is_automatic), (State.RUNNING, True))
-        self.assertIsNotNone(job.last_automatic_attempt_at)
-
-    @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
-    def test_it_is_not_repeated_before_the_interval_and_the_check_is_throttled(self):
-        now = timezone.now()
-        ImportRequest.objects.create(pk=1, state=State.FAILED, last_automatic_attempt_at=now - timedelta(hours=1))
-        with patch.object(runner, "_start", return_value=True) as start:
-            self.assertFalse(runner.maybe_start_automatic())
-            # The second call within the check interval does not even look at the database.
-            with self.assertNumQueries(0):
-                self.assertFalse(runner.maybe_start_automatic())
-        start.assert_not_called()
-
-    @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
-    def test_an_error_of_the_check_never_breaks_the_page(self):
-        with patch.object(jobs, "claim", side_effect=RuntimeError("x")):
-            with self.assertLogs("leg_platform.addresses.runner", "WARNING"):
-                self.assertFalse(runner.maybe_start_automatic())
-
-    @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
-    def test_the_text_of_the_page_names_the_trigger_and_admits_what_it_needs(self):
+    def test_the_text_of_the_page_names_the_trigger_and_the_time(self):
         with translation.override("de-ch"):
             text = status.next_automatic_text(None)
-        self.assertIn("kein Zeitplaner", text)
-        self.assertIn("niemand das Portal benutzt", text)
+        self.assertIn("geplanten Aufgaben", text)
+        self.assertIn("ab 03:00", text)
+        self.assertNotIn("niemand das Portal benutzt", text)
+
+    @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
+    def test_the_text_follows_the_configured_time_and_the_flag(self):
+        ImportRequest.objects.create(pk=1, run_time=time(4, 30), update_flag_set_at=timezone.now())
+        with translation.override("en"):
+            text = status.next_automatic_text(ImportRequest.objects.get(pk=1))
+        self.assertIn("from 04:30", text)
+        self.assertIn("An address could not be found", text)
 
     @override_settings(ADDRESS_IMPORT_AUTOMATIC=False)
     def test_the_text_of_the_page_says_when_it_is_turned_off(self):
         with translation.override("en"):
             self.assertIn("turned off", status.next_automatic_text(None))
+
+    def test_the_first_visit_of_a_staff_member_starts_nothing_any_more(self):
+        # The old trigger (D-090: the first visit after the due time) is replaced by the daily run.
+        self.assertFalse(hasattr(runner, "maybe_start_automatic"))
+        client, person = make_staff("visit.person@example.org")
+        person.set_privileges(is_staff=True, is_superuser=True)
+        with override_settings(ADDRESS_IMPORT_AUTOMATIC=True), patch.object(runner, "_start") as start, \
+                patch.object(jobs, "claim") as claim:
+            self.assertEqual(client.get(reverse("admin:index")).status_code, 200)
+            client.get(reverse("management:overview"))
+        start.assert_not_called()
+        claim.assert_not_called()
 
 
 @tag("mariadb")
@@ -439,7 +423,7 @@ class StatusEndpointTests(TestCase):
         response = client.get(PAGE_URL)
         self.assertContains(response, 'data-status-url="%s"' % STATUS_URL)
         self.assertContains(response, "js/import-status.js")
-        self.assertContains(response, "Der Import läuft im Portal selbst")
+        self.assertContains(response, "Eine Anforderung auf dieser Seite läuft im Portal selbst")
         self.assertNotContains(response, "separaten Hintergrundprozess")
         self.assertNotContains(response, "Hintergrund-Worker")
         # No inline script or handler on the page (Content Security Policy).

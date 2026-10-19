@@ -190,13 +190,17 @@ class OverviewTests(Fixture):
 
     def test_the_menu_has_the_entries_in_the_order_of_the_specification_and_the_link_to_the_mail_texts(self):
         keys = [entry["key"] for entry in navigation.menu_entries(self.staff)]
-        self.assertEqual(keys, ["overview", "persons", "locations", "legs", "metering_points", "settings"])
-        # The link to the Django administration keeps its permission model (D-086).
+        self.assertEqual(
+            keys, ["overview", "processes", "persons", "locations", "legs", "metering_points", "settings", "contracts"]
+        )
+        # The link to the Django administration keeps its permission model (D-086); "Contracts" follows it (owner design).
         editor = staff_user("staff.mail@example.org")
         editor.user_permissions.add(Permission.objects.get(content_type__app_label="accounts", codename="change_emailtext"))
         editor = type(editor).objects.get(pk=editor.pk)
-        last = navigation.menu_entries(editor)[-1]
+        entries = navigation.menu_entries(editor)
+        last = entries[-2]
         self.assertEqual((last["key"], last["url"]), ("email_texts", "/admin/accounts/emailtext/"))
+        self.assertEqual(entries[-1]["key"], "contracts")
         home = self.login(editor).get(reverse("home")).content.decode()
         self.assertIn('href="/admin/accounts/emailtext/"', home)
         self.assertIn("Mailtexte", home)

@@ -1,0 +1,54 @@
+{% extends "customer/base.html" %}
+{% load i18n %}{% comment %}
+"Start application" (EINSTIEG.md; mockup anmeldung-starten): without a draft the question "What do we still need to know?" with the
+five steps (green = already on file, the wizard skips it); with a draft the card to continue. The steps are the same rows.
+Context: ``rows`` (customer.wizard.OverviewRow), ``location`` (the own building chosen by "Add metering point"), and either
+``done`` / ``total`` (no draft) or ``draft``, ``progress``, ``remaining``, ``paused``, ``next_url``, ``next_name``.
+{% endcomment %}
+{% block title %}{% translate "Start registration" %}{% endblock %}
+{% block content %}
+  <div class="wizard">
+    {% if draft %}
+      <div>
+        <p class="page-label">{% translate "My participation" %}</p>
+        <h1 class="start-title">{% translate "Start registration" %}</h1>
+        <p class="start-sub">{% translate "You started an application. You can continue where you left off." %}</p>
+      </div>
+      {% if paused %}<div class="alert alert-warning" role="status">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</div>{% endif %}
+      <section class="step-card" aria-labelledby="draft-title">
+        <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not completed yet" %}</p>
+        <h2 id="draft-title">{% blocktranslate with done=progress.done total=progress.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</h2>
+        <progress class="path-bar" max="{{ progress.total }}" value="{{ progress.done }}" aria-label="{% blocktranslate with done=progress.done total=progress.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ progress.done }}/{{ progress.total }}</progress>
+        {% if remaining %}<p class="muted">{% blocktranslate count remaining=remaining %}{{ remaining }} step still open{% plural %}{{ remaining }} steps still open{% endblocktranslate %}</p>{% else %}<p class="muted">{% translate "Your details are complete. Submit your application now." %}</p>{% endif %}
+        <p class="next-up"><span class="muted">{% translate "Next up" %}</span> <strong>{{ next_name }}</strong></p>
+        <div class="step-actions">
+          <a class="btn btn-primary" href="{{ next_url }}">{% translate "Continue application" %}</a>
+          <form method="post" action="{% url 'customer:application_cancel' draft.pk %}" class="inline-form" data-submit-once>
+            {% csrf_token %}
+            <input type="hidden" name="restart" value="1">
+            {% if location %}<input type="hidden" name="building" value="{{ location.pk }}">{% endif %}
+            <button type="submit" class="btn btn-secondary-action">{% translate "Start again" %}</button>
+          </form>
+        </div>
+        <p class="muted">{% translate "If you start again, the details of this application are deleted." %}</p>
+      </section>
+      {% include "customer/_overview_rows.html" with title=_("How it works") %}
+    {% else %}
+      <div>
+        <p class="page-label">{% translate "My participation" %}</p>
+        <h1 class="start-title">{% translate "What do we still need to know?" %}</h1>
+        <p class="start-sub">{% translate "We take over details that are already on file. You can change them at any time." %}</p>
+      </div>
+      <div class="progress-block">
+        <progress class="path-bar" max="{{ total }}" value="{{ done }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ done }}/{{ total }}</progress>
+        <p class="step-note">{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</p>
+      </div>
+      {% include "customer/_overview_rows.html" with title=_("Your steps") %}
+      <form method="post" class="step-actions" data-submit-once>
+        {% csrf_token %}
+        {% if location %}<input type="hidden" name="building" value="{{ location.pk }}">{% endif %}
+        <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}

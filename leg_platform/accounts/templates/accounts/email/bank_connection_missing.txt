@@ -1,0 +1,6 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your application at {{ instance_name }} needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+{% endautoescape %}

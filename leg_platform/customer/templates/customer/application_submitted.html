@@ -1,0 +1,46 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your application was submitted" %}{% endblock %}
+{% block content %}
+  <div class="wizard">
+    <div class="progress-block">
+      <p class="page-label">{% translate "My participation · Registration" %}</p>
+      <progress class="path-bar" max="{{ total }}" value="{{ done }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} done{% endblocktranslate %}">{{ done }}/{{ total }}</progress>
+      <p class="step-note">{% blocktranslate %}{{ done }} of {{ total }} done{% endblocktranslate %}</p>
+    </div>
+    <div>
+      <h1 class="start-title">{% translate "Your application was submitted" %}</h1>
+      <p class="start-sub">{% blocktranslate %}The LEG checks your details and registers your building at {{ operator }}. Then you receive an email from {{ operator }}. Please confirm the registration there.{% endblocktranslate %}</p>
+    </div>
+
+    <section class="step-card" aria-labelledby="next-steps">
+      <h2 id="next-steps">{% translate "What happens next" %}</h2>
+      <ol class="step-list">
+        {% for step in steps %}
+          <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.name }}</span><span class="step-word step-word-{{ step.state }}">{% if step.waiting %}{% blocktranslate %}Confirmation by {{ operator }} pending{% endblocktranslate %}{% elif step.state == 'done' %}{% translate "Finished" %}{% elif step.state == 'next' %}{% translate "Next up" %}{% else %}{% translate "Open" %}{% endif %}</span></li>
+        {% endfor %}
+      </ol>
+      <p class="muted">{% blocktranslate %}Please confirm the registration within {{ days }} days after the email from {{ operator }}.{% endblocktranslate %}</p>
+    </section>
+
+    <section class="step-card" aria-labelledby="your-details">
+      <h2 id="your-details">{% translate "Your submitted details" %}</h2>
+      <dl class="facts">
+        {% if building %}
+          {% with address=building.current_address %}
+            <div><dt>{% translate "Building" %}</dt><dd>{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}{% if building.egid %}<span class="mp-note">{% translate "EGID" %} {{ building.egid }}</span>{% endif %}</dd></div>
+          {% endwith %}
+        {% endif %}
+        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}{{ point.get_direction_display }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>
+        <div><dt>{% translate "Start date" %}</dt><dd>{% if application.start_choice == "date" %}{{ application.desired_start_date|date:"d.m.Y" }}{% else %}{% translate "As soon as possible" %}{% endif %}</dd></div>
+      </dl>
+      <p class="muted">{% translate "Changes are now only possible through the LEG." %}</p>
+    </section>
+
+    <div class="step-actions">
+      <a class="btn btn-primary" href="{% url 'home' %}">{% translate "To the start page" %}</a>
+      {% if withdrawable %}<a class="btn btn-danger-outline" href="{% url 'customer:application_withdraw' application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
+    </div>
+    {% if withdrawable %}<p class="muted">{% blocktranslate %}You can withdraw the application as long as the LEG has not yet submitted it to {{ operator }}.{% endblocktranslate %}</p>{% endif %}
+  </div>
+{% endblock %}

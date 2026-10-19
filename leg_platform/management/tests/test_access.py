@@ -226,7 +226,8 @@ class AccessTests(TestCase):
 
     def test_the_menu_of_a_staff_account_has_every_entry_and_a_plain_account_has_none(self):
         links = [reverse(entry.url_name) for entry in navigation.MENU]
-        self.assertEqual(len(links), 6)  # overview, persons, locations, LEGs, metering points, settings
+        # overview, processes, persons, locations, LEGs, metering points, settings, contracts
+        self.assertEqual(len(links), 8)
         for user in (self.staff, self.administrator):
             for part in self.menu_parts(user):
                 with self.subTest(user=user.email):
@@ -262,7 +263,8 @@ class MenuRuleTests(SimpleTestCase):
 
     def test_an_active_staff_account_sees_every_entry_in_the_order_of_the_menu(self):
         self.assertEqual(
-            self.keys(FakeUser()), ["overview", "persons", "locations", "legs", "metering_points", "settings"]
+            self.keys(FakeUser()),
+            ["overview", "processes", "persons", "locations", "legs", "metering_points", "settings", "contracts"],
         )
         self.assertEqual(self.keys(FakeUser()), [entry.key for entry in navigation.MENU])
 
@@ -272,7 +274,10 @@ class MenuRuleTests(SimpleTestCase):
 
     def test_the_link_to_the_mail_texts_of_the_administration_needs_its_own_right(self):
         self.assertNotIn("email_texts", self.keys(FakeUser()))
-        self.assertEqual(self.keys(FakeUser(perms=["accounts.view_emailtext"]))[-1], "email_texts")
+        keys = self.keys(FakeUser(perms=["accounts.view_emailtext"]))
+        # Owner design: "Contracts" follows "Mail texts"; without the right it follows "Settings".
+        self.assertEqual(keys[-2:], ["email_texts", "contracts"])
+        self.assertEqual([key for key in keys if key != "email_texts"], [entry.key for entry in navigation.MENU])
 
     def test_the_area_of_an_url_name_is_active(self):
         entry = navigation.MenuEntry("metering_points", "x", "i-x")

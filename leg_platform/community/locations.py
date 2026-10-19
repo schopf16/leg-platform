@@ -223,8 +223,12 @@ def set_archived(location, archived, actor=None):
 
 
 def can_delete(location):
-    """Deletable only without a history and metering points (those archive instead)."""
-    return not history.has_history(location) and not location.metering_points.exists()
+    """Deletable only without a history, metering points and draft buildings of an application (those archive instead)."""
+    return (
+        not history.has_history(location)
+        and not location.metering_points.exists()
+        and not location.application_buildings.exists()
+    )
 
 
 def delete(location):

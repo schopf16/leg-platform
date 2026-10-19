@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load static %}{% comment %}
+The shell of the customer's pages (docs/DESIGN.md, section 6): the frame of the pages after the login, the stylesheet of the
+customer pages and their one script (progressive enhancement only; every page works without it).
+{% endcomment %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
+{% block inner_class %}{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/submit-once.js' %}"></script>
+  <script defer src="{% static 'customer/js/customer.js' %}"></script>
+{% endblock %}

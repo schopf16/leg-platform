@@ -217,6 +217,67 @@ DEFINITIONS = {
         (GREETING, CONTACT_URL),
         (),
     ),
+    # Onboarding of customers (D-103): no address, IBAN or metering point number, only the link to the portal.
+    Key.APPLICATION_SUBMITTED: Definition(
+        "accounts/email/application_submitted.txt",
+        lambda: gettext("Your application at %(instance_name)s was submitted"),
+        (GREETING,),
+        (),
+    ),
+    Key.APPLICATION_REMINDER: Definition(
+        "accounts/email/application_reminder.txt",
+        lambda: gettext("Your application at %(instance_name)s is not completed yet"),
+        (GREETING,),
+        (),
+    ),
+    Key.APPLICATION_ROLLED_BACK: Definition(
+        "accounts/email/application_rolled_back.txt",
+        lambda: gettext("Your application at %(instance_name)s was rolled back"),
+        (GREETING,),
+        (),
+    ),
+    Key.CONTRACT_REMINDER: Definition(
+        "accounts/email/contract_reminder.txt",
+        lambda: gettext("Please approve the contract at %(instance_name)s"),
+        (GREETING,),
+        (),
+    ),
+    Key.CONTRACT_ROLLED_BACK: Definition(
+        "accounts/email/contract_rolled_back.txt",
+        lambda: gettext("Your application at %(instance_name)s was rolled back"),
+        (GREETING,),
+        (),
+    ),
+    Key.BANK_CONNECTION_MISSING: Definition(
+        "accounts/email/bank_connection_missing.txt",
+        lambda: gettext("Bank connection needed at %(instance_name)s"),
+        (GREETING,),
+        (),
+    ),
+    Key.DEREGISTRATION_SUBMITTED: Definition(
+        "accounts/email/deregistration_submitted.txt",
+        lambda: gettext("Your deregistration at %(instance_name)s was received"),
+        (GREETING,),
+        (),
+    ),
+    Key.DEREGISTRATION_EFFECTIVE: Definition(
+        "accounts/email/deregistration_effective.txt",
+        lambda: gettext("Your deregistration at %(instance_name)s has taken effect"),
+        (GREETING,),
+        (),
+    ),
+    Key.IBAN_CHANGED: Definition(
+        "accounts/email/iban_changed.txt",
+        lambda: gettext("The IBAN of your account at %(instance_name)s was changed"),
+        (GREETING, CONTACT_URL),
+        (),
+    ),
+    Key.OPERATOR_CONFIRMATION_LAPSED: Definition(
+        "accounts/email/operator_confirmation_lapsed.txt",
+        lambda: gettext("Registration at the grid operator to be withdrawn: %(instance_name)s"),
+        (GREETING,),
+        (),
+    ),
 }
 
 MAX_BODY_LENGTH = 5000

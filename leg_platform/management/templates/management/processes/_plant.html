@@ -1,0 +1,4 @@
+{% load i18n %}{% comment %}
+The plant figures of a metering point of an application (PV power, battery, wallbox), as the customer entered them; nothing for a
+figure that was left empty. Context: ``point`` (a dict of ``process_views.building_rows``).
+{% endcomment %}{% if point.pv is not None %}{% blocktranslate with value=point.pv|floatformat:"2u" %}PV {{ value }} kWp{% endblocktranslate %}{% endif %}{% if point.battery is not None %} {% blocktranslate with value=point.battery|floatformat:"2u" %}Battery {{ value }} kWh{% endblocktranslate %}{% endif %}{% if point.wallbox is not None %} {% blocktranslate with value=point.wallbox|floatformat:"2u" %}Wallbox {{ value }} kW{% endblocktranslate %}{% endif %}

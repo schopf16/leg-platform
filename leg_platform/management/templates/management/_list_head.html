@@ -4,12 +4,13 @@ The head of a list table (D-078; LISTEN-STANDARD.md, sections 1 to 3 and 5). Con
 ascending, second descending, third ascending again; the active column is blue with an arrow), a
 column can carry an info bubble (a plain ``info`` text or an ``info_template`` with markup) and a
 handle at its right edge to change the width (``management/js/list.js``; the width is saved per
-account). The last column is the narrow link column: 56 px, no title, no handle. The widths are
+account). The last column is the narrow link column: 56 px, no title, no handle (a list without a detail
+page, such as the contract versions, includes the head with ``no_link_column=True``). The widths are
 set with the ``width`` attribute of ``col`` (an inline style would be refused by the Content
 Security Policy).
 {% endcomment %}<colgroup>
   {% for column in list_columns %}<col data-col="{{ column.key }}"{% if column.width %} width="{{ column.width }}"{% endif %}{% if column.keep %} data-keep{% endif %}>
-  {% endfor %}<col class="mgmt-link-col" width="56">
+  {% endfor %}{% if not no_link_column %}<col class="mgmt-link-col" width="56">{% endif %}
 </colgroup>
 <thead>
   <tr>
@@ -20,6 +21,6 @@ Security Policy).
         {% if column.resizable %}<span class="mgmt-grip" role="separator" aria-orientation="vertical" tabindex="0" aria-label="{% translate 'Change the width of the column' %}"></span>{% endif %}
       </th>
     {% endfor %}
-    <th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th>
+    {% if not no_link_column %}<th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th>{% endif %}
   </tr>
 </thead>

@@ -357,19 +357,21 @@ class AccountDeletionTests(TestCase):
         self.assertIn("Konto endgültig löschen</button>", card)
         self.assertIn("Ich weiss, dass mein Konto und meine Angaben gelöscht werden", card)
 
-    def test_the_card_is_the_same_for_every_account_and_says_nothing_about_the_obligation_of_the_account(self):
-        # Owner decision (D-055): deleting is deleting; the retention obligation of the account is
-        # never shown. The generic notice of the legal text (D-059) is the same for everybody.
+    def test_the_card_of_a_retained_account_says_it_is_deactivated_and_the_plain_card_says_nothing_of_it(self):
+        # Owner decision 2026-10-19 (kundenprofil/PROFIL.md section 6; amends D-055): an account that is only
+        # deactivated is told so before; an account that is deleted sees the card of D-059 unchanged.
         retained = create_active_user("retained.person@example.org")
         retained.set_retention_obligation()
         other = VerifiedClient()
         other.force_login(retained)
 
         plain = self.delete_card(self.client)
+        kept = self.delete_card(other)
 
-        self.assertEqual(self.delete_card(other), plain)
-        for word in ("Aufbewahrungspflicht", "geschlossen", "retention", "retain", "closed"):
+        for word in ("Aufbewahrung", "deaktiviert", "retention", "retain", "closed"):
             self.assertNotIn(word, plain)
+        self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", kept)
+        self.assertNotIn("Rechnungen und Buchungsbelege", kept)
 
     def test_the_checkbox_is_never_ticked_again_after_an_error(self):
         # Ticked, but with a wrong password: the card is shown again with the box unticked.
@@ -390,7 +392,7 @@ class AccountDeletionTests(TestCase):
         self.assertNotContains(response, "zwingend erforderlich")
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
 
-    def test_the_message_is_the_same_for_every_account(self):
+    def test_the_result_says_deleted_or_deactivated_and_a_retained_account_stays_deactivated(self):
         deleted = self.client.post(DELETE_URL, {"confirm": "on", "current_password": PASSWORD}, follow=True)
 
         retained_user = create_active_user("retained.person@example.org")
@@ -399,15 +401,15 @@ class AccountDeletionTests(TestCase):
         client.force_login(retained_user)
         kept = client.post(DELETE_URL, {"confirm": "on", "current_password": PASSWORD}, follow=True)
 
-        for response in (deleted, kept):
-            self.assertContains(response, "Ihr Konto wurde gelöscht")
-            for word in ("geschlossen", "aufbewahr", "gesetzlich"):
-                self.assertNotContains(response, word)
+        self.assertContains(deleted, "Ihr Konto wurde gelöscht")
+        for word in ("geschlossen", "aufbewahr", "gesetzlich", "deaktiviert"):
+            self.assertNotContains(deleted, word)
+        # Owner decision 2026-10-19 (amends D-055): the result tells an account that is kept.
+        self.assertContains(kept, "Ihr Konto wurde deaktiviert")
+        self.assertContains(kept, "Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.")
+        self.assertNotContains(kept, "Ihr Konto wurde gelöscht")
         self.assertEqual(deleted.redirect_chain, kept.redirect_chain)
-        # The CSRF token of the language form is masked and differs in every response.
-        token = re.compile(rb'name="csrfmiddlewaretoken" value="[^"]+"')
-        self.assertEqual(token.sub(b"", deleted.content), token.sub(b"", kept.content))
-        # Behind the same message the retained account stays in the database, deactivated.
+        # Behind the message the retained account stays in the database, deactivated.
         retained_user.refresh_from_db()
         self.assertEqual(retained_user.status, User.Status.DEACTIVATED)
         self.assertFalse(User.objects.filter(pk=self.user.pk).exists())

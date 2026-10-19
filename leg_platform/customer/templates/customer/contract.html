@@ -1,0 +1,32 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Articles of association" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "Information" %}</p>
+    <h1 class="start-title">{% translate "Articles of association" %}</h1>
+    <p class="start-sub">{% translate "The current version and every version you agreed to." %}</p>
+    {% if versions %}
+      <ul class="contract-list">
+        {% for version, acceptance in versions %}
+          <li class="step-card contract-version">
+            <div>
+              <h2>{% blocktranslate with date=version.version_date|date:"d.m.Y" %}Version of {{ date }}{% endblocktranslate %}</h2>
+              <p class="dotword">
+                {% if version.is_current %}<span class="dot tone-accent" aria-hidden="true"></span>{% translate "Current version" %}{% else %}<span class="dot tone-muted" aria-hidden="true"></span>{% translate "Replaced version" %}{% endif %}
+                {% if acceptance %} · <span class="dot tone-ok" aria-hidden="true"></span>{% blocktranslate with date=acceptance.accepted_at|date:"d.m.Y" %}You agreed on {{ date }}{% endblocktranslate %}{% else %} · <span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not agreed yet" %}{% endif %}
+              </p>
+            </div>
+            <a class="btn btn-secondary-action" href="{% if version.is_current %}{% url 'customer:contract_download' %}{% else %}{% url 'customer:contract_version_download' version.pk %}{% endif %}">{% translate "Download contract" %}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">
+        <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-document"/></svg></span>
+        <h2>{% translate "The contract is not available yet" %}</h2>
+        <p>{% translate "As soon as the LEG has published it, you find it here." %}</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

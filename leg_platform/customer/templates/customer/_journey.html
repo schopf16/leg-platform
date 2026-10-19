@@ -1,0 +1,20 @@
+{% load i18n %}{% comment %}
+The card "Your way into the LEG" (START-SEITE.md, section 4): title, "n of m done", a bar, the steps with a dot and a word, one
+sentence about the next step and one main button. It cannot be hidden. Context: ``journey`` (customer.journey.Journey).
+{% endcomment %}<section class="journey" aria-labelledby="journey-title">
+  <div class="journey-head">
+    <h2 id="journey-title">{% translate "Your way into the LEG" %}</h2>
+    <span class="muted">{% blocktranslate with done=journey.done total=journey.total %}{{ done }} of {{ total }} done{% endblocktranslate %}</span>
+  </div>
+  <progress class="path-bar" max="{{ journey.total }}" value="{{ journey.done }}" aria-label="{% blocktranslate with done=journey.done total=journey.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ journey.done }}/{{ journey.total }}</progress>
+  {% if journey.paused %}<p class="note-warn">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</p>{% endif %}
+  <ol class="step-list">
+    {% for step in journey.steps %}
+      <li{% if step.muted %} class="is-muted"{% endif %}><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'now' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.label }}</span><span class="step-word step-word-{% if step.state == 'done' %}done{% elif step.state == 'now' %}next{% else %}open{% endif %}">{% if step.state == 'done' %}{% translate "Finished" %}{% elif step.state == 'now' %}{% translate "Next up" %}{% else %}{% translate "Open" %}{% endif %}</span></li>
+    {% endfor %}
+  </ol>
+  <div class="journey-next">
+    <p>{{ journey.sentence }}</p>
+    <a class="btn btn-primary" href="{{ journey.url }}">{{ journey.button }}</a>
+  </div>
+</section>

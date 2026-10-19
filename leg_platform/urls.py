@@ -20,6 +20,8 @@ urlpatterns = [
     path("addresses/", include("leg_platform.addresses.urls")),
     # The management area for staff users (D-077); every view checks its permissions itself.
     path("management/", include("leg_platform.management.urls")),
+    # The customer's participation: buildings, the registration wizard, the contract (D-103).
+    path("participation/", include("leg_platform.customer.urls")),
     path("", HomeView.as_view(), name="home"),
     path("", include("leg_platform.accounts.urls")),
     path("admin/", admin.site.urls),

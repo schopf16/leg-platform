@@ -1,4 +1,4 @@
-{% load i18n management_ui %}{% comment %}
+{% load i18n management_ui customer_ui %}{% comment %}
 The entries of the menu, shared by the left menu of the desktop and the menu of the phone
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
 (team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
@@ -16,6 +16,26 @@ D-102; the administration itself checks every request) and is the very last entr
 <a class="frame-item{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span>{% translate "Profile" %}</span>
 </a>
+{% if not user.is_staff %}{% customer_menu as customer_state %}
+{# A customer (MENU-STANDARD.md): Participation and Information with their entries always open. Entries whose page does not exist yet are marked "later" (no link). #}
+<p class="frame-item frame-parent{% if customer_state.participation %} is-active{% endif %}">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg><span>{% translate "Participation" %}</span>
+</p>
+<ul class="frame-sub">
+  <li><a class="frame-sub-item{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>{% translate "Buildings" %}</a></li>
+  <li><a class="frame-sub-item" href="{% url 'customer:contract' %}">{% translate "Contract" %}</a></li>
+  <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Start date" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
+  <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Neighbourhood" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
+</ul>
+<p class="frame-item frame-parent{% if customer_state.information %} is-active{% endif %}">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg><span>{% translate "Information" %}</span>
+</p>
+<ul class="frame-sub">
+  <li><a class="frame-sub-item{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
+  <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Questions and answers" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
+  <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Event" context "customer menu" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
+</ul>
+{% endif %}
 {% management_menu as management_entries %}{% if management_entries %}
 <p class="frame-group">{% translate "Management" %}</p>
 {% for entry in management_entries %}
@@ -24,6 +44,7 @@ D-102; the administration itself checks every request) and is the very last entr
 </a>
 {% endfor %}{% endif %}
 <p class="frame-group">{% translate "Coming next" %}</p>
+{% if user.is_staff %}
 <a class="frame-item is-later" role="link" aria-disabled="true">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoices" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
@@ -36,6 +57,21 @@ D-102; the administration itself checks every request) and is the very last entr
   <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Messages" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
+{% else %}
+{# The names of the customer menu are singular (MENU-STANDARD.md). #}
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoice" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg><span>{% translate "Energy" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Message" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+{% endif %}
 {% system_administration as show_system %}{% if show_system %}
 <p class="frame-group">{% translate "System" %}</p>
 <a class="frame-item" href="{% url 'admin:index' %}">

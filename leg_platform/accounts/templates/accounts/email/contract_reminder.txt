@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your application at {{ instance_name }} is almost complete. The contract still needs your approval. You can read and approve it after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+
+{% translate "If the contract is not approved in time, the application is rolled back and the details you entered about buildings and metering points are deleted." %}
+{% endautoescape %}

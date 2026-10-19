@@ -240,6 +240,66 @@
   border-top: 1px solid var(--line);
 }
 
+/* A customer's menu (MENU-STANDARD.md): a parent entry (no link) with its entries always open below it, indented under a line. */
+.frame-parent {
+  margin: 0 0 2px;
+  cursor: default;
+}
+
+.frame-parent:hover {
+  background: transparent;
+}
+
+.frame-parent.is-active {
+  background: transparent;
+  border-left-color: transparent;
+}
+
+.frame-sub {
+  list-style: none;
+  margin: 2px 0 8px 22px;
+  padding: 0 0 0 14px;
+  display: grid;
+  gap: 2px;
+  border-left: 1px solid var(--line);
+}
+
+.frame-sub-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.frame-sub-item:hover {
+  background: var(--warm);
+  color: var(--fg);
+}
+
+.frame-sub-item.is-active {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--warm);
+  border-color: var(--line);
+}
+
+.frame-sub-item.is-later {
+  cursor: default;
+}
+
+.frame-sub-item.is-later:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
 .frame-menu-foot form {
   margin: 0;
 }
@@ -334,7 +394,8 @@
     padding: 16px;
   }
 
-  .frame-item {
+  .frame-item,
+  .frame-sub-item {
     min-height: 48px;
   }
 
@@ -774,6 +835,12 @@
 .profile-step {
   font-size: 14px;
   color: var(--muted);
+}
+
+/* The IBAN in full, in groups of four (PROFIL.md section 2). */
+.profile-iban {
+  font-family: var(--tblr-font-monospace);
+  letter-spacing: 0.04em;
 }
 
 .profile-note,

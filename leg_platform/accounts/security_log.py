@@ -64,6 +64,8 @@ MESSAGES = {
     Event.ACCOUNT_DATA_CHANGED_BY_STAFF: "The data of an account was changed by staff",
     Event.GRID_OPERATOR_CHANGED: "The grid operator of the instance was changed",
     Event.MANAGEMENT_DATA_EDITED: "Management data was edited in the administration",
+    Event.IBAN_CHANGED: "The IBAN of an account was changed by the account",
+    Event.CONTRACT_VERSION_CHANGED: "A contract version was uploaded, made current or deleted",
 }
 
 

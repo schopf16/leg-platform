@@ -290,3 +290,57 @@ def send_account_deleted(address):
     Always the neutral greeting: no name of a deleted account is stored or used (D-068).
     """
     _send(address, Key.ACCOUNT_DELETED, {})
+
+
+# Onboarding of customers (D-103): the text carries no address, IBAN or metering point number, only the greeting and
+# the link to the login page (``{login_url}``, built from the instance configuration).
+
+
+def send_application_submitted(address, greeting_name=""):
+    """Confirm the submission of an application."""
+    _send(address, Key.APPLICATION_SUBMITTED, {}, greeting_name)
+
+
+def send_application_reminder(address, greeting_name=""):
+    """Remind the customer that an application is not completed."""
+    _send(address, Key.APPLICATION_REMINDER, {}, greeting_name)
+
+
+def send_application_rolled_back(address, greeting_name=""):
+    """Tell the customer that an application was rolled back and its details deleted."""
+    _send(address, Key.APPLICATION_ROLLED_BACK, {}, greeting_name)
+
+
+def send_contract_reminder(address, greeting_name=""):
+    """Remind the customer to approve the contract."""
+    _send(address, Key.CONTRACT_REMINDER, {}, greeting_name)
+
+
+def send_contract_rolled_back(address, greeting_name=""):
+    """Tell the customer that an application was rolled back because the contract was not approved in time."""
+    _send(address, Key.CONTRACT_ROLLED_BACK, {}, greeting_name)
+
+
+def send_bank_connection_missing(address, greeting_name=""):
+    """Ask for the bank or postal account that a feed-in needs."""
+    _send(address, Key.BANK_CONNECTION_MISSING, {}, greeting_name)
+
+
+def send_deregistration_submitted(address, greeting_name=""):
+    """Confirm a deregistration request."""
+    _send(address, Key.DEREGISTRATION_SUBMITTED, {}, greeting_name)
+
+
+def send_deregistration_effective(address, greeting_name=""):
+    """Tell the customer that a deregistration has taken effect."""
+    _send(address, Key.DEREGISTRATION_EFFECTIVE, {}, greeting_name)
+
+
+def send_iban_changed(address, greeting_name=""):
+    """Tell every address of the account that the IBAN was changed; the IBAN itself is never in the text."""
+    _send(address, Key.IBAN_CHANGED, {}, greeting_name)
+
+
+def send_operator_confirmation_lapsed(address, greeting_name=""):
+    """Tell a staff account that an application was rolled back because the grid operator's confirmation is missing."""
+    _send(address, Key.OPERATOR_CONFIRMATION_LAPSED, {}, greeting_name)

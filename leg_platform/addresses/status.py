@@ -12,7 +12,7 @@ from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from . import jobs
+from . import jobs, schedule
 from .models import ImportRequest
 from .services import directory_status
 
@@ -33,6 +33,8 @@ REASONS = {
     "Unsafe ZIP member.": _("The official file does not have the expected content."),
     "Invalid CSV header.": _("The official file does not have the expected content."),
     "Missing approved CSV columns.": _("The official file does not have the expected content."),
+    "Missing EGID column.": _("The official file has no building number (EGID) column. Nothing was changed."),
+    "Missing entrance column.": _("The official file has no entrance number (ADR_EDID) column. Nothing was changed."),
     "Invalid CSV row count or width.": _("The official file does not have the expected content."),
     "Invalid postal label.": _("The official file contains an invalid postal code."),
     "Empty directory.": _("The official file contains no addresses."),
@@ -94,18 +96,20 @@ def effective_state(job, now=None):
 
 
 def next_automatic_text(job):
-    """A sentence about the automatic refresh; honest about what triggers it."""
+    """A sentence about the automatic refresh (the daily run of the scheduled tasks); honest about what triggers it."""
     if not settings.ADDRESS_IMPORT_AUTOMATIC:
         return gettext(
             "The automatic refresh is turned off on this server. The directory is only updated when you "
             "request it here or when the operator starts the import on the server."
         )
-    interval = jobs.EMPTY_DIRECTORY_INTERVAL if jobs.directory_is_empty() else jobs.AUTOMATIC_INTERVAL
     base = gettext(
-        "The portal refreshes the directory by itself: the first time a staff member opens the "
-        "administration or the management area after the due time. It needs no scheduler, but nothing "
-        "happens while nobody uses the portal."
-    )
+        "Once a day from %(time)s the scheduled tasks of the server check whether the directory must be "
+        "updated: when an address could not be found, or when the regular refresh is due. A request on this "
+        "page starts at once."
+    ) % {"time": schedule.import_run_time().strftime("%H:%M")}
+    if job is not None and job.update_flag_set_at is not None:
+        return base + " " + gettext("An address could not be found: the directory is updated at the next daily run.")
+    interval = jobs.EMPTY_DIRECTORY_INTERVAL if jobs.directory_is_empty() else jobs.AUTOMATIC_INTERVAL
     last = job.last_automatic_attempt_at if job else None
     if last is None:
         return base + " " + gettext("The first refresh is due now.")

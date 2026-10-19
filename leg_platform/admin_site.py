@@ -79,10 +79,6 @@ class PortalAdminSite(AdminSite):
         return None
 
     def index(self, request, extra_context=None):
-        # The first visit after the due time starts the automatic refresh of the address directory (D-090).
-        from leg_platform.addresses.runner import maybe_start_automatic
-
-        maybe_start_automatic()
         # The hint names the group "Content": only an account that sees that group gets it. An
         # account that sees nothing gets Django's own sentence for it (reworded in the catalogue).
         groups = self.get_app_list(request)

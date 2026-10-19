@@ -1,0 +1,24 @@
+{% extends "customer/wizard_base.html" %}
+{% load i18n %}
+{% block heading %}{% translate "When should your participation start?" %}{% endblock %}
+{% block lead %}{% translate "Choose the earliest date or a desired date." %}{% endblock %}
+{% block step %}
+  <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Activation' %}">
+    {% csrf_token %}
+    {% include "accounts/_error_summary.html" %}
+    <fieldset class="question">
+      <legend>{% translate "When should it start?" %}</legend>
+      {% for radio in form.start %}
+        <label class="entry-check"><input class="entry-check-input" type="radio" name="start" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <div class="reveal{% if form.start.value == 'date' %} is-open{% endif %}" data-reveal-name="start" data-reveal-value="date">
+      {% include "customer/_field.html" with field=form.desired_date %}
+    </div>
+    <p class="form-hint">{% blocktranslate %}Confirmation of the final date: {{ operator }}.{% endblocktranslate %}</p>
+    <div class="step-actions">
+      <button type="submit" class="btn btn-primary" data-gate-date="id_desired_date">{% translate "Submit application" %}</button>
+      <a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>
+    </div>
+  </form>
+{% endblock %}

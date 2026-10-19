@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import NamedTuple
 
 from django.db import DatabaseError, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from leg_platform.accounts import security_log
@@ -40,7 +41,8 @@ SAFE_FAILURES = frozenset({
     "Download exceeds the size limit.", "Download exceeds its resource limit.", "Incomplete download.",
     "Invalid official catalogue metadata.", "CSV exceeds its resource limit.",
     "Invalid address field length.", "Invalid address field.", "Expected exactly one CSV member.",
-    "Unsafe ZIP member.", "Invalid CSV header.", "Missing approved CSV columns.",
+    "Unsafe ZIP member.", "Invalid CSV header.", "Missing approved CSV columns.", "Missing EGID column.",
+    "Missing entrance column.",
     "Invalid CSV row count or width.", "Invalid postal label.", "Empty directory.",
     "Invalid official archive format.", "Another import is running.", "The import lease was lost.",
     "The free disk space could not be checked.", "Not enough free disk space for an import.",
@@ -48,6 +50,8 @@ SAFE_FAILURES = frozenset({
     "A repair was tried recently and did not succeed.", "Official archive checksum mismatch.",
     "The official directory could not be imported.",
 })
+# The official file lacks a required column: the same file fails again, so the daily run waits a week (``schedule``).
+COLUMN_FAILURES = frozenset({"Missing EGID column.", "Missing entrance column."})
 
 
 def directory_is_empty():
@@ -73,6 +77,21 @@ def _is_running(job, now):
 def is_alive(job, now=None):
     """Whether ``job`` is running and alive (for the status page)."""
     return _is_running(job, now or timezone.now())
+
+
+def set_update_flag():
+    """Note that an address was found neither in the directory nor at swisstopo (the update flag, KONZEPT 3a).
+
+    Set at most once: a flag that is set keeps its time, so many failed searches change nothing. The flag holds
+    no address. True if this call set it.
+    """
+    ImportRequest.objects.get_or_create(pk=1)
+    newly_set = bool(
+        ImportRequest.objects.filter(pk=1, update_flag_set_at__isnull=True).update(update_flag_set_at=timezone.now())
+    )
+    if newly_set:
+        logger.info("An address was not found; the update flag of the address directory is set.")
+    return newly_set
 
 
 def request_import():
@@ -105,11 +124,15 @@ class Claim(NamedTuple):
     took_over: bool
 
 
-def claim(*, schedule_automatic=False, web=False):
+def claim(*, schedule_automatic=False, scheduled=False, web=False):
     """Claim the job for this process; None if nothing is queued or due, or a live import runs.
 
     A queued manual request wins. An expired RUNNING job counts as failed and is not repeated.
-    ``web``: the import thread of the web process, which writes heartbeats.
+    ``web``: the caller writes heartbeats (the import thread of the web process, the daily run of ``schedule``): a
+    job without a heartbeat for ``HEARTBEAT_STALE_AFTER`` is dead and can be requested again at once. Without it
+    (the worker) the job is taken as alive for its six-hour lease.
+    ``scheduled``: the daily run (``schedule``) has decided that an import is due; the 90-day interval of
+    ``schedule_automatic`` is not asked again. The claim is an automatic one (no repair).
     """
     took_over = False
     with transaction.atomic():
@@ -126,14 +149,15 @@ def claim(*, schedule_automatic=False, web=False):
             job.last_error = INTERRUPTED
             job.save(update_fields=["state", "finished_at", "last_error"])
         if job.state != ImportRequest.State.QUEUED:
-            if not schedule_automatic:
+            if not (schedule_automatic or scheduled):
                 return None
-            interval = EMPTY_DIRECTORY_INTERVAL if directory_is_empty() else AUTOMATIC_INTERVAL
-            if (
-                job.last_automatic_attempt_at is not None
-                and now < job.last_automatic_attempt_at + interval
-            ):
-                return None
+            if not scheduled:
+                interval = EMPTY_DIRECTORY_INTERVAL if directory_is_empty() else AUTOMATIC_INTERVAL
+                if (
+                    job.last_automatic_attempt_at is not None
+                    and now < job.last_automatic_attempt_at + interval
+                ):
+                    return None
             job.is_automatic = True
             job.requested_at = now
         else:
@@ -167,6 +191,7 @@ def record_success(claimed, count, *, downloaded=None):
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
         state=ImportRequest.State.SUCCEEDED, finished_at=timezone.now(), heartbeat_at=None,
         phase="unchanged" if downloaded is False else "", last_error="", rows_done=count,
+        columns_missing_at=None,
     )
     if not finished:
         logger.warning("An address directory import finished, but its job was taken over meanwhile.")
@@ -175,6 +200,11 @@ def record_success(claimed, count, *, downloaded=None):
         "Address directory import completed (%s): %s addresses%s.", _kind(claimed), count,
         "" if downloaded is not False else ", the directory was already up to date",
     )
+    # The update flag (KONZEPT 3a): an import that started after it was set has answered it. A flag set while this
+    # import ran stays for the next daily run.
+    ImportRequest.objects.filter(
+        pk=1, claim_token=claimed.token, update_flag_set_at__lte=F("started_at"),
+    ).update(update_flag_set_at=None)
     with transaction.atomic():
         security_log.record(
             SecurityEvent.Event.ADDRESS_IMPORT_SUCCEEDED, detail=f"{_kind(claimed)}, {count} addresses"
@@ -189,6 +219,8 @@ def record_failure(claimed, exc):
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
         state=ImportRequest.State.FAILED, finished_at=timezone.now(), heartbeat_at=None,
         phase="", last_error=reason[:255],
+        # The file itself lacks a required column: the daily run waits (``schedule.COLUMNS_RETRY_INTERVAL``).
+        **({"columns_missing_at": timezone.now()} if reason in COLUMN_FAILURES else {}),
     )
     if not finished:
         # Taken over meanwhile: the new holder owns the row.
@@ -207,10 +239,13 @@ def record_failure(claimed, exc):
 def execute(claimed, progress=None):
     """Run the claimed import and record the outcome; re-raises a failure (after recording it)."""
     # Imported locally so web requests never load the downloader.
-    from .importer import import_directory
+    from .importer import clear_stale_lease, import_directory
 
     options = {} if progress is None else {"progress": progress}
     try:
+        if claimed.took_over:
+            # The process that held the lease on the directory is gone (its heartbeat or lease ran out, D-090).
+            clear_stale_lease()
         if claimed.manual:
             count = import_directory(repair=True, **options)
         else:

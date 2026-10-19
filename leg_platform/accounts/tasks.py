@@ -1,10 +1,12 @@
 """The tasks of the start page (D-057): open while something is missing in the account, shown as tiles.
 
 A person can hide a tile for good (``HiddenTask``); a done task disappears by itself. The tasks are
-fixed here and computed from the account's state, never stored.
+fixed here and computed from the account's state, never stored. Tasks about the participation (D-103,
+START-SEITE.md, LEERE-ZUSTAENDE.md) are for customers only and read ``leg_platform.customer.journey``
+(imported when needed: that module reads the community domain).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 from django.urls import reverse
@@ -31,10 +33,43 @@ class Task:
     # How the button leads on: "link" (a page) or "post" (a form that starts something).
     method: str
     url_name: str
+    # "open" (orange dot, "Open") or "optional" (grey dot, "Optional"); "primary" for a button that starts a
+    # registration (blue), else "secondary" (START-SEITE.md, section 5).
+    status: str = "open"
+    button_style: str = "secondary"
+    # An address that depends on the account (``url_for(user)``), resolved by ``open_tasks`` into ``fixed_url``.
+    url_for: Callable | None = None
+    fixed_url: str = ""
 
     @property
     def url(self):
-        return reverse(self.url_name)
+        return self.fixed_url or reverse(self.url_name)
+
+
+def _customer(user):
+    """The tiles about the participation are for customers (not for staff accounts, which do not take part): the one
+    predicate of the customer pages, ``customer.access.is_customer`` (imported when needed)."""
+    from leg_platform.customer import access
+
+    return access.is_customer(user)
+
+
+def _has_no_building(user):
+    from leg_platform.customer import journey
+
+    return _customer(user) and not journey.has_participation(user)
+
+
+def _feed_in_missing(user):
+    from leg_platform.customer import journey
+
+    return _customer(user) and journey.feed_in_building(user)[0]
+
+
+def _feed_in_url(user):
+    from leg_platform.customer import journey
+
+    return journey.feed_in_building(user)[1]
 
 
 TASKS = (
@@ -46,6 +81,27 @@ TASKS = (
         is_open=lambda user: not address_is_complete(user),
         method="link",
         url_name="accounts:profile_edit",
+    ),
+    Task(
+        key="register_building",
+        title=_("Register building"),
+        description=_("Register your building to take part in the LEG."),
+        button=_("Register building"),
+        is_open=_has_no_building,
+        method="link",
+        url_name="customer:application_start",
+        button_style="primary",
+    ),
+    Task(
+        key="feed_in",
+        title=_("Report feed-in later"),
+        description=_("Do you have a PV system? Then register the metering point for the feed-in."),
+        button=_("Add metering point"),
+        is_open=_feed_in_missing,
+        method="link",
+        url_name="customer:buildings",
+        status="optional",
+        url_for=_feed_in_url,
     ),
     Task(
         key="two_factor",
@@ -67,7 +123,11 @@ def hidden_keys(user):
 def open_tasks(user):
     """The tasks to show: open and not hidden by this person."""
     hidden = hidden_keys(user)
-    return [task for task in TASKS if task.key not in hidden and task.is_open(user)]
+    return [
+        replace(task, fixed_url=task.url_for(user)) if task.url_for else task
+        for task in TASKS
+        if task.key not in hidden and task.is_open(user)
+    ]
 
 
 def hide(user, key):

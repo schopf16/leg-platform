@@ -19,12 +19,24 @@ from leg_platform.community.status import MeteringPointStatus, derive_status, st
 # Art. 19e para. 1 StromVV: a constant, not a setting.
 LEGAL_MINIMUM_QUOTA_PERCENT = 5
 DEFAULT_WARNING_THRESHOLD_PERCENT = 10
+# Defaults of the deadlines (days; owner examples, KONZEPT 5.2, 5.8, 5.9; the staff changes them).
+DEFAULT_REMINDER_AFTER_DAYS = 2
+DEFAULT_ROLLBACK_AFTER_DAYS = 14
+DEFAULT_CONTRACT_DEADLINE_DAYS = 14
+DEFAULT_OPERATOR_CONFIRMATION_DAYS = 14
+DEFAULT_IBAN_MISSING_REMINDER_DAYS = 7
 
 SUBJECT_MAX_LENGTH = 20
 ADDRESS_SIGNATURE_LENGTH = 400
 # The PDF prints a remark in full: ``management.printing.pdf.MAX_FACT_CHARS`` must not be smaller (D-084).
 REMARK_MAX_LENGTH = 5000
 REMARK_VALIDATORS = [MaxLengthValidator(REMARK_MAX_LENGTH)]
+# Names the customer gives to a building and to a metering point; free text, never searched (D-103).
+BUILDING_NAME_MAX_LENGTH = 80
+BUILDING_DESCRIPTION_MAX_LENGTH = 200
+METERING_POINT_NAME_MAX_LENGTH = 80
+# The federal building identifier (EGID) has at most nine digits (Federal Register of Buildings and Dwellings).
+EGID_MAX = 999_999_999
 
 
 def validate_postal_code(value):
@@ -160,7 +172,13 @@ class Location(AddressSuggestionMixin, TimestampedModel):
     is_archived = models.BooleanField(_("archived"), default=False)
     # Created by a customer and not yet confirmed by the staff ("neu").
     needs_confirmation = models.BooleanField(_("not yet confirmed"), default=False)
-
+    # The federal building identifier: the same EGID is the same building, never a second location (D-103). A building
+    # is shared by all customers of it; each customer's name and description of it are ``CustomerBuilding``.
+    # Empty for buildings the staff entered without one; the unique index allows several empty values.
+    egid = models.PositiveIntegerField(
+        _("EGID"), null=True, blank=True, unique=True,
+        validators=[MinValueValidator(1), MaxValueValidator(EGID_MAX)],
+    )
     class Meta:
         default_permissions = ("view",)
         verbose_name = _("location")
@@ -249,6 +267,8 @@ class MeteringPoint(TimestampedModel):
         validators=[MinValueValidator(0)],
     )
     remark = models.TextField(_("remark"), blank=True, validators=REMARK_VALIDATORS)
+    # Chosen by the customer (D-103); free text, never searched, never in the history.
+    name = models.CharField(_("name"), max_length=METERING_POINT_NAME_MAX_LENGTH, blank=True)
     is_archived = models.BooleanField(_("archived"), default=False)
     # The dates that drive the status (``community.status``).
     registered_with_operator_on = models.DateField(_("notified on"), null=True, blank=True)
@@ -459,6 +479,26 @@ class ManagementSettings(models.Model):
     sender_suggestion_dismissed_for = models.CharField(
         _("sender suggestion dismissed for"), max_length=ADDRESS_SIGNATURE_LENGTH, blank=True, editable=False
     )
+    # Reminders and deadlines of the applications, whole days from 1, no upper limit of our own (D-103;
+    # ``community.deadline_settings`` changes them with history).
+    reminder_after_days = models.PositiveIntegerField(
+        _("reminder after (days)"), default=DEFAULT_REMINDER_AFTER_DAYS, validators=[MinValueValidator(1)]
+    )
+    rollback_after_days = models.PositiveIntegerField(
+        _("rollback after the reminder (days)"), default=DEFAULT_ROLLBACK_AFTER_DAYS,
+        validators=[MinValueValidator(1)],
+    )
+    contract_deadline_days = models.PositiveIntegerField(
+        _("contract deadline (days)"), default=DEFAULT_CONTRACT_DEADLINE_DAYS, validators=[MinValueValidator(1)]
+    )
+    operator_confirmation_days = models.PositiveIntegerField(
+        _("confirmation by the grid operator (days)"), default=DEFAULT_OPERATOR_CONFIRMATION_DAYS,
+        validators=[MinValueValidator(1)],
+    )
+    iban_missing_reminder_days = models.PositiveIntegerField(
+        _("reminder: bank connection missing (days)"), default=DEFAULT_IBAN_MISSING_REMINDER_DAYS,
+        validators=[MinValueValidator(1)],
+    )
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 
     class Meta:
@@ -606,3 +646,337 @@ class ListPreference(models.Model):
 
     def __str__(self):
         return self.list_key
+
+
+# ---- Applications, contract and deregistration (D-103) ----
+
+
+class Application(TimestampedModel):
+    """A customer's application ("Anmeldung") to take part with buildings and metering points (D-103).
+
+    The buildings and metering points of an application are **draft rows** (``ApplicationBuilding``,
+    ``ApplicationMeteringPoint``), not rows of ``Location`` and ``MeteringPoint``: a draft is invisible in the
+    management lists, its numbers block nobody, and a rollback deletes only draft rows. The real rows are created by
+    ``community.application_staff.complete``. Rules: ``community.applications`` (the customer's side),
+    ``community.application_staff`` (the staff's side), ``community.application_deadlines`` (the scheduler)."""
+
+    class State(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        PAUSED = "paused", _("Paused")
+        SUBMITTED = "submitted", _("Submitted")
+        IN_REVIEW = "in_review", _("In review")
+        # Static labels: a model label never reads the database (system checks, migrate). The operator's name is
+        # filled in at display time by ``community.labels.application_state_label``.
+        OPERATOR_STARTED = "operator_started", _("Registration at the grid operator started")
+        OPERATOR_CONFIRMED = "operator_confirmed", _("Confirmed by the grid operator")
+        COMPLETED = "completed", _("Completed")
+
+    class StartChoice(models.TextChoices):
+        # Nothing is chosen at first: the start is never prefilled (README 2a).
+        ASAP = "asap", _("As soon as possible")
+        DATE = "date", _("Desired date")
+
+    # The customer edits and the idle deadlines run.
+    DRAFT_STATES = (State.DRAFT, State.PAUSED)
+    # Submitted and not yet at the grid operator: the customer may still withdraw.
+    WITHDRAWABLE_STATES = (State.SUBMITTED, State.IN_REVIEW)
+    # Not completed: the application still occupies buildings and numbers.
+    OPEN_STATES = (
+        State.DRAFT, State.PAUSED, State.SUBMITTED, State.IN_REVIEW, State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED,
+    )
+    # Submitted, i.e. visible to the staff and holding its numbers and buildings against other customers.
+    IN_FLIGHT_STATES = (State.SUBMITTED, State.IN_REVIEW, State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED)
+
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="applications")
+    state = models.CharField(max_length=20, choices=State, default=State.DRAFT)
+    # The step of the wizard the customer is on (server side, D-103); a key of ``applications.STEPS``.
+    wizard_step = models.CharField(max_length=20, default="building", editable=False)
+    start_choice = models.CharField(max_length=4, choices=StartChoice, blank=True)
+    desired_start_date = models.DateField(null=True, blank=True)
+    # Whether a bank connection was already stored when the application was started ("already on file").
+    bank_known_at_start = models.BooleanField(default=False, editable=False)
+    # The idle clock of a draft: every change of the customer sets it and ends a pause.
+    last_activity_at = models.DateTimeField(default=timezone.now)
+    reminded_at = models.DateTimeField(null=True, blank=True)
+    # Since when everything but the contract is complete (the contract deadline runs from then).
+    contract_pending_since = models.DateTimeField(null=True, blank=True)
+    # The reminder "bank connection missing" is sent once per period of missing.
+    iban_reminded_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    operator_started_at = models.DateTimeField(null=True, blank=True)
+    operator_started_on = models.DateField(null=True, blank=True)
+    operator_confirmed_on = models.DateField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("pk",)
+        indexes = [models.Index(fields=["state", "last_activity_at"], name="community_application_idle")]
+
+    def __str__(self):
+        return f"application {self.pk}"
+
+
+class CustomerBuilding(TimestampedModel):
+    """One customer's own name and description of a building (D-103). A ``Location`` is shared by every customer of the
+    building, so these words are per account: the row is read and written only through the account, and nobody sees
+    another account's row. Free text, never searched, never in the history."""
+
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="building_labels")
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name="customer_labels")
+    name = models.CharField(max_length=BUILDING_NAME_MAX_LENGTH, blank=True)
+    description = models.CharField(max_length=BUILDING_DESCRIPTION_MAX_LENGTH, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(fields=["person", "location"], name="community_customerbuilding_unique"),
+        ]
+
+    def __str__(self):
+        return f"building label of account {self.person_id}"
+
+
+class ApplicationBuilding(TimestampedModel):
+    """A building of an application: an existing ``Location`` (``location`` set, "add a metering point") or the
+    address of a new one, which becomes a ``Location`` only at completion."""
+
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="buildings")
+    # Protected: a location that a draft refers to is not deleted under it.
+    location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, null=True, blank=True, related_name="application_buildings"
+    )
+    egid = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(EGID_MAX)])
+    street = models.CharField(max_length=150, blank=True)
+    house_number = models.CharField(max_length=30, blank=True)
+    postal_code = models.CharField(max_length=4, blank=True)
+    town = models.CharField(max_length=100, blank=True)
+    name = models.CharField(max_length=BUILDING_NAME_MAX_LENGTH, blank=True)
+    description = models.CharField(max_length=BUILDING_DESCRIPTION_MAX_LENGTH, blank=True)
+    # Chosen by "add a metering point" on the building page: the building is fixed.
+    preselected = models.BooleanField(default=False)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("pk",)
+        constraints = [
+            models.UniqueConstraint(fields=["application", "egid"], name="community_appbuilding_egid_unique"),
+            models.UniqueConstraint(fields=["application", "location"], name="community_appbuilding_location_unique"),
+        ]
+
+    def __str__(self):
+        return f"building of application {self.application_id}"
+
+    def current_address(self):
+        if self.location_id is not None:
+            return self.location.current_address()
+        return (self.street, self.house_number, self.postal_code, self.town)
+
+
+class ApplicationMeteringPoint(TimestampedModel):
+    """A metering point of an application (draw or feed-in); a real ``MeteringPoint`` only after completion."""
+
+    building = models.ForeignKey(ApplicationBuilding, on_delete=models.CASCADE, related_name="metering_points")
+    direction = models.CharField(max_length=11, choices=Direction)
+    number = models.CharField(
+        max_length=numbers.METERING_POINT_LENGTH, db_index=True, db_collation=EXACT_COLLATION,
+        validators=[numbers.validate_metering_point_number],
+    )
+    name = models.CharField(max_length=METERING_POINT_NAME_MAX_LENGTH, blank=True)
+    pv_power_kwp = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                       validators=[MinValueValidator(0)])
+    battery_kwh = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                      validators=[MinValueValidator(0)])
+    wallbox_kw = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                     validators=[MinValueValidator(0)])
+    # Set at completion.
+    metering_point = models.ForeignKey(
+        MeteringPoint, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False
+    )
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("pk",)
+        constraints = [
+            models.UniqueConstraint(fields=["building", "direction"], name="community_appmeteringpoint_direction"),
+        ]
+
+    def __str__(self):
+        return f"{self.direction} of application building {self.building_id}"
+
+
+class ApplicationNotice(models.Model):
+    """A notice for the staff that the customer was refused something without being told why (D-103): the building
+    or number belongs to someone else. Rows hold what the staff needs to act; ``numbers`` is emptied when resolved."""
+
+    class Kind(models.TextChoices):
+        BUILDING_UNAVAILABLE = "building_unavailable", _("Building not available to the customer")
+        NUMBER_UNAVAILABLE = "number_unavailable", _("Metering point number not available to the customer")
+        # Static (see ``Application.State``); ``community.labels.notice_kind_label`` names the operator at display time.
+        OPERATOR_CONFIRMATION_LAPSED = "operator_lapsed", _(
+            "Confirmation by the grid operator did not arrive: withdraw the registration there"
+        )
+
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    kind = models.CharField(max_length=20, choices=Kind)
+    egid = models.PositiveIntegerField(null=True, blank=True)
+    # The metering point numbers concerned; staff data, deleted when the notice is resolved.
+    numbers = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("created_at", "pk")
+        indexes = [models.Index(fields=["resolved_at", "kind"], name="community_appnotice_open")]
+
+    def __str__(self):
+        return f"{self.kind} of account {self.person_id}"
+
+
+class ContractVersionManager(models.Manager):
+    def current(self):
+        """The current version, or None while none is chosen."""
+        return self.filter(current_marker=True).first()
+
+
+class ContractVersion(models.Model):
+    """One uploaded contract PDF (D-103), kept in the database like the logos (``community.contracts``).
+
+    Exactly one version is current: ``current_marker`` is True for it and NULL for every other, and the unique index
+    allows one True. A version that was never current and has no acceptance may be deleted; every other stays as
+    evidence."""
+
+    class State(models.TextChoices):
+        UPLOADED = "uploaded", _("Uploaded")
+        CURRENT = "current", _("Current")
+        REPLACED = "replaced", _("Replaced")
+
+    version_date = models.DateField()
+    pdf = models.BinaryField(editable=False)
+    sha256 = models.CharField(max_length=64, unique=True, editable=False)
+    size = models.PositiveIntegerField(editable=False)
+    current_marker = models.BooleanField(null=True, unique=True, default=None, editable=False)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+", editable=False
+    )
+    uploaded_at = models.DateTimeField(default=timezone.now, editable=False)
+    made_current_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    objects = ContractVersionManager()
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("-version_date", "-pk")
+
+    def __str__(self):
+        return f"contract {self.version_date}"
+
+    @property
+    def is_current(self):
+        return self.current_marker is True
+
+    @property
+    def state(self):
+        if self.is_current:
+            return self.State.CURRENT
+        return self.State.UPLOADED if self.made_current_at is None else self.State.REPLACED
+
+
+class AppendOnlyQuerySet(models.QuerySet):
+    """No update and no delete through the application (a cascade of an account deletion does not use these)."""
+
+    def update(self, **kwargs):
+        raise ValueError("These rows are never changed.")
+
+    def delete(self):
+        raise ValueError("These rows are never deleted by the application.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise ValueError("These rows are never changed.")
+
+
+class ContractAcceptance(models.Model):
+    """The consent of a person to one contract version (D-103): append-only, once per person and version.
+
+    Stores the time, the version, the SHA-256 of the accepted file and the second tick (data exchange with the grid
+    operator) as its own value. No IP address, no device data, no password."""
+
+    person = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="contract_acceptances"
+    )
+    version = models.ForeignKey(ContractVersion, on_delete=models.PROTECT, related_name="acceptances")
+    accepted_at = models.DateTimeField(default=timezone.now, editable=False)
+    sha256 = models.CharField(max_length=64, editable=False)
+    data_exchange_accepted = models.BooleanField()
+
+    objects = AppendOnlyQuerySet.as_manager()
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("accepted_at", "pk")
+        constraints = [
+            models.UniqueConstraint(fields=["person", "version"], name="community_contractacceptance_once"),
+        ]
+
+    def __str__(self):
+        return f"acceptance of account {self.person_id}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("An acceptance is never changed.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("An acceptance is never deleted by the application.")
+
+
+class Deregistration(TimestampedModel):
+    """A customer's request to end whole buildings or single metering points (D-103; Gesellschaftsvertrag item 4)."""
+
+    class State(models.TextChoices):
+        SUBMITTED = "submitted", _("In deregistration")
+        CONFIRMED = "confirmed", _("Date confirmed")
+        EFFECTIVE = "effective", _("Deregistered")
+
+    person = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="deregistrations"
+    )
+    state = models.CharField(max_length=10, choices=State, default=State.SUBMITTED)
+    # The earliest possible day on the day of the request, and the day the customer asked for (never before it).
+    earliest_date = models.DateField()
+    desired_date = models.DateField()
+    wants_earliest = models.BooleanField(default=True)
+    confirmed_date = models.DateField(null=True, blank=True)
+    submitted_at = models.DateTimeField(default=timezone.now, editable=False)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    effective_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("pk",)
+
+    def __str__(self):
+        return f"deregistration {self.pk}"
+
+
+class DeregistrationItem(models.Model):
+    deregistration = models.ForeignKey(Deregistration, on_delete=models.CASCADE, related_name="items")
+    metering_point = models.ForeignKey(
+        MeteringPoint, on_delete=models.PROTECT, related_name="deregistration_items"
+    )
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(
+                fields=["deregistration", "metering_point"], name="community_deregistrationitem_unique"
+            ),
+        ]
+
+    def __str__(self):
+        return f"metering point {self.metering_point_id} in deregistration {self.deregistration_id}"

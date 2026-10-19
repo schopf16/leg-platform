@@ -1,0 +1,22 @@
+{% load i18n %}{% comment %}
+The open notices as a list with the button "Mark as resolved" (POST, then back to ``current_url``). A notice is staff data:
+the EGID and the metering point numbers it names are deleted when it is resolved. Context: ``notices`` (rows of
+``process_views.notice_rows``), ``current_url`` and ``show_person`` (the page of an application knows the person).
+{% endcomment %}<ul class="mgmt-notices">
+  {% for notice in notices %}
+    <li class="mgmt-notice">
+      <p class="mgmt-notice-title"><span class="mgmt-warn-text">{{ notice.kind }}</span></p>
+      <dl class="mgmt-facts">
+        {% if show_person %}<div class="mgmt-fact"><dt>{% translate "Person" %}</dt><dd>{{ notice.person.name }} · <span class="tnum">{{ notice.person.number }}</span>{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=notice.person.url label=goto_label subject=notice.person.name %}</dd></div>{% endif %}
+        {% if notice.egid %}<div class="mgmt-fact"><dt>{% translate "EGID" %}</dt><dd class="tnum">{{ notice.egid }}</dd></div>{% endif %}
+        {% if notice.numbers %}<div class="mgmt-fact"><dt>{% translate "Metering points" %}</dt><dd class="tnum">{% for number in notice.numbers %}{{ number }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd></div>{% endif %}
+        <div class="mgmt-fact"><dt>{% translate "Date" %}</dt><dd class="tnum">{{ notice.created|date:"d.m.Y" }}</dd></div>
+      </dl>
+      <form method="post" action="{{ notice.resolve_url }}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ current_url }}">
+        <button type="submit" class="btn btn-accent-outline btn-xs">{% translate "Mark as resolved" %}</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>

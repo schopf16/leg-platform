@@ -1,14 +1,19 @@
 """Address directory (own SQLite file, alias ``addresses``, public data) and the import queue row (application database); see ``router`` (D-075)."""
 
 import uuid
-from datetime import timedelta
+from datetime import time, timedelta
 
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from leg_platform.accounts.models.common import EXACT_COLLATION
+
 from .keys import key
 from .storage import DIRECTORY_ALIAS  # noqa: F401  (the alias of the directory file, D-075)
+
+# Default time of day of the daily address directory run (``schedule.import_run_time``).
+DEFAULT_RUN_TIME = time(3, 0)
 
 
 class Directory(models.Model):
@@ -18,6 +23,9 @@ class Directory(models.Model):
     imported_at = models.DateTimeField(null=True, verbose_name=_("Imported at"))
     checksum = models.CharField(max_length=64, blank=True)
     row_count = models.PositiveIntegerField(default=0, verbose_name=_("Address count"))
+    # Whether the published generation carries the building identifier (EGID, D-049). A generation published
+    # before that was added has none: it is replaced by the next import even if the checksum is unchanged.
+    has_egid = models.BooleanField(default=False, editable=False)
     # Import lease against concurrent imports (importer.py).
     import_token = models.UUIDField(null=True, editable=False)
     import_lease_until = models.DateTimeField(null=True, editable=False)
@@ -50,6 +58,13 @@ class Address(models.Model):
     street_key = models.CharField(max_length=255, editable=False, default="")
     house_number_key = models.CharField(max_length=32, editable=False, default="", blank=True)
     locality_key = models.CharField(max_length=255, editable=False, default="")
+    # Federal building identifier (column BDG_EGID of the official file; D-049). One row per row of the file:
+    # an address with several buildings (entrances) has several rows, a building with several addresses
+    # shares its EGID over several rows. Null: the file gives the address no building.
+    egid = models.PositiveIntegerField(null=True, editable=False)
+    # Entrance of the building (column ADR_EDID, "Eingangsidentifikator"; D-049): with the EGID it tells the
+    # entrances of one building (or the buildings of one address) apart. Null: the file gives none.
+    entrance_id = models.PositiveSmallIntegerField(null=True, editable=False)
 
     objects = AddressQuerySet.as_manager()
 
@@ -109,6 +124,18 @@ class ImportRequest(models.Model):
     rows_done = models.PositiveIntegerField(null=True, editable=False)
     # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
     last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
+    # The update flag (KONZEPT 3a, D-066): set once when a building could not be found in the directory nor at
+    # swisstopo; the daily run (``schedule``) downloads the directory and a successful import that started
+    # after the flag was set clears it. Never holds an address.
+    update_flag_set_at = models.DateTimeField(null=True, editable=False)
+    # When the last import ended because the official file lacks a required column ("Missing EGID column.",
+    # "Missing entrance column."): the daily run then waits a week before it downloads again (schedule); cleared by a
+    # successful import. The button is not held back.
+    columns_missing_at = models.DateTimeField(null=True, editable=False)
+    # The daily run (``schedule``): time of day (instance time zone) from which it may start the import, and the
+    # day of the last run (at most one download per day). Read through ``schedule.import_run_time``.
+    run_time = models.TimeField(default=DEFAULT_RUN_TIME, editable=False)
+    last_scheduled_run_on = models.DateField(null=True, editable=False)
 
     class Meta:
         default_permissions = ()
@@ -118,3 +145,23 @@ class ImportRequest(models.Model):
 
     def __str__(self):
         return str(_("Address directory import"))
+
+
+class BuildingLookup(models.Model):
+    """The answer of the external building search for one address, kept so that it is not asked again (``buildings``).
+
+    Lives in the application database, not in the directory file: an import does not replace it and the
+    request threads may write it. The address itself is never stored, only a keyed digest of its normalised
+    form; a found building is public data of the official directory. An empty list is a negative answer
+    that expires after ``buildings.NEGATIVE_CACHE_DAYS``.
+    """
+
+    digest = models.CharField(max_length=64, unique=True, db_collation=EXACT_COLLATION, editable=False)
+    # From when the answer is no longer used (``buildings.POSITIVE_CACHE_DAYS``, ``NEGATIVE_CACHE_DAYS``); the
+    # scheduled cleanup deletes it then.
+    expires_at = models.DateTimeField(db_index=True, editable=False)
+    # [{"egid": 1, "street": "..", "house_number": "..", "postal_code": "..", "locality": ".."}, ...]
+    buildings = models.JSONField(default=list, editable=False)
+
+    class Meta:
+        default_permissions = ()

@@ -1,0 +1,8 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your application at {{ instance_name }} is not completed yet. You can continue at any time after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+
+{% translate "If you do not continue, the application is rolled back automatically after some time and the details you entered about buildings and metering points are deleted. Your account is kept." %}
+{% endautoescape %}

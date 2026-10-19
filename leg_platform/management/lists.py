@@ -49,6 +49,8 @@ class ListState:
     sort: str = ""
     default_sort: str = ""
     descending: bool = False
+    # The direction of the default sort (a list that shows the newest first); "dir" is in the address only when it differs.
+    default_descending: bool = False
     per: str = str(DEFAULT_PER)
     page: int = 1
     problems: bool = False
@@ -71,10 +73,10 @@ class ListState:
             if value not in ("", None) and value != self.defaults.get(name, ""):
                 params[name] = value
         descending = state["dir"] == "desc"
-        if state["sort"] != self.default_sort or descending:
+        if state["sort"] != self.default_sort or descending != self.default_descending:
             params["sort"] = state["sort"]
-        if descending:
-            params["dir"] = "desc"
+        if descending != self.default_descending:
+            params["dir"] = "desc" if descending else "asc"
         if str(state["per"]) != str(DEFAULT_PER):
             params["per"] = state["per"]
         if int(state["page"]) > 1:
@@ -98,10 +100,11 @@ class ListState:
         return [(name, params[name]) for name in ("sort", "dir", "problems") if name in params]
 
 
-def parse(params, *, path, columns, default_sort, filters=None):
+def parse(params, *, path, columns, default_sort, filters=None, default_descending=False):
     """Read the state of a list from ``request.GET`` (any mapping with ``get``).
 
-    ``filters`` maps a filter name to ``(allowed values, default)``."""
+    ``filters`` maps a filter name to ``(allowed values, default)``. ``default_descending`` is the direction when the
+    address names none (a list that shows the newest first)."""
     filters = filters or {}
     sortable = [column.key for column in columns if column.sortable]
     sort = params.get("sort")
@@ -117,6 +120,7 @@ def parse(params, *, path, columns, default_sort, filters=None):
         value = params.get(name, default)
         values[name] = value if value in allowed else default
         defaults[name] = default
+    direction = params.get("dir")
     return ListState(
         path=path,
         query=(params.get("q") or "").strip()[:MAX_QUERY_LENGTH],
@@ -124,7 +128,8 @@ def parse(params, *, path, columns, default_sort, filters=None):
         defaults=defaults,
         sort=sort,
         default_sort=default_sort,
-        descending=params.get("dir") == "desc",
+        descending=(direction == "desc") if direction in ("asc", "desc") else default_descending,
+        default_descending=default_descending,
         per=per,
         page=max(page, 1),
         problems=params.get("problems") == "1",

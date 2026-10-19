@@ -1,0 +1,6 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your deregistration at {{ instance_name }} has taken effect. You can see the details after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+{% endautoescape %}

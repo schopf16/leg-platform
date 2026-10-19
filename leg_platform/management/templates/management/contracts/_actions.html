@@ -1,0 +1,20 @@
+{% load i18n %}{% comment %}
+The actions of one contract version as icon buttons (owner design ``vertraege/VORGABEN.md``, section 3): 40 px, no text,
+an accessible name with the file name and a hint on hover. Download (neutral outline, any version), set as current (blue
+outline, only a version that is not current; a POST with the token) and delete (red outline, only a version that may be
+deleted). A button that is not allowed is not drawn. Context: ``row``.
+{% endcomment %}<div class="mgmt-row-actions">
+  {% blocktranslate asvar download_label with name=row.file_name %}Download {{ name }}{% endblocktranslate %}
+  <a class="mgmt-action is-neutral" href="{{ row.download_url }}" aria-label="{{ download_label }}" title="{{ download_label }}"><svg class="mgmt-action-icon" aria-hidden="true"><use href="#m-download"/></svg></a>
+  {% if row.can_make_current %}
+    {% blocktranslate asvar current_label with name=row.file_name %}Set {{ name }} as current{% endblocktranslate %}
+    <form method="post" action="{{ row.current_url }}" class="mgmt-inline-form">
+      {% csrf_token %}
+      <button type="submit" class="mgmt-action is-accent" aria-label="{{ current_label }}" title="{{ current_label }}"><svg class="mgmt-action-icon" aria-hidden="true"><use href="#m-set-current"/></svg></button>
+    </form>
+  {% endif %}
+  {% if row.can_delete %}
+    {% blocktranslate asvar delete_label with name=row.file_name %}Delete {{ name }}{% endblocktranslate %}
+    <a class="mgmt-action is-danger" href="{{ row.delete_url }}" aria-label="{{ delete_label }}" title="{{ delete_label }}"><svg class="mgmt-action-icon" aria-hidden="true"><use href="#m-trash"/></svg></a>
+  {% endif %}
+</div>

@@ -5,7 +5,7 @@ and "Anfrage abbrechen". The form asks for both addresses and the current passwo
 {% endcomment %}<section class="profile-card" id="card-email" aria-labelledby="card-email-title"{% if edit == "email" %} data-state="edit"{% endif %}>
   <div class="profile-card-head has-action">
     <h2 id="card-email-title">{% translate "Email addresses" %}</h2>
-    {% if edit != "email" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=email#card-email">{% translate "Edit" %}</a>{% endif %}
+    {% if edit != "email" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=email#card-email">{% translate "Change" %}</a>{% endif %}
   </div>
   {% include "accounts/profile/_card_messages.html" with items=messages_email %}
   {% if edit == "email" %}

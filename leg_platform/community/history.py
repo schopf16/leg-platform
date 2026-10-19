@@ -16,7 +16,10 @@ METERING_POINT = "metering_point"
 LEG = "leg"
 PERSON = "person"
 SETTINGS = "settings"
-SUBJECT_TYPES = (LOCATION, METERING_POINT, LEG, PERSON, SETTINGS)
+APPLICATION = "application"
+DEREGISTRATION = "deregistration"
+CONTRACT = "contract"
+SUBJECT_TYPES = (LOCATION, METERING_POINT, LEG, PERSON, SETTINGS, APPLICATION, DEREGISTRATION, CONTRACT)
 
 
 class HistoryEvent(models.TextChoices):
@@ -61,17 +64,55 @@ class HistoryEvent(models.TextChoices):
     # D-087: PERSON_DATA_CHANGED names the changed fields in ``detail["fields"]`` (names, never values).
     PERSON_INVITATION_SENT = "person_invitation_sent", _("Invitation sent")
     PERSON_DATA_CHANGED = "person_data_changed", _("Customer data changed")
+    # Onboarding (D-103): ids, dates and field names only; never an address, number, name or IBAN.
+    PERSON_IBAN_CHANGED = "person_iban_changed", _("Bank connection changed")
+    CONTRACT_ACCEPTED = "contract_accepted", _("Contract accepted")
+    LOCATION_DETAILS_CHANGED = "location_details_changed", _("Building details changed")
+    DEADLINES_CHANGED = "deadlines_changed", _("Reminders and deadlines changed")
+    IMPORT_RUN_TIME_CHANGED = "import_run_time_changed", _("Time of the daily address directory run changed")
+    APPLICATION_STARTED = "application_started", _("Application started")
+    APPLICATION_BUILDING_SET = "application_building_set", _("Building chosen")
+    APPLICATION_SUBMITTED = "application_submitted", _("Application submitted")
+    APPLICATION_WITHDRAWN = "application_withdrawn", _("Application withdrawn")
+    APPLICATION_IN_REVIEW = "application_in_review", _("Application in review")
+    APPLICATION_RETURNED = "application_returned", _("Application returned for correction")
+    APPLICATION_OPERATOR_STARTED = "application_operator_started", grid_operator.text(
+        _("Registration at the %(operator)s started")
+    )
+    APPLICATION_OPERATOR_CONFIRMED = "application_operator_confirmed", grid_operator.text(
+        _("Confirmed by the %(operator)s")
+    )
+    APPLICATION_COMPLETED = "application_completed", _("Application completed")
+    APPLICATION_ROLLED_BACK = "application_rolled_back", _("Application rolled back")
+    DEREGISTRATION_SUBMITTED = "deregistration_submitted", _("Deregistration requested")
+    DEREGISTRATION_CONFIRMED = "deregistration_confirmed", _("Deregistration date confirmed")
+    DEREGISTRATION_EFFECTIVE = "deregistration_effective", _("Deregistration took effect")
+    CONTRACT_UPLOADED = "contract_uploaded", _("Contract version uploaded")
+    CONTRACT_MADE_CURRENT = "contract_made_current", _("Contract version made current")
+    CONTRACT_DELETED = "contract_deleted", _("Contract version deleted")
 
 
 def subject_of(obj):
     """``(subject_type, subject_id)`` of a domain object."""
-    from leg_platform.community.models import Leg, Location, ManagementSettings, MeteringPoint, PersonRecord
+    from leg_platform.community.models import (
+        Application,
+        ContractVersion,
+        Deregistration,
+        Leg,
+        Location,
+        ManagementSettings,
+        MeteringPoint,
+        PersonRecord,
+    )
 
     for model, subject_type in (
         (Location, LOCATION),
         (MeteringPoint, METERING_POINT),
         (Leg, LEG),
         (ManagementSettings, SETTINGS),
+        (Application, APPLICATION),
+        (Deregistration, DEREGISTRATION),
+        (ContractVersion, CONTRACT),
     ):
         if isinstance(obj, model):
             return subject_type, obj.pk

@@ -109,10 +109,17 @@ class HomeView(NeverCacheMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         user = self.request.user
+        journey = None
+        if not user.is_staff:
+            # The card "Your way into the LEG" (D-103): only while an application of the account is open.
+            from leg_platform.customer import journey as customer_journey
+
+            journey = customer_journey.for_account(user)
         return super().get_context_data(
             account=user,
             tasks=tasks.open_tasks(user),
             address_line=user.street_address_display,
+            journey=journey,
             **kwargs,
         )
 

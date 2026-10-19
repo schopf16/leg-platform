@@ -12,11 +12,13 @@ from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
-from leg_platform.addresses.runner import maybe_start_automatic
+from leg_platform.accounts.models import EmailText
 from leg_platform.community import addressing, grid_operator, problems, settings_service
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, GridOperator, ManagementSettings
 from leg_platform.community.settings_service import EDITABLE_FIELDS
+from leg_platform.management import navigation, overview_tasks
 from leg_platform.management.access import ManagementAccessMixin
+from leg_platform.management.deadline_forms import DEADLINES, DeadlinesForm
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
 
 
@@ -53,15 +55,15 @@ PROBLEM_LISTS = (
 
 
 class OverviewView(ManagementAccessMixin, TemplateView):
-    """The start page: a row per list with problems and the "Filter problems" button.
+    """The start page: the work of the staff (the queues of the onboarding, ``overview_tasks``), then a row per list
+    with problems and the "Filter problems" button.
 
-    The button opens the first affected list (menu order) with the problem filter on."""
+    The button opens the first affected list (menu order) with the problem filter on. The queues and the problems of
+    the lists are two different things and are not added up."""
 
     template_name = "management/overview.html"
 
     def get_context_data(self, **kwargs):
-        # The first visit after the due time starts the automatic refresh of the address directory (D-090).
-        maybe_start_automatic()
         counts = problems.problem_counts(only=[entry.key for entry in PROBLEM_LISTS])
         rows = []
         for entry in PROBLEM_LISTS:
@@ -79,6 +81,7 @@ class OverviewView(ManagementAccessMixin, TemplateView):
                 )
         return super().get_context_data(
             page_title=_("Overview"),
+            task_rows=overview_tasks.task_rows(self.request.user),
             problem_lists=rows,
             problem_count=sum(row["count"] for row in rows),
             filter_url=rows[0]["url"] if rows else "",
@@ -164,13 +167,32 @@ class SettingsView(ManagementAccessMixin, View):
             return {"notice": check.not_found_notice}
         return {}
 
-    def show(self, request, form, check):
+    def show(self, request, form, check, deadline_form=None):
+        mail_text_link = (
+            reverse("admin:accounts_emailtext_changelist")
+            if any(request.user.has_perm(permission) for permission in navigation.EMAIL_TEXT_PERMISSIONS) else ""
+        )
+        deadline_form = deadline_form or DeadlinesForm.from_settings()
+        deadline_rows = [
+            {
+                "name": deadline.name,
+                "trigger": deadline.trigger,
+                "recipient": deadline.recipient,
+                "mail_texts": [EmailText.Key(key).label for key in deadline.mail_keys],
+                "effect": deadline.effect,
+                "field": deadline_form[deadline.field],
+            }
+            for deadline in DEADLINES
+        ]
         return render(
             request,
             self.template_name,
             {
                 "page_title": _("Settings"),
                 "form": form,
+                "deadline_form": deadline_form,
+                "deadline_rows": deadline_rows,
+                "mail_text_link": mail_text_link,
                 "suggestion_text": check.get("suggestion", ""),
                 "notice_text": check.get("notice", ""),
                 "operator_name": grid_operator.name(),
