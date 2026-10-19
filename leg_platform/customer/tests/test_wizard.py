@@ -66,10 +66,10 @@ class StartPageTests(WizardCase):
         html = text(self.client.get(START))
         self.assertIn("Was müssen wir noch wissen?", html)
         self.assertIn("Bereits hinterlegte Angaben übernehmen wir. Sie können sie jederzeit ändern.", html)
-        for name in ("Gebäude", "Messpunkte", "Bank- oder Postverbindung", "Vertrag", "Aufschaltung"):
+        for name in ("Gebäude", "Messpunkte", "Bank- oder Postverbindung", "Vertrag", "Startdatum"):
             self.assertIn(name, html)
         self.assertIn("nur bei Einspeisung", html)
-        self.assertIn("0 von 5 Schritten erledigt", html)
+        self.assertIn("0 von 4 Schritten erledigt", html)
         self.assertNotIn("Bereits hinterlegt</span>", html.replace("Bereits hinterlegte", ""))
         self.assertEqual(html.count('class="btn btn-primary"'), 1)
         self.assertNotIn("Abbrechen", html)
@@ -79,7 +79,7 @@ class StartPageTests(WizardCase):
         publish = contracts.current_version()
         contracts.accept_contract(self.mine, publish.pk, agrees_contract=True, agrees_data_exchange=True)
         html = text(self.client.get(START))
-        self.assertIn("2 von 5 Schritten erledigt", html)
+        self.assertIn("1 von 4 Schritten erledigt", html)
         self.assertEqual(html.count("Bereits hinterlegt</span>"), 2)
         # "Change" leads to where the detail is kept: the profile card for the bank connection (with the safe way back
         # to this page), the contract page.
@@ -93,9 +93,13 @@ class StartPageTests(WizardCase):
 
         assign_person(point, self.mine, valid_from=date(2025, 1, 1))
         html = text(self.client.get(START, {"building": location.pk}))
-        self.assertIn("1 von 5 Schritten erledigt", html)
+        self.assertIn("1 von 4 Schritten erledigt", html)
         self.assertIn("Musterstrasse 1, 3063 Ittigen", html)
         response = self.client.post(START, {"building": location.pk})
+        # Something is on file (the building): the overview shows it first (W1-05).
+        self.assertRedirects(response, f"{START}?building={location.pk}")
+        self.assertFalse(Application.objects.filter(person=self.mine).exists())
+        response = self.client.post(START, {"building": location.pk, "overview": "1"})
         draft = self.draft()
         self.assertEqual(draft.buildings.get().location, location)
         self.assertRedirects(response, step_url(draft, "metering_points"))
@@ -127,7 +131,7 @@ class StartPageTests(WizardCase):
     def test_a_paused_draft_says_so_on_the_start_page_and_on_every_step(self):
         draft, _building = draft_with_points(self.mine)
         Application.objects.filter(pk=draft.pk).update(state=Application.State.PAUSED)
-        banner = "Ihre Anmeldung ist pausiert, weil Sie sie länger nicht bearbeitet haben."
+        banner = "Ihre Anmeldung ist pausiert, weil Sie sie länger nicht bearbeitet haben. Machen Sie weiter, sonst wird sie"
         self.assertIn(banner, text(self.client.get(START)))
         self.assertIn(banner, text(self.client.get(step_url(draft, "contract"))))
         # Any change ends the pause.
@@ -263,7 +267,7 @@ class BuildingStepTests(WizardCase):
                 self.assertEqual((row.egid, row.street, row.town), (None, "Ittigenstrasse", "Ittigen"))
                 page = text(self.client.get(self.url))
                 self.assertIn("Wird von der LEG geprüft", page)
-                self.assertIn("Diese Adresse wurde im Register noch nicht gefunden. Die LEG prüft sie. Sie können weitermachen.", page)
+                self.assertIn("Diese Adresse wurde im Gebäuderegister noch nicht gefunden. Die LEG prüft sie. Sie können weitermachen.", page)
                 self.assertIn(reverse("customer:application", args=[self.application.pk]), page)
                 # The next step is open: the customer can continue with the metering points.
                 self.assertEqual(self.client.get(step_url(self.application, "metering_points")).status_code, 200)
@@ -404,13 +408,18 @@ class MeteringPointStepTests(WizardCase):
     def test_the_fields_the_fixed_beginning_and_the_hints_of_the_documents(self):
         html = text(self.client.get(self.url))
         for marker in (
-            "Schritt 2 von 4: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?", "Erstellen Sie Ihre Messpunkte.",
+            "Schritt 2: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?",
+            "Der Messpunkt ist der Anschluss Ihres Stromzählers.", f"Seine Nummer beginnt mit CH{IDENTIFIER}.",
             "Messpunkt-Nummer für den Bezug", f">CH{IDENTIFIER}<", "Die Nummer finden Sie auf Ihrer letzten Stromrechnung.",
             "Name des Messpunkts", "z. B. Wohnhaus", "Speisen Sie Solarstrom ein?", ">Nein<", ">Ja<",
-            "Messpunkt-Nummer für die Einspeisung", "PV-Leistung in kWp", "Batteriespeicher in kWh", "Wallbox in kW",
+            "Messpunkt-Nummer für die Einspeisung", "Die Nummer steht in den Unterlagen Ihres Netzbetreibers.",
+            "Diese Angaben sind freiwillig und dienen nur der Statistik.", ">Einspeisung<",
+            "PV-Leistung in kWp", "Batteriespeicher in kWh", "Wallbox in kW",
             'data-reveal-name="feed_in"',
         ):
             self.assertIn(marker, html)
+        # No total in step 2: a feed-in adds a step (W1-01).
+        self.assertNotIn("Schritt 2 von", html)
         # The answer "No" is chosen first; the part of the feed-in is hidden by the script, never by the server.
         self.assertRegex(html, r'value="no" checked|checked[^>]*value="no"')
         self.assertNotIn("is-open", html)
@@ -531,7 +540,7 @@ class BankStepTests(WizardCase):
         html = text(self.client.get(self.url))
         for marker in (
             "Schritt 3 von 5: Bank- oder Postverbindung", "Wohin sollen wir Ihre Vergütung überweisen?",
-            "Tragen Sie Ihre Bank- oder Postverbindung ein. Damit bezahlen wir Ihnen den eingespeisten Strom.",
+            "Damit bezahlen wir Ihnen die Vergütung für den eingespeisten Strom.",
             "IBAN", "CH93 0076 2011 6238 5295 7", "Die IBAN steht auf Ihrem Konto- oder Zahlungsauszug und auf der Rückseite Ihrer Bankkarte.",
             'autocomplete="off"',
         ):
@@ -591,7 +600,7 @@ class ContractStepTests(WizardCase):
         for marker in (
             "Schritt 3 von 4: Vertrag", "Vertrag lesen und zustimmen", "Der Vertrag gilt für alle Ihre Gebäude. Sie stimmen ihm einmal zu.",
             "Vertragsfassung vom 7. Oktober 2026", "Vertrag herunterladen", reverse("customer:contract_download"),
-            "Den vollständigen Vertrag finden Sie unter Information.",
+            "Den Vertrag finden Sie auch unter", 'href="/participation/contract/"', "Information › Gesellschaftsvertrag",
             "Ich habe den Gesellschaftsvertrag gelesen und stimme ihm zu.",
             "Ich bin damit einverstanden, dass der Netzbetreiber meine Messdaten an die LEG übermittelt.",
             'data-gate-all="id_agrees_contract id_agrees_data_exchange"',
@@ -663,10 +672,10 @@ class StartDateStepTests(WizardCase):
     def test_the_page_has_as_soon_as_possible_chosen_and_an_empty_date(self):
         html = text(self.client.get(self.url))
         for marker in (
-            "Schritt 4 von 4: Aufschaltung", "Ab wann soll Ihre Teilnahme beginnen?",
+            "Schritt 4 von 4: Startdatum", "Ab wann soll Ihre Teilnahme beginnen?",
             "Wählen Sie den frühesten Termin oder ein Wunschdatum.", "Wann soll es losgehen?", "So bald wie möglich",
-            "Wunschdatum", 'type="date"', "Anmeldung abschicken", "Bestätigung des endgültigen Termins: Netzbetreiber.",
-            'data-reveal-name="start"',
+            "Wunschdatum", 'type="date"', "Anmeldung abschicken", "Den endgültigen Termin bestätigt Netzbetreiber.",
+            'data-reveal-name="start"', "Frühestens ab dem",
         ):
             self.assertIn(marker, html)
         self.assertRegex(html, r'value="asap" checked|checked[^>]*value="asap"')
@@ -737,16 +746,20 @@ class SubmittedAndWithdrawTests(WizardCase):
         html = text(self.client.get(self.submitted))
         for marker in (
             "Ihre Anmeldung ist abgeschickt",
-            "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei Netzbetreiber an. Danach erhalten Sie eine E-Mail von Netzbetreiber. Bitte bestätigen Sie die Anmeldung dort.",
+            "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei Netzbetreiber an. Danach erhalten Sie eine E-Mail vom Netzbetreiber. Bitte bestätigen Sie die Anmeldung dort.",
             "So geht es weiter", "Angaben abgeschickt", "Prüfung durch die LEG", "Anmeldung bei Netzbetreiber",
-            "Kundenanfrage durch Netzbetreiber bestätigt", "Warten auf Startdatum", "Bestätigung durch Netzbetreiber offen",
-            "Bitte bestätigen Sie die Anmeldung innerhalb von 14 Tagen", "Ihre Angaben", "Ittigenstrasse 51", "EGID 90004269",
+            "Sie bestätigen die Anfrage in der E-Mail von Netzbetreiber", "Wird von Netzbetreiber festgelegt",
+            "Bitte bestätigen Sie die Anmeldung innerhalb von 14 Tagen nach der E-Mail vom Netzbetreiber.",
+            "Ihre Angaben", "Ittigenstrasse 51", "EGID 90004269",
             "Bezug, Einspeisung", "So bald wie möglich", "Änderungen sind jetzt nur noch über die LEG möglich.",
             ">Zur Startseite<", ">Anmeldung zurückziehen<",
-            "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht bei Netzbetreiber eingereicht hat.",
-            "1 von 5 erledigt",
+            "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim Netzbetreiber eingereicht hat.",
         ):
             self.assertIn(marker, html)
+        # One list, no second count (W1-14): the bar only; the old words are gone.
+        self.assertNotIn("step-note", html)
+        for gone in ("Kundenanfrage durch", "Warten auf Startdatum", "Bestätigung durch Netzbetreiber offen"):
+            self.assertNotIn(gone, html)
         self.assertIn(f'href="{HOME}"', html)
         # No button for another building: a further one is made with "Start registration" on the page Buildings.
         self.assertNotIn("weiteres Gebäude", html)
@@ -799,13 +812,18 @@ class CancelTests(WizardCase):
         for name in ("contract",):
             html = text(self.client.get(step_url(application, name) + "?cancel=1"))
             self.assertIn("Anmeldung abbrechen?", html)
-            self.assertIn(
-                "Ihre Angaben zu Gebäude und Messpunkten werden gelöscht. Ihre Bank- oder Postverbindung bleibt erhalten, weil sie zu Ihrer Person gehört.",
-                html,
-            )
+            self.assertIn("Ihre Angaben zu Gebäude und Messpunkten werden gelöscht.", html)
+            # The bank connection is named only where there is one (W2-05); "Cancel" is not offered twice.
+            self.assertNotIn("Bank- oder Postverbindung bleibt erhalten", html)
+            self.assertNotIn(">Abbrechen<", html)
             self.assertIn(">Weiter anmelden<", html)
             self.assertIn(">Anmeldung abbrechen<", html)
             self.assertRegex(html, r'<a class="btn btn-primary" href="[^"]+" autofocus>Weiter anmelden</a>')
+        own_iban.set_own_iban(self.mine, GOOD_IBAN)
+        self.assertIn(
+            "Ihre Bank- oder Postverbindung bleibt erhalten, weil sie zu Ihrer Person gehört.",
+            text(self.client.get(step_url(application, "contract") + "?cancel=1")),
+        )
         plain = text(self.client.get(step_url(application, "contract")))
         self.assertNotIn("Anmeldung abbrechen?", plain)
         self.assertIn(">Abbrechen<", plain)

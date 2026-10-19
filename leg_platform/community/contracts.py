@@ -143,6 +143,15 @@ def history_rows(actor, limit=100):
     ]
 
 
+def stored_version_of(actor, data):
+    """The stored version (without its file) that has exactly these bytes, or None; for an active staff account. Used to
+    name the existing version when an upload is refused as a duplicate (design walkthrough W5-09). Reads nothing but the
+    SHA-256 of the given bytes."""
+    staff_actor(actor)
+    digest = hashlib.sha256(bytes(data)).hexdigest()
+    return ContractVersion.objects.defer("pdf").filter(sha256=digest).first()
+
+
 def staff_download(actor, version_id):
     """``(file name, bytes)`` of any version, for an active staff account."""
     staff_actor(actor)

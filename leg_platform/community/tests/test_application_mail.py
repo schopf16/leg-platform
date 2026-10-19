@@ -27,7 +27,12 @@ NEW_KINDS = (
     MailJob.Kind.DEREGISTRATION_EFFECTIVE,
     MailJob.Kind.IBAN_CHANGED,
     MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED,
+    MailJob.Kind.APPLICATION_RETURNED,
+    MailJob.Kind.APPLICATION_REJECTED,
+    MailJob.Kind.APPLICATION_REJECTED_OPERATOR,
 )
+# Mails to a customer (the one kind for the staff is the exception).
+CUSTOMER_KINDS = tuple(kind for kind in NEW_KINDS if kind != MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED)
 
 
 class DefinitionTests(SimpleTestCase):
@@ -138,3 +143,82 @@ class SendingTests(TestCase):
         (message,) = django_mail.outbox
         for secret in ("Geheimstrasse", point.number):
             self.assertNotIn(secret, message.subject + message.body)
+
+
+class PlainWordsTests(SimpleTestCase):
+    """The customer mails use plain words (design walkthrough W2-03): no "rolled back" jargon, and a contact line."""
+
+    JARGON = ("rolled back", "roll back", "rückabgewickelt", "rückgängig", "rückabwick")
+
+    def test_no_customer_default_text_uses_the_jargon_in_english_or_german(self):
+        for language in ("en", "de-ch"):
+            for kind in CUSTOMER_KINDS:
+                with self.subTest(kind=kind, language=language), self.settings(LANGUAGE_CODE=language):
+                    subject, body = email_texts.default_texts(kind)
+                    for word in self.JARGON:
+                        self.assertNotIn(word, (subject + body).lower())
+
+    def test_the_rejection_texts_say_what_happened_and_what_stays(self):
+        with self.settings(LANGUAGE_CODE="en"):
+            _subject, plain = email_texts.default_texts(Key.APPLICATION_REJECTED)
+            subject, operator = email_texts.default_texts(Key.APPLICATION_REJECTED_OPERATOR)
+        self.assertIn("was not accepted", subject)
+        self.assertIn("was not accepted", plain)
+        self.assertIn("For privacy reasons we deleted your building and metering point details. Your account remains.", plain)
+        self.assertIn("You can start a new application at any time", plain)
+        self.assertNotIn("grid operator", plain)
+        self.assertIn("The grid operator did not accept the registration of your metering points.", operator)
+
+    def test_the_return_text_has_no_reason_and_points_to_the_portal(self):
+        with self.settings(LANGUAGE_CODE="en"):
+            subject, body = email_texts.default_texts(Key.APPLICATION_RETURNED)
+        self.assertIn("returned your application", body)
+        self.assertIn("after you sign in", body)
+        self.assertIn("{login_url}", body)
+        self.assertEqual(email_texts.placeholders_of(Key.APPLICATION_RETURNED).count(email_texts.GREETING), 1)
+        # No placeholder can carry the reason: the mail jobs have no payload.
+        self.assertEqual(
+            {p.name for p in email_texts.DEFINITIONS[Key.APPLICATION_RETURNED].placeholders}, {"greeting"}
+        )
+
+
+@tag("mariadb")
+class ContactLineTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.person = customer("mail.contact@example.org")
+
+    def sent(self, kind):
+        django_mail.outbox.clear()
+        mail_queue.enqueue_for_account(kind, self.person)
+        mail_queue.process_pending()
+        (message,) = django_mail.outbox
+        return message
+
+    def test_every_customer_mail_has_the_contact_line_when_the_instance_has_a_website(self):
+        from leg_platform.accounts.models import PortalSettings
+
+        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
+        for kind in CUSTOMER_KINDS:
+            with self.subTest(kind=kind), translation.override("de-ch"):
+                body = self.sent(kind).body
+                self.assertIn("Kontaktinformationen: https://leg.example.org/", body)
+                self.assertEqual(body.count("https://leg.example.org/"), 1)
+
+    def test_without_a_website_the_line_is_left_out(self):
+        for kind in CUSTOMER_KINDS:
+            with self.subTest(kind=kind), translation.override("de-ch"):
+                body = self.sent(kind).body
+                self.assertNotIn("Kontaktinformationen", body)
+                self.assertNotIn("Contact information", body)
+
+    def test_the_new_mails_say_it_in_german_in_plain_words(self):
+        with translation.override("de-ch"):
+            rejected = self.sent(MailJob.Kind.APPLICATION_REJECTED)
+            operator = self.sent(MailJob.Kind.APPLICATION_REJECTED_OPERATOR)
+            returned = self.sent(MailJob.Kind.APPLICATION_RETURNED)
+        self.assertIn("wurde nicht angenommen", rejected.subject)
+        self.assertIn("Ihr Konto bleibt bestehen", rejected.body)
+        self.assertIn("Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen", operator.body)
+        self.assertIn("muss korrigiert werden", returned.subject)
+        self.assertIn("zur Korrektur zurückgegeben", returned.body)

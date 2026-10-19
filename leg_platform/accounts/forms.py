@@ -765,6 +765,8 @@ class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):
         self.use_one_proof(user)
         self.fields["new_password1"].widget.attrs.pop("autofocus", None)
         describe_password_fields(self, "new_password1", "new_password2")
+        # The list of rules under the field says the same: no lead sentence (design walkthrough W4-02).
+        self.fields["new_password1"].help_text = ""
 
     def clean_current_password(self):
         password = self.cleaned_data["current_password"]

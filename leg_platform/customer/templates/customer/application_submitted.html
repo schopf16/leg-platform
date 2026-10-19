@@ -4,23 +4,22 @@
 {% block content %}
   <div class="wizard">
     <div class="progress-block">
-      <p class="page-label">{% translate "My participation · Registration" %}</p>
+      <p class="page-label">{% translate "My participation · Application" %}</p>
       <progress class="path-bar" max="{{ total }}" value="{{ done }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} done{% endblocktranslate %}">{{ done }}/{{ total }}</progress>
-      <p class="step-note">{% blocktranslate %}{{ done }} of {{ total }} done{% endblocktranslate %}</p>
     </div>
     <div>
       <h1 class="start-title">{% translate "Your application was submitted" %}</h1>
-      <p class="start-sub">{% blocktranslate %}The LEG checks your details and registers your building at {{ operator }}. Then you receive an email from {{ operator }}. Please confirm the registration there.{% endblocktranslate %}</p>
+      <p class="start-sub">{% blocktranslate %}The LEG checks your details and registers your building at {{ operator }}. Then you receive an email from the grid operator. Please confirm the registration there.{% endblocktranslate %}</p>
     </div>
 
     <section class="step-card" aria-labelledby="next-steps">
       <h2 id="next-steps">{% translate "What happens next" %}</h2>
       <ol class="step-list">
         {% for step in steps %}
-          <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.name }}</span><span class="step-word step-word-{{ step.state }}">{% if step.waiting %}{% blocktranslate %}Confirmation by {{ operator }} pending{% endblocktranslate %}{% elif step.state == 'done' %}{% translate "Finished" %}{% elif step.state == 'next' %}{% translate "Next up" %}{% else %}{% translate "Open" %}{% endif %}</span></li>
+          <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.name }}</span><span class="step-word step-word-{{ step.state }}">{{ step.word }}</span></li>
         {% endfor %}
       </ol>
-      <p class="muted">{% blocktranslate %}Please confirm the registration within {{ days }} days after the email from {{ operator }}.{% endblocktranslate %}</p>
+      <p class="muted">{% blocktranslate %}Please confirm the registration within {{ days }} days after the email from the grid operator.{% endblocktranslate %}</p>
     </section>
 
     <section class="step-card" aria-labelledby="your-details">
@@ -41,6 +40,6 @@
       <a class="btn btn-primary" href="{% url 'home' %}">{% translate "To the start page" %}</a>
       {% if withdrawable %}<a class="btn btn-danger-outline" href="{% url 'customer:application_withdraw' application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
     </div>
-    {% if withdrawable %}<p class="muted">{% blocktranslate %}You can withdraw the application as long as the LEG has not yet submitted it to {{ operator }}.{% endblocktranslate %}</p>{% endif %}
+    {% if withdrawable %}<p class="muted">{% translate "You can withdraw the application as long as the LEG has not yet submitted it to the grid operator." %}</p>{% endif %}
   </div>
 {% endblock %}

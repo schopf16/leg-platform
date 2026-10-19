@@ -88,6 +88,7 @@ D-102; the administration itself checks every request) and is the very last entr
   <div class="frame-legal">
     {% if instance_privacy_url %}<a href="{{ instance_privacy_url }}" target="_blank" rel="noopener noreferrer">{% translate "Privacy notice" %}</a>{% else %}<span>{% translate "Privacy notice" %}</span>{% endif %}
     {% if instance_imprint_url %}<a href="{{ instance_imprint_url }}" target="_blank" rel="noopener noreferrer">{% translate "Legal notice" %}</a>{% else %}<span>{% translate "Legal notice" %}</span>{% endif %}
+    {% if not user.is_staff and instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<a href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}</a>{% endif %}
   </div>
 </div>
 {% endwith %}

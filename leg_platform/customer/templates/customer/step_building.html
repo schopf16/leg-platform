@@ -1,8 +1,9 @@
 {% extends "customer/wizard_base.html" %}
-{% load i18n %}
+{% load i18n customer_ui %}
 {% block heading %}{% translate "Where is your building?" %}{% endblock %}
 {% block lead %}{% translate "Enter the address where your electricity is drawn." %}{% endblock %}
 {% block step %}
+  {% leg_link as leg %}
   {% if chosen %}
     {% with address=chosen.current_address %}
       <section class="step-card" aria-label="{% translate 'Address' %}">
@@ -13,7 +14,7 @@
             <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "To be checked by the LEG" %}</p>
           {% endif %}
           <p class="found-address">{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}</p>
-          {% if chosen.egid %}<p class="muted">{% translate "EGID" %} {{ chosen.egid }}</p>{% else %}<p class="note-warn" id="address-review-note">{% translate "This address could not be found in the register yet. The LEG will check it. You can continue." %}</p>{% endif %}
+          {% if chosen.egid %}<p class="muted">{% translate "EGID" %} {{ chosen.egid }}</p>{% else %}<p class="note-warn" id="address-review-note">{% blocktranslate %}This address could not be found in the building register yet. The {{ leg }} will check it. You can continue.{% endblocktranslate %}</p>{% endif %}
           {% if chosen.name %}<p class="muted">{{ chosen.name }}</p>{% endif %}
           {% if chosen.location_id %}<p class="note-info">{% translate "This building is already created. Your metering points are assigned to it." %}</p>{% endif %}
         </div>
@@ -22,17 +23,18 @@
           {% if not chosen.preselected %}
             <form method="post" class="inline-form" data-submit-once>
               {% csrf_token %}
-              <button type="submit" name="action" value="change" class="btn btn-secondary-action">{% translate "Choose another building" %}</button>
+              <button type="submit" name="action" value="change" class="btn btn-secondary-action"{% if chosen.metering_points.all %} aria-describedby="change-building-note"{% endif %}>{% translate "Choose another building" %}</button>
             </form>
           {% endif %}
-          <a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>
+          {% if not confirm_cancel %}<a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>{% endif %}
         </div>
+        {% if not chosen.preselected and chosen.metering_points.all %}<p class="muted" id="change-building-note">{% translate "If you choose another building, the metering points you entered are deleted." %}</p>{% endif %}
       </section>
     {% endwith %}
   {% else %}
     <form method="post" class="step-card{% if not_clear %} is-error{% endif %}" novalidate data-submit-once aria-label="{% translate 'Address' %}">
       {% csrf_token %}
-      {% include "accounts/_error_summary.html" %}
+      {% include "customer/_error_summary.html" %}
       {% include "customer/_field.html" with field=form.name optional=True %}
       <div class="address-row address-row-street">
         {% include "customer/_field.html" with field=form.street %}
@@ -45,7 +47,7 @@
 
       {% if suggestions %}
         <div class="suggest" role="group" aria-labelledby="suggest-title">
-          <h2 id="suggest-title">{% translate "Did you mean one of these addresses?" %}</h2>
+          <h2 id="suggest-title" tabindex="-1" autofocus>{% translate "Did you mean one of these addresses?" %}</h2>
           <ul class="suggest-list">
             {% for suggestion in suggestions %}
               <li><button type="submit" name="suggestion" value="{{ suggestion.index }}" class="suggest-option">{{ suggestion.label }} <span class="suggest-egid">{% translate "EGID" %} {{ suggestion.egid }}</span></button></li>
@@ -56,18 +58,19 @@
       {% endif %}
 
       {% if options %}
-        <fieldset class="question">
+        <fieldset class="question" id="options-fieldset" tabindex="-1" autofocus aria-describedby="options-help">
           <legend>{% translate "There are several buildings at this address. Which one is yours?" %}</legend>
+          <p class="muted" id="options-help">{% blocktranslate %}Choose the building where your electricity meter is. Not sure? Contact the {{ leg }}.{% endblocktranslate %}</p>
           {% for option in options %}
-            <label class="entry-check"><input class="entry-check-input" type="radio" name="egid" value="{{ option.egid }}" required><span>{{ option.label }}{% if option.entrance is not None %} · {% blocktranslate with entrance=option.entrance %}Entrance {{ entrance }}{% endblocktranslate %}{% endif %} · {% translate "EGID" %} {{ option.egid }}</span></label>
+            <label class="entry-check"><input class="entry-check-input" type="radio" name="egid" value="{{ option.egid }}" required><span>{{ option.label }}{% if option.entrance %} · {% blocktranslate with entrance=option.entrance %}Entrance {{ entrance }}{% endblocktranslate %}{% endif %} · {% translate "EGID" %} {{ option.egid }}</span></label>
           {% endfor %}
         </fieldset>
       {% endif %}
 
       {% if not_clear %}
-        <div class="note-bad" role="alert">
+        <div class="note-bad" role="alert" tabindex="-1" autofocus>
           <p class="dotword"><span class="dot tone-bad" aria-hidden="true"></span>{% translate "Not found clearly" %}</p>
-          <p>{% translate "This address could not be assigned to one building clearly. Please check your entry or contact the LEG." %}</p>
+          <p>{% blocktranslate %}This address could not be assigned to one building clearly. Please check your entry or contact the {{ leg }}.{% endblocktranslate %}</p>
         </div>
       {% endif %}
       {% include "customer/_step_actions.html" %}

@@ -23,6 +23,7 @@ urlpatterns = [
     path("settings/", views.SettingsView.as_view(), name="settings"),
     path("settings/check/", views.SettingsFieldCheckView.as_view(), name="settings_check"),
     path("settings/deadlines/", deadline_views.DeadlinesView.as_view(), name="settings_deadlines"),
+    path("settings/run-time/", deadline_views.RunTimeView.as_view(), name="settings_run_time"),
     # The saved column widths of the lists (any list).
     path("lists/<slug:list_key>/widths/", location_views.ListWidthsView.as_view(), name="list_widths"),
     # Processes: the running applications and deregistrations, and the notices for the staff (D-103)

@@ -15,6 +15,8 @@
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -53,6 +55,43 @@ OPEN_STATES = (State.SUBMITTED, State.CONFIRMED)
 def earliest_termination_date(on=None):
     """The earliest month end for a notice given on ``on`` (default today): four months later, to the month end."""
     return month_end(add_months(on or timezone.localdate(), NOTICE_MONTHS))
+
+
+def earliest_date_preview(today=None):
+    """For the customer page: "Frühestens am <date>", the earliest month end if the customer gave notice today. The
+    same value ``request_deregistration`` stores as ``earliest_date``. It is a reading of the notice period, not a
+    promise: the LEG confirms the date. Deviates from ABMELDUNG section 3 (no calculated date): team lead decision
+    2026-10-19, owner to confirm (D-103)."""
+    return earliest_termination_date(today)
+
+
+@dataclass(frozen=True)
+class ConfirmationDefaults:
+    """What the confirmation dialog of the staff is filled with."""
+
+    desired_date: date  # the date the customer asked for (the earliest one if he took the earliest)
+    wants_earliest: bool
+    earliest_date: date  # the earliest possible day on the day of the request (notice period)
+    suggested_date: date  # the field's value: the desired date, or the end of this month if that has passed
+
+
+def confirmation_defaults(deregistration, actor, today=None):
+    """The defaults for the staff's confirmation dialog of a deregistration that waits for its date: the customer's
+    desired date, the earliest date of the notice period and the suggested value (the desired date; if it lies in the
+    past, the end of the current month, so the field is always a date ``confirm`` accepts). Staff only (``actor`` is
+    re-read: ``not_allowed``); ``not_found`` for a missing one, ``wrong_state`` unless it still waits for the date."""
+    staff_actor(actor)
+    today = today or timezone.localdate()
+    row = Deregistration.objects.filter(pk=getattr(deregistration, "pk", None)).first()
+    if row is None:
+        raise ApplicationError("not_found")
+    if row.state != State.SUBMITTED:
+        raise ApplicationError("wrong_state")
+    suggested = row.desired_date if row.desired_date >= today else month_end(today)
+    return ConfirmationDefaults(
+        desired_date=row.desired_date, wants_earliest=row.wants_earliest, earliest_date=row.earliest_date,
+        suggested_date=suggested,
+    )
 
 
 def _covered():

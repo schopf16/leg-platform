@@ -388,7 +388,7 @@ class LogoutTests(TestCase):
         self.assertIn(reverse("accounts:profile"), menu)
         self.assertRegex(menu, r'<form method="post" action="/logout/"')
         self.assertIn("csrfmiddlewaretoken", menu)
-        self.assertIn("Abmelden", menu)
+        self.assertIn("Ausloggen", menu)
         # The menu for small screens is the same menu in a drawer.
         self.assertIn('id="frame-drawer"', html)
 

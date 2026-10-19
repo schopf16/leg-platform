@@ -35,6 +35,7 @@ from leg_platform.community.models import (
     ApplicationNotice,
     Deregistration,
     Direction,
+    MeteringPoint,
 )
 from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
@@ -89,8 +90,10 @@ def person_card(person):
 
 def history_rows(subject, person_id):
     """The history of an application or deregistration, newest first: event, time and who (field names and dates only
-    are stored, D-077)."""
+    are stored, D-077). Entries of the same event by the same actor that follow one another are one row with a count
+    (the customer chooses a building three times: "Customer: building chosen × 3"), shown with the time of the newest."""
     rows = []
+    last_key = None
     for entry in history.entries_for(subject).order_by("-created_at", "-pk"):
         if entry.actor_id is None:
             actor = _("System")
@@ -98,7 +101,12 @@ def history_rows(subject, person_id):
             actor = _("Customer")
         else:
             actor = entry.actor.display_name
-        rows.append({"time": entry.created_at, "label": event_label(entry.event), "actor": actor})
+        key = (entry.actor_id, entry.event)
+        if rows and key == last_key:
+            rows[-1]["count"] += 1
+            continue
+        last_key = key
+        rows.append({"time": entry.created_at, "label": event_label(entry.event), "actor": actor, "count": 1})
     return rows
 
 
@@ -106,33 +114,36 @@ def history_rows(subject, person_id):
 
 
 def list_columns():
-    # Widths for a 1280 px screen (the content is about 1000 px wide): the kind, the count and the date of the last change
-    # never shrink (their words must be whole); the others are cut with three dots and show the full text on hover.
+    # Widths for a 1280 px screen: the content card is about 967 px wide (the menu takes the rest), so the sum of the start
+    # widths, with the link column of 56 px, is at most that and the table fits without scrolling (walkthrough W5-03). The
+    # kind, the count and the date of the last change never shrink (their words must be whole); the others are cut with
+    # three dots and show the full text on hover. The status, the progress and the date have the least room their header
+    # (title, sort arrow and info button) needs.
     return (
-        lists.Column("person", gettext_lazy("Person"), width=170),
-        lists.Column("kind", gettext_lazy("Kind"), width=110, keep=True),
-        lists.Column("building", gettext_lazy("Building"), width=190),
-        lists.Column("points", gettext_lazy("Metering points"), width=112, keep=True),
+        lists.Column("person", gettext_lazy("Person"), width=116),
+        lists.Column("kind", gettext_lazy("Kind"), width=100, keep=True),
+        lists.Column("building", gettext_lazy("Building"), width=116),
+        lists.Column("points", gettext_lazy("Metering points"), width=108, keep=True),
         lists.Column(
-            "state", gettext_lazy("Status"), width=180,
+            "state", gettext_lazy("Status"), width=116,
             info=_(
                 "Submitted: waiting for the review. In review: the LEG checks it. Then the registration at the grid "
                 "operator. In deregistration: the notice was given and the LEG confirms the date."
             ),
         ),
         lists.Column(
-            "progress", gettext_lazy("Progress"), width=130,
+            "progress", gettext_lazy("Progress"), width=124,
             info=_("Applications: the five steps from the submission to the completion. Deregistrations: three steps."),
         ),
         lists.Column(
-            "date", gettext_lazy("Date"), width=130,
+            "date", gettext_lazy("Date"), width=104,
             info=_(
                 "Applications: the start date the customer chose. Deregistrations: the date from which the "
                 "deregistration is effective, once the LEG has confirmed it. Open until it is known."
             ),
             info_placement="left",
         ),
-        lists.Column("changed", gettext_lazy("Last change"), width=130, keep=True, info_placement="left"),
+        lists.Column("changed", gettext_lazy("Last change"), width=126, keep=True, info_placement="left"),
     )
 
 
@@ -262,8 +273,9 @@ def way_steps(application):
     labels = {
         "submitted": _("Details submitted"),
         "review": _("Review by the LEG"),
-        "operator_registration": _("Registration at the %(operator)s") % {"operator": operator},
-        "operator_confirmation": _("Confirmation by the %(operator)s") % {"operator": operator},
+        # The words of the customer's page (customer/steps.py), so both sides name the way the same (W1-01, W5-04).
+        "operator_registration": _("Registration at %(operator)s") % {"operator": operator},
+        "operator_confirmation": _("Customer confirms the request of the %(operator)s") % {"operator": operator},
         "start": _("Completed"),
     }
     words = step_words()
@@ -311,16 +323,27 @@ def building_rows(application):
 
 
 def notice_rows(queryset, request):
-    """The notices as rows (EGID and numbers are staff data, deleted when resolved)."""
+    """The notices as rows (EGID and numbers are staff data, deleted when resolved). A number that is a metering point
+    of this instance has a link to its page, where the staff sees whose it is (D-086; walkthrough W5-08)."""
+    notices = list(queryset)
+    wanted = {number for notice in notices for number in notice.numbers}
+    known = dict(MeteringPoint.objects.filter(number__in=wanted).values_list("number", "pk")) if wanted else {}
     rows = []
-    for notice in queryset:
+    for notice in notices:
         rows.append(
             {
                 "id": notice.pk,
                 "kind": labels.notice_kind_label(notice.kind),
                 "person": person_card(notice.person),
                 "egid": notice.egid,
-                "numbers": [numbers.format_metering_point_number(number) for number in notice.numbers],
+                "numbers": [
+                    {
+                        "text": numbers.format_metering_point_number(number),
+                        "url": reverse("management:metering_points_detail", args=[known[number]])
+                        if number in known else "",
+                    }
+                    for number in notice.numbers
+                ],
                 "created": notice.created_at,
                 "resolve_url": reverse("management:processes_notice_resolve", args=[notice.pk]),
             }
@@ -436,6 +459,16 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
             )
         confirmed = state in (Deregistration.State.CONFIRMED, Deregistration.State.EFFECTIVE)
         effective = state == Deregistration.State.EFFECTIVE
+        if state == Deregistration.State.SUBMITTED:
+            next_text = _(
+                "The customer gave notice. Confirm the date: it is recorded as the termination date of every metering point."
+            )
+        elif effective:
+            next_text = _("The deregistration is effective.")
+        else:
+            next_text = _(
+                "The date %(date)s is confirmed. The portal marks the deregistration effective by itself on that day."
+            ) % {"date": format_date(deregistration.confirmed_date)}
         dereg_label = Deregistration.State(state).label
         dereg_tone = "ok" if effective else ("accent" if confirmed else "warn")
         steps = [
@@ -473,6 +506,7 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
             "wants_earliest": deregistration.wants_earliest,
             "confirmed_date": format_date(deregistration.confirmed_date) if deregistration.confirmed_date else "",
             "can_confirm": state == Deregistration.State.SUBMITTED,
+            "next_text": next_text,
             "confirm_url": with_next(
                 reverse("management:processes_deregistration_confirm", args=[deregistration.pk]), request
             ),

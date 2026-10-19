@@ -10,6 +10,7 @@ the second factor (``test_access`` walks every route, ``test_acceptance_matrix``
 """
 
 from datetime import date, timedelta
+from pathlib import Path
 
 from django.test import Client, TestCase, tag
 from django.urls import reverse
@@ -30,7 +31,9 @@ from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Application,
     ApplicationNotice,
+    CustomerMessage,
     Deregistration,
+    Direction,
     Location,
     MeteringPoint,
     PersonAssignment,
@@ -250,12 +253,56 @@ class ApplicationPageTests(ProcessBase):
     def test_the_way_the_application_goes_and_its_progress(self):
         application = self.submitted(self.anna)
         page = self.client.get(self.url(application))
-        for text in ("Angaben abgeschickt", "Prüfung durch die LEG", "1 von 5 Schritten", "Erledigt", "Als Nächstes"):
+        for text in ("Angaben abgeschickt", "Prüfung durch die LEG", "1 von 5 Schritten erledigt", "Erledigt",
+                     "Als Nächstes"):
             self.assertContains(page, text)
         application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)
         page = self.client.get(self.url(application))
         self.assertContains(page, "01.06.2026")
-        self.assertContains(page, "3 von 5 Schritten")
+        self.assertContains(page, "3 von 5 Schritten erledigt")
+
+    def test_the_steps_are_named_like_on_the_page_of_the_customer(self):
+        # W1-01, W5-04: the same five steps, the same words; no "Netzbetreiber-Anmeldung".
+        page = self.client.get(self.url(self.submitted(self.anna)))
+        for text in ("Anmeldung bei Netzbetreiber", "Kunde bestätigt die Anfrage von Netzbetreiber"):
+            self.assertContains(page, text)
+        self.assertNotContains(page, "Netzbetreiber-Anmeldung")
+
+    def test_the_buttons_say_what_they_do_and_the_back_link_stands_once(self):
+        # W5-04: "Record the start at ..." is an action, not a status; no second "Back to the list" at the end.
+        application = self.submitted(self.anna)
+        page = self.client.get(self.url(application))
+        self.assertContains(page, "Start bei Netzbetreiber erfassen")
+        self.assertNotContains(page, "Anmeldung bei Netzbetreiber gestartet<")
+        self.assertNotContains(page, "Zurück zur Liste")
+        self.assertContains(page, "Zurück zu den Vorgängen", count=1)
+        self.assertContains(page, "Anmeldung rückabwickeln")
+
+    def test_the_side_column_stacks_the_facts_so_an_email_is_not_broken_inside_a_word(self):
+        css = (Path(__file__).resolve().parents[1] / "static" / "management" / "css" / "management.css").read_text(
+            encoding="utf-8"
+        )
+        rule = css[css.index(".mgmt-process-side .mgmt-fact {"):]
+        self.assertIn("grid-template-columns: minmax(0, 1fr)", rule[:rule.index("}")])
+        self.assertContains(
+            self.client.get(self.url(self.submitted(self.anna))), '<dd class="mgmt-wrap">anna.process@example.org</dd>'
+        )
+
+    def test_equal_entries_that_follow_one_another_are_one_line_with_a_count(self):
+        # W5-04: "Customer: building chosen" three times in a row is one line "× 3".
+        application = self.submitted(self.anna)
+        for _ in range(2):
+            history.record(application, HistoryEvent.APPLICATION_SUBMITTED, self.anna)
+        page = self.client.get(self.url(application)).content.decode()
+        label = "Kunde: Anmeldung eingereicht"
+        self.assertEqual(page.count(label), 1)
+        self.assertIn('<span class="mgmt-log-count tnum">× 3</span>', page)
+        # A different entry in between breaks the run: two lines.
+        application_staff.start_review(application, self.staff)
+        history.record(application, HistoryEvent.APPLICATION_SUBMITTED, self.anna)
+        page = self.client.get(self.url(application)).content.decode()
+        self.assertEqual(page.count(label), 2)
+        self.assertEqual(page.count("mgmt-log-count"), 1)
 
     def test_the_buttons_follow_the_state(self):
         application = self.submitted(self.anna)
@@ -352,25 +399,56 @@ class ApplicationStepTests(ProcessBase):
         events = list(history.entries_for(application).values_list("event", flat=True))
         self.assertEqual(events.count(HistoryEvent.APPLICATION_IN_REVIEW), 1)
 
-    def test_return_for_correction_asks_first_and_makes_it_a_draft_again(self):
+    def test_return_for_correction_asks_first_for_a_reason_and_makes_it_a_draft_again(self):
         application = self.submitted(self.anna)
         page = self.client.get(self.url(application, "return"))
         self.assertContains(page, "Zur Korrektur zurückgeben")
-        self.assertContains(page, "Es wird keine E-Mail verschickt")
+        self.assertContains(page, "Der Kunde erhält eine E-Mail und liest Ihre Begründung im Portal.")
+        self.assertContains(page, "Begründung der Korrektur")
+        self.assertContains(page, "<textarea")
+        self.assertContains(page, 'maxlength="500"')
         self.assertEqual(self.state(application), State.SUBMITTED)
-        response = self.client.post(self.url(application, "return"), {"next": self.detail(application)})
-        self.assertEqual(response.status_code, 302)
+        # Without a reason nothing happens.
+        empty = self.client.post(self.url(application, "return"), {"reason": "", "next": self.detail(application)})
+        self.assertEqual(empty.status_code, 200)
+        self.assertEqual(self.state(application), State.SUBMITTED)
+        response = self.client.post(
+            self.url(application, "return"), {"reason": "Nummer prüfen", "next": self.detail(application)},
+            follow=True,
+        )
+        # W2-02: the page of the application is gone (a draft has none), so the way on is the list, with a message.
+        self.assertRedirects(response, reverse("management:processes"))
+        self.assertContains(response, "Die Anmeldung wurde zur Korrektur zurückgegeben.")
         application.refresh_from_db()
         self.assertEqual(application.state, State.DRAFT)
         self.assertIsNotNone(application.returned_at)
+        self.assertEqual(application.returned_reason, "Nummer prüfen")
         # A draft has no page for the staff any more.
         self.assertEqual(self.client.get(self.detail(application)).status_code, 404)
+        self.assertEqual(MailJob.objects.filter(kind="application_returned").count(), 1)
         self.assertEqual(MailJob.objects.filter(kind="application_rolled_back").count(), 0)
+
+    def test_the_reason_of_a_return_is_at_most_500_characters_and_never_a_500_error(self):
+        application = self.submitted(self.anna)
+        url = self.url(application, "return")
+        for reason in ("x" * 501, "   ", "bad\x00text"):
+            with self.subTest(reason=reason[:10]):
+                response = self.client.post(url, {"reason": reason, "next": self.detail(application)})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.state(application), State.SUBMITTED)
+        ok = self.client.post(url, {"reason": "y" * 500, "next": self.detail(application)})
+        self.assertEqual(ok.status_code, 302)
+        self.assertEqual(self.state(application), State.DRAFT)
 
     def test_the_registration_at_the_grid_operator_needs_a_date_that_is_not_in_the_future(self):
         application = self.submitted(self.anna)
         url = self.url(application, "operator_started")
-        self.assertContains(self.client.get(url), "Anmeldung bei Netzbetreiber gestartet am")
+        page = self.client.get(url)
+        self.assertContains(page, "Anmeldung bei Netzbetreiber gestartet am")
+        # W5-04: an action as title and button, and the sentence about the withdrawal only once.
+        self.assertContains(page, "Start bei Netzbetreiber erfassen")
+        self.assertContains(page, "Start erfassen")
+        self.assertEqual(page.content.decode().count("nicht mehr zurückziehen"), 1)
         future = (timezone.localdate() + timedelta(days=2)).isoformat()
         response = self.client.post(url, {"started_on": future, "next": self.detail(application)})
         self.assertContains(response, "Das Datum darf nicht in der Zukunft liegen.")
@@ -389,6 +467,10 @@ class ApplicationStepTests(ProcessBase):
         application = self.submitted(self.anna)
         application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)
         url = self.url(application, "operator_confirmed")
+        # W5-04: the lead asks the person to record something; it is no statement.
+        self.assertContains(
+            self.client.get(url), "Erfassen Sie, wann der Kunde die Anmeldung bei Netzbetreiber bestätigt hat."
+        )
         response = self.client.post(url, {"confirmed_on": "2026-05-01", "next": self.detail(application)})
         self.assertContains(response, "Das Datum darf nicht vor der Anmeldung liegen.")
         self.assertEqual(self.state(application), State.OPERATOR_STARTED)
@@ -402,13 +484,59 @@ class ApplicationStepTests(ProcessBase):
         url = self.url(application, "complete")
         page = self.client.get(url)
         self.assertContains(page, 'value="2026-09-01"')
-        self.assertContains(page, "Nicht vor dem Tag drei Monate nach der Anmeldung.")
-        self.assertContains(page, "Noch nicht bestätigt")
-        too_early = self.client.post(url, {"start_date": "2026-08-31", "confirm_addresses": "0",
-                                           "next": self.detail(application)})
+        self.assertContains(page, "Frühestens am 01.09.2026 (drei Monate nach der Anmeldung).")
+        self.assertContains(page, "Der Kunde wünscht den Start so bald wie möglich.")
+        too_early = self.client.post(url, {"start_date": "2026-08-31", "next": self.detail(application)})
         self.assertContains(too_early, "Das Startdatum darf nicht vor dem 01.09.2026 liegen")
         self.assertEqual(self.state(application), State.OPERATOR_CONFIRMED)
         self.assertEqual(MeteringPoint.objects.count(), 0)
+
+    def test_the_completion_is_filled_with_the_wish_of_the_customer_never_before_the_earliest_date(self):
+        # W5-05: a wish after the earliest date is the value of the field; one before it is lifted to the earliest date.
+        later = self.at_operator()
+        Application.objects.filter(pk=later.pk).update(
+            start_choice=Application.StartChoice.DATE, desired_start_date=date(2026, 11, 15)
+        )
+        page = self.client.get(self.url(later, "complete"))
+        self.assertContains(page, 'value="2026-11-15"')
+        self.assertContains(page, "Der Kunde wünscht den Start am 15.11.2026.")
+        self.assertContains(page, "Frühestens am 01.09.2026")
+        earlier = self.at_operator(self.bert, egid=90004270, number=7, address={"house_number": "52"})
+        Application.objects.filter(pk=earlier.pk).update(
+            start_choice=Application.StartChoice.DATE, desired_start_date=date(2026, 8, 1)
+        )
+        page = self.client.get(self.url(earlier, "complete"))
+        self.assertContains(page, 'value="2026-09-01"')
+        self.assertContains(page, "Der Kunde wünscht den Start am 01.08.2026.")
+
+    def test_the_confirmation_of_the_addresses_is_an_explicit_tick_that_is_off_by_default(self):
+        # W5-07: no select "New addresses"; a tick "Addresses are checked and will be locked", only while a building
+        # of the application is not confirmed yet; left alone, the new building stays editable.
+        application = self.at_operator()
+        url = self.url(application, "complete")
+        page = self.client.get(url)
+        html = page.content.decode()
+        self.assertContains(page, "Adressen sind geprüft und werden gesperrt")
+        self.assertContains(page, "1 Gebäude hat eine Adresse, die noch nicht bestätigt ist.")
+        self.assertNotContains(page, "Neue Adressen")
+        self.assertRegex(html, r'<input type="checkbox" name="confirm_addresses"(?![^>]*checked)[^>]*>')
+        self.assertEqual(
+            self.client.post(url, {"start_date": START.isoformat(), "next": self.detail(application)}).status_code, 302
+        )
+        self.assertTrue(Location.objects.get(egid=90004269).needs_confirmation)
+
+    def test_without_a_building_to_confirm_the_tick_is_not_offered_and_a_posted_one_is_ignored(self):
+        make_location(egid=90004269, street="Ittigenstrasse", house_number="51", postal_code="3063", town="Ittigen")
+        Location.objects.filter(egid=90004269).update(needs_confirmation=False)
+        application = self.at_operator()
+        url = self.url(application, "complete")
+        self.assertNotContains(self.client.get(url), "Adressen sind geprüft und werden gesperrt")
+        self.assertEqual(
+            self.client.post(
+                url, {"start_date": START.isoformat(), "confirm_addresses": "1", "next": self.detail(application)}
+            ).status_code, 302,
+        )
+        self.assertEqual(self.state(application), State.COMPLETED)
 
     def test_the_completion_creates_the_real_rows_through_the_service(self):
         application = self.at_operator(feed_in=True)
@@ -434,7 +562,7 @@ class ApplicationStepTests(ProcessBase):
         make_metering_point(1, location=None)  # the number of the application, stored in the meantime
         response = self.client.post(
             self.url(application, "complete"),
-            {"start_date": START.isoformat(), "confirm_addresses": "0", "next": self.detail(application)},
+            {"start_date": START.isoformat(), "next": self.detail(application)},
         )
         self.assertContains(response, "Eine Messpunkt-Nummer dieser Anmeldung wurde inzwischen gespeichert")
         self.assertEqual(self.state(application), State.OPERATOR_CONFIRMED)
@@ -445,13 +573,22 @@ class ApplicationStepTests(ProcessBase):
         url = self.url(application, "reject")
         page = self.client.get(url)
         self.assertContains(page, "Anmeldung rückabwickeln")
+        # W2-03: a reason to choose, and an optional note that the customer reads once.
+        self.assertContains(page, "Von der LEG nicht angenommen")
+        self.assertContains(page, "Von Netzbetreiber abgelehnt")
+        self.assertContains(page, "Mitteilung an den Kunden")
+        self.assertContains(page, "(optional)")
+        self.assertContains(page, 'maxlength="300"')
         self.assertContains(page, "Das Konto, die Bankverbindung und gespeicherte Gebäude bleiben bestehen.")
-        response = self.client.post(url, {"reason": "rejected", "next": self.detail(application)}, follow=True)
+        response = self.client.post(
+            url, {"reason": "rejected", "note": "Bitte neu starten.", "next": self.detail(application)}, follow=True
+        )
         self.assertContains(response, "Die Anmeldung wurde rückabgewickelt.")
         self.assertRedirects(response, reverse("management:processes"))
         self.assertFalse(Application.objects.filter(pk=application.pk).exists())
         self.assertTrue(own_iban.has_iban(self.anna))
-        self.assertEqual(MailJob.objects.filter(kind="application_rolled_back").count(), 1)
+        self.assertEqual(MailJob.objects.filter(kind="application_rejected").count(), 1)
+        self.assertEqual(CustomerMessage.objects.get().text, "Bitte neu starten.")
         self.assertEqual(self.client.get(self.detail(application)).status_code, 404)
 
     def test_the_reason_is_one_of_two_and_a_forged_one_changes_nothing(self):
@@ -460,14 +597,23 @@ class ApplicationStepTests(ProcessBase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Application.objects.filter(pk=application.pk).exists())
 
+    def test_the_note_is_optional_and_at_most_300_characters(self):
+        application = self.submitted(self.anna)
+        url = self.url(application, "reject")
+        too_long = self.client.post(url, {"reason": "rejected", "note": "n" * 301, "next": "/"})
+        self.assertEqual(too_long.status_code, 200)
+        self.assertTrue(Application.objects.filter(pk=application.pk).exists())
+        response = self.client.post(url, {"reason": "operator_rejected", "next": "/"})
+        self.assertRedirects(response, reverse("management:processes"), fetch_redirect_response=False)
+        self.assertEqual(CustomerMessage.objects.get().text, "")  # the message of the kind is there, without a note
+
     def test_a_dialog_for_a_state_that_does_not_fit_goes_back_with_a_message(self):
         application = self.submitted(self.anna)
         for name in ("operator_confirmed", "complete"):
             with self.subTest(name=name):
                 response = self.client.get(self.url(application, name), follow=True)
                 self.assertContains(response, "Dieser Schritt ist im aktuellen Zustand nicht möglich")
-                post = self.client.post(self.url(application, name), {"confirmed_on": "2026-07-01", "start_date": "2026-09-01",
-                                                                       "confirm_addresses": "0"})
+                post = self.client.post(self.url(application, name), {"confirmed_on": "2026-07-01", "start_date": "2026-09-01"})
                 self.assertEqual(post.status_code, 302)
         self.assertEqual(self.state(application), State.SUBMITTED)
 
@@ -525,12 +671,45 @@ class DeregistrationPageTests(ProcessBase):
     def test_the_page_shows_the_steps_the_points_and_the_one_button(self):
         page = self.client.get(self.detail())
         for text in ("Abmeldung eingereicht", "Termin durch die LEG bestätigt", "Bei Netzbetreiber abgemeldet",
-                     "1 von 3 Schritten", "Frühester Termin", "Gewünschter Termin", "Termin bestätigen",
+                     "1 von 3 Schritten erledigt", "Frühester Termin", "Gewünschter Termin", "Termin bestätigen",
                      "Anna Muster", "EGID 88880001", "Abmeldeweg 4"):
             self.assertContains(page, text)
         self.assertContains(page, self.confirm_url())
         # The third step is done by the system on the confirmed date: no button for it.
         self.assertNotContains(page, "als bei")
+        # W5-06: the same pattern as the page of an application: the card "Next step" with a large button.
+        html = page.content.decode()
+        card = html[html.index('id="next-title"'):]
+        card = card[:card.index("</section>")]
+        self.assertIn("Nächster Schritt", card)
+        self.assertIn("Der Kunde hat gekündigt. Bestätigen Sie den Termin", card)
+        self.assertIn(f'<a class="btn btn-primary" href="{self.confirm_url()}?next=', card)
+        self.assertIn('Termin bestätigen</a>', card)
+        self.assertNotIn("btn-xs", html)
+
+    def test_the_confirmation_dialog_is_filled_with_the_wish_and_names_the_earliest_date(self):
+        # W5-05: the field holds the date the customer wished and the hint names the earliest date.
+        page = self.client.get(self.confirm_url())
+        wish = self.dereg.desired_date
+        self.assertContains(page, f'value="{wish.isoformat()}"')
+        self.assertContains(
+            page, "Frühestens am %s (vier Monate nach der Kündigung, auf ein Monatsende)."
+            % self.dereg.earliest_date.strftime("%d.%m.%Y"),
+        )
+        if self.dereg.wants_earliest:
+            self.assertContains(
+                page, "Der Kunde wünscht den frühestmöglichen Termin (%s)." % wish.strftime("%d.%m.%Y")
+            )
+        else:
+            self.assertContains(page, "Der Kunde wünscht den %s." % wish.strftime("%d.%m.%Y"))
+        self.assertContains(page, "Der Termin wird bei jedem Messpunkt der Abmeldung als Kündigungsdatum erfasst.")
+        self.assertContains(page, "Der letzte Tag eines Monats, nicht in der Vergangenheit.")
+
+    def test_a_wish_that_has_passed_is_replaced_by_the_end_of_this_month_in_the_field(self):
+        Deregistration.objects.filter(pk=self.dereg.pk).update(desired_date=self.today - timedelta(days=45))
+        page = self.client.get(self.confirm_url())
+        self.assertContains(page, "Der gewünschte Termin ist vorbei: Vorgeschlagen wird das Ende dieses Monats.")
+        self.assertContains(page, f'value="{self.month_end(0).isoformat()}"')
 
     def test_the_confirmation_records_the_date_at_the_point(self):
         date_text = self.month_end(130)
@@ -543,9 +722,10 @@ class DeregistrationPageTests(ProcessBase):
         self.assertEqual(self.dereg.state, Deregistration.State.CONFIRMED)
         self.assertEqual(self.point.terminated_on, date_text)
         after = self.client.get(self.detail())
-        self.assertContains(after, "2 von 3 Schritten")
+        self.assertContains(after, "2 von 3 Schritten erledigt")
         self.assertNotContains(after, self.confirm_url())
         self.assertContains(after, "Gekündigt zum")
+        self.assertContains(after, "ist bestätigt. Das Portal setzt die Abmeldung an diesem Tag selbst auf wirksam.")
 
     def test_a_date_that_is_no_month_end_or_in_the_past_is_refused_in_the_dialog(self):
         first_of_month = (self.today.replace(day=1) + timedelta(days=64)).replace(day=1)
@@ -592,6 +772,17 @@ class NoticePageTests(ProcessBase):
         self.assertContains(page, "CH 1A2B")
         self.assertContains(page, "Als erledigt markieren")
         self.assertContains(page, "Gebäude für den Kunden nicht verfügbar")
+
+    def test_a_number_that_is_a_metering_point_of_the_instance_has_a_link_to_it(self):
+        # W5-08: "Go to the metering point" (the staff may see whose it is on that page); a number that is unknown has none.
+        known = MeteringPoint.objects.create(number=full_number(31), direction=Direction.CONSUMPTION)
+        self.make_notice()
+        page = self.client.get(reverse("management:processes_notices"))
+        url = reverse("management:metering_points_detail", args=[known.pk])
+        self.assertContains(page, f'href="{url}"', count=1)
+        self.assertContains(page, "Zum Messpunkt", count=2)  # the title and the accessible name of the one link
+        self.assertContains(page, full_number(32)[:2])
+        self.assertContains(page, reverse("management:persons_detail", args=[self.anna.pk]))
 
     def test_the_page_of_an_application_shows_the_notices_of_its_person_only(self):
         application = self.submitted(self.anna)
@@ -667,11 +858,30 @@ class OverviewQueueTests(ProcessBase):
         deregistrations.request_deregistration(self.anna, metering_point_ids=[point.pk], today=today)
         application_notices.record(self.anna, application_notices.Kind.BUILDING_UNAVAILABLE, egid=12345678)
         page = self.client.get(self.URL)
-        self.assertContains(page, "1 Abmeldung wartet auf ihren Termin")
+        # W5-02: wording and the first notice (what and whom).
+        self.assertContains(page, "1 Abmeldung wartet auf die Terminbestätigung")
+        self.assertContains(page, "Wunschtermin ")
+        self.assertNotContains(page, "gewünscht auf")
         self.assertContains(page, "1 Hinweis für die Verwaltung")
+        self.assertContains(page, "Gebäude für den Kunden nicht verfügbar")
+        self.assertContains(page, "Anna Muster")
         self.assertContains(page, 'href="/management/processes/notices/"')
         self.assertContains(page, 'href="/management/processes/?state=deregistration_submitted"')
         self.assertNotContains(page, "Keine Vertragsfassung ist aktuell")
+
+    def test_the_name_of_a_row_is_the_link_and_the_chain_icon_is_no_second_stop(self):
+        # W5-02: the whole heading is a link of at least 44 px; the 24 px icon beside it is out of the tab order.
+        self.submitted(self.anna)
+        html = self.client.get(self.URL).content.decode()
+        self.assertIn('<div class="mgmt-overview-name"><a href="/management/processes/?state=submitted">', html)
+        self.assertRegex(
+            html, r'<a class="mgmt-goto" href="/management/processes/\?state=submitted" tabindex="-1" aria-hidden="true"'
+        )
+        css = (Path(__file__).resolve().parents[1] / "static" / "management" / "css" / "management.css").read_text(
+            encoding="utf-8"
+        )
+        rule = css[css.index(".mgmt-overview-name a {"):]
+        self.assertIn("min-height: 44px", rule[:rule.index("}")])
 
     def test_a_missing_contract_is_a_row_with_the_link_and_no_number(self):
         from leg_platform.community.models import ContractVersion

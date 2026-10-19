@@ -48,7 +48,7 @@ class CustomerMenuTests(TestCase):
         order = [
             "Mein Bereich", "Start", "Profil", "Teilnahme", "Gebäude", "Vertrag", "Startdatum", "Nachbarschaft",
             "Information", "Gesellschaftsvertrag", "Frage und Antwort", "Veranstaltung", "Demnächst", "Rechnung",
-            "Energie", "Mitteilung", "Abmelden", "Datenschutz", "Impressum",
+            "Energie", "Mitteilung", "Ausloggen", "Datenschutz", "Impressum",
         ]
         positions = [menu.index(label) for label in order]
         self.assertEqual(positions, sorted(positions))
@@ -120,7 +120,8 @@ class CustomerMenuTests(TestCase):
         for gone in ("Teilnahme", "Gesellschaftsvertrag", "frame-sub"):
             self.assertNotIn(gone, menu)
         bar = bar_of(staff_client.get(HOME))
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Energie", "Rechnungen", "Standorte"])
+        # The bar of the staff changed with the staff walkthrough (W5-11): Start, Overview, Processes and the menu.
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Übersicht", "Vorgänge", "Menü"])
 
     def test_the_menu_has_no_inline_script_or_style(self):
         html = self.client.get(BUILDINGS).content.decode()

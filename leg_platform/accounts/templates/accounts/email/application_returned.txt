@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}The LEG returned your application at {{ instance_name }} for correction. You can see why, and what to check, after you sign in:{% endblocktranslate %}
+
+{{ login_url }}
+
+{% translate "Please check your details and submit the application again." %}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% endautoescape %}

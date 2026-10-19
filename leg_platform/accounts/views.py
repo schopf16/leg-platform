@@ -101,25 +101,46 @@ class HomeView(NeverCacheMixin, TemplateView):
     """The start page (D-057): greeting and open tasks of ``request.user``; others go to the login page."""
 
     template_name = "accounts/home.html"
+    # The kinds of ``participation.status_lines`` that the page words (an open application shows its card instead).
+    STATUS_KINDS = ("deregistration_running", "deregistration_requested", "participation_starts", "participation_started")
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect("accounts:login")
-        return super().get(request, *args, **kwargs)
+        response = super().get(request, *args, **kwargs)
+        pending = getattr(self, "pending_messages", None)
+        if pending is not None:
+            # The template renders now, so a failure never consumes a message; only a real visit marks them.
+            response.render()
+            from leg_platform.customer import banners as customer_banners
+
+            customer_banners.mark_shown(request, request.user, pending)
+        return response
 
     def get_context_data(self, **kwargs):
         user = self.request.user
         journey = None
+        banners = []
+        status_lines = []
         if not user.is_staff:
             # The card "Your way into the LEG" (D-103): only while an application of the account is open.
+            from leg_platform.community import participation
+            from leg_platform.customer import banners as customer_banners
             from leg_platform.customer import journey as customer_journey
 
+            self.pending_messages = customer_banners.pending(user)
+            banners = self.pending_messages.banners
             journey = customer_journey.for_account(user)
+            if journey is None:
+                # A status line under the greeting where no card is shown (W1-18): the participation or a deregistration.
+                status_lines = [line for line in participation.status_lines(user) if line.kind in self.STATUS_KINDS]
         return super().get_context_data(
             account=user,
             tasks=tasks.open_tasks(user),
             address_line=user.street_address_display,
             journey=journey,
+            banners=banners,
+            status_lines=status_lines,
             **kwargs,
         )
 

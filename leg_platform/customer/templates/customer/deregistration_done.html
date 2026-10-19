@@ -2,8 +2,8 @@
 {% load i18n %}{% comment %}
 The result of a deregistration (ABMELDUNG.md section 5; KONZEPT 7.1 item 5): what was submitted, what happens next, the
 confirmation by email. Context: ``deregistration``, ``progress`` (customer.overview.Block: the three steps), ``points``,
-``operator``, ``deletion`` (started from "Delete account") and ``released`` (the deletion is released now). The date that
-the notice period gives is never shown; a date is shown only when the LEG confirmed it or the customer chose one.
+``operator``, ``deletion`` (started from "Delete account") and ``released`` (the deletion is released now). A date is shown
+only when the LEG confirmed it or the customer chose one.
 {% endcomment %}
 {% block title %}{% translate "Your deregistration was submitted" %}{% endblock %}
 {% block content %}
@@ -11,7 +11,6 @@ the notice period gives is never shown; a date is shown only when the LEG confir
     <div class="progress-block">
       <p class="page-label">{% translate "My participation · Deregistration" %}</p>
       <progress class="path-bar" max="{{ progress.total }}" value="{{ progress.done }}" aria-label="{% blocktranslate with done=progress.done total=progress.total %}Deregistration: {{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ progress.done }}/{{ progress.total }}</progress>
-      <p class="step-note">{% blocktranslate with done=progress.done total=progress.total %}Deregistration: {{ done }} of {{ total }} done{% endblocktranslate %}</p>
     </div>
     <div>
       <h1 class="start-title">{% translate "Your deregistration was submitted" %}</h1>
@@ -31,7 +30,7 @@ the notice period gives is never shown; a date is shown only when the LEG confir
     <section class="step-card" aria-labelledby="your-details">
       <h2 id="your-details">{% translate "Your submitted details" %}</h2>
       <dl class="facts">
-        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number }}</span>{% if point.name %}<span class="mp-note">{{ point.name }}</span>{% endif %}</span>{% endfor %}</dd></div>
+        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number }}</span>{% if point.name %}<span class="mp-note">{{ point.name }}</span>{% endif %}<span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
         <div><dt>{% translate "Date" %}</dt><dd>{% if deregistration.confirmed_date %}{% blocktranslate with date=deregistration.confirmed_date|date:"d.m.Y" %}Terminated on {{ date }}{% endblocktranslate %}{% elif deregistration.wants_earliest %}{% translate "Earliest possible date" %}{% else %}{{ deregistration.desired_date|date:"d.m.Y" }}{% endif %}{% if not deregistration.confirmed_date %}<span class="mp-note">{% translate "Date open: the LEG confirms it." %}</span>{% endif %}</dd></div>
       </dl>
     </section>

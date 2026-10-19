@@ -1,4 +1,4 @@
-{% load i18n static language_menu customer_ui %}<!doctype html>
+{% load i18n static language_menu customer_ui management_ui %}<!doctype html>
 <html lang="{% html_language %}" data-theme="light" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
@@ -69,24 +69,20 @@
         </div>
         <nav class="frame-bottombar d-print-none" aria-label="{% translate 'Quick access' %}">
           {% if user.is_staff %}
+          {# Staff (walkthrough W5-11): Start, Overview, Processes and the menu; the entries that are "later" stay in the menu. #}
           <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span>{% translate "Start" %}</span>
           </a>
-          <a class="frame-tab is-later" role="link" aria-disabled="true">
-            <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg>
-            <span>{% translate "Energy" %}</span>
-            <span class="frame-tab-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+          {% management_menu as bar_entries %}{% for entry in bar_entries %}{% if entry.key == "overview" or entry.key == "processes" %}
+          <a class="frame-tab{% if entry.active %} is-active{% endif %}" href="{{ entry.url }}"{% if entry.active %} aria-current="page"{% endif %}>
+            <svg class="frame-icon" aria-hidden="true"><use href="#{{ entry.icon }}"/></svg>
+            <span>{{ entry.label }}</span>
           </a>
-          <a class="frame-tab is-later" role="link" aria-disabled="true">
-            <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg>
-            <span>{% translate "Invoices" %}</span>
-            <span class="frame-tab-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-          </a>
-          <a class="frame-tab is-later" role="link" aria-disabled="true">
-            <svg class="frame-icon" aria-hidden="true"><use href="#i-building"/></svg>
-            <span>{% translate "Locations" %}</span>
-            <span class="frame-tab-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+          {% endif %}{% endfor %}
+          <a class="frame-tab" href="#frame-drawer" role="button" data-menu-open aria-controls="frame-drawer" aria-expanded="false">
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-menu"/></svg>
+            <span>{% translate "Menu" %}</span>
           </a>
           {% else %}{% customer_menu as customer_state %}
           {# A customer (START-SEITE.md, section 7): Start, Participation, Information, Profile. #}

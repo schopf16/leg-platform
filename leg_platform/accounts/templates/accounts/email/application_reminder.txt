@@ -4,5 +4,7 @@
 
 {{ login_url }}
 
-{% translate "If you do not continue, the application is rolled back automatically after some time and the details you entered about buildings and metering points are deleted. Your account is kept." %}
+{% translate "If you do not continue, the application is deleted automatically after some time, together with the details you entered about buildings and metering points. Your account is kept." %}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

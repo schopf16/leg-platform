@@ -2,8 +2,8 @@
 {% load i18n static management_ui %}{% comment %}
 The list "Contracts" (LEG-Design-Vorgaben/verwaltung/vertraege/VORGABEN.md and referenz/vertraege-liste-desktop; D-103): one row
 per uploaded file, newest first; columns file name, status (Current, Uploaded, Older), uploaded, acceptances, actions. The
-actions are icon buttons of 40 px with an accessible name and a hint: download (any version), set as current (a version that
-is not current), delete (not current, never current, no acceptance); an action that is not allowed is not drawn and the
+actions are icon buttons of 44 px with an accessible name and a text label on hover and focus: download (any version), set as current (a version that
+is not current; asks first), delete (not current, never current, no acceptance; asks first); an action that is not allowed is not drawn and the
 hint under the list says why. "Upload a new version" is a text button, blue, top right. Below the list the history (event,
 file name, who; never content). On a phone one card per version. No link column: a version has no page.
 {% endcomment %}
@@ -25,7 +25,7 @@ file name, who; never content). On a phone one card per version. No link column:
               <td>{% include "management/_status.html" with tone=row.state_tone label=row.state_label %}</td>
               <td class="tnum">{{ row.uploaded }}</td>
               <td class="tnum">{{ row.acceptances }}</td>
-              <td>{% include "management/contracts/_actions.html" %}</td>
+              <td class="mgmt-actions-cell">{% include "management/contracts/_actions.html" %}</td>
             </tr>
           {% empty %}
             {% include "management/_empty_row.html" with colspan=list_columns|length text=empty_text %}

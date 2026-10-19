@@ -4,5 +4,6 @@ accent colour, without a circle. Context: ``url`` and ``label`` (the accessible 
 translated text such as "Go to the LEG page") and optionally ``subject`` (the name of the entry, plain text;
 the accessible name is then "label: subject", so that a list of identical links can be told apart, D-084).
 It stands in the narrow column on the right, never in a row that opens and closes. Only an address of this
-site is linked (starts with one "/"); anything else renders nothing (L-7 of the security review).
-{% endcomment %}{% if url|first == "/" and url|slice:":2" != "//" %}<a class="mgmt-goto" href="{{ url }}" aria-label="{{ label }}{% if subject %}: {{ subject }}{% endif %}" title="{{ label }}{% if subject %}: {{ subject }}{% endif %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-goto"/></svg></a>{% endif %}
+site is linked (starts with one "/"); anything else renders nothing (L-7 of the security review). With ``decorative`` the
+icon only repeats a text link beside it: it leaves the tab order and the accessibility tree (W5-02).
+{% endcomment %}{% if url|first == "/" and url|slice:":2" != "//" %}<a class="mgmt-goto" href="{{ url }}"{% if decorative %} tabindex="-1" aria-hidden="true"{% else %} aria-label="{{ label }}{% if subject %}: {{ subject }}{% endif %}"{% endif %} title="{{ label }}{% if subject %}: {{ subject }}{% endif %}"><svg class="mgmt-goto-icon" aria-hidden="true"><use href="#m-goto"/></svg></a>{% endif %}

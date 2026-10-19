@@ -16,6 +16,7 @@ Rules, each row in its own transaction with the application row locked and its c
    ``operator_confirmation_days`` is rolled back; the active staff accounts get the mail to withdraw the registration and
    a notice (never capped, never deduplicated) holds the numbers, because the application rows are gone.
 5. **Deregistrations** whose confirmed date is reached become effective, with one mail each.
+6. **Customer messages** (``customer_messages.cleanup``): seen ones are deleted after 30 days, unseen ones after 180.
 
 Mails go only to ACTIVE accounts (``application_common.notify``); the state change happens anyway. Every state change and
 its mail job are written in one transaction, so a second run changes nothing. A row that fails (a database error, a
@@ -31,7 +32,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_notices, deregistrations
+from leg_platform.community import application_notices, customer_messages, deregistrations
 from leg_platform.community.application_common import notify, subtract_days
 from leg_platform.community.applications import delete_application
 from leg_platform.community.models import Application, ApplicationMeteringPoint, Direction, ManagementSettings
@@ -173,6 +174,7 @@ def _operator_lapses(now, values, counts):
             # The notice is the only trace of the registration to withdraw: without it nothing is deleted.
             raise RuntimeError("The notice could not be written.")
         delete_application(row, "operator_not_confirmed")
+        customer_messages.record(person, customer_messages.Kind.OPERATOR_NOT_CONFIRMED)
         for account in staff:
             notify(MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED, account)
         counts["operator_lapsed"] += 1
@@ -187,7 +189,8 @@ def process(now=None, today=None):
     today = today or timezone.localdate(now)
     values = ManagementSettings.load()
     counts = Counter(
-        rolled_back=0, paused=0, bank_reminded=0, operator_lapsed=0, deregistrations_effective=0, failed=0
+        rolled_back=0, paused=0, bank_reminded=0, operator_lapsed=0, deregistrations_effective=0, messages_deleted=0,
+        failed=0,
     )
     _rollbacks(now, values, counts)
     _reminders(now, values, counts)
@@ -196,10 +199,15 @@ def process(now=None, today=None):
     failures = []
     counts["deregistrations_effective"] = deregistrations.finish_due(today, failures=failures)
     counts["failed"] += len(failures)
+    try:
+        counts["messages_deleted"] = customer_messages.cleanup(now)
+    except Exception as error:  # noqa: BLE001 - only its class is logged
+        counts["failed"] += 1
+        logger.error("Old customer messages could not be deleted (%s).", type(error).__name__)
     logger.info(
         "Application deadlines at %s: rolled back %d, reminded %d, bank connection reminders %d, "
-        "operator confirmation lapsed %d, deregistrations effective %d, failed rows %d.",
+        "operator confirmation lapsed %d, deregistrations effective %d, messages deleted %d, failed rows %d.",
         now.isoformat(timespec="seconds"), counts["rolled_back"], counts["paused"], counts["bank_reminded"],
-        counts["operator_lapsed"], counts["deregistrations_effective"], counts["failed"],
+        counts["operator_lapsed"], counts["deregistrations_effective"], counts["messages_deleted"], counts["failed"],
     )
     return dict(counts)

@@ -1205,7 +1205,7 @@ msgid "Profile"
 msgstr "Profil"
 
 msgid "Log out"
-msgstr "Abmelden"
+msgstr "Ausloggen"
 
 msgid "Privacy notice"
 msgstr "Datenschutz"
@@ -4288,7 +4288,7 @@ msgstr[0] "%(count)d Messpunkt mit Problem"
 msgstr[1] "%(count)d Messpunkte mit Problem"
 
 msgid "The button \"Filter problems\" appears only when a list has a problem. It shows only the entries with a problem in each list."
-msgstr "Der Knopf \"Probleme filtern\" erscheint nur, wenn eine Liste ein Problem hat. Er zeigt in jeder Liste nur die Einträge mit Problem."
+msgstr "Der Knopf „Probleme filtern“ erscheint nur, wenn eine Liste ein Problem hat. Er zeigt in jeder Liste nur die Einträge mit Problem."
 
 msgid "No problems."
 msgstr "Keine Probleme."
@@ -4926,6 +4926,24 @@ msgstr "Mitteilung: IBAN geändert"
 msgid "Staff: confirmation by the grid operator is missing, withdraw the registration"
 msgstr "Personal: Bestätigung des Netzbetreibers fehlt, Anmeldung zurückziehen"
 
+msgid "Application: returned for correction"
+msgstr "Anmeldung: zur Korrektur zurückgegeben"
+
+msgid "Application: not accepted by the LEG"
+msgstr "Anmeldung: von der LEG nicht angenommen"
+
+msgid "Application: not accepted by the grid operator"
+msgstr "Anmeldung: vom Netzbetreiber nicht angenommen"
+
+msgid "Application not accepted by the LEG"
+msgstr "Anmeldung von der LEG nicht angenommen"
+
+msgid "Application not accepted by the grid operator"
+msgstr "Anmeldung vom Netzbetreiber nicht angenommen"
+
+msgid "Confirmation by the grid operator did not arrive"
+msgstr "Bestätigung des Netzbetreibers ist nicht eingetroffen"
+
 msgid "Application"
 msgstr "Anmeldung"
 
@@ -4938,8 +4956,14 @@ msgstr "Ihre Anmeldung bei %(instance_name)s wurde eingereicht"
 msgid "Your application at %(instance_name)s is not completed yet"
 msgstr "Ihre Anmeldung bei %(instance_name)s ist noch nicht abgeschlossen"
 
-msgid "Your application at %(instance_name)s was rolled back"
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde rückabgewickelt"
+msgid "Your application at %(instance_name)s was deleted"
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde gelöscht"
+
+msgid "Your application at %(instance_name)s needs a correction"
+msgstr "Ihre Anmeldung bei %(instance_name)s muss korrigiert werden"
+
+msgid "Your application at %(instance_name)s was not accepted"
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen"
 
 msgid "Please approve the contract at %(instance_name)s"
 msgstr "Bitte stimmen Sie dem Vertrag bei %(instance_name)s zu"
@@ -4965,11 +4989,11 @@ msgstr "Ihre Anmeldung bei %(instance_name)s wurde eingereicht. Sie wird jetzt g
 msgid "Your application at %(instance_name)s is not completed yet. You can continue at any time after you sign in:"
 msgstr "Ihre Anmeldung bei %(instance_name)s ist noch nicht abgeschlossen. Sie können jederzeit weitermachen, sobald Sie sich anmelden:"
 
-msgid "If you do not continue, the application is rolled back automatically after some time and the details you entered about buildings and metering points are deleted. Your account is kept."
-msgstr "Wenn Sie nicht weitermachen, wird die Anmeldung nach einiger Zeit automatisch rückabgewickelt und Ihre Angaben zu Gebäuden und Messpunkten werden gelöscht. Ihr Konto bleibt bestehen."
+msgid "If you do not continue, the application is deleted automatically after some time, together with the details you entered about buildings and metering points. Your account is kept."
+msgstr "Wenn Sie nicht weitermachen, wird die Anmeldung nach einiger Zeit automatisch gelöscht, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
-msgid "Your application at %(instance_name)s was not completed and has been rolled back. For privacy reasons the details you entered about buildings and metering points were deleted. Your account is kept."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht abgeschlossen und ist rückabgewickelt worden. Aus Datenschutzgründen wurden Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
+msgid "Your application at %(instance_name)s was not completed in time and was deleted, together with the details you entered about buildings and metering points. Your account is kept."
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht rechtzeitig abgeschlossen und ist gelöscht worden, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
 
 msgid "You can start a new application at any time after you sign in:"
 msgstr "Sie können jederzeit eine neue Anmeldung starten, sobald Sie sich anmelden:"
@@ -4977,17 +5001,29 @@ msgstr "Sie können jederzeit eine neue Anmeldung starten, sobald Sie sich anmel
 msgid "Your application at %(instance_name)s is almost complete. The contract still needs your approval. You can read and approve it after you sign in:"
 msgstr "Ihre Anmeldung bei %(instance_name)s ist fast vollständig. Dem Vertrag fehlt noch Ihre Zustimmung. Sie können ihn nach der Anmeldung lesen und ihm zustimmen:"
 
-msgid "If the contract is not approved in time, the application is rolled back and the details you entered about buildings and metering points are deleted."
-msgstr "Wird dem Vertrag nicht rechtzeitig zugestimmt, wird die Anmeldung rückabgewickelt und Ihre Angaben zu Gebäuden und Messpunkten werden gelöscht."
+msgid "If the contract is not approved in time, the application is deleted, together with the details you entered about buildings and metering points."
+msgstr "Wird dem Vertrag nicht rechtzeitig zugestimmt, wird die Anmeldung gelöscht, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten."
 
-msgid "Your application at %(instance_name)s was rolled back because the contract was not approved in time. For privacy reasons the details you entered about buildings and metering points were deleted. Your account is kept."
-msgstr "Ihre Anmeldung bei %(instance_name)s wurde rückabgewickelt, weil dem Vertrag nicht rechtzeitig zugestimmt wurde. Aus Datenschutzgründen wurden Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
+msgid "Your application at %(instance_name)s was deleted because the contract was not approved in time, together with the details you entered about buildings and metering points. Your account is kept."
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde gelöscht, weil dem Vertrag nicht rechtzeitig zugestimmt wurde, zusammen mit Ihren Angaben zu Gebäuden und Messpunkten. Ihr Konto bleibt bestehen."
+
+msgid "The LEG returned your application at %(instance_name)s for correction. You can see why, and what to check, after you sign in:"
+msgstr "Die LEG hat Ihre Anmeldung bei %(instance_name)s zur Korrektur zurückgegeben. Den Grund und was Sie prüfen müssen, sehen Sie nach der Anmeldung:"
+
+msgid "Please check your details and submit the application again."
+msgstr "Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab."
+
+msgid "Your application at %(instance_name)s was not accepted. For privacy reasons we deleted your building and metering point details. Your account remains."
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
+
+msgid "Your application at %(instance_name)s was not accepted. The grid operator did not accept the registration of your metering points. For privacy reasons we deleted your building and metering point details. Your account remains."
+msgstr "Ihre Anmeldung bei %(instance_name)s wurde nicht angenommen. Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen. Aus Datenschutzgründen haben wir Ihre Angaben zu Gebäuden und Messpunkten gelöscht. Ihr Konto bleibt bestehen."
 
 msgid "Your application at %(instance_name)s needs a bank or postal account, so that the electricity you feed in can be paid. Please enter it after you sign in:"
 msgstr "Für Ihre Anmeldung bei %(instance_name)s brauchen wir eine Bank- oder Postverbindung, damit der eingespeiste Strom vergütet werden kann. Bitte tragen Sie sie nach der Anmeldung ein:"
 
-msgid "Your deregistration at %(instance_name)s was received. The date is confirmed by the operator of this portal. You can follow the progress after you sign in:"
-msgstr "Ihre Abmeldung bei %(instance_name)s ist eingegangen. Den Termin bestätigt der Betreiber dieses Portals. Den Stand sehen Sie nach der Anmeldung:"
+msgid "Your deregistration at %(instance_name)s was received. The LEG confirms the date. You can follow the progress after you sign in:"
+msgstr "Ihre Abmeldung bei %(instance_name)s ist eingegangen. Die LEG bestätigt den Termin. Den Stand sehen Sie nach der Anmeldung:"
 
 msgid "Your deregistration at %(instance_name)s has taken effect. You can see the details after you sign in:"
 msgstr "Ihre Abmeldung bei %(instance_name)s ist wirksam geworden. Die Einzelheiten sehen Sie nach der Anmeldung:"
@@ -5103,6 +5139,10 @@ msgid "Confirmation by the %(operator)s"
 msgstr "Bestätigung durch %(operator)s"
 
 #, python-format
+msgid "Customer confirms the request of the %(operator)s"
+msgstr "Kunde bestätigt die Anfrage von %(operator)s"
+
+#, python-format
 msgid "Customer number %(number)s · Last change %(date)s"
 msgstr "Kundennummer %(number)s · Letzte Änderung %(date)s"
 
@@ -5156,9 +5196,6 @@ msgstr "Zur Korrektur zurückgeben"
 
 msgid "Roll back application"
 msgstr "Anmeldung rückabwickeln"
-
-msgid "Back to the list"
-msgstr "Zurück zur Liste"
 
 msgid "Side column"
 msgstr "Seitenspalte"
@@ -5274,8 +5311,32 @@ msgid "Confirm the date"
 msgstr "Termin bestätigen"
 
 #, python-format
-msgid "The customer asked for %(date)s. The date is recorded as the termination date of every metering point of the deregistration."
-msgstr "Der Kunde wünscht den %(date)s. Der Termin wird bei jedem Messpunkt der Abmeldung als Kündigungsdatum erfasst."
+msgid "The customer asked for %(date)s."
+msgstr "Der Kunde wünscht den %(date)s."
+
+#, python-format
+msgid "The customer asked for the earliest possible date (%(date)s)."
+msgstr "Der Kunde wünscht den frühestmöglichen Termin (%(date)s)."
+
+msgid "The date is recorded as the termination date of every metering point of the deregistration."
+msgstr "Der Termin wird bei jedem Messpunkt der Abmeldung als Kündigungsdatum erfasst."
+
+msgid "The wished date has passed: the end of this month is suggested."
+msgstr "Der gewünschte Termin ist vorbei: Vorgeschlagen wird das Ende dieses Monats."
+
+#, python-format
+msgid "Earliest on %(date)s (four months after the notice, to the end of a month)."
+msgstr "Frühestens am %(date)s (vier Monate nach der Kündigung, auf ein Monatsende)."
+
+msgid "The customer gave notice. Confirm the date: it is recorded as the termination date of every metering point."
+msgstr "Der Kunde hat gekündigt. Bestätigen Sie den Termin: Er wird bei jedem Messpunkt als Kündigungsdatum erfasst."
+
+msgid "The deregistration is effective."
+msgstr "Die Abmeldung ist wirksam."
+
+#, python-format
+msgid "The date %(date)s is confirmed. The portal marks the deregistration effective by itself on that day."
+msgstr "Der Termin %(date)s ist bestätigt. Das Portal setzt die Abmeldung an diesem Tag selbst auf wirksam."
 
 msgid "The date is confirmed."
 msgstr "Der Termin ist bestätigt."
@@ -5308,15 +5369,40 @@ msgstr "Das Startdatum darf nicht vor dem %(date)s liegen (drei Monate nach der 
 msgid "This step is not possible. Nothing was saved."
 msgstr "Dieser Schritt ist nicht möglich. Es wurde nichts gespeichert."
 
-msgid "The application becomes a draft again. The customer can correct it and submit it again. No email is sent: the customer sees it in the portal."
-msgstr "Die Anmeldung wird wieder ein Entwurf. Der Kunde kann sie korrigieren und erneut abschicken. Es wird keine E-Mail verschickt: Der Kunde sieht es im Portal."
+msgid "The application becomes a draft again. The customer can correct it and submit it again. The customer receives an email and reads your reason in the portal."
+msgstr "Die Anmeldung wird wieder ein Entwurf. Der Kunde kann sie korrigieren und erneut abschicken. Der Kunde erhält eine E-Mail und liest Ihre Begründung im Portal."
+
+msgid "The application was returned for correction."
+msgstr "Die Anmeldung wurde zur Korrektur zurückgegeben."
+
+msgid "Reason for the correction"
+msgstr "Begründung der Korrektur"
+
+msgid "What the customer has to correct. The customer reads this text in the portal."
+msgstr "Was der Kunde korrigieren muss. Der Kunde liest diesen Text im Portal."
+
+msgid "Note for the customer"
+msgstr "Mitteilung an den Kunden"
+
+msgid "Shown to the customer once on the next visit, not in the email."
+msgstr "Wird dem Kunden einmal beim nächsten Besuch angezeigt, nicht in der E-Mail."
+
+msgid "Enter a reason."
+msgstr "Geben Sie einen Grund an."
 
 msgid "From now on the customer can no longer withdraw the application; only the staff can change it."
 msgstr "Ab jetzt kann der Kunde die Anmeldung nicht mehr zurückziehen. Nur noch die LEG kann sie ändern."
 
 #, python-format
-msgid "The customer has confirmed the registration with the %(operator)s."
-msgstr "Der Kunde hat die Anmeldung bei %(operator)s bestätigt."
+msgid "Record when the customer confirmed the registration at the %(operator)s."
+msgstr "Erfassen Sie, wann der Kunde die Anmeldung bei %(operator)s bestätigt hat."
+
+msgid "The customer wished the start as soon as possible."
+msgstr "Der Kunde wünscht den Start so bald wie möglich."
+
+#, python-format
+msgid "The customer wished the start on %(date)s."
+msgstr "Der Kunde wünscht den Start am %(date)s."
 
 msgid "The buildings and metering points are created and assigned to the customer from the start date."
 msgstr "Die Gebäude und Messpunkte werden angelegt und dem Kunden ab dem Startdatum zugeordnet."
@@ -5328,11 +5414,18 @@ msgid "The application is rolled back and cannot be restored."
 msgstr "Die Anmeldung wird rückabgewickelt und kann nicht wiederhergestellt werden."
 
 #, python-format
+msgid "Record the start at the %(operator)s"
+msgstr "Start bei %(operator)s erfassen"
+
+msgid "Record the start"
+msgstr "Start erfassen"
+
+#, python-format
 msgid "Registration at the %(operator)s started on"
 msgstr "Anmeldung bei %(operator)s gestartet am"
 
-msgid "The date is not in the future. From now on the customer cannot withdraw the application any more."
-msgstr "Das Datum liegt nicht in der Zukunft. Ab jetzt kann der Kunde die Anmeldung nicht mehr zurückziehen."
+msgid "The date is not in the future."
+msgstr "Das Datum liegt nicht in der Zukunft."
 
 #, python-format
 msgid "Confirmation by the %(operator)s received on"
@@ -5341,23 +5434,25 @@ msgstr "Bestätigung von %(operator)s erhalten am"
 msgid "The date is not in the future and not before the registration."
 msgstr "Das Datum liegt nicht in der Zukunft und nicht vor der Anmeldung."
 
-msgid "New addresses"
-msgstr "Neue Adressen"
+msgid "Addresses are checked and will be locked"
+msgstr "Adressen sind geprüft und werden gesperrt"
 
-msgid "Not yet confirmed"
-msgstr "Noch nicht bestätigt"
+#, python-format
+msgid "%(counter)s building has an address that is not confirmed yet. A confirmed address is locked: the customer can no longer change it. Without the tick the address stays editable and can be confirmed later on the page of the location."
+msgid_plural "%(counter)s buildings have an address that is not confirmed yet. A confirmed address is locked: the customer can no longer change it. Without the tick the addresses stay editable and can be confirmed later on the pages of the locations."
+msgstr[0] "%(counter)s Gebäude hat eine Adresse, die noch nicht bestätigt ist. Eine bestätigte Adresse ist gesperrt: Der Kunde kann sie nicht mehr ändern. Ohne Häkchen bleibt die Adresse änderbar und kann später auf der Seite des Standorts bestätigt werden."
+msgstr[1] "%(counter)s Gebäude haben eine Adresse, die noch nicht bestätigt ist. Eine bestätigte Adresse ist gesperrt: Der Kunde kann sie nicht mehr ändern. Ohne Häkchen bleiben die Adressen änderbar und können später auf den Seiten der Standorte bestätigt werden."
 
-msgid "Confirmed: the addresses are checked"
-msgstr "Bestätigt: Die Adressen sind geprüft"
+#, python-format
+msgid "Earliest on %(date)s (three months after the registration)."
+msgstr "Frühestens am %(date)s (drei Monate nach der Anmeldung)."
 
-msgid "A confirmed address is locked: the customer can no longer change it."
-msgstr "Eine bestätigte Adresse ist gesperrt: Der Kunde kann sie nicht mehr ändern."
+#, python-format
+msgid "Earliest on %(date)s (three months from today)."
+msgstr "Frühestens am %(date)s (drei Monate ab heute)."
 
-msgid "Not before the day three months after the registration."
-msgstr "Nicht vor dem Tag drei Monate nach der Anmeldung."
-
-msgid "Rolled back by the LEG"
-msgstr "Von der LEG rückabgewickelt"
+msgid "Not accepted by the LEG"
+msgstr "Von der LEG nicht angenommen"
 
 #, python-format
 msgid "Rejected by the %(operator)s"
@@ -5369,8 +5464,8 @@ msgstr "Die Anmeldung und ihre Messpunkte werden gelöscht. Das Konto, die Bankv
 msgid "Effective on"
 msgstr "Wirksam am"
 
-msgid "The last day of a month, not in the past. Recorded as the termination date of every metering point."
-msgstr "Der letzte Tag eines Monats, nicht in der Vergangenheit. Wird bei jedem Messpunkt als Kündigungsdatum erfasst."
+msgid "The last day of a month, not in the past."
+msgstr "Der letzte Tag eines Monats, nicht in der Vergangenheit."
 
 msgid "Contracts"
 msgstr "Verträge"
@@ -5422,12 +5517,26 @@ msgid "Download %(name)s"
 msgstr "%(name)s herunterladen"
 
 #, python-format
-msgid "Set %(name)s as current"
-msgstr "%(name)s als aktuell festlegen"
+msgid "Set as current: %(name)s"
+msgstr "Als aktuell festlegen: %(name)s"
 
 #, python-format
-msgid "Delete %(name)s"
-msgstr "%(name)s löschen"
+msgid "Delete: %(name)s"
+msgstr "Löschen: %(name)s"
+
+msgid "Set as current"
+msgstr "Als aktuell festlegen"
+
+msgid "Delete"
+msgstr "Löschen"
+
+#, python-format
+msgid "Set the version of %(date)s as current? New customers accept this version. Existing acceptances are kept."
+msgstr "Fassung vom %(date)s als aktuell festlegen? Neue Kunden stimmen dieser Fassung zu. Bisherige Zustimmungen bleiben gespeichert."
+
+#, python-format
+msgid "This file is already stored as the version of %(date)s."
+msgstr "Diese Datei ist schon als Fassung vom %(date)s gespeichert."
 
 msgid "Delete version"
 msgstr "Fassung löschen"
@@ -5460,8 +5569,8 @@ msgstr "Die Datei konnte nicht gelesen werden."
 msgid "Version date"
 msgstr "Datum der Fassung"
 
-msgid "A new file is stored as uploaded and is not current yet. Only a version that is set as current is shown to the customers. The file is not changed. PDF only, at most 10 MiB."
-msgstr "Eine neue Datei wird unverändert gespeichert und ist noch nicht aktuell. Nur eine Fassung, die als aktuell festgelegt ist, sehen die Kunden. Die Datei wird nicht verändert. Nur PDF, höchstens 10 MiB."
+msgid "A new version is not current yet: customers see only the version that is set as current. PDF only, at most 10 MiB."
+msgstr "Eine neue Fassung ist noch nicht aktuell: Die Kunden sehen nur die Fassung, die als aktuell festgelegt ist. Nur PDF, höchstens 10 MiB."
 
 msgid "To do"
 msgstr "Zu erledigen"
@@ -5497,10 +5606,10 @@ msgid "Go to the applications at the grid operator"
 msgstr "Zu den Anmeldungen beim Netzbetreiber"
 
 #, python-format
-msgid "%(count)d deregistration waiting for its date"
-msgid_plural "%(count)d deregistrations waiting for their date"
-msgstr[0] "%(count)d Abmeldung wartet auf ihren Termin"
-msgstr[1] "%(count)d Abmeldungen warten auf ihren Termin"
+msgid "%(count)d deregistration waiting for the date confirmation"
+msgid_plural "%(count)d deregistrations waiting for the date confirmation"
+msgstr[0] "%(count)d Abmeldung wartet auf die Terminbestätigung"
+msgstr[1] "%(count)d Abmeldungen warten auf die Terminbestätigung"
 
 msgid "Go to the deregistrations waiting for their date"
 msgstr "Zu den Abmeldungen, die auf ihren Termin warten"
@@ -5531,8 +5640,8 @@ msgid "submitted %(date)s"
 msgstr "eingereicht am %(date)s"
 
 #, python-format
-msgid "wanted for %(date)s"
-msgstr "gewünscht auf %(date)s"
+msgid "requested date %(date)s"
+msgstr "Wunschtermin %(date)s"
 
 msgid "Reminders and deadlines"
 msgstr "Erinnerungen und Fristen"
@@ -5570,20 +5679,23 @@ msgstr "Haupt- und Zweitadresse des Kunden"
 msgid "A draft without a change for this many days is paused and the customer receives one reminder."
 msgstr "Ein Entwurf ohne Änderung wird nach dieser Anzahl Tage pausiert und der Kunde erhält eine Erinnerung."
 
+msgid "Draft deleted"
+msgstr "Entwurf gelöscht"
+
 msgid "The reminder, if the draft has not been changed since"
 msgstr "Die Erinnerung, wenn der Entwurf seither nicht geändert wurde"
 
-msgid "This many days after the reminder, without a change, the draft is deleted and the customer receives an email. The bank connection and stored buildings stay."
-msgstr "Diese Anzahl Tage nach der Erinnerung wird der Entwurf ohne Änderung gelöscht und der Kunde erhält eine E-Mail. Die Bankverbindung und gespeicherte Gebäude bleiben erhalten."
+msgid "This many days after the reminder, without a change, the paused draft is deleted and the customer receives an email. The bank connection and stored buildings stay."
+msgstr "Diese Anzahl Tage nach der Erinnerung wird der pausierte Entwurf ohne Änderung gelöscht und der Kunde erhält eine E-Mail. Die Bankverbindung und gespeicherte Gebäude bleiben erhalten."
 
 msgid "Contract not accepted"
-msgstr "Vertrag nicht akzeptiert"
+msgstr "Vertrag nicht zugestimmt"
 
 msgid "Everything but the contract is complete in the draft"
 msgstr "Im Entwurf ist alles ausser dem Vertrag vollständig"
 
-msgid "After this many days without the acceptance the draft is rolled back and the customer receives an email."
-msgstr "Nach dieser Anzahl Tage ohne Zustimmung wird der Entwurf rückabgewickelt und der Kunde erhält eine E-Mail."
+msgid "After this many days without the acceptance the draft is deleted and the customer receives an email."
+msgstr "Nach dieser Anzahl Tage ohne Zustimmung wird der Entwurf gelöscht und der Kunde erhält eine E-Mail."
 
 #, python-format
 msgid "The registration at the %(operator)s was started"
@@ -5608,11 +5720,11 @@ msgstr "Diese Anzahl Tage nach dem Einreichen erhält der Kunde eine Erinnerung;
 msgid "Days without a change until the reminder"
 msgstr "Tage ohne Änderung bis zur Erinnerung"
 
-msgid "Days after the reminder until the rollback"
-msgstr "Tage nach der Erinnerung bis zur Rückabwicklung"
+msgid "Days after the reminder until the draft is deleted"
+msgstr "Tage nach der Erinnerung bis zur Löschung des Entwurfs"
 
-msgid "Days until the rollback (contract)"
-msgstr "Tage bis zur Rückabwicklung (Vertrag)"
+msgid "Days until the draft is deleted (contract)"
+msgstr "Tage bis zur Löschung des Entwurfs (Vertrag)"
 
 #, python-format
 msgid "Days until the confirmation by the %(operator)s is overdue"
@@ -5636,20 +5748,49 @@ msgstr "Die Zahl ist zu gross."
 msgid "Confirm the change"
 msgstr "Änderung bestätigen"
 
-msgid "Save the change"
-msgstr "Änderung speichern"
+#, python-format
+msgid "Deadline “%(name)s”: you change it from %(old)d to %(new)d day."
+msgid_plural "Deadline “%(name)s”: you change it from %(old)d to %(new)d days."
+msgstr[0] "Frist „%(name)s“: Sie ändern sie von %(old)d auf %(new)d Tag."
+msgstr[1] "Frist „%(name)s“: Sie ändern sie von %(old)d auf %(new)d Tage."
 
 #, python-format
-msgid "This change deletes %(count)d draft. The next run of the scheduled tasks rolls it back and the customer receives an email."
-msgid_plural "This change deletes %(count)d drafts. The next run of the scheduled tasks rolls them back and the customers receive an email."
-msgstr[0] "Diese Änderung löscht %(count)d Entwurf. Der nächste Lauf der geplanten Aufgaben wickelt ihn zurück und der Kunde erhält eine E-Mail."
-msgstr[1] "Diese Änderung löscht %(count)d Entwürfe. Der nächste Lauf der geplanten Aufgaben wickelt sie zurück und die Kunden erhalten eine E-Mail."
+msgid "This permanently deletes %(count)d draft. The customer receives an email."
+msgid_plural "This permanently deletes %(count)d drafts. The customers receive an email."
+msgstr[0] "Dadurch wird %(count)d Entwurf endgültig gelöscht. Der Kunde erhält eine E-Mail."
+msgstr[1] "Dadurch werden %(count)d Entwürfe endgültig gelöscht. Die Kunden erhalten eine E-Mail."
+
+msgid "This cannot be undone."
+msgstr "Das lässt sich nicht rückgängig machen."
+
+#, python-format
+msgid "delete %(count)d draft"
+msgid_plural "delete %(count)d drafts"
+msgstr[0] "%(count)d Entwurf löschen"
+msgstr[1] "%(count)d Entwürfe löschen"
+
+#, python-format
+msgid "roll back %(count)d application"
+msgid_plural "roll back %(count)d applications"
+msgstr[0] "%(count)d Anmeldung rückabwickeln"
+msgstr[1] "%(count)d Anmeldungen rückabwickeln"
+
+#, python-format
+msgid "%(first)s and %(second)s"
+msgstr "%(first)s und %(second)s"
+
+#, python-format
+msgid "Save and %(actions)s"
+msgstr "Speichern und %(actions)s"
+
+msgid "Save the time"
+msgstr "Zeit speichern"
 
 #, python-format
 msgid "%(count)d application that is already at the %(operator)s is rolled back. The staff must withdraw its registration there."
 msgid_plural "%(count)d applications that are already at the %(operator)s are rolled back. The staff must withdraw their registrations there."
-msgstr[0] "%(count)d Anmeldung, die schon beim %(operator)s ist, wird rückabgewickelt. Das Personal muss ihre Registrierung dort zurückziehen."
-msgstr[1] "%(count)d Anmeldungen, die schon beim %(operator)s sind, werden rückabgewickelt. Das Personal muss ihre Registrierungen dort zurückziehen."
+msgstr[0] "%(count)d Anmeldung, die schon bei %(operator)s ist, wird rückabgewickelt. Die Verwaltung muss ihre Anmeldung dort zurückziehen."
+msgstr[1] "%(count)d Anmeldungen, die schon bei %(operator)s sind, werden rückabgewickelt. Die Verwaltung muss ihre Anmeldungen dort zurückziehen."
 
 msgid "Time of the daily address directory run changed"
 msgstr "Uhrzeit des täglichen Laufs des Adressverzeichnisses geändert"
@@ -5709,12 +5850,6 @@ msgstr "Wann soll es losgehen?"
 msgid "Choose a date."
 msgstr "Wählen Sie ein Datum."
 
-msgid "Record location"
-msgstr "Standort erfassen"
-
-msgid "Record metering points"
-msgstr "Messpunkte erfassen"
-
 msgid "Bank or postal connection"
 msgstr "Bank- oder Postverbindung"
 
@@ -5723,9 +5858,6 @@ msgstr "Vertrag zustimmen"
 
 msgid "Choose the start date"
 msgstr "Startdatum wählen"
-
-msgid "Registered with the LEG"
-msgstr "Bei der LEG angemeldet"
 
 msgid "You have to say where your building is."
 msgstr "Sie müssen angeben, wo Ihr Gebäude liegt."
@@ -5781,9 +5913,6 @@ msgstr "Erledigt"
 msgid "Next up"
 msgstr "Als Nächstes"
 
-msgid "Activation"
-msgstr "Aufschaltung"
-
 msgid "Check by the LEG"
 msgstr "Prüfung durch die LEG"
 
@@ -5792,15 +5921,12 @@ msgid "Registration at %(operator)s"
 msgstr "Anmeldung bei %(operator)s"
 
 #, python-format
-msgid "Customer request confirmed by %(operator)s"
-msgstr "Kundenanfrage durch %(operator)s bestätigt"
-
-msgid "Waiting for the start date"
-msgstr "Warten auf Startdatum"
+msgid "You confirm the request in the email from %(operator)s"
+msgstr "Sie bestätigen die Anfrage in der E-Mail von %(operator)s"
 
 #, python-format
-msgid "Confirmation by %(operator)s pending"
-msgstr "Bestätigung durch %(operator)s offen"
+msgid "Set by %(operator)s"
+msgstr "Wird von %(operator)s festgelegt"
 
 #, python-format
 msgid "Terminated on %(date)s"
@@ -5827,6 +5953,10 @@ msgstr "Messpunkte ohne Gebäude"
 
 msgid "Participating"
 msgstr "Teilnehmend"
+
+#, python-format
+msgid "This address could not be assigned to one building clearly. Please check your entry or contact the %(leg)s."
+msgstr "Diese Adresse konnte nicht eindeutig einem Gebäude zugeordnet werden. Bitte prüfen Sie die Eingabe oder wenden Sie sich an die %(leg)s."
 
 msgid "This address could not be assigned to one building clearly. Please check your entry or contact the LEG."
 msgstr "Diese Adresse konnte nicht eindeutig einem Gebäude zugeordnet werden. Bitte prüfen Sie die Eingabe oder wenden Sie sich an die LEG."
@@ -5984,7 +6114,7 @@ msgstr "Ihre Schritte"
 msgid "Your application was submitted"
 msgstr "Ihre Anmeldung ist abgeschickt"
 
-msgid "My participation · Registration"
+msgid "My participation · Application"
 msgstr "Meine Teilnahme · Anmeldung"
 
 #, python-format
@@ -5992,15 +6122,15 @@ msgid "%(done)s of %(total)s done"
 msgstr "%(done)s von %(total)s erledigt"
 
 #, python-format
-msgid "The LEG checks your details and registers your building at %(operator)s. Then you receive an email from %(operator)s. Please confirm the registration there."
-msgstr "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei %(operator)s an. Danach erhalten Sie eine E-Mail von %(operator)s. Bitte bestätigen Sie die Anmeldung dort."
+msgid "The LEG checks your details and registers your building at %(operator)s. Then you receive an email from the grid operator. Please confirm the registration there."
+msgstr "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei %(operator)s an. Danach erhalten Sie eine E-Mail vom Netzbetreiber. Bitte bestätigen Sie die Anmeldung dort."
 
 msgid "What happens next"
 msgstr "So geht es weiter"
 
 #, python-format
-msgid "Please confirm the registration within %(days)s days after the email from %(operator)s."
-msgstr "Bitte bestätigen Sie die Anmeldung innerhalb von %(days)s Tagen nach der E-Mail von %(operator)s."
+msgid "Please confirm the registration within %(days)s days after the email from the grid operator."
+msgstr "Bitte bestätigen Sie die Anmeldung innerhalb von %(days)s Tagen nach der E-Mail vom Netzbetreiber."
 
 msgid "Changes are now only possible through the LEG."
 msgstr "Änderungen sind jetzt nur noch über die LEG möglich."
@@ -6008,19 +6138,14 @@ msgstr "Änderungen sind jetzt nur noch über die LEG möglich."
 msgid "Withdraw application"
 msgstr "Anmeldung zurückziehen"
 
-#, python-format
-msgid "You can withdraw the application as long as the LEG has not yet submitted it to %(operator)s."
-msgstr "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht bei %(operator)s eingereicht hat."
+msgid "You can withdraw the application as long as the LEG has not yet submitted it to the grid operator."
+msgstr "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim Netzbetreiber eingereicht hat."
 
 msgid "Withdraw application?"
 msgstr "Anmeldung zurückziehen?"
 
 msgid "Your application becomes a draft again. You can change it and submit it again."
 msgstr "Ihre Anmeldung wird wieder ein Entwurf. Sie können sie ändern und neu abschicken."
-
-#, python-format
-msgid "Withdrawing is possible as long as the LEG has not yet submitted the application to %(operator)s."
-msgstr "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht bei %(operator)s eingereicht hat."
 
 msgid "Keep application"
 msgstr "Anmeldung behalten"
@@ -6084,8 +6209,8 @@ msgstr "Zurück zu den Gebäuden"
 msgid "Where should we transfer your compensation?"
 msgstr "Wohin sollen wir Ihre Vergütung überweisen?"
 
-msgid "Enter your bank or postal connection. With it we pay you for the electricity you feed in."
-msgstr "Tragen Sie Ihre Bank- oder Postverbindung ein. Damit bezahlen wir Ihnen den eingespeisten Strom."
+msgid "This is how we pay you the compensation for the electricity you feed in."
+msgstr "Damit bezahlen wir Ihnen die Vergütung für den eingespeisten Strom."
 
 msgid "Where is your building?"
 msgstr "Wo liegt Ihr Gebäude?"
@@ -6132,8 +6257,9 @@ msgstr "Sie haben dem Vertrag am %(date)s zugestimmt."
 msgid "Contract version of %(date)s"
 msgstr "Vertragsfassung vom %(date)s"
 
-msgid "You find the complete contract under Information."
-msgstr "Den vollständigen Vertrag finden Sie unter Information."
+#, python-format
+msgid "You can also find the contract under <a href=\"%(contract_url)s\">Information › Articles of association</a>."
+msgstr "Den Vertrag finden Sie auch unter <a href=\"%(contract_url)s\">Information › Gesellschaftsvertrag</a>."
 
 msgid "I have read the articles of association and I agree to them."
 msgstr "Ich habe den Gesellschaftsvertrag gelesen und stimme ihm zu."
@@ -6144,8 +6270,21 @@ msgstr "Ich bin damit einverstanden, dass der Netzbetreiber meine Messdaten an d
 msgid "Which metering points belong to your building?"
 msgstr "Welche Messpunkte gehören zu Ihrem Gebäude?"
 
-msgid "Create your metering points."
-msgstr "Erstellen Sie Ihre Messpunkte."
+msgid "The metering point is the connection of your electricity meter."
+msgstr "Der Messpunkt ist der Anschluss Ihres Stromzählers."
+
+#, python-format
+msgid "Its number starts with %(prefix)s."
+msgstr "Seine Nummer beginnt mit %(prefix)s."
+
+msgid "You enter the feed-in metering point."
+msgstr "Sie erfassen den Messpunkt für die Einspeisung."
+
+msgid "You find the number in the documents of your grid operator."
+msgstr "Die Nummer steht in den Unterlagen Ihres Netzbetreibers."
+
+msgid "These details are optional and are used for statistics only."
+msgstr "Diese Angaben sind freiwillig und dienen nur der Statistik."
 
 msgid "When should your participation start?"
 msgstr "Ab wann soll Ihre Teilnahme beginnen?"
@@ -6154,8 +6293,12 @@ msgid "Choose the earliest date or a desired date."
 msgstr "Wählen Sie den frühesten Termin oder ein Wunschdatum."
 
 #, python-format
-msgid "Confirmation of the final date: %(operator)s."
-msgstr "Bestätigung des endgültigen Termins: %(operator)s."
+msgid "%(operator)s confirms the final date."
+msgstr "Den endgültigen Termin bestätigt %(operator)s."
+
+#, python-format
+msgid "Earliest possible: %(date)s."
+msgstr "Frühestens ab dem %(date)s."
 
 msgid "Too many requests"
 msgstr "Zu viele Anfragen"
@@ -6169,8 +6312,11 @@ msgstr "Die LEG hat Ihre Anmeldung zurückgegeben. Bitte prüfen Sie Ihre Angabe
 msgid "Cancel application?"
 msgstr "Anmeldung abbrechen?"
 
-msgid "Your details about the building and the metering points will be deleted. Your bank or postal connection is kept because it belongs to you as a person."
-msgstr "Ihre Angaben zu Gebäude und Messpunkten werden gelöscht. Ihre Bank- oder Postverbindung bleibt erhalten, weil sie zu Ihrer Person gehört."
+msgid "Your details about the building and the metering points will be deleted."
+msgstr "Ihre Angaben zu Gebäude und Messpunkten werden gelöscht."
+
+msgid "Your bank or postal connection is kept because it belongs to you as a person."
+msgstr "Ihre Bank- oder Postverbindung bleibt erhalten, weil sie zu Ihrer Person gehört."
 
 msgid "Continue registration"
 msgstr "Weiter anmelden"
@@ -6268,9 +6414,6 @@ msgstr "Die Adresse, an der sich der Messpunkt befindet."
 msgid "You enter the metering point for the draw. If you also feed in electricity, you add the metering point for the feed-in."
 msgstr "Sie tragen den Messpunkt für den Bezug ein. Wenn Sie auch Strom einspeisen, tragen Sie den Messpunkt für die Einspeisung dazu."
 
-msgid "Only needed with a feed-in. With it we pay you the compensation for the electricity you feed in."
-msgstr "Nur bei Einspeisung nötig. Damit bezahlen wir Ihnen die Vergütung für den eingespeisten Strom."
-
 msgid "Choice of the start date"
 msgstr "Wahl des Startdatums"
 
@@ -6313,8 +6456,25 @@ msgstr "Nächstmöglicher Termin"
 msgid "Desired date (end of a month)"
 msgstr "Wunschtermin (Monatsende)"
 
-msgid "Only the last day of a month is possible."
-msgstr "Möglich ist nur der letzte Tag eines Monats."
+msgid "Desired date (last day of a month)"
+msgstr "Wunschdatum (letzter Tag eines Monats)"
+
+#, python-format
+msgid "Earliest on %(date)s"
+msgstr "Frühestens am %(date)s"
+
+msgid "Already deregistered"
+msgstr "Bereits abgemeldet"
+
+msgid "Your metering points are already deregistered. You see the status on the page Buildings."
+msgstr "Ihre Messpunkte sind bereits abgemeldet. Den Stand sehen Sie auf der Seite Gebäude."
+
+msgid "You want to delete your account. For that, first deregister your metering points."
+msgstr "Sie möchten Ihr Konto löschen. Melden Sie dafür zuerst Ihre Messpunkte ab."
+
+#, python-format
+msgid "You cannot withdraw the termination yourself afterwards. Questions: contact the %(leg)s."
+msgstr "Die Kündigung können Sie danach nicht selbst zurücknehmen. Bei Fragen wenden Sie sich an die %(leg)s."
 
 msgid "The notice period is four months to the end of a month. The LEG confirms the date."
 msgstr "Die Kündigungsfrist beträgt vier Monate auf ein Monatsende. Die LEG bestätigt den Termin."
@@ -6370,8 +6530,9 @@ msgstr "Zu den Gebäuden"
 msgid "Not on file"
 msgstr "Nicht hinterlegt"
 
-msgid "The address is confirmed and cannot be changed. Please contact the LEG for a change."
-msgstr "Die Adresse ist bestätigt und kann nicht geändert werden. Wenden Sie sich bei einer Änderung an die LEG."
+#, python-format
+msgid "The address is confirmed and cannot be changed. Please contact the %(leg)s for a change."
+msgstr "Die Adresse ist bestätigt und kann nicht geändert werden. Wenden Sie sich bei einer Änderung an die %(leg)s."
 
 msgid "With the deletion you lose access to the portal."
 msgstr "Mit dem Löschen verlieren Sie den Zugang zum Portal."
@@ -6397,5 +6558,79 @@ msgstr "Sie haben zu viele Entwürfe. Bitte schliessen Sie einen ab oder brechen
 msgid "To be checked by the LEG"
 msgstr "Wird von der LEG geprüft"
 
-msgid "This address could not be found in the register yet. The LEG will check it. You can continue."
-msgstr "Diese Adresse wurde im Register noch nicht gefunden. Die LEG prüft sie. Sie können weitermachen."
+#, python-format
+msgid "This address could not be found in the building register yet. The %(leg)s will check it. You can continue."
+msgstr "Diese Adresse wurde im Gebäuderegister noch nicht gefunden. Die %(leg)s prüft sie. Sie können weitermachen."
+
+# Design walkthrough 2026-10-19, customer part (W1 to W4).
+#, python-format
+msgid "Choose the building where your electricity meter is. Not sure? Contact the %(leg)s."
+msgstr "Wählen Sie das Gebäude, in dem Ihr Stromzähler ist. Nicht sicher? Wenden Sie sich an die %(leg)s."
+
+msgid "Contact the LEG"
+msgstr "Kontakt zur LEG"
+
+msgid "If you choose another building, the metering points you entered are deleted."
+msgstr "Wenn Sie ein anderes Gebäude wählen, werden die erfassten Messpunkte gelöscht."
+
+msgid "No description"
+msgstr "Keine Beschreibung"
+
+msgid "Reason:"
+msgstr "Grund:"
+
+#, python-format
+msgid "Registered on %(date)s"
+msgstr "Angemeldet am %(date)s"
+
+#, python-format
+msgid "Step %(step_number)s"
+msgstr "Schritt %(step_number)s"
+
+#, python-format
+msgid "Step %(step_number)s: %(step_name)s"
+msgstr "Schritt %(step_number)s: %(step_name)s"
+
+msgid "The LEG did not accept your application."
+msgstr "Die LEG hat Ihre Anmeldung nicht angenommen."
+
+msgid "The LEG returned your application for correction:"
+msgstr "Die LEG hat Ihre Anmeldung zur Korrektur zurückgegeben:"
+
+msgid "The grid operator did not accept the registration."
+msgstr "Der Netzbetreiber hat die Anmeldung nicht angenommen."
+
+msgid "Your application was deleted because your confirmation in the email of the grid operator did not arrive in time."
+msgstr "Ihre Anmeldung wurde gelöscht, weil Ihre Bestätigung in der E-Mail des Netzbetreibers nicht rechtzeitig eingetroffen ist."
+
+#, python-format
+msgid "You can register again at any time. Questions: contact the %(leg)s."
+msgstr "Sie können sich jederzeit erneut anmelden. Bei Fragen wenden Sie sich an die %(leg)s."
+
+msgid "View"
+msgstr "Ansehen"
+
+msgid "Your status"
+msgstr "Ihr Stand"
+
+#, python-format
+msgid "Your deregistration is confirmed. Your metering points end on %(date)s."
+msgstr "Ihre Abmeldung ist bestätigt. Ihre Messpunkte enden am %(date)s."
+
+msgid "Your deregistration was submitted. The LEG confirms the date."
+msgstr "Ihre Abmeldung ist eingereicht. Die LEG bestätigt den Termin."
+
+#, python-format
+msgid "Your participation starts on %(date)s."
+msgstr "Ihre Teilnahme beginnt am %(date)s."
+
+#, python-format
+msgid "You take part in the LEG since %(date)s."
+msgstr "Sie nehmen seit dem %(date)s an der LEG teil."
+
+#, python-format
+msgid "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted on %(date)s."
+msgstr "Ihre Anmeldung ist pausiert, weil Sie sie länger nicht bearbeitet haben. Machen Sie weiter, sonst wird sie am %(date)s gelöscht."
+
+msgid "Your deregistration continues. The metering points end on the confirmed date."
+msgstr "Ihre Abmeldung läuft weiter. Die Messpunkte enden am bestätigten Termin."

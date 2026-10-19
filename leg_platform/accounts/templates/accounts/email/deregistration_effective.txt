@@ -2,5 +2,7 @@
 
 {% blocktranslate %}Your deregistration at {{ instance_name }} has taken effect. You can see the details after you sign in:{% endblocktranslate %}
 
-{{ login_url }}
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

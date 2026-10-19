@@ -1,7 +1,8 @@
 {% extends "management/page.html" %}
 {% load i18n static management_ui %}{% comment %}
 The settings page (LEG-Design-Vorgaben/verwaltung/einstellungen; D-077): three cards, one button
-"Save". The banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
+"Save". Below them, each with its own form and button: the small block "Address directory" (the time of the daily
+run) and the chapter "Reminders and deadlines" (D-103). The banner (the suggestion of the address directory with "Accept" and "Do not accept") or the notice
 (the directory does not know the address) is at the top of the first card; it is made on the server. The card
 "Metering points" starts with a read-only line that names the grid operator of the instance; for a system
 administrator the name is a link to its form in the administration (D-086).
@@ -45,6 +46,7 @@ administrator the name is a link to its form in the administration (D-086).
     <div class="mgmt-actions"><button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button></div>
   </form>
 
+  {% include "management/_run_time.html" %}
   {% include "management/_deadlines.html" %}
 {% endblock %}
 {% block scripts %}

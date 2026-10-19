@@ -16,7 +16,7 @@ from datetime import date
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from leg_platform.community import applications, buildings, grid_operator
+from leg_platform.community import applications, buildings, grid_operator, labels
 from leg_platform.community.models import (
     Application,
     CustomerBuilding,
@@ -26,6 +26,8 @@ from leg_platform.community.models import (
     PersonAssignment,
 )
 from leg_platform.community.status import MeteringPointStatus
+from leg_platform.customer import steps as steps_module
+from leg_platform.customer.steps import STEP_NAMES
 
 OK, WARN, BAD, MUTED = "ok", "warn", "bad", "muted"
 STEP_DONE, STEP_NEXT, STEP_OPEN = "done", "next", "open"
@@ -62,6 +64,9 @@ class Block:
     resume: bool = False  # a draft: "Continue the registration"
     withdrawable: bool = False  # submitted and not yet at the grid operator
     paused: bool = False
+    paused_date: date | None = None  # the day the scheduler deletes a paused draft
+    reason: str = ""  # why the LEG returned the draft for correction
+    returned: bool = False  # the LEG returned the draft (``reason`` may be empty)
     note: str = ""  # one line under the steps (a deregistration whose date the LEG has not confirmed yet)
 
 
@@ -82,6 +87,16 @@ class PointRow:
     def direction_label(self):
         return Direction(self.direction).label
 
+    @property
+    def since_kind(self):
+        """Which date line the card shows (W1-16): "since" for a point that runs or ran, "registered" for one that is
+        still in registration (the day of the registration), "" where the status already names the start."""
+        if self.state in (ACTIVE, TERMINATING, ENDED):
+            return "since"
+        if self.state == STARTS:
+            return ""
+        return "registered"
+
 
 @dataclass
 class Card:
@@ -98,11 +113,17 @@ class Card:
     label: str = ""
     rows: list = field(default_factory=list)
     application_states: list = field(default_factory=list)
+    application_labels: list = field(default_factory=list)
     can_add_point: bool = False
     removal: str | None = None  # "link": a point can be deregistered; "withdraw": a submitted registration can be withdrawn
     # (``withdraw_pk``); "blocked": not possible yet
     withdraw_pk: int | None = None
     deregistrable: bool = False  # an active point that is in no deregistration
+
+    @property
+    def withdraw_in_footer(self):
+        """The card footer offers "Withdraw application": the buttons of the progress block would repeat it (W1-15)."""
+        return self.removal == "withdraw"
 
 
 @dataclass
@@ -130,13 +151,6 @@ def _word(state):
 def _registration_block(application, operator):
     if application.state in Application.DRAFT_STATES:
         current = applications.progress(application)
-        names = {
-            applications.BUILDING: _("Building"),
-            applications.METERING_POINTS: _("Metering points"),
-            applications.BANK_CONNECTION: _("Bank or postal connection"),
-            applications.CONTRACT: _("Contract"),
-            applications.START: _("Activation"),
-        }
         steps = []
         for step in current.steps:
             if not step.applicable:
@@ -144,24 +158,16 @@ def _registration_block(application, operator):
             state = STEP_DONE if step.state != applications.OPEN else (
                 STEP_NEXT if step.key == current.next_step else STEP_OPEN
             )
-            steps.append(Step(step.key, state, names[step.key], _word(state)))
+            steps.append(Step(step.key, state, str(STEP_NAMES[step.key]), steps_module.state_word(state)))
+        paused = application.state == Application.State.PAUSED
         return Block(
             "registration", steps, current.done, current.total, application=application, resume=True,
-            paused=application.state == Application.State.PAUSED,
+            paused=paused, paused_date=applications.rollback_date(application) if paused else None,
+            reason=applications.returned_reason(application), returned=application.returned_at is not None,
         )
-    names = {
-        "submitted": _("Details submitted"),
-        "review": _("Check by the LEG"),
-        "operator_registration": _("Registration at %(operator)s") % {"operator": operator},
-        "operator_confirmation": _("Customer request confirmed by %(operator)s") % {"operator": operator},
-        "start": _("Waiting for the start date"),
-    }
-    steps = []
-    for key, state in applications.post_submit_progress(application):
-        word = _word(state)
-        if key == "start" and application.state != Application.State.OPERATOR_CONFIRMED:
-            word = _("Confirmation by %(operator)s pending") % {"operator": operator}
-        steps.append(Step(key, state, names[key], word))
+    steps = [
+        Step(key, state, label, word) for key, state, label, word in steps_module.post_submit_steps(application, operator)
+    ]
     return Block(
         "registration", steps, sum(step.state == STEP_DONE for step in steps), len(steps), application=application,
         withdrawable=application.state in Application.WITHDRAWABLE_STATES,
@@ -212,6 +218,8 @@ def _stored_row(assignment, point, deregistration, today):
 
 def _application_state(application):
     if application.state in Application.DRAFT_STATES:
+        if application.state == Application.State.PAUSED:
+            return DRAFT, MUTED, labels.application_state_label(Application.State.PAUSED)
         return DRAFT, MUTED, _("Draft")
     if application.state in (Application.State.SUBMITTED, Application.State.IN_REVIEW):
         return IN_REVIEW, WARN, _("In review by the LEG")
@@ -259,6 +267,7 @@ def build(person, today=None):
             card = card_for(key, building.location)
             card.building = card.building or building
             card.application_states.append(state)
+            card.application_labels.append(label)
             rows = [
                 PointRow(
                     number=point.number, name=point.name, direction=point.direction, since=started, state=state,
@@ -312,7 +321,8 @@ def _finish(card, person, own_words, today):
     elif stored_live or states & {IN_REVIEW, AT_OPERATOR}:
         card.state, card.tone, card.label = "registering", WARN, _("Registration running")
     elif DRAFT in states or DRAFT in card.application_states:
-        card.state, card.tone, card.label = "draft", MUTED, _("Draft")
+        draft_labels = [label for state, label in zip(card.application_states, card.application_labels) if state == DRAFT]
+        card.state, card.tone, card.label = "draft", MUTED, (draft_labels[0] if draft_labels else _("Draft"))
     elif card.application_states:
         card.state, card.tone, card.label = "registering", WARN, _("Registration running")
     else:

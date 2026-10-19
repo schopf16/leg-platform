@@ -38,7 +38,12 @@ only deactivated: the notice says so, ``User.delete_or_deactivate``). While the 
         {% if delete_info.customer %}<div class="profile-actions"><a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "To the buildings" %}</a></div>{% endif %}
       {% endif %}
     {% else %}
-      <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
+      {% if delete_info.retained %}
+        <p class="profile-text">{% translate "Your account will be deactivated. Your details are kept for retention reasons." %}</p>
+      {% else %}
+        <p class="profile-text">{% translate "Your account and your personal details are deleted. This cannot be undone." %}</p>
+      {% endif %}
+      {% if delete_info.deregistration_running %}<p class="profile-text">{% translate "Your deregistration continues. The metering points end on the confirmed date." %}</p>{% endif %}
       <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></div>
     {% endif %}
   {% endif %}

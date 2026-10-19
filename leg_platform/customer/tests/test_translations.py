@@ -17,13 +17,13 @@ SOURCES = [
     PACKAGE / name
     for name in (
         "forms.py", "texts.py", "journey.py", "overview.py", "wizard.py", "views.py", "apps.py", "deregistration.py",
-        "returns.py",
+        "returns.py", "steps.py", "banners.py",
     )
 ] + [PACKAGE.parent / "accounts" / "tasks.py", PACKAGE / "templatetags" / "customer_ui.py"]
 MENU = [PACKAGE.parent / "templates" / "_frame_menu.html", PACKAGE.parent / "templates" / "base.html"]
 FUNCTIONS = {"_", "_lazy", "gettext", "gettext_lazy"}
 # Where the German text really is the same as the source.
-SAME = {"Information", "Wallbox in kW", "IBAN", "EGID", "optional", "Optional", "Name", "Start", "Energie", "System"}
+SAME = {"Information", "Wallbox in kW", "IBAN", "EGID", "optional", "Optional", "Name", "Start", "Energie", "System", "Details", "LEG"}
 TRANSLATE = re.compile(r'\{%\s*translate\s+"((?:[^"\\]|\\.)*)"(?:\s+context\s+"([^"]*)")?\s*%\}')
 BLOCK = re.compile(r"\{%\s*blocktranslate(?P<head>[^%]*)%\}(?P<body>.*?)\{%\s*endblocktranslate\s*%\}", re.S)
 VARIABLE = re.compile(r"\{\{\s*(\w+)\s*\}\}")

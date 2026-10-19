@@ -18,7 +18,7 @@ class Command(BaseCommand):
         self.stdout.write(
             "Drafts rolled back: {rolled_back}, drafts reminded: {paused}, bank connection reminders: {bank_reminded}, "
             "operator confirmation lapsed: {operator_lapsed}, deregistrations effective: "
-            "{deregistrations_effective}, failed rows: {failed}.".format(**counts)
+            "{deregistrations_effective}, old customer messages deleted: {messages_deleted}, failed rows: {failed}.".format(**counts)
         )
         if counts["failed"]:
             # After all rows were tried: the failures are in the application log (class of the error only).

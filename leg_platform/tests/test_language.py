@@ -28,7 +28,7 @@ LOGIN = reverse("accounts:login")
 COOKIE = settings.LANGUAGE_COOKIE_NAME
 CODES = ["de-ch", "fr", "it", "en"]
 # Texts that only the German pages have (the default language of the instance).
-GERMAN_MARKERS = ("Abmelden", "Anmelden", "E-Mail-Adresse", "Passwort", "Mein Bereich")
+GERMAN_MARKERS = ("Ausloggen", "Anmelden", "E-Mail-Adresse", "Passwort", "Mein Bereich")
 
 
 def menu_of(html):
@@ -245,12 +245,12 @@ class SwitchTests(TestCase):
     def test_a_signed_in_page_switches(self):
         client = self.signed_in(self.member)
         profile = reverse("accounts:profile")
-        self.assertIn("Abmelden", client.get(profile).content.decode())
+        self.assertIn("Ausloggen", client.get(profile).content.decode())
         self.switch(client, "en", profile)
         html = client.get(profile).content.decode()
         self.assertEqual(html_lang_of(html), "en")
         self.assertIn("Log out", html)
-        self.assertNotIn("Abmelden", html)
+        self.assertNotIn("Ausloggen", html)
         self.assertNotIn("Mein Bereich", html)
         # The choice outlasts the session: after the logout the entry page is still English.
         client.post(reverse("accounts:logout"))
@@ -259,7 +259,7 @@ class SwitchTests(TestCase):
     def test_the_management_area_switches(self):
         client = self.signed_in(self.staff)
         overview = reverse("management:overview")
-        self.assertIn("Abmelden", client.get(overview).content.decode())
+        self.assertIn("Ausloggen", client.get(overview).content.decode())
         for code in ("fr", "it", "en"):
             with self.subTest(language=code):
                 self.switch(client, code, overview)
@@ -268,7 +268,7 @@ class SwitchTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(html_lang_of(html), code)
                 self.assertEqual(menu_of(html)[0], code.upper())
-                self.assertNotIn("Abmelden", html)
+                self.assertNotIn("Ausloggen", html)
                 self.assertNotIn("Mein Bereich", html)
         self.assertIn("Log out", html)
         # The management area stays uncached whatever the language (D-077).
@@ -279,7 +279,7 @@ class SwitchTests(TestCase):
         index = reverse("admin:index")
         html = client.get(index).content.decode()
         self.assertEqual(html_lang_of(html), "de-ch")
-        self.assertIn("Abmelden", html)
+        self.assertIn("Ausloggen", html)
         for code in ("fr", "it", "en"):
             with self.subTest(language=code):
                 self.switch(client, code, index)
@@ -287,7 +287,7 @@ class SwitchTests(TestCase):
                 html = response.content.decode()
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(html_lang_of(html), code)
-                self.assertNotIn("Abmelden", html)
+                self.assertNotIn("Ausloggen", html)
                 self.assertNotIn("Willkommen", html)
         self.assertIn("Log out", html.replace("LOG OUT", "Log out"))
 

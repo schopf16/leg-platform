@@ -4,6 +4,7 @@ rejection; who may do it; what completion creates; and that a rejection deletes 
 from datetime import date
 from unittest import mock
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase, tag
 
@@ -16,6 +17,7 @@ from leg_platform.community.models import (
     ApplicationBuilding,
     ApplicationMeteringPoint,
     ApplicationNotice,
+    CustomerMessage,
     Direction,
     Location,
     MeteringPoint,
@@ -78,16 +80,22 @@ class TransitionTests(StaffCase):
         application.refresh_from_db()
         self.assertEqual(application.state, State.IN_REVIEW)
 
-        application_staff.return_for_correction(application, self.staff)
+        application_staff.return_for_correction(application, self.staff, "Please check the number of the draw point.")
 
         application.refresh_from_db()
         self.assertEqual(application.state, State.DRAFT)
         self.assertIsNotNone(application.returned_at)
+        self.assertEqual(application.returned_reason, "Please check the number of the draw point.")
+        self.assertEqual(applications.returned_reason(application), "Please check the number of the draw point.")
         self.assertIsNone(application.submitted_at)
-        self.assertEqual(MailJob.objects.filter(kind__startswith="application_").count(), 1)  # only the submission mail
+        # The submission mail and the mail about the return (action required).
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 1)
+        self.assertEqual(CustomerMessage.objects.get().kind, CustomerMessage.Kind.APPLICATION_RETURNED)
         applications.submit(self.person, application, today=TODAY)
         application.refresh_from_db()
         self.assertIsNone(application.returned_at)
+        self.assertEqual((application.returned_reason, applications.returned_reason(application)), ("", ""))
         events = list(history.entries_for(application).values_list("event", flat=True))
         self.assertEqual(
             events,
@@ -106,7 +114,7 @@ class TransitionTests(StaffCase):
         application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)
         self.assertEqual(code_of(lambda: application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)),
                          "wrong_state")
-        self.assertEqual(code_of(lambda: application_staff.return_for_correction(application, self.staff)), "wrong_state")
+        self.assertEqual(code_of(lambda: application_staff.return_for_correction(application, self.staff, "x")), "wrong_state")
 
     def test_the_dates_follow_the_rules(self):
         application = self.submitted()
@@ -153,7 +161,7 @@ class AuthorizationTests(StaffCase):
         for actor in (self.person, other_customer, blocked, None):
             calls = {
                 "review": lambda: application_staff.start_review(application, actor),
-                "return": lambda: application_staff.return_for_correction(application, actor),
+                "return": lambda: application_staff.return_for_correction(application, actor, "Reason"),
                 "start": lambda: application_staff.mark_operator_started(application, actor, STARTED, today=TODAY),
                 "confirm": lambda: application_staff.record_operator_confirmation(application, actor, STARTED, TODAY),
                 "complete": lambda: application_staff.complete(application, actor, START, today=TODAY),
@@ -335,16 +343,40 @@ class RejectTests(StaffCase):
         assign_person(make_metering_point(70, location=stored), self.person)
         application = self.at_operator()
 
-        application_staff.reject(application, self.staff, "operator_rejected")
+        application_staff.reject(application, self.staff, "operator_rejected", "  Not   registered there. ")
 
         self.assertEqual(Application.objects.count(), 0)
         self.assertEqual(ApplicationBuilding.objects.count(), 0)
         self.assertEqual(Location.objects.get(), stored)
         self.assertEqual(MeteringPoint.objects.count(), 1)
         self.assertEqual(PersonAssignment.objects.count(), 1)
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_ROLLED_BACK).count(), 1)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_REJECTED_OPERATOR).count(), 1)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_REJECTED).count(), 0)
+        message = CustomerMessage.objects.get()
+        self.assertEqual(
+            (message.person, message.kind, message.text),
+            (self.person, CustomerMessage.Kind.APPLICATION_REJECTED_OPERATOR, "Not registered there."),
+        )
         entry = history.entries_for(application).get(event=HistoryEvent.APPLICATION_ROLLED_BACK)
         self.assertEqual((entry.actor, entry.detail), (self.staff, {"reason": "operator_rejected"}))
+
+    def test_a_rejection_by_the_leg_has_its_own_mail_and_message_and_the_note_is_optional(self):
+        application = self.at_operator()
+        application_staff.reject(application, self.staff)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_REJECTED).count(), 1)
+        message = CustomerMessage.objects.get()
+        self.assertEqual((message.kind, message.text), (CustomerMessage.Kind.APPLICATION_REJECTED, ""))
+
+    def test_the_note_is_limited_and_never_in_the_history_or_the_queue(self):
+        application = self.at_operator()
+        for bad in ("x" * 301, "a\x00b"):
+            with self.subTest(bad=len(bad)), self.assertRaises(ValidationError):
+                application_staff.reject(application, self.staff, "rejected", bad)
+        self.assertTrue(Application.objects.filter(pk=application.pk).exists())
+        application_staff.reject(application, self.staff, "rejected", "x" * 300)
+        for entry in history.entries_for(application):
+            self.assertNotIn("xxxx", str(entry.detail))
+        self.assertEqual(CustomerMessage.objects.get().text, "x" * 300)
 
     def test_a_draft_a_completed_application_and_an_unknown_reason_are_refused(self):
         application, _building = ready_draft(self.person)
@@ -511,3 +543,136 @@ class ConcurrentBuildingTests(StaffCase):
 
         self.assertEqual(order, [90004270, 90004299])
         self.assertIsNotNone(second)
+
+
+@tag("mariadb")
+class ReturnForCorrectionTests(StaffCase):
+    def test_the_reason_is_required_cleaned_and_limited(self):
+        application = self.submitted()
+        for bad, error in (("", ApplicationError), ("   \n ", ApplicationError), (None, ApplicationError),
+                           ("x" * 501, ValidationError), ("a\x00b", ValidationError), ("a\u202eb", ValidationError)):
+            with self.subTest(bad=bad if bad is None else len(bad)), self.assertRaises(error) as caught:
+                application_staff.return_for_correction(application, self.staff, bad)
+            if error is ApplicationError:
+                self.assertEqual(caught.exception.code, "reason_required")
+        application.refresh_from_db()
+        self.assertEqual((application.state, application.returned_reason), (State.SUBMITTED, ""))
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 0)
+
+        application_staff.return_for_correction(application, self.staff, "  Check   the\nnumber ")
+        self.assertEqual(applications.returned_reason(application), "Check the number")
+        self.assertEqual(
+            code_of(lambda: application_staff.return_for_correction(application, self.staff, "Again")), "wrong_state"
+        )
+
+    def test_exactly_500_characters_are_accepted(self):
+        application = self.submitted()
+        application_staff.return_for_correction(application, self.staff, "x" * 500)
+        self.assertEqual(len(applications.returned_reason(application)), 500)
+
+    def test_the_history_and_the_mail_never_hold_the_text(self):
+        application = self.submitted()
+        application_staff.return_for_correction(application, self.staff, "Geheimer Grund 4711")
+        entry = history.entries_for(application).get(event=HistoryEvent.APPLICATION_RETURNED)
+        self.assertEqual(entry.detail, {"fields": ["returned_reason"]})
+        self.assertNotIn("Geheimer", str(entry.detail))
+        # The mail is a notification without payload: its text comes from the default text and holds no reason.
+        from leg_platform.accounts import email_texts
+
+        subject, body = email_texts.default_texts(email_texts.Key.APPLICATION_RETURNED)
+        self.assertNotIn("Geheimer", subject + body)
+        self.assertEqual(CustomerMessage.objects.get().text, "")
+
+    def test_the_reason_is_shown_on_the_draft_only_and_belongs_to_the_account(self):
+        application = self.submitted()
+        application_staff.return_for_correction(application, self.staff, "Please correct")
+        other = customer("review.stranger@example.org")
+        self.assertEqual(applications.returned_reason(applications.own_application(self.person, application.pk)),
+                         "Please correct")
+        with self.assertRaises(Application.DoesNotExist):
+            applications.own_application(other, application.pk)
+        # A change of the customer keeps it; the submission clears it; a pause does not hide a returned draft.
+        Application.objects.filter(pk=application.pk).update(state=State.PAUSED)
+        self.assertEqual(applications.returned_reason(application), "Please correct")
+        Application.objects.filter(pk=application.pk).update(state=State.DRAFT)
+        applications.submit(self.person, application, today=TODAY)
+        self.assertEqual(applications.returned_reason(application), "")
+
+    def test_a_draft_that_was_never_returned_has_no_reason(self):
+        application, _building = ready_draft(self.person)
+        self.assertEqual(applications.returned_reason(application), "")
+        applications.submit(self.person, application, today=TODAY)
+        self.assertEqual(applications.returned_reason(application), "")
+
+    def test_the_withdrawal_cap_does_not_stop_a_return(self):
+        application = self.submitted()
+        with mock.patch.object(applications, "MAX_DRAFTS_PER_PERSON", 0):
+            application_staff.return_for_correction(application, self.staff, "Reason")
+        application.refresh_from_db()
+        self.assertEqual(application.state, State.DRAFT)
+
+    def test_a_blocked_customer_gets_no_mail_but_the_return_happens(self):
+        application = self.submitted()
+        self.person.set_status(type(self.person).Status.BLOCKED)
+        application_staff.return_for_correction(application, self.staff, "Reason")
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 0)
+        self.assertEqual(CustomerMessage.objects.count(), 1)
+
+
+@tag("mariadb")
+class CompletionDefaultsTests(StaffCase):
+    def test_the_wish_the_earliest_date_and_the_unconfirmed_addresses_are_given(self):
+        application = self.at_operator()  # asap; registered on STARTED
+        defaults = application_staff.completion_defaults(application, self.staff, today=TODAY)
+
+        self.assertEqual(defaults.start_choice, "asap")
+        self.assertIsNone(defaults.desired_start_date)
+        self.assertEqual(defaults.earliest_start_date, START)
+        self.assertTrue(defaults.registered)
+        self.assertEqual(defaults.suggested_start_date, START)
+        self.assertEqual(defaults.unconfirmed_addresses, 1)  # a new building is "not yet confirmed"
+
+    def test_a_date_wish_is_kept_but_never_before_the_earliest_date(self):
+        application = self.at_operator()
+        later, earlier = date(2027, 2, 1), date(2026, 8, 1)
+        for wish, expected in ((later, later), (earlier, START)):
+            with self.subTest(wish=wish):
+                Application.objects.filter(pk=application.pk).update(
+                    start_choice=Application.StartChoice.DATE, desired_start_date=wish
+                )
+                defaults = application_staff.completion_defaults(application, self.staff, today=TODAY)
+                self.assertEqual((defaults.desired_start_date, defaults.suggested_start_date), (wish, expected))
+                self.assertEqual(defaults.start_choice, "date")
+
+    def test_a_confirmed_stored_building_is_not_counted(self):
+        make_location(street="Taken", house_number="1", egid=90004269)
+        application = self.at_operator()
+        self.assertEqual(application_staff.completion_defaults(application, self.staff, TODAY).unconfirmed_addresses, 0)
+        Location.objects.update(needs_confirmation=True)
+        self.assertEqual(application_staff.completion_defaults(application, self.staff, TODAY).unconfirmed_addresses, 1)
+
+    def test_without_a_registration_date_the_earliest_is_three_months_from_today(self):
+        application = self.at_operator()
+        Application.objects.filter(pk=application.pk).update(operator_started_on=None)
+        defaults = application_staff.completion_defaults(application, self.staff, today=date(2026, 10, 19))
+        self.assertEqual((defaults.registered, defaults.earliest_start_date), (False, date(2027, 1, 19)))
+
+    def test_the_default_is_accepted_by_complete(self):
+        application = self.at_operator()
+        defaults = application_staff.completion_defaults(application, self.staff, today=TODAY)
+        application_staff.complete(application, self.staff, defaults.suggested_start_date, today=TODAY)
+        application.refresh_from_db()
+        self.assertEqual(application.state, State.COMPLETED)
+
+    def test_staff_only_and_only_in_the_state_of_the_completion(self):
+        application = self.at_operator()
+        other = customer("review.defaults@example.org")
+        for actor in (self.person, other, None):
+            with self.subTest(actor=getattr(actor, "email", None)):
+                self.assertEqual(code_of(lambda: application_staff.completion_defaults(application, actor)), "not_allowed")
+        early = self.submitted(person=other, number=7, egid=90004270,
+                               address={"street": "Zweiteweg", "house_number": "2", "postal_code": "3000", "town": "Bern"})
+        self.assertEqual(code_of(lambda: application_staff.completion_defaults(early, self.staff)), "wrong_state")
+        missing = Application(pk=0)
+        self.assertEqual(code_of(lambda: application_staff.completion_defaults(missing, self.staff)), "not_found")
+

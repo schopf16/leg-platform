@@ -95,7 +95,10 @@ class MeteringPointsForm(CustomerForm):
         label=_("Do you feed in solar power?"), required=False, choices=((NO, _("No")), (YES, _("Yes"))),
         widget=forms.RadioSelect,
     )
-    feed_in_number = forms.CharField(label=_("Metering point number for the feed-in"), required=False, max_length=250)
+    feed_in_number = forms.CharField(
+        label=_("Metering point number for the feed-in"), required=False, max_length=250,
+        help_text=_("You find the number in the documents of your grid operator."),
+    )
     feed_in_name = forms.CharField(
         label=_("Name of the metering point"), required=False, max_length=METERING_POINT_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"placeholder": _("e.g. PV system")}),
@@ -216,8 +219,8 @@ class DeregistrationForm(ReauthenticationForm):
         choices=((EARLIEST, _("Earliest possible date")), (DATE, _("Desired date (end of a month)"))),
     )
     desired_date = forms.DateField(
-        label=_("Desired date"), required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
-        help_text=_("Only the last day of a month is possible."),
+        label=_("Desired date (last day of a month)"), required=False,
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
     )
     field_order = ("metering_points", "termination", "desired_date", "current_password", "otp_token")
 

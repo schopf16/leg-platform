@@ -2,5 +2,7 @@
 
 {% blocktranslate %}Your application at {{ instance_name }} was submitted. It is being checked now. You can follow the progress after you sign in:{% endblocktranslate %}
 
-{{ login_url }}
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

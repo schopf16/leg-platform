@@ -1,6 +1,8 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}Your deregistration at {{ instance_name }} was received. The date is confirmed by the operator of this portal. You can follow the progress after you sign in:{% endblocktranslate %}
+{% blocktranslate %}Your deregistration at {{ instance_name }} was received. The LEG confirms the date. You can follow the progress after you sign in:{% endblocktranslate %}
 
-{{ login_url }}
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

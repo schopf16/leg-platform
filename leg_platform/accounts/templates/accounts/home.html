@@ -6,6 +6,8 @@
 {% block content %}
   <h1 class="start-title">{% blocktranslate with name=account.display_name %}Hello, {{ name }}{% endblocktranslate %}</h1>
   <p class="start-sub">{% translate "Customer number" %} {{ account.customer_number_display }}{% if address_line %} · {{ address_line }}{% endif %}</p>
+  {% include "customer/_banners.html" %}
+  {% include "customer/_status_lines.html" %}
   {% if journey %}{% include "customer/_journey.html" %}{% endif %}
   {% if tasks %}
     <div class="task-grid">
@@ -24,7 +26,7 @@
             {% if task.method == "post" %}
               <form method="post" action="{{ task.url }}">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-secondary-action">{{ task.button }}</button>
+                <button type="submit" class="btn {% if task.button_style == 'primary' %}btn-primary{% else %}btn-secondary-action{% endif %}">{{ task.button }}</button>
               </form>
             {% else %}
               <a class="btn {% if task.button_style == 'primary' %}btn-primary{% else %}btn-secondary-action{% endif %}" href="{{ task.url }}">{{ task.button }}</a>

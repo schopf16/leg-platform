@@ -52,12 +52,14 @@ def state_word(state):
 
 
 def list_columns():
+    # Start widths that fit the card of a 1280 px screen (about 967 px): the file name and the actions never shrink (the
+    # three buttons of 44 px with their gaps need 148 px and the cell's padding).
     return (
-        lists.Column("file", gettext_lazy("File name"), width=330, keep=True),
-        lists.Column("state", gettext_lazy("Status"), width=170),
-        lists.Column("uploaded", gettext_lazy("Uploaded"), width=170),
+        lists.Column("file", gettext_lazy("File name"), width=260, keep=True),
+        lists.Column("state", gettext_lazy("Status"), width=150),
+        lists.Column("uploaded", gettext_lazy("Uploaded"), width=160),
         lists.Column("acceptances", gettext_lazy("Acceptances"), width=150),
-        lists.Column("actions", gettext_lazy("Actions"), sortable=False, width=176, resizable=False, keep=True),
+        lists.Column("actions", gettext_lazy("Actions"), sortable=False, width=172, resizable=False, keep=True),
     )
 
 
@@ -146,10 +148,24 @@ class ContractUploadView(DialogView):
     def render_dialog(self, request, form, **extra):
         return super().render_dialog(request, form, multipart=True, **extra)
 
+    @staticmethod
+    def duplicate_text(request, data):
+        """The refusal of a file that is stored already, with the version it is (W5-09); the plain refusal if that
+        version is gone meanwhile."""
+        existing = contracts.stored_version_of(request.user, data)
+        if existing is None:
+            return contracts.DUPLICATE_FILE
+        return _("This file is already stored as the version of %(date)s.") % {
+            "date": format_date(existing.version_date)
+        }
+
     def save(self, request, form):
         try:
             contracts.upload_version(request.user, form.cleaned_data["file"], form.cleaned_data["version_date"])
         except ValidationError as error:
+            if error.code == "duplicate":
+                form.add_error("file", self.duplicate_text(request, form.cleaned_data["file"]))
+                return None
             field = "version_date" if error.code == "required" else "file"
             form.add_error(field, error.messages)
             return None
@@ -172,12 +188,35 @@ class ContractDownloadView(ManagementAccessMixin, View):
 
 
 class ContractCurrentView(ManagementAccessMixin, View):
-    """"Set as current": POST only. Only this step makes a version visible to the customers."""
+    """"Set as current": a question first (GET, like the deletion: all new customers get this version), then the step
+    (POST). Only this step makes a version visible to the customers. A version that is current already has no question."""
 
-    http_method_names = ["post"]
+    http_method_names = ["get", "head", "options", "post"]
+
+    def version(self, pk):
+        return get_object_or_404(ContractVersion.objects.defer("pdf"), pk=pk)
+
+    def get(self, request, pk):
+        version = self.version(pk)
+        if version.is_current:
+            raise Http404
+        return render(
+            request,
+            "management/dialog_form.html",
+            {
+                "page_title": _("Set as current"),
+                "dialog_lead": _(
+                    "Set the version of %(date)s as current? New customers accept this version. "
+                    "Existing acceptances are kept."
+                ) % {"date": format_date(version.version_date)},
+                "submit_label": _("Set as current"),
+                "back_url": reverse("management:contracts"),
+                "form": None,
+            },
+        )
 
     def post(self, request, pk):
-        version = get_object_or_404(ContractVersion.objects.defer("pdf"), pk=pk)
+        version = self.version(pk)
         try:
             contracts.make_current(request.user, version)
         except ApplicationError:

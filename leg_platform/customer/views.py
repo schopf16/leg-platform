@@ -19,7 +19,7 @@ from leg_platform.accounts import profile_views
 from leg_platform.community import archived, buildings, contracts, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.persons import PersonError
-from leg_platform.customer import forms, limits, overview, returns, texts
+from leg_platform.customer import banners, forms, limits, overview, returns, texts
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.customer.wizard import too_many_requests
 from leg_platform.downloads import pdf_attachment
@@ -30,10 +30,14 @@ class BuildingsView(CustomerAccessMixin, View):
 
     def get(self, request):
         data = overview.build(request.user)
-        return render(request, "customer/buildings.html", {
+        read = banners.pending(request.user)
+        response = render(request, "customer/buildings.html", {
             "overview": data, "deregistration_url": reverse("customer:deregistration_start"),
-            "can_deregister": data.can_deregister,
+            "can_deregister": data.can_deregister, "banners": read.banners,
         })
+        # Only after the page was built, and only for a real visit (not HEAD, not a prefetch).
+        banners.mark_shown(request, request.user, read)
+        return response
 
 
 class BuildingDetailsView(CustomerAccessMixin, View):

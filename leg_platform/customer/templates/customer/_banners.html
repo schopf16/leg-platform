@@ -1,0 +1,22 @@
+{% load i18n customer_ui %}{% comment %}
+The one-time banners (W2-03): shown once on the next visit of the start page or the page Buildings after the LEG rejected an
+application or the grid operator's confirmation did not arrive in time. One sentence per kind; the optional note of the staff
+is plain text (escaped). Context: ``banners`` (customer.banners.Banner list; may be empty or missing).
+{% endcomment %}{% if banners %}{% leg_link as leg %}
+  <div class="banner-list">
+    {% for banner in banners %}
+      <div class="alert alert-warning one-time-banner" role="status">
+        {% if banner.kind == "application_rejected" %}
+          <p>{% translate "The LEG did not accept your application." %}</p>
+          {% if banner.note %}<p class="banner-note"><strong>{% translate "Reason:" %}</strong> {{ banner.note }}</p>{% endif %}
+        {% elif banner.kind == "application_rejected_operator" %}
+          <p>{% translate "The grid operator did not accept the registration." %}</p>
+          {% if banner.note %}<p class="banner-note"><strong>{% translate "Reason:" %}</strong> {{ banner.note }}</p>{% endif %}
+        {% elif banner.kind == "operator_not_confirmed" %}
+          <p>{% translate "Your application was deleted because your confirmation in the email of the grid operator did not arrive in time." %}</p>
+        {% endif %}
+        <p>{% blocktranslate %}You can register again at any time. Questions: contact the {{ leg }}.{% endblocktranslate %}</p>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

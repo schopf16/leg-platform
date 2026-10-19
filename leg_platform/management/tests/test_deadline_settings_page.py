@@ -20,10 +20,11 @@ from leg_platform.community.tests.onboarding import configure_numbers, customer,
 
 SETTINGS = reverse("management:settings")
 URL = reverse("management:settings_deadlines")
+RUN_TIME_URL = reverse("management:settings_run_time")
 FIELDS = deadline_settings.FIELDS
 VALID = {
     "reminder_after_days": "3", "rollback_after_days": "15", "contract_deadline_days": "16",
-    "operator_confirmation_days": "17", "iban_missing_reminder_days": "8", "run_time": "04:30",
+    "operator_confirmation_days": "17", "iban_missing_reminder_days": "8",
 }
 
 
@@ -63,8 +64,8 @@ class ChapterTests(DeadlinesBase):
     def test_the_chapter_lists_every_deadline_with_name_trigger_days_recipient_mail_text_and_effect(self):
         page = self.client.get(SETTINGS)
         for text in (
-            "Erinnerungen und Fristen", "Anmeldung nicht abgeschlossen", "Anmeldung rückabgewickelt",
-            "Vertrag nicht akzeptiert", "Bestätigung durch Netzbetreiber", "Bankverbindung fehlt",
+            "Erinnerungen und Fristen", "Anmeldung nicht abgeschlossen", "Entwurf gelöscht",
+            "Vertrag nicht zugestimmt", "Bestätigung durch Netzbetreiber", "Bankverbindung fehlt",
             "Auslöser", "Empfänger", "Mailtext", "Wirkung", "Haupt- und Zweitadresse des Kunden",
             "Jedes aktive Mitarbeiterkonto", "Die letzte Änderung eines Entwurfs durch den Kunden",
             "Anmeldung: Erinnerung, noch nicht abgeschlossen", "Anmeldung: rückabgewickelt",
@@ -82,32 +83,83 @@ class ChapterTests(DeadlinesBase):
         editor = type(editor).objects.get(pk=editor.pk)
         self.assertContains(self.login(editor).get(SETTINGS), 'href="/admin/accounts/emailtext/"')
 
-    def test_the_time_of_the_daily_run_is_shown_and_defaults_to_the_one_of_the_schedule(self):
-        page = self.client.get(SETTINGS)
-        self.assertContains(page, "Uhrzeit des täglichen Laufs")
-        self.assertContains(page, 'name="run_time" value="03:00"')
+    def test_the_wording_of_the_chapter_is_one_vocabulary(self):
+        # W5-10: a draft is paused, then deleted ("Rückabwicklung" is gone from the labels and the effects); "not agreed
+        # to", like the customer's side.
+        page = self.client.get(SETTINGS).content.decode()
+        chapter = page[page.index('id="deadlines-title"'):]
+        self.assertNotIn("Rückabwicklung", chapter)
+        self.assertIn("pausiert", chapter)
+        self.assertIn("der pausierte Entwurf ohne Änderung gelöscht", chapter)
+        self.assertIn("Tage nach der Erinnerung bis zur Löschung des Entwurfs", chapter)
+        self.assertIn("Tage bis zur Löschung des Entwurfs (Vertrag)", chapter)
+        self.assertNotIn("Vertrag nicht akzeptiert", chapter)
+
+    def test_the_time_of_the_daily_run_is_not_part_of_the_chapter_but_a_block_of_its_own(self):
+        page = self.client.get(SETTINGS).content.decode()
+        block = page[page.index('id="run-time-title"'):page.index('id="deadlines-title"')]
+        self.assertIn("Adressverzeichnis", block)
+        self.assertIn("Uhrzeit des täglichen Laufs", block)
+        self.assertIn('name="run_time" value="03:00"', block)
+        self.assertIn('action="/management/settings/run-time/"', page)
+        chapter = page[page.index('id="deadlines-title"'):]
+        self.assertNotIn("run_time", chapter)
+        self.assertNotIn("Uhrzeit des täglichen Laufs", chapter)
         self.assertEqual(schedule.import_run_time(), time(3, 0))
 
     def test_every_staff_account_sees_and_may_save_the_chapter_and_a_get_leads_back(self):
         self.assertRedirects(self.client.get(URL), SETTINGS, fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(RUN_TIME_URL), SETTINGS, fetch_redirect_response=False)
         self.assertEqual(self.login(self.plain).get(SETTINGS).status_code, 404)
 
 
 @tag("mariadb")
+class RunTimeTests(DeadlinesBase):
+    def test_the_time_is_saved_with_a_history_without_a_value(self):
+        response = self.client.post(RUN_TIME_URL, {"run_time": "04:30"})
+        self.assertRedirects(response, SETTINGS, fetch_redirect_response=False)
+        self.assertEqual(schedule.import_run_time(), time(4, 30))
+        events = {entry.event: entry for entry in history.entries_for(ManagementSettings.load())}
+        self.assertEqual(events[HistoryEvent.IMPORT_RUN_TIME_CHANGED].detail, {})
+        self.assertEqual(events[HistoryEvent.IMPORT_RUN_TIME_CHANGED].actor, self.staff)
+        self.assertNotIn(HistoryEvent.DEADLINES_CHANGED, events)
+        self.assertContains(self.client.get(SETTINGS), 'name="run_time" value="04:30"')
+
+    def test_the_time_must_be_a_time_of_day(self):
+        for bad in ("", "25:00", "noon", "03:61"):
+            with self.subTest(bad=bad):
+                response = self.client.post(RUN_TIME_URL, {"run_time": bad})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Uhrzeit")
+        self.assertEqual(schedule.import_run_time(), time(3, 0))
+
+    def test_the_deadlines_are_not_touched(self):
+        before = deadline_settings.current_values()
+        self.client.post(RUN_TIME_URL, {"run_time": "05:15"})
+        self.assertEqual(deadline_settings.current_values(), before)
+
+    def test_a_customer_cannot_save_the_time(self):
+        self.assertEqual(self.login(self.plain).post(RUN_TIME_URL, {"run_time": "05:15"}).status_code, 404)
+        self.assertEqual(Client().post(RUN_TIME_URL, {"run_time": "05:15"}).status_code, 302)
+        self.assertEqual(schedule.import_run_time(), time(3, 0))
+
+
+@tag("mariadb")
 class SaveTests(DeadlinesBase):
-    def test_a_valid_set_is_saved_with_a_history_of_field_names_and_the_run_time(self):
+    def test_a_valid_set_is_saved_with_a_history_of_field_names_only(self):
         response = self.client.post(URL, VALID)
         self.assertRedirects(response, SETTINGS, fetch_redirect_response=False)
         self.assertEqual(deadline_settings.current_values(), {
             "reminder_after_days": 3, "rollback_after_days": 15, "contract_deadline_days": 16,
             "operator_confirmation_days": 17, "iban_missing_reminder_days": 8,
         })
-        self.assertEqual(schedule.import_run_time(), time(4, 30))
+        # The time of the address run is not part of this form.
+        self.assertEqual(schedule.import_run_time(), time(3, 0))
         row = ManagementSettings.load()
         events = {entry.event: entry for entry in history.entries_for(row)}
         self.assertEqual(sorted(events[HistoryEvent.DEADLINES_CHANGED].detail["fields"]), sorted(FIELDS))
         self.assertEqual(events[HistoryEvent.DEADLINES_CHANGED].actor, self.staff)
-        self.assertEqual(events[HistoryEvent.IMPORT_RUN_TIME_CHANGED].detail, {})
+        self.assertNotIn(HistoryEvent.IMPORT_RUN_TIME_CHANGED, events)
         # Never a value in the history.
         for entry in events.values():
             for value in VALID.values():
@@ -115,13 +167,13 @@ class SaveTests(DeadlinesBase):
         self.assertContains(self.client.get(SETTINGS), "Gespeichert.")
 
     def test_saving_the_same_values_writes_no_history(self):
-        data = {**self.values(), "run_time": "03:00"}
+        data = self.values()
         before = history.entries_for(ManagementSettings.load()).count()
         self.assertEqual(self.client.post(URL, data).status_code, 302)
         self.assertEqual(history.entries_for(ManagementSettings.load()).count(), before)
 
     def test_only_the_changed_fields_are_named(self):
-        self.client.post(URL, {**self.values(), "run_time": "03:00", "reminder_after_days": "5"})
+        self.client.post(URL, {**self.values(), "reminder_after_days": "5"})
         entry = history.entries_for(ManagementSettings.load()).filter(event=HistoryEvent.DEADLINES_CHANGED).get()
         self.assertEqual(entry.detail, {"fields": ["reminder_after_days"]})
 
@@ -131,17 +183,6 @@ class SaveTests(DeadlinesBase):
         after = ManagementSettings.load()
         for name in ("country_code", "identifier", "warning_threshold_percent", "sender_street"):
             self.assertEqual(getattr(before, name), getattr(after, name))
-
-    def test_the_run_time_must_be_a_time_of_day(self):
-        for bad in ("", "25:00", "noon", "03:61"):
-            with self.subTest(bad=bad):
-                response = self.client.post(URL, {**VALID, "run_time": bad})
-                self.assertEqual(response.status_code, 200)
-                self.assertContains(response, "Uhrzeit")
-        self.assertEqual(schedule.import_run_time(), time(3, 0))
-        self.assertEqual(self.values(), {"reminder_after_days": "2", "rollback_after_days": "14",
-                                         "contract_deadline_days": "14", "operator_confirmation_days": "14",
-                                         "iban_missing_reminder_days": "7"})
 
 
 @tag("mariadb")
@@ -184,12 +225,17 @@ class WholeNumberTests(DeadlinesBase):
 @tag("mariadb")
 class DraftWarningTests(DeadlinesBase):
     def question(self, **changes):
-        return self.client.post(URL, {**self.values(), "run_time": "03:00", **changes})
+        return self.client.post(URL, {**self.values(), **changes})
 
-    def test_a_shorter_value_that_would_delete_drafts_shows_the_number_and_saves_nothing(self):
+    def test_a_shorter_value_that_would_delete_drafts_shows_the_values_the_number_and_saves_nothing(self):
         self.paused_draft()
         response = self.question(rollback_after_days="5")
-        self.assertContains(response, "Diese Änderung löscht 1 Entwurf.")
+        # W5-10: old and new value, what is deleted, the email, no way back, and a red button that says it.
+        self.assertContains(response, "Frist „Entwurf gelöscht“: Sie ändern sie von 14 auf 5 Tage.")
+        self.assertContains(response, "Dadurch wird 1 Entwurf endgültig gelöscht. Der Kunde erhält eine E-Mail.")
+        self.assertContains(response, "Das lässt sich nicht rückgängig machen.")
+        self.assertContains(response, "Speichern und 1 Entwurf löschen")
+        self.assertContains(response, "btn-danger")
         self.assertContains(response, 'name="confirmed_count" value="1:0"')
         self.assertEqual(deadline_settings.current_values()["rollback_after_days"], 14)
         # A number only: no name and no address of the draft.
@@ -201,7 +247,8 @@ class DraftWarningTests(DeadlinesBase):
         self.paused_draft(customer("bert.deadline@example.org"), egid=90004270, number=5, address={"house_number": "52"})
         response = self.question(rollback_after_days="5")
         self.assertEqual(deadline_settings.affected_drafts_count({"rollback_after_days": 5}), 2)
-        self.assertContains(response, "Diese Änderung löscht 2 Entwürfe.")
+        self.assertContains(response, "Dadurch werden 2 Entwürfe endgültig gelöscht. Die Kunden erhalten eine E-Mail.")
+        self.assertContains(response, "Speichern und 2 Entwürfe löschen")
 
     def test_the_second_step_with_the_same_number_saves(self):
         self.paused_draft()
@@ -215,7 +262,7 @@ class DraftWarningTests(DeadlinesBase):
         self.paused_draft()
         self.paused_draft(customer("bert.deadline@example.org"), egid=90004270, number=5, address={"house_number": "52"})
         response = self.question(rollback_after_days="5", confirmed_count="1:0")
-        self.assertContains(response, "Diese Änderung löscht 2 Entwürfe.")
+        self.assertContains(response, "Dadurch werden 2 Entwürfe endgültig gelöscht.")
         self.assertContains(response, 'name="confirmed_count" value="2:0"')
         self.assertEqual(deadline_settings.current_values()["rollback_after_days"], 14)
 
@@ -225,7 +272,7 @@ class DraftWarningTests(DeadlinesBase):
             with self.subTest(forged=forged):
                 response = self.question(rollback_after_days="5", confirmed_count=forged)
                 self.assertEqual(response.status_code, 200)
-                self.assertContains(response, "Diese Änderung löscht 1 Entwurf.")
+                self.assertContains(response, "Dadurch wird 1 Entwurf endgültig gelöscht.")
                 self.assertEqual(deadline_settings.current_values()["rollback_after_days"], 14)
 
     def at_operator(self, days_ago=10):
@@ -241,8 +288,9 @@ class DraftWarningTests(DeadlinesBase):
     def test_an_application_at_the_grid_operator_is_a_second_number_in_the_warning(self):
         self.at_operator()
         response = self.question(operator_confirmation_days="5")
-        self.assertContains(response, "1 Anmeldung, die schon beim Netzbetreiber ist")
-        self.assertNotContains(response, "löscht")
+        self.assertContains(response, "1 Anmeldung, die schon bei Netzbetreiber ist")
+        self.assertNotContains(response, "Entwurf endgültig")
+        self.assertContains(response, "Speichern und 1 Anmeldung rückabwickeln")
         self.assertContains(response, 'name="confirmed_count" value="0:1"')
         self.assertEqual(deadline_settings.current_values()["operator_confirmation_days"], 14)
         for fragment in ("Zora", "Quelle", "Ittigenstrasse", "anna.deadline"):
@@ -257,8 +305,11 @@ class DraftWarningTests(DeadlinesBase):
         self.paused_draft()
         self.at_operator()
         response = self.question(rollback_after_days="5", operator_confirmation_days="5")
-        self.assertContains(response, "Diese Änderung löscht 1 Entwurf.")
-        self.assertContains(response, "1 Anmeldung, die schon beim Netzbetreiber ist")
+        self.assertContains(response, "Dadurch wird 1 Entwurf endgültig gelöscht.")
+        self.assertContains(response, "1 Anmeldung, die schon bei Netzbetreiber ist")
+        self.assertContains(response, "Speichern und 1 Entwurf löschen und 1 Anmeldung rückabwickeln")
+        self.assertContains(response, "Frist „Entwurf gelöscht“: Sie ändern sie von 14 auf 5 Tage.")
+        self.assertContains(response, "Frist „Bestätigung durch Netzbetreiber“: Sie ändern sie von 14 auf 5 Tage.")
         self.assertContains(response, 'name="confirmed_count" value="1:1"')
 
     def test_a_change_that_deletes_nothing_is_saved_at_once(self):
@@ -274,14 +325,23 @@ class DraftWarningTests(DeadlinesBase):
             contract_pending_since=timezone.now() - timedelta(days=10)
         )
         response = self.question(contract_deadline_days="5")
-        self.assertContains(response, "Diese Änderung löscht 1 Entwurf.")
+        self.assertContains(response, "Dadurch wird 1 Entwurf endgültig gelöscht.")
+        self.assertContains(response, "Frist „Vertrag nicht zugestimmt“: Sie ändern sie von 14 auf 5 Tage.")
+
+    def test_a_deadline_of_one_day_is_singular(self):
+        self.paused_draft()
+        response = self.question(rollback_after_days="1")
+        self.assertContains(response, "von 14 auf 1 Tag.")
 
     def test_the_question_is_a_form_with_the_token_and_a_way_back(self):
         self.paused_draft()
         page = self.question(rollback_after_days="5")
         self.assertContains(page, "csrfmiddlewaretoken")
-        self.assertContains(page, "Änderung speichern")
+        self.assertContains(page, "Speichern und 1 Entwurf löschen")
         self.assertContains(page, f'href="{SETTINGS}"')
+        # The posted values travel on; the address directory time is no part of them.
+        self.assertContains(page, 'name="rollback_after_days" value="5"')
+        self.assertNotContains(page, 'name="run_time"')
 
 
 @tag("mariadb")

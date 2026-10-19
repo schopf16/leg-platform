@@ -1,11 +1,11 @@
 {% extends "customer/wizard_base.html" %}
 {% load i18n %}
 {% block heading %}{% translate "Which metering points belong to your building?" %}{% endblock %}
-{% block lead %}{% translate "Create your metering points." %}{% endblock %}
+{% block lead %}{% if feed_in_required %}{% translate "You enter the feed-in metering point." %}{% else %}{% translate "The metering point is the connection of your electricity meter." %}{% if numbers_ready %} {% blocktranslate %}Its number starts with {{ prefix }}.{% endblocktranslate %}{% endif %}{% endif %}{% endblock %}
 {% block step %}
   <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Metering points' %}">
     {% csrf_token %}
-    {% include "accounts/_error_summary.html" %}
+    {% include "customer/_error_summary.html" %}
     {% if not numbers_ready %}<div class="alert alert-warning" role="alert">{% translate "Metering point numbers cannot be entered yet. Please contact the LEG." %}</div>{% endif %}
 
     {% if draw_needed %}
@@ -28,12 +28,15 @@
         </fieldset>
       {% endif %}
       <div class="reveal{% if feed_in_required or form.feed_in.value == 'yes' %} is-open{% endif %}" data-reveal-name="feed_in" data-reveal-value="yes">
+        <h2 class="block-title">{% translate "Feed-in" %}</h2>
         <div class="mb-3">
           <label class="form-label" for="{{ form.feed_in_number.id_for_label }}">{% translate "Metering point number for the feed-in" %}</label>
           <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.feed_in_number }}</span>
           {% if form.feed_in_number.errors %}<div class="invalid-feedback d-block" id="{{ form.feed_in_number.auto_id }}_error">{% for error in form.feed_in_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+          <div class="form-hint" id="{{ form.feed_in_number.auto_id }}_helptext">{{ form.feed_in_number.help_text }}</div>
         </div>
         {% include "customer/_field.html" with field=form.feed_in_name optional=True %}
+        <p class="muted">{% translate "These details are optional and are used for statistics only." %}</p>
         <div class="figures">
           {% include "customer/_field.html" with field=form.pv_power_kwp optional=True %}
           {% include "customer/_field.html" with field=form.battery_kwh optional=True %}

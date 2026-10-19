@@ -26,7 +26,9 @@ from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.models import Application, Direction, ManagementSettings
 from leg_platform.community.persons import PersonError
 from leg_platform.customer import forms, limits, returns, texts
+from leg_platform.customer import steps as steps_module
 from leg_platform.customer.access import CustomerAccessMixin
+from leg_platform.customer.steps import STEP_NAMES
 
 SUBMITTED_SESSION_KEY = "customer_submitted_application"
 
@@ -37,13 +39,6 @@ STEP_URLS = {
     applications.CONTRACT: "customer:application_contract",
     applications.START: "customer:application_start_date",
 }
-STEP_NAMES = {
-    applications.BUILDING: _lazy("Building"),
-    applications.METERING_POINTS: _lazy("Metering points"),
-    applications.BANK_CONNECTION: _lazy("Bank or postal connection"),
-    applications.CONTRACT: _lazy("Contract"),
-    applications.START: _lazy("Activation"),
-}
 # One sentence per step on the page "Start application" (the owner's words from the mockup).
 STEP_SENTENCES = {
     applications.BUILDING: _lazy("The address where the metering point is located."),
@@ -51,12 +46,12 @@ STEP_SENTENCES = {
         "You enter the metering point for the draw. If you also feed in electricity, you add the metering point "
         "for the feed-in."
     ),
-    applications.BANK_CONNECTION: _lazy(
-        "Only needed with a feed-in. With it we pay you the compensation for the electricity you feed in."
-    ),
+    applications.BANK_CONNECTION: _lazy("This is how we pay you the compensation for the electricity you feed in."),
     applications.CONTRACT: _lazy("You have to agree to the articles of association."),
     applications.START: _lazy("Choice of the start date"),
 }
+# The sentence of the metering point row when a metering point is added and only the feed-in is missing (W2-06).
+FEED_IN_ADD_SENTENCE = _lazy("You enter the feed-in metering point.")
 NEXT_STEP_NAMES = {
     applications.BUILDING: _lazy("Enter building"),
     applications.METERING_POINTS: _lazy("Enter metering points"),
@@ -107,9 +102,9 @@ def operator_name():
 class OverviewRow:
     """One of the five rows of "What do we still need to know?"."""
 
-    def __init__(self, key, number, name, text, state, tag=False, change_url=""):
+    def __init__(self, key, number, name, text, state, tag=False, change_url="", view_only=False):
         self.key, self.number, self.name, self.text = key, number, name, text
-        self.state, self.tag, self.change_url = state, tag, change_url
+        self.state, self.tag, self.change_url, self.view_only = state, tag, change_url, view_only
 
     @property
     def done(self):
@@ -141,14 +136,24 @@ def _address_text(address):
     return ", ".join(part for part in (f"{street} {number}".strip(), f"{postal_code} {town}".strip()) if part)
 
 
+def _feed_in_add_case(person, location):
+    """True where the account has a draw at the building and only a feed-in can be added (W2-06)."""
+    if location is None:
+        return False
+    taken = buildings.occupied_directions(location, person, timezone.localdate())
+    return Direction.CONSUMPTION in taken and Direction.FEED_IN not in taken
+
+
 def overview_rows(person, application=None, location=None):
     """The five rows with their state: already on file (green), finished, or open.
 
     Without a draft: the building is green only when the application starts from "add a metering point" (``location``),
     the bank connection when an IBAN is stored, the contract when the current version was accepted; the other two are
     never green. With a draft: the state of the stored rows (``applications.progress``). A green or finished row has
-    "Change" (to the building page, the profile, the contract page or the step page of the draft)."""
+    "View" (the building and the contract) or "Change" (the bank connection, the rows of a draft)."""
+    feed_in_add = False
     if application is None:
+        feed_in_add = _feed_in_add_case(person, location)
         states = {
             applications.BUILDING: applications.KNOWN if location is not None else applications.OPEN,
             applications.METERING_POINTS: applications.OPEN,
@@ -178,6 +183,7 @@ def overview_rows(person, application=None, location=None):
         shown = [key for key in applications.STEPS if key != applications.BANK_CONNECTION or not (optional_bank and points_known)]
         first = application.buildings.select_related("location").first()
         address = _address_text(first.current_address()) if first is not None else ""
+        feed_in_add = first is not None and _feed_in_add_case(person, first.location)
     rows = []
     for number, key in enumerate(applications.STEPS, start=1):
         if key not in shown:
@@ -186,9 +192,12 @@ def overview_rows(person, application=None, location=None):
         text = STEP_SENTENCES[key]
         if key == applications.BUILDING and state != applications.OPEN and address:
             text = address
+        elif key == applications.METERING_POINTS and feed_in_add:
+            text = FEED_IN_ADD_SENTENCE
         rows.append(OverviewRow(
             key, number, STEP_NAMES[key], text, state, tag=key == applications.BANK_CONNECTION and optional_bank,
             change_url=change.get(key, "") if state != applications.OPEN else "",
+            view_only=application is None and key in (applications.BUILDING, applications.CONTRACT),
         ))
     return rows
 
@@ -209,15 +218,20 @@ class ApplicationStartView(CustomerAccessMixin, View):
             draft = drafts[0]
             rows = overview_rows(request.user, draft)
             current = applications.progress(draft)
+            paused = draft.state == Application.State.PAUSED
             context.update(
                 drafts=drafts, draft=draft, rows=rows, progress=current,
-                remaining=current.total - current.done, paused=draft.state == Application.State.PAUSED,
+                remaining=current.total - current.done, paused=paused,
+                paused_date=applications.rollback_date(draft) if paused else None,
+                reason=applications.returned_reason(draft), returned=draft.returned_at is not None,
                 next_url=next_url(draft),
                 next_name=NEXT_STEP_NAMES[current.next_step] if current.next_step else _("Submit application"),
             )
         else:
             rows = overview_rows(request.user, None, location)
-            context.update(rows=rows, done=sum(row.done for row in rows), total=len(rows))
+            # The count is the wizard's: the optional bank row is not a step of it (W1-01).
+            counted = [row for row in rows if not row.tag]
+            context.update(rows=rows, done=sum(row.done for row in counted), total=len(counted))
         return render(request, self.template_name, context)
 
     def post(self, request):
@@ -227,6 +241,10 @@ class ApplicationStartView(CustomerAccessMixin, View):
         if self.drafts(request):
             # The page offers "continue" or "start again" (which discards the draft); never a second draft.
             return redirect(self.page_url(location))
+        if not request.POST.get("overview") and self.something_on_file(request.user, location):
+            # Something is on file (a bank connection, the contract, the building): the overview shows what is taken
+            # over (W1-05). Without anything on file the overview would only repeat the steps: straight to step 1.
+            return redirect(self.page_url(location))
         try:
             application = applications.start_draft(request.user, location=location)
         except ApplicationError as error:
@@ -235,6 +253,12 @@ class ApplicationStartView(CustomerAccessMixin, View):
             messages.error(request, texts.message(error.code))
             return redirect(self.page_url(location))
         return redirect(next_url(application))
+
+    @staticmethod
+    def something_on_file(person, location):
+        """True where a step is "already on file" (the overview marks it green): a preselected building, the bank
+        connection or the accepted contract."""
+        return location is not None or own_iban.has_iban(person) or contracts.has_accepted_current(person)
 
     @staticmethod
     def page_url(location):
@@ -282,7 +306,10 @@ class StepView(CustomerAccessMixin, View):
             "step_total": len(applicable),
             "step_name": STEP_NAMES[self.step],
             "paused": application.state == Application.State.PAUSED,
+            "paused_date": applications.rollback_date(application) if application.state == Application.State.PAUSED else None,
             "returned": application.returned_at is not None,
+            "returned_reason": applications.returned_reason(application),
+            "has_iban": own_iban.has_iban(request.user),
             "confirm_cancel": request.GET.get("cancel") == "1",
             "operator": operator_name(),
             **extra,
@@ -345,8 +372,20 @@ class BuildingStepView(StepView):
 
     def show(self, request, application, current, form=None, **extra):
         return self.render_step(
-            request, application, current, form=form or forms.BuildingForm(), chosen=self.chosen(application), **extra
+            request, application, current, form=form or forms.BuildingForm(initial=self.account_address(request.user)),
+            chosen=self.chosen(application), **extra
         )
+
+    @staticmethod
+    def account_address(user):
+        """The address of the account's profile as the start of the form (W1-06): editable, nothing is skipped. A foreign
+        address (no Swiss postal code) is not offered: the building is in Switzerland."""
+        if user.swiss_postal_code is None:
+            return {}
+        return {
+            "street": user.street, "house_number": user.house_number,
+            "postal_code": user.postal_code_display, "town": user.town,
+        }
 
     def submit(self, request, application, current):
         person = request.user
@@ -654,8 +693,10 @@ class StartDateStepView(StepView):
             initial = {"start": application.start_choice, "desired_date": application.desired_start_date}
         form = form or forms.StartForm(initial=initial or {"start": forms.ASAP})
         earliest = applications.earliest_start_date()
-        # The earliest day for the date picker (a hint of the browser; the service checks it again).
+        # The earliest day for the date picker (a hint of the browser; the service checks it again) and, up front, as the
+        # help text under the field (W1-11).
         form.fields["desired_date"].widget.attrs["min"] = earliest.isoformat()
+        form.fields["desired_date"].help_text = _("Earliest possible: %(date)s.") % {"date": earliest.strftime("%d.%m.%Y")}
         return self.render_step(request, application, current, form=form, earliest=earliest)
 
     def submit(self, request, application, current):
@@ -749,22 +790,10 @@ class ApplicationSubmittedView(CustomerAccessMixin, View):
         ):
             return redirect("customer:buildings")
         del request.session[SUBMITTED_SESSION_KEY]
-        order = applications.post_submit_progress(application)
+        order = steps_module.post_submit_steps(application, operator_name())
         building = application.buildings.select_related("location").first()
         points = list(building.metering_points.all()) if building else []
-        names = {
-            "submitted": _("Details submitted"),
-            "review": _("Check by the LEG"),
-            "operator_registration": _("Registration at %(operator)s") % {"operator": operator_name()},
-            "operator_confirmation": _("Customer request confirmed by %(operator)s") % {"operator": operator_name()},
-            "start": _("Waiting for the start date"),
-        }
-        confirmed = application.state == Application.State.OPERATOR_CONFIRMED
-        steps = [
-            {"key": key, "name": names[key], "state": state,
-             "waiting": key == "start" and not confirmed}
-            for key, state in order
-        ]
+        steps = [{"key": key, "state": state, "name": label, "word": word} for key, state, label, word in order]
         return render(request, "customer/application_submitted.html", {
             "application": application, "steps": steps, "done": sum(s["state"] == "done" for s in steps),
             "total": len(steps), "building": building, "points": points,

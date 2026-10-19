@@ -9,7 +9,7 @@ the EGID and the metering point numbers it names are deleted when it is resolved
       <dl class="mgmt-facts">
         {% if show_person %}<div class="mgmt-fact"><dt>{% translate "Person" %}</dt><dd>{{ notice.person.name }} · <span class="tnum">{{ notice.person.number }}</span>{% translate "Go to the person" as goto_label %}{% include "management/_goto.html" with url=notice.person.url label=goto_label subject=notice.person.name %}</dd></div>{% endif %}
         {% if notice.egid %}<div class="mgmt-fact"><dt>{% translate "EGID" %}</dt><dd class="tnum">{{ notice.egid }}</dd></div>{% endif %}
-        {% if notice.numbers %}<div class="mgmt-fact"><dt>{% translate "Metering points" %}</dt><dd class="tnum">{% for number in notice.numbers %}{{ number }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd></div>{% endif %}
+        {% if notice.numbers %}<div class="mgmt-fact"><dt>{% translate "Metering points" %}</dt><dd class="tnum">{% for number in notice.numbers %}{{ number.text }}{% if number.url %}{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=number.url label=goto_label subject=number.text %}{% endif %}{% if not forloop.last %}<br>{% endif %}{% endfor %}</dd></div>{% endif %}
         <div class="mgmt-fact"><dt>{% translate "Date" %}</dt><dd class="tnum">{{ notice.created|date:"d.m.Y" }}</dd></div>
       </dl>
       <form method="post" action="{{ notice.resolve_url }}">

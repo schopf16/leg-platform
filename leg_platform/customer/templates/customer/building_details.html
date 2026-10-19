@@ -8,7 +8,7 @@
     <p class="start-sub">{{ location.street }} {{ location.house_number }}, {{ location.postal_code }} {{ location.town }}</p>
     <form method="post" class="step-card" novalidate data-submit-once>
       {% csrf_token %}
-      {% include "accounts/_error_summary.html" %}
+      {% include "customer/_error_summary.html" %}
       {% include "accounts/_field.html" with field=form.name optional=True %}
       {% include "accounts/_field.html" with field=form.description optional=True %}
       <div class="step-actions">

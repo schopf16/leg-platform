@@ -18,7 +18,7 @@ from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, GridOpera
 from leg_platform.community.settings_service import EDITABLE_FIELDS
 from leg_platform.management import navigation, overview_tasks
 from leg_platform.management.access import ManagementAccessMixin
-from leg_platform.management.deadline_forms import DEADLINES, DeadlinesForm
+from leg_platform.management.deadline_forms import DEADLINES, DeadlinesForm, RunTimeForm
 from leg_platform.management.forms import ADDRESS_FIELDS, ManagementSettingsForm
 
 
@@ -167,12 +167,13 @@ class SettingsView(ManagementAccessMixin, View):
             return {"notice": check.not_found_notice}
         return {}
 
-    def show(self, request, form, check, deadline_form=None):
+    def show(self, request, form, check, deadline_form=None, run_time_form=None):
         mail_text_link = (
             reverse("admin:accounts_emailtext_changelist")
             if any(request.user.has_perm(permission) for permission in navigation.EMAIL_TEXT_PERMISSIONS) else ""
         )
         deadline_form = deadline_form or DeadlinesForm.from_settings()
+        run_time_form = run_time_form or RunTimeForm.from_settings()
         deadline_rows = [
             {
                 "name": deadline.name,
@@ -191,6 +192,7 @@ class SettingsView(ManagementAccessMixin, View):
                 "page_title": _("Settings"),
                 "form": form,
                 "deadline_form": deadline_form,
+                "run_time_form": run_time_form,
                 "deadline_rows": deadline_rows,
                 "mail_text_link": mail_text_link,
                 "suggestion_text": check.get("suggestion", ""),

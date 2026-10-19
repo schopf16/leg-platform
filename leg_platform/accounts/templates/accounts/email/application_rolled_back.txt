@@ -1,8 +1,10 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}Your application at {{ instance_name }} was not completed and has been rolled back. For privacy reasons the details you entered about buildings and metering points were deleted. Your account is kept.{% endblocktranslate %}
+{% blocktranslate %}Your application at {{ instance_name }} was not completed in time and was deleted, together with the details you entered about buildings and metering points. Your account is kept.{% endblocktranslate %}
 
 {% translate "You can start a new application at any time after you sign in:" %}
 
-{{ login_url }}
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

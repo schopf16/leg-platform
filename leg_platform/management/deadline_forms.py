@@ -1,6 +1,6 @@
 """The chapter "Reminders and deadlines" of the settings page (KONZEPT 5.8, D-103): the five deadlines of the
-applications and the time of the daily address directory run. The form only reads and checks input; the rules (whole
-days from 1, the number of drafts a change would delete, the history) are in ``community.deadline_settings``."""
+applications, and (own form) the time of the daily address directory run. The form only reads and checks input; the rules
+(whole days from 1, the number of drafts a change would delete, the history) are in ``community.deadline_settings``."""
 
 from dataclasses import dataclass
 
@@ -41,19 +41,19 @@ DEADLINES = (
         _("A draft without a change for this many days is paused and the customer receives one reminder."),
     ),
     Deadline(
-        "rollback_after_days", _("Application rolled back"),
+        "rollback_after_days", _("Draft deleted"),
         _("The reminder, if the draft has not been changed since"),
         _("Main and second address of the customer"), (Key.APPLICATION_ROLLED_BACK,),
         _(
-            "This many days after the reminder, without a change, the draft is deleted and the customer receives an "
-            "email. The bank connection and stored buildings stay."
+            "This many days after the reminder, without a change, the paused draft is deleted and the customer "
+            "receives an email. The bank connection and stored buildings stay."
         ),
     ),
     Deadline(
         "contract_deadline_days", _("Contract not accepted"),
         _("Everything but the contract is complete in the draft"),
         _("Main and second address of the customer"), (Key.CONTRACT_REMINDER, Key.CONTRACT_ROLLED_BACK),
-        _("After this many days without the acceptance the draft is rolled back and the customer receives an email."),
+        _("After this many days without the acceptance the draft is deleted and the customer receives an email."),
     ),
     Deadline(
         "operator_confirmation_days", grid_operator.text(_("Confirmation by the %(operator)s")),
@@ -76,18 +76,19 @@ DEADLINES = (
 
 
 class DeadlinesForm(forms.Form):
-    """The five deadlines (whole days from 1, any size: the owner sets no upper limit) and the run time of the address
-    directory. ``deadline_values()`` is the cleaned set of numbers."""
+    """The five deadlines (whole days from 1, any size: the owner sets no upper limit). ``deadline_values()`` is the
+    cleaned set of numbers. (The time of the address directory run has its own form, ``RunTimeForm``: it is no
+    deadline.)"""
 
     reminder_after_days = forms.CharField(
         label=_("Days without a change until the reminder"), required=False, widget=forms.TextInput(attrs=DAY_INPUT)
     )
     rollback_after_days = forms.CharField(
-        label=_("Days after the reminder until the rollback"), required=False,
+        label=_("Days after the reminder until the draft is deleted"), required=False,
         widget=forms.TextInput(attrs=DAY_INPUT),
     )
     contract_deadline_days = forms.CharField(
-        label=_("Days until the rollback (contract)"), required=False, widget=forms.TextInput(attrs=DAY_INPUT)
+        label=_("Days until the draft is deleted (contract)"), required=False, widget=forms.TextInput(attrs=DAY_INPUT)
     )
     operator_confirmation_days = forms.CharField(
         label=grid_operator.text(_("Days until the confirmation by the %(operator)s is overdue")), required=False,
@@ -96,18 +97,11 @@ class DeadlinesForm(forms.Form):
     iban_missing_reminder_days = forms.CharField(
         label=_("Days until the reminder (bank connection)"), required=False, widget=forms.TextInput(attrs=DAY_INPUT)
     )
-    run_time = forms.TimeField(
-        label=_("Time of the daily run"), input_formats=["%H:%M", "%H:%M:%S"],
-        widget=forms.TimeInput(attrs={"type": "time", "class": "form-control mgmt-field-short tnum"}, format="%H:%M"),
-        error_messages={"required": _("Enter a time of day."), "invalid": _("Enter a time of day, for example 03:00.")},
-    )
 
     @classmethod
     def from_settings(cls):
         """The form with the stored values."""
-        initial = dict(deadline_settings.current_values())
-        initial["run_time"] = deadline_settings.address_run_time()
-        return cls(initial=initial)
+        return cls(initial=dict(deadline_settings.current_values()))
 
     def clean(self):
         cleaned = super().clean()
@@ -138,3 +132,18 @@ class DeadlinesForm(forms.Form):
     def deadline_values(self):
         """The five numbers as whole days (after ``is_valid``)."""
         return dict(self.cleaned_values)
+
+
+class RunTimeForm(forms.Form):
+    """The time of day of the daily address directory run (KONZEPT 3a.5): its own small block of the settings page."""
+
+    run_time = forms.TimeField(
+        label=_("Time of the daily run"), input_formats=["%H:%M", "%H:%M:%S"],
+        widget=forms.TimeInput(attrs={"type": "time", "class": "form-control mgmt-field-short tnum"}, format="%H:%M"),
+        error_messages={"required": _("Enter a time of day."), "invalid": _("Enter a time of day, for example 03:00.")},
+    )
+
+    @classmethod
+    def from_settings(cls):
+        """The form with the stored time."""
+        return cls(initial={"run_time": deadline_settings.address_run_time()})

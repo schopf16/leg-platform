@@ -6,6 +6,7 @@ decides a rule. A dialog is a normal page (works without JavaScript) that return
 """
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -26,6 +27,7 @@ from leg_platform.management.process_forms import (
     OperatorConfirmationForm,
     OperatorStartedForm,
     RejectForm,
+    ReturnForm,
 )
 from leg_platform.management.process_views import VISIBLE_APPLICATION_STATES
 from leg_platform.management.returns import return_url
@@ -40,6 +42,7 @@ def error_texts():
         "date_in_future": _("The date must not be in the future."),
         "date_before_start": _("The date must not be before the registration."),
         "number_exists": _("A metering point number of this application was stored in the meantime. Nothing was saved."),
+        "reason_required": _("Enter a reason."),
         "building_unavailable": _("A building of this application is not available any more. Nothing was saved."),
         "date_before_earliest": _("The date must not be in the past."),
         "not_month_end": _("Enter the last day of a month."),
@@ -64,11 +67,13 @@ class QuestionForm(DialogForm):
 
 class ProcessDialog(DialogView):
     """A dialog about one application. ``states`` are the states in which it applies (a GET in another state goes back
-    with a message; a POST is refused by the service)."""
+    with a message; a POST is refused by the service). ``leaves_page`` is set by a step after which the page of the
+    application is no longer there (a draft or a deleted application has no page): the way on is the list."""
 
     states = ()
     form_class = QuestionForm
     danger = False
+    leaves_page = False
     success_message = gettext_lazy("Saved.")
     detail_name = "management:processes_application"
 
@@ -107,6 +112,8 @@ class ProcessDialog(DialogView):
 
     def after(self, request):
         messages.success(request, self.success_message)
+        if self.leaves_page:
+            return redirect(reverse("management:processes"))
         return redirect(self.back(request))
 
     def save(self, request, form):
@@ -116,6 +123,10 @@ class ProcessDialog(DialogView):
             if error.code == "not_found":
                 raise Http404 from None
             form.add_error(None, refusal_text(error))
+            return None
+        except ValidationError as error:
+            # A free text with a control character (the form checked the length already).
+            form.add_error(None, error)
             return None
         return self.after(request)
 
@@ -142,21 +153,25 @@ class ApplicationReturnView(ProcessDialog):
     states = Application.WITHDRAWABLE_STATES
     title = gettext_lazy("Return for correction")
     submit_label = gettext_lazy("Return for correction")
+    form_class = ReturnForm
+    # A draft has no page for the staff: after the step the way on is the list (walkthrough W2-02).
+    leaves_page = True
+    success_message = gettext_lazy("The application was returned for correction.")
 
     def get_lead(self):
         return _(
             "The application becomes a draft again. The customer can correct it and submit it again. "
-            "No email is sent: the customer sees it in the portal."
+            "The customer receives an email and reads your reason in the portal."
         )
 
     def run(self, application, data, actor):
-        application_staff.return_for_correction(application, actor)
+        application_staff.return_for_correction(application, actor, data["reason"])
 
 
 class ApplicationOperatorStartedView(ProcessDialog):
     states = Application.WITHDRAWABLE_STATES
-    title = grid_operator.text(gettext_lazy("Registration at the %(operator)s started"))
-    submit_label = gettext_lazy("Save")
+    title = grid_operator.text(gettext_lazy("Record the start at the %(operator)s"))
+    submit_label = gettext_lazy("Record the start")
     form_class = OperatorStartedForm
 
     def get_lead(self):
@@ -173,7 +188,8 @@ class ApplicationOperatorConfirmedView(ProcessDialog):
     form_class = OperatorConfirmationForm
 
     def get_lead(self):
-        return _("The customer has confirmed the registration with the %(operator)s.") % {
+        # A request, not a statement: what the person is asked to record (walkthrough W5-04).
+        return _("Record when the customer confirmed the registration at the %(operator)s.") % {
             "operator": grid_operator.name()
         }
 
@@ -182,17 +198,43 @@ class ApplicationOperatorConfirmedView(ProcessDialog):
 
 
 class ApplicationCompleteView(ProcessDialog):
+    """"Complete application": the start date is filled from ``application_staff.completion_defaults`` (the customer's
+    wish, never before the earliest date), the dialog names the wish and the earliest date, and the confirmation of the
+    new addresses is an explicit tick (W5-05, W5-07)."""
+
     states = (Application.State.OPERATOR_CONFIRMED,)
     title = gettext_lazy("Complete application")
     submit_label = gettext_lazy("Complete application")
     form_class = CompleteForm
+    template_name = "management/processes/dialog_complete.html"
     success_message = gettext_lazy("The application is completed. The metering points were created.")
 
+    def defaults(self):
+        """The defaults of the service; None if the state moved meanwhile (the service then refuses the step with its
+        own message)."""
+        if not hasattr(self, "_defaults"):
+            try:
+                self._defaults = application_staff.completion_defaults(self.application(), self.request.user)
+            except ApplicationError as error:
+                if error.code == "not_found":
+                    raise Http404 from None
+                self._defaults = None
+        return self._defaults
+
     def get_form(self, data=None):
-        return CompleteForm(data, application=self.application())
+        return CompleteForm(data, defaults=self.defaults())
 
     def get_lead(self):
-        return _("The buildings and metering points are created and assigned to the customer from the start date.")
+        lead = _("The buildings and metering points are created and assigned to the customer from the start date.")
+        defaults = self.defaults()
+        if defaults is not None:
+            if defaults.start_choice == Application.StartChoice.ASAP:
+                lead += " " + _("The customer wished the start as soon as possible.")
+            elif defaults.desired_start_date is not None:
+                lead += " " + _("The customer wished the start on %(date)s.") % {
+                    "date": format_date(defaults.desired_start_date)
+                }
+        return lead
 
     def run(self, application, data, actor):
         application_staff.complete(
@@ -206,18 +248,14 @@ class ApplicationRejectView(ProcessDialog):
     submit_label = gettext_lazy("Roll back application")
     form_class = RejectForm
     danger = True
+    leaves_page = True
     success_message = gettext_lazy("The application was rolled back.")
 
     def get_lead(self):
         return _("The application is rolled back and cannot be restored.")
 
     def run(self, application, data, actor):
-        application_staff.reject(application, actor, data["reason"])
-
-    def after(self, request):
-        messages.success(request, self.success_message)
-        # The application is gone, so the page it was opened from is gone too: the way on is the list.
-        return redirect(reverse("management:processes"))
+        application_staff.reject(application, actor, data["reason"], data.get("note", ""))
 
 
 # ---- A deregistration ----
@@ -243,13 +281,34 @@ class DeregistrationConfirmView(DialogView):
         return self.deregistration().state == Deregistration.State.SUBMITTED
 
     def get_form(self, data=None):
-        return ConfirmDeregistrationForm(data, initial={"confirmed_date": self.deregistration().desired_date})
+        return ConfirmDeregistrationForm(data, defaults=self.defaults())
+
+    def defaults(self):
+        """The defaults of the service (the customer's wish, the earliest date); None if the state moved meanwhile (the
+        service then refuses the step with its own message)."""
+        if not hasattr(self, "_defaults"):
+            try:
+                self._defaults = deregistrations.confirmation_defaults(self.deregistration(), self.request.user)
+            except ApplicationError as error:
+                if error.code == "not_found":
+                    raise Http404 from None
+                self._defaults = None
+        return self._defaults
 
     def get_lead(self):
-        return _(
-            "The customer asked for %(date)s. The date is recorded as the termination date of every metering point "
-            "of the deregistration."
-        ) % {"date": format_date(self.deregistration().desired_date)}
+        deregistration = self.deregistration()
+        date = format_date(deregistration.desired_date)
+        if deregistration.wants_earliest:
+            lead = _("The customer asked for the earliest possible date (%(date)s).") % {"date": date}
+        else:
+            lead = _("The customer asked for %(date)s.") % {"date": date}
+        lead += " " + _(
+            "The date is recorded as the termination date of every metering point of the deregistration."
+        )
+        defaults = self.defaults()
+        if defaults is not None and defaults.suggested_date != defaults.desired_date:
+            lead += " " + _("The wished date has passed: the end of this month is suggested.")
+        return lead
 
     def get(self, request, **kwargs):
         if not self.applicable():

@@ -1,0 +1,16 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n %}{% comment %}
+The dialog "Complete application" (D-103; walkthrough W5-05, W5-07). The start date is the field of the form (filled from the
+customer's wish and the earliest date). The confirmation of the addresses is an explicit tick, off by default: the box is
+drawn only while a building of the application is not confirmed yet (``form.unconfirmed`` is their number). Ticked, a new
+building is confirmed and its address locked at once; otherwise it stays "not yet confirmed" and can be confirmed on the page
+of the location.
+{% endcomment %}
+{% block dialog_after_fields %}
+  {% if form.unconfirmed %}
+    <div class="mgmt-mask">
+      <label for="{{ form.confirm_addresses.id_for_label }}">{{ form.confirm_addresses }}<span>{% translate "Addresses are checked and will be locked" %}</span></label>
+      <p class="mgmt-hint">{% blocktranslate count counter=form.unconfirmed %}{{ counter }} building has an address that is not confirmed yet. A confirmed address is locked: the customer can no longer change it. Without the tick the address stays editable and can be confirmed later on the page of the location.{% plural %}{{ counter }} buildings have an address that is not confirmed yet. A confirmed address is locked: the customer can no longer change it. Without the tick the addresses stay editable and can be confirmed later on the pages of the locations.{% endblocktranslate %}</p>
+    </div>
+  {% endif %}
+{% endblock %}

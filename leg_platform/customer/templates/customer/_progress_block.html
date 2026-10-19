@@ -4,7 +4,8 @@ count, a bar (a native progress element: no inline style) and the steps with a d
 {% endcomment %}<div class="mp-progress">
   <p class="mp-progress-head">{% if block.kind == "registration" %}{% blocktranslate with done=block.done total=block.total %}Registration: {{ done }} of {{ total }} done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} done{% endblocktranslate %}{% endif %}</p>
   <progress class="path-bar" max="{{ block.total }}" value="{{ block.done }}" aria-label="{% if block.kind == 'registration' %}{% blocktranslate with done=block.done total=block.total %}Registration: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% endif %}">{{ block.done }}/{{ block.total }}</progress>
-  {% if block.paused %}<p class="note-warn">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</p>{% endif %}
+  {% if block.paused %}<p class="note-warn">{% include "customer/_paused_note.html" with paused_date=block.paused_date %}</p>{% endif %}
+  {% include "customer/_returned_note.html" with reason=block.reason returned=block.returned %}
   {% if block.note %}<p class="muted">{{ block.note }}</p>{% endif %}
   <details>
     <summary>{% translate "Show details" %}</summary>
@@ -14,10 +15,10 @@ count, a bar (a native progress element: no inline style) and the steps with a d
       {% endfor %}
     </ol>
   </details>
-  {% if block.resume or block.withdrawable %}
+  {% if block.resume or block.withdrawable and not footer_withdraw %}
     <div class="mp-progress-actions">
       {% if block.resume %}<a class="btn btn-secondary-action" href="{% url 'customer:application' block.application.pk %}">{% translate "Continue registration" %}</a>{% endif %}
-      {% if block.withdrawable %}<a class="btn btn-secondary-action" href="{% url 'customer:application_withdraw' block.application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
+      {% if block.withdrawable and not footer_withdraw %}<a class="btn btn-secondary-action" href="{% url 'customer:application_withdraw' block.application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
     </div>
   {% endif %}
 </div>

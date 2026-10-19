@@ -1,11 +1,13 @@
-{% load i18n %}{% comment %}
+{% load i18n customer_ui %}{% comment %}
 The card "Persönliche Angaben" (navigation/VORGABEN.md, section 3.3): name and address; the form
 opens in the card. The further fields of the profile (salutation, company, address addition, post
-office box, country, phone) are under "Weitere Angaben (optional)" (K15).
-{% endcomment %}<section class="profile-card" id="card-personal" aria-labelledby="card-personal-title"{% if edit == "personal" %} data-state="edit"{% endif %}>
+office box, country, phone) are under "Weitere Angaben (optional)" (K15). The button is "Change" like on every other
+card (design walkthrough W4-03; deviates from PROFIL.md, owner to confirm). The note of a confirmed address sits directly
+under the address fields (W4-01) and names the LEG as a link where the instance has a website (W1-03).
+{% endcomment %}{% leg_link as leg %}<section class="profile-card" id="card-personal" aria-labelledby="card-personal-title"{% if edit == "personal" %} data-state="edit"{% endif %}>
   <div class="profile-card-head has-action">
     <h2 id="card-personal-title">{% translate "Personal details" %}</h2>
-    {% if edit != "personal" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=personal#card-personal">{% translate "Edit" %}</a>{% endif %}
+    {% if edit != "personal" %}<a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=personal#card-personal">{% translate "Change" %}</a>{% endif %}
   </div>
   {% include "accounts/profile/_card_messages.html" with items=messages_personal %}
   {% if edit == "personal" %}
@@ -17,7 +19,6 @@ office box, country, phone) are under "Weitere Angaben (optional)" (K15).
           {% include "accounts/_field.html" with field=form.first_name %}
           {% include "accounts/_field.html" with field=form.last_name %}
         </div>
-        {% if address_building.locked %}<p class="profile-note" id="address-locked-note">{% translate "The address is confirmed and cannot be changed. Please contact the LEG for a change." %}</p>{% endif %}
         <div class="field-pair field-pair-street">
           {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" %}
           {% include "accounts/_field.html" with field=form.house_number %}
@@ -26,7 +27,7 @@ office box, country, phone) are under "Weitere Angaben (optional)" (K15).
           {% include "accounts/_field.html" with field=form.postal_code %}
           {% include "accounts/_field.html" with field=form.town %}
         </div>
-        {% include "addresses/widget_notice.html" %}
+        {% if address_building.locked %}<p class="profile-note" id="address-locked-note">{% blocktranslate %}The address is confirmed and cannot be changed. Please contact the {{ leg }} for a change.{% endblocktranslate %}</p>{% endif %}        {% include "addresses/widget_notice.html" %}
         <details class="more-details"{% if form.is_bound %} open{% endif %}>
           <summary>{% translate "Further details (optional)" %}</summary>
           <div class="more-fields">
@@ -47,7 +48,7 @@ office box, country, phone) are under "Weitere Angaben (optional)" (K15).
   {% else %}
     <dl class="profile-rows">
       <div class="profile-row"><dt>{% translate "Name" %}</dt><dd>{{ account.display_name }}</dd></div>
-      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}{% if address_building.egid %} · {% translate "EGID" %} {{ address_building.egid }}{% endif %}{% if address_building.locked %}<span class="profile-note d-block" id="address-locked-note">{% translate "The address is confirmed and cannot be changed. Please contact the LEG for a change." %}</span>{% endif %}</dd></div>
+      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}{% if address_building.egid %} · {% translate "EGID" %} {{ address_building.egid }}{% endif %}{% if address_building.locked %}<span class="profile-note d-block" id="address-locked-note">{% blocktranslate %}The address is confirmed and cannot be changed. Please contact the {{ leg }} for a change.{% endblocktranslate %}</span>{% endif %}</dd></div>
       {% if account.organisation_name and account.first_name %}<div class="profile-row"><dt>{% translate "Company" %}</dt><dd>{{ account.organisation_name }}</dd></div>{% endif %}
       {% if account.phone_number %}<div class="profile-row"><dt>{% translate "Phone" %}</dt><dd>{{ account.phone_number_display }}</dd></div>{% endif %}
     </dl>

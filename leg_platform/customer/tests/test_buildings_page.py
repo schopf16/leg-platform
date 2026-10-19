@@ -172,13 +172,14 @@ class BuildingsPageTests(TestCase):
         html = self.page(login(newcomer))
         self.assertRegex(html, r'<span class="dot tone-warn" aria-hidden="true"></span>Bei der LEG in Prüfung')
         self.assertIn("Anmeldung: 1 von 5 erledigt", html)
-        for word in ("Angaben abgeschickt", "Prüfung durch die LEG", "Warten auf Startdatum"):
+        for word in ("Angaben abgeschickt", "Prüfung durch die LEG", "Wird von"):
             self.assertIn(word, html)
-        self.assertIn(reverse("customer:application_withdraw", args=[application.pk]), html)
-        # "Remove metering point" withdraws a registration that is not active yet (ABMELDUNG.md section 7).
-        self.assertRegex(
-            html, rf'href="{reverse("customer:application_withdraw", args=[application.pk])}">Messpunkt entfernen<'
-        )
+        # ONE withdraw button (W1-15): the card's, red outline; the progress block does not repeat it and no second
+        # wording ("Remove metering point") is offered for the same action.
+        withdraw = reverse("customer:application_withdraw", args=[application.pk])
+        self.assertEqual(html.count(f'href="{withdraw}"'), 1)
+        self.assertRegex(html, rf'btn btn-danger-outline end-action" href="{withdraw}">Anmeldung zurückziehen<')
+        self.assertNotIn(">Messpunkt entfernen<", html)
         # From the start of the registration at the grid operator on nothing can be withdrawn.
         from leg_platform.community import application_staff
 

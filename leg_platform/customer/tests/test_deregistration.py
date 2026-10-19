@@ -98,12 +98,31 @@ class PageTests(DeregistrationCase):
         self.assertNotIn(self.foreign.number, html)
         self.assertNotIn("Fremd", html)
 
-    def test_the_date_of_the_notice_period_is_never_shown_and_the_page_is_not_stored(self):
+    def test_the_summary_in_the_page_and_for_the_script_is_german_for_one_and_for_many(self):
+        from django.utils import translation
+
+        from leg_platform.customer import deregistration as dereg_views
+
+        html = self.client.get(START).content.decode()
+        # The script replaces the placeholder in the "many" text; the percent sign must not be doubled by the template
+        # (then the catalogue entry is not found and the English text shows).
+        self.assertIn('data-many="Sie melden %(count)s Messpunkte zum gewählten Termin ab."', html)
+        self.assertIn('data-one="Sie melden 1 Messpunkt zum gewählten Termin ab."', html)
+        self.assertIn('data-none="Wählen Sie mindestens einen Messpunkt aus."', html)
+        self.assertNotIn("You are deregistering", html)
+        with translation.override("de-ch"):
+            self.assertEqual(dereg_views.summary_text(1), "Sie melden 1 Messpunkt zum gewählten Termin ab.")
+            self.assertEqual(dereg_views.summary_text(2), "Sie melden 2 Messpunkte zum gewählten Termin ab.")
+            self.assertEqual(dereg_views.summary_text(0), "Wählen Sie mindestens einen Messpunkt aus.")
+
+    def test_the_earliest_date_is_shown_next_to_the_earliest_option_and_the_page_is_not_stored(self):
+        # Team lead decision (W3-03), a deviation from ABMELDUNG.md section 3: the earliest month end is shown as a
+        # reading of the notice period; the LEG confirms the date.
         response = self.client.get(START)
         html = response.content.decode()
 
-        for form in (self.earliest().strftime("%d.%m.%Y"), self.earliest().isoformat()):
-            self.assertNotIn(form, html)
+        self.assertIn(f"Frühestens am {self.earliest().strftime('%d.%m.%Y')}", html)
+        self.assertNotIn(self.earliest().isoformat(), html)
         for directive in ("no-cache", "no-store", "private"):
             self.assertIn(directive, response["Cache-Control"])
 
@@ -279,7 +298,7 @@ class SubmitTests(DeregistrationCase):
         self.assertEqual((dereg.desired_date, dereg.wants_earliest), (wish, False))
         self.assertIn(wish.strftime("%d.%m.%Y"), self.client.get(response["Location"]).content.decode())
 
-    def test_a_date_that_is_refused_changes_nothing_and_never_shows_the_earliest_day(self):
+    def test_a_date_that_is_refused_changes_nothing_and_keeps_the_choice(self):
         today = timezone.localdate()
         cases = (
             (today - timedelta(days=3), "Das Datum darf nicht in der Vergangenheit liegen."),
@@ -292,7 +311,6 @@ class SubmitTests(DeregistrationCase):
                 html = response.content.decode()
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(message, html)
-                self.assertNotIn(self.earliest().strftime("%d.%m.%Y"), html)
                 # The choice stays on the page.
                 self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         missing = self.client.post(START, self.data(termination="date"))

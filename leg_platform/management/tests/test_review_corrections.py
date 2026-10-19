@@ -237,7 +237,7 @@ class SystemAdministrationMenuTests(TestCase):
                 self.assertNotIn('<p class="frame-group">System</p>', text)
         # The rest of the menu is unchanged for staff without a right.
         _status, text = self.menu(self.bare)
-        for entry in ("Übersicht", "Personen", "Messpunkte", "Abmelden"):
+        for entry in ("Übersicht", "Personen", "Messpunkte", "Ausloggen"):
             self.assertIn(entry, text)
 
     def test_the_mail_texts_entry_follows_the_same_rule_and_the_administration_still_refuses(self):
@@ -260,8 +260,10 @@ class SystemAdministrationMenuTests(TestCase):
         template = (ROOT / "templates" / "_frame_menu.html").read_text(encoding="utf-8")
         self.assertEqual(template.count("system_administration as show_system"), 1)
         # D-102: the entry "System administration" is decided by the tag alone, never by ``user.is_staff``. The
-        # customer menu (D-105) separates a customer from a staff account above this block; that is not the entry.
-        block = template.split("system_administration as show_system", 1)[1]
+        # customer menu (D-105) separates a customer from a staff account above this block, and the contact link of the
+        # customer (W1-03) is in the foot below it; neither is the entry. So the block is read up to the foot.
+        block = template.split("system_administration as show_system", 1)[1].split("frame-menu-foot", 1)[0]
+        self.assertIn("href=\"{% url 'admin:index' %}\"", block)
         self.assertNotIn("is_staff", block)
 
 

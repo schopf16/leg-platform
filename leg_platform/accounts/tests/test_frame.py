@@ -87,8 +87,8 @@ class FrameTests(TestCase):
         self.assertNotRegex(profile_menu, r'class="frame-item is-active" href="/"')
 
     def test_the_later_entries_are_no_links_and_say_so(self):
-        # K10: no href, aria-disabled and a hidden note, in the menu of a customer and in the menu and the bottom bar of
-        # staff (a customer's bottom bar has no entry that is "later", START-SEITE.md, section 7).
+        # K10: no href, aria-disabled and a hidden note, in the menu of a customer and of staff (the bottom bars of both
+        # have no entry that is "later": a customer's, START-SEITE.md, section 7; staff's, walkthrough W5-11).
         html = self.client.get(HOME_URL).content.decode()
         containers = [part(html, '<nav class="frame-menu', "</nav>")]
         staff = create_active_user("later.staff@example.org")
@@ -96,7 +96,7 @@ class FrameTests(TestCase):
         staff_client = VerifiedClient()
         staff_client.force_login(staff)
         staff_html = staff_client.get(HOME_URL).content.decode()
-        containers += [part(staff_html, '<nav class="frame-menu', "</nav>"), part(staff_html, '<nav class="frame-bottombar', "</nav>")]
+        containers += [part(staff_html, '<nav class="frame-menu', "</nav>")]
         for container in containers:
             later = re.findall(r'<a class="frame-(?:item|tab) is-later"[^>]*>', container)
             self.assertGreaterEqual(len(later), 3)
@@ -105,14 +105,16 @@ class FrameTests(TestCase):
                 self.assertNotIn("href", tag_text)
             self.assertIn("später", container)
             self.assertIn("noch nicht verfügbar", container)
+        # The bottom bar of a customer and of staff has no entry that is "later" (W5-11 for staff).
         self.assertNotIn("is-later", part(html, '<nav class="frame-bottombar', "</nav>"))
+        self.assertNotIn("is-later", part(staff_html, '<nav class="frame-bottombar', "</nav>"))
 
     def test_the_menu_logs_out_with_a_post_form_and_has_the_legal_links(self):
         html = self.client.get(HOME_URL).content.decode()
         menu = part(html, '<nav class="frame-menu', "</nav>")
         self.assertRegex(menu, r'<form method="post" action="/logout/">')
         self.assertIn("csrfmiddlewaretoken", menu)
-        self.assertIn("Abmelden", menu)
+        self.assertIn("Ausloggen", menu)
         self.assertNotRegex(menu, r'<a[^>]*href="/logout/')
         self.assertIn("Datenschutz", menu)
         self.assertIn("Impressum", menu)
@@ -135,21 +137,45 @@ class FrameTests(TestCase):
         self.assertIn("<span>Datenschutz</span>", menu)
 
     def test_the_bottom_bar_of_a_customer_has_start_participation_information_and_profile(self):
-        # START-SEITE.md, section 7 (the owner, 2026-10-19): the bar of a staff account is unchanged (below).
+        # START-SEITE.md, section 7 (the owner, 2026-10-19); the bar of a staff account is another one (below, W5-11).
         html = self.client.get(HOME_URL).content.decode()
         bar = part(html, '<nav class="frame-bottombar', "</nav>")
         labels = re.findall(r"<span>([^<]+)</span>", bar)
         self.assertEqual(labels, ["Start", "Teilnahme", "Information", "Profil"])
         self.assertIn('class="frame-tab is-active"', bar)
 
-    def test_the_bottom_bar_of_a_staff_account_is_unchanged(self):
+    def test_the_bottom_bar_of_a_staff_account_has_start_overview_processes_and_the_menu(self):
+        # W5-11 (design walkthrough, team lead decision): no entry that is "later" in the bar; the menu opens the drawer.
         staff = create_active_user("bar.staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)
         client = VerifiedClient()
         client.force_login(staff)
         bar = part(client.get(HOME_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Energie", "Rechnungen", "Standorte"])
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Übersicht", "Vorgänge", "Menü"])
+        self.assertIn('href="/management/"', bar)
+        self.assertIn('href="/management/processes/"', bar)
+        self.assertIn('href="#frame-drawer" role="button" data-menu-open aria-controls="frame-drawer"', bar)
+        self.assertIn('aria-expanded="false"', bar)
         self.assertNotIn("Profil", bar)
+        self.assertNotIn("Energie", bar)
+
+    def test_the_active_page_of_the_bottom_bar_of_a_staff_account_is_marked(self):
+        staff = create_active_user("bar.active@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        client = VerifiedClient()
+        client.force_login(staff)
+        for url, label in (("/management/", "Übersicht"), ("/management/processes/", "Vorgänge")):
+            with self.subTest(url=url):
+                bar = part(client.get(url).content.decode(), '<nav class="frame-bottombar', "</nav>")
+                self.assertEqual(bar.count("is-active"), 1)
+                active = re.search(r'<a class="frame-tab is-active"[^>]*>\s*<svg[^>]*>.*?</svg>\s*<span>([^<]+)</span>', bar, re.S)
+                self.assertEqual(active.group(1), label)
+
+    def test_the_menu_script_opens_the_menu_from_every_opener_and_returns_the_focus_to_it(self):
+        text = (STATIC / "js" / "frame-menu.js").read_text(encoding="utf-8")
+        self.assertIn('document.querySelectorAll("[data-menu-open]")', text)
+        self.assertIn("opener.focus()", text)
+        self.assertNotIn("eval(", text)
 
     def test_on_the_profile_only_the_profile_entry_of_the_bottom_bar_is_active(self):
         # K4 for staff (no profile entry in the bar); a customer's bar has one and marks it.
@@ -216,7 +242,7 @@ class FrameTests(TestCase):
         self.assertIn('class="frame frame-bare"', html)
         header = part(html, '<header class="frame-header', "</header>")
         self.assertIn('action="/logout/"', header)
-        self.assertIn("Abmelden", header)
+        self.assertIn("Ausloggen", header)
         for absent in ('class="frame-menu', 'id="frame-drawer"', 'class="frame-bottombar', 'id="menu-btn"'):
             self.assertNotIn(absent, html)
         self.assertNotIn("Profil", part(html, "<body", "</header>"))
@@ -276,10 +302,10 @@ class FrameStyleTests(SimpleTestCase):
                           "console."):
             self.assertNotIn(forbidden, text)
         self.assertIn('"use strict"', text)
-        # Escape, the focus trap and the return of the focus to the button.
+        # Escape, the focus trap and the return of the focus to the button that opened the menu.
         self.assertIn('"Escape"', text)
         self.assertIn('"Tab"', text)
-        self.assertIn("button.focus()", text)
+        self.assertIn("opener.focus()", text)
         self.assertIn("inert", text)
 
     def test_the_measures_of_the_images_of_the_owner(self):

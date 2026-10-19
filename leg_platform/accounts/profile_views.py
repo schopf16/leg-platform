@@ -102,6 +102,7 @@ def deletion_state(user):
     can be deregistered now: the button leads to the deregistration) and ``retained`` (the account is deactivated, not
     deleted: a retention obligation or a metering point assignment, ``User.delete_or_deactivate``)."""
     from leg_platform.community import deregistrations
+    from leg_platform.community.models import Deregistration
     from leg_platform.customer import access
 
     released = deregistrations.deletion_released(user)
@@ -111,6 +112,13 @@ def deletion_state(user):
         "customer": customer,
         "can_start": bool(customer and not released and deregistrations.eligible_points(user)),
         "retained": bool(user.retention_obligation or user.metering_point_assignments.exists()),
+        # A deregistration is open: it continues after the account is gone or deactivated (W3-05).
+        "deregistration_running": bool(
+            customer and released
+            and Deregistration.objects.filter(
+                person=user, state__in=(Deregistration.State.SUBMITTED, Deregistration.State.CONFIRMED)
+            ).exists()
+        ),
     }
 
 
@@ -656,13 +664,16 @@ class AccountDeleteView(ProfileCardView):
         addresses = user.notification_addresses()
         try:
             with transaction.atomic():
-                from leg_platform.community import deregistrations
+                from leg_platform.community import customer_messages, deregistrations
 
                 User._base_manager.select_for_update().get(pk=user.pk)
                 if not deregistrations.deletion_released(user):
                     raise DeletionBlocked
                 # Also blanks the name in the account's queued notifications (D-068).
                 outcome = user.delete_or_deactivate()
+                if outcome == "deactivated":
+                    # The staff's free text (one-time messages, return reasons) does not outlive the use of the portal.
+                    customer_messages.purge(user)
                 event = (
                     SecurityEvent.Event.ACCOUNT_DEACTIVATED
                     if outcome == "deactivated"

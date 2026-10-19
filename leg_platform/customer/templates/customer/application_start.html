@@ -14,7 +14,8 @@ Context: ``rows`` (customer.wizard.OverviewRow), ``location`` (the own building 
         <h1 class="start-title">{% translate "Start registration" %}</h1>
         <p class="start-sub">{% translate "You started an application. You can continue where you left off." %}</p>
       </div>
-      {% if paused %}<div class="alert alert-warning" role="status">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</div>{% endif %}
+      {% if paused %}<div class="alert alert-warning" role="status">{% include "customer/_paused_note.html" with paused_date=paused_date %}</div>{% endif %}
+      {% include "customer/_returned_note.html" with reason=reason returned=returned %}
       <section class="step-card" aria-labelledby="draft-title">
         <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not completed yet" %}</p>
         <h2 id="draft-title">{% blocktranslate with done=progress.done total=progress.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</h2>
@@ -46,6 +47,7 @@ Context: ``rows`` (customer.wizard.OverviewRow), ``location`` (the own building 
       {% include "customer/_overview_rows.html" with title=_("Your steps") %}
       <form method="post" class="step-actions" data-submit-once>
         {% csrf_token %}
+        <input type="hidden" name="overview" value="1">
         {% if location %}<input type="hidden" name="building" value="{{ location.pk }}">{% endif %}
         <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
       </form>

@@ -4,5 +4,7 @@
 
 {{ login_url }}
 
-{% translate "If the contract is not approved in time, the application is rolled back and the details you entered about buildings and metering points are deleted." %}
+{% translate "If the contract is not approved in time, the application is deleted, together with the details you entered about buildings and metering points." %}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

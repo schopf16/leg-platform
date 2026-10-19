@@ -70,25 +70,6 @@ def current_values():
     return {name: getattr(row, name) for name in FIELDS}
 
 
-def update(values, actor):
-    """Save the given fields (a subset of ``FIELDS``); returns the names that changed. History ``deadlines_changed`` with
-    the names only. ``ValidationError`` for anything that is not a whole number from 1."""
-    staff = staff_actor(actor)
-    cleaned = clean_values(values)
-    with transaction.atomic():
-        ManagementSettings.objects.get_or_create(id=1)
-        row = ManagementSettings.objects.select_for_update().get(id=1)
-        changed = [name for name, value in cleaned.items() if getattr(row, name) != value]
-        if not changed:
-            return []
-        for name in changed:
-            setattr(row, name, cleaned[name])
-        row.full_clean()
-        row.save(update_fields=[*changed, "updated_at"])
-        history.record(row, HistoryEvent.DEADLINES_CHANGED, staff, {"fields": changed})
-    return changed
-
-
 def address_run_time():
     """The time of day of the daily address directory run (``addresses.schedule``, KONZEPT 3a.5)."""
     from leg_platform.addresses import schedule

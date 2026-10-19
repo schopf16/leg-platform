@@ -9,17 +9,30 @@ Nothing real exists before ``complete``: the buildings and points are draft rows
 assignments from the start date. The registration at the grid operator itself happens outside the portal.
 """
 
+from dataclasses import dataclass
+from datetime import date
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_notices, archived, assignments, buildings, history, metering_points
+from leg_platform.community import (
+    application_notices,
+    archived,
+    assignments,
+    buildings,
+    customer_messages,
+    history,
+    metering_points,
+)
 from leg_platform.community.application_common import ApplicationError, add_months, notify, staff_actor
 from leg_platform.community.applications import START_AFTER_MONTHS, _changed, delete_application
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
+    REJECTION_NOTE_MAX_LENGTH,
+    RETURN_REASON_MAX_LENGTH,
     Application,
     ApplicationMeteringPoint,
     CustomerBuilding,
@@ -101,19 +114,32 @@ def start_review(application, actor):
     return fresh
 
 
-def return_for_correction(application, actor):
-    """Submitted or in review -> draft again, marked ``returned_at``; the idle clock starts anew. No mail (the customer sees it
-    in the portal)."""
+def return_for_correction(application, actor, reason):
+    """Submitted or in review -> draft again, marked ``returned_at``; the idle clock starts anew.
+
+    ``reason`` is required: free text of at most 500 characters (``buildings.clean_free_text``: white space collapsed,
+    no control characters; ``ApplicationError("reason_required")`` if empty, ``ValidationError`` if too long or invalid).
+    It is stored on the application and shown to the customer on the draft (``applications.returned_reason``, cleared
+    when the application is submitted again); the history entry names no text. The customer gets the mail
+    ``application_returned`` (action required; the reason is in the portal only, never in the mail) and a one-time
+    message."""
     staff = staff_actor(actor)
+    reason = buildings.clean_free_text(reason if isinstance(reason, str) else "", RETURN_REASON_MAX_LENGTH)
+    if not reason:
+        raise ApplicationError("reason_required")
     with transaction.atomic():
         fresh = _lock(application, Application.WITHDRAWABLE_STATES)
         now = timezone.now()
         fresh.state = State.DRAFT
         fresh.submitted_at = None
         fresh.returned_at = now
-        history.record(fresh, HistoryEvent.APPLICATION_RETURNED, staff)
+        fresh.returned_reason = reason
+        history.record(fresh, HistoryEvent.APPLICATION_RETURNED, staff, {"fields": ["returned_reason"]})
         _changed(fresh, now)
-        fresh.save(update_fields=["returned_at", "submitted_at", "updated_at"])
+        fresh.save(update_fields=["returned_at", "returned_reason", "submitted_at", "updated_at"])
+        person = get_user_model()._base_manager.get(pk=fresh.person_id)
+        customer_messages.record(person, customer_messages.Kind.APPLICATION_RETURNED, now=now)
+        notify(MailJob.Kind.APPLICATION_RETURNED, person)
     return fresh
 
 
@@ -169,6 +195,47 @@ def record_operator_confirmation(application, actor, confirmed_on, today=None):
 def earliest_completion_start(application):
     """The earliest start date the staff may set: three months after the registration at the grid operator."""
     return add_months(application.operator_started_on, START_AFTER_MONTHS)
+
+
+@dataclass(frozen=True)
+class CompletionDefaults:
+    """What the completion dialog of the staff is filled with."""
+
+    start_choice: str  # the customer's wish: "asap", "date" or "" (none recorded)
+    desired_start_date: date | None  # the customer's date when ``start_choice`` is "date"
+    earliest_start_date: date  # registration + 3 months, or (before the registration) today + 3 months
+    registered: bool  # whether the earliest date rests on the real registration date
+    suggested_start_date: date  # the field's value: the wish, never before the earliest date
+    unconfirmed_addresses: int  # buildings whose address is not confirmed yet (new ones count)
+
+
+def completion_defaults(application, actor, today=None):
+    """The defaults for the staff's completion dialog: the customer's start wish (as soon as possible, or a date), the
+    earliest allowed date (three months after the registration at the grid operator; today + 3 months while no
+    registration date is recorded), the suggested field value (the wish, but never before the earliest date) and how
+    many of the buildings are not confirmed yet (a new building is created "not yet confirmed" unless the staff confirms
+    the addresses). Staff only (``not_allowed``); ``not_found``; ``wrong_state`` unless the grid operator's
+    confirmation arrived (the state ``complete`` takes). Pure reading."""
+    staff_actor(actor)
+    today = today or timezone.localdate()
+    row = Application.objects.filter(pk=getattr(application, "pk", None)).first()
+    if row is None:
+        raise ApplicationError("not_found")
+    if row.state != State.OPERATOR_CONFIRMED:
+        raise ApplicationError("wrong_state")
+    registered = row.operator_started_on is not None
+    earliest = add_months(row.operator_started_on if registered else today, START_AFTER_MONTHS)
+    wish = row.desired_start_date if row.start_choice == Application.StartChoice.DATE else None
+    suggested = max(wish, earliest) if wish is not None else earliest
+    unconfirmed = 0
+    for building in row.buildings.select_related("location"):
+        location = building.location or buildings.existing_location(building.egid, building.current_address())
+        if location is None or location.needs_confirmation:
+            unconfirmed += 1
+    return CompletionDefaults(
+        start_choice=row.start_choice, desired_start_date=wish, earliest_start_date=earliest, registered=registered,
+        suggested_start_date=suggested, unconfirmed_addresses=unconfirmed,
+    )
 
 
 def _new_location(building, staff, confirm):
@@ -302,15 +369,28 @@ def complete(application, actor, start_date, *, today=None, confirm_addresses=Fa
     return fresh
 
 
-def reject(application, actor, reason="rejected"):
-    """Roll the application back (not completed): the staff rejects it, or the grid operator did
-    (``reason`` ``operator_rejected``). The draft rows are deleted; the account, its IBAN and every stored building stay.
-    The customer gets the "rolled back" mail."""
+def reject(application, actor, reason="rejected", note=""):
+    """Roll the application back (not completed): the staff rejects it (``reason`` ``rejected``: the LEG did not accept)
+    or the grid operator did (``operator_rejected``). The draft rows are deleted; the account, its IBAN and every stored
+    building stay. ``note`` is an optional free text of at most 300 characters for the customer (``ValidationError`` if
+    longer or invalid); it is kept only in the one-time message, never in the history or the mail.
+
+    The customer gets the mail ``application_rejected`` (or ``application_rejected_operator``: the reason-specific
+    sentence) and a one-time message of the same kind (``customer_messages``)."""
     staff = staff_actor(actor)
     if reason not in REJECTION_REASONS:
         raise ApplicationError("wrong_state")
+    note = buildings.clean_free_text(note if isinstance(note, str) else "", REJECTION_NOTE_MAX_LENGTH)
+    operator = reason == "operator_rejected"
     with transaction.atomic():
         fresh = _lock(application, Application.IN_FLIGHT_STATES)
         person = get_user_model()._base_manager.get(pk=fresh.person_id)
         delete_application(fresh, reason, staff)
-        notify(MailJob.Kind.APPLICATION_ROLLED_BACK, person)
+        customer_messages.record(
+            person,
+            customer_messages.Kind.APPLICATION_REJECTED_OPERATOR if operator else customer_messages.Kind.APPLICATION_REJECTED,
+            note,
+        )
+        notify(
+            MailJob.Kind.APPLICATION_REJECTED_OPERATOR if operator else MailJob.Kind.APPLICATION_REJECTED, person
+        )

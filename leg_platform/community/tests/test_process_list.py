@@ -216,6 +216,17 @@ class ContractReadTests(TestCase):
                 with self.assertRaises(ApplicationError):
                     call(actor)
 
+    def test_the_version_with_the_same_bytes_is_found_for_the_staff_only(self):
+        data = pdf(b"\n% same")
+        stored = contracts.upload_version(self.staff, data, date(2026, 3, 1))
+        found = contracts.stored_version_of(self.staff, data)
+        self.assertEqual(found.pk, stored.pk)
+        self.assertIn("pdf", found.get_deferred_fields())
+        self.assertIsNone(contracts.stored_version_of(self.staff, pdf(b"\n% other")))
+        for actor in (self.anna, None):
+            with self.assertRaises(ApplicationError):
+                contracts.stored_version_of(actor, data)
+
     def test_the_newest_acceptance_of_an_account_without_the_file(self):
         self.assertIsNone(contracts.latest_acceptance(self.anna))
         first = contracts.upload_version(self.staff, pdf(b"\n% one"), date(2026, 1, 1))

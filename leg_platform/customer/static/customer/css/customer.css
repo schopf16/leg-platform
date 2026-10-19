@@ -731,6 +731,47 @@ fieldset.question legend {
   margin-top: 32px;
 }
 
+/* ---- One-time banners, status lines, the returned note (design walkthrough W1-18, W2-01, W2-03) ---- */
+.banner-list {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 24px;
+}
+
+.banner-list p,
+.returned-note p {
+  margin: 0 0 4px;
+}
+
+.returned-note .returned-reason {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.status-lines {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-details {
+  margin: 0 0 24px;
+}
+
+.block-title {
+  margin: 8px 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
 /* ---- The deregistration (ABMELDUNG.md): three cards in one form ---- */
 .dereg-form {
   display: grid;

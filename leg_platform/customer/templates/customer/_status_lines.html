@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+The status line(s) under the greeting where no card "Your way into the LEG" is shown (W1-18): where the customer stands now.
+Context: ``status_lines`` (community.participation.StatusLine: a kind and a date). The words are here; no names, addresses or
+numbers. Nothing is mailed for these states, so this is where the customer finds them.
+{% endcomment %}{% if status_lines %}
+  <ul class="status-lines" aria-label="{% translate 'Your status' %}">
+    {% for line in status_lines %}
+      <li class="status-line"><span class="dot tone-{% if line.kind == 'participation_started' %}ok{% else %}accent{% endif %}" aria-hidden="true"></span><span>{% if line.kind == "deregistration_running" %}{% blocktranslate with date=line.date|date:"d.m.Y" %}Your deregistration is confirmed. Your metering points end on {{ date }}.{% endblocktranslate %}{% elif line.kind == "deregistration_requested" %}{% translate "Your deregistration was submitted. The LEG confirms the date." %}{% elif line.kind == "participation_starts" %}{% blocktranslate with date=line.date|date:"d.m.Y" %}Your participation starts on {{ date }}.{% endblocktranslate %}{% elif line.kind == "participation_started" %}{% blocktranslate with date=line.date|date:"d.m.Y" %}You take part in the LEG since {{ date }}.{% endblocktranslate %}{% endif %}</span></li>
+    {% endfor %}
+  </ul>
+  <p class="status-details"><a href="{% url 'customer:buildings' %}">{% translate "Details" %}</a></p>
+{% endif %}

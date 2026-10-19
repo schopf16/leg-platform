@@ -25,8 +25,8 @@ shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state
 
   <section class="mgmt-card" aria-labelledby="way-title">
     <h2 id="way-title">{% translate "Progress" %}</h2>
-    <progress class="mgmt-progress mgmt-progress-wide" value="{{ done }}" max="{{ total }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}"></progress>
-    <p class="mgmt-note">{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}</p>
+    <progress class="mgmt-progress mgmt-progress-wide" value="{{ done }}" max="{{ total }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}"></progress>
+    <p class="mgmt-note">{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</p>
     <ol class="mgmt-way">
       {% for step in way %}
         <li>{% include "management/_status.html" with tone=step.tone label=step.state_label %}<span class="mgmt-way-label">{{ step.label }}</span>{% if step.note %}<span class="mgmt-muted tnum">{{ step.note }}</span>{% endif %}</li>
@@ -55,7 +55,7 @@ shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state
           <button type="submit" class="btn btn-primary">{% translate "Take into review" %}</button>
         </form>
       {% endif %}
-      {% if can_start_operator %}<a class="btn {% if application.state == 'in_review' %}btn-primary{% else %}btn-accent-outline{% endif %}" href="{{ operator_started_url }}">{% blocktranslate %}Registration at the {{ operator }} started{% endblocktranslate %}</a>{% endif %}
+      {% if can_start_operator %}<a class="btn {% if application.state == 'in_review' %}btn-primary{% else %}btn-accent-outline{% endif %}" href="{{ operator_started_url }}">{% blocktranslate %}Record the start at the {{ operator }}{% endblocktranslate %}</a>{% endif %}
       {% if can_confirm %}<a class="btn btn-primary" href="{{ operator_confirmed_url }}">{% translate "Record confirmation" %}</a>{% endif %}
       {% if can_complete %}<a class="btn btn-primary" href="{{ complete_url }}">{% translate "Complete application" %}</a>{% endif %}
       {% if can_return %}<a class="btn btn-secondary-action" href="{{ return_url }}">{% translate "Return for correction" %}</a>{% endif %}
@@ -133,10 +133,11 @@ shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state
         </dl>
       </section>
 
-      <div class="mgmt-actions mgmt-process-end">
-        <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Back to the list" %}</a>
-        {% if can_reject %}<a class="btn btn-danger-outline" href="{{ reject_url }}">{% translate "Roll back application" %}</a>{% endif %}
-      </div>
+      {% if can_reject %}
+        <div class="mgmt-actions mgmt-process-end">
+          <a class="btn btn-danger-outline" href="{{ reject_url }}">{% translate "Roll back application" %}</a>
+        </div>
+      {% endif %}
     </div>
 
     <aside class="mgmt-process-side" aria-label="{% translate 'Side column' %}">

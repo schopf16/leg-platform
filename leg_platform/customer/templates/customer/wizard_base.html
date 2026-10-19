@@ -5,15 +5,15 @@ question, one sentence, the card of the step. A paused draft and a draft returne
 the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of the step views: ``step_number``,
 ``step_total``, ``step_name``, ``application``, ``paused``, ``returned``, ``confirm_cancel``, ``operator``.
 {% endcomment %}
-{% block title %}{{ step_name }} – {% translate "Registration" %}{% endblock %}
+{% block title %}{{ step_name }} – {% translate "Application" %}{% endblock %}
 {% block content %}
   <div class="wizard">
-    {% if paused %}<div class="alert alert-warning" role="status">{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}</div>{% endif %}
-    {% if returned %}<div class="alert alert-info" role="status">{% translate "The LEG returned your application. Please check your details and submit it again." %}</div>{% endif %}
+    {% if paused %}<div class="alert alert-warning" role="status">{% include "customer/_paused_note.html" with paused_date=paused_date %}</div>{% endif %}
+    {% include "customer/_returned_note.html" with reason=returned_reason returned=returned %}
     {% if confirm_cancel %}
       <section class="step-card cancel-card" aria-labelledby="cancel-title">
         <h2 id="cancel-title">{% translate "Cancel application?" %}</h2>
-        <p>{% translate "Your details about the building and the metering points will be deleted. Your bank or postal connection is kept because it belongs to you as a person." %}</p>
+        <p>{% translate "Your details about the building and the metering points will be deleted." %}{% if has_iban %} {% translate "Your bank or postal connection is kept because it belongs to you as a person." %}{% endif %}</p>
         <div class="step-actions">
           <a class="btn btn-primary" href="{{ request.path }}" autofocus>{% translate "Continue registration" %}</a>
           <form method="post" action="{% url 'customer:application_cancel' application.pk %}" class="inline-form">
@@ -24,9 +24,14 @@ the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of th
       </section>
     {% endif %}
     <div class="progress-block">
-      <p class="page-label">{% translate "My participation · Registration" %}</p>
-      <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }} of {{ step_total }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
-      <p class="step-note">{% blocktranslate %}Step {{ step_number }} of {{ step_total }}: {{ step_name }}{% endblocktranslate %}</p>
+      <p class="page-label">{% translate "My participation · Application" %}</p>
+      {% if step == "metering_points" %}
+        <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
+        <p class="step-note">{% blocktranslate %}Step {{ step_number }}: {{ step_name }}{% endblocktranslate %}</p>
+      {% else %}
+        <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }} of {{ step_total }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
+        <p class="step-note">{% blocktranslate %}Step {{ step_number }} of {{ step_total }}: {{ step_name }}{% endblocktranslate %}</p>
+      {% endif %}
     </div>
     <div>
       <h1 class="start-title">{% block heading %}{% endblock %}</h1>

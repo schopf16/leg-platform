@@ -9,6 +9,7 @@ second factor.
 """
 
 from datetime import date
+from pathlib import Path
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, tag
@@ -97,19 +98,37 @@ class ContractListTests(ContractBase):
             return page[start: page.index("</tr>", start)]
 
         spare, current, old = row("contract-2026-12-01.pdf"), row("contract-2026-10-07.pdf"), row("contract-2025-03-01.pdf")
-        # Uploaded and never current, no acceptance: download, set as current, delete.
+        # Uploaded and never current, no acceptance: download, set as current, delete (W5-09: the name says what it
+        # does and the visible short label stands next to it for hover and focus).
         self.assertIn('aria-label="contract-2026-12-01.pdf herunterladen"', spare)
-        self.assertIn('aria-label="contract-2026-12-01.pdf als aktuell festlegen"', spare)
-        self.assertIn('aria-label="contract-2026-12-01.pdf löschen"', spare)
-        self.assertIn('title="contract-2026-12-01.pdf herunterladen"', spare)
+        self.assertIn('aria-label="Als aktuell festlegen: contract-2026-12-01.pdf"', spare)
+        self.assertIn('aria-label="Löschen: contract-2026-12-01.pdf"', spare)
+        self.assertIn('<span class="mgmt-action-text" aria-hidden="true">Herunterladen</span>', spare)
+        self.assertIn('<span class="mgmt-action-text" aria-hidden="true">Als aktuell festlegen</span>', spare)
+        self.assertIn('<span class="mgmt-action-text" aria-hidden="true">Löschen</span>', spare)
         # The current one: only the download. An older one that was current: download, and it may be set again.
         self.assertIn("herunterladen", current)
-        self.assertNotIn("als aktuell festlegen", current)
-        self.assertNotIn("löschen", current)
-        self.assertIn("als aktuell festlegen", old)
-        self.assertNotIn("löschen", old)
-        # No text in the buttons.
-        self.assertNotIn(">Herunterladen<", page)
+        self.assertNotIn("Als aktuell festlegen", current)
+        self.assertNotIn("Löschen", current)
+        self.assertIn("Als aktuell festlegen", old)
+        self.assertNotIn("Löschen", old)
+
+    def test_the_actions_are_links_to_a_question_and_44_px_big(self):
+        # W5-09: "Set as current" opens a question like the deletion (no POST button in the row any more).
+        page = self.client.get(LIST).content.decode()
+        self.assertIn(f'<a class="mgmt-action is-accent" href="{self.url("current", self.spare)}"', page)
+        self.assertIn(f'<a class="mgmt-action is-danger" href="{self.url("delete", self.spare)}"', page)
+        self.assertNotIn('<form method="post" action="' + self.url("current", self.spare), page)
+        css = (Path(__file__).resolve().parents[1] / "static" / "management" / "css" / "management.css").read_text(
+            encoding="utf-8"
+        )
+        rule = css[css.index(".mgmt-action {"):]
+        rule = rule[:rule.index("}")]
+        self.assertIn("width: 44px", rule)
+        self.assertIn("height: 44px", rule)
+        # The label shows on hover and on keyboard focus.
+        self.assertIn(".mgmt-action:focus-visible .mgmt-action-text", css)
+        self.assertIn(".mgmt-action:hover .mgmt-action-text", css)
 
     def test_a_version_that_was_accepted_is_never_offered_for_deletion(self):
         ContractAcceptance.objects.create(person=self.anna, version=self.current, sha256=self.current.sha256,
@@ -118,7 +137,7 @@ class ContractListTests(ContractBase):
         page = self.client.get(LIST).content.decode()
         start = page.index("contract-2026-10-07.pdf")
         row = page[start: page.index("</tr>", start)]
-        self.assertNotIn("löschen", row)
+        self.assertNotIn("Löschen", row)
         self.assertIn("1", row)  # the acceptance count
 
     def test_without_a_current_version_a_banner_says_so(self):
@@ -151,7 +170,11 @@ class ContractUploadTests(ContractBase):
         self.assertContains(page, 'enctype="multipart/form-data"')
         self.assertContains(page, 'accept=".pdf,application/pdf"')
         self.assertContains(page, "Datum der Fassung")
-        self.assertContains(page, "noch nicht aktuell")
+        self.assertContains(page, "Eine neue Fassung ist noch nicht aktuell")
+        self.assertContains(page, "Nur PDF, höchstens 10 MiB.")
+        # W5-09: the sentence about the file that stays as it is was said twice; it is gone.
+        self.assertNotContains(page, "unverändert")
+        self.assertNotContains(page, "nicht verändert")
 
     def test_a_valid_upload_is_stored_but_not_current_and_the_customers_see_nothing_new(self):
         before = self.events()
@@ -218,9 +241,15 @@ class ContractUploadTests(ContractBase):
         count = ContractVersion.objects.count()
         before = self.events()
         again = self.post(file=upload_file(data, name="other-name.pdf"))
-        self.assertContains(again, "Diese Datei ist schon gespeichert.")
+        # W5-09: the refusal names the version that holds the file.
+        self.assertContains(again, "Diese Datei ist schon als Fassung vom 10.01.2027 gespeichert.")
         self.assertEqual(ContractVersion.objects.count(), count)
         self.assertEqual(self.events(), before)
+
+    def test_the_duplicate_of_an_older_version_names_that_version(self):
+        same = contracts.upload_version(self.staff, pdf(b"\n% shelf"), date(2026, 5, 5))
+        response = self.post(file=upload_file(bytes(ContractVersion.objects.get(pk=same.pk).pdf)))
+        self.assertContains(response, "Diese Datei ist schon als Fassung vom 05.05.2026 gespeichert.")
 
     def test_a_forged_post_needs_the_token_and_a_staff_account(self):
         client = self.login(self.staff, enforce_csrf_checks=True)
@@ -311,14 +340,30 @@ class ContractCurrentAndDeleteTests(ContractBase):
         self.client.post(self.url("current", self.spare))
         self.assertEqual(self.events(), again)
 
+    def test_set_as_current_asks_first_and_changes_nothing_on_a_get(self):
+        # W5-09: a question like the deletion; all new customers get that version, the acceptances stay.
+        page = self.client.get(self.url("current", self.spare))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Fassung vom 01.12.2026 als aktuell festlegen?")
+        self.assertContains(page, "Neue Kunden stimmen dieser Fassung zu. Bisherige Zustimmungen bleiben gespeichert.")
+        self.assertContains(page, "csrfmiddlewaretoken")
+        self.assertContains(page, f'href="{LIST}"')  # the way back
+        self.assertEqual(contracts.current_version().pk, self.current.pk)
+        # The current version has no question; an unknown one is a 404.
+        self.assertEqual(self.client.get(self.url("current", self.current)).status_code, 404)
+        self.assertEqual(self.client.get(reverse("management:contracts_current", args=[999999])).status_code, 404)
+
     def test_set_as_current_is_a_post_with_a_token_for_a_known_version(self):
-        self.assertEqual(self.client.get(self.url("current", self.spare)).status_code, 405)
         self.assertEqual(self.client.post(reverse("management:contracts_current", args=[999999])).status_code, 404)
         client = self.login(self.staff, enforce_csrf_checks=True)
         self.assertEqual(client.post(self.url("current", self.spare)).status_code, 403)
         self.assertEqual(contracts.current_version().pk, self.current.pk)
         self.assertEqual(self.login(self.plain).post(self.url("current", self.spare)).status_code, 404)
+        self.assertEqual(self.login(self.plain).get(self.url("current", self.spare)).status_code, 404)
+        self.assertEqual(Client().get(self.url("current", self.spare)).status_code, 302)
         self.assertEqual(contracts.current_version().pk, self.current.pk)
+        for method in ("put", "patch", "delete"):
+            self.assertEqual(getattr(self.client, method)(self.url("current", self.spare)).status_code, 405)
 
     def test_delete_asks_first_and_then_removes_a_version_that_was_never_current(self):
         page = self.client.get(self.url("delete", self.spare))

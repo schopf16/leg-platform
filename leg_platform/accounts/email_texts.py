@@ -232,7 +232,7 @@ DEFINITIONS = {
     ),
     Key.APPLICATION_ROLLED_BACK: Definition(
         "accounts/email/application_rolled_back.txt",
-        lambda: gettext("Your application at %(instance_name)s was rolled back"),
+        lambda: gettext("Your application at %(instance_name)s was deleted"),
         (GREETING,),
         (),
     ),
@@ -244,7 +244,7 @@ DEFINITIONS = {
     ),
     Key.CONTRACT_ROLLED_BACK: Definition(
         "accounts/email/contract_rolled_back.txt",
-        lambda: gettext("Your application at %(instance_name)s was rolled back"),
+        lambda: gettext("Your application at %(instance_name)s was deleted"),
         (GREETING,),
         (),
     ),
@@ -275,6 +275,25 @@ DEFINITIONS = {
     Key.OPERATOR_CONFIRMATION_LAPSED: Definition(
         "accounts/email/operator_confirmation_lapsed.txt",
         lambda: gettext("Registration at the grid operator to be withdrawn: %(instance_name)s"),
+        (GREETING,),
+        (),
+    ),
+    # Action required of the customer, so it is sent: the reason is in the portal, never in the mail.
+    Key.APPLICATION_RETURNED: Definition(
+        "accounts/email/application_returned.txt",
+        lambda: gettext("Your application at %(instance_name)s needs a correction"),
+        (GREETING,),
+        (),
+    ),
+    Key.APPLICATION_REJECTED: Definition(
+        "accounts/email/application_rejected.txt",
+        lambda: gettext("Your application at %(instance_name)s was not accepted"),
+        (GREETING,),
+        (),
+    ),
+    Key.APPLICATION_REJECTED_OPERATOR: Definition(
+        "accounts/email/application_rejected_operator.txt",
+        lambda: gettext("Your application at %(instance_name)s was not accepted"),
         (GREETING,),
         (),
     ),

@@ -29,6 +29,7 @@ from leg_platform.community.application_common import (
     MAX_DRAFTS_PER_PERSON,
     MAX_OPEN_APPLICATIONS_PER_PERSON,
     ApplicationError,
+    add_days,
     add_months,
     locked_customer,
 )
@@ -125,6 +126,42 @@ def open_applications(person):
 def own_application(person, pk):
     """The application of this account; ``Application.DoesNotExist`` for any other (never reveals one)."""
     return Application.objects.get(pk=pk, person=person)
+
+
+def returned_reason(application):
+    """The reason the LEG gave when it returned the application for correction, for the banner on the draft; ``""`` if
+    the draft was not returned (or was submitted again: the reason is cleared then). The caller got the application
+    through ``own_application``; the value is read from the database, not from the object."""
+    reason = (
+        Application.objects.filter(
+            pk=getattr(application, "pk", None), state__in=Application.DRAFT_STATES, returned_at__isnull=False
+        )
+        .values_list("returned_reason", flat=True)
+        .first()
+    )
+    return reason or ""
+
+
+def rollback_date(application, now=None):
+    """The day on which the scheduler deletes the draft if the customer does nothing: the reminder day plus
+    ``rollback_after_days`` for a paused draft, and the day the contract deadline lapses for a draft that waits only for
+    the contract (the earlier of the two if both run); ``None`` for any other state or a day beyond the range of
+    dates. For "continue, otherwise it is deleted on <date>"."""
+    values = ManagementSettings.load()
+    row = (
+        Application.objects.filter(pk=getattr(application, "pk", None), state__in=Application.DRAFT_STATES)
+        .values("state", "reminded_at", "contract_pending_since")
+        .first()
+    )
+    if row is None:
+        return None
+    moments = []
+    if row["state"] == Application.State.PAUSED and row["reminded_at"] is not None:
+        moments.append(add_days(row["reminded_at"], values.rollback_after_days))
+    if row["contract_pending_since"] is not None:
+        moments.append(add_days(row["contract_pending_since"], values.contract_deadline_days))
+    moments = [moment for moment in moments if moment is not None]
+    return timezone.localdate(min(moments)) if moments else None
 
 
 def _draw_present(building, today):
@@ -659,10 +696,11 @@ def submit(person, application, *, today=None):
             draft.contract_pending_since = None
             draft.iban_reminded_at = None
             draft.returned_at = None
+            draft.returned_reason = ""
             draft.save(
                 update_fields=[
                     "state", "submitted_at", "reminded_at", "contract_pending_since", "iban_reminded_at",
-                    "returned_at", "updated_at",
+                    "returned_at", "returned_reason", "updated_at",
                 ]
             )
             history.record(draft, HistoryEvent.APPLICATION_SUBMITTED, fresh)

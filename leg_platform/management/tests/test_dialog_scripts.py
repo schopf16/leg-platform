@@ -390,11 +390,11 @@ class MenuOrderTests(TestCase):
         self.assertGreaterEqual(len(menus), 2)  # the left menu and the menu of the phone
         all_items = re.findall(r'<(?:a|button)[^>]*class="frame-item[^"]*"[^>]*>.*?</(?:a|button)>', html, re.S)
         labels = [re.sub(r"<[^>]+>|\s+", " ", item).strip() for item in all_items]
-        # In every copy of the menu "Systemverwaltung" comes after "Mitteilungen" and before "Abmelden".
+        # In every copy of the menu "Systemverwaltung" comes after "Mitteilungen" and before "Ausloggen".
         for index, label in enumerate(labels):
             if label.startswith("Systemverwaltung"):
                 self.assertTrue(labels[index - 1].startswith("Mitteilungen"), labels[index - 1])
-                self.assertTrue(labels[index + 1].startswith("Abmelden"), labels[index + 1])
+                self.assertTrue(labels[index + 1].startswith("Ausloggen"), labels[index + 1])
         self.assertEqual(sum(label.startswith("Systemverwaltung") for label in labels), 2)
         for part in menus:
             self.assertLess(part.index("Verwaltung</p>"), part.index("Systemverwaltung"))

@@ -13,7 +13,7 @@ means the wizard skips the step; "Change" leads to where the detail is kept. A s
         </div>
         <div class="overview-state">
           <span class="dotword"><span class="dot tone-{% if row.state == 'known' or row.state == 'done' %}ok{% else %}muted{% endif %}" aria-hidden="true"></span>{% if row.state == 'known' %}{% translate "Already on file" %}{% elif row.state == 'done' %}{% translate "Finished" %}{% else %}{% translate "Open" %}{% endif %}</span>
-          {% if row.change_url %}<a class="btn btn-secondary-action btn-small" href="{{ row.change_url }}">{% translate "Change" %}<span class="visually-hidden"> – {{ row.name }}</span></a>{% endif %}
+          {% if row.change_url %}<a class="btn btn-secondary-action btn-small" href="{{ row.change_url }}">{% if row.view_only %}{% translate "View" %}{% else %}{% translate "Change" %}{% endif %}<span class="visually-hidden"> – {{ row.name }}</span></a>{% endif %}
         </div>
       </li>
     {% endfor %}

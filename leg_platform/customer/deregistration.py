@@ -11,7 +11,9 @@ the button "Give binding notice" (no typed word, no extra dialog: KONZEPT 7.1 it
   "Delete account" (all running points chosen), ``?point=<id>`` (repeatable, the way back from the IBAN) chooses points.
   Every id is resolved through the account: the id of a building or a metering point that is not the account's own is a 404.
 * **Feed-in needs an IBAN** (``iban_required``): the page leads to the profile card, which leads back with the choice.
-* **The date is never shown** (ABMELDUNG.md section 3): "Earliest possible date" or a desired month end; the LEG confirms.
+* **The earliest date is shown** next to "Earliest possible date" (``deregistrations.earliest_date_preview``; W3-03, a team
+  lead decision that deviates from ABMELDUNG.md section 3, owner to confirm). It is a reading of the notice period; the
+  LEG confirms the date.
 * A GET changes nothing. Nothing here writes a name, a number or an IBAN to a log.
 """
 
@@ -31,7 +33,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from leg_platform.accounts import second_factor
 from leg_platform.community import buildings, deregistrations, own_iban
 from leg_platform.community.application_common import ApplicationError
-from leg_platform.community.models import Direction, PersonAssignment
+from leg_platform.community.models import Deregistration, Direction, PersonAssignment
 from leg_platform.customer import forms, limits, overview, returns, texts
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.customer.wizard import _preselected_location, operator_name, too_many_requests
@@ -205,6 +207,11 @@ class DeregistrationStartView(DeregistrationBase):
             "needs_iban": needs_iban, "bank_url": returns.bank_change_url(back),
             "cancel_url": reverse("accounts:profile") + "#card-delete" if deletion else reverse("customer:buildings"),
             "today": today.isoformat(), "operator": operator_name(),
+            "earliest": deregistrations.earliest_date_preview(today),
+            # Nothing to choose because the points are in a deregistration already (W3-07), not because there are none.
+            "already_deregistered": not points and Deregistration.objects.filter(
+                person=request.user, state__in=(Deregistration.State.SUBMITTED, Deregistration.State.CONFIRMED)
+            ).exists(),
         }
         return render(request, self.template_name, context)
 

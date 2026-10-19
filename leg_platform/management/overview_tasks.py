@@ -9,9 +9,10 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
-from leg_platform.community import application_queue, grid_operator, process_list
+from leg_platform.community import application_notices, application_queue, grid_operator, labels, process_list
 from leg_platform.community.models import Application
 from leg_platform.management.metering_point_views import format_date
+from leg_platform.management.process_views import person_card
 
 PREVIEW = 5
 
@@ -42,11 +43,24 @@ def _deregistration_entries(found):
         {
             "label": row.person_label,
             "sub": " · ".join(
-                [_("wanted for %(date)s") % {"date": format_date(row.desired_date)}, _points_text(row.metering_points)]
+                [_("requested date %(date)s") % {"date": format_date(row.desired_date)}, _points_text(row.metering_points)]
             ),
             "url": reverse("management:processes_deregistration", args=[row.deregistration_id]),
         }
         for row in found[:PREVIEW]
+    ]
+
+
+def _notice_entries():
+    """The oldest few open notices: the kind (what happened) and the person it is about. The link opens the page of the
+    notices, where the person and the numbers stand."""
+    return [
+        {
+            "label": labels.notice_kind_label(notice.kind),
+            "sub": person_card(notice.person)["name"],
+            "url": reverse("management:processes_notices"),
+        }
+        for notice in application_notices.open_notices()[:PREVIEW]
     ]
 
 
@@ -94,7 +108,8 @@ def task_rows(actor):
     add(
         count,
         ngettext(
-            "%(count)d deregistration waiting for its date", "%(count)d deregistrations waiting for their date", count
+            "%(count)d deregistration waiting for the date confirmation",
+            "%(count)d deregistrations waiting for the date confirmation", count,
         ) % {"count": count},
         _list_url(process_list.STATE_DEREGISTRATION_SUBMITTED), _("Go to the deregistrations waiting for their date"),
         _deregistration_entries(application_queue.waiting_deregistrations(actor)),
@@ -103,7 +118,7 @@ def task_rows(actor):
     add(
         count,
         ngettext("%(count)d notice for the staff", "%(count)d notices for the staff", count) % {"count": count},
-        reverse("management:processes_notices"), _("Go to the notices"),
+        reverse("management:processes_notices"), _("Go to the notices"), _notice_entries(),
     )
     if counts["contract_missing"]:
         rows.append(

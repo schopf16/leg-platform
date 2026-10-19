@@ -7,8 +7,12 @@
   "use strict";
   const root = document.documentElement;
   const button = document.getElementById("menu-btn");
+  // More buttons may open the same menu (the "Menu" tab of the bottom bar of a staff account); the focus goes back to
+  // the one that opened it.
+  const openers = [button, ...document.querySelectorAll("[data-menu-open]")].filter(Boolean);
   const drawer = document.getElementById("frame-drawer");
   if (!button || !drawer) return;
+  let opener = button;
   const panel = drawer.querySelector(".frame-drawer-panel");
   const behind = Array.from(document.querySelectorAll(".frame-header, .frame-main, .frame-bottombar, .corner"));
   const desktop = window.matchMedia("(min-width: 761px)");
@@ -23,7 +27,7 @@
     isOpen = true;
     drawer.classList.add("is-open");
     root.classList.add("menu-open");
-    button.setAttribute("aria-expanded", "true");
+    openers.forEach((element) => element.setAttribute("aria-expanded", "true"));
     behind.forEach((element) => { element.inert = true; });
     const items = focusable();
     // The focus goes to the close button, the first thing a keyboard user may want (designer review
@@ -38,18 +42,21 @@
     isOpen = false;
     drawer.classList.remove("is-open");
     root.classList.remove("menu-open");
-    button.setAttribute("aria-expanded", "false");
+    openers.forEach((element) => element.setAttribute("aria-expanded", "false"));
     behind.forEach((element) => { element.inert = false; });
     // A leftover anchor (the page was opened with #frame-drawer) must not keep the menu open.
     if (window.location.hash === "#frame-drawer") {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
-    button.focus();
+    opener.focus();
   };
 
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    open();
+  openers.forEach((element) => {
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      opener = element;
+      open();
+    });
   });
   drawer.querySelectorAll("[data-menu-close]").forEach((element) => {
     element.addEventListener("click", (event) => {

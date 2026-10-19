@@ -63,6 +63,9 @@ class MailJob(models.Model):
         DEREGISTRATION_EFFECTIVE = "deregistration_effective", "Deregistration effective"
         IBAN_CHANGED = "iban_changed", "IBAN changed"
         OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", "Confirmation by the grid operator missing"
+        APPLICATION_RETURNED = "application_returned", "Application returned for correction"
+        APPLICATION_REJECTED = "application_rejected", "Application not accepted"
+        APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", "Application not accepted by the grid operator"
 
     # Notifications about a change of the account, as opposed to the requests of a person who
     # may have no account (D-038, D-040).
@@ -91,6 +94,9 @@ class MailJob(models.Model):
         Kind.DEREGISTRATION_EFFECTIVE,
         Kind.IBAN_CHANGED,
         Kind.OPERATOR_CONFIRMATION_LAPSED,
+        Kind.APPLICATION_RETURNED,
+        Kind.APPLICATION_REJECTED,
+        Kind.APPLICATION_REJECTED_OPERATOR,
     )
 
     kind = models.CharField(max_length=32, choices=Kind, editable=False)
@@ -197,6 +203,11 @@ class EmailText(models.Model):
         IBAN_CHANGED = "iban_changed", _("Notification: IBAN changed")
         OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", _(
             "Staff: confirmation by the grid operator is missing, withdraw the registration"
+        )
+        APPLICATION_RETURNED = "application_returned", _("Application: returned for correction")
+        APPLICATION_REJECTED = "application_rejected", _("Application: not accepted by the LEG")
+        APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", _(
+            "Application: not accepted by the grid operator"
         )
 
     key = models.CharField(

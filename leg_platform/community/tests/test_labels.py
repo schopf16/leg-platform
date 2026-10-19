@@ -8,7 +8,7 @@ from django.utils import translation
 from unittest.mock import patch
 
 from leg_platform.community import labels
-from leg_platform.community.models import Application, ApplicationNotice, GridOperator
+from leg_platform.community.models import Application, ApplicationNotice, CustomerMessage, GridOperator
 
 
 @tag("mariadb")
@@ -22,7 +22,7 @@ class ModelLabelTests(TestCase):
                     for _key, label in getattr(field, "choices", None) or ():
                         str(label)
                 str(model._meta.verbose_name)
-            for choices in (Application.State, Application.StartChoice, ApplicationNotice.Kind):
+            for choices in (Application.State, Application.StartChoice, ApplicationNotice.Kind, CustomerMessage.Kind):
                 for label in choices.labels:
                     str(label)
 
@@ -47,6 +47,15 @@ class HelperTests(TestCase):
             )
             self.assertEqual(labels.application_state_label("operator_confirmed"), "Confirmed by the Example Grid")
             self.assertIn("Example Grid", labels.notice_kind_label(ApplicationNotice.Kind.OPERATOR_CONFIRMATION_LAPSED))
+
+    def test_a_paused_draft_is_labelled_paused_for_the_customer_without_the_operator(self):
+        with translation.override("de-ch"):
+            self.assertEqual(labels.application_state_label("paused"), "Pausiert")
+            self.assertEqual(labels.application_state_label(Application.State.DRAFT), "Entwurf")
+        with translation.override("en"):
+            self.assertEqual(labels.application_state_label("paused"), "Paused")
+        with self.assertNumQueries(0):
+            labels.application_state_label("paused")
 
     def test_other_states_keep_their_plain_label_and_a_database_error_gives_the_static_one(self):
         with translation.override("en"):

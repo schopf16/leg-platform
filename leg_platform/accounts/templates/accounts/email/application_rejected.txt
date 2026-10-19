@@ -1,0 +1,10 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your application at {{ instance_name }} was not accepted. For privacy reasons we deleted your building and metering point details. Your account remains.{% endblocktranslate %}
+
+{% translate "You can start a new application at any time after you sign in:" %}
+
+{{ login_url }}{% if contact_url %}
+
+{% blocktranslate %}Contact information: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% endautoescape %}

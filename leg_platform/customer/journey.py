@@ -14,19 +14,12 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.community import applications
+from leg_platform.community import applications, grid_operator
 from leg_platform.community.models import Application, Direction, PersonAssignment
+from leg_platform.customer import steps as steps_module
+from leg_platform.customer.steps import STEP_NAMES
 
 DONE, NOW, TODO = "done", "now", "todo"
-
-STEP_LABELS = {
-    applications.BUILDING: _("Record location"),
-    applications.METERING_POINTS: _("Record metering points"),
-    applications.BANK_CONNECTION: _("Bank or postal connection"),
-    applications.CONTRACT: _("Agree to the contract"),
-    applications.START: _("Choose the start date"),
-}
-FINAL_LABEL = _("Registered with the LEG")
 
 # What the card says about the next step: (sentence, button) and the name of the page of the step.
 NEXT = {
@@ -57,6 +50,7 @@ class JourneyStep:
     label: object
     state: str  # done / now / todo
     muted: bool = False  # "not yet selectable": greyed out but visible
+    word: str = ""  # a special word for the state (after the submission); empty: Finished / Next up / Open
 
 
 @dataclass(frozen=True)
@@ -68,6 +62,9 @@ class Journey:
     button: object
     url: str
     paused: bool = False
+    paused_date: object = None  # the day a paused draft is deleted
+    reason: str = ""  # why the LEG returned the draft
+    returned: bool = False
 
 
 def current_application(person):
@@ -78,7 +75,10 @@ def current_application(person):
 
 
 def for_account(person):
-    """The ``Journey`` of the account, or None (state B: no application is open)."""
+    """The ``Journey`` of the account, or None (state B: no application is open).
+
+    One list for the whole process (W1-01): before the submission the steps of the wizard with its names and "n of m"
+    (no final step: the count is the wizard's); after it the five steps of the page "submitted"."""
     application = current_application(person)
     if application is None:
         return None
@@ -88,30 +88,33 @@ def for_account(person):
         steps = []
         for step in applicable:
             if step.state != applications.OPEN:
-                steps.append(JourneyStep(STEP_LABELS[step.key], DONE))
+                steps.append(JourneyStep(STEP_NAMES[step.key], DONE))
             else:
-                steps.append(JourneyStep(STEP_LABELS[step.key], NOW if step.key == current.next_step else TODO, not step.available))
-        steps.append(JourneyStep(FINAL_LABEL, TODO))
+                steps.append(JourneyStep(STEP_NAMES[step.key], NOW if step.key == current.next_step else TODO, not step.available))
         if current.next_step is None:
             sentence, button, name = READY
         else:
             sentence, button, name = NEXT[current.next_step]
+        paused = application.state == Application.State.PAUSED
         return Journey(
-            steps, current.done, current.total + 1, sentence, button,
-            reverse(name, args=[application.pk]), paused=application.state == Application.State.PAUSED,
+            steps, current.done, current.total, sentence, button,
+            reverse(name, args=[application.pk]), paused=paused,
+            paused_date=applications.rollback_date(application) if paused else None,
+            reason=applications.returned_reason(application), returned=application.returned_at is not None,
         )
-    # Submitted or later: everything the customer does is done; the LEG acts.
-    has_feed_in = application.buildings.filter(metering_points__direction=Direction.FEED_IN).exists()
-    keys = [
-        key for key in applications.STEPS if key != applications.BANK_CONNECTION or has_feed_in
+    # Submitted or later: everything the customer does is done; the LEG acts. The list of the page "submitted".
+    steps = [
+        JourneyStep(label, {applications.DONE: DONE, "next": NOW}.get(state, TODO), word=word)
+        for _key, state, label, word in steps_module.post_submit_steps(application, grid_operator.name())
     ]
-    steps = [JourneyStep(STEP_LABELS[key], DONE) for key in keys]
-    steps.append(JourneyStep(FINAL_LABEL, NOW))
     sentence = {
         Application.State.OPERATOR_STARTED: AT_OPERATOR,
         Application.State.OPERATOR_CONFIRMED: CONFIRMED,
     }.get(application.state, IN_REVIEW)
-    return Journey(steps, len(steps) - 1, len(steps), sentence, _("View progress"), reverse("customer:buildings"))
+    return Journey(
+        steps, sum(step.state == DONE for step in steps), len(steps), sentence, _("View progress"),
+        reverse("customer:buildings"),
+    )
 
 
 # ---- Facts for the tiles of the start page ----

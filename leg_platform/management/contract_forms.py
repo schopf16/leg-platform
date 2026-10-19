@@ -28,8 +28,8 @@ class ContractUploadForm(DialogForm):
     version_date = date_field(_("Version date"), initial="today")
     layout = [("single", ["file"]), ("single", ["version_date"])]
     hint = _(
-        "A new file is stored as uploaded and is not current yet. Only a version that is set as current is shown "
-        "to the customers. The file is not changed. PDF only, at most 10 MiB."
+        "A new version is not current yet: customers see only the version that is set as current. "
+        "PDF only, at most 10 MiB."
     )
 
     def clean_file(self):

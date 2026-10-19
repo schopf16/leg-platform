@@ -6,10 +6,25 @@ Buildings" and "Information / Articles of association" are active on the pages o
 """
 
 from django import template
+from django.utils.html import format_html
+from django.utils.translation import gettext
 
 register = template.Library()
 
 INFORMATION_VIEWS = frozenset({"customer:contract"})
+
+
+@register.simple_tag(takes_context=True)
+def leg_link(context):
+    """The word "LEG" as a link to the instance's website where one is configured (the portal settings, as on the entry
+    pages), else the plain word (W1-03). The address is escaped; the link opens in a new tab without the opener."""
+    url = str(context.get("instance_website_url") or "")
+    word = gettext("LEG")
+    # Only an https address becomes a link: never a "javascript:", "data:" or plain "http:" address (the setting is
+    # validated already; this is the second check at the place where it becomes a link).
+    if not url.lower().startswith("https://"):
+        return word
+    return format_html('<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>', url, word)
 
 
 @register.simple_tag(takes_context=True)

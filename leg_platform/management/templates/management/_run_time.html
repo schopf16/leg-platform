@@ -1,0 +1,14 @@
+{% load i18n %}{% comment %}
+The small block "Address directory" of the settings page (KONZEPT 3a.5; walkthrough W5-10): the time of day of the daily
+run. It is no deadline, so it stands outside the chapter "Reminders and deadlines" and has its own form and button.
+Context: ``run_time_form``.
+{% endcomment %}<form method="post" action="{% url 'management:settings_run_time' %}" novalidate>
+  {% csrf_token %}
+  <section class="mgmt-card" aria-labelledby="run-time-title">
+    <h2 id="run-time-title">{% translate "Address directory" %}</h2>
+    {% if run_time_form.errors %}{% with form=run_time_form %}{% include "accounts/_error_summary.html" %}{% endwith %}{% endif %}
+    <p class="mgmt-hint">{% translate "From this time of day the daily run checks whether the address directory must be updated. At most one download per day." %}</p>
+    {% include "management/_field_row.html" with field=run_time_form.run_time %}
+    <div class="mgmt-actions"><button type="submit" class="btn btn-primary">{% translate "Save the time" %}</button></div>
+  </section>
+</form>

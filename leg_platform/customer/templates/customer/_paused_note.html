@@ -1,0 +1,3 @@
+{% load i18n %}{% comment %}
+The paused note (W2-04): a paused draft and the day on which it is deleted. Context: ``paused_date`` (a date or empty).
+{% endcomment %}{% if paused_date %}{% blocktranslate with date=paused_date|date:"d.m.Y" %}Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted on {{ date }}.{% endblocktranslate %}{% else %}{% translate "Your application is paused because it was not changed for some time. Continue it, otherwise it will be deleted." %}{% endif %}

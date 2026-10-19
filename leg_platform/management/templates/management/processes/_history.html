@@ -6,7 +6,7 @@ value, D-077). Newest first. Context: ``history``.
   {% if history %}
     <ol class="mgmt-log">
       {% for entry in history %}
-        <li><time datetime="{{ entry.time|date:'c' }}">{{ entry.time|date:"d.m.Y, H:i" }}</time> {{ entry.actor }}: {{ entry.label }}</li>
+        <li><time datetime="{{ entry.time|date:'c' }}">{{ entry.time|date:"d.m.Y, H:i" }}</time> {{ entry.actor }}: {{ entry.label }}{% if entry.count > 1 %}<span class="mgmt-log-count tnum">× {{ entry.count }}</span>{% endif %}</li>
       {% endfor %}
     </ol>
   {% else %}

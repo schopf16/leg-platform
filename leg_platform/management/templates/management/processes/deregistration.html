@@ -2,7 +2,8 @@
 {% load i18n static management_ui %}{% comment %}
 The page of one deregistration (owner design ``vorgaenge/referenz/vorgang-abmeldung-desktop``, ``VORGABEN.md`` section 10,
 ``ABMELDUNG.md``; D-103): three steps (submitted, date confirmed by the LEG, deregistered at the grid operator), the metering points,
-the dates and the one button of the staff: "Confirm the date" (records the termination at every point). The proof of the
+the dates and the one button of the staff: "Confirm the date" (records the termination at every point), in the card "Next step" like
+the page of an application (walkthrough W5-06). The proof of the
 customer's confirmation (password or code) is never shown; the deregistration exists only because it was given. The third
 step is done by the system on the confirmed date (the scheduled tasks mark it effective): the page has no button for it.
 {% endcomment %}
@@ -24,8 +25,8 @@ step is done by the system on the confirmed date (the scheduled tasks mark it ef
 
   <section class="mgmt-card" aria-labelledby="way-title">
     <h2 id="way-title">{% translate "Progress" %}</h2>
-    <progress class="mgmt-progress mgmt-progress-wide" value="{{ done }}" max="{{ total }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}"></progress>
-    <p class="mgmt-note">{% blocktranslate %}{{ done }} of {{ total }} steps{% endblocktranslate %}</p>
+    <progress class="mgmt-progress mgmt-progress-wide" value="{{ done }}" max="{{ total }}" aria-label="{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}"></progress>
+    <p class="mgmt-note">{% blocktranslate %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</p>
     <ol class="mgmt-way">
       {% for step in steps %}
         <li>{% include "management/_status.html" with tone=step.tone label=step.state_label %}<span class="mgmt-way-label">{{ step.label }}</span>{% if step.note %}<span class="mgmt-muted tnum">{{ step.note }}</span>{% endif %}</li>
@@ -33,12 +34,18 @@ step is done by the system on the confirmed date (the scheduled tasks mark it ef
     </ol>
   </section>
 
+  <section class="mgmt-card" aria-labelledby="next-title">
+    <h2 id="next-title">{% translate "Next step" %}</h2>
+    <p>{{ next_text }}</p>
+    {% if can_confirm %}
+      <div class="mgmt-step-buttons"><a class="btn btn-primary" href="{{ confirm_url }}">{% translate "Confirm the date" %}</a></div>
+    {% endif %}
+  </section>
+
   <div class="mgmt-process-layout">
     <div class="mgmt-process-main">
       <section class="mgmt-card" aria-labelledby="dates-title">
-        <div class="mgmt-card-head"><h2 id="dates-title">{% translate "Dates" %}</h2>
-          {% if can_confirm %}<a class="btn btn-primary btn-xs" href="{{ confirm_url }}">{% translate "Confirm the date" %}</a>{% endif %}
-        </div>
+        <div class="mgmt-card-head"><h2 id="dates-title">{% translate "Dates" %}</h2></div>
         <dl class="mgmt-facts">
           <div class="mgmt-fact"><dt>{% translate "Earliest date" %}</dt><dd class="tnum">{{ earliest }}<br><span class="mgmt-muted">{% translate "Four months to the end of a month, counted from the day of the notice." %}</span></dd></div>
           <div class="mgmt-fact"><dt>{% translate "Wished date" %}</dt><dd class="tnum">{{ desired }}{% if wants_earliest %}<br><span class="mgmt-muted">{% translate "The customer chose the earliest possible date." %}</span>{% endif %}</dd></div>
@@ -71,10 +78,6 @@ step is done by the system on the confirmed date (the scheduled tasks mark it ef
           {% endfor %}
         </dl>
       </section>
-
-      <div class="mgmt-actions mgmt-process-end">
-        <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Back to the list" %}</a>
-      </div>
     </div>
 
     <aside class="mgmt-process-side" aria-label="{% translate 'Side column' %}">

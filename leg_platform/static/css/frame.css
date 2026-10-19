@@ -853,6 +853,14 @@
   color: var(--muted);
 }
 
+/* A field that is locked (a confirmed address, W4-01) looks different from an editable one: grey background, muted text. */
+.profile-form .form-control:disabled,
+.profile-form .form-control[readonly] {
+  background-color: var(--bg);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .profile-actions {
   display: flex;
   flex-wrap: wrap;

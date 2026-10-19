@@ -88,7 +88,7 @@ TASKS = (
         description=_("Register your building to take part in the LEG."),
         button=_("Register building"),
         is_open=_has_no_building,
-        method="link",
+        method="post",  # starts the application (a POST: it may create the draft, W1-05)
         url_name="customer:application_start",
         button_style="primary",
     ),

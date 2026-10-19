@@ -2350,6 +2350,47 @@ a.mgmt-sort:hover {
   overflow-wrap: anywhere;
 }
 
+/* The side column of a process page is narrow (a third of the page): the label stands above its value, so an email
+   address has the whole width and is not broken inside a word (walkthrough W5-04). */
+.mgmt-process-side .mgmt-fact {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.mgmt-process-side .mgmt-fact dd {
+  overflow-wrap: break-word;
+}
+
+.mgmt-process-side .mgmt-fact dd.mgmt-wrap {
+  overflow-wrap: anywhere;
+}
+
+/* A run of equal entries of the history is one line with its count. */
+.mgmt-log-count {
+  margin-left: 6px;
+  color: var(--muted);
+}
+
+/* The name of a row of the overview is the link; the small chain icon beside it only repeats it (W5-02). */
+.mgmt-overview-name a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.mgmt-overview-name a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.mgmt-overview-name a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .mgmt-notices {
   margin: 0;
   padding: 0;
@@ -2387,17 +2428,19 @@ a.mgmt-sort:hover {
 }
 
 .mgmt-action {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1.5px solid var(--muted);
   border-radius: 8px;
   background: var(--panel);
   color: var(--fg);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .mgmt-action.is-accent {
@@ -2430,9 +2473,48 @@ a.mgmt-sort:hover {
   stroke-linejoin: round;
 }
 
-/* A cell whose words wrap (the status and the date of the process list) instead of being cut. */
+/* The text label of an icon button: a bubble above it on hover and keyboard focus (pure CSS; it is no popup that needs
+   a close key). The cell of the actions does not cut it off. */
+.mgmt-action-text {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--fg);
+  color: var(--panel);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.mgmt-action:hover .mgmt-action-text,
+.mgmt-action:focus-visible .mgmt-action-text {
+  display: block;
+}
+
+.mgmt-table-fixed td.mgmt-actions-cell {
+  overflow: visible;
+}
+
+/* A cell whose words wrap (the status and the date of the process list) instead of being cut; a word that is longer than
+   the column (the name of the grid operator) breaks inside, so it is never cut off. */
 .mgmt-table-fixed td.mgmt-wrap-cell {
   white-space: normal;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+}
+
+/* The process list has eight columns in a card of about 967 px at 1280 px: narrower cell padding (8 px a side) gives the
+   words their room (walkthrough W5-03). */
+.mgmt-processes .mgmt-table th,
+.mgmt-processes .mgmt-table td {
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .mgmt-wrap-cell .mgmt-status {
@@ -2477,11 +2559,25 @@ a.mgmt-sort:hover {
 
   .mgmt-row-actions {
     margin-top: 8px;
+    flex-wrap: wrap;
   }
 
+  /* On a phone there is no hover: the text stands next to the icon. */
   .mgmt-action {
-    width: 44px;
-    height: 44px;
+    width: auto;
+    min-width: 44px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .mgmt-action-text {
+    position: static;
+    display: inline;
+    padding: 0;
+    transform: none;
+    background: none;
+    color: inherit;
+    font-size: 15px;
   }
 
   .mgmt-task-head {

@@ -36,6 +36,7 @@ from leg_platform.community.models import (
     ApplicationNotice,
     ContractAcceptance,
     ContractVersion,
+    CustomerMessage,
     Deregistration,
     DeregistrationItem,
     HistoryEntry,
@@ -83,7 +84,7 @@ SNAPSHOT_MODELS = (
     # The onboarding (D-103): applications and their draft rows, notices, contract versions and acceptances,
     # deregistrations.
     Application, ApplicationBuilding, ApplicationMeteringPoint, ApplicationNotice, ContractVersion,
-    ContractAcceptance, Deregistration, DeregistrationItem,
+    ContractAcceptance, CustomerMessage, Deregistration, DeregistrationItem,
 )
 
 
@@ -116,7 +117,7 @@ SAMPLE = frozenset({
     "locations", "locations_detail", "locations_address", "locations_circuit", "locations_metering_point_assign",
     "metering_points_detail", "metering_points_notify", "metering_points_edit", "legs_metering_point_assign",
     "legs", "legs_quota", "legs_delete",
-    "settings_deadlines", "processes", "processes_application", "processes_application_complete",
+    "settings_deadlines", "settings_run_time", "processes", "processes_application", "processes_application_complete",
     "processes_application_review", "processes_notice_resolve", "processes_deregistration_confirm",
     "contracts", "contracts_upload", "contracts_download", "contracts_current", "contracts_delete",
 })
@@ -223,8 +224,9 @@ class MatrixBase(TestCase):
             Case("settings_check", query={"field": "identifier", "value": "x"}),
             Case("settings_deadlines", data={
                 "reminder_after_days": "3", "rollback_after_days": "15", "contract_deadline_days": "15",
-                "operator_confirmation_days": "15", "iban_missing_reminder_days": "8", "run_time": "04:30",
+                "operator_confirmation_days": "15", "iban_missing_reminder_days": "8",
             }, changes=True),
+            Case("settings_run_time", data={"run_time": "04:30"}, changes=True),
             Case("list_widths", ("locations",), {"widths": {"street": 200}}, json=True),
             # Processes and notices (D-103)
             Case("processes"),
@@ -232,12 +234,12 @@ class MatrixBase(TestCase):
             Case("processes_notice_resolve", pk(self.notice), {}, True),
             Case("processes_application", pk(self.app_review)),
             Case("processes_application_review", pk(self.app_review), {}, True),
-            Case("processes_application_return", pk(self.app_return), {}, True),
+            Case("processes_application_return", pk(self.app_return), {"reason": "Please check the details."}, True),
             Case("processes_application_operator_started", pk(self.app_start), {"started_on": date(0)}, True),
             Case("processes_application_operator_confirmed", pk(self.app_confirm), {"confirmed_on": date(0)}, True),
             Case(
                 "processes_application_complete", pk(self.app_complete),
-                {"start_date": "2026-09-01", "confirm_addresses": "0"}, True,
+                {"start_date": "2026-09-01"}, True,
             ),
             Case("processes_application_reject", pk(self.app_reject), {"reason": "rejected"}, True),
             Case("processes_deregistration", pk(self.dereg)),

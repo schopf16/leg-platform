@@ -559,6 +559,20 @@ class AdminLifecycleTests(TestCase):
         self.assertTrue(retained.retention_obligation)
         self.assertIsNone(retained.normalized_email)
 
+    def test_admin_deactivation_also_purges_the_one_time_messages_and_return_reasons(self):
+        from leg_platform.community import customer_messages
+        from leg_platform.community.models import CustomerMessage
+
+        retained = create_active_user("retained.purge@example.org")
+        retained.set_retention_obligation()
+        customer_messages.record(retained, CustomerMessage.Kind.APPLICATION_REJECTED, "intern")
+
+        self.client.post(self.lifecycle_url(retained, "delete"), {"confirm": "on"})
+
+        retained.refresh_from_db()
+        self.assertEqual(retained.status, User.Status.DEACTIVATED)
+        self.assertFalse(CustomerMessage.objects.filter(person=retained).exists())
+
     def test_reactivation_refuses_an_address_owned_by_an_active_account(self):
         retained = create_active_user("retained@example.org")
         retained.set_retention_obligation()

@@ -71,7 +71,8 @@ class StartPageCardTests(TestCase):
         tile = tile[: tile.index("</article>")]
         for marker in ("Gebäude anmelden", "Offen", "Melden Sie Ihr Gebäude an, um an der LEG teilzunehmen.", "btn-primary", "Ausblenden"):
             self.assertIn(marker, tile)
-        self.assertIn(f'href="{START}"', tile)
+        self.assertIn(f'action="{START}"', tile)
+        self.assertIn('method="post"', tile)
         # The two tiles of the empty state of the owner: register building, then two-factor sign-in.
         self.assertLess(html.index("task-register_building-title"), html.index("task-two_factor-title"))
 
@@ -92,14 +93,17 @@ class StartPageCardTests(TestCase):
         card = html[html.index('class="journey"') :]
         card = card[: card.index("</section>")]
         for marker in (
-            "Ihr Weg in die LEG", "2 von 5 erledigt", "<progress", "Standort erfassen", "Messpunkte erfassen",
-            "Vertrag zustimmen", "Startdatum wählen", "Bei der LEG angemeldet",
+            "Ihr Weg in die LEG", "2 von 4 erledigt", "<progress", "<span>Gebäude</span>", "<span>Messpunkte</span>",
+            "<span>Vertrag</span>", "<span>Startdatum</span>",
             "Sie müssen dem Gesellschaftsvertrag zustimmen.", "Vertrag lesen und zustimmen",
         ):
             self.assertIn(marker, card)
+        # One list (W1-01): the names of the wizard, no extra final step.
+        for gone in ("Bei der LEG angemeldet", "Standort erfassen", "Messpunkte erfassen", "Aufschaltung"):
+            self.assertNotIn(gone, card)
         self.assertEqual(card.count("Als Nächstes"), 1)
         self.assertEqual(card.count("Erledigt"), 2)
-        self.assertEqual(card.count("Offen"), 2)
+        self.assertEqual(card.count("Offen"), 1)
         self.assertNotIn("Bank- oder Postverbindung", card)
         self.assertIn(f'href="{step_url(application, "contract")}"', card)
         self.assertEqual(card.count("btn-primary"), 1)
@@ -110,7 +114,7 @@ class StartPageCardTests(TestCase):
     def test_the_start_date_is_visible_but_greyed_before_the_contract(self):
         draft_with_points(self.mine)
         html = text(self.client.get(HOME))
-        self.assertRegex(html, r'<li class="is-muted"><span class="dot[^>]*></span><span>Startdatum wählen</span>')
+        self.assertRegex(html, r'<li class="is-muted"><span class="dot[^>]*></span><span>Startdatum</span>')
 
     def test_the_bank_step_is_in_the_card_only_with_a_feed_in(self):
         application, _building = draft_with_points(self.mine, feed_in=True)
@@ -118,7 +122,7 @@ class StartPageCardTests(TestCase):
         self.assertIn("Bank- oder Postverbindung", html)
         self.assertIn("Sie müssen Ihre Bank- oder Postverbindung angeben.", html)
         self.assertIn(f'href="{step_url(application, "bank_connection")}"', html)
-        self.assertIn("2 von 6 erledigt", html)
+        self.assertIn("2 von 5 erledigt", html)
 
     def test_a_complete_draft_is_ready_to_submit(self):
         application, _building = draft_with_points(self.mine)
@@ -138,7 +142,9 @@ class StartPageCardTests(TestCase):
         applications.set_start(self.mine, application, asap=True)
         applications.submit(self.mine, application)
         html = text(self.client.get(HOME))
-        self.assertIn("4 von 5 erledigt", html)
+        self.assertIn("1 von 5 erledigt", html)
+        self.assertIn("Sie bestätigen die Anfrage in der E-Mail von", html)
+        self.assertNotIn("Bei der LEG angemeldet", html)
         self.assertIn("Die LEG prüft Ihre Angaben. Sie müssen nichts tun.", html)
         self.assertIn(f'href="{BUILDINGS}"', html)
         application_staff.mark_operator_started(application, self.staff)
@@ -192,4 +198,4 @@ class JourneyUnitTests(TestCase):
     def test_the_texts_for_every_next_step_exist(self):
         for key in applications.STEPS:
             self.assertIn(key, journey.NEXT)
-            self.assertIn(key, journey.STEP_LABELS)
+            self.assertIn(key, journey.STEP_NAMES)

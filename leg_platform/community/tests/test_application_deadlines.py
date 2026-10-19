@@ -635,3 +635,67 @@ class CommandTests(DeadlineCase):
         call_command("run_scheduled_tasks", stdout=StringIO())
         call_command("run_scheduled_tasks", stdout=StringIO())
         self.assertEqual(mails(MailJob.Kind.APPLICATION_REMINDER), 1)
+
+
+@tag("mariadb")
+class RollbackDateTests(DeadlineCase):
+    """``applications.rollback_date``: the day a paused draft is deleted (W2-04), as the scheduler will do it."""
+
+    def test_a_paused_draft_is_deleted_on_the_reminder_day_plus_the_rollback_days(self):
+        application = self.idle_draft(3)
+        application_deadlines.process(NOW)
+        application.refresh_from_db()
+        expected = timezone.localdate(application.reminded_at + timedelta(days=14))
+        self.assertEqual(applications.rollback_date(application), expected)
+        # The scheduler really deletes it on that day and not the day before.
+        before = application_deadlines.process(application.reminded_at + timedelta(days=14) - timedelta(minutes=1))
+        self.assertEqual(before["rolled_back"], 0)
+        after = application_deadlines.process(application.reminded_at + timedelta(days=14))
+        self.assertEqual(after["rolled_back"], 1)
+
+    def test_the_setting_decides(self):
+        application = self.idle_draft(3)
+        application_deadlines.process(NOW)
+        application.refresh_from_db()
+        deadline_settings.update({"rollback_after_days": 30}, self.staff)
+        self.assertEqual(
+            applications.rollback_date(application), timezone.localdate(application.reminded_at + timedelta(days=30))
+        )
+
+    def test_a_draft_that_waits_for_the_contract_has_the_date_of_the_contract_deadline_the_earlier_one_counts(self):
+        waiting = self.idle_draft(1, contract_pending_since=days_ago(10))
+        self.assertEqual(
+            applications.rollback_date(waiting), timezone.localdate(days_ago(10) + timedelta(days=14))
+        )
+        # Paused as well: the reminder-based day is later than the contract deadline here, so the contract day counts.
+        set_state(waiting, state=State.PAUSED, reminded_at=days_ago(1))
+        self.assertEqual(
+            applications.rollback_date(waiting), timezone.localdate(days_ago(10) + timedelta(days=14))
+        )
+        set_state(waiting, contract_pending_since=days_ago(1))
+        self.assertEqual(applications.rollback_date(waiting), timezone.localdate(days_ago(1) + timedelta(days=14)))
+
+    def test_there_is_no_date_for_a_draft_that_is_not_paused_nor_waiting_and_not_for_other_states(self):
+        draft = self.idle_draft(1)
+        self.assertIsNone(applications.rollback_date(draft))
+        set_state(draft, state=State.SUBMITTED, reminded_at=days_ago(3))
+        self.assertIsNone(applications.rollback_date(draft))
+        self.assertIsNone(applications.rollback_date(Application(pk=0)))
+
+    def test_a_huge_setting_gives_no_date_and_never_an_error(self):
+        application = self.idle_draft(3)
+        application_deadlines.process(NOW)
+        application.refresh_from_db()
+        deadline_settings.update({"rollback_after_days": 4_294_967_295}, self.staff)
+        self.assertIsNone(applications.rollback_date(application))
+
+
+@tag("mariadb")
+class OwnIbanCheapTests(DeadlineCase):
+    def test_has_iban_exists_and_tells_whether_the_account_has_one(self):
+        """The cancel confirmation depends on it (W2-05): one query for the row, one decryption, no write."""
+        self.assertFalse(own_iban.has_iban(self.person))
+        own_iban.set_own_iban(self.person, GOOD_IBAN)
+        self.assertTrue(own_iban.has_iban(self.person))
+        own_iban.remove_own_iban(self.person)
+        self.assertFalse(own_iban.has_iban(self.person))

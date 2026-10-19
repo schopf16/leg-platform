@@ -265,6 +265,48 @@ class ConfirmAndEffectTests(TestCase):
         self.assertEqual((first["deregistrations_effective"], second["deregistrations_effective"]), (1, 0))
         self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.DEREGISTRATION_EFFECTIVE).count(), 1)
 
+    def test_the_confirmation_dialog_is_prefilled_with_the_customers_wish_and_the_earliest_date(self):
+        defaults = deregistrations.confirmation_defaults(self.dereg, self.staff, today=TODAY)
+        self.assertEqual(
+            (defaults.desired_date, defaults.wants_earliest, defaults.earliest_date, defaults.suggested_date),
+            (date(2027, 2, 28), True, date(2027, 2, 28), date(2027, 2, 28)),
+        )
+        # The default is a date that ``confirm`` accepts.
+        deregistrations.confirm(self.dereg, self.staff, defaults.suggested_date, today=TODAY)
+
+    def test_a_wish_that_has_passed_is_replaced_by_the_end_of_the_current_month(self):
+        Deregistration.objects.filter(pk=self.dereg.pk).update(desired_date=date(2026, 9, 30), wants_earliest=False)
+        defaults = deregistrations.confirmation_defaults(self.dereg, self.staff, today=TODAY)
+        self.assertEqual((defaults.desired_date, defaults.wants_earliest), (date(2026, 9, 30), False))
+        self.assertEqual(defaults.suggested_date, date(2026, 10, 31))
+        deregistrations.confirm(self.dereg, self.staff, defaults.suggested_date, today=TODAY)
+
+    def test_the_defaults_are_for_staff_and_for_a_deregistration_that_waits_for_its_date(self):
+        other = customer("effect.defaults@example.org")
+        for actor in (self.person, other, None):
+            with self.subTest(actor=getattr(actor, "email", None)):
+                self.assertEqual(code_of(lambda: deregistrations.confirmation_defaults(self.dereg, actor)), "not_allowed")
+        self.assertEqual(
+            code_of(lambda: deregistrations.confirmation_defaults(Deregistration(pk=999_999), self.staff)), "not_found"
+        )
+        deregistrations.confirm(self.dereg, self.staff, date(2027, 3, 31), today=TODAY)
+        self.assertEqual(code_of(lambda: deregistrations.confirmation_defaults(self.dereg, self.staff)), "wrong_state")
+
+
+class EarliestDatePreviewTests(SimpleTestCase):
+    def test_the_preview_is_the_earliest_month_end_of_a_notice_given_on_that_day(self):
+        for day, expected in ((date(2026, 10, 19), date(2027, 2, 28)), (date(2027, 1, 31), date(2027, 5, 31))):
+            with self.subTest(day=day):
+                self.assertEqual(deregistrations.earliest_date_preview(day), expected)
+                self.assertEqual(deregistrations.earliest_date_preview(day), deregistrations.earliest_termination_date(day))
+
+    def test_without_a_day_it_is_today(self):
+        from django.utils import timezone
+
+        self.assertEqual(
+            deregistrations.earliest_date_preview(), deregistrations.earliest_termination_date(timezone.localdate())
+        )
+
 
 @tag("mariadb")
 class DeletionReleaseTests(TestCase):

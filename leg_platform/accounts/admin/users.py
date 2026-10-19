@@ -347,6 +347,9 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
                     else:
                         result = account.delete_or_deactivate()
                         if result == "deactivated":
+                            from leg_platform.community import customer_messages
+
+                            customer_messages.purge(account)
                             event = Event.ACCOUNT_DEACTIVATED
                             message = gettext(
                                 "Deleted the account; it is kept under the retention obligation."

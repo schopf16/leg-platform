@@ -18,7 +18,8 @@ CSS = MANAGEMENT / "static" / "management" / "css" / "management.css"
 NEW_TEMPLATES = sorted(
     [
         *TEMPLATES.glob("processes/*.html"), *TEMPLATES.glob("contracts/*.html"),
-        TEMPLATES / "_open.html", TEMPLATES / "_deadlines.html", TEMPLATES / "overview.html",
+        TEMPLATES / "_open.html", TEMPLATES / "_deadlines.html", TEMPLATES / "_run_time.html",
+        TEMPLATES / "overview.html",
     ]
 )
 # The page marker classes of the body (they carry no rule of their own).
@@ -85,16 +86,23 @@ class OnboardingTemplateTests(SimpleTestCase):
         for name in ("m-download", "m-set-current", "m-trash", "i-processes"):
             self.assertIn(name, ids)
 
-    def test_the_icon_buttons_have_a_name_and_a_hint_and_no_text(self):
+    def test_the_icon_buttons_have_a_name_and_a_text_label_for_hover_and_focus(self):
         text = self.read(TEMPLATES / "contracts" / "_actions.html")
         tags = re.findall(r"<(?:a|button)\b[^>]*class=\"mgmt-action[^>]*>", text)
         self.assertEqual(len(tags), 3)
         for tag in tags:
             self.assertIn("aria-label=", tag)
-            self.assertIn("title=", tag)
-        # The symbol is decoration for the screen reader.
-        self.assertEqual(text.count('aria-hidden="true"'), 3)
+        # The symbol and the short label are decoration for the screen reader (the name says it all, with the file).
+        self.assertEqual(text.count('aria-hidden="true"'), 6)
+        self.assertEqual(text.count('class="mgmt-action-text"'), 3)
         self.assertGreaterEqual(len(re.findall(r'class="mgmt-action is-', text)), 3)
+        # Label in name (WCAG 2.5.3): every visible label is the start of the accessible name.
+        for visible, name in (
+            ("Download", "Download {{ name }}"), ("Set as current", "Set as current: {{ name }}"),
+            ("Delete", "Delete: {{ name }}"),
+        ):
+            self.assertIn(f'{{% translate "{visible}" %}}', text)
+            self.assertIn(f"%}}{name}{{% endblocktranslate", text)
 
     def test_the_progress_is_a_native_element_with_a_name(self):
         for name in ("list.html", "application.html", "deregistration.html"):
@@ -120,10 +128,11 @@ class OnboardingTemplateTests(SimpleTestCase):
         self.assertNotRegex(new, r"\b(?:rgb|rgba|hsl)\(")
         self.assertNotRegex(new, r"!important")
         self.assertIn("var(--accent)", new)
-        # The touch targets of the phone: 44 px for the action buttons (WCAG 2.2, 2.5.8).
-        self.assertRegex(new, r"@media \(max-width: 760px\) \{[^@]*\.mgmt-action \{\s*width: 44px;\s*height: 44px;")
-        # The desktop size of the action buttons is the owner's 40 px.
-        self.assertRegex(new, r"\.mgmt-action \{[^}]*width: 40px;[^}]*height: 40px;")
+        # The touch targets: 44 px for the action buttons (WCAG 2.2, 2.5.8), on a desktop (W5-09) and on a phone, where
+        # the button grows to hold the text label.
+        self.assertRegex(new, r"\.mgmt-action \{[^}]*width: 44px;[^}]*height: 44px;")
+        self.assertRegex(new, r"@media \(max-width: 760px\) \{[^@]*\.mgmt-action \{[^}]*min-width: 44px;")
+        self.assertNotRegex(new, r"\.mgmt-action \{[^}]*width: 40px;")
 
     def test_the_new_pages_load_no_new_script(self):
         for path in NEW_TEMPLATES:

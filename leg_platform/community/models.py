@@ -35,6 +35,9 @@ REMARK_VALIDATORS = [MaxLengthValidator(REMARK_MAX_LENGTH)]
 BUILDING_NAME_MAX_LENGTH = 80
 BUILDING_DESCRIPTION_MAX_LENGTH = 200
 METERING_POINT_NAME_MAX_LENGTH = 80
+# The reason of a return for correction and the note of a rejection (free text of the staff, D-103).
+RETURN_REASON_MAX_LENGTH = 500
+REJECTION_NOTE_MAX_LENGTH = 300
 # The federal building identifier (EGID) has at most nine digits (Federal Register of Buildings and Dwellings).
 EGID_MAX = 999_999_999
 
@@ -703,6 +706,9 @@ class Application(TimestampedModel):
     # The reminder "bank connection missing" is sent once per period of missing.
     iban_reminded_at = models.DateTimeField(null=True, blank=True)
     returned_at = models.DateTimeField(null=True, blank=True)
+    # The reason the staff gave when the application was returned for correction (free text, never in the history);
+    # shown to the customer on the draft and cleared when the application is submitted again.
+    returned_reason = models.CharField(max_length=RETURN_REASON_MAX_LENGTH, blank=True, editable=False)
     submitted_at = models.DateTimeField(null=True, blank=True)
     operator_started_at = models.DateTimeField(null=True, blank=True)
     operator_started_on = models.DateField(null=True, blank=True)
@@ -836,6 +842,33 @@ class ApplicationNotice(models.Model):
 
     def __str__(self):
         return f"{self.kind} of account {self.person_id}"
+
+
+class CustomerMessage(models.Model):
+    """A one-time message for a customer after an event that removed or changed an application (D-103): shown once on
+    the next visit (``community.customer_messages``). Holds the kind key, the optional short note the staff wrote and
+    the times; no other data. Seen messages are deleted after 30 days, unseen ones after 180."""
+
+    class Kind(models.TextChoices):
+        # Static labels (see ``Application.State``); the pages choose their own words per kind.
+        APPLICATION_REJECTED = "application_rejected", _("Application not accepted by the LEG")
+        APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", _("Application not accepted by the grid operator")
+        APPLICATION_RETURNED = "application_returned", _("Application returned for correction")
+        OPERATOR_NOT_CONFIRMED = "operator_not_confirmed", _("Confirmation by the grid operator did not arrive")
+
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="customer_messages")
+    kind = models.CharField(max_length=30, choices=Kind)
+    text = models.CharField(max_length=REJECTION_NOTE_MAX_LENGTH, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ("created_at", "pk")
+        indexes = [models.Index(fields=["person", "seen_at"], name="community_custmsg_person_seen")]
+
+    def __str__(self):
+        return f"{self.kind} for account {self.person_id}"
 
 
 class ContractVersionManager(models.Manager):
