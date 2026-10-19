@@ -9,7 +9,7 @@ Read through the account only; no names, addresses or numbers are part of a line
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date as Date
 
 from django.db.models import Q
 from django.utils import timezone
@@ -29,7 +29,7 @@ MAX_LINES = 2
 @dataclass(frozen=True)
 class StatusLine:
     kind: str
-    date: date | None = None
+    date: Date | None = None
 
 
 def status_lines(person, today=None):

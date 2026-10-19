@@ -378,6 +378,10 @@ REQUIRE_COMPLETE_CATALOGS = True
 LOCALE_DIRECTORY = Path(settings.BASE_DIR) / "locale"
 DOMAINS = ("django", "djangojs")
 OTHER_LANGUAGES = ("fr", "it")
+EXPECTED_PLURAL_FORMS = {
+    "fr": "nplurals=3; plural=(n == 0 || n == 1) ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;",
+    "it": "nplurals=2; plural=(n != 1);",
+}
 
 
 def catalogue_path(language, domain="django"):
@@ -434,10 +438,10 @@ class LanguageCatalogueTests(SimpleTestCase):
 
     def test_the_headers_name_the_language_and_use_the_plural_forms_of_django(self):
         for language in OTHER_LANGUAGES:
-            django_header = read_header(
-                Path(django.__file__).parent / "conf" / "locale" / language / "LC_MESSAGES" / "django.po"
-            )
-            django_plural = re.search(r"Plural-Forms: ([^\n]+)\n", django_header).group(1)
+            # Django 6.0 (declared minimum) and Django 6.1 (newest) ship different French plural rules.
+            # The catalogue follows the newest Django, so the expected rule is fixed here and does not
+            # depend on the Django release that runs the test.
+            django_plural = EXPECTED_PLURAL_FORMS[language]
             for domain in DOMAINS:
                 with self.subTest(language=language, domain=domain):
                     header = read_header(catalogue_path(language, domain))
