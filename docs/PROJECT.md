@@ -132,15 +132,9 @@ Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email";
 * The owner of the mailbox of a confirmed second address learns the account holder's name (D-068, L4; input for the privacy notice).
 * The application is restricted to the sender mailbox in Microsoft Entra / Exchange Online (installation guide, which also describes the procedure after a report of an unrequested change).
 
-## AGOV and Passkeys
+## Passkeys
 
-The first version uses the email address and password with an authenticator app (TOTP) as second factor. AGOV (the login service of the Swiss authorities) is intended as second factor; the project owner has asked AGOV whether this use is permitted and is waiting for the answer (a waiting item, not a task; D-074). If permitted, the factor is switched without weakening security, expected before go-live so that no productive TOTP enrolments need migration. No AGOV integration is built; preparation is limited to:
-
-* completion of the second factor is checked in one central place independent of the method, TOTP-specific parts kept separate (`docs/ARCHITECTURE.md`, "Authentication");
-* an AGOV identity is linked to an account only through a stored, unambiguous identifier, never solely by a matching email address; linking requires re-authentication, is notified by email and logged;
-* before a switch, recovery, enrolment, re-authentication, reset and logging are reviewed again and keep at least the current level.
-
-Whether password login can later be disabled for system administrators is open. Passkeys are implemented only once the concrete solution (recovery, enrolment, account protection) is securely designed and tested.
+Passkeys are an optional login method next to password with authenticator app (TOTP). Administrators may use a passkey-only account. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). Not built yet.
 
 ## Environments
 
@@ -149,7 +143,7 @@ Local; stage (identical to production in behaviour and configuration, sends real
 ## Explicitly Not Included
 
 * billing, invoicing, electricity cost distribution, productive financial processes, bank file import, payouts
-* AGOV integration (only prepared), passkeys, final hosting decision, multi-tenancy
+* final hosting decision, multi-tenancy
 * predefined roles other than system administrator, staff user and authenticated user
 * user interface languages beyond Swiss German, French, Italian and English (D-056)
 * a public home page and information about the LEG (the instance's website, D-025); publication of aggregated figures (minimum number of participants decided per instance, D-025)

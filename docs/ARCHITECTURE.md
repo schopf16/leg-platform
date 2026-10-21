@@ -72,11 +72,7 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 ## Authentication
 
-* Password login with the email address (D-021). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
-* **Preparation for AGOV** (`docs/PROJECT.md`, "AGOV and Passkeys"):
-  * Completion of the second factor is checked in one central place (middleware and decorator or mixin), independent of the method. Protected functions, the mandatory second factor and re-authentication rely only on it.
-  * TOTP enrolment, verification and recovery codes are separate (`django-otp`: `OTPMiddleware` adds `user.is_verified()`).
-  * No AGOV-specific code in advance. An external identity maps to an internal account only through a stored, unambiguous identifier, never solely through a matching email address.
+* Password login with the email address (D-021), or passkey-only login for administrators and optionally for users (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
 
 ## Email
 
@@ -160,7 +156,7 @@ Source code in Git; reproducible installation and deployment; configuration outs
 Not yet decided; decided only when needed for the next development step:
 
 * hosting details beyond provider and plan of the Ittigen instance (Infomaniak "VPS Lite 1", D-008) and of other instances; container-based or direct server deployment; final document storage; architecture of the later billing and financial modules
-* whether AGOV may be used as the second factor (request by the project owner pending), integration details, and whether password login can later be disabled for system administrators
+* whether password login can later be disabled for system administrators
 * concrete roles and their permissions, and whether they use the Django admin or application views (pure data maintenance: admin; frequent guided work: application views in the Clear register, `docs/DESIGN.md`)
 * the review of the uploaded logos (D-073; security review and browser checks open)
 * whether Django's `redirect_authenticated_user` of the login view is used (Django's documentation warns it can allow social media fingerprinting)
