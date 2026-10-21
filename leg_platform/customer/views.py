@@ -22,7 +22,7 @@ from leg_platform.community.persons import PersonError
 from leg_platform.customer import banners, forms, limits, overview, returns, texts
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.customer.wizard import too_many_requests
-from leg_platform.downloads import pdf_attachment
+from leg_platform.downloads import pdf_attachment, pdf_inline
 
 
 class BuildingsView(CustomerAccessMixin, View):
@@ -130,6 +130,18 @@ class ContractDownloadView(CustomerAccessMixin, View):
         except ApplicationError:
             raise Http404 from None
         return pdf_attachment(data, name)
+
+
+class ContractReadingView(CustomerAccessMixin, View):
+    """The current version for reading in the frame of the contract pages (D-108): ``inline``, framing allowed for the
+    own origin only, ``nosniff``, no caching. Only the current version (an earlier one has the download); none is a 404."""
+
+    def get(self, request):
+        try:
+            name, data = contracts.customer_download(request.user)
+        except ApplicationError:
+            raise Http404 from None
+        return pdf_inline(data, name)
 
 
 class BankConnectionView(CustomerAccessMixin, View):

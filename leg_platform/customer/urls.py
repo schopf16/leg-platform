@@ -33,6 +33,7 @@ urlpatterns = [
     path("application/<int:pk>/change/", wizard.ApplicationChangeView.as_view(), name="application_change"),
     path("contract/", views.ContractView.as_view(), name="contract"),
     path("contract/download/", views.ContractDownloadView.as_view(), name="contract_download"),
+    path("contract/read/", views.ContractReadingView.as_view(), name="contract_read"),
     path(
         "contract/<int:version_id>/download/", views.ContractDownloadView.as_view(), name="contract_version_download"
     ),

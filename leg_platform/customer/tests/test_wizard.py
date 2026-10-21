@@ -620,6 +620,8 @@ class ContractStepTests(WizardCase):
         for marker in (
             "Schritt 3 von 4: Vertrag", "Vertrag lesen und zustimmen", "Der Vertrag gilt für alle Ihre Gebäude. Sie stimmen ihm einmal zu.",
             "Vertragsfassung vom 7. Oktober 2026", "Vertrag herunterladen", reverse("customer:contract_download"),
+            '<iframe class="contract-frame" src="/participation/contract/read/#view=FitH&amp;navpanes=0"',
+            "Wenn der Vertrag hier nicht angezeigt wird, laden Sie ihn bitte herunter.",
             "Den Vertrag finden Sie auch unter", 'href="/participation/contract/"', "Information › Gesellschaftsvertrag",
             "Ich habe den Gesellschaftsvertrag gelesen und stimme ihm zu.",
             "Ich bin damit einverstanden, dass der Netzbetreiber meine Messdaten an die LEG übermittelt.",

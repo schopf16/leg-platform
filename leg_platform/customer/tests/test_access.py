@@ -181,7 +181,7 @@ class AccessTests(TestCase):
             ("customer:deregistration_start", []),
             ("customer:application_building", [application.pk]),
             ("customer:application_metering_points", [application.pk]),
-            ("customer:contract_download", []),
+            ("customer:contract_download", []), ("customer:contract_read", []),
         ):
             with self.subTest(name=name):
                 response = client.get(reverse(name, args=args))

@@ -709,6 +709,32 @@ span.note-warn {
   align-items: center;
 }
 
+/* The contract in the page (D-108): a bordered frame that scrolls inside; on a phone the frame is hidden (embedded PDFs
+   are not shown there reliably) and the download is the way to read. */
+.contract-reader {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.contract-frame {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  min-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.contract-reader-note {
+  margin: 0;
+}
+
+.contract-reader-phone {
+  display: none;
+}
+
 /* ---- The card "Your way into the LEG" on the start page ---- */
 .journey {
   display: grid;
@@ -963,6 +989,19 @@ span.note-warn {
 
   .contract-version .btn,
   .mp-progress-actions .btn {
+    width: 100%;
+  }
+
+  .contract-frame,
+  .contract-reader-wide {
+    display: none;
+  }
+
+  .contract-reader-phone {
+    display: block;
+  }
+
+  .contract-reader .btn {
     width: 100%;
   }
 

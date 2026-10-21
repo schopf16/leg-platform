@@ -6111,6 +6111,12 @@ msgstr "Non ancora accettato"
 msgid "Download contract"
 msgstr "Scarica il contratto"
 
+msgid "If the contract is not shown here, please download it."
+msgstr "Se il contratto non viene visualizzato qui, lo scarichi."
+
+msgid "Please download the contract to read it."
+msgstr "Scarichi il contratto per leggerlo."
+
 msgid "The contract is not available yet"
 msgstr "Il contratto non è ancora disponibile"
 

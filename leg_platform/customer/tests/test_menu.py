@@ -46,7 +46,7 @@ class CustomerMenuTests(TestCase):
     def test_the_entries_and_their_order(self):
         menu = menu_of(self.client.get(HOME))
         order = [
-            "Mein Bereich", "Start", "Profil", "Teilnahme", "Gebäude", "Vertrag", "Startdatum", "Nachbarschaft",
+            "Mein Bereich", "Start", "Profil", "Teilnahme", "Gebäude", "Startdatum", "Nachbarschaft",
             "Information", "Gesellschaftsvertrag", "Frage und Antwort", "Veranstaltung", "Demnächst", "Rechnung",
             "Energie", "Mitteilung", "Ausloggen", "Datenschutz", "Impressum",
         ]
@@ -70,10 +70,14 @@ class CustomerMenuTests(TestCase):
     def test_the_two_real_entries_are_links_to_the_pages(self):
         menu = menu_of(self.client.get(HOME))
         self.assertIn(f'href="{BUILDINGS}"', menu)
-        # The entry "Contract" under Participation and "Articles of association" under Information are the same page;
-        # only the second one carries the current mark (one entry is current, MENU-STANDARD.md section 6).
-        self.assertEqual(menu.count(f'href="{reverse("customer:contract")}"'), 2)
-        self.assertRegex(menu, rf'<a class="frame-sub-item" href="{reverse("customer:contract")}">Vertrag</a>')
+        # The contract is ONE entry, "Articles of association" under Information (D-108: the entry "Contract" under
+        # Participation led to the same page and is gone); it is the current entry on the contract page.
+        self.assertEqual(menu.count(f'href="{reverse("customer:contract")}"'), 1)
+        self.assertRegex(
+            menu, rf'<a class="frame-sub-item" href="{reverse("customer:contract")}">Gesellschaftsvertrag</a>'
+        )
+        participation = menu[menu.index("Teilnahme"):menu.index("Information")]
+        self.assertNotIn("Vertrag", participation)
         self.assertIn('<form method="post" action="/logout/">', menu)
         self.assertNotIn("Verwaltung", menu)
 
