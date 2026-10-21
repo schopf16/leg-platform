@@ -150,7 +150,7 @@ class MeteringPointForm(forms.Form):
         stays as typed (the check says why)."""
         value = (data.get("number_digits") or "").strip()
         try:
-            normalised = numbers.normalise_entered_number(value)
+            normalised = numbers.normalise_entered_number(value, ManagementSettings.load().metering_point_prefix)
         except ValidationError:
             return data
         if normalised == value:
@@ -178,7 +178,7 @@ class MeteringPointForm(forms.Form):
             ("single", ["remark"]),
         ]
         self.no_lead = True  # the locked rows say which point it is: no lead sentence that repeats them
-        make_fact(self, "number_digits", point.number or "–")
+        make_fact(self, "number_digits", numbers.format_metering_point_number(point.number) or "–")
         make_fact(self, "direction", str(Direction(point.direction).label), initial=point.direction)
         current = leg_switch.current_assignment(assignments.LEG, point)
         make_fact(
@@ -192,8 +192,8 @@ class MeteringPointForm(forms.Form):
     def clean_number_digits(self):
         if self.fields["number_digits"].disabled:
             return ""
-        digits = numbers.normalise_entered_number(self.cleaned_data["number_digits"])
         settings_row = ManagementSettings.load()
+        digits = numbers.normalise_entered_number(self.cleaned_data["number_digits"], settings_row.metering_point_prefix)
         try:
             self.number = numbers.compose_metering_point_number(settings_row.country_code, settings_row.identifier, digits)
         except ValidationError as error:
@@ -369,10 +369,11 @@ class LocationPointForm(DialogForm):
         for point in points:
             self.points[str(point.pk)] = point
             direction = str(Direction(point.direction).label)
+            shown = numbers.format_metering_point_number(point.number) or "–"
             if point.location_id is None:
-                free.append((str(point.pk), f"{point.number or '–'} · {direction} · {gettext('no location')}"))
+                free.append((str(point.pk), f"{shown} · {direction} · {gettext('no location')}"))
             else:
-                other.append((str(point.pk), f"{point.number or '–'} · {direction} · {point.location}"))
+                other.append((str(point.pk), f"{shown} · {direction} · {point.location}"))
                 # Only a point that moves from another location can change its transformer circuit (UX-005).
                 old = circuit_text(point.location.transformer_circuit)
                 if old != new:

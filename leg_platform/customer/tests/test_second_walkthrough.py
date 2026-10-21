@@ -14,7 +14,7 @@ from django.utils import timezone, translation
 
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
-from leg_platform.community import applications, contracts, deregistrations
+from leg_platform.community import applications, contracts, deregistrations, numbers
 from leg_platform.community.models import Application, GridOperator
 from leg_platform.community.tests.helpers import staff_user
 from leg_platform.customer.tests.helpers import (
@@ -175,7 +175,7 @@ class SubmittedPageTests(TestCase):
         self.assertIn("Ihr Wunschdatum", html)
         self.assertIn(wish.strftime("%d.%m.%Y"), html)
         for point in building.metering_points.all():
-            self.assertIn(point.number, html)
+            self.assertIn(numbers.format_metering_point_number(point.number), html)
         self.assertNotIn("<progress", html)
 
 

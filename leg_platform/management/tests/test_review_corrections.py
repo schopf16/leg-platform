@@ -14,7 +14,7 @@ from django.test import Client, RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import leg_services, transformer_circuits
+from leg_platform.community import leg_services, numbers, transformer_circuits
 from leg_platform.community.models import Leg, ManagementSettings, TransformerCircuit
 from leg_platform.community.tests.helpers import (
     make_circuit,
@@ -297,7 +297,7 @@ class MissingLocationWarningTests(TestCase):
         self.assertNotIn(warning, placed)
         # The filter "problems" lists it; the person page text does not offer an assignment before registration.
         filtered = self.client.get(reverse("management:metering_points"), {"problems": "1"}).content.decode()
-        self.assertIn(self.point.number, filtered)
+        self.assertIn(numbers.format_metering_point_number(self.point.number), filtered)
 
 
 class TouchRuleTests(SimpleTestCase):

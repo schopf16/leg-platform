@@ -2365,6 +2365,65 @@ a.mgmt-sort:hover {
   overflow-wrap: anywhere;
 }
 
+/* A metering point of an application (D-109): the number on one line with its direction and its buttons, below it the
+   labelled facts. The plant details stand one under the other: a label and its value on each line, at most three. */
+.mgmt-point-block {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.mgmt-point-block:first-of-type {
+  border-top: 0;
+}
+
+.mgmt-point-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.mgmt-point-id {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mgmt-point-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.mgmt-point-facts {
+  margin-top: 4px;
+}
+
+.mgmt-point-facts .mgmt-fact:first-child {
+  border-top: 0;
+}
+
+.mgmt-plant {
+  margin: 0;
+}
+
+.mgmt-plant > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.mgmt-plant dt {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.mgmt-plant dd {
+  margin: 0;
+}
+
 /* A run of equal entries of the history is one line with its count. */
 .mgmt-log-count {
   margin-left: 6px;

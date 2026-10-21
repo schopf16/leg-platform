@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static management_ui %}{% comment %}
+{% load i18n static management_ui metering_points %}{% comment %}
 The detail page of a person (LEG-Design-Vorgaben/verwaltung/personen/detail/referenz/person-detail-desktop and
 -handy; D-081, D-087). On a desktop two columns of cards (details, contact, billing address, payment and customer numbers on
 the left; cooperative and note on the right) and the metering points over the full width; on a phone all cards one
@@ -138,7 +138,7 @@ invited and who has not completed the registration has no customer number yet; t
               {% with row=entry.row %}
               <tr>
                 <td>{% if row.address %}{{ row.address }}{% if entry.location_url %}{% translate "Go to the location" as location_label %}{% include "management/_goto.html" with url=entry.location_url label=location_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
-                <td class="tnum">{% if entry.number %}<span class="mgmt-person-number">{{ entry.number }}</span>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
+                <td class="tnum">{% if entry.number %}<span class="mgmt-person-number">{{ entry.number|metering_point }}</span>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
                 <td>{% include "management/_direction.html" with direction=row.point.direction %}</td>
                 <td>{% if row.leg_name %}{{ row.leg_name }}{% if entry.leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=entry.leg_url label=leg_label %}{% endif %}{% else %}<span class="mgmt-muted">–</span>{% endif %}</td>
                 <td>{% for line in entry.assigned %}<div>{{ line }}</div>{% endfor %}</td>
@@ -155,7 +155,7 @@ invited and who has not completed the registration has no customer number yet; t
         {% for entry in point_entries %}
           {% with row=entry.row %}
           <div class="mgmt-mp">
-            <div class="mgmt-mp-nr mgmt-point-nr"><strong>{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</strong>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}</div>
+            <div class="mgmt-mp-nr mgmt-point-nr"><strong>{% if entry.number %}{{ entry.number|metering_point }}{% else %}–{% endif %}</strong>{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=entry.point_url label=point_label %}</div>
             <div class="mgmt-mp-person">{% if row.address %}{{ row.address }}{% else %}–{% endif %} · {{ row.point.direction|direction_label }}{% if row.leg_name %} · {{ row.leg_name }}{% endif %}</div>
             <div class="mgmt-mp-person mgmt-person-lines">{{ entry.assigned|join:" · " }} · {% for line in entry.registration_lines %}<span class="mgmt-person-registration is-{{ entry.registration_tone }}">{{ line }}</span>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
           </div>

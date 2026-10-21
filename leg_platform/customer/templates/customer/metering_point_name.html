@@ -1,11 +1,11 @@
 {% extends "customer/base.html" %}
-{% load i18n %}
+{% load i18n metering_points %}
 {% block title %}{% translate "Edit metering point" %}{% endblock %}
 {% block content %}
   <div class="narrow-page">
     <p class="page-label">{% translate "My participation" %}</p>
     <h1 class="start-title">{% translate "Edit metering point" %}</h1>
-    <p class="start-sub mp-num">{{ point.number }}</p>
+    <p class="start-sub mp-num">{{ point.number|metering_point }}</p>
     <form method="post" class="step-card" novalidate data-submit-once>
       {% csrf_token %}
       {% include "customer/_error_summary.html" %}

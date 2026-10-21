@@ -338,7 +338,7 @@ class PersonArea(Area):
             table_rows.append(
                 [
                     or_dash(row.address),
-                    or_dash(numbers.format_metering_point_number(row.point.number)),
+                    or_dash(numbers.format_metering_point_number(row.point.number, separator=" ")),
                     str(Direction(row.point.direction).label),
                     or_dash(row.leg_name if row.leg_id else ""),
                     "\n".join(person_views.assignment_lines(row.assignment)),

@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n metering_points %}{% comment %}
 One card per building (GEBAEUDE.md, section 4). Context: ``card`` (customer.overview.Card), ``overview``,
 ``deregistration_url``. Only the account's own metering points are listed. Status: dot plus word. The EGID is shown
 where an address is; the EGRID is left out (no verified source). The pencils are links to a small form page, so they work
@@ -26,7 +26,7 @@ without a script.
     <ul class="mp-list" aria-label="{% blocktranslate with title=card.title %}Metering points of {{ title }}{% endblocktranslate %}">
       {% for row in card.rows %}
         <li>
-          <span class="mp-num">{{ row.number }}{% if row.name %}<span class="mp-note">{{ row.name }}</span>{% endif %}</span>
+          <span class="mp-num">{{ row.number|metering_point }}{% if row.name %}<span class="mp-note">{{ row.name }}</span>{% endif %}</span>
           <span class="mp-dir">{{ row.direction_label }}{% if row.since_kind == "since" %}<span class="mp-since">{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}</span>{% elif row.since_kind == "registered" %}<span class="mp-since">{% blocktranslate with date=row.since|date:"d.m.Y" %}Registered on {{ date }}{% endblocktranslate %}</span>{% endif %}</span>
           <span class="dotword"><span class="dot tone-{{ row.tone }}" aria-hidden="true"></span>{{ row.label }}{% if row.point_id %}<a class="icon-btn" href="{% url 'customer:metering_point_name' row.point_id %}" aria-label="{% translate 'Edit name of the metering point' %}"><svg class="frame-icon" aria-hidden="true"><use href="#i-pencil"/></svg></a>{% endif %}</span>
           {% if row.block %}{% include "customer/_progress_block.html" with block=row.block footer_withdraw=card.withdraw_in_footer %}{% endif %}

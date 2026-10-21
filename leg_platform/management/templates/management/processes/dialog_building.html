@@ -1,0 +1,11 @@
+{% extends "management/dialog_form.html" %}
+{% load i18n %}{% comment %}
+The dialog "Edit address" of a building of an application in flight (D-109). The fields are the form's. When the address
+directory does not know the address (``unlisted``), the notice names the directory's suggestion (``unlisted_detail``) and the
+next save keeps the address as entered, without an EGID (the hidden value ``confirm_unlisted`` is set by the view).
+{% endcomment %}
+{% block dialog_notice %}
+  {% if unlisted %}
+    <div class="mgmt-banner" role="alert"><p><b>{% translate "The address directory does not know this address." %}</b>{% if unlisted_detail %} {{ unlisted_detail }}{% endif %} {% translate "Check the entry. If it is right, save it as entered: the building then has no EGID." %}</p></div>
+  {% endif %}
+{% endblock %}

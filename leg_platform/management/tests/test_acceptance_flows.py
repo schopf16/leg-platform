@@ -619,11 +619,15 @@ class LifeOfTheObjectsTests(MatrixBase):
         self.assertEqual(client.post(url("metering_points_new"), {"number_digits": twenty, "direction": "consumption"}).status_code, 302)
         self.assertTrue(MeteringPoint.objects.filter(number="DEABCDEFGHIJK" + twenty).exists())
         count = MeteringPoint.objects.count()
-        for digits in ("1" * 21, "12!", "1 2", "٣", "ß", "1.5", "", "   ", "%"):
+        for digits in ("1" * 21, "12!", "1 !", "٣", "ß", "1.5", "", "   ", "%"):
             with self.subTest(digits=digits):
                 response = client.post(url("metering_points_new"), {"number_digits": digits, "direction": "consumption"})
                 self.assertEqual(response.status_code, 200)
         self.assertEqual(MeteringPoint.objects.count(), count)
+        # White space is no part of a number (D-109): the blocks of the display are accepted.
+        response = client.post(url("metering_points_new"), {"number_digits": "1 2", "direction": "consumption"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(MeteringPoint.objects.filter(number="DEABCDEFGHIJK" + "12".zfill(20)).exists())
 
     def test_without_the_identifier_in_the_settings_no_number_can_be_composed(self):
         row = ManagementSettings.load()
@@ -955,7 +959,9 @@ class LifeOfTheObjectsTests(MatrixBase):
     def test_the_problem_filter_shows_the_rows_that_the_button_counts(self):
         client = self.login(self.administrator)
         page = client.get(url("metering_points"), {"problems": "1"})
-        shown = {p for p in MeteringPoint.objects.all() if p.number[13:] in page.content.decode()}
+        shown = {
+            p for p in MeteringPoint.objects.all() if numbers.format_metering_point_number(p.number) in page.content.decode()
+        }
         self.assertNotIn(self.point_active, shown)  # location, LEG and person: no problem
         self.assertNotIn(self.point_archived, shown)  # archived points have no problem and appear only as archived
         self.assertIn(self.point_registered, shown)
@@ -1095,7 +1101,8 @@ class HostileListParameterTests(MatrixBase):
         client = self.login(self.administrator)
         for name, secret, visible in (
             ("locations", "SECRETLOCATIONREMARK", "Remarkweg"), ("locations", "SECRETPOINTREMARK", "Remarkweg"),
-            ("metering_points", "SECRETPOINTREMARK", number(800)[13:]), ("metering_points", "SECRETLOCATIONREMARK", number(800)[13:]),
+            ("metering_points", "SECRETPOINTREMARK", numbers.format_metering_point_number(number(800))),
+            ("metering_points", "SECRETLOCATIONREMARK", numbers.format_metering_point_number(number(800))),
             ("legs", "SECRETLEGREMARK", "LEG Visible"), ("persons", "SECRETNOTE", "Notiz"), ("persons", "CH9300762011623852957", "Notiz"),
             ("persons", "SECRETLOCATIONREMARK", "Notiz"),
         ):
@@ -1106,7 +1113,9 @@ class HostileListParameterTests(MatrixBase):
         self.assertContains(client.get(url("locations"), {"q": "Remarkweg"}), "Remarkweg")
         self.assertContains(client.get(url("legs"), {"q": "visible"}), "LEG Visible")
         self.assertContains(client.get(url("persons"), {"q": "Notiz"}), "Notiz")
-        self.assertContains(client.get(url("metering_points"), {"q": number(800)[20:]}), number(800)[13:])
+        self.assertContains(
+            client.get(url("metering_points"), {"q": number(800)[20:]}), numbers.format_metering_point_number(number(800))
+        )
         # The printout of the search does not find it either (a PDF is made from the same list).
         pdf_response = client.post(url("locations_print") + "?q=SECRETLOCATIONREMARK", {"scope": "all"})
         self.assertEqual(pdf_response["Content-Type"], "application/pdf")
@@ -1114,16 +1123,17 @@ class HostileListParameterTests(MatrixBase):
     def test_the_search_finds_what_the_pages_show_to_every_staff_account(self):
         """D-086: persons' names, LEG names and addresses are searchable for every staff account."""
         client = self.login(self.administrator)
-        for name, text, marker in (
-            ("metering_points", "Muster", number(4)[13:]),  # the name of the person
-            ("metering_points", "LEG Main", number(4)[13:]),  # the name of the LEG
-            ("metering_points", "Examplestrasse", number(4)[13:]),  # the address
+        marker = numbers.format_metering_point_number(number(4))
+        for name, text, expected in (
+            ("metering_points", "Muster", marker),  # the name of the person
+            ("metering_points", "LEG Main", marker),  # the name of the LEG
+            ("metering_points", "Examplestrasse", marker),  # the address
             ("locations", "Muster", "Examplestrasse"),
             ("locations", "LEG Main", "Examplestrasse"),
             ("locations", number(4)[20:], "Examplestrasse"),  # a number of a metering point
         ):
             with self.subTest(list=name, text=text):
-                self.assertContains(client.get(url(name), {"q": text}), marker)
+                self.assertContains(client.get(url(name), {"q": text}), expected)
 
 
 @tag("mariadb")

@@ -14,14 +14,22 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 from django.views import View
 
-from leg_platform.community import application_staff, deregistrations, grid_operator
+from leg_platform.community import addressing, application_corrections, application_staff, deregistrations, grid_operator, numbers
 from leg_platform.community.application_common import ApplicationError
-from leg_platform.community.models import Application, Deregistration
+from leg_platform.community.models import (
+    Application,
+    ApplicationBuilding,
+    ApplicationMeteringPoint,
+    Deregistration,
+    ManagementSettings,
+)
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_views import DialogView
 from leg_platform.management.metering_point_forms import DialogForm
 from leg_platform.management.metering_point_views import format_date
 from leg_platform.management.process_forms import (
+    ApplicationBuildingForm,
+    ApplicationPointForm,
     CompleteForm,
     ConfirmDeregistrationForm,
     OperatorConfirmationForm,
@@ -47,6 +55,35 @@ def error_texts():
         "date_before_earliest": _("The date must not be in the past."),
         "not_month_end": _("Enter the last day of a month."),
         "cannot_terminate": _("A metering point cannot be terminated to this date. Nothing was saved."),
+        # The corrections of an application (D-109).
+        "changed": _(
+            "This entry was changed in the meantime, for example by the customer. Nothing was saved. Go back and "
+            "check the page."
+        ),
+        "unchanged": _("Nothing was changed."),
+        "building_stored": _("This building is stored already. Change its address on the page of the location."),
+        "number_taken": _(
+            "This number belongs to a stored metering point or to another application. Nothing was saved."
+        ),
+        "number_own": _("This number is used already by a metering point or an application of the same customer."),
+        "number_in_application": _("This number is used already by another metering point of this application."),
+        "direction_taken": _("The building has a metering point with this direction already."),
+        "direction_invalid": _("Choose consumption or feed-in."),
+        "iban_required": _("A feed-in needs the bank connection of the customer. The customer enters it in the profile."),
+        "draw_required": _(
+            "A building needs a metering point for consumption. Change the other metering point of the building first."
+        ),
+        "plant_data_feed_in_only": _("Plant details apply to a feed-in only. Clear them or choose feed-in."),
+        "plant_data_swap": _(
+            "The other metering point of the building has plant details, which a metering point for consumption cannot "
+            "have. Clear them there first."
+        ),
+        "prefix_not_configured": _("Enter the country and the identifier in the settings first."),
+        "already_added": _("The application has this building already."),
+        "already_in_progress": _("The customer has another application for this building."),
+        "egid_not_offered": _("The EGID does not belong to this address."),
+        "egid_invalid": _("Enter the EGID as a number."),
+        "directory_unavailable": _("The address directory cannot be asked now. Try again later."),
     }
 
 
@@ -256,6 +293,197 @@ class ApplicationRejectView(ProcessDialog):
 
     def run(self, application, data, actor):
         application_staff.reject(application, actor, data["reason"], data.get("note", ""))
+
+
+# ---- The staff's corrections of an application in flight (D-109) ----
+
+
+def add_validation_errors(form, error, names=None):
+    """Show the messages of a service ``ValidationError`` at the fields they name (``names`` maps a model field to the
+    field of the form); a message without a field of the form is shown for the whole form."""
+    names = names or {}
+    if hasattr(error, "error_dict"):
+        for key, errors in error.error_dict.items():
+            name = names.get(key, key)
+            form.add_error(name if name in form.fields else None, errors)
+    else:
+        form.add_error(None, error)
+
+
+class CorrectionDialog(ProcessDialog):
+    """A dialog that corrects one row (a building or a metering point) of an application in flight. It applies while the
+    LEG works on the application (``Application.CORRECTABLE_STATES``); the service checks the state, the rules and the
+    token of the row again under the lock, so a stale page or a forged POST changes nothing that the rules refuse. The
+    row is found through the application of the address (a foreign id is a 404)."""
+
+    states = Application.CORRECTABLE_STATES
+    submit_label = gettext_lazy("Save")
+    success_message = gettext_lazy("Saved.")
+
+    def row(self):
+        raise NotImplementedError
+
+    def row_refusal(self, request):
+        """A response if the dialog does not apply to this row, else None."""
+        return None
+
+    def refusal(self, request, *args, **kwargs):
+        """The hook of the access mixin (after the access check, before the handler): the state of the application is
+        refused by ``ProcessDialog`` with its message; a row that this dialog does not apply to, here."""
+        if not self.applicable():
+            return None
+        return self.row_refusal(request)
+
+
+class ApplicationBuildingView(CorrectionDialog):
+    """"Edit address" of a new building of the application: checked like the customer's entry (the address directory,
+    the EGID, duplicates). A stored building has its address on the page of the location. An address that the directory
+    does not know is shown with the directory's suggestion and kept as entered (without an EGID) only after a second,
+    explicit save."""
+
+    title = gettext_lazy("Edit address")
+    form_class = ApplicationBuildingForm
+    template_name = "management/processes/dialog_building.html"
+
+    def row(self):
+        if not hasattr(self, "_row"):
+            self._row = get_object_or_404(
+                ApplicationBuilding, pk=self.kwargs["building_id"], application=self.application()
+            )
+        return self._row
+
+    def row_refusal(self, request):
+        if self.row().location_id is not None:
+            messages.error(request, error_texts()["building_stored"])
+            return redirect(self.back(request))
+        return None
+
+    def get_lead(self):
+        return _(
+            "The address that the customer entered. It is checked against the address directory like the customer's "
+            "entry. The customer sees the corrected address."
+        )
+
+    def get_form(self, data=None):
+        row = self.row()
+        initial = {
+            "street": row.street, "house_number": row.house_number, "postal_code": row.postal_code, "town": row.town,
+            "egid": row.egid or "", "expected": application_corrections.building_token(row),
+        }
+        return ApplicationBuildingForm(data, initial=initial)
+
+    def save(self, request, form):
+        data = form.cleaned_data
+        try:
+            application_corrections.correct_building(
+                self.application(), request.user, self.row().pk, expected=data["expected"], egid=data["egid"] or None,
+                allow_unlisted=form.allow_unlisted, **form.address(),
+            )
+        except ApplicationError as error:
+            if error.code == "not_found":
+                raise Http404 from None
+            if error.code == "building_not_found":
+                return self.ask_unlisted(request, form)
+            if error.code == "ambiguous":
+                form.add_error("egid", _(
+                    "Several buildings have this address. Enter the EGID of one of them: %(egids)s."
+                ) % {"egids": ", ".join(str(egid) for egid in error.details["egids"])})
+                return None
+            form.add_error(None, refusal_text(error))
+            return None
+        except ValidationError as error:
+            add_validation_errors(form, error)
+            return None
+        messages.success(request, self.success_message)
+        return redirect(self.back(request))
+
+    def ask_unlisted(self, request, form):
+        """The directory does not know the address: show the directory's suggestion (or the notice) and let the next save
+        keep the address as entered, without an EGID."""
+        check = addressing.check_address(*form.address().values())
+        detail = (
+            addressing.suggestion_banner_text(check.suggestion) if check.suggestion is not None else check.not_found_notice
+        )
+        data = request.POST.copy()
+        data["confirm_unlisted"] = "1"
+        return self.render_dialog(
+            request, ApplicationBuildingForm(data), submit_label=_("Save as entered"), unlisted=True,
+            unlisted_detail=detail,
+        )
+
+
+class ApplicationPointView(CorrectionDialog):
+    """"Edit metering point": the number, the direction and the plant details of a metering point of the application,
+    checked like the customer's entry and what the submission requires (``application_corrections``)."""
+
+    title = gettext_lazy("Edit metering point")
+    form_class = ApplicationPointForm
+
+    FIELD_OF_CODE = {
+        "number_in_application": "number_digits", "number_own": "number_digits", "number_taken": "number_digits",
+        "prefix_not_configured": "number_digits", "direction_taken": "direction", "direction_invalid": "direction",
+    }
+    FIELD_OF_MODEL = {"number": "number_digits"}
+
+    def row(self):
+        if not hasattr(self, "_row"):
+            self._row = get_object_or_404(
+                ApplicationMeteringPoint, pk=self.kwargs["point_id"], building__application=self.application()
+            )
+        return self._row
+
+    def get_lead(self):
+        lead = _(
+            "The metering point that the customer entered. The number, the direction and the plant details are checked "
+            "like the customer's entry. The customer sees the corrected values."
+        )
+        row = self.row()
+        if row.building.metering_points.exclude(pk=row.pk).exists():
+            lead += " " + _(
+                "If the consumption and the feed-in were entered the wrong way round, choose the direction of the other "
+                "metering point: the two exchange their directions."
+            )
+        head = row.number[: numbers.HEAD_LENGTH]
+        if head != ManagementSettings.load().metering_point_prefix:
+            lead += " " + _(
+                "The number starts with %(prefix)s, not with the country and the identifier of the settings. It "
+                "stays so unless you change the number; a changed number starts with the ones of the settings."
+            ) % {"prefix": head}
+        return lead
+
+    def get_form(self, data=None):
+        row = self.row()
+        initial = {
+            "number_digits": row.number[numbers.HEAD_LENGTH :], "direction": row.direction,
+            "pv_power_kwp": row.pv_power_kwp, "battery_kwh": row.battery_kwh, "wallbox_kw": row.wallbox_kw,
+            "expected": application_corrections.point_token(row),
+        }
+        return ApplicationPointForm(data, initial=initial)
+
+    def save(self, request, form):
+        data = form.cleaned_data
+        try:
+            result = application_corrections.correct_metering_point(
+                self.application(), request.user, self.row().pk, entered_number=data["number_digits"],
+                direction=data["direction"], pv_power_kwp=data.get("pv_power_kwp"),
+                battery_kwh=data.get("battery_kwh"), wallbox_kw=data.get("wallbox_kw"), expected=data["expected"],
+            )
+        except ApplicationError as error:
+            if error.code == "not_found":
+                raise Http404 from None
+            if error.code == "prefix_not_configured":
+                form.identifier_missing = True
+            form.add_error(self.FIELD_OF_CODE.get(error.code), refusal_text(error))
+            return None
+        except ValidationError as error:
+            add_validation_errors(form, error, self.FIELD_OF_MODEL)
+            return None
+        for field, _kind in result.warnings:
+            messages.warning(request, _("The figure %(name)s is unusually large. Please check it.") % {
+                "name": ApplicationPointForm.base_fields[field].label
+            })
+        messages.success(request, self.success_message)
+        return redirect(self.back(request))
 
 
 # ---- A deregistration ----

@@ -221,9 +221,12 @@ class PersonListTests(TestCase):
 
 
 class PointNumberTests(SimpleTestCase):
-    def test_a_number_shows_the_country_and_a_space_after_every_four_characters(self):
+    def test_a_number_shows_the_grid_operators_block_and_then_blocks_of_four_with_no_break_spaces(self):
         number = "CH1A2B3C4D5E6" + "0" * 19 + "1"
-        self.assertEqual(numbers.format_metering_point_number(number), "CH 1A2B 3C4D 5E60 0000 0000 0000 0000 001")
+        self.assertEqual(
+            numbers.format_metering_point_number(number),
+            "CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00001",
+        )
         self.assertEqual(numbers.format_metering_point_number(None), "")
         self.assertEqual(numbers.format_metering_point_number("short"), "short")
 

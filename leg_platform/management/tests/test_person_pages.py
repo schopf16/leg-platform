@@ -201,7 +201,7 @@ class PersonPageTests(TestCase):
         # The table: the number with a space after four characters, the direction, the LEG, "Zugeordnet" with both
         # lines for an assignment that ends, the words of the registration at the grid operator.
         for text in (
-            "CH 1A2B 3C4D 5E60 0000 0000 0000 0000 001", "Bezug", "Einspeisung", "LEG Musterquartier",
+            "CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00001", "Bezug", "Einspeisung", "LEG Musterquartier",
             f"ab {fmt_date(EARLIER)}", f"bis {fmt_date(LATER)}", "registriert", "Netzbetreiber Beispiel-Anmeldung",
             f"bestätigt am {fmt_date(EARLIER)}",
         ):
@@ -236,7 +236,7 @@ class PersonPageTests(TestCase):
 
         def order(**params):
             content = client.get(url, params).content.decode()
-            return sorted(("0001", "0002"), key=lambda end: content.index(f"0000 0000 0000 0000 00{end[-1]}"))
+            return sorted(("0001", "0002"), key=lambda end: content.index(f"0000\u00a00000\u00a00000\u00a00000\u00a0000{end[-1]}"))
 
         self.assertEqual(order(), ["0001", "0002"])
         self.assertEqual(order(sort="number", dir="desc"), ["0002", "0001"])
@@ -254,7 +254,7 @@ class PersonPageTests(TestCase):
         client = self.login(self.staff)
         page = client.get(self.detail(self.company))
         self.assertContains(page, "<h1 class=\"start-title\">Beispiel Verwaltung AG</h1>")
-        for text in ("Lea", "Probe", "c/o Treuhand", "CH 1A2B 3C4D 5E60 0000 0000 0000 0000 007", "angemeldet am"):
+        for text in ("Lea", "Probe", "c/o Treuhand", "CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00007", "angemeldet am"):
             self.assertContains(page, text)
         # A person without a side record shows dashes and "no shares"; nothing was created by looking.
         page = client.get(self.detail(self.blocked))

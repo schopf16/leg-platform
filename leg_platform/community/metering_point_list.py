@@ -6,7 +6,7 @@ from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, 
 from django.db.models.functions import Cast
 from django.utils import timezone
 
-from leg_platform.community import problems
+from leg_platform.community import numbers, problems
 from leg_platform.community.models import LegAssignment, MeteringPoint, PersonAssignment
 from leg_platform.community.status import MeteringPointStatus, status_filter
 
@@ -45,8 +45,12 @@ def apply_leg(queryset, leg_id):
 
 
 def apply_search(queryset, text, *, today=None):
-    """Every word must match the number, the address, the LEG name or the person name."""
+    """Every word must match the number, the address, the LEG name or the person name. A number copied from a page (its
+    blocks stand apart, D-109) is searched as one number."""
     today = today or timezone.localdate()
+    pasted = numbers.pasted_number(text)
+    if pasted is not None and queryset.filter(number__contains=pasted).exists():
+        return queryset.filter(number__contains=pasted)
     for word in (text or "").split():
         upper = word.upper()
         condition = (

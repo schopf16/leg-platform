@@ -14,7 +14,7 @@ from django.utils import timezone
 from leg_platform.accounts.models import MailJob, SessionCodeFailure
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, code_for
 from leg_platform.accounts.tests.test_second_factor import create_user_with_totp
-from leg_platform.community import deregistrations, history, own_iban
+from leg_platform.community import deregistrations, history, numbers, own_iban
 from leg_platform.community.application_common import add_months, month_end
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Deregistration, Direction, MeteringPoint
@@ -90,11 +90,12 @@ class PageTests(DeregistrationCase):
             self.assertIn(text, html)
         self.assertCountEqual(all_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
-        self.assertIn(self.draw.number, html)
+        self.assertIn(numbers.format_metering_point_number(self.draw.number), html)
         self.assertIn("Wohnhaus", html)
         self.assertRegex(html, r"Bezug · Seit \d\d\.\d\d\.\d{4}")
         self.assertIn("Einspeisung", html)
         # Nothing of the other customer at the same building.
+        self.assertNotIn(numbers.format_metering_point_number(self.foreign.number), html)
         self.assertNotIn(self.foreign.number, html)
         self.assertNotIn("Fremd", html)
 
@@ -277,7 +278,7 @@ class SubmitTests(DeregistrationCase):
         self.assertEqual(page.status_code, 200)
         for text in (
             "Ihre Abmeldung ist abgeschickt", "So geht es weiter", "Abmeldung eingereicht", "Termin durch die LEG bestätigt",
-            "Abgemeldet", "Die LEG bestätigt den Termin.", self.draw.number,
+            "Abgemeldet", "Die LEG bestätigt den Termin.", numbers.format_metering_point_number(self.draw.number),
             "Bis zum Termin bleiben die Messpunkte aktiv.", "Eine Bestätigung wurde an Ihre E-Mail-Adressen gesendet.",
         ):
             self.assertIn(text, html)

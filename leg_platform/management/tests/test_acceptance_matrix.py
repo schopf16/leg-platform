@@ -19,6 +19,7 @@ import calendar
 from collections import namedtuple
 from datetime import date as date_type
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -28,7 +29,15 @@ from django.urls import resolve, reverse
 from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import application_notices, application_staff, applications, contracts, deregistrations
+from leg_platform.community import (
+    application_corrections,
+    application_notices,
+    application_staff,
+    applications,
+    buildings,
+    contracts,
+    deregistrations,
+)
 from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
@@ -39,6 +48,7 @@ from leg_platform.community.models import (
     CustomerMessage,
     Deregistration,
     DeregistrationItem,
+    Direction,
     HistoryEntry,
     Leg,
     LegAssignment,
@@ -119,6 +129,7 @@ SAMPLE = frozenset({
     "legs", "legs_quota", "legs_delete",
     "settings_deadlines", "settings_run_time", "processes", "processes_application", "processes_application_complete",
     "processes_application_review", "processes_notice_resolve", "processes_deregistration_confirm",
+    "processes_application_building", "processes_application_point",
     "contracts", "contracts_upload", "contracts_download", "contracts_current", "contracts_delete",
 })
 
@@ -184,14 +195,16 @@ class MatrixBase(TestCase):
         cls.contract_delete = contracts.upload_version(cls.staff, onboarding.pdf(b"\n% delete"), date_type(2026, 2, 5))
         cls.kunde = create_active_user("kunde.person@example.org", first_name="Kunde", last_name="Beispiel")
         made = []
+        cls.building_of = {}
         for index in range(6):
-            application, _building = onboarding.ready_draft(
+            application, building = onboarding.ready_draft(
                 cls.kunde, egid=90010000 + index, number=100 + 10 * index,
                 address={"house_number": str(60 + index)},
             )
             applications.submit(cls.kunde, application, today=onboarding.TODAY)
             application.refresh_from_db()
             made.append(application)
+            cls.building_of[application.pk] = building
         (cls.app_review, cls.app_return, cls.app_start, cls.app_confirm, cls.app_complete, cls.app_reject) = made
         application_staff.mark_operator_started(cls.app_confirm, cls.staff, d - timedelta(days=20), today=d)
         application_staff.mark_operator_started(cls.app_complete, cls.staff, date_type(2026, 6, 1), today=d)
@@ -209,6 +222,27 @@ class MatrixBase(TestCase):
         client = VerifiedClient(**kwargs)
         client.force_login(user)
         return client
+
+    def setUp(self):
+        # The address directory offers one building for the address of the correction payload (never a request to
+        # swisstopo from a test).
+        offered = onboarding.candidate(90010077, house_number="70")
+        lookup = patch.object(buildings, "find_candidates", return_value=[offered])
+        lookup.start()
+        self.addCleanup(lookup.stop)
+
+    def point_of_review(self):
+        return ApplicationMeteringPoint.objects.get(
+            building=self.building_of[self.app_review.pk], direction=Direction.CONSUMPTION
+        )
+
+    def building_token(self):
+        return application_corrections.building_token(
+            ApplicationBuilding.objects.get(pk=self.building_of[self.app_review.pk].pk)
+        )
+
+    def point_token(self):
+        return application_corrections.point_token(self.point_of_review())
 
     def cases(self):
         d, date = TODAY, lambda days: (TODAY + timedelta(days=days)).isoformat()
@@ -242,6 +276,17 @@ class MatrixBase(TestCase):
                 {"start_date": "2026-09-01"}, True,
             ),
             Case("processes_application_reject", pk(self.app_reject), {"reason": "rejected"}, True),
+            # The staff's corrections of a building and of a metering point of an application in flight (D-109). The
+            # address directory answers with one building for the address of the payload (``setUp``).
+            Case(
+                "processes_application_building", (self.app_review.pk, self.building_of[self.app_review.pk].pk),
+                {**address, "house_number": "70", "egid": "", "confirm_unlisted": "", "expected": self.building_token()},
+                True,
+            ),
+            Case(
+                "processes_application_point", (self.app_review.pk, self.point_of_review().pk),
+                {"number_digits": "55", "direction": "consumption", "expected": self.point_token()}, True,
+            ),
             Case("processes_deregistration", pk(self.dereg)),
             Case(
                 "processes_deregistration_confirm", pk(self.dereg),
@@ -542,7 +587,7 @@ class NegativeAuthorizationTests(MatrixBase):
             # An id that does not exist asks every route; one beyond every integer column asks a route of each kind.
             for forged in (999999, 2**63 + 5) if case.name in SAMPLE else (999999,):
                 with self.subTest(case=case.name, forged=forged):
-                    forged_case = case._replace(args=(forged,))
+                    forged_case = case._replace(args=tuple(forged for _ in case.args))
                     methods = ("get", "post") if case.name in SAMPLE else (("post",) if case.changes or case.data else ("get",))
                     answers = {method: self.request(client, forged_case, method).status_code for method in methods}
                     # The supported method says 404, the other 405 (or 404 as well); never a page or a change.

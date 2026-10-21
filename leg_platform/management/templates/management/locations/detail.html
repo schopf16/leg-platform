@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static management_ui %}{% comment %}
+{% load i18n static management_ui metering_points %}{% comment %}
 The detail page of a location (LEG-Design-Vorgaben/verwaltung/standorte/referenz/standort-detail-desktop,
 -handy, standort-neu-desktop and standorte/adresskorrektur; D-078). Cards left and right on a
 desktop, one under the other on a phone. The one button at the top right is "Delete location" (red
@@ -91,11 +91,11 @@ notice and "Confirm address" first.
         <tbody>
           {% for row in points %}
             <tr>
-              <td><span class="mgmt-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}</span>{% include "management/_direction.html" with direction=row.metering_point.direction %}</td>
+              <td><span class="mgmt-nr">{% if row.metering_point.number %}{{ row.metering_point.number|metering_point }}{% else %}–{% endif %}</span>{% include "management/_direction.html" with direction=row.metering_point.direction %}</td>
               <td>{% if row.leg_id %}<span class="mgmt-leg mgmt-cut-inline">{{ row.leg_name }}</span>{% url "management:legs_detail" row.leg_id as leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</td>
               <td>{% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}</td>
               <td>{% if row.person_id %}<span class="mgmt-cut-inline">{{ row.person_name }}</span>{% url "management:persons_detail" row.person_id as person_url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=person_url label=person_label subject=row.person_name %}{% else %}{% translate "no person" as missing_person %}{% include "management/_missing.html" with text=missing_person %}{% endif %}</td>
-              <td class="mgmt-link-col">{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}</td>
+              <td class="mgmt-link-col">{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number|metering_point_text %}</td>
             </tr>
           {% empty %}
             {% translate "No metering points at this location." as empty_text %}
@@ -108,7 +108,7 @@ notice and "Confirm address" first.
     <div class="mgmt-cards-view mgmt-card-pad">
       {% for row in points %}
         <div class="mgmt-mp">
-          <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number %}</div>
+          <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number|metering_point }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}{% url "management:metering_points_detail" row.metering_point.pk as point_url %}{% translate "Go to the details of the metering point" as point_label %}{% include "management/_goto.html" with url=point_url label=point_label subject=row.metering_point.number|metering_point_text %}</div>
           <div class="mgmt-mp-line">
             <span>{% if row.leg_id %}{{ row.leg_name }}{% url "management:legs_detail" row.leg_id as leg_url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=leg_url label=leg_label subject=row.leg_name %}{% else %}{% translate "no LEG" as missing_leg %}{% include "management/_missing.html" with text=missing_leg %}{% endif %}</span>
             {% include "management/_status.html" with tone=row.status|status_tone label=row.status|status_label %}
@@ -129,7 +129,7 @@ notice and "Confirm address" first.
         <thead><tr><th>{% translate "Metering point" %}</th><th>{% translate "Person" %}</th><th>{% translate "From" %}</th><th>{% translate "To" %}</th></tr></thead>
         <tbody>
           {% for entry in assignment_history %}
-            <tr><td><span class="mgmt-nr">{% if entry.number %}{{ entry.number }}{% else %}–{% endif %}</span></td><td>{{ entry.person }}</td><td>{{ entry.from|date:"d.m.Y" }}</td><td>{% if entry.to %}{{ entry.to|date:"d.m.Y" }}{% else %}–{% endif %}</td></tr>
+            <tr><td><span class="mgmt-nr">{% if entry.number %}{{ entry.number|metering_point }}{% else %}–{% endif %}</span></td><td>{{ entry.person }}</td><td>{{ entry.from|date:"d.m.Y" }}</td><td>{% if entry.to %}{{ entry.to|date:"d.m.Y" }}{% else %}–{% endif %}</td></tr>
           {% empty %}
             {% translate "No assignments yet." as empty_text %}
             {% include "management/_empty_row.html" with colspan=4 text=empty_text %}
@@ -139,7 +139,7 @@ notice and "Confirm address" first.
     </div>
     <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
       {% for entry in assignment_history %}
-        <div class="mgmt-fact"><dt>{{ entry.number|slice:":13" }}…{{ entry.number|slice:"-4:" }} · {{ entry.person }}</dt><dd>{% if entry.to %}{{ entry.from|date:"d.m.Y" }} – {{ entry.to|date:"d.m.Y" }}{% else %}{% translate "since" %} {{ entry.from|date:"d.m.Y" }}{% endif %}</dd></div>
+        <div class="mgmt-fact"><dt>{{ entry.number|metering_point }} · {{ entry.person }}</dt><dd>{% if entry.to %}{{ entry.from|date:"d.m.Y" }} – {{ entry.to|date:"d.m.Y" }}{% else %}{% translate "since" %} {{ entry.from|date:"d.m.Y" }}{% endif %}</dd></div>
       {% endfor %}
     </dl>
   </section>

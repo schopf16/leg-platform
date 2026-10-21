@@ -25,7 +25,6 @@ from leg_platform.community import (
     grid_operator,
     history,
     labels,
-    numbers,
     own_iban,
     process_list,
 )
@@ -327,7 +326,12 @@ def draft_steps(application):
     return steps, current.done, current.total
 
 
-def building_rows(application):
+def building_rows(application, request=None):
+    """The buildings of an application with their metering points for the page. With a ``request`` and an application
+    that the staff may correct (D-109) every row has the address of its edit dialog (a new building; a stored building has
+    its address on the page of the location) and every point the address of its own, both with the current page as
+    ``next``."""
+    correctable = request is not None and application.state in Application.CORRECTABLE_STATES
     rows = []
     for building in application.buildings.select_related("location").prefetch_related("metering_points"):
         address = building.current_address()
@@ -335,12 +339,20 @@ def building_rows(application):
         for point in building.metering_points.all():
             points.append(
                 {
-                    "number": numbers.format_metering_point_number(point.number),
+                    "number": point.number,
                     "direction": Direction(point.direction).label,
+                    "direction_value": point.direction,
                     "name": point.name,
                     "pv": point.pv_power_kwp, "battery": point.battery_kwh, "wallbox": point.wallbox_kw,
+                    # Plant details are asked for a feed-in; a figure on another point is shown as well.
+                    "has_plant": point.direction == Direction.FEED_IN or any(
+                        value is not None for value in (point.pv_power_kwp, point.battery_kwh, point.wallbox_kw)
+                    ),
                     "url": reverse("management:metering_points_detail", args=[point.metering_point_id])
                     if point.metering_point_id else "",
+                    "edit_url": with_next(
+                        reverse("management:processes_application_point", args=[application.pk, point.pk]), request
+                    ) if correctable else "",
                 }
             )
         egid = building.egid or (building.location.egid if building.location_id else None)
@@ -353,6 +365,9 @@ def building_rows(application):
                 "existing": building.location_id is not None,
                 "url": reverse("management:locations_detail", args=[building.location_id])
                 if building.location_id else "",
+                "edit_url": with_next(
+                    reverse("management:processes_application_building", args=[application.pk, building.pk]), request
+                ) if correctable and building.location_id is None else "",
                 "points": points,
             }
         )
@@ -375,7 +390,7 @@ def notice_rows(queryset, request):
                 "egid": notice.egid,
                 "numbers": [
                     {
-                        "text": numbers.format_metering_point_number(number),
+                        "number": number,
                         "url": reverse("management:metering_points_detail", args=[known[number]])
                         if number in known else "",
                     }
@@ -400,7 +415,7 @@ class ApplicationDetailView(ManagementAccessMixin, View):
         progress = applications.progress(application)
         has_feed_in = progress.step(applications.BANK_CONNECTION).applicable
         acceptance = contracts.latest_acceptance(person)
-        buildings = building_rows(application)
+        buildings = building_rows(application, request)
         next_url = lambda name: with_next(reverse(name, args=[application.pk]), request)  # noqa: E731
         in_flight = state in Application.IN_FLIGHT_STATES
         is_draft = state in Application.DRAFT_STATES
@@ -426,6 +441,7 @@ class ApplicationDetailView(ManagementAccessMixin, View):
             "done": done,
             "total": total,
             "buildings": buildings,
+            "has_points": any(building["points"] for building in buildings),
             "has_feed_in": has_feed_in,
             "step_numbers": self.step_numbers(has_feed_in),
             "iban_on_file": own_iban.has_iban(person) if has_feed_in else None,
@@ -440,6 +456,7 @@ class ApplicationDetailView(ManagementAccessMixin, View):
             "empty_points": _("No metering points."),
             "can_review": state == Application.State.SUBMITTED,
             "can_return": state in Application.WITHDRAWABLE_STATES,
+            "can_correct": state in Application.CORRECTABLE_STATES,
             "can_start_operator": state in Application.WITHDRAWABLE_STATES,
             "can_confirm": state == Application.State.OPERATOR_STARTED,
             "can_complete": state == Application.State.OPERATOR_CONFIRMED,
@@ -493,8 +510,9 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
             location = point.location
             points.append(
                 {
-                    "number": numbers.format_metering_point_number(point.number),
+                    "number": point.number,
                     "direction": Direction(point.direction).label,
+                    "direction_value": point.direction,
                     "address": f"{location.street} {location.house_number}, {location.postal_code} {location.town}"
                     if location is not None else "",
                     "egid": location.egid if location is not None else None,

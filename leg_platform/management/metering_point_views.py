@@ -80,7 +80,7 @@ STEP_ROUTES = {
 
 
 def point_title(point):
-    return point.number or "–"
+    return numbers.format_metering_point_number(point.number) or "–"
 
 
 def direction_label(point):
@@ -630,7 +630,7 @@ class LegView(AssignmentDialog):
                     parts.append(f"{point.location.street} {point.location.house_number}")
                 if names.get(point.pk):
                     parts.append(names[point.pk])
-                related.append({"point": point, "text": f"{point.number or '–'} ({', '.join(parts)})"})
+                related.append({"point": point, "text": f"{point_title(point)} ({', '.join(parts)})"})
         checked = {str(pk) for pk in request.POST.getlist("also")} if request.method == "POST" else set()
         return super().render_dialog(
             request, form, related=related, checked=checked, related_count=len(related),

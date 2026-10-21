@@ -74,8 +74,8 @@ class TypedDigitsTests(SimpleTestCase):
     def test_every_wrong_entry_has_its_own_code_and_message(self):
         for typed, code in (
             ("", "empty"), ("   ", "empty"), (None, "empty"),
-            ("12 ab", "not_allowed"), ("1 2", "not_allowed"), ("1.5", "not_allowed"), ("+1", "not_allowed"),
-            ("٣", "not_allowed"), ("²", "not_allowed"), ("1\n2", "not_allowed"), ("ß", "not_allowed"),
+            ("1.5", "not_allowed"), ("+1", "not_allowed"), ("12 a!", "not_allowed"),
+            ("٣", "not_allowed"), ("²", "not_allowed"), ("ß", "not_allowed"),
             ("é", "not_allowed"), ("1_2", "not_allowed"), ("1/2", "not_allowed"), ("İ", "not_allowed"),
             ("1" * 21, "too_long"), ("9" * 40, "too_long"),
         ):

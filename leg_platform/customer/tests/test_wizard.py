@@ -8,7 +8,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_staff, applications, buildings, contracts, history, own_iban
+from leg_platform.community import application_staff, applications, buildings, contracts, history, numbers, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
@@ -478,7 +478,7 @@ class MeteringPointStepTests(WizardCase):
         self.assertEqual(self.building.metering_points.get().number, full_number(7))
 
     def test_an_empty_or_forbidden_entry_is_a_message_at_the_field(self):
-        for value, message in (("", "Geben Sie die letzten Stellen der Nummer ein."), ("12 34", "Erlaubt sind nur die Buchstaben")):
+        for value, message in (("", "Geben Sie die letzten Stellen der Nummer ein."), ("12 3!", "Erlaubt sind nur die Buchstaben")):
             with self.subTest(value=value):
                 response = self.client.post(self.url, {"draw_number": value, "feed_in": "no"})
                 self.assertEqual(response.status_code, 200)
@@ -782,7 +782,7 @@ class SubmittedAndWithdrawTests(WizardCase):
         self.assertNotIn("Änderungen sind jetzt nur noch über die LEG möglich.", html)
         # N-09: every point with its number (the customer can check what was typed), the operator named once, no bar.
         for point in self.building.metering_points.all():
-            self.assertIn(point.number, html)
+            self.assertIn(numbers.format_metering_point_number(point.number), html)
         self.assertNotIn("<progress", html)
         # One list, no second count (W1-14): the bar only; the old words are gone.
         self.assertNotIn("step-note", html)

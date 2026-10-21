@@ -11,6 +11,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.tests.helpers import VerifiedClient
+from leg_platform.community import numbers
 from leg_platform.community.models import ManagementSettings
 from leg_platform.community.tests.helpers import (
     make_circuit,
@@ -107,7 +108,7 @@ class EntryPointsOfAMeteringPointTests(TestCase):
         # Everything else is the same field with the same label and hint.
         open_names = [name for name in field_names(created) if name not in fixed]
         self.assertEqual(signature(created, open_names), signature(changed, open_names))
-        self.assertContains(page, self.point.number)
+        self.assertContains(page, numbers.format_metering_point_number(self.point.number))
         for name in ("number_digits", "direction", "leg"):
             self.assertNotContains(page, f'name="{name}"')
 

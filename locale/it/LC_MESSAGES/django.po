@@ -5135,21 +5135,6 @@ msgstr "Descrizione"
 msgid "Number"
 msgstr "Numero"
 
-msgid "Plant"
-msgstr "Impianto"
-
-#, python-format
-msgid "PV %(value)s kWp"
-msgstr "FV %(value)s kWp"
-
-#, python-format
-msgid "Battery %(value)s kWh"
-msgstr "Batteria %(value)s kWh"
-
-#, python-format
-msgid "Wallbox %(value)s kW"
-msgstr "Wallbox %(value)s kW"
-
 msgid "Go to the metering point"
 msgstr "Vai al punto di misura"
 
@@ -6725,6 +6710,110 @@ msgstr "La Sua richiesta è inoltrata. Può ancora modificarla finché la CEL no
 
 msgid "Draft / not submitted"
 msgstr "Bozza / non inoltrata"
+
+msgid "Building corrected by the LEG"
+msgstr "Edificio corretto dalla CEL"
+
+msgid "Metering point corrected by the LEG"
+msgstr "Punto di misura corretto dalla CEL"
+
+msgid "This entry was changed in the meantime, for example by the customer. Nothing was saved. Go back and check the page."
+msgstr "Questa voce è stata nel frattempo modificata, ad esempio dal cliente. Non è stato salvato nulla. Torni indietro e controlli la pagina."
+
+msgid "This building is stored already. Change its address on the page of the location."
+msgstr "Questo edificio è già memorizzato. Modifichi il suo indirizzo nella pagina dell'ubicazione."
+
+msgid "This number belongs to a stored metering point or to another application. Nothing was saved."
+msgstr "Questo numero appartiene a un punto di misura memorizzato o a un'altra richiesta. Non è stato salvato nulla."
+
+msgid "This number is used already by a metering point or an application of the same customer."
+msgstr "Questo numero è già utilizzato da un punto di misura o da una richiesta dello stesso cliente."
+
+msgid "This number is used already by another metering point of this application."
+msgstr "Questo numero è già utilizzato da un altro punto di misura di questa richiesta."
+
+msgid "The building has a metering point with this direction already."
+msgstr "L'edificio ha già un punto di misura con questa direzione."
+
+msgid "Choose consumption or feed-in."
+msgstr "Scelga prelievo o immissione."
+
+msgid "A feed-in needs the bank connection of the customer. The customer enters it in the profile."
+msgstr "Un'immissione richiede le coordinate bancarie del cliente. Il cliente le inserisce nel profilo."
+
+msgid "A building needs a metering point for consumption. Change the other metering point of the building first."
+msgstr "Un edificio richiede un punto di misura per il prelievo. Modifichi prima l'altro punto di misura dell'edificio."
+
+msgid "Plant details apply to a feed-in only. Clear them or choose feed-in."
+msgstr "I dettagli dell'impianto valgono solo per un'immissione. Li cancelli o scelga immissione."
+
+msgid "The other metering point of the building has plant details, which a metering point for consumption cannot have. Clear them there first."
+msgstr "L'altro punto di misura dell'edificio ha dettagli dell'impianto, che un punto di misura di prelievo non può avere. Li cancelli prima lì."
+
+msgid "The application has this building already."
+msgstr "La richiesta contiene già questo edificio."
+
+msgid "The customer has another application for this building."
+msgstr "Il cliente ha un'altra richiesta per questo edificio."
+
+msgid "The EGID does not belong to this address."
+msgstr "L'EGID non appartiene a questo indirizzo."
+
+msgid "Enter the EGID as a number."
+msgstr "Inserisca l'EGID come numero."
+
+msgid "The address directory cannot be asked now. Try again later."
+msgstr "L'elenco degli indirizzi non può essere interrogato in questo momento. Riprovi più tardi."
+
+msgid "The address that the customer entered. It is checked against the address directory like the customer's entry. The customer sees the corrected address."
+msgstr "L'indirizzo inserito dal cliente. Viene controllato con l'elenco degli indirizzi come l'inserimento del cliente. Il cliente vede l'indirizzo corretto."
+
+#, python-format
+msgid "Several buildings have this address. Enter the EGID of one of them: %(egids)s."
+msgstr "Più edifici hanno questo indirizzo. Inserisca l'EGID di uno di essi: %(egids)s."
+
+msgid "Save as entered"
+msgstr "Salva come inserito"
+
+msgid "The metering point that the customer entered. The number, the direction and the plant details are checked like the customer's entry. The customer sees the corrected values."
+msgstr "Il punto di misura inserito dal cliente. Il numero, la direzione e i dettagli dell'impianto vengono controllati come l'inserimento del cliente. Il cliente vede i valori corretti."
+
+#, python-format
+msgid "The number starts with %(prefix)s, not with the country and the identifier of the settings. It stays so unless you change the number; a changed number starts with the ones of the settings."
+msgstr "Il numero inizia con %(prefix)s, non con il paese e l'identificativo delle impostazioni. Resta così finché non modifica il numero; un numero modificato inizia con quelli delle impostazioni."
+
+msgid "Leave it empty: the address directory gives the EGID. Enter it only when several buildings have this address."
+msgstr "Lasci il campo vuoto: l'elenco degli indirizzi fornisce l'EGID. La inserisca solo se più edifici hanno questo indirizzo."
+
+msgid "If the consumption and the feed-in were entered the wrong way round, choose the direction of the other metering point: the two exchange their directions."
+msgstr "Se il prelievo e l'immissione sono stati inseriti al contrario, scelga la direzione dell'altro punto di misura: i due scambiano le loro direzioni."
+
+msgid "Plant details apply to a feed-in only."
+msgstr "I dettagli dell'impianto valgono solo per un'immissione."
+
+msgid "Plant details"
+msgstr "Dettagli dell'impianto"
+
+#, python-format
+msgid "%(value)s kWp"
+msgstr "%(value)s kWp"
+
+#, python-format
+msgid "%(value)s kWh"
+msgstr "%(value)s kWh"
+
+#, python-format
+msgid "%(value)s kW"
+msgstr "%(value)s kW"
+
+msgid "The address of a stored building is changed on the page of the location."
+msgstr "L'indirizzo di un edificio memorizzato si modifica nella pagina dell'ubicazione."
+
+msgid "The address directory does not know this address."
+msgstr "L'elenco degli indirizzi non conosce questo indirizzo."
+
+msgid "Check the entry. If it is right, save it as entered: the building then has no EGID."
+msgstr "Controlli l'inserimento. Se è corretto, lo salvi come inserito: l'edificio non ha allora alcun EGID."
 
 msgid "Paused / not submitted"
 msgstr "In pausa / non inoltrata"

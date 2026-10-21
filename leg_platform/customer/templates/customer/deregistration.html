@@ -1,5 +1,5 @@
 {% extends "customer/base.html" %}
-{% load i18n customer_ui %}{% comment %}
+{% load i18n customer_ui metering_points %}{% comment %}
 The deregistration (ABMELDUNG.md): one page with three cards, the metering points, the date and the confirmation with one
 proof. Context: ``form`` (customer.forms.DeregistrationForm), ``groups`` (the points by building), ``empty``,
 ``already_deregistered`` (nothing to choose because a deregistration runs), ``deletion`` (started from "Delete account"),
@@ -56,7 +56,7 @@ count; the server checks everything again.
               {% if groups|length > 1 %}<legend>{{ group.title }}{% if group.line %}<span class="muted"> · {{ group.line }}</span>{% endif %}</legend>{% endif %}
               <div class="checks">
                 {% for row in group.rows %}
-                  <label class="entry-check point-check" for="id_metering_points_{{ row.index }}"><input class="entry-check-input" type="checkbox" id="id_metering_points_{{ row.index }}" name="metering_points" value="{{ row.pk }}"{% if row.checked %} checked{% endif %}><span>{{ row.name|default:row.direction }}<span class="meta">{% if row.number %}<span class="mp-num">{{ row.number }}</span>{% endif %}{% if row.name %}{% if row.number %} · {% endif %}{{ row.direction }}{% endif %}{% if row.since %}{% if row.number or row.name %} · {% endif %}{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}{% endif %}</span></span></label>
+                  <label class="entry-check point-check" for="id_metering_points_{{ row.index }}"><input class="entry-check-input" type="checkbox" id="id_metering_points_{{ row.index }}" name="metering_points" value="{{ row.pk }}"{% if row.checked %} checked{% endif %}><span>{{ row.name|default:row.direction }}<span class="meta">{% if row.number %}<span class="mp-num">{{ row.number|metering_point }}</span>{% endif %}{% if row.name %}{% if row.number %} · {% endif %}{{ row.direction }}{% endif %}{% if row.since %}{% if row.number or row.name %} · {% endif %}{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}{% endif %}</span></span></label>
                 {% endfor %}
               </div>
             </fieldset>

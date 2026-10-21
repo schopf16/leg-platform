@@ -84,6 +84,10 @@ class HistoryEvent(models.TextChoices):
     )
     APPLICATION_COMPLETED = "application_completed", _("Application completed")
     APPLICATION_ROLLED_BACK = "application_rolled_back", _("Application rolled back")
+    # D-109: the staff corrected the address of a building or a metering point of an application in flight; the detail
+    # names the row and the changed fields (``{"building_id" / "point_id": id, "fields": [names]}``), never a value.
+    APPLICATION_BUILDING_CORRECTED = "application_building_corrected", _("Building corrected by the LEG")
+    APPLICATION_POINT_CORRECTED = "application_point_corrected", _("Metering point corrected by the LEG")
     DEREGISTRATION_SUBMITTED = "deregistration_submitted", _("Deregistration requested")
     DEREGISTRATION_CONFIRMED = "deregistration_confirmed", _("Deregistration date confirmed")
     DEREGISTRATION_EFFECTIVE = "deregistration_effective", _("Deregistration took effect")

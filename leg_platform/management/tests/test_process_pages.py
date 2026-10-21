@@ -25,6 +25,7 @@ from leg_platform.community import (
     applications,
     deregistrations,
     history,
+    numbers,
     own_iban,
     process_list,
 )
@@ -247,7 +248,8 @@ class ApplicationPageTests(ProcessBase):
         self.assertContains(page, "Ittigenstrasse 51")
         self.assertContains(page, "3063 Ittigen")
         self.assertContains(page, "EGID 90004269")
-        self.assertContains(page, full_number(1)[:2] + " 1A2B")
+        # The number on one line: the grid operator's block, then blocks of four, no-break spaces (D-109).
+        self.assertContains(page, numbers.format_metering_point_number(full_number(1)))
         self.assertContains(page, "Bezug")
         self.assertContains(page, "Einspeisung")
         self.assertContains(page, "anna.process@example.org")
@@ -820,7 +822,7 @@ class NoticePageTests(ProcessBase):
         page = self.client.get(reverse("management:processes_notices"))
         self.assertContains(page, "Anna Muster")
         self.assertContains(page, "12345678")
-        self.assertContains(page, "CH 1A2B")
+        self.assertContains(page, "CH1A2B3C4D5E6")
         self.assertContains(page, "Als erledigt markieren")
         self.assertContains(page, "Gebäude für den Kunden nicht verfügbar")
 

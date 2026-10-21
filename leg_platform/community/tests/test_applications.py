@@ -366,10 +366,16 @@ class AddMeteringPointTests(TestCase):
         self.assertEqual(self.add(Direction.FEED_IN, last="00000000000000000000099").point.number, full_number(99))
 
     def test_invalid_numbers_are_refused(self):
-        for bad in ("", "  ", "ä", "1" * 21, "12 34", "1.5"):
+        for bad in ("", "  ", "ä", "1" * 21, "1.5", "12 3!"):
             with self.subTest(bad=bad), self.assertRaises(ValidationError):
                 self.add(last=bad)
         self.assertEqual(ApplicationMeteringPoint.objects.count(), 0)
+
+    def test_white_space_in_the_number_is_ignored_and_a_pasted_complete_number_loses_its_prefix(self):
+        # D-109: the blocks of the display (no-break spaces, or normal ones after a copy) are no part of the number.
+        self.assertEqual(self.add(Direction.CONSUMPTION, last="12 34").point.number, full_number(1234))
+        pasted = "CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00099"
+        self.assertEqual(self.add(Direction.FEED_IN, last=pasted).point.number, full_number(99))
 
     def test_without_the_identifier_of_the_settings_nothing_is_added(self):
         from leg_platform.community.models import ManagementSettings

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from django.test import TestCase, tag
 from django.urls import reverse
 
-from leg_platform.community import applications, buildings, deregistrations
+from leg_platform.community import applications, buildings, deregistrations, numbers
 from leg_platform.community.models import CustomerBuilding, Direction, GridOperator, MeteringPoint
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.customer.tests.helpers import (
@@ -74,9 +74,11 @@ class BuildingsPageTests(TestCase):
         self.assertIn("<dt>Netzbetreiber</dt><dd>Example Grid AG</dd>", html)
         self.assertIn("Block A", html)
         self.assertNotIn("EGRID", html)
-        self.assertIn(self.draw.number, html)
+        # One line: the grid operator's block, then blocks of four, no-break spaces (D-109).
+        self.assertIn(f'<span class="mp-number">{numbers.format_metering_point_number(self.draw.number)}</span>', html)
         self.assertIn("Wohnhaus", html)
         # The other customer of the shared building: nothing of theirs.
+        self.assertNotIn(numbers.format_metering_point_number(self.foreign.number), html)
         self.assertNotIn(self.foreign.number, html)
         self.assertNotIn("Fremd", html)
 
@@ -140,7 +142,7 @@ class BuildingsPageTests(TestCase):
 
     def test_an_archived_point_is_not_shown(self):
         MeteringPoint.objects.filter(pk=self.draw.pk).update(is_archived=True)
-        self.assertNotIn(self.draw.number, self.page())
+        self.assertNotIn(numbers.format_metering_point_number(self.draw.number), self.page())
 
     # --- running registrations --------------------------------------------------------------------------------
 
@@ -299,7 +301,9 @@ class NamePagesTests(TestCase):
         self.assertEqual(buildings.building_details(self.mine, self.location), ("", ""))
 
     def test_the_pencil_of_a_metering_point_changes_its_name(self):
-        self.assertIn(self.point.number, self.client.get(self.point_name).content.decode())
+        self.assertIn(
+            numbers.format_metering_point_number(self.point.number), self.client.get(self.point_name).content.decode()
+        )
         response = self.client.post(self.point_name, {"name": "Neu"})
         self.assertRedirects(response, BUILDINGS)
         self.point.refresh_from_db()
