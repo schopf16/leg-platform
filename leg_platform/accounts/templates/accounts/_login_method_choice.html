@@ -1,0 +1,41 @@
+{% load i18n %}{% comment %}
+The choice "Sign-in method" (D-106, "Guidance", docs/DESIGN.md "Choice cards"): the question, the explainer, the
+decision helper and one card per method. The page that includes it supplies the form, the error summary and the
+buttons. Context: ``methods`` (the ``login_methods.Method`` objects this account is offered, in the order of the page:
+the options are decided on the server, never here), ``selected`` (the key checked now), ``current``, ``recommended``,
+``recommended_title``, ``privileged`` (staff user or system administrator), ``passkeys_available`` (every passkey
+sentence is inside ``{% if passkeys_available %}`` or comes from a method that exists only while it is true) and
+``choose_form`` (its errors).
+{% endcomment %}<fieldset class="choice-group">
+  <legend class="choice-legend">{% translate "How do you want to sign in?" %}</legend>
+  {% include "accounts/_login_method_help.html" %}
+  <p class="choice-recommendation" id="choice-recommendation">
+    {% if privileged and recommended == "passkey" %}{% translate "Not sure? We recommend a passkey on two devices. Without a second device, choose Password and code from an app." %}
+    {% else %}{% blocktranslate with title=recommended_title %}Not sure? We recommend: {{ title }}.{% endblocktranslate %}{% endif %}
+  </p>
+  <div class="choice-helper">
+    <p class="choice-helper-title" id="choice-helper-title">{% translate "Which fits me?" %}</p>
+    <ul aria-labelledby="choice-helper-title">
+      {% for method in methods %}<li>{{ method.helper }} <span aria-hidden="true">→</span> <strong>{{ method.title }}</strong></li>{% endfor %}
+    </ul>
+  </div>
+  {% if choose_form.method.errors %}<div class="invalid-feedback d-block" id="id_method_error">{% for error in choose_form.method.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+  <div class="choice-cards">
+    {% for method in methods %}
+      <label class="choice-card" for="id_method_{{ forloop.counter0 }}">
+        <input class="form-check-input choice-radio" type="radio" name="method" id="id_method_{{ forloop.counter0 }}" value="{{ method.key }}"{% if method.key == selected %} checked{% endif %} aria-describedby="choice-{{ method.key }}-benefit choice-{{ method.key }}-need choice-{{ method.key }}-lose{% if method.note %} choice-{{ method.key }}-note{% endif %}">
+        <span class="choice-body">
+          <span class="choice-head">
+            <span class="choice-title">{{ method.title }}</span>
+            {% if method.key == recommended %}<span class="choice-tag choice-tag-recommended">{% translate "Recommended" %}</span>{% endif %}
+            {% if method.key == current %}<span class="choice-tag"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Current" %}</span>{% endif %}
+          </span>
+          <span class="choice-benefit" id="choice-{{ method.key }}-benefit">{{ method.benefit }}</span>
+          <span class="choice-line" id="choice-{{ method.key }}-need"><strong>{% translate "You need:" %}</strong> {{ method.need }}</span>
+          <span class="choice-line" id="choice-{{ method.key }}-lose"><strong>{% translate "If you lose it:" %}</strong> {{ method.lose }}</span>
+          {% if method.note %}<span class="choice-line choice-note" id="choice-{{ method.key }}-note">{{ method.note }}</span>{% endif %}
+        </span>
+      </label>
+    {% endfor %}
+  </div>
+</fieldset>

@@ -116,7 +116,10 @@ class LostPhoneSuccessTests(TestCase):
         self.lost(current_password=PASSWORD, otp_token=RECOVERY_CODES[0])
 
         self.assertEqual(self.client.get(f"{PROFILE}?edit=two_factor").status_code, 200)
-        self.assertContains(self.client.get(f"{PROFILE}?edit=two_factor"), "Nicht eingerichtet")
+        self.assertContains(
+            self.client.get(f"{PROFILE}?edit=two_factor"),
+            "Mit einem Code aus einer App schützen Sie Ihr Konto zusätzlich.",
+        )
 
 
 @tag("mariadb")

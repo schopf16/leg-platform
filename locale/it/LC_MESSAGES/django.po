@@ -161,11 +161,11 @@ msgstr "Il Suo indirizzo manca ancora."
 msgid "Add address"
 msgstr "Aggiungi indirizzo"
 
-msgid "Two-factor sign-in"
-msgstr "Accesso a due fattori"
+msgid "Choose how you sign in"
+msgstr "Scegliere come accedere"
 
-msgid "Protects your account additionally with a code from an app."
-msgstr "Protegge ulteriormente il Suo conto con un codice generato da un'app."
+msgid "Password only, or password and a code from an app on your phone."
+msgstr "Solo password, oppure password e codice generato da un'app sul telefono."
 
 msgid "Set up 2FA"
 msgstr "Configura 2FA"
@@ -2226,8 +2226,8 @@ msgstr "Disattiva 2FA"
 msgid "New codes replace the old ones. The old codes no longer work afterwards."
 msgstr "I nuovi codici sostituiscono quelli vecchi. In seguito i vecchi codici non funzionano più."
 
-msgid "With a code from an app you protect your account additionally. This is voluntary."
-msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto. È facoltativo."
+msgid "You sign in with your password only. With a code from an app you protect your account additionally. This is voluntary."
+msgstr "Accede solo con la password. Con un codice generato da un'app protegge ulteriormente il Suo conto. È facoltativo."
 
 msgid "With a code from an app you protect your account additionally."
 msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto."
@@ -6580,3 +6580,106 @@ msgstr "Stabilito dal gestore di rete"
 
 msgid "Your desired date"
 msgstr "La Sua data desiderata"
+
+msgid "Choose"
+msgstr "Scegli"
+
+msgid "Sign-in method"
+msgstr "Metodo di accesso"
+
+msgid "Choose how you want to sign in."
+msgstr "Scelga come desidera accedere."
+
+msgid "Your sign-in method stays as it is."
+msgstr "Il Suo metodo di accesso rimane invariato."
+
+msgid "Password only"
+msgstr "Solo password"
+
+msgid "The simplest way. Less protected: whoever knows your password can sign in."
+msgstr "Il modo più semplice. Meno protetto: chiunque conosca la Sua password può accedere."
+
+msgid "Your password."
+msgstr "La Sua password."
+
+msgid "If you forget your password, we send a link to your email address."
+msgstr "Se dimentica la password, Le inviamo un link via e-mail."
+
+msgid "I just want to sign in as before"
+msgstr "Voglio semplicemente accedere come prima"
+
+msgid "Password and code from an app"
+msgstr "Password e codice generato da un'app"
+
+msgid "Safer: after your password you enter a 6-digit code from an app on your phone."
+msgstr "Più sicuro: dopo la password inserisce un codice a 6 cifre generato da un'app sul Suo telefono."
+
+msgid "A smartphone with a free authenticator app."
+msgstr "Uno smartphone con un'app di autenticazione gratuita."
+
+msgid "Use one of your 10 recovery codes. Without them, contact the LEG administrator."
+msgstr "Utilizzi uno dei Suoi 10 codici di recupero. Senza di essi, contatti l'amministratore della LEG."
+
+msgid "I have a smartphone and can install an app"
+msgstr "Ho uno smartphone e posso installare un'app"
+
+msgid "Passkey"
+msgstr "Passkey (accesso senza password)"
+
+msgid "Quick and safe: you sign in with fingerprint, face or screen lock of your phone or computer. No password, no codes."
+msgstr "Rapido e sicuro: accede con impronta digitale, riconoscimento del volto o blocco schermo del telefono o del computer. Nessuna password, nessun codice."
+
+msgid "A phone or computer with a screen lock. We recommend a second device."
+msgstr "Un telefono o un computer con blocco schermo. Consigliamo un secondo dispositivo."
+
+msgid "Sign in with your second device. Without one, you send an ID document by email to the LEG administrator, who resets your account."
+msgstr "Acceda con il secondo dispositivo. Senza un secondo dispositivo, invia un documento d'identità via e-mail all'amministratore della LEG, che reimposta il Suo conto."
+
+msgid "My phone or computer unlocks with fingerprint, face or PIN"
+msgstr "Il mio telefono o computer si sblocca con impronta digitale, volto o PIN"
+
+msgid "Your password and app are deleted. You cannot combine a password with a passkey."
+msgstr "La Sua password e la Sua app vengono eliminate. Password e passkey non si possono combinare."
+
+msgid "First set up two passkeys on two devices."
+msgstr "Configuri prima due passkey su due dispositivi."
+
+msgid "What is an authenticator app? What is a passkey?"
+msgstr "Che cos'è un'app di autenticazione? Che cos'è una passkey?"
+
+msgid "What is an authenticator app?"
+msgstr "Che cos'è un'app di autenticazione?"
+
+msgid "An authenticator app is a free app from your phone's app store. It shows a new 6-digit code every 30 seconds. After your password you type the current code. This proves that you hold your phone."
+msgstr "Un'app di autenticazione è un'app gratuita dell'app store del Suo telefono. Mostra un nuovo codice a 6 cifre ogni 30 secondi. Dopo la password digita il codice attuale. Così dimostra di avere il Suo telefono."
+
+msgid "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, and it cannot be guessed."
+msgstr "Una passkey sostituisce la password. Il Suo telefono o computer custodisce una chiave segreta. Conferma con impronta digitale, volto o blocco schermo, come quando sblocca il telefono. Non c'è nulla da ricordare o digitare e non può essere indovinata."
+
+msgid "You can change your choice at any time in your profile."
+msgstr "Può modificare la Sua scelta in qualsiasi momento nel profilo."
+
+msgid "How do you want to sign in?"
+msgstr "Come desidera accedere?"
+
+msgid "Not sure? We recommend a passkey on two devices. Without a second device, choose Password and code from an app."
+msgstr "Non è sicuro? Consigliamo una passkey su due dispositivi. Senza un secondo dispositivo, scelga Password e codice generato da un'app."
+
+#, python-format
+msgid "Not sure? We recommend: %(title)s."
+msgstr "Non è sicuro? Consigliamo: %(title)s."
+
+msgid "Which fits me?"
+msgstr "Quale fa per me?"
+
+msgid "Recommended"
+msgstr "Consigliato"
+
+msgid "You need:"
+msgstr "Serve:"
+
+msgid "If you lose it:"
+msgstr "Se lo perde:"
+
+msgid "Next: you may be asked for your password or code."
+msgstr "Dopo, potrebbe esserLe chiesta la password o il codice."

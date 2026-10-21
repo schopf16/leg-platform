@@ -21,11 +21,19 @@ from django.views import View
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django_otp import login as otp_login
 
-from leg_platform.accounts import email_change, password_reset, second_factor, security_log, totp
+from leg_platform.accounts import (
+    email_change,
+    login_methods,
+    password_reset,
+    second_factor,
+    security_log,
+    totp,
+)
 from leg_platform.accounts.forms import (
     AccountDeleteForm,
     ChangePasswordForm,
     EmailChangeForm,
+    LoginMethodForm,
     LostPhoneForm,
     ProfileForm,
     ReauthenticationForm,
@@ -58,7 +66,8 @@ CARD_ANCHORS = {
     "delete": "card-delete",
 }
 # Steps of the two-factor card that a person can open by address; codes are only ever the answer to a form.
-TWO_FACTOR_STEPS = ("setup", "app", "codes_new", "disable", "lost_phone")
+# "choose" is the choice "Sign-in method" (D-106); it is shown only to an account that has something to choose.
+TWO_FACTOR_STEPS = ("choose", "setup", "app", "codes_new", "disable", "lost_phone")
 # The fields of the profile that make up the address: locked once the staff confirmed the building at that address.
 ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town", "country")
 
@@ -152,6 +161,8 @@ def two_factor_state(user, edit, step, session):
     active = second_factor.has_second_factor(user)
     if edit != "two_factor":
         return "setup" if second_factor.requires_second_factor(user) and not active else "view"
+    if step == "choose" and login_methods.has_choice(user) and (active or not second_factor.requires_second_factor(user)):
+        return "choose"
     if active:
         if step == "codes_new":
             return "codes_new"
@@ -205,6 +216,8 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         "pending": email_change.pending_changes(user),
         "privacy_url": legal_links(request).privacy_url,
         "password_rules": password_rules(),
+        "can_choose": login_methods.has_choice(user),
+        "passkeys_available": login_methods.passkeys_available(),
     }
     if not only_two_factor:
         context["address_building"] = address_building(user)
@@ -242,6 +255,19 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
             )
         elif state in ("codes_new", "disable"):
             context["action_form"] = forms.get("action") or ReauthenticationForm(request=request)
+        elif state == "choose":
+            choose_form = forms.get("choose") or LoginMethodForm(
+                user=user, initial={"method": login_methods.current(user)}
+            )
+            context.update(
+                choose_form=choose_form,
+                methods=login_methods.available(user),
+                selected=choose_form["method"].value(),
+                current=login_methods.current(user),
+                recommended=login_methods.recommended(user),
+                recommended_title=login_methods.title_of(login_methods.recommended(user)),
+                privileged=login_methods.is_privileged(user),
+            )
         elif state == "lost_phone":
             context["action_form"] = forms.get("action") or LostPhoneForm(request=request)
     else:
@@ -426,6 +452,37 @@ class TwoFactorOverviewView(ProfileCardView):
 
     def get(self, request):
         return render_profile(request, edit="two_factor")
+
+
+class LoginMethodView(ProfileCardView):
+    """The choice "Sign-in method" (D-106): GET opens it in the card, POST validates the posted method on the server
+    and leads into the existing flows (setup of the app, turning it off). It adds no security logic of its own: the
+    flows ask for the password where they always did. An account with only one method has no choice page."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not login_methods.has_choice(request.user):
+            return redirect("accounts:two_factor")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        return render_profile(request, edit="two_factor", step="choose")
+
+    def post(self, request):
+        user = request.user
+        form = LoginMethodForm(request.POST, user=user)
+        if not form.is_valid():
+            return render_profile(request, edit="two_factor", step="choose", forms={"choose": form})
+        method = form.cleaned_data["method"]
+        if method == login_methods.current(user):
+            messages.info(request, _("Your sign-in method stays as it is."), extra_tags="card-two_factor")
+            return back_to("two_factor")
+        if method == login_methods.PASSWORD_AND_APP:
+            # The same start as the button "Set up 2FA" had: no password within five minutes of the login, else asked.
+            return TwoFactorSetupView.as_view()(request)
+        if method == login_methods.PASSWORD_ONLY:
+            return redirect(card_url("two_factor", "disable"))
+        # A method that is offered but has no flow yet: passkeys (D-106) are not built.
+        raise Http404
 
 
 class TwoFactorSetupView(ProfileCardView):

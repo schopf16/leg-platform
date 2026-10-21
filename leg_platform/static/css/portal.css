@@ -742,6 +742,141 @@ body {
   background: var(--warn);
 }
 
+/* Choice cards (docs/DESIGN.md, "Choice cards"; D-106): one native radio per card, the whole card is the click target.
+   Always stacked (the entry column is 400 px wide); no shadow; the selected card has a 2 px accent border and the
+   filled radio, never colour alone. */
+.choice-group {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice-legend {
+  float: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.choice-group > * {
+  min-width: 0;
+}
+
+.choice-recommendation,
+.choice-helper-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.choice-helper ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.choice-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.choice-card {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-height: 48px;
+  margin: 0;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.choice-card:has(.choice-radio:checked) {
+  padding: 15px;
+  border: 2px solid var(--accent);
+}
+
+.choice-card:has(.choice-radio:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice-radio {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.choice-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.choice-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.choice-title {
+  font-weight: 600;
+}
+
+.choice-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.choice-tag-recommended {
+  font-weight: 600;
+}
+
+.choice-line {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.choice-line strong {
+  color: var(--fg);
+}
+
+/* The explainer: a native <details>, closed, no script. */
+.help-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.help-details-body {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.help-details-body p {
+  margin: 0;
+}
+
 @media print {
   .corner,
   footer {

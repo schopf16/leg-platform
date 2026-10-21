@@ -309,10 +309,12 @@ AREAS: dict[str, Area] = {
         paths=(
             "leg_platform/accounts/profile_views.py", "leg_platform/accounts/email_change.py",
             "leg_platform/accounts/views.py", "leg_platform/accounts/forms.py",
+            "leg_platform/accounts/login_methods.py",
         ),
         tests=(
             _labels(A, "test_profile", "test_profile_acceptance", "test_account_lifecycle",
-                    "test_phase4_review", "test_address_notice", "test_recent_authentication")
+                    "test_phase4_review", "test_address_notice", "test_recent_authentication",
+                    "test_login_methods")
             + _FLOW_REVIEWS
             + ("leg_platform.customer.tests.test_profile_cards", C + "test_profile_address")
         ),

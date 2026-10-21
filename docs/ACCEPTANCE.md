@@ -16,6 +16,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 * [ ] Users can set up an authenticator app (TOTP) optionally and remove it after re-authentication; staff users and system administrators must set it up before using any function; recovery codes are issued at setup and can be regenerated.
 * [ ] A system administrator can reset or remove another account's second factor (`docs/SECURITY.md`, section 3); the last system administrator's only via the management command on the server.
 * [ ] Completion of the second factor is checked in one central place, TOTP-specific parts separate.
+* [ ] Guidance for the login method (D-106): the step "Sign-in method" shows, in plain language, one card per method with "You need" and "If you lose it", an explainer without app brands, the decision helper "Which fits me?" and the recommendation "password and app" for users. It is reached from the start tile "Choose how you sign in" (optional, a link) and from the profile card. The options come from the server (`login_methods.available`): an administrator is never offered "password only" and has no choice page while passkeys are off; a posted method that is not offered (for example `passkey`) is refused; the choice routes into the existing setup and turn-off flows and asks for the proof there. No page mentions a passkey while `PASSKEYS_ENABLED` is off. Verified by automated tests (`accounts/tests/test_login_methods.py`); not verified in a real browser, with a screen reader or at 200 % zoom.
 
 ## 4. Profile and Account Lifecycle
 
@@ -61,6 +62,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 ## 12. Design Language
 
+* [ ] Choice cards (`docs/DESIGN.md`, section 6): one fieldset with the question as legend, stacked cards (a native radio in a label, at least 48 px high, 1 px line, 12 px radius, no shadow), the selected card marked by the filled radio and a 2 px accent border, "Recommended" and "Current" as words, a visible focus ring, the explainer as a native `<details>` without script; they reflow at 200 % zoom and fit the 400 px entry column. **Not verified in a browser.**
 * [ ] All application views follow `docs/DESIGN.md`; configured instance colours are checked for contrast (documented); status is never shown by colour alone; keyboard operation and a visible focus indicator work on all phase 1 pages.
 * [ ] Light and dark mode work only through the corner button, kept for the tab only, negative logo in dark mode; the print stylesheet hides navigation and controls; fonts and icons are served by the instance with the font licence texts (D-056). The language menu is a form (D-056, section 13).
 * [ ] The error pages (404, 403, expired link, 500) are in the portal design (`navigation/VORGABEN.md`, section 8a), show no technical detail and work without session, database and context processor (D-054, D-060). The administration start page is as in D-060.

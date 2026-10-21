@@ -432,12 +432,13 @@ class TwoFactorPageTests(TestCase):
 
         response = self.client.get(PROFILE_URL)
 
-        self.assertContains(response, "Zwei-Faktor-Anmeldung (2FA)")
-        self.assertContains(response, "Nicht eingerichtet")
+        self.assertContains(response, "Anmeldemethode")
         self.assertContains(
-            response, "Mit einem Code aus einer App schützen Sie Ihr Konto zusätzlich. Das ist freiwillig."
+            response,
+            "Sie melden sich nur mit Ihrem Passwort an. Mit einem Code aus einer App schützen Sie Ihr Konto zusätzlich. "
+            "Das ist freiwillig.",
         )
-        self.assertContains(response, "2FA einrichten")
+        self.assertContains(response, "Ändern</a>")
 
     def test_the_card_with_a_second_factor_counts_the_recovery_codes_and_turns_off_in_red(self):
         user, _device = create_user_with_totp()

@@ -11,7 +11,7 @@ from django.forms.boundfield import BoundField
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.accounts import second_factor, totp
+from leg_platform.accounts import login_methods, second_factor, totp
 from leg_platform.accounts.bot_check import BotCheckMixin
 from leg_platform.accounts.models import (
     EMAIL_MAX_LENGTH,
@@ -473,6 +473,28 @@ class StartSetupForm(PortalFormMixin, forms.Form):
 
     def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+class LoginMethodForm(PortalFormMixin, forms.Form):
+    """The choice "Sign-in method" (D-106): the posted method must be one of ``login_methods.available(user)``.
+
+    The browser's value is never trusted: a method that is not offered to this account (for example "passkey" while
+    ``PASSKEYS_ENABLED`` is off, or "password" for an administrator) is refused like a missing choice.
+    """
+
+    choose_message = _("Choose how you want to sign in.")
+    method = forms.ChoiceField(
+        label=_("Sign-in method"),
+        widget=forms.RadioSelect,
+        error_messages={"required": choose_message, "invalid_choice": choose_message},
+    )
+
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["method"].choices = [(method.key, method.title) for method in login_methods.available(user)]
+        # RadioSelect has no id for its label, so the error summary would link to "#": point it at the first radio
+        # (the page renders the radios with ids ``id_method_<n>``, ``_login_method_choice.html``).
+        self.fields["method"].summary_anchor = "id_method_0"
 
 
 class ProofCodeInput(forms.TextInput):

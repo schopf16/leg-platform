@@ -73,6 +73,7 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 ## Authentication
 
 * Password login with the email address (D-021), or passkey-only login for administrators and optionally for users (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
+* The login method is chosen in the step "Sign-in method" (D-106, "Guidance"); the offered methods come from `accounts/login_methods.py`. The setting `PASSKEYS_ENABLED` (default False) is a plain Django setting with no environment variable and no entry in `settings.py`; it stays off until passkeys are built, and no operator changes it.
 
 ## Email
 
