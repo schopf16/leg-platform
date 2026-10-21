@@ -713,8 +713,24 @@ a.mgmt-sort:hover {
   vertical-align: middle;
 }
 
-.mgmt-site.is-expandable {
+/* The whole row opens and closes (the script, D-110); the arrow is the indicator and the button for the keyboard. */
+.mgmt-site.is-expandable,
+.mgmt-place.is-expandable {
   cursor: pointer;
+}
+
+.mgmt-place.is-expandable .mgmt-place-points {
+  cursor: default;
+}
+
+.mgmt-site.is-expandable:focus-within > td {
+  background: var(--warm);
+}
+
+@media (hover: hover) {
+  .mgmt-site.is-expandable:hover > td {
+    background: var(--warm);
+  }
 }
 
 .mgmt-addr {

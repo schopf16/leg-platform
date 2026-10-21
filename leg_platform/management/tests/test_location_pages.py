@@ -143,6 +143,31 @@ class LocationPageTests(TestCase):
         # What one account remembers is not remembered for another.
         self.assertEqual(preferences.get_preference(self.administrator, "locations").expanded_locations, [])
 
+    def test_the_whole_row_opens_and_only_the_link_icon_leads_to_the_detail_page(self):
+        # D-110: the address is plain text, the row is the target of the click, the arrow is the keyboard button.
+        page = self.client.get(reverse("management:locations")).content.decode()
+        detail = self.detail()
+        self.assertIn('<span class="mgmt-addr-name">Musterweg 12</span>', page)
+        self.assertNotIn(f'class="mgmt-row-link" href="{detail}"', page)
+        self.assertIn(f'href="{detail}"', page)  # the link icon at the right stays (table and card)
+        self.assertIn("Zur Detailseite des Standorts", page)
+        self.assertIn('class="mgmt-site is-expandable"', page)
+        self.assertIn('class="mgmt-place is-expandable"', page)
+        pk = self.musterweg.pk
+        for kind in ("table", "card"):
+            self.assertIn(f'aria-controls="points-{kind}-{pk}"', page)
+            self.assertIn(f'id="points-{kind}-{pk}"', page)
+        self.assertEqual(page.count('data-expand-toggle'), 2)
+        # A location without metering points cannot open: no arrow button, no expandable row.
+        empty = self.client.get(reverse("management:locations"), {"q": "Zielweg"}).content.decode()
+        self.assertIn("Zielweg 3", empty)
+        self.assertNotIn("is-expandable", empty)
+        self.assertNotIn("data-expand-toggle", empty)
+        # The state the server remembers is on the button too.
+        self.client.post(reverse("management:locations_expanded"), {"toggle": pk})
+        opened = self.client.get(reverse("management:locations")).content.decode()
+        self.assertEqual(opened.count('aria-expanded="true"'), 4)  # row, card and the two buttons
+
     def test_a_hostile_next_value_never_leaves_the_site(self):
         client = self.client
         for value in HOSTILE:

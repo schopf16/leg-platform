@@ -4,7 +4,8 @@ The list of locations (LEG-Design-Vorgaben/verwaltung/standorte/referenz/standor
 -handy; D-078). On a desktop a table whose rows open to the table of their metering points, on a phone
 one card per location. The page works without a script: the arrows and the button "Expand all" post to
 ``management:locations_expanded``, the filters are a GET form. The script adds the resizing of the
-columns, the opening of a row by a click and the sending of the form on change.
+columns, the opening of a row by a click anywhere on it (the row, not only the arrow; the name is plain text,
+the way to the detail page is the link at the right, DESIGN section 6) and the sending of the form on change.
 {% endcomment %}
 {% block inner_class %}mgmt-page mgmt-wide{% endblock %}
 {% block extra_head %}{{ block.super }}{% endblock %}
@@ -53,8 +54,8 @@ columns, the opening of a row by a click and the sending of the form on change.
             <tr class="mgmt-site{% if entry.can_open %} is-expandable{% endif %}" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
               <td>
                 <div class="mgmt-addr mgmt-cut" title="{{ location.street }} {{ location.house_number }}">
-                  {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% else %}<span class="mgmt-caret-space"></span>{% endif %}
-                  <a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ location.street }} {{ location.house_number }}</a>
+                  {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}" aria-controls="points-table-{{ location.pk }}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% else %}<span class="mgmt-caret-space"></span>{% endif %}
+                  <span class="mgmt-addr-name">{{ location.street }} {{ location.house_number }}</span>
                   {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
                   {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
                 </div>
@@ -65,7 +66,7 @@ columns, the opening of a row by a click and the sending of the form on change.
               <td class="mgmt-link-col">{% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}</td>
             </tr>
             {% if entry.can_open %}
-              <tr class="mgmt-subwrap" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
+              <tr class="mgmt-subwrap" id="points-table-{{ location.pk }}" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
                 <td colspan="5">
                   <table class="mgmt-sub">
                     <colgroup><col width="440"><col width="300"><col width="200"><col width="200"></colgroup>
@@ -103,17 +104,17 @@ columns, the opening of a row by a click and the sending of the form on change.
     <div class="mgmt-cards-view">
       {% for entry in entries %}
         {% with location=entry.location %}
-        <article class="mgmt-place" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
+        <article class="mgmt-place{% if entry.can_open %} is-expandable{% endif %}" data-expand-id="{{ location.pk }}"{% if entry.can_open %} aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}"{% endif %}>
           <div class="mgmt-place-addr">
-            {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% endif %}
-            <a class="mgmt-row-link" href="{{ entry.detail_url }}">{{ location.street }} {{ location.house_number }}</a>
+            {% if entry.can_open %}<button type="submit" form="expand-form" name="toggle" value="{{ location.pk }}" class="mgmt-caret" aria-label="{% translate 'Show or hide the metering points' %}" aria-expanded="{% if entry.is_open %}true{% else %}false{% endif %}" aria-controls="points-card-{{ location.pk }}" data-expand-toggle><span class="mgmt-caret-icon" aria-hidden="true"></span></button>{% endif %}
+            <span class="mgmt-addr-name">{{ location.street }} {{ location.house_number }}</span>
             {% if location.needs_confirmation %}<span class="mgmt-new">{% translate "new" %}</span>{% endif %}
             {% if location.address_correction_open %}{% translate "Problem: Address correction open" as problem_text %}{% include "management/_warning.html" with text=problem_text %}{% endif %}
             {% translate "Go to the details of the location" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}
           </div>
           <div class="mgmt-place-sub">{{ entry.circuit }} · {{ entry.count_phrase }} · {{ entry.occupancy }}</div>
           {% if entry.can_open %}
-            <div class="mgmt-place-points" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
+            <div class="mgmt-place-points" id="points-card-{{ location.pk }}" data-expand-for="{{ location.pk }}"{% if not entry.is_open %} hidden{% endif %}>
               {% for row in entry.points %}
                 <div class="mgmt-mp">
                   <div class="mgmt-mp-nr">{% if row.metering_point.number %}{{ row.metering_point.number|metering_point }}{% else %}–{% endif %}{% include "management/_direction.html" with direction=row.metering_point.direction %}</div>
