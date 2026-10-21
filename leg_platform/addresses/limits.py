@@ -19,8 +19,16 @@ def allow_request(request, *, admin=False):
             return False
         scope = "address-import" if admin else "address-lookup"
         limits = ((5 if admin else 60, timedelta(minutes=1)),)
+        user = getattr(request, "user", None)
+        pk = getattr(user, "pk", None)
+        if not admin and pk is not None and getattr(user, "is_authenticated", False):
+            # A signed-in account has its own budget (D-111): an office behind one address does not share one budget,
+            # and no account can use more than this however many addresses it comes from.
+            first = (ACCOUNT_SCOPE, str(pk), ACCOUNT_LOOKUP_LIMITS)
+        else:
+            first = (scope + "-ip", ip_key(address), limits)
         checks = [
-            (scope + "-ip", ip_key(address), limits),
+            first,
             (scope + "-global", "instance", ((20 if admin else 600, timedelta(minutes=1)),)),
         ]
         # Read-only pre-check first: a refused client costs no bucket row (D-066).
@@ -30,6 +38,11 @@ def allow_request(request, *, admin=False):
     except (ValueError, DatabaseError):
         logger.warning("Address request limit check failed; request refused.")
         return False
+
+
+# The typing suggestions of the forms (D-111): per signed-in account, three kinds of lookup (street, postal code, town).
+ACCOUNT_SCOPE = "address-lookup-account"
+ACCOUNT_LOOKUP_LIMITS = ((120, timedelta(minutes=1)),)
 
 
 # Outbound building searches at swisstopo (``buildings``, D-066): a budget per signed-in account and one for the whole

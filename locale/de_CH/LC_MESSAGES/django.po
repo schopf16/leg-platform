@@ -222,6 +222,29 @@ msgstr[1] "Keine genaue Übereinstimmung. %(count)s ähnliche Adressen verfügba
 msgid "Address filled in: %(address)s."
 msgstr "Adresse eingetragen: %(address)s."
 
+msgid "Choose a town"
+msgstr "Wählen Sie einen Ort"
+
+msgid "Choose a postal code"
+msgstr "Wählen Sie eine PLZ"
+
+#, python-format
+msgid "%(count)s match available. Press the down arrow key to choose it."
+msgid_plural "%(count)s matches available. Press the down arrow key to choose one."
+msgstr[0] "%(count)s Treffer verfügbar. Mit der Pfeiltaste nach unten wählen Sie ihn aus."
+msgstr[1] "%(count)s Treffer verfügbar. Mit der Pfeiltaste nach unten wählen Sie einen aus."
+
+#, python-format
+msgid "Town filled in: %(town)s."
+msgstr "Ort eingetragen: %(town)s."
+
+#, python-format
+msgid "Postal code filled in: %(postal_code)s."
+msgstr "PLZ eingetragen: %(postal_code)s."
+
+msgid "There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration."
+msgstr "Es gibt keine Adressvorschläge: Das Adressverzeichnis ist nicht verfügbar oder wurde noch nicht importiert. Ein Systemadministrator kann es in der Systemverwaltung importieren."
+
 msgid "Can request an address directory import"
 msgstr "Kann einen Import des Adressverzeichnisses anfordern"
 

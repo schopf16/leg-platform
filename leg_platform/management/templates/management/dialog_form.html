@@ -1,5 +1,5 @@
 {% extends "management/dialog.html" %}
-{% load i18n management_ui %}{% comment %}
+{% load i18n management_ui static %}{% comment %}
 A dialog whose form is laid out by ``form.layout``, a list of ``(row class, [field names])`` (the rows
 are grids: ``street`` = street and house number, ``postal`` = postal code and town, ``single``).
 ``form.optional`` names the fields whose label says "(optional)". Blocks for a dialog with a notice:
@@ -21,4 +21,9 @@ lead and the buttons are shown.
     {% if form.hint %}<div class="mgmt-hint mgmt-dialog-hint">{{ form.hint }}</div>{% endif %}
   {% endif %}
   {% block dialog_after_fields %}{% endblock %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {# One script for every address of a dialog (D-111): where a field of the form has the address suggestions. #}
+  {% if form and "street" in form.fields %}<script defer src="{% static 'js/address-directory.js' %}"></script>{% endif %}
 {% endblock %}

@@ -4,7 +4,7 @@ field, the message under it and a hint. Context: ``field`` and ``form``. A field
 ``fact`` (a read-only row: a locked or fixed value, with an optional ``fact_link``; the field is disabled and
 never trusted from the browser), ``segmented`` (a choice of few options as a segmented control), ``prefix_text``
 (a grey fixed text in front of the input), ``unit`` (a unit after the input), ``after_template`` (what follows the
-field). A checked field (``CheckedInput``) always has its message slot, which ``field-check.js`` fills while typing.
+field; ``address_country`` is the fixed country that the address suggestions of ``form_fields.address_suggestions`` use). A checked field (``CheckedInput``) always has its message slot, which ``field-check.js`` fills while typing.
 {% endcomment %}{% if field.field.fact is not None %}<div class="mgmt-dialog-field is-fact">
   <span class="mgmt-dialog-label" id="{{ field.auto_id }}_label">{{ field.label }}</span>
   <div class="mgmt-fact-value" aria-labelledby="{{ field.auto_id }}_label">{{ field.field.fact }}{% if field.field.fact_link %} <a href="{{ field.field.fact_link.0 }}">{{ field.field.fact_link.1 }}</a>{% endif %}</div>
@@ -22,5 +22,5 @@ field). A checked field (``CheckedInput``) always has its message slot, which ``
   {% endif %}
   {% if field.errors %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% elif field.field.widget.kind %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error" hidden></div>{% endif %}
   {% if field.help_text %}<div class="mgmt-hint" id="{{ field.auto_id }}_hint">{{ field.help_text }}</div>{% endif %}
-  {% if field.field.after_template %}{% include field.field.after_template %}{% endif %}
+  {% if field.field.after_template %}{% include field.field.after_template with address_country_value=field.field.address_country %}{% endif %}
 </div>{% endif %}

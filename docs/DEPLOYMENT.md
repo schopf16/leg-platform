@@ -1036,6 +1036,8 @@ sudo ls -l /var/lib/leg-platform/
 **Open operator step (D-065, D-075, UNVERIFIED):** after the first import run `EXPLAIN QUERY PLAN` (`leg-manage web shell`, connection `addresses`) for the two lookup queries of `PrefixSearchTests` (`leg_platform/addresses/tests/test_directory.py`) on the largest postal code.
 
 * Expected: `SEARCH ... USING (COVERING) INDEX addr_generation_postal_street` and `addr_generation_street`; no `SCAN addresses_address`.
+* Since D-111 also the town queries (`test_typeahead.QueryPlanTests`, on the town "Bern" and on a postal code): `addr_generation_locality` for the town prefix, `addr_generation_postal_street` for a postal code. The index is created by migration `addresses.0007` (`manage.py migrate addresses --database=addresses`, run by the setup unit and `setup_instance`, also on an existing file); size and duration on the 3.3 million rows are **not measured** (an estimate: some tens of seconds and about 100 MB). Run `ANALYZE` again afterwards (the next import does).
+* The typing suggestions rank the addresses of the LEG's own postal code and town first (the "Invoice sender" of the settings, D-111); with an empty sender address nothing is ranked.
 * A scan blocks the release: report to the owner. Report plans and lookup/cleanup times before go-live.
 
 ## 11. Verification checklist

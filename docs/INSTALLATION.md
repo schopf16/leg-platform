@@ -201,7 +201,7 @@ Lockout paths (D-044):
 * IPware validates the chain strictly. An unexpected or malformed chain produces no client IP and the login is refused. A wrong value can group users under a proxy address or refuse logins: verify it against the actual proxy topology before enabling a stage or production instance.
 * Client IPs are not stored in Axes (D-017, D-023).
 
-**Address suggestions need the same setting (D-052, D-065).** `/addresses/lookup/` counts requests per client IP (60 per minute, 5 for administrators; IPv6 per /64) and for the whole instance (600 per minute). With the count at `0` behind a reverse proxy, all visitors share the proxy's budget and everybody sees "temporarily limited". Saving the profile is never affected.
+**Address suggestions need the same setting (D-052, D-065, D-111).** `/addresses/lookup/` counts requests per client IP for an anonymous visitor (60 per minute, 5 for administrators; IPv6 per /64), per account for a signed-in account (120 per minute) and for the whole instance (600 per minute). With the count at `0` behind a reverse proxy, all visitors share the proxy's budget and everybody sees "temporarily limited". Saving the profile is never affected.
 
 ### Changing `SECRET_KEY`
 

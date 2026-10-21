@@ -225,6 +225,30 @@ msgstr[2] "Aucune correspondance exacte. %(count)s adresses similaires disponibl
 msgid "Address filled in: %(address)s."
 msgstr "Adresse saisie : %(address)s."
 
+msgid "Choose a town"
+msgstr "Choisissez une localité"
+
+msgid "Choose a postal code"
+msgstr "Choisissez un code postal"
+
+#, python-format
+msgid "%(count)s match available. Press the down arrow key to choose it."
+msgid_plural "%(count)s matches available. Press the down arrow key to choose one."
+msgstr[0] "%(count)s résultat disponible. Appuyez sur la flèche vers le bas pour le choisir."
+msgstr[1] "%(count)s résultats disponibles. Appuyez sur la flèche vers le bas pour en choisir un."
+msgstr[2] "%(count)s résultats disponibles. Appuyez sur la flèche vers le bas pour en choisir un."
+
+#, python-format
+msgid "Town filled in: %(town)s."
+msgstr "Localité saisie : %(town)s."
+
+#, python-format
+msgid "Postal code filled in: %(postal_code)s."
+msgstr "Code postal saisi : %(postal_code)s."
+
+msgid "There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration."
+msgstr "Aucune suggestion d’adresse : le répertoire des adresses n’est pas disponible ou n’a pas encore été importé. Un administrateur système peut l’importer dans l’administration système."
+
 msgid "Can request an address directory import"
 msgstr "Peut demander une importation du répertoire d’adresses"
 

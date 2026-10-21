@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.community import grid_operator, numbers, transformer_circuits
 from leg_platform.community.models import Location, validate_postal_code
-from leg_platform.management.form_fields import CONTROL, remark_field
+from leg_platform.management.form_fields import CONTROL, address_suggestions, remark_field
 
 NEW_CIRCUIT = "__new__"  # the value of the last option of the circuit list: "+ Create new transformer circuit"
 
@@ -113,6 +113,8 @@ class AddressForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.location = location  # being changed: its own address is no duplicate
         self.duplicate = None
+        # The typing suggestions of the address directory; a location lies in Switzerland (D-111).
+        address_suggestions(self, country="CH")
 
     def clean_postal_code(self):
         value = self.cleaned_data["postal_code"].strip()

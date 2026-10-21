@@ -1,17 +1,26 @@
 {% load i18n %}{% comment %}
-The suggestions of the address directory (D-054, D-065). Include it inside the street field (the
-``after`` include of ``accounts/_field.html``), so that the list sits directly under the street
-input. The fields stay authoritative: nothing here changes a field except a deliberate choice.
-The texts are read by ``static/js/address-directory.js`` from the data attributes; ``%(name)s``
-placeholders are replaced there by plain string replacement and the result is set as text.
-The notice about the address as a whole is ``addresses/widget_notice.html`` (after the postal code
-and town). Without JavaScript both stay empty and nothing is said about it (D-066).
-{% endcomment %}{% blocktranslate asvar title_one count counter=1 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar title_many count counter=2 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar note_approximate with street='%(street)s' postal_code='%(postal_code)s' %}No street starting with “{{ street }}” was found in {{ postal_code }}. Choose an address to fill in the fields.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_one count counter=1 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_many count counter=2 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_one count counter=1 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_many count counter=2 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_text with address='%(address)s' %}Address filled in: {{ address }}.{% endblocktranslate %}<div class="address-assist" data-address-directory
+The suggestions of the address directory (D-054, D-065, D-111): street, postal code and town of every address form.
+Include it inside the street field (the ``after`` include of ``accounts/_field.html``, ``customer/_field.html``,
+``management/_field_row.html`` or the ``after_template`` of a dialog field), so that the list sits directly under the
+street input; ``addresses/widget_notice.html`` follows the postal code and town. One script
+(``static/js/address-directory.js``) turns the street, postal code and town inputs into ARIA comboboxes. The fields stay
+authoritative: nothing here changes a field except a deliberate choice, or the town (postal code) that follows from a
+postal code (town) that has exactly one answer and goes into an empty field.
+Context (all optional): ``address_prefix`` (the prefix of the field names, "sender_" in the settings: the ids are
+``id_<prefix>street`` and so on), ``address_country_value`` ("CH" where the form has no country field; else the id of
+the country field is ``id_country``), ``address_notice_id``.
+The texts are read by the script from the data attributes; ``%(name)s`` placeholders are replaced there by plain string
+replacement and the result is set as text. Without JavaScript the panel and the notice stay empty and nothing is said
+about it (D-066). For a staff account only, ``data-directory-missing`` carries the sentence that the script shows when
+the directory has no addresses (D-111); nobody else is told about the state of the directory.
+{% endcomment %}{% blocktranslate asvar title_one count counter=1 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar title_many count counter=2 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar note_approximate with street='%(street)s' postal_code='%(postal_code)s' %}No street starting with “{{ street }}” was found in {{ postal_code }}. Choose an address to fill in the fields.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_one count counter=1 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_many count counter=2 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_one count counter=1 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_many count counter=2 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_text with address='%(address)s' %}Address filled in: {{ address }}.{% endblocktranslate %}{% blocktranslate asvar announce_locality_one count counter=1 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_locality_many count counter=2 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_locality with town='%(town)s' %}Town filled in: {{ town }}.{% endblocktranslate %}{% blocktranslate asvar filled_postal_code with postal_code='%(postal_code)s' %}Postal code filled in: {{ postal_code }}.{% endblocktranslate %}{% with prefix=address_prefix|default:"" %}<div class="address-assist" data-address-directory
      data-endpoint="{% url 'addresses:lookup' %}"
      data-notice-id="{{ address_notice_id|default:'address-notice' }}"
      data-title-prefix="{% translate 'Matching addresses' %}"
      data-title-approximate-one="{{ title_one }}"
      data-title-approximate-many="{{ title_many }}"
+     data-title-locality="{% translate 'Choose a town' %}"
+     data-title-postal-code="{% translate 'Choose a postal code' %}"
      data-note-prefix="{% translate 'Choose an address to fill in the fields.' %}"
      data-note-approximate="{{ note_approximate }}"
      data-more="{% translate 'More addresses match. Keep typing to narrow the list.' %}"
@@ -19,19 +28,24 @@ and town). Without JavaScript both stay empty and nothing is said about it (D-06
      data-announce-prefix-many="{{ announce_prefix_many }}"
      data-announce-approximate-one="{{ announce_approximate_one }}"
      data-announce-approximate-many="{{ announce_approximate_many }}"
+     data-announce-locality-one="{{ announce_locality_one }}"
+     data-announce-locality-many="{{ announce_locality_many }}"
      data-filled="{{ filled_text }}"
-     data-street-id="{{ address_street_id|default:'id_street' }}"
-     data-house-number-id="{{ address_house_number_id|default:'id_house_number' }}"
-     data-postal-code-id="{{ address_postal_code_id|default:'id_postal_code' }}"
-     data-locality-id="{{ address_locality_id|default:'id_town' }}"
-     {% if address_country_value %}data-country-value="{{ address_country_value }}"{% else %}data-country-id="{{ address_country_id|default:'id_country' }}"{% endif %}>
+     data-filled-locality="{{ filled_locality }}"
+     data-filled-postal-code="{{ filled_postal_code }}"
+     {% if request.user.is_staff %}data-directory-missing="{% translate 'There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration.' %}"
+     {% endif %}data-street-id="id_{{ prefix }}street"
+     data-house-number-id="id_{{ prefix }}house_number"
+     data-postal-code-id="id_{{ prefix }}postal_code"
+     data-locality-id="id_{{ prefix }}town"
+     {% if address_country_value %}data-country-value="{{ address_country_value }}"{% else %}data-country-id="id_country"{% endif %}>
   <div class="address-suggest" data-address-suggest hidden>
     <div class="address-suggest-head">
       <p class="address-suggest-title" id="address-suggest-title" data-address-title></p>
       <p class="address-suggest-note" data-address-note></p>
     </div>
-    <ul class="address-suggest-list" data-address-results aria-labelledby="address-suggest-title"></ul>
+    <ul class="address-suggest-list" id="address-suggest-list" data-address-results role="listbox" aria-labelledby="address-suggest-title"></ul>
     <p class="address-more" data-address-more hidden></p>
   </div>
   <p class="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-address-announce></p>
-</div>
+</div>{% endwith %}

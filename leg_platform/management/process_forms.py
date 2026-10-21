@@ -16,7 +16,7 @@ from leg_platform.community.models import (
     ManagementSettings,
     validate_postal_code,
 )
-from leg_platform.management.form_fields import CONTROL, date_field
+from leg_platform.management.form_fields import CONTROL, address_suggestions, date_field
 from leg_platform.management.metering_point_forms import DialogForm, MeteringPointForm
 from leg_platform.management.metering_point_views import format_date
 
@@ -150,6 +150,10 @@ class ApplicationBuildingForm(DialogForm):
     layout = [("street", ["street", "house_number"]), ("postal", ["postal_code", "town"]), ("single", ["egid"])]
     optional = ("egid",)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The typing suggestions of the address directory, as in the wizard of the customer (D-111).
+        address_suggestions(self, country="CH")
     def clean_postal_code(self):
         value = self.cleaned_data["postal_code"].strip()
         validate_postal_code(value)

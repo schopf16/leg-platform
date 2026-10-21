@@ -2551,6 +2551,8 @@ class MigrateTests(SimpleTestCase):
             self.assertIn("Applying addresses.0004_building_identifier_update_flag_and_lookups... OK", first.stdout)
             self.assertIn("Applying addresses.0005_entrance_identifier... OK", first.stdout)
             self.assertIn("Applying addresses.0006_columns_missing_backoff... OK", first.stdout)
+            # 0007 adds the index of the towns (the suggestions of the postal code and the town, D-111).
+            self.assertIn("Applying addresses.0007_locality_index... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2576,6 +2578,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0004_building_identifier_update_flag_and_lookups"),
                 ("addresses", "0005_entrance_identifier"),
                 ("addresses", "0006_columns_missing_backoff"),
+                ("addresses", "0007_locality_index"),
             })
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":

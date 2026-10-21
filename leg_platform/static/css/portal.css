@@ -1046,8 +1046,9 @@ input.account-name-input:focus {
   object-fit: cover;
   box-shadow: 0 0 0 1px var(--line);
 }
-/* Suggestions of the address directory (D-065): a bordered list of buttons under the street
-   input. The focus ring is inset so that overflow:hidden does not clip it. */
+/* Suggestions of the address directory (D-065, D-111): a bordered list of options under the street, postal code and
+   town input (ARIA combobox, the focus stays in the input), in the flow of the page so that nothing covers the fields below
+   and a closing panel cannot be clipped by a card. */
 .address-assist {
   display: grid;
   gap: 8px;
@@ -1060,6 +1061,8 @@ input.account-name-input:focus {
   overflow: hidden;
 }
 .address-suggest[hidden] { display: none; }
+/* The panels of the postal code and the town follow their input directly. */
+input + .address-suggest { margin-top: 8px; }
 .address-suggest-head { padding: 8px 12px; }
 .address-suggest-title { margin: 0; font-size: 16px; font-weight: 600; }
 .address-suggest-note {
@@ -1077,18 +1080,17 @@ input.account-name-input:focus {
 .address-suggest-list li + li { border-top: 1px solid var(--line); }
 .address-option {
   display: block;
-  width: 100%;
   min-height: 48px;
   padding: 8px 12px;
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
-  background: transparent;
-  border: 0;
-  font: inherit;
+  cursor: pointer;
   color: var(--tblr-body-color);
 }
-.address-option:focus-visible {
+/* The active option of the combobox: the focus stays in the input, so the ring is drawn on the option. */
+.address-option.is-active {
+  background: var(--warm);
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }

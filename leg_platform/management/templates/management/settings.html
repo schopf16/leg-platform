@@ -22,11 +22,11 @@ administrator the name is a link to its form in the administration (D-086).
       {% elif notice_text %}
         {% include "management/_banner.html" with text=notice_text %}
       {% endif %}
-      {% include "management/_field_row.html" with field=form.sender_street %}
+      {% include "management/_field_row.html" with field=form.sender_street after="addresses/widget.html" address_prefix="sender_" address_country_value="CH" %}
       {% include "management/_field_row.html" with field=form.sender_house_number %}
       {% include "management/_field_row.html" with field=form.sender_address_addition optional=True %}
       {% include "management/_field_row.html" with field=form.sender_postal_code %}
-      {% include "management/_field_row.html" with field=form.sender_town %}
+      {% include "management/_field_row.html" with field=form.sender_town after="addresses/widget_notice.html" %}
     </section>
 
     <section class="mgmt-card" aria-labelledby="metering-title">
@@ -52,4 +52,5 @@ administrator the name is a link to its form in the administration (D-086).
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'management/js/settings-validate.js' %}"></script>
+  <script defer src="{% static 'js/address-directory.js' %}"></script>
 {% endblock %}

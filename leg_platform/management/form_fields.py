@@ -184,7 +184,21 @@ def make_fact(form, name, text, *, link=None, initial=None):
         form.initial[name] = initial
 
 
+def address_suggestions(form, *, country=None):
+    """Give the street field the typing suggestions of the address directory and the town the notice under it (D-111).
+
+    One definition for every dialog with an address (``addresses/widget.html`` under the street,
+    ``addresses/widget_notice.html`` under the town, ``static/js/address-directory.js`` loaded by ``dialog_form.html``).
+    ``country`` is the fixed country of a form that has no country field (``"CH"``); a form with a country field passes
+    nothing and the script reads the field. A form without a street or town field is left alone."""
+    if "street" in form.fields:
+        form.fields["street"].after_template = "addresses/widget.html"
+        form.fields["street"].address_country = country
+    if "street" in form.fields and "town" in form.fields:
+        form.fields["town"].after_template = "addresses/widget_notice.html"
+
+
 __all__ = [
-    "CONTROL", "CheckedInput", "DecimalInputField", "NotedSelect", "REMARK_ROWS", "SegmentedChoiceField", "date_field",
-    "make_fact", "remark_field", "select_field",
+    "CONTROL", "CheckedInput", "DecimalInputField", "NotedSelect", "REMARK_ROWS", "SegmentedChoiceField",
+    "address_suggestions", "date_field", "make_fact", "remark_field", "select_field",
 ]

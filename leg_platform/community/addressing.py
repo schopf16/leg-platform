@@ -7,6 +7,7 @@ A suggestion is only advice: nothing here writes to the directory or changes a s
 import hashlib
 from dataclasses import dataclass
 
+from django.db import DatabaseError
 from django.utils.translation import gettext
 
 from leg_platform.addresses.keys import fold
@@ -93,6 +94,22 @@ def suggest_correction(street, house_number, postal_code, town):
     if not candidates or len(candidates) != 1 or (street, house_number, postal_code, town) in candidates:
         return None
     return AddressSuggestion(*next(iter(candidates)))
+
+
+def home_area():
+    """``(postal code, town)`` of the LEG's own address, the "Invoice sender" of the settings, or ``("", "")`` (D-111).
+
+    The area whose addresses the typing suggestions list first. The directory has the postal locality, not the political
+    municipality (D-049), so the postal code and the town of the sender address stand for it. Read-only (no row is
+    created); a database error means no area."""
+    from leg_platform.community.models import ManagementSettings
+
+    try:
+        row = ManagementSettings.objects.filter(pk=1).values_list("sender_postal_code", "sender_town").first()
+    except DatabaseError:
+        return "", ""
+    postal_code, town = row or ("", "")
+    return collapse(postal_code), collapse(town)
 
 
 def not_found_notice(street, house_number, postal_code, town):

@@ -1,7 +1,12 @@
 {% extends "customer/wizard_base.html" %}
-{% load i18n customer_ui %}
+{% load i18n static customer_ui %}
 {% block heading %}{% translate "Where is your building?" %}{% endblock %}
 {% block lead %}{% translate "Enter the address where your electricity is drawn." %}{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {# The typing suggestions of the address directory under the address fields (D-111). #}
+  {% if not chosen %}<script defer src="{% static 'js/address-directory.js' %}"></script>{% endif %}
+{% endblock %}
 {% block step %}
   {% leg_link as leg %}
   {% if chosen %}
@@ -37,14 +42,14 @@
       {% include "customer/_error_summary.html" %}
       {% include "customer/_field.html" with field=form.name optional=True %}
       <div class="address-row address-row-street">
-        {% include "customer/_field.html" with field=form.street %}
+        {% include "customer/_field.html" with field=form.street after="addresses/widget.html" address_country_value="CH" %}
         {% include "customer/_field.html" with field=form.house_number %}
       </div>
       <div class="address-row address-row-locality">
         {% include "customer/_field.html" with field=form.postal_code %}
         {% include "customer/_field.html" with field=form.town %}
       </div>
-
+      {% include "addresses/widget_notice.html" %}
       {% if suggestions %}
         <div class="suggest" role="group" aria-labelledby="suggest-title">
           <h2 id="suggest-title" tabindex="-1" autofocus>{% translate "Did you mean one of these addresses?" %}</h2>

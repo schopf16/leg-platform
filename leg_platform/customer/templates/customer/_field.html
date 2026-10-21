@@ -1,9 +1,11 @@
 {% load i18n %}{% comment %}
 One text field of a customer form: label (with "(optional)" where the owner's design asks for it), the control, one error and
-the hint. The ids of the error and the hint are the ones Django puts into ``aria-describedby`` of the control.
+the hint. The ids of the error and the hint are the ones Django puts into ``aria-describedby`` of the control. ``after`` is
+the name of a template that follows the field inside its wrapper (the address suggestions under the street, D-111).
 {% endcomment %}<div class="mb-3">
   <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if optional %} <span class="text-secondary fw-normal">({% translate "optional" context "customer" %})</span>{% endif %}</label>
   {{ field }}
   {% if field.errors %}<div class="invalid-feedback d-block" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
   {% if field.help_text %}<div class="form-hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+  {% if after %}{% include after %}{% endif %}
 </div>
