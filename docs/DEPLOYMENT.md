@@ -354,7 +354,7 @@ Expected: `No broken requirements found.`; Python 3.12 or newer; Django 6.1.x (a
 | `/opt/leg-platform/venv` | virtual environment | same |
 | `/opt/leg-platform/instance-static` | branding files (public only) | same |
 | `/etc/leg-platform/app.env` | environment file | 0600 root |
-| `/var/lib/leg-platform` | state directory created by systemd (address directory file, not backed up) | systemd |
+| `/var/lib/leg-platform` | state directory created by systemd through `StateDirectory=leg-platform` in the setup, web, scheduled-tasks and optional importer units (address directory file, not backed up) | owned by the service user and group (`User=`/`Group=` of the unit, `leg-platform` here), mode 0755 (`StateDirectoryMode=` default); the file 0600. Never `mkdir`, `chown` or `ReadWritePaths=` by hand (8.0) |
 | `/var/www/leg-platform/static` | collected static files served by nginx | root-owned |
 | `/var/backups/leg-platform` | local dumps | 0700 root |
 
@@ -382,7 +382,7 @@ Expected: `No broken requirements found.`; Python 3.12 or newer; Django 6.1.x (a
 * `DJANGO_SECURE_HSTS_SECONDS=3600` during verification, then unset (one-year default, O-20). `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=False` unless O-20 decides otherwise.
 * **`BOOTSTRAP_SYSTEM_ADMIN_EMAIL`** (personal data) and **`BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`** (secret, at least 15 characters): written by the human before the first start (section 9). Remove the password line after the first login. Both are ignored once a system administrator exists.
 * Optional (O-10): `INSTANCE_NAME` (at most 100 characters), `INSTANCE_WEBSITE_URL`, `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK`, `INSTANCE_HIGHLIGHT` (`#RRGGBB`, contrast checked at start), `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` (relative static paths such as `instance/logo.svg`, both or neither), `INSTANCE_STATIC_DIRECTORY=/opt/leg-platform/instance-static`.
-* Optional: `ADDRESS_DIRECTORY_FILE` (default `/var/lib/leg-platform/address-directory.sqlite3`; else an absolute path outside the repository, writable by the service user, D-075); `SECURITY_LOG_RETENTION_DAYS`, `SECURITY_LOG_LONG_RETENTION_DAYS` (unset: 30 and 365, also the minimum).
+* Optional: `ADDRESS_DIRECTORY_FILE` (default `/var/lib/leg-platform/address-directory.sqlite3`, inside the `StateDirectory` of the units, so nothing else is needed; a path elsewhere is not writable under `ProtectSystem=strict` until **every** unit that touches the file (setup, web, scheduled tasks, optional importer, and the `web` profile of `leg-manage`) names its folder in `ReadWritePaths=` and the folder belongs to the service user: do not set it without the owner's decision, D-075); `SECURITY_LOG_RETENTION_DAYS`, `SECURITY_LOG_LONG_RETENTION_DAYS` (unset: 30 and 365, also the minimum).
 
 ### 5.3 Write the non-secret values
 
@@ -741,7 +741,9 @@ WantedBy=multi-user.target
 ```
 
 * **Block H** = the 22 lines from `UMask=0077` to `SystemCallErrorNumber=EPERM`, identical in every unit. Other unit files show `# <block H>`: replace that line by the block.
-* `StateDirectory=leg-platform` creates `/var/lib/leg-platform` for the service user (D-075).
+* `StateDirectory=leg-platform` creates `/var/lib/leg-platform` for the service user (D-075) and, per `systemd.exec(5)`, `StateDirectory=` also excludes that directory from `ProtectSystem=strict`: **no `ReadWritePaths=` is needed or wanted** for it. systemd sets owner and group of the directory to `User=`/`Group=`; if an existing directory has another owner, systemd changes the ownership of the directory and everything below it recursively. `ReadWritePaths=` creates nothing and changes no owner (access "with the same access modes as from outside"), so a hand-made root-owned directory stays unusable. Source: https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html (`ProtectSystem=`, `RuntimeDirectory=, StateDirectory=, ...`, `ReadWritePaths=`; read 2026-10-21 for systemd 262; the project's minimum is systemd 244, **UNVERIFIED** there).
+* **The four units that touch the file carry the same line**: this unit (creates file and tables), the web service (lookup reads it; the button's import thread writes it), the scheduled tasks (the daily import) and the optional importer. Only the mail worker has none (8.2).
+* **Names:** this runbook uses one service user (`leg-platform`, 2.7), one state folder and the unit names of this section for the instance on a host. A host that deliberately uses other names (for example per-instance names such as `gunicorn-<instance>`) maps them in its instance record (0.6); the rules stay: the setup unit uses the **same** `User=`, `Group=`, `EnvironmentFile=` and `StateDirectory=` as the web and scheduled-tasks units, and no unit carries a `ReadWritePaths=` for the state folder. Check: `systemctl show -p User,Group,StateDirectory,ReadWritePaths <unit>` for every unit, and `ls -ld /var/lib/leg-platform` shows the same user and group.
 * Web and mail name this unit with `Requires=` and `After=`. The importer uses `Wants=` and `After=` (N-1): a failed setup run must neither keep it from starting nor stop it.
 * **Start rate limit (N-1):** never set `StartLimitIntervalSec=15min` / `StartLimitBurst=5` to 0 (they stop a crash loop of web or mail from re-running the migrations again and again).
   * Every explicit and every dependent-pulled start counts. The update (12.3 step 7) plus one more restart within 15 minutes can reach it: `leg-setup` `failed` with `start-limit-hit`, web and mail do not start.
@@ -1023,6 +1025,13 @@ sudo ls -l /var/lib/leg-platform/
 2. `sudo rm -f /var/lib/leg-platform/address-directory.sqlite3 /var/lib/leg-platform/address-directory.sqlite3-wal /var/lib/leg-platform/address-directory.sqlite3-shm` (the path of `ADDRESS_DIRECTORY_FILE` if set). Suggestions are missing until the rebuild.
 3. `sudo systemctl start leg-setup.service`. Check `sudo journalctl -u leg-setup -n 20 --no-pager` for `Address directory: file prepared`. Then `sudo systemctl start leg-platform-web`.
 4. The next daily run after the configured time imports it (an empty directory is due at once; otherwise an administrator presses the button). Check as above.
+
+**Repair: `no such table: addresses_directory`** (the import or the page fails; found on stage 2026-10-21). The file exists but has no tables: the setup unit never ran (it did not exist on that host, or the units differ from 8.0 to 8.3), so no run of `manage.py setup_instance` created the tables (8.0, D-076). Any process that opens the directory may create an empty file (`INSTALLATION.md`, "Address Directory"). There is no separate importer migration step and no manual `migrate addresses` on a server.
+
+1. Compare the units with 8.0 to 8.3 (`systemctl cat <unit>`; do not dump files with inline credentials). Create `leg-setup.service` as in 8.0 with the **same** `User=`, `Group=`, `EnvironmentFile=` and `WorkingDirectory=` as the web unit. Add `StateDirectory=leg-platform` to the web unit and to the scheduled-tasks unit (and the optional importer). **Remove** any hand-added `ReadWritePaths=` for `/var/lib/leg-platform`. Web and mail name the setup unit with `Requires=` and `After=` (8.1, 8.2).
+2. `sudo systemctl daemon-reload`, `sudo systemctl enable leg-setup.service`. Check `ls -ld /var/lib/leg-platform /var/lib/leg-platform/*`: directory and file must belong to the service user and group. If the file is owned by someone else (for example a hand-run `migrate` as root) or holds no tables and no import ran, treat it as rebuildable: stop the web service when no import runs (state not `running`; never stop `leg-setup`), delete the file and its `-wal`/`-shm` as in the recovery above.
+3. `sudo systemctl start leg-setup.service`, then `sudo journalctl -u leg-setup -n 20 --no-pager` must show `Address directory: file prepared, N migration(s) applied.` (or `file ready`), no `NOT set up`. Start the web service again and run V3 and V3a.
+4. The next daily run imports the directory, or an administrator presses the button.
 
 **Open operator step (D-065, D-075, UNVERIFIED):** after the first import run `EXPLAIN QUERY PLAN` (`leg-manage web shell`, connection `addresses`) for the two lookup queries of `PrefixSearchTests` (`leg_platform/addresses/tests/test_directory.py`) on the largest postal code.
 

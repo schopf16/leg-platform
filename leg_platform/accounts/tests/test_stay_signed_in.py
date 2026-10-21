@@ -12,7 +12,7 @@ from unittest import mock
 from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.core import mail
-from django.test import TestCase, tag
+from django.test import TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone
 
@@ -359,6 +359,137 @@ class StaySignedInWithSecondFactorTests(TestCase):
         response = self.client.get(PROFILE_URL)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response["Location"].startswith(LOGIN_URL))
+
+
+def restart_browser(client):
+    """What a browser does when it is closed and opened again: cookies without Max-Age and Expires are dropped."""
+    for name in list(client.cookies.keys()):
+        morsel = client.cookies[name]
+        if not (morsel["max-age"] or morsel["expires"]):
+            del client.cookies[name]
+
+
+def session_morsel(response):
+    return response.cookies[settings.SESSION_COOKIE_NAME]
+
+
+def assert_persistent_cookie(test, response, remaining=DURATION):
+    """The session cookie of the response has Max-Age and Expires (a persistent cookie), as stage sends it."""
+    morsel = session_morsel(response)
+    test.assertTrue(morsel["expires"], "no Expires: the browser would drop the cookie when it is closed")
+    test.assertAlmostEqual(int(morsel["max-age"]), remaining, delta=120)
+    test.assertTrue(morsel["secure"])
+    test.assertTrue(morsel["httponly"])
+
+
+STAGE_COOKIES = {"SESSION_COOKIE_NAME": "__Host-sessionid", "SESSION_COOKIE_SECURE": True}
+
+
+@tag("mariadb")
+@override_settings(**STAGE_COOKIES)
+class StaySignedInSurvivesTheBrowserTests(TestCase):
+    """Regression (stage walkthrough): a ticked login must still be open after the browser was closed and
+    opened again, with the cookie name and the Secure flag of stage (``__Host-sessionid``).
+
+    The browser is simulated by dropping every cookie that has neither Max-Age nor Expires.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user()
+        cls.second_factor_user, cls.device = create_user_with_totp("second.factor@example.org")
+
+    def _days_later(self, days, url=PROFILE_URL, secure=True):
+        started = self.client.session[session_timeout.STARTED_KEY]
+        with mock.patch.object(session_timeout, "time") as clock:
+            clock.time.return_value = started + days * DAY
+            return self.client.get(url, secure=secure)
+
+    def test_the_login_response_sends_a_persistent_secure_cookie(self):
+        response = self.client.post(
+            LOGIN_URL, {"username": self.user.email, "password": PASSWORD, "remember_me": "on"},
+            REMOTE_ADDR="10.9.1.1", secure=True,
+        )
+        self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
+        assert_persistent_cookie(self, response)
+
+    def test_a_ticked_login_is_still_open_after_the_browser_was_closed_and_days_later(self):
+        self.client.post(
+            LOGIN_URL, {"username": self.user.email, "password": PASSWORD, "remember_me": "on"},
+            REMOTE_ADDR="10.9.1.1", secure=True,
+        )
+        for day in (0, 1, 7, 13):
+            restart_browser(self.client)
+            self.assertIn(settings.SESSION_COOKIE_NAME, self.client.cookies)
+            response = self._days_later(day)
+            self.assertEqual(response.status_code, 200, f"signed out on day {day}")
+            if settings.SESSION_COOKIE_NAME in response.cookies:
+                # A request that wrote the session sends the cookie again: still persistent, never a browser-session
+                # cookie (the clock of Django's expiry is the real one here, so the remaining time is the full duration).
+                assert_persistent_cookie(self, response)
+        # The start page is open as well, not the login page.
+        self.assertEqual(self._days_later(13, url=HOME_URL).status_code, 200)
+
+    def test_a_ticked_login_with_the_second_factor_is_still_open_after_the_browser_was_closed(self):
+        response = self.client.post(
+            LOGIN_URL,
+            {"username": self.second_factor_user.email, "password": PASSWORD, "remember_me": "on"},
+            REMOTE_ADDR="10.9.1.2", secure=True,
+        )
+        self.assertRedirects(response, CODE_URL)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        response = self.client.post(
+            CODE_URL, {"otp_token": code_for(self.device)}, REMOTE_ADDR="10.9.1.2", secure=True
+        )
+        self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
+        assert_persistent_cookie(self, response)
+        for day in (0, 6, 13):
+            restart_browser(self.client)
+            self.assertEqual(self._days_later(day).status_code, 200, f"signed out on day {day}")
+        # No new code was asked for, and the day after the duration the login page comes.
+        self.assertEqual(self._days_later(14.01, url=HOME_URL).status_code, 302)
+
+    def test_a_ticked_login_of_a_staff_user_with_the_second_factor_survives_the_browser(self):
+        promote(self.second_factor_user)
+        self.client.post(
+            LOGIN_URL,
+            {"username": self.second_factor_user.email, "password": PASSWORD, "remember_me": "on"},
+            REMOTE_ADDR="10.9.1.3", secure=True,
+        )
+        response = self.client.post(
+            CODE_URL, {"otp_token": code_for(self.device)}, REMOTE_ADDR="10.9.1.3", secure=True
+        )
+        assert_persistent_cookie(self, response)
+        restart_browser(self.client)
+        self.assertEqual(self._days_later(5, url=reverse("admin:index")).status_code, 200)
+
+    def test_every_later_request_that_writes_the_session_keeps_the_expiry(self):
+        self.client.post(
+            LOGIN_URL, {"username": self.user.email, "password": PASSWORD, "remember_me": "on"},
+            REMOTE_ADDR="10.9.1.1", secure=True,
+        )
+        key = self.client.session.session_key
+        ends = Session.objects.get(session_key=key).expire_date
+        started = self.client.session[session_timeout.STARTED_KEY]
+        with mock.patch.object(session_timeout, "time") as clock:
+            for minutes in (2, 4, 6):
+                clock.time.return_value = started + minutes * 60
+                response = self.client.get(PROFILE_URL, secure=True)
+                self.assertEqual(response.status_code, 200)
+                assert_persistent_cookie(self, response)
+        self.assertEqual(Session.objects.get(session_key=key).expire_date, ends)
+        self.assertAlmostEqual((ends - timezone.now()).total_seconds(), DURATION, delta=120)
+
+    def test_an_unticked_login_is_ended_by_the_idle_timeout_and_keeps_its_row_bounded(self):
+        # Documented policy (D-100): without the box there is no persistence beyond the idle timeout of 30 minutes;
+        # the cookie age of 8 hours only bounds an abandoned cookie and row.
+        response = self.client.post(
+            LOGIN_URL, {"username": self.user.email, "password": PASSWORD}, REMOTE_ADDR="10.9.1.1", secure=True
+        )
+        self.assertEqual(int(session_morsel(response)["max-age"]), settings.SESSION_COOKIE_AGE)
+        restart_browser(self.client)
+        self.assertEqual(self._days_later(0).status_code, 200)
+        self.assertEqual(self._days_later(1).status_code, 302)
 
 
 @tag("mariadb")

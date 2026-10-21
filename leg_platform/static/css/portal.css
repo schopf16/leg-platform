@@ -576,19 +576,24 @@ body {
   gap: 2px;
 }
 
-/* A value shown as text in a real field (so that the password manager finds the user name). */
-.entry-card input.plain-value,
-.entry-card input.plain-value:focus {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  outline: 0;
-  padding: 0;
+/* The account name for the password manager (accounts/_account_name.html): hidden from the eye by clipping, not by
+   display:none, so that password managers that skip undisplayed fields still find it. The person reads the
+   name as plain text beside it. */
+input.account-name-input,
+input.account-name-input:focus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   min-height: 0;
-  height: auto;
-  font-size: 16px;
-  color: var(--fg);
-  overflow-wrap: anywhere;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Plain text with its status beside it (no border, background or box). */

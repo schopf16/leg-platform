@@ -45,13 +45,22 @@ def _email_input():
 
 
 def _username_field():
-    """The address as a read-only text field, for the password manager; the value is never used."""
+    """The account name for the password manager only: a read-only text field, hidden from the eye.
+
+    The page shows the address as plain text (``accounts/_account_name.html``); this field is only
+    the "username" context that the browser needs to save the new password for the right account
+    (Chromium, "Create Amazing Password Forms": a hidden field with the user name on forms that do
+    not ask for it). It is read-only and out of the tab order, and the server never uses the posted
+    value: the account comes from the link or the session (``pin_username``, ``clean_username``).
+    """
     attrs = {
         "readonly": True,
         "tabindex": "-1",
+        "aria-hidden": "true",
         "autocomplete": "username",
         "autocapitalize": "none",
         "spellcheck": "false",
+        "class": "account-name-input",
     }
     return forms.CharField(
         label=_("Email address (username)"), required=False, widget=forms.TextInput(attrs=attrs)
@@ -292,7 +301,6 @@ class NewPasswordForm(PortalFormMixin, SetPasswordForm):
         super().__init__(*args, **kwargs)
         pin_username(self, self.user.email)
         self.initial["username"] = self.user.email
-        self.fields["username"].widget.attrs["class"] = "plain-value"
         describe_password_fields(self, "new_password1", "new_password2")
         self.fields["new_password1"].help_text = ""
         self.fields["new_password1"].label = _("Password")
@@ -316,7 +324,6 @@ class RegistrationPasswordForm(SetPasswordMixin, PortalFormMixin, forms.Form):
         self.user = user
         pin_username(self, user.email)
         self.initial["username"] = user.email
-        self.fields["username"].widget.attrs["class"] = "plain-value"
         describe_password_fields(self, "password1", "password2")
         self.fields["password1"].help_text = ""
         self.fields["password1"].label = _("Password")
