@@ -2,7 +2,7 @@
 correction, the registration at the grid operator, its confirmation, completion, roll back; confirm the date of a
 deregistration; every one calls a service of ``community`` that checks the state again under a lock, so the page never
 decides a rule. A dialog is a normal page (works without JavaScript) that returns to where it was opened
-(``management.returns``). An unknown id is a 404; a draft is never shown (its pages are 404).
+(``management.returns``). An unknown id is a 404; a draft has a read-only page (D-107) and no dialog applies to it.
 """
 
 from django.contrib import messages
@@ -154,7 +154,7 @@ class ApplicationReturnView(ProcessDialog):
     title = gettext_lazy("Return for correction")
     submit_label = gettext_lazy("Return for correction")
     form_class = ReturnForm
-    # A draft has no page for the staff: after the step the way on is the list (walkthrough W2-02).
+    # After the step the way on is the list (walkthrough W2-02); the draft's own page is read-only (D-107).
     leaves_page = True
     success_message = gettext_lazy("The application was returned for correction.")
 

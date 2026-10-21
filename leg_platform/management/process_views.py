@@ -1,11 +1,11 @@
-"""The pages of the processes (owner design ``verwaltung/vorgaenge``; D-103): the list of the running applications and
+"""The pages of the processes (owner design ``verwaltung/vorgaenge``; D-103, D-107): the list of the applications and
 deregistrations, the page of one application, the page of one deregistration and the notices for the staff.
 
 Every view uses ``management.access`` (every active staff account, D-086). The rules live in ``community``
 (``process_list``, ``applications.progress``, ``application_staff``, ``deregistrations``, ``application_notices``); a page
-only reads and shows. Drafts and paused drafts are never shown (KONZEPT 5.6): their pages are 404. The page of an
-application shows what the customer entered; it never shows the IBAN (only whether one is on file, D-087) and no
-proof of a confirmation.
+only reads and shows. Drafts and paused drafts are listed and have a read-only page marked "Draft / not submitted" (D-107,
+which replaces KONZEPT 5.6 and the 404 of D-104); no staff step applies to them. The page of an application shows what the
+customer entered; it never shows the IBAN (only whether one is on file, D-087) and no proof of a confirmation.
 """
 
 from django.contrib import messages
@@ -43,10 +43,13 @@ from leg_platform.management.location_views import event_label
 from leg_platform.management.metering_point_views import format_date
 from leg_platform.management.returns import return_url, with_next
 
-# The applications the staff can open: submitted and later (never a draft).
-VISIBLE_APPLICATION_STATES = (*Application.IN_FLIGHT_STATES, Application.State.COMPLETED)
+# The applications the staff can open: the drafts too (D-107; read-only, marked as not submitted), the running ones and
+# the completed ones. The dialogs and services of the staff act only on the states they name.
+VISIBLE_APPLICATION_STATES = (*Application.OPEN_STATES, Application.State.COMPLETED)
 
 STATE_TONES = {
+    Application.State.DRAFT: "muted",
+    Application.State.PAUSED: "muted",
     Application.State.SUBMITTED: "warn",
     Application.State.IN_REVIEW: "accent",
     Application.State.OPERATOR_STARTED: "accent",
@@ -64,6 +67,11 @@ def state_label(state):
         return Deregistration.State.SUBMITTED.label
     if state == process_list.STATE_DEREGISTRATION_CONFIRMED:
         return Deregistration.State.CONFIRMED.label
+    # The staff's words for a draft say what matters to them: nothing was submitted yet (D-107).
+    if state == Application.State.DRAFT:
+        return _("Draft / not submitted")
+    if state == Application.State.PAUSED:
+        return _("Paused / not submitted")
     return labels.application_state_label(state)
 
 
@@ -127,13 +135,18 @@ def list_columns():
         lists.Column(
             "state", gettext_lazy("Status"), width=116,
             info=_(
-                "Submitted: waiting for the review. In review: the LEG checks it. Then the registration at the grid "
-                "operator. In deregistration: the notice was given and the LEG confirms the date."
+                "Draft / not submitted: the customer has started the application and not sent it yet; you can read "
+                "it, not change it. Submitted: waiting for the review. In review: the LEG checks it. Then the "
+                "registration at the grid operator. In deregistration: the notice was given and the LEG confirms "
+                "the date."
             ),
         ),
         lists.Column(
             "progress", gettext_lazy("Progress"), width=124,
-            info=_("Applications: the five steps from the submission to the completion. Deregistrations: three steps."),
+            info=_(
+                "Applications: the five steps from the submission to the completion; a draft shows the steps the "
+                "customer has completed in the form. Deregistrations: three steps."
+            ),
         ),
         lists.Column(
             "date", gettext_lazy("Date"), width=104,
@@ -158,6 +171,7 @@ def kind_options():
 def state_options():
     return [
         (process_list.STATE_ALL, _("All")),
+        (process_list.STATE_DRAFT, _("Draft / not submitted")),
         (Application.State.SUBMITTED.value, Application.State.SUBMITTED.label),
         (Application.State.IN_REVIEW.value, Application.State.IN_REVIEW.label),
         (process_list.STATE_AT_OPERATOR, _("At the %(operator)s") % {"operator": grid_operator.name()}),
@@ -229,7 +243,7 @@ class ProcessListView(ManagementAccessMixin, View):
         )
         context.update(
             page_title=_("Processes"),
-            page_subtitle=_("Running applications and deregistrations of the customers."),
+            page_subtitle=_("Applications, also drafts that are not submitted yet, and deregistrations of the customers."),
             entries=entries,
             kind_options=kind_options(),
             state_options=state_options(),
@@ -288,6 +302,29 @@ def way_steps(application):
             }
         )
     return steps
+
+
+def draft_steps(application):
+    """The steps of the form of a draft (building, metering points, bank connection if a feed-in is entered, contract,
+    start date) with their state: what the customer has completed so far (D-107). The staff only reads it."""
+    names = {
+        applications.BUILDING: _("Building"),
+        applications.METERING_POINTS: _("Metering points"),
+        applications.BANK_CONNECTION: _("Bank connection"),
+        applications.CONTRACT: _("Contract"),
+        applications.START: _("Start date"),
+    }
+    current = applications.progress(application)
+    words = step_words()
+    steps = []
+    for step in current.steps:
+        if not step.applicable:
+            continue
+        state = applications.DONE if step.state != applications.OPEN else (
+            "next" if step.key == current.next_step else applications.OPEN
+        )
+        steps.append({"label": names[step.key], "state_label": words[state], "tone": STEP_TONES[state], "note": ""})
+    return steps, current.done, current.total
 
 
 def building_rows(application):
@@ -366,10 +403,18 @@ class ApplicationDetailView(ManagementAccessMixin, View):
         buildings = building_rows(application)
         next_url = lambda name: with_next(reverse(name, args=[application.pk]), request)  # noqa: E731
         in_flight = state in Application.IN_FLIGHT_STATES
+        is_draft = state in Application.DRAFT_STATES
+        if is_draft:
+            way, done, total = draft_steps(application)
+        else:
+            way = way_steps(application)
+            done = sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE)
+            total = len(applications.STEPS)
         card = person_card(person)
         context = {
             "page_title": card["name"],
             "application": application,
+            "is_draft": is_draft,
             "person": card,
             "state_label": state_label(state),
             "state_tone": state_tone(state),
@@ -377,9 +422,9 @@ class ApplicationDetailView(ManagementAccessMixin, View):
                 "number": card["number"],
                 "date": format_date(application.updated_at.astimezone(timezone.get_current_timezone())),
             },
-            "way": way_steps(application),
-            "done": sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE),
-            "total": len(applications.STEPS),
+            "way": way,
+            "done": done,
+            "total": total,
             "buildings": buildings,
             "has_feed_in": has_feed_in,
             "step_numbers": self.step_numbers(has_feed_in),

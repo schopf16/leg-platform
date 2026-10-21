@@ -36,9 +36,11 @@ without a script.
   {% endif %}
   {% for extra in card.extra_blocks %}{% include "customer/_progress_block.html" with block=extra footer_withdraw=card.withdraw_in_footer %}{% endfor %}
 
-  {% if card.can_add_point or card.removal %}
+  {% if card.can_add_point or card.removal or card.change_pk or card.review_locked %}
     <div class="card-foot">
       {% if card.can_add_point %}<a class="btn btn-primary" href="{% url 'customer:application_start' %}?building={{ card.location.pk }}">{% translate "Add metering point" %}</a>{% endif %}
+      {% if card.change_pk %}<a class="btn btn-secondary-action" href="{% url 'customer:application_change' card.change_pk %}">{% translate "Change application" %}</a>{% endif %}
+      {% if card.review_locked %}<span class="card-note">{% translate "The LEG is checking your application. You can no longer change it here. Until the registration at the grid operator starts, you can still withdraw it." %}</span>{% endif %}
       {% if card.removal == "link" and deregistration_url %}
         <a class="btn btn-danger-outline end-action" href="{{ deregistration_url }}{% if card.location %}?building={{ card.location.pk }}{% endif %}">{% translate "Remove metering point" %}</a>
       {% elif card.removal == "withdraw" %}

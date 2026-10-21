@@ -1,0 +1,23 @@
+{% extends "customer/base.html" %}
+{% load i18n %}{% comment %}
+"Change application" (D-107): confirmation for a submitted application that the LEG has not taken into review yet. The
+POST makes it a draft again; it is submitted again afterwards. Context: ``application``.
+{% endcomment %}
+{% block title %}{% translate "Change application" %}{% endblock %}
+{% block content %}
+  <div class="wizard">
+    <p class="page-label">{% translate "My participation · Application" %}</p>
+    <section class="step-card cancel-card" aria-labelledby="change-title">
+      <h1 id="change-title" class="card-title">{% translate "Change application?" %}</h1>
+      <p>{% translate "Your application becomes a draft again so that you can change it. The LEG does not check it until you submit it again." %}</p>
+      <p class="muted">{% translate "A draft that you do not continue is deleted after a while. Submit it again when you are done." %}</p>
+      <div class="step-actions">
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}" autofocus>{% translate "Keep application" %}</a>
+        <form method="post" class="inline-form" data-submit-once>
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">{% translate "Change application" %}</button>
+        </form>
+      </div>
+    </section>
+  </div>
+{% endblock %}

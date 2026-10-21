@@ -5,7 +5,8 @@ No wizard: what the customer entered stands one under the other (the five steps 
 application goes (submitted, review, registration at the grid operator, confirmation, completed) and the next step of the
 staff with its buttons. The side column holds the person, the notices of the person and the history. The buttons open
 dialogs (normal pages). The bank connection shows only whether one is on file (D-087); the proof of a confirmation is never
-shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state are not drawn; the service checks again.
+shown. A draft has a read-only page marked "Draft / not submitted" (D-107): its way is the form's steps, it has no button.
+Buttons that do not fit the state are not drawn; the service checks again.
 {% endcomment %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
@@ -36,7 +37,9 @@ shown. A draft has no page (404, KONZEPT 5.6). Buttons that do not fit the state
 
   <section class="mgmt-card" aria-labelledby="next-title">
     <h2 id="next-title">{% translate "Next step" %}</h2>
-    {% if can_review %}
+    {% if is_draft %}
+      <p>{% translate "The customer has started this application and has not submitted it. Nothing is to be done by the LEG. You can read it, but you cannot change it. The customer can still change it. A draft that the customer does not continue is deleted after the deadlines of the settings." %}</p>
+    {% elif can_review %}
       <p>{% blocktranslate %}The application is waiting. Take it into review, or start the registration at the {{ operator }} directly.{% endblocktranslate %}</p>
     {% elif application.state == "in_review" %}
       <p>{% blocktranslate %}Check the details. Then start the registration at the {{ operator }}, or return the application to the customer for correction.{% endblocktranslate %}</p>

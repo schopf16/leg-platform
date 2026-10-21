@@ -8,8 +8,9 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_staff, applications, buildings, contracts, own_iban
+from leg_platform.community import application_staff, applications, buildings, contracts, history, own_iban
 from leg_platform.community.application_common import ApplicationError
+from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
@@ -410,9 +411,11 @@ class MeteringPointStepTests(WizardCase):
         for marker in (
             "Schritt 2: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?",
             "Der Messpunkt ist der Anschluss Ihres Stromzählers.", f"Seine Nummer beginnt mit CH{IDENTIFIER}.",
-            "Messpunkt-Nummer für den Bezug", f">CH{IDENTIFIER}<", "Die Nummer finden Sie auf Ihrer letzten Stromrechnung.",
+            "Messpunkt-Nummer für den Bezug", f">CH{IDENTIFIER}<",
+            "Die Nummer finden Sie auf Ihrer Stromrechnung, bei den Angaben zu Ihrer Bezugsstelle.",
             "Name des Messpunkts", "z. B. Wohnhaus", "Speisen Sie Solarstrom ein?", ">Nein<", ">Ja<",
-            "Messpunkt-Nummer für die Einspeisung", "Die Nummer steht in den Unterlagen Ihres Netzbetreibers.",
+            "Messpunkt-Nummer für die Einspeisung",
+            "Die Nummer finden Sie in den Unterlagen Ihres Netzbetreibers, bei den Angaben zu Ihrer Einspeisestelle.",
             "Diese Angaben sind freiwillig und dienen nur der Statistik.", ">Einspeisung<",
             "PV-Leistung in kWp", "Batteriespeicher in kWh", "Wallbox in kW",
             'data-reveal-name="feed_in"',
@@ -423,6 +426,23 @@ class MeteringPointStepTests(WizardCase):
         # The answer "No" is chosen first; the part of the feed-in is hidden by the script, never by the server.
         self.assertRegex(html, r'value="no" checked|checked[^>]*value="no"')
         self.assertNotIn("is-open", html)
+
+    def test_both_number_hints_share_one_structure_in_every_language(self):
+        """Where to find it, then what it is called and what it is not (the same words for draw and feed-in)."""
+        from django.utils import translation
+
+        from leg_platform.customer.forms import MeteringPointsForm
+
+        tail = {"de-ch": "Sie heisst auch Messpunkt-ID und ist nicht die kürzere Zählernummer.",
+                "fr": "Il s’appelle aussi ID du point de mesure", "it": "Si chiama anche ID del punto di misura"}
+        for language, ending in tail.items():
+            with translation.override(language):
+                form = MeteringPointsForm()
+                draw, feed_in = str(form.fields["draw_number"].help_text), str(form.fields["feed_in_number"].help_text)
+            self.assertIn(ending, draw)
+            self.assertIn(ending, feed_in)
+            self.assertNotEqual(draw, feed_in)
+            self.assertNotIn("ß", draw + feed_in)
 
     def test_a_draw_only(self):
         response = self.client.post(self.url, {"draw_number": "12345", "draw_name": "Wohnhaus", "feed_in": "no"})
@@ -751,11 +771,13 @@ class SubmittedAndWithdrawTests(WizardCase):
             "Sie bestätigen die Anfrage in der E-Mail vom Netzbetreiber", "Wird vom Netzbetreiber festgelegt",
             "Bitte bestätigen Sie die Anmeldung innerhalb von 14 Tagen nach der E-Mail vom Netzbetreiber.",
             "Ihre Angaben", "Ittigenstrasse 51", "EGID 90004269",
-            "Bezug", "Einspeisung", "Startdatum", "So bald wie möglich", "Änderungen sind jetzt nur noch über die LEG möglich.",
-            ">Zur Startseite<", ">Anmeldung zurückziehen<",
+            "Bezug", "Einspeisung", "Startdatum", "So bald wie möglich",
+            "Sie können Ihre Angaben noch ändern, bis die LEG mit der Prüfung beginnt.",
+            ">Zur Startseite<", ">Anmeldung ändern<", ">Anmeldung zurückziehen<",
             "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim Netzbetreiber eingereicht hat.",
         ):
             self.assertIn(marker, html)
+        self.assertNotIn("Änderungen sind jetzt nur noch über die LEG möglich.", html)
         # N-09: every point with its number (the customer can check what was typed), the operator named once, no bar.
         for point in self.building.metering_points.all():
             self.assertIn(point.number, html)
@@ -775,6 +797,85 @@ class SubmittedAndWithdrawTests(WizardCase):
     def test_a_page_without_the_flag_of_the_session_is_no_page(self):
         other_session = login(self.mine)
         self.assertRedirects(other_session.get(self.submitted), BUILDINGS, fetch_redirect_response=False)
+
+    def test_changing_a_submitted_application_asks_first_and_makes_a_draft_again_with_all_its_details(self):
+        url = reverse("customer:application_change", args=[self.application.pk])
+        page = text(self.client.get(url))
+        self.assertIn("Anmeldung ändern?", page)
+        self.assertIn("Die LEG prüft sie erst wieder, wenn Sie sie neu abschicken.", page)
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
+        response = self.client.post(url)
+        self.assertRedirects(response, START, fetch_redirect_response=False)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.state, Application.State.DRAFT)
+        self.assertIsNone(self.application.submitted_at)
+        self.assertEqual(self.building.metering_points.count(), 2)
+        self.assertEqual(own_iban.own_iban(self.mine), GOOD_IBAN)
+        entry = history.entries_for(self.application).filter(event=HistoryEvent.APPLICATION_WITHDRAWN).get()
+        self.assertEqual(entry.detail, {"purpose": "change"})
+        # The details can be changed on the steps (a "Change" link on every finished row) and submitted again.
+        start = text(self.client.get(START))
+        self.assertIn(step_url(self.application, "metering_points"), start)
+        self.client.post(step_url(self.application, "start_date"), {"start": "asap"})
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.state, Application.State.SUBMITTED)
+
+    def test_the_change_is_locked_once_the_leg_took_the_application_into_review(self):
+        staff = staff_user("staff.change@example.org")
+        application_staff.start_review(self.application, staff)
+        url = reverse("customer:application_change", args=[self.application.pk])
+        text_in_review = "Die LEG prüft Ihre Anmeldung bereits"
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, BUILDINGS)
+        self.assertContains(response, text_in_review)
+        response = self.client.post(url, follow=True)
+        self.assertContains(response, text_in_review)
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.IN_REVIEW)
+        # The card says why there is no button; the withdrawal stays as documented (until the grid operator started).
+        page = text(self.client.get(BUILDINGS))
+        self.assertIn("Die LEG prüft Ihre Anmeldung. Sie können sie hier nicht mehr ändern.", page)
+        self.assertNotIn(url, page)
+
+    def test_the_change_is_refused_for_a_draft_a_foreign_application_and_after_the_registration_started(self):
+        url = reverse("customer:application_change", args=[self.application.pk])
+        staff = staff_user("staff.change2@example.org")
+        application_staff.mark_operator_started(self.application, staff)
+        self.assertRedirects(self.client.get(url), BUILDINGS, fetch_redirect_response=False)
+        self.client.post(url)
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.OPERATOR_STARTED)
+        stranger = login(customer("stranger.change@example.org"))
+        self.assertEqual(stranger.get(url).status_code, 404)
+        self.assertEqual(stranger.post(url).status_code, 404)
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.OPERATOR_STARTED)
+
+    def test_a_change_races_the_review_and_exactly_one_wins(self):
+        """The staff took the application into review first: the customer's click is refused; the other way round the
+        staff's click is refused (the state is read again under the row lock)."""
+        staff = staff_user("staff.race@example.org")
+        stale = Application.objects.get(pk=self.application.pk)  # the customer's page was built while submitted
+        application_staff.start_review(self.application, staff)
+        with self.assertRaises(ApplicationError) as refused:
+            applications.reopen_for_change(self.mine, stale)
+        self.assertEqual(refused.exception.code, "review_started")
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.IN_REVIEW)
+        other, _building = draft_with_points(self.mine, number=60, egid=90004271, house_number="61")
+        applications.set_start(self.mine, other, asap=True)
+        applications.submit(self.mine, other)
+        stale_staff = Application.objects.get(pk=other.pk)
+        applications.reopen_for_change(self.mine, other)
+        with self.assertRaises(ApplicationError) as refused:
+            application_staff.start_review(stale_staff, staff)
+        self.assertEqual(refused.exception.code, "wrong_state")
+        self.assertEqual(Application.objects.get(pk=other.pk).state, Application.State.DRAFT)
+
+    def test_the_change_needs_a_free_place_among_the_drafts_like_the_withdrawal(self):
+        for _count in range(3):
+            applications.start_draft(self.mine)
+        url = reverse("customer:application_change", args=[self.application.pk])
+        response = self.client.post(url, follow=True)
+        self.assertRedirects(response, BUILDINGS)
+        self.assertContains(response, "Sie haben zu viele Entwürfe.")
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
 
     def test_withdrawing_asks_first_and_makes_a_draft_again_with_all_its_details(self):
         url = reverse("customer:application_withdraw", args=[self.application.pk])

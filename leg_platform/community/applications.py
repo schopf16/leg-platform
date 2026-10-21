@@ -361,21 +361,44 @@ def cancel(person, application):
         delete_application(draft, "cancelled", fresh)
 
 
-def withdraw(person, application):
-    """Take a submitted application back, as long as the registration at the grid operator has not started: it becomes a
-    draft again with all its data (``wrong_state`` later: only the staff can act then). A draft is created by this, so the
-    cap of drafts per account applies (``too_many_drafts``; the staff's ``return_for_correction`` is exempt)."""
+def _take_back(person, application, states, detail=None):
+    """Submitted application -> draft again with all its data, under the account's and the application's row lock (the
+    staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies; the staff's
+    ``return_for_correction`` is exempt."""
     with transaction.atomic():
         fresh = locked_customer(person)
-        locked = _lock_draft(fresh, application, states=Application.WITHDRAWABLE_STATES)
+        locked = _lock_draft(fresh, application, states=states)
         if Application.objects.filter(person=fresh, state__in=Application.DRAFT_STATES).count() >= MAX_DRAFTS_PER_PERSON:
             raise ApplicationError("too_many_drafts")
         locked.state = Application.State.DRAFT
         locked.submitted_at = None
-        history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh)
+        history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh, detail)
         _changed(locked)
         locked.save(update_fields=["submitted_at", "updated_at"])
     return locked
+
+
+def withdraw(person, application):
+    """Take a submitted application back, as long as the registration at the grid operator has not started: it becomes a
+    draft again with all its data (``wrong_state`` later: only the staff can act then). A draft is created by this, so the
+    cap of drafts per account applies (``too_many_drafts``; the staff's ``return_for_correction`` is exempt)."""
+    return _take_back(person, application, Application.WITHDRAWABLE_STATES)
+
+
+def reopen_for_change(person, application):
+    """Change a submitted application that the LEG has not picked up yet (D-107): it becomes a draft again with all its
+    data, the customer edits it in the wizard and submits it again (the queue position is the new submission's). Only
+    state ``submitted`` qualifies; once the staff took it into review (or started the registration at the grid operator)
+    the customer cannot change it any more (``review_started`` / ``not_editable``). The check is made under the row lock
+    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two."""
+    try:
+        return _take_back(person, application, (Application.State.SUBMITTED,), {"purpose": "change"})
+    except ApplicationError as error:
+        if error.code == "not_editable" and Application.objects.filter(
+            pk=getattr(application, "pk", None), person=person, state=Application.State.IN_REVIEW
+        ).exists():
+            raise ApplicationError("review_started") from None
+        raise
 
 
 def go_to_step(person, application, step):

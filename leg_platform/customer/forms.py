@@ -85,7 +85,10 @@ class MeteringPointsForm(CustomerForm):
 
     draw_number = forms.CharField(
         label=_("Metering point number for consumption"), required=False, max_length=250,
-        help_text=_("You find the number on your last electricity bill."),
+        help_text=_(
+            "You find the number on your electricity bill, with the details of your supply point. "
+            "It is also called metering point ID and is not the shorter meter number."
+        ),
     )
     draw_name = forms.CharField(
         label=_("Name of the metering point"), required=False, max_length=METERING_POINT_NAME_MAX_LENGTH,
@@ -97,7 +100,10 @@ class MeteringPointsForm(CustomerForm):
     )
     feed_in_number = forms.CharField(
         label=_("Metering point number for the feed-in"), required=False, max_length=250,
-        help_text=_("You find the number in the documents of your grid operator."),
+        help_text=_(
+            "You find the number in the documents of your grid operator, with the details of your feed-in point. "
+            "It is also called metering point ID and is not the shorter meter number."
+        ),
     )
     feed_in_name = forms.CharField(
         label=_("Name of the metering point"), required=False, max_length=METERING_POINT_NAME_MAX_LENGTH,

@@ -157,6 +157,54 @@ class BuildingsPageTests(TestCase):
         self.assertIn(">Weiter anmelden<", html)
         self.assertIn("Ittigenstrasse 51", html)
 
+    def test_a_draft_without_a_building_yet_is_a_card_and_not_the_empty_state(self):
+        """Walkthrough 3: the start page shows the progress of the draft, so the page Buildings lists it too, marked as
+        not completely recorded, with the way to continue (never "No building registered yet")."""
+        newcomer = customer("started.buildings@example.org")
+        application = applications.start_draft(newcomer)
+        html = self.page(login(newcomer))
+        self.assertNotIn("Noch kein Gebäude angemeldet", html)
+        self.assertIn("Gebäude noch nicht erfasst", html)
+        self.assertRegex(html, r'<span class="dot tone-muted" aria-hidden="true"></span>Entwurf, noch nicht vollständig erfasst')
+        self.assertRegex(html, r"Anmeldung: 0 von \d erledigt")
+        self.assertIn(reverse("customer:application", args=[application.pk]), html)
+        self.assertIn(">Weiter anmelden<", html)
+        # The same draft is what the start page follows.
+        home = login(newcomer).get(reverse("home")).content.decode()
+        self.assertIn("Ihr Weg in die LEG", home)
+
+    def test_a_draft_with_a_building_is_marked_as_not_completely_recorded(self):
+        newcomer = customer("marked.buildings@example.org")
+        draft_with_building(newcomer, egid=90005556, street="Seitenweg", house_number="10", postal_code="3000", town="Bern")
+        html = self.page(login(newcomer))
+        self.assertIn("Seitenweg 10", html)
+        self.assertRegex(html, r'<span class="dot tone-muted" aria-hidden="true"></span>Entwurf, noch nicht vollständig erfasst')
+
+    def test_a_submitted_application_can_be_changed_until_the_leg_takes_it_into_review(self):
+        publish_contract()
+        configure_numbers()
+        newcomer = customer("changeable.buildings@example.org")
+        application, _building = draft_with_points(newcomer, number=50)
+        from leg_platform.community import application_staff, contracts
+
+        applications.accept_contract_step(
+            newcomer, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+        )
+        applications.set_start(newcomer, application, asap=True)
+        applications.submit(newcomer, application)
+        change = reverse("customer:application_change", args=[application.pk])
+        html = self.page(login(newcomer))
+        self.assertEqual(html.count(f'href="{change}"'), 1)
+        self.assertIn(">Anmeldung ändern<", html)
+        self.assertNotIn("Sie können sie hier nicht mehr ändern", html)
+        staff = staff_user("staff.changeable@example.org")
+        application_staff.start_review(application, staff)
+        html = self.page(login(newcomer))
+        self.assertNotIn(change, html)
+        self.assertIn("Die LEG prüft Ihre Anmeldung. Sie können sie hier nicht mehr ändern.", html)
+        # The withdrawal is the documented way until the registration at the grid operator starts.
+        self.assertIn(reverse("customer:application_withdraw", args=[application.pk]), html)
+
     def test_a_submitted_application_can_be_withdrawn_until_the_operator_starts(self):
         publish_contract()
         configure_numbers()

@@ -757,6 +757,32 @@ class SubmitTests(TestCase):
         Application.objects.filter(pk=application.pk).update(state=Application.State.OPERATOR_STARTED)
         self.assertEqual(code_of(lambda: applications.withdraw(self.person, application)), "not_editable")
 
+    def test_reopen_for_change_only_while_the_leg_has_not_picked_the_application_up(self):
+        publish_contract(self.staff)
+        application, building = ready_draft(self.person)
+        # A draft cannot be reopened: nothing was submitted.
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "not_editable")
+        applications.submit(self.person, application, today=TODAY)
+
+        applications.reopen_for_change(self.person, application)
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.DRAFT)
+        self.assertIsNone(application.submitted_at)
+        self.assertEqual(ApplicationMeteringPoint.objects.filter(building=building).count(), 1)
+        entry = history.entries_for(application).get(event=HistoryEvent.APPLICATION_WITHDRAWN)
+        self.assertEqual(entry.detail, {"purpose": "change"})
+        # The details are editable again and the application is submitted again.
+        applications.submit(self.person, application, today=TODAY)
+        # From the start of the review on the customer cannot change it (the withdrawal stays until the operator).
+        Application.objects.filter(pk=application.pk).update(state=Application.State.IN_REVIEW)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "review_started")
+        Application.objects.filter(pk=application.pk).update(state=Application.State.OPERATOR_STARTED)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "not_editable")
+        # Another account's application is "not found", never a hint.
+        other = customer("reopen.other@example.org")
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(other, application)), "not_found")
+
     def test_a_withdrawal_is_refused_while_the_account_holds_the_most_drafts_it_may_have(self):
         publish_contract(self.staff)
         application, _building = ready_draft(self.person)

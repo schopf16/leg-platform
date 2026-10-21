@@ -1,5 +1,5 @@
-"""The list of the processes and the small services behind the management pages of the onboarding (D-103): the rows of
-``process_list`` (running applications and deregistrations, never a draft), their filters, search and sorting; the contract
+"""The list of the processes and the small services behind the management pages of the onboarding (D-103, D-107): the rows
+of ``process_list`` (applications including drafts, and deregistrations), their filters, search and sorting; the contract
 history and the newest acceptance for the staff; the time of the daily address directory run."""
 
 from datetime import date, time, timedelta
@@ -11,6 +11,7 @@ from django.utils import timezone
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses import schedule
 from leg_platform.community import (
+    application_queue,
     application_staff,
     applications,
     contracts,
@@ -48,18 +49,30 @@ class ProcessListTests(TestCase):
         application.refresh_from_db()
         return application
 
-    def test_only_running_applications_are_rows_and_never_a_draft(self):
+    def test_drafts_are_rows_marked_by_their_state_and_a_completed_application_is_not(self):
         anna = self.submitted(self.anna, 90004269, 1)
-        ready_draft(self.bert, egid=90004270, number=5)
+        draft, _building = ready_draft(self.bert, egid=90004270, number=5)
         paused, _building = ready_draft(self.carl, egid=90004271, number=9)
         Application.objects.filter(pk=paused.pk).update(state=State.PAUSED)
         rows = process_list.rows()
-        self.assertEqual([(row.kind, row.pk) for row in rows], [("application", anna.pk)])
+        self.assertEqual(
+            {(row.pk, row.state) for row in rows},
+            {(anna.pk, "submitted"), (draft.pk, "draft"), (paused.pk, "paused")},
+        )
+        # A draft shows the steps of the form (not the five steps after the submission); never a bank or IBAN value.
+        draft_row = next(row for row in rows if row.pk == draft.pk)
+        self.assertEqual(draft_row.progress_total, applications.progress(draft).total)
+        self.assertEqual(draft_row.progress_done, applications.progress(draft).done)
+        self.assertEqual({row.pk for row in process_list.rows(state="draft")}, {draft.pk, paused.pk})
+        self.assertEqual({row.pk for row in process_list.rows(state="submitted")}, {anna.pk})
+        self.assertEqual({row.pk for row in process_list.rows(text="Beispiel")}, {draft.pk})
         completed = self.submitted(self.bert, 90004272, 13, house="53")
         application_staff.mark_operator_started(completed, self.staff, STARTED, today=TODAY)
         application_staff.record_operator_confirmation(completed, self.staff, date(2026, 7, 1), today=TODAY)
         application_staff.complete(completed, self.staff, date(2026, 9, 1), today=TODAY)
         self.assertNotIn(completed.pk, [row.pk for row in process_list.rows()])
+        # A draft is no work for the staff: the queue counts of the overview never include it.
+        self.assertEqual(application_queue.queue_counts()["applications_submitted"], 1)
 
     def test_the_row_carries_what_the_list_shows(self):
         application = self.submitted(self.anna, 90004269, 1, feed_in=True)
