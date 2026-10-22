@@ -855,6 +855,11 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                 self.assertFalse(thread.is_alive())
                 self.assertEqual(outcomes, [(7,), "refused", "refused", "refused"])
                 if replace_file:
+                    # This bypasses setup's WAL coordination. The old connection is closed
+                    # now; discard only its orphaned fixture sidecars before opening the
+                    # replacement (https://www.sqlite.org/howtocorrupt.html, section 2.5).
+                    for suffix in ("-wal", "-shm"):
+                        Path(str(path) + suffix).unlink(missing_ok=True)
                     with contextlib.closing(sqlite3.connect(path)) as database:
                         self.assertEqual(database.execute("SELECT * FROM cursor_probe").fetchall(), [(99,)])
                 else:
