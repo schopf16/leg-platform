@@ -6962,3 +6962,18 @@ msgstr "En pause / non soumis"
 
 msgid "The customer has started this application and has not submitted it. Nothing is to be done by the LEG. You can read it, but you cannot change it. The customer can still change it. A draft that the customer does not continue is deleted after the deadlines of the settings."
 msgstr "Le client a commencé cette demande et ne l’a pas soumise. La CEL n’a rien à faire. Vous pouvez la lire, mais pas la modifier. Le client peut encore la modifier. Un brouillon que le client ne poursuit pas est supprimé après les délais des paramètres."
+
+msgid "The customer has a metering point for consumption and one for feed-in at this building already."
+msgstr "Le client a déjà un point de mesure pour la consommation et un pour l’injection dans ce bâtiment."
+
+msgid "Data changed after the registration at the grid operator: check the registration again"
+msgstr "Données modifiées après l’annonce auprès du gestionnaire de réseau : vérifier à nouveau l’annonce"
+
+msgid "Data changed after the registration at the %(operator)s: check the registration again"
+msgstr "Données modifiées après l’annonce auprès de %(operator)s : vérifier à nouveau l’annonce"
+
+msgid "You changed this application too often today. Please try again tomorrow."
+msgstr "Vous avez modifié cette demande trop souvent aujourd’hui. Veuillez réessayer demain."
+
+msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
+msgstr "Plus de %(max)d demandes ou désinscriptions correspondent. Seules les plus récemment modifiées sont listées, les demandes soumises avant les brouillons. Restreignez la liste avec la recherche ou les filtres."

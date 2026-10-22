@@ -16,9 +16,11 @@ application started) or ``OPEN``; the start date is chosen only after the contra
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from leg_platform.accounts import mail_queue
@@ -41,6 +43,7 @@ from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
     ApplicationMeteringPoint,
+    ContractAcceptance,
     Direction,
     Location,
     ManagementSettings,
@@ -67,6 +70,9 @@ START_AFTER_MONTHS = 3
 PLAUSIBLE_MAXIMUM = {"pv_power_kwp": Decimal(1000), "battery_kwh": Decimal(2000), "wallbox_kw": Decimal(1000)}
 
 UNSET = object()
+
+# A customer may reopen the same application for a change at most this often within 24 hours (D-107).
+MAX_CHANGES_PER_DAY = 10
 
 
 @dataclass(frozen=True)
@@ -175,13 +181,13 @@ def next_deletion_date(person_id):
     return min(dates) if dates else None
 
 
-def _draw_present(building, today):
+def _draw_present(building, occupied):
+    """A draw is entered in the building, or the account has one at the stored building already. ``occupied(location)``
+    gives the directions the account has there."""
     rows = list(building.metering_points.all())
     if any(row.direction == Direction.CONSUMPTION for row in rows):
         return True
-    return building.location is not None and Direction.CONSUMPTION in buildings.occupied_directions(
-        building.location, building.application.person_id, today
-    )
+    return building.location is not None and Direction.CONSUMPTION in occupied(building.location)
 
 
 def _start_valid(application, today):
@@ -196,6 +202,67 @@ def progress(application, today=None):
     """The steps, how many are done and the next open one (wizard state computed from the stored rows)."""
     today = today or timezone.localdate()
     listed = list(application.buildings.select_related("location").prefetch_related("metering_points"))
+    acceptance = contracts.acceptance_of(application.person, contracts.current_version())
+    return _progress(
+        application, listed, today,
+        accepted_at=acceptance.accepted_at if acceptance is not None else None,
+        has_iban=lambda: own_iban.has_iban(application.person),
+        occupied=lambda location: buildings.occupied_directions(location, application.person_id, today),
+    )
+
+
+def progress_many(drafts, today=None):
+    """``{application id: Progress}`` for many applications with a fixed number of queries (the list of the staff shows
+    the progress of every draft; one ``progress`` per draft would be several queries each). The same computation as
+    ``progress``; the buildings and their points must be prefetched on each application (``buildings`` with
+    ``select_related("location")`` and ``prefetch_related("metering_points")``, ``select_related("person")``)."""
+    today = today or timezone.localdate()
+    drafts = list(drafts)
+    if not drafts:
+        return {}
+    version = contracts.current_version()
+    accepted = {}
+    if version is not None:
+        accepted = dict(
+            ContractAcceptance.objects.filter(version=version, person_id__in={row.person_id for row in drafts})
+            .values_list("person_id", "accepted_at")
+        )
+    # The directions each account has at the stored buildings its drafts name: one query for all of them.
+    locations = {
+        building.location_id for row in drafts for building in row.buildings.all() if building.location_id is not None
+    }
+    held = {}
+    if locations:
+        live = (
+            PersonAssignment.objects.not_ended(today)
+            .filter(
+                person_id__in={row.person_id for row in drafts}, metering_point__location_id__in=locations,
+                metering_point__is_archived=False,
+            )
+            .exclude(Q(metering_point__terminated_on__isnull=False, metering_point__terminated_on__lte=today))
+            .values_list("person_id", "metering_point__location_id", "metering_point__direction")
+        )
+        for person_id, location_id, direction in live:
+            held.setdefault((person_id, location_id), set()).add(direction)
+    with_feed_in = {
+        row.person_id for row in drafts
+        if any(point.direction == Direction.FEED_IN for building in row.buildings.all()
+               for point in building.metering_points.all())
+    }
+    with_iban = own_iban.accounts_with_iban(with_feed_in) if with_feed_in else set()
+    result = {}
+    for row in drafts:
+        result[row.pk] = _progress(
+            row, list(row.buildings.all()), today, accepted_at=accepted.get(row.person_id),
+            has_iban=lambda row=row: row.person_id in with_iban,
+            occupied=lambda location, row=row: held.get((row.person_id, location.pk), set()),
+        )
+    return result
+
+
+def _progress(application, listed, today, *, accepted_at, has_iban, occupied):
+    """The one computation behind ``progress`` and ``progress_many``. ``has_iban()`` is asked only for a feed-in;
+    ``occupied(location)`` gives the directions the account has at a stored building."""
     rows = [row for building in listed for row in building.metering_points.all()]
     has_feed_in = any(row.direction == Direction.FEED_IN for row in rows)
 
@@ -205,17 +272,15 @@ def progress(application, today=None):
         building_state = KNOWN
     else:
         building_state = DONE
-    points_state = DONE if rows and all(_draw_present(building, today) for building in listed) else OPEN
-    if has_feed_in and own_iban.has_iban(application.person):
+    points_state = DONE if rows and all(_draw_present(building, occupied) for building in listed) else OPEN
+    if has_feed_in and has_iban():
         bank_state = KNOWN if application.bank_known_at_start else DONE
     else:
         bank_state = OPEN
-    version = contracts.current_version()
-    acceptance = contracts.acceptance_of(application.person, version)
-    if acceptance is None:
+    if accepted_at is None:
         contract_state = OPEN
     else:
-        contract_state = KNOWN if acceptance.accepted_at < application.created_at else DONE
+        contract_state = KNOWN if accepted_at < application.created_at else DONE
     start_state = DONE if _start_valid(application, today) else OPEN
 
     steps = (
@@ -361,15 +426,28 @@ def cancel(person, application):
         delete_application(draft, "cancelled", fresh)
 
 
+def _changes_in_last_day(application, now):
+    """How often the customer reopened this application for a change in the last 24 hours (the history entries
+    ``application_withdrawn`` with the purpose ``change``)."""
+    details = history.entries_for(application).filter(
+        event=HistoryEvent.APPLICATION_WITHDRAWN, created_at__gte=now - timedelta(days=1)
+    ).values_list("detail", flat=True)
+    return sum(1 for detail in details if isinstance(detail, dict) and detail.get("purpose") == "change")
+
+
 def _take_back(person, application, states, detail=None):
     """Submitted application -> draft again with all its data, under the account's and the application's row lock (the
     staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies; the staff's
-    ``return_for_correction`` is exempt."""
+    ``return_for_correction`` is exempt. A change (``purpose`` ``change``) is also capped per application and day
+    (``MAX_CHANGES_PER_DAY``, ``too_many_changes``): every cycle of change and submission puts the application at the
+    end of the queue and writes history rows, so an endless cycle is no use to the customer and a cost to the LEG."""
     with transaction.atomic():
         fresh = locked_customer(person)
         locked = _lock_draft(fresh, application, states=states)
         if Application.objects.filter(person=fresh, state__in=Application.DRAFT_STATES).count() >= MAX_DRAFTS_PER_PERSON:
             raise ApplicationError("too_many_drafts")
+        if (detail or {}).get("purpose") == "change" and _changes_in_last_day(locked, timezone.now()) >= MAX_CHANGES_PER_DAY:
+            raise ApplicationError("too_many_changes")
         locked.state = Application.State.DRAFT
         locked.submitted_at = None
         history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh, detail)
@@ -390,7 +468,8 @@ def reopen_for_change(person, application):
     data, the customer edits it in the wizard and submits it again (the queue position is the new submission's). Only
     state ``submitted`` qualifies; once the staff took it into review (or started the registration at the grid operator)
     the customer cannot change it any more (``review_started`` / ``not_editable``). The check is made under the row lock
-    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two."""
+    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two. At
+    most ``MAX_CHANGES_PER_DAY`` changes per application in 24 hours (``too_many_changes``)."""
     try:
         return _take_back(person, application, (Application.State.SUBMITTED,), {"purpose": "change"})
     except ApplicationError as error:

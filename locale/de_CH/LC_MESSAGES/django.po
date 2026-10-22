@@ -6926,3 +6926,18 @@ msgstr "Pausiert / nicht eingereicht"
 
 msgid "The customer has started this application and has not submitted it. Nothing is to be done by the LEG. You can read it, but you cannot change it. The customer can still change it. A draft that the customer does not continue is deleted after the deadlines of the settings."
 msgstr "Der Kunde hat diese Anmeldung begonnen und nicht eingereicht. Die LEG muss nichts tun. Sie können sie lesen, aber nicht ändern. Der Kunde kann sie noch ändern. Ein Entwurf, den der Kunde nicht weiterführt, wird nach den Fristen der Einstellungen gelöscht."
+
+msgid "The customer has a metering point for consumption and one for feed-in at this building already."
+msgstr "Der Kunde hat bei diesem Gebäude bereits einen Messpunkt für den Bezug und einen für die Einspeisung."
+
+msgid "Data changed after the registration at the grid operator: check the registration again"
+msgstr "Daten nach der Anmeldung beim Netzbetreiber geändert: Anmeldung erneut prüfen"
+
+msgid "Data changed after the registration at the %(operator)s: check the registration again"
+msgstr "Daten nach der Anmeldung bei %(operator)s geändert: Anmeldung erneut prüfen"
+
+msgid "You changed this application too often today. Please try again tomorrow."
+msgstr "Sie haben diese Anmeldung heute zu oft geändert. Bitte versuchen Sie es morgen wieder."
+
+msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
+msgstr "Mehr als %(max)d Anmeldungen oder Abmeldungen passen. Es werden nur die zuletzt geänderten aufgeführt, eingereichte Anmeldungen vor Entwürfen. Grenzen Sie die Liste mit der Suche oder den Filtern ein."

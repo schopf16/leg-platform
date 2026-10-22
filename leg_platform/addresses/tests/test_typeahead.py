@@ -9,14 +9,18 @@ endpoint refuses a GET, a missing CSRF token and a body of another type; a signe
 for every address it comes from) and an anonymous client the budget of its address."""
 
 import uuid
+from unittest.mock import patch
 from urllib.parse import urlencode
 
-from django.db import connections
+from django.db import DatabaseError, connections
 from django.test import Client, TestCase, tag
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.digests import keyed_digest
+from leg_platform.accounts.models import RateLimitEvent
+from leg_platform.accounts.rate_limits import RATE_LIMIT_PURPOSE
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses.models import Address, Directory
 from leg_platform.addresses.services import TYPEAHEAD_MINIMUM, lookup
@@ -319,3 +323,91 @@ class BudgetTests(TestCase):
     def test_an_anonymous_client_has_the_budget_of_its_address(self):
         self.assertEqual(self.count_until_refused(Client(), REMOTE_ADDR="10.20.30.50"), 60)
         self.assertEqual(post(Client(), self.values(), REMOTE_ADDR="10.20.30.51").status_code, 200)
+
+    def test_signed_in_accounts_of_one_address_share_a_higher_counter_of_the_address(self):
+        # L-1: an account has its own budget, but the address of signed-in accounts is counted too (300 a minute), so
+        # many accounts from one address cannot multiply the budget.
+        clients = []
+        for name in ("one", "two", "three"):
+            client = Client()
+            client.force_login(create_active_user(f"{name}.address@example.org"))
+            clients.append(client)
+        address = "10.20.30.60"
+        self.assertEqual(self.count_until_refused(clients[0], REMOTE_ADDR=address), 120)
+        self.assertEqual(self.count_until_refused(clients[1], REMOTE_ADDR=address), 120)
+        # The third account has used nothing, but the address has 60 left of its 300.
+        self.assertEqual(self.count_until_refused(clients[2], REMOTE_ADDR=address), 60)
+        # The same account from another address is held back by its own budget only (60 of 120 used).
+        self.assertEqual(post(clients[2], self.values(), REMOTE_ADDR="10.20.30.61").status_code, 200)
+        fourth = Client()
+        fourth.force_login(create_active_user("four.address@example.org"))
+        self.assertEqual(post(fourth, self.values(), REMOTE_ADDR="10.20.30.62").status_code, 200)
+
+
+class ApproximateSearchTests(TypeaheadBase):
+    """The approximate street search (L-1): never for an anonymous client, a budget of its own for an account, and only
+    where it can run (a complete postal code, a street of three characters, no prefix hit)."""
+
+    TYPED = {"mode": "suggest", "street": "Gantrischwek", "postal_code": "3063", "country": "CH"}
+
+    def signed_in(self, name="fuzzy"):
+        client = Client()
+        client.force_login(create_active_user(f"{name}.typing@example.org"))
+        return client
+
+    def test_the_service_allows_the_search_only_when_the_caller_does(self):
+        values = {key: value for key, value in self.TYPED.items() if key != "mode"}
+        self.assertEqual(lookup(values)["kind"], "approximate")
+        self.assertEqual(len(lookup(values)["results"]), 2)
+        for denied in (False, lambda: False):
+            with self.subTest(denied=repr(denied)[:20]):
+                answer = lookup(values, approximate=denied)
+                self.assertEqual((answer["results"], answer["kind"]), ([], "prefix"))
+        self.assertEqual(len(lookup(values, approximate=lambda: True)["results"]), 2)
+
+    def test_the_function_is_asked_only_for_a_search_that_would_run(self):
+        asked = []
+
+        def ask():
+            asked.append(1)
+            return True
+
+        for values in (
+            {"street": "gantrischweg", "postal_code": "3063"},  # a prefix hit: no fuzzy search
+            {"street": "Gantrischwek"},  # no complete postal code
+            {"street": "Gantrischwek", "postal_code": "30"},
+            {"street": "Gq", "postal_code": "3063"},  # shorter than three characters
+        ):
+            lookup(values, approximate=ask, minimum=2)
+        self.assertEqual(asked, [])
+        lookup({"street": "Gantrischwek", "postal_code": "3063"}, approximate=ask)
+        self.assertEqual(asked, [1])
+
+    def test_an_anonymous_client_gets_prefix_suggestions_only_and_uses_no_approximate_budget(self):
+        answer = post(Client(), self.TYPED).json()
+        self.assertEqual((answer["results"], answer["kind"]), ([], "prefix"))
+        # The prefix search of the same client works (the registration needs only this).
+        self.assertEqual(len(post(Client(), {**self.TYPED, "street": "gantrischweg"}).json()["results"]), 2)
+        digest = keyed_digest("address-approximate-global\ninstance", RATE_LIMIT_PURPOSE)
+        self.assertFalse(RateLimitEvent.objects.filter(bucket_id=digest).exists())
+
+    def test_a_signed_in_account_gets_the_approximate_search_within_its_own_lower_budget(self):
+        client = self.signed_in()
+        first = post(client, self.TYPED).json()
+        self.assertEqual((first["kind"], len(first["results"])), ("approximate", 2))
+        for _number in range(9):
+            self.assertEqual(post(client, self.TYPED).json()["kind"], "approximate")
+        # The eleventh in a minute: no fuzzy search, no error (the prefix suggestions are not affected).
+        eleventh = post(client, self.TYPED)
+        self.assertEqual(eleventh.status_code, 200)
+        self.assertEqual((eleventh.json()["results"], eleventh.json()["kind"]), ([], "prefix"))
+        self.assertEqual(len(post(client, {**self.TYPED, "street": "gantrischweg"}).json()["results"]), 2)
+        # Another account has its own budget.
+        self.assertEqual(post(self.signed_in("other"), self.TYPED).json()["kind"], "approximate")
+
+    def test_a_failing_counter_skips_the_search_instead_of_running_it(self):
+        client = self.signed_in("failing")
+        with patch("leg_platform.accounts.rate_limits.consume_all", side_effect=[[True, True, True], DatabaseError()]):
+            # The first call counts the request itself, the second the approximate search.
+            answer = post(client, self.TYPED).json()
+        self.assertEqual((answer["results"], answer["kind"]), ([], "prefix"))

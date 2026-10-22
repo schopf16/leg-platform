@@ -46,6 +46,19 @@ def has_iban(person):
     return bool(own_iban(person))
 
 
+def accounts_with_iban(person_ids):
+    """The ids among ``person_ids`` that have an IBAN (one query; an IBAN that cannot be decrypted counts as none, like
+    ``own_iban``)."""
+    found = set()
+    for record in PersonRecord.objects.filter(person_id__in=set(person_ids)):
+        try:
+            if record.iban:
+                found.add(record.person_id)
+        except DecryptionError:
+            continue
+    return found
+
+
 def _record_change(fresh, record, mail):
     """Security event and history (never the value); the mail to every address only for a change of an existing IBAN
     or its removal, not for the first entry from empty (owner decision 2026-10-19)."""

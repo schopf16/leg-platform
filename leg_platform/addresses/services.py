@@ -198,14 +198,16 @@ def locality_matches(query, values, home):
     return ranked_rows(query, home, order=LOCALITY_ORDER, columns=LOCALITY_FIELDS)
 
 
-def lookup(values, *, mode="suggest", home=None, minimum=2):
+def lookup(values, *, mode="suggest", home=None, minimum=2, approximate=True):
     """The JSON answer of the lookup endpoint.
 
     ``warning`` is non-empty only in mode "check" when a current directory does not know the
     complete address (D-066); directory problems are logged and shown to the operator only.
     Mode "locality" (D-111) answers ``results`` of ``{"postal_code", "locality"}`` for the typed postal code or town.
     ``home`` is ``(postal code, town)`` of the LEG: its addresses come first. ``minimum`` is the shortest street
-    or town that is searched.
+    or town that is searched. ``approximate`` allows the approximate street search after a prefix search without a hit
+    (True, False, or a function that is called only when the search would run and says whether it may; the endpoint
+    gives it a budget and refuses it to an anonymous client, ``limits.allow_approximate``).
     """
     values = clean_input(values)
     if mode not in MODES:
@@ -259,8 +261,12 @@ def lookup(values, *, mode="suggest", home=None, minimum=2):
             if values["locality"]:
                 prefix_query = prefix_query.filter(**prefix_range("locality_key", key(values["locality"])))
             result["results"] = ranked_rows(prefix_query, home, order=ANSWER_ORDER, columns=FIELDS)
-            # Only a complete postal code bounds the candidates.
-            if not result["results"] and len(values["postal_code"]) == 4:
+            # Only a complete postal code bounds the candidates. The approximate search is the one expensive step: the
+            # caller decides (``approximate``: True, False or a function asked just before the search runs, so a budget
+            # is counted only for a search that happens).
+            if not result["results"] and len(values["postal_code"]) == 4 and (
+                APPROXIMATE_MIN_LENGTH <= len(values["street"]) <= APPROXIMATE_MAX_LENGTH
+            ) and (approximate() if callable(approximate) else approximate):
                 rows, kind = approximate_matches(query, values)
                 if rows:
                     result["results"], result["kind"] = sorted(rows, key=lambda row: not in_home(row, home)), kind

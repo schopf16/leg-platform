@@ -827,6 +827,10 @@ class ApplicationNotice(models.Model):
         OPERATOR_CONFIRMATION_LAPSED = "operator_lapsed", _(
             "Confirmation by the grid operator did not arrive: withdraw the registration there"
         )
+        # A correction after the registration at the grid operator started (D-109): the data now differs from it.
+        OPERATOR_DATA_CHANGED = "operator_changed", _(
+            "Data changed after the registration at the grid operator: check the registration again"
+        )
 
     person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     kind = models.CharField(max_length=20, choices=Kind)

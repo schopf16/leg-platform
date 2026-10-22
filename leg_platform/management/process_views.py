@@ -193,7 +193,9 @@ def build_list(params):
         text=state.query, kind=state.values["kind"], state=state.values["state"], sort=state.sort,
         descending=state.descending,
     )
-    return state, columns, lists.ListRows(found)
+    listed = lists.ListRows(found)
+    listed.truncated = found.truncated
+    return state, columns, listed
 
 
 def list_entry(row):
@@ -249,6 +251,10 @@ class ProcessListView(ManagementAccessMixin, View):
             notice_count=notice_count,
             notices_url=reverse("management:processes_notices"),
             empty_text=_("No running processes."),
+            truncated_text=_(
+                "More than %(max)d applications or deregistrations match. Only the most recently changed ones are "
+                "listed, submitted applications before drafts. Narrow the list with the search or the filters."
+            ) % {"max": process_list.MAX_ROWS} if found.truncated else "",
         )
         return render(request, "management/processes/list.html", context)
 

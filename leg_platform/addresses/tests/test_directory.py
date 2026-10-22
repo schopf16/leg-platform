@@ -1916,7 +1916,11 @@ class DirectoryDatabaseTests(TestCase):
         self.assertEqual(self.client.get("/addresses/lookup/").status_code, 405)
 
     def test_public_endpoint_returns_kind_and_only_directory_data_for_an_approximate_match(self):
+        # The approximate search is for a signed-in account only (L-1): an anonymous client gets the prefix search.
+        from leg_platform.accounts.tests.helpers import create_active_user
+
         self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        self.client.force_login(create_active_user("approximate-endpoint@example.org"))
         with patch("leg_platform.addresses.views.allow_request", return_value=True):
             response = self.client.post(
                 "/addresses/lookup/", urlencode({"street": "Bahnhofstrase", "postal_code": "9999"}),

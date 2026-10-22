@@ -6843,3 +6843,18 @@ msgstr "In pausa / non inoltrata"
 
 msgid "The customer has started this application and has not submitted it. Nothing is to be done by the LEG. You can read it, but you cannot change it. The customer can still change it. A draft that the customer does not continue is deleted after the deadlines of the settings."
 msgstr "Il cliente ha iniziato questa richiesta e non l'ha inoltrata. La CEL non deve fare nulla. È possibile leggerla, ma non modificarla. Il cliente può ancora modificarla. Una bozza che il cliente non prosegue viene eliminata dopo i termini delle impostazioni."
+
+msgid "The customer has a metering point for consumption and one for feed-in at this building already."
+msgstr "Il cliente ha già un punto di misura per il consumo e uno per l'immissione in questo edificio."
+
+msgid "Data changed after the registration at the grid operator: check the registration again"
+msgstr "Dati modificati dopo la registrazione presso il gestore di rete: verificare di nuovo la registrazione"
+
+msgid "Data changed after the registration at the %(operator)s: check the registration again"
+msgstr "Dati modificati dopo la registrazione presso %(operator)s: verificare di nuovo la registrazione"
+
+msgid "You changed this application too often today. Please try again tomorrow."
+msgstr "Oggi ha modificato questa richiesta troppe volte. Riprovi domani."
+
+msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
+msgstr "Più di %(max)d richieste o uscite corrispondono. Sono elencate solo quelle modificate più di recente, le richieste inoltrate prima delle bozze. Restringa l'elenco con la ricerca o i filtri."

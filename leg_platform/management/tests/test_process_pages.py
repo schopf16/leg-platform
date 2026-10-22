@@ -12,6 +12,7 @@ the second factor (``test_access`` walks every route, ``test_acceptance_matrix``
 
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.test import Client, TestCase, tag
 from django.urls import reverse
@@ -195,6 +196,19 @@ class ProcessListTests(ProcessBase):
 
     def test_the_empty_list_says_so(self):
         self.assertContains(self.client.get(self.URL), "Keine laufenden Vorgänge.")
+
+    def test_a_cut_of_the_list_is_said_on_the_page_and_a_complete_list_says_nothing(self):
+        self.submitted(self.anna, egid=90004269)
+        ready_draft(self.bert, egid=90004270, number=7, address={"house_number": "52"})
+        complete = self.client.get(self.URL)
+        self.assertNotContains(complete, "Grenzen Sie die Liste")
+        with patch.object(process_list, "MAX_ROWS", 1):
+            cut = self.client.get(self.URL)
+        self.assertContains(cut, "Mehr als 1 Anmeldungen oder Abmeldungen passen.")
+        self.assertContains(cut, "eingereichte Anmeldungen vor Entwürfen")
+        # The submitted application stays, the draft drops out.
+        self.assertContains(cut, "Anna Muster")
+        self.assertNotContains(cut, "Bert Beispiel")
 
     def test_the_rows_equal_the_counts_of_the_overview_queues(self):
         self.submitted(self.anna, egid=90004269)

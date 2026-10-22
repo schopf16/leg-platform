@@ -39,7 +39,16 @@ from django.utils import timezone
 
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
-from leg_platform.community import addressing, application_staff, applications, buildings, history, numbers, own_iban
+from leg_platform.community import (
+    addressing,
+    application_notices,
+    application_staff,
+    applications,
+    buildings,
+    history,
+    numbers,
+    own_iban,
+)
 from leg_platform.community.application_common import ApplicationError, staff_actor
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
@@ -121,6 +130,16 @@ def _record(application, event, row_key, row, fields, staff, person):
 # ---- The address of a building ----
 
 
+OPERATOR_STATES = (Application.State.OPERATOR_STARTED, Application.State.OPERATOR_CONFIRMED)
+
+
+def _flag_operator_data(application, person, *, egid=None, numbers=()):
+    """After the registration at the grid operator started, a correction makes the data differ from what was registered
+    there: a notice for the staff (shown on the page of the application and in the notices) asks them to check the
+    registration again. Written in the transaction of the correction; the grid operator itself is outside the portal."""
+    if application.state in OPERATOR_STATES:
+        application_notices.record(person, application_notices.Kind.OPERATOR_DATA_CHANGED, egid=egid, numbers=numbers)
+
 def correct_building(
     application, actor, building_id, *, street, house_number, postal_code, town, egid=None, expected,
     allow_unlisted=False,
@@ -182,6 +201,10 @@ def correct_building(
             if mine_elsewhere.filter(location=location).exists():
                 raise ApplicationError("already_in_progress")
             taken = buildings.occupied_directions(location, person, today)
+            # The wizard's rule (``applications.choose_building``): an account with a draw and a feed-in at the stored
+            # building has nothing left to register there.
+            if taken >= {Direction.CONSUMPTION, Direction.FEED_IN}:
+                raise ApplicationError("building_complete")
             if any(point.direction in taken for point in row.metering_points.all()):
                 raise ApplicationError("direction_taken")
             # A stored building is attached with its own EGID (its address is known here).
@@ -201,6 +224,7 @@ def correct_building(
         row.save()
         fields = tuple("location" if name == "location_id" else name for name in changed)
         _record(fresh, HistoryEvent.APPLICATION_BUILDING_CORRECTED, "building_id", row, fields, staff, person)
+        _flag_operator_data(fresh, person, egid=row.egid)
     return Corrected(row, fields)
 
 
@@ -286,9 +310,17 @@ def correct_metering_point(
             ApplicationMeteringPoint.objects.filter(pk=row.pk).update(direction="", updated_at=moment)
             ApplicationMeteringPoint.objects.filter(pk=swapped.pk).update(direction=old_direction, updated_at=moment)
         row.save()
+        if "number" in changed and fresh.state in OPERATOR_STATES:
+            # From the registration at the grid operator on nobody re-checks the numbers before ``complete``
+            # (``application_staff.start_review`` and ``mark_operator_started`` did it earlier): check the new number
+            # again with the rule of those steps, so a number of a stored metering point or of an earlier application
+            # (also one that was stored in the meantime) is refused and nothing is saved.
+            if number in application_staff.conflicting_numbers(fresh):
+                raise ApplicationError("number_taken")
         _record(fresh, HistoryEvent.APPLICATION_POINT_CORRECTED, "point_id", row, changed, staff, person)
         if swapped is not None:
             history.record(
                 fresh, HistoryEvent.APPLICATION_POINT_CORRECTED, staff, {"point_id": swapped.pk, "fields": ["direction"]}
             )
+        _flag_operator_data(fresh, person, numbers=[row.number])
     return Corrected(row, changed, tuple(applications.plant_warnings(**figures)))

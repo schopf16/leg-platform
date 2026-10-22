@@ -879,6 +879,17 @@ class SubmittedAndWithdrawTests(WizardCase):
         self.assertContains(response, "Sie haben zu viele Entwürfe.")
         self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
 
+    def test_the_change_is_refused_with_a_plain_message_after_too_many_changes_of_the_day(self):
+        url = reverse("customer:application_change", args=[self.application.pk])
+        with patch.object(applications, "MAX_CHANGES_PER_DAY", 0):
+            response = self.client.post(url, follow=True)
+        self.assertRedirects(response, BUILDINGS)
+        self.assertContains(response, "Sie haben diese Anmeldung heute zu oft geändert. Bitte versuchen Sie es morgen wieder.")
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
+        # Within the cap the same click works.
+        self.client.post(url)
+        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.DRAFT)
+
     def test_withdrawing_asks_first_and_makes_a_draft_again_with_all_its_details(self):
         url = reverse("customer:application_withdraw", args=[self.application.pk])
         page = text(self.client.get(url))

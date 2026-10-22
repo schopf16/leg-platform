@@ -23,12 +23,17 @@ def allow_request(request, *, admin=False):
         pk = getattr(user, "pk", None)
         if not admin and pk is not None and getattr(user, "is_authenticated", False):
             # A signed-in account has its own budget (D-111): an office behind one address does not share one budget,
-            # and no account can use more than this however many addresses it comes from.
-            first = (ACCOUNT_SCOPE, str(pk), ACCOUNT_LOOKUP_LIMITS)
+            # and no account can use more than this however many addresses it comes from. The address has a counter
+            # too, a higher one: many accounts from one address (a script that signs in with several accounts) are
+            # bounded all the same.
+            first = [
+                (ACCOUNT_SCOPE, str(pk), ACCOUNT_LOOKUP_LIMITS),
+                (ACCOUNT_IP_SCOPE, ip_key(address), ACCOUNT_IP_LIMITS),
+            ]
         else:
-            first = (scope + "-ip", ip_key(address), limits)
+            first = [(scope + "-ip", ip_key(address), limits)]
         checks = [
-            first,
+            *first,
             (scope + "-global", "instance", ((20 if admin else 600, timedelta(minutes=1)),)),
         ]
         # Read-only pre-check first: a refused client costs no bucket row (D-066).
@@ -43,6 +48,39 @@ def allow_request(request, *, admin=False):
 # The typing suggestions of the forms (D-111): per signed-in account, three kinds of lookup (street, postal code, town).
 ACCOUNT_SCOPE = "address-lookup-account"
 ACCOUNT_LOOKUP_LIMITS = ((120, timedelta(minutes=1)),)
+# The address of a signed-in account (an office or a household shares one, so the number is a multiple of the account's).
+ACCOUNT_IP_SCOPE = "address-lookup-account-ip"
+ACCOUNT_IP_LIMITS = ((300, timedelta(minutes=1)),)
+
+# The approximate (fuzzy) street search is the one expensive lookup (up to ``services.APPROXIMATE_TIME_BUDGET`` of CPU): it
+# has its own, lower budget per signed-in account and for the instance, counted only when the search really runs. An
+# anonymous client never gets it (the registration needs prefix suggestions only, D-066).
+APPROXIMATE_ACCOUNT_SCOPE = "address-approximate-account"
+APPROXIMATE_ACCOUNT_LIMITS = ((10, timedelta(minutes=1)), (60, timedelta(hours=1)))
+APPROXIMATE_GLOBAL_SCOPE = "address-approximate-global"
+APPROXIMATE_GLOBAL_LIMITS = ((60, timedelta(minutes=1)),)
+
+
+def allow_approximate(request):
+    """Count one approximate street search of a signed-in account; False for an anonymous client and when a budget is used
+    up (fail closed: the search is skipped, the prefix suggestions are not affected)."""
+    from leg_platform.accounts.rate_limits import consume_all, exhausted
+
+    try:
+        user = getattr(request, "user", None)
+        pk = getattr(user, "pk", None)
+        if pk is None or not getattr(user, "is_authenticated", False):
+            return False
+        checks = [
+            (APPROXIMATE_ACCOUNT_SCOPE, str(pk), APPROXIMATE_ACCOUNT_LIMITS),
+            (APPROXIMATE_GLOBAL_SCOPE, "instance", APPROXIMATE_GLOBAL_LIMITS),
+        ]
+        if exhausted(checks):
+            return False
+        return all(consume_all(checks))
+    except (ValueError, DatabaseError):
+        logger.warning("Approximate address search limit check failed; the search is skipped.")
+        return False
 
 
 # Outbound building searches at swisstopo (``buildings``, D-066): a budget per signed-in account and one for the whole

@@ -22,9 +22,10 @@ from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
     ApplicationMeteringPoint,
+    ApplicationNotice,
     Direction,
 )
-from leg_platform.community.tests.helpers import make_location, staff_user
+from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.community.tests.onboarding import (
     ADDRESS,
     TODAY,
@@ -546,3 +547,40 @@ class AuthorizationTests(CorrectionBase):
         self.assertEqual(len(history.entries_for(self.application).filter(
             event__in=[HistoryEvent.APPLICATION_BUILDING_CORRECTED, HistoryEvent.APPLICATION_POINT_CORRECTED]
         )), 0)
+
+
+class CorrectionsAfterTheRegistrationAtTheGridOperatorTests(CorrectionBase):
+    """The staff are told on the page when a correction makes the data differ from the registration at the grid operator
+    (security review L-4), and a stored building where the customer has both directions is refused (L-2)."""
+
+    def test_the_page_shows_the_notice_after_a_correction_at_the_grid_operator_and_the_staff_can_resolve_it(self):
+        self.set_state(State.OPERATOR_STARTED)
+        self.assertNotContains(self.client.get(self.page_url()), "Anmeldung erneut prüfen")
+
+        self.client.post(self.point_url(), self.point_data(number_digits="9"))
+
+        page = self.client.get(self.page_url())
+        self.assertContains(page, "geändert: Anmeldung erneut prüfen")
+        self.assertContains(page, "Hinweise")
+        notice = ApplicationNotice.objects.get(kind="operator_changed")
+        self.assertEqual(notice.numbers, [full_number(9)])
+        self.client.post(reverse("management:processes_notice_resolve", args=[notice.pk]))
+        self.assertNotContains(self.client.get(self.page_url()), "Anmeldung erneut prüfen")
+
+    def test_no_notice_while_the_application_is_not_yet_at_the_grid_operator(self):
+        self.client.post(self.point_url(), self.point_data(number_digits="9"))
+
+        self.assertEqual(self.refreshed(self.draw).number, full_number(9))
+        self.assertNotContains(self.client.get(self.page_url()), "Anmeldung erneut prüfen")
+
+    def test_a_stored_building_with_a_draw_and_a_feed_in_of_the_customer_is_refused_with_its_reason(self):
+        stored = make_location("Ittigenstrasse", "52", "3063", "Ittigen", egid=90004270)
+        for last, direction in ((40, Direction.CONSUMPTION), (41, Direction.FEED_IN)):
+            assign_person(make_metering_point(last, direction=direction, location=stored), self.anna)
+
+        with directory(candidate(90004270, house_number="52")):
+            page = self.client.post(self.building_url(), self.building_data(house_number="52"))
+
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Der Kunde hat bei diesem Gebäude bereits einen Messpunkt für den Bezug und einen für die Einspeisung.")
+        self.assertEqual(self.refreshed(self.building).house_number, "51")

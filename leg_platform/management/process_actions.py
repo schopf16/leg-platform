@@ -68,6 +68,9 @@ def error_texts():
         "number_own": _("This number is used already by a metering point or an application of the same customer."),
         "number_in_application": _("This number is used already by another metering point of this application."),
         "direction_taken": _("The building has a metering point with this direction already."),
+        "building_complete": _(
+            "The customer has a metering point for consumption and one for feed-in at this building already."
+        ),
         "direction_invalid": _("Choose consumption or feed-in."),
         "iban_required": _("A feed-in needs the bank connection of the customer. The customer enters it in the profile."),
         "draw_required": _(

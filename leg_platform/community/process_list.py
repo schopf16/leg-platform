@@ -6,13 +6,14 @@ of all customers in one list. Pure query code, no pages.
   cannot act on them and they are in no work count of the overview) and the deregistrations that are not yet effective.
 * The search finds the name, the customer number, the address and the EGID, never a note or an IBAN. Every word must
   match (AND). The filters are the kind (application / deregistration) and the state.
-* Rows are built in Python and sorted there (empty values always last). Both queries are bounded by ``MAX_ROWS``.
+* Rows are built in Python and sorted there (empty values always last). Both queries are bounded by ``MAX_ROWS``: the
+  cap keeps submitted work before drafts and the newest changes first, and a cut is reported (``RowList.truncated``).
 """
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db.models import Prefetch, Q
+from django.db.models import Case, IntegerField, Prefetch, Q, When
 
 from leg_platform.community import applications, deregistrations, person_list
 from leg_platform.community.models import (
@@ -137,12 +138,13 @@ def _address_text(address):
     return f"{street} {house_number}, {postal_code} {town}".strip(" ,")
 
 
-def _application_row(application):
+def _application_row(application, draft_progress=None):
     buildings = list(application.buildings.all())
     first = buildings[0] if buildings else None
     if application.state in Application.DRAFT_STATES:
-        # A draft has no way after the submission yet: its progress is what the customer completed in the form.
-        current = applications.progress(application)
+        # A draft has no way after the submission yet: its progress is what the customer completed in the form
+        # (computed for all drafts together by ``applications.progress_many``, never one by one).
+        current = (draft_progress or {}).get(application.pk) or applications.progress(application)
         done, total = current.done, current.total
     else:
         done = sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE)
@@ -216,20 +218,47 @@ def deregistration_queryset(text="", state=STATE_ALL):
     return _deregistration_search(queryset, text)
 
 
+class RowList(list):
+    """The rows of the list; ``truncated`` is True when ``MAX_ROWS`` cut the applications or the deregistrations."""
+
+    truncated = False
+
+
+def _capped(queryset):
+    """``(rows, truncated)``: at most ``MAX_ROWS`` of an already ordered queryset (one more is read to know)."""
+    found = list(queryset[: MAX_ROWS + 1])
+    return found[:MAX_ROWS], len(found) > MAX_ROWS
+
+
 def rows(*, text="", kind=KIND_ALL, state=STATE_ALL, sort=DEFAULT_SORT, descending=False):
-    """The rows of the list as the address asks for them (unknown values are the defaults)."""
+    """The rows of the list as the address asks for them (unknown values are the defaults).
+
+    The cap keeps the work that is not a draft first and, within it, the most recently changed rows: with more than
+    ``MAX_ROWS`` open applications the oldest drafts drop out, never the newest submissions. A cut sets ``truncated``
+    on the result (the page tells the staff to narrow the search)."""
     kind = kind if kind in KINDS else KIND_ALL
     state = state if state in STATES else STATE_ALL
     found = []
+    truncated = False
     wants_applications = kind in (KIND_ALL, KIND_APPLICATION) and state not in DEREGISTRATION_FILTER
     wants_deregistrations = kind in (KIND_ALL, KIND_DEREGISTRATION) and (
         state == STATE_ALL or state in DEREGISTRATION_FILTER
     )
     if wants_applications:
-        found += [_application_row(row) for row in application_queryset(text, state).order_by("pk")[:MAX_ROWS]]
+        queryset = application_queryset(text, state).annotate(
+            draft_rank=Case(When(state__in=Application.DRAFT_STATES, then=1), default=0, output_field=IntegerField())
+        )
+        listed, cut = _capped(queryset.order_by("draft_rank", "-updated_at", "-pk"))
+        truncated |= cut
+        progress = applications.progress_many(row for row in listed if row.state in Application.DRAFT_STATES)
+        found += [_application_row(row, progress) for row in listed]
     if wants_deregistrations:
-        found += [_deregistration_row(row) for row in deregistration_queryset(text, state).order_by("pk")[:MAX_ROWS]]
-    return sort_rows(found, sort, descending)
+        listed, cut = _capped(deregistration_queryset(text, state).order_by("-submitted_at", "-pk"))
+        truncated |= cut
+        found += [_deregistration_row(row) for row in listed]
+    result = RowList(sort_rows(found, sort, descending))
+    result.truncated = truncated
+    return result
 
 
 def _key(row, sort):

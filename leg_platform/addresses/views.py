@@ -5,7 +5,7 @@ from django.views.decorators.http import require_POST
 
 from leg_platform.community.addressing import home_area
 
-from .limits import allow_request
+from .limits import allow_approximate, allow_request
 from .services import TYPEAHEAD_MINIMUM, lookup
 
 
@@ -34,7 +34,10 @@ def address_lookup(request):
             mode = request.POST.get("mode", "suggest")
             # The LEG's own area comes first in the answers (the check needs no ranking).
             home = home_area() if mode != "check" else None
-            result = lookup(request.POST, mode=mode, home=home, minimum=TYPEAHEAD_MINIMUM)
+            result = lookup(
+                request.POST, mode=mode, home=home, minimum=TYPEAHEAD_MINIMUM,
+                approximate=lambda: allow_approximate(request),
+            )
             response = JsonResponse(result)
         except ValueError:
             response = JsonResponse({"status": "invalid", "results": [], "match": None, "warning": ""}, status=400)

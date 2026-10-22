@@ -1,12 +1,13 @@
 """The customer's application (D-103): draft services, steps, identity of buildings by EGID, number rules, neutral
 refusals, caps, submit/withdraw/cancel, and the safety of a rollback."""
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase, tag
+from django.utils import timezone
 
 from leg_platform.accounts.models import MailJob
 from leg_platform.community import (
@@ -25,6 +26,7 @@ from leg_platform.community.models import (
     ApplicationMeteringPoint,
     ApplicationNotice,
     Direction,
+    HistoryEntry,
     Location,
     MeteringPoint,
     PersonAssignment,
@@ -788,6 +790,47 @@ class SubmitTests(TestCase):
         # Another account's application is "not found", never a hint.
         other = customer("reopen.other@example.org")
         self.assertEqual(code_of(lambda: applications.reopen_for_change(other, application)), "not_found")
+
+    def test_a_change_is_capped_per_application_and_day_and_the_cap_is_counted_per_application(self):
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        other_application, _other = ready_draft(self.person, egid=EGID + 31, number=21, address={"house_number": "31"})
+        for _cycle in range(applications.MAX_CHANGES_PER_DAY):
+            applications.submit(self.person, application, today=TODAY)
+            applications.reopen_for_change(self.person, application)
+        applications.submit(self.person, application, today=TODAY)
+
+        self.assertEqual(applications.MAX_CHANGES_PER_DAY, 10)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "too_many_changes")
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.SUBMITTED)
+        # The refusal wrote nothing; the count does not grow and another application of the account has its own.
+        self.assertEqual(
+            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_WITHDRAWN).count(),
+            applications.MAX_CHANGES_PER_DAY,
+        )
+        applications.submit(self.person, other_application, today=TODAY)
+        applications.reopen_for_change(self.person, other_application)
+        # The withdrawal is not a change (it is not counted and not refused by this cap).
+        applications.withdraw(self.person, application)
+
+    def test_a_change_of_more_than_a_day_ago_is_not_counted(self):
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        for _cycle in range(applications.MAX_CHANGES_PER_DAY):
+            applications.submit(self.person, application, today=TODAY)
+            applications.reopen_for_change(self.person, application)
+        applications.submit(self.person, application, today=TODAY)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "too_many_changes")
+        # The entries are older than 24 hours now: the day has passed.
+        HistoryEntry.objects.filter(subject_type="application", subject_id=application.pk).update(
+            created_at=timezone.now() - timedelta(hours=25)
+        )
+
+        applications.reopen_for_change(self.person, application)
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.DRAFT)
 
     def test_a_withdrawal_is_refused_while_the_account_holds_the_most_drafts_it_may_have(self):
         publish_contract(self.staff)

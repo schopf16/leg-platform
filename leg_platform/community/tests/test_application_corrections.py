@@ -10,8 +10,9 @@ first wins and the stale dialog is refused, a row that changed in between is ref
 nothing changed or a rule refuses.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.db import connection
@@ -20,7 +21,7 @@ from django.test.utils import CaptureQueriesContext
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.community import application_corrections, application_staff, applications, history
-from leg_platform.community.application_common import ApplicationError
+from leg_platform.community.application_common import MAX_UNRESOLVED_NOTICES_PER_PERSON, ApplicationError
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Application,
@@ -551,3 +552,123 @@ class MeteringPointCorrectionTests(CorrectionCase):
         stored = MeteringPoint.objects.count()
         self.fix_point(entered_number="4")
         self.assertEqual(MeteringPoint.objects.count(), stored)
+
+
+class BuildingCompleteTests(CorrectionCase):
+    def test_a_stored_building_where_the_customer_has_a_draw_and_a_feed_in_is_refused_like_in_the_wizard(self):
+        stored = make_location("Ittigenstrasse", "52", "3063", "Ittigen", egid=90004270)
+        for last, direction in ((40, Direction.CONSUMPTION), (41, Direction.FEED_IN)):
+            assign_person(make_metering_point(last, direction=direction, location=stored), self.person)
+        before = self.row()
+
+        with directory(candidate(90004270, house_number="52")):
+            code = code_of(lambda: self.fix_building(house_number="52"))
+
+        self.assertEqual(code, "building_complete")
+        after = self.row()
+        self.assertEqual((after.location_id, after.egid, after.house_number), (before.location_id, before.egid, "51"))
+        self.assertEqual(self.corrected(HistoryEvent.APPLICATION_BUILDING_CORRECTED), [])
+
+    def test_a_stored_building_with_only_one_direction_of_the_customer_is_still_attached_to(self):
+        # The draw is the application's own (consumption) and the feed-in at the stored building is free: no refusal.
+        stored = make_location("Ittigenstrasse", "52", "3063", "Ittigen", egid=90004270)
+        assign_person(make_metering_point(40, direction=Direction.FEED_IN, location=stored), self.person)
+        ApplicationMeteringPoint.objects.filter(building=self.building, direction=Direction.FEED_IN).delete()
+        self.assertEqual(self.building.metering_points.count(), 1)
+
+        with directory(candidate(90004270, house_number="52")):
+            self.fix_building(house_number="52")
+
+        self.assertEqual(self.row().location_id, stored.pk)
+
+
+class AtTheGridOperatorTests(CorrectionCase):
+    """A correction after the registration at the grid operator started (security review L-3, L-4)."""
+
+    def other_application(self, number, email="fix.operator.other@example.org", earlier=True):
+        other = customer(email)
+        application, _building = ready_draft(other, egid=90004290, number=number, address={"house_number": "90"})
+        applications.submit(other, application, today=TODAY)
+        if earlier:
+            Application.objects.filter(pk=application.pk).update(
+                submitted_at=self.application.submitted_at - timedelta(days=1)
+            )
+        return application
+
+    def test_a_number_of_another_application_is_refused_in_every_state_that_is_at_the_grid_operator(self):
+        self.other_application(7)
+        for state in (State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED):
+            with self.subTest(state=state):
+                self.set_state(state)
+                self.assertEqual(code_of(lambda: self.fix_point(entered_number="7")), "number_taken")
+                self.assertEqual(self.point().number, full_number(1))
+
+    def test_the_number_is_checked_again_after_the_save_with_the_rule_of_the_review(self):
+        # The earlier check (``applications._check_number``) is replaced to show the second line of defence: a number that
+        # was stored for a metering point or named by an earlier application in between (the window of a race).
+        make_metering_point(5)
+        self.other_application(7)
+        for state in (State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED):
+            for typed in ("5", "7"):
+                with self.subTest(state=state, typed=typed), patch.object(applications, "_check_number"):
+                    self.set_state(state)
+                    notices = ApplicationNotice.objects.count()
+                    self.assertEqual(code_of(lambda: self.fix_point(entered_number=typed)), "number_taken")
+                    self.assertEqual(self.point().number, full_number(1))
+                    self.assertEqual(self.corrected(HistoryEvent.APPLICATION_POINT_CORRECTED), [])
+                    # Rolled back: no notice of the data change either.
+                    self.assertEqual(ApplicationNotice.objects.count(), notices)
+        # An application that was submitted later yields (the review's rule): its number is not a conflict for this one.
+        later = self.other_application(8, "fix.operator.later@example.org", earlier=False)
+        later.refresh_from_db()
+        self.application.refresh_from_db()
+        self.assertGreater(later.submitted_at, self.application.submitted_at)
+        self.set_state(State.OPERATOR_STARTED)
+        with patch.object(applications, "_check_number"):
+            self.fix_point(entered_number="8")
+        self.assertEqual(self.point().number, full_number(8))
+
+    def test_a_correction_after_the_registration_writes_a_notice_for_the_staff(self):
+        for state in (State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED):
+            with self.subTest(state=state):
+                ApplicationNotice.objects.all().delete()
+                self.set_state(state)
+                self.fix_point(entered_number="9", direction=Direction.CONSUMPTION)
+                notice = ApplicationNotice.objects.get()
+                self.assertEqual(
+                    (notice.person_id, notice.kind, notice.egid, notice.numbers, notice.resolved_at),
+                    (self.person.pk, "operator_changed", None, [full_number(9)], None),
+                )
+                # The same data again does not pile up notices; another correction is another notice.
+                self.fix_point(entered_number="1", direction=Direction.CONSUMPTION)
+                self.assertEqual(ApplicationNotice.objects.count(), 2)
+                self.fix_point(entered_number="9", direction=Direction.CONSUMPTION)
+                self.assertEqual(ApplicationNotice.objects.filter(numbers=[full_number(9)]).count(), 1)
+                self.fix_point(entered_number="1", direction=Direction.CONSUMPTION)
+
+    def test_a_correction_of_the_address_after_the_registration_writes_the_notice_with_the_egid(self):
+        self.set_state(State.OPERATOR_STARTED)
+        with directory(candidate(90004270, house_number="52")):
+            self.fix_building(house_number="52")
+        notice = ApplicationNotice.objects.get()
+        self.assertEqual((notice.kind, notice.egid, notice.numbers), ("operator_changed", 90004270, []))
+
+    def test_no_notice_before_the_registration_and_none_for_a_refused_or_an_unchanged_correction(self):
+        for state in (State.SUBMITTED, State.IN_REVIEW):
+            with self.subTest(state=state):
+                self.set_state(state)
+                self.fix_point(entered_number="9", direction=Direction.CONSUMPTION)
+                self.fix_point(entered_number="1", direction=Direction.CONSUMPTION)
+        self.set_state(State.OPERATOR_STARTED)
+        self.assertEqual(code_of(lambda: self.fix_point(entered_number="1")), "unchanged")
+        self.assertEqual(code_of(lambda: self.fix_point(entered_number="2")), "number_in_application")
+        self.assertEqual(ApplicationNotice.objects.count(), 0)
+
+    def test_the_notice_is_written_although_the_account_has_the_most_open_notices(self):
+        for index in range(MAX_UNRESOLVED_NOTICES_PER_PERSON):
+            ApplicationNotice.objects.create(person=self.person, kind="building_unavailable", egid=1000 + index)
+        self.set_state(State.OPERATOR_CONFIRMED)
+
+        self.fix_point(entered_number="9", direction=Direction.CONSUMPTION)
+
+        self.assertEqual(ApplicationNotice.objects.filter(kind="operator_changed").count(), 1)
