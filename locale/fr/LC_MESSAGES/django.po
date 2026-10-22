@@ -7172,8 +7172,8 @@ msgstr "Comment ajouter une clé d’accès sur un autre appareil"
 msgid "Stay signed in on this computer. In Profile, choose Add a passkey on another device and confirm with an existing passkey. You do not need to select your sign-in method again."
 msgstr "Restez connecté sur cet ordinateur. Dans Profil, choisissez Ajouter une clé d’accès sur un autre appareil et confirmez avec une clé d’accès existante. Vous n’avez pas besoin de sélectionner à nouveau votre méthode de connexion."
 
-msgid "Enter a recognizable name, then choose Create passkey on another phone or device. This asks the browser for a phone, tablet or external security key rather than this computer."
-msgstr "Saisissez un nom reconnaissable, puis choisissez Créer une clé d’accès sur un autre téléphone ou appareil. Le navigateur recherchera un téléphone, une tablette ou une clé de sécurité externe plutôt que cet ordinateur."
+msgid "Enter a recognizable name, then choose Create passkey on another device. This requests another device; it cannot force the browser to show a QR code."
+msgstr "Saisissez un nom reconnaissable, puis choisissez Créer une clé d’accès sur un autre appareil. Cela demande un autre appareil, sans pouvoir forcer le navigateur à afficher un code QR."
 
 msgid "In the browser or operating-system prompt, choose your phone or tablet if offered. If a QR code appears, scan it with that device and follow its instructions to create the passkey. You do not need an existing passkey on that device."
 msgstr "Dans la fenêtre du navigateur ou du système, choisissez votre téléphone ou tablette si cette option est proposée. Si un code QR apparaît, scannez-le avec cet appareil et suivez ses instructions pour créer la clé d’accès. Aucune clé d’accès existante n’est nécessaire sur cet appareil."
@@ -7181,8 +7181,8 @@ msgstr "Dans la fenêtre du navigateur ou du système, choisissez votre téléph
 msgid "Do not open the portal on the phone for this flow. A localhost or 127.0.0.1 address only reaches the device where it is opened; the phone communicates through the browser's credential prompt instead."
 msgstr "N’ouvrez pas le portail sur le téléphone pour cette procédure. Une adresse localhost ou 127.0.0.1 ne mène qu’à l’appareil sur lequel elle est ouverte ; le téléphone communique plutôt par la fenêtre d’identification du navigateur."
 
-msgid "If no suitable cross-device option is offered, cancel the prompt. Try another supported browser or an available external security key, or explicitly choose Create passkey on this device. Browser and device support varies; no automatic fallback to this computer is requested."
-msgstr "Si aucune option interappareils adaptée n’est proposée, annulez la fenêtre. Essayez un autre navigateur compatible ou une clé de sécurité externe disponible, ou choisissez explicitement Créer une clé d’accès sur cet appareil. La prise en charge varie selon le navigateur et l’appareil ; aucun repli automatique vers cet ordinateur n’est demandé."
+msgid "If no suitable other-device option is offered, cancel the prompt. This flow is unavailable in that browser and provider combination. Create passkey on this device is a separate choice, not a way to obtain a QR code."
+msgstr "Si aucune option adaptée pour un autre appareil n’est proposée, annulez la fenêtre. Cette procédure n’est pas disponible avec cette combinaison de navigateur et de fournisseur. Créer une clé d’accès sur cet appareil est un choix distinct, pas un moyen d’obtenir un code QR."
 
 msgid "After creation, choose Save passkey to finish adding it (Use passkeys during initial setup). Only then is the new passkey activated. Your current session and existing passkeys are retained; all other sessions end, and security notices are sent to all confirmed email addresses after saving."
 msgstr "Après la création, choisissez Enregistrer la clé d’accès pour terminer l’ajout (Utiliser les clés d’accès lors de la configuration initiale). La nouvelle clé n’est activée qu’à ce moment-là. Votre session actuelle et vos clés existantes sont conservées ; toutes les autres sessions sont fermées et des notifications de sécurité sont envoyées à toutes les adresses e-mail confirmées après l’enregistrement."
@@ -7190,17 +7190,26 @@ msgstr "Après la création, choisissez Enregistrer la clé d’accès pour term
 msgid "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there."
 msgstr "Choisissez où créer la clé d’accès. Pour un autre téléphone ou une tablette, restez sur cette page et utilisez la fenêtre du navigateur ; vous n’avez pas besoin d’y ouvrir le portail."
 
-msgid "Create passkey on another phone or device"
-msgstr "Créer une clé d’accès sur un autre téléphone ou appareil"
+msgid "Create passkey on another device"
+msgstr "Créer une clé d’accès sur un autre appareil"
 
 msgid "Create passkey on this device"
 msgstr "Créer une clé d’accès sur cet appareil"
 
-msgid "If no phone, tablet or external security key is offered, cancel the prompt. You can try another supported browser or explicitly choose this device instead. The portal cannot guarantee which options your browser supports."
-msgstr "Si aucun téléphone, aucune tablette ou clé de sécurité externe n’est proposé, annulez la fenêtre. Vous pouvez essayer un autre navigateur compatible ou choisir explicitement cet appareil. Le portail ne peut pas garantir les options prises en charge par votre navigateur."
+msgid "The portal requests another device, but cannot force a QR code. Your browser, operating system or password manager may still offer local creation. If no suitable other-device option appears, cancel the prompt; this flow is unavailable in that combination."
+msgstr "Le portail demande un autre appareil, mais ne peut pas imposer un code QR. Votre navigateur, système ou gestionnaire de mots de passe peut malgré tout proposer une création locale. Si aucune option adaptée pour un autre appareil n’apparaît, annulez la fenêtre ; cette procédure n’est pas disponible avec cette combinaison."
 
 msgid "The passkey could not be created. If no suitable device is offered, cancel the browser prompt and choose another available method. The new passkey is not activated until you finish."
 msgstr "La clé d’accès n’a pas pu être créée. Si aucun appareil adapté n’est proposé, annulez la fenêtre du navigateur et choisissez une autre méthode disponible. La nouvelle clé d’accès n’est activée qu’à la fin de la procédure."
+
+msgid "If your local password manager opens even after you choose Create passkey on another device, cancel that prompt. This does not mean you chose the wrong button. If the browser offers a phone or tablet, use that option instead. An existing passkey cannot be added a second time."
+msgstr "Si votre gestionnaire de mots de passe local s’ouvre même après avoir choisi Créer une clé d’accès sur un autre appareil, annulez cette fenêtre. Cela ne signifie pas que vous avez choisi le mauvais bouton. Si le navigateur propose un téléphone ou une tablette, utilisez plutôt cette option. Une clé existante ne peut pas être ajoutée une seconde fois."
+
+msgid "The passkey could not be created. A password manager may open even after choosing another device and may refuse an existing passkey. Cancel that prompt. If no other-device or QR option is offered, this flow is unavailable in your current browser or passkey provider. Your existing passkeys remain usable. A new passkey is activated only after saving."
+msgstr "La clé d’accès n’a pas pu être créée. Un gestionnaire de mots de passe peut s’ouvrir même après le choix d’un autre appareil et refuser une clé existante. Annulez cette fenêtre. Si aucune option pour un autre appareil ou un code QR n’est proposée, cette procédure n’est pas disponible avec votre navigateur ou fournisseur actuel. Vos clés existantes restent utilisables. Une nouvelle clé n’est activée qu’après l’enregistrement."
+
+msgid "The browser reported creation on this device instead of another device. This passkey was not sent to the portal or saved there. It may still exist in your password manager."
+msgstr "Le navigateur a signalé une création sur cet appareil au lieu d’un autre appareil. Cette clé d’accès n’a pas été envoyée au portail ni enregistrée dans celui-ci. Elle peut toutefois exister dans votre gestionnaire de mots de passe."
 
 msgid "The available devices and choices depend on your browser and passkey provider. A synchronized passkey may already work on several devices; a device name does not prove a separate backup."
 msgstr "Les appareils et les choix disponibles dépendent de votre navigateur et de votre fournisseur de clés d’accès. Une clé synchronisée peut déjà fonctionner sur plusieurs appareils ; un nom d’appareil ne prouve pas l’existence d’une sauvegarde distincte."
@@ -7258,3 +7267,66 @@ msgstr "L’exploitant a lancé la récupération de la connexion de votre compt
 
 msgid "Sign-in recovery of your account at %(instance_name)s was confirmed. The earlier password, passkeys, app and recovery codes no longer work, and all sessions were ended. A restricted session lets you choose and set up a new sign-in method."
 msgstr "La récupération de la connexion de votre compte à %(instance_name)s a été confirmée. L’ancien mot de passe, les clés d’accès, l’application et les codes de récupération ne fonctionnent plus ; toutes les sessions ont été terminées. Une session restreinte vous permet de choisir et configurer une nouvelle méthode."
+
+msgctxt "Passkey setup step"
+msgid "Name"
+msgstr "Nommer"
+
+msgctxt "Passkey setup step"
+msgid "Create"
+msgstr "Créer"
+
+msgctxt "Passkey setup step"
+msgid "Save"
+msgstr "Enregistrer"
+
+msgid "Confirm your current sign-in method first."
+msgstr "Confirmez d’abord votre méthode de connexion actuelle."
+
+msgid "Choose a name you recognise."
+msgstr "Choisissez un nom que vous reconnaîtrez."
+
+msgid "For another device, select your phone or tablet in the browser prompt, if offered. If a QR code appears, scan it with that device."
+msgstr "Pour un autre appareil, sélectionnez votre téléphone ou tablette dans la fenêtre du navigateur, si cette option est proposée. Si un code QR apparaît, scannez-le avec cet appareil."
+
+msgid "The passkey is activated only when you save."
+msgstr "La clé d’accès n’est activée qu’après l’enregistrement."
+
+msgid "Not yet activated"
+msgstr "Pas encore activée"
+
+msgid "Save and use passkeys"
+msgstr "Enregistrer et utiliser les clés d’accès"
+
+msgid "One passkey is enough. We strongly recommend another on a different device in case you lose access."
+msgstr "Une clé d’accès suffit. Nous recommandons vivement d’en ajouter une sur un autre appareil en cas de perte d’accès."
+
+msgid "Your previous sign-in methods no longer work. Save a new passkey to restore access."
+msgstr "Vos anciennes méthodes de connexion ne fonctionnent plus. Enregistrez une nouvelle clé d’accès pour rétablir l’accès."
+
+msgid "Your existing passkeys and this session stay active. Saving ends all other sessions and sends a notice to every confirmed email address."
+msgstr "Vos clés d’accès existantes et cette session restent actives. L’enregistrement ferme toutes les autres sessions et envoie une notification à chaque adresse e-mail confirmée."
+
+msgid "Until you save, your current sign-in method stays active. Saving removes your password, app and recovery codes, ends all other sessions and notifies every confirmed email address. This session stays active."
+msgstr "Votre méthode de connexion actuelle reste active jusqu’à l’enregistrement. Celui-ci supprime votre mot de passe, votre application et vos codes de récupération, ferme toutes les autres sessions et notifie chaque adresse e-mail confirmée. Cette session reste active."
+
+msgid "More help"
+msgstr "Aide complémentaire"
+
+msgid "A password manager may open even after you choose another device. Cancel that prompt if it has no suitable option. Your browser may not offer another device or a QR code."
+msgstr "Un gestionnaire de mots de passe peut s’ouvrir même si vous avez choisi un autre appareil. Annulez cette fenêtre si elle ne propose aucune option adaptée. Votre navigateur peut ne proposer ni autre appareil ni code QR."
+
+msgid "Keep this page open. You do not need to open the portal or already have a passkey on the phone. A localhost address only opens on its own device."
+msgstr "Gardez cette page ouverte. Il n’est pas nécessaire d’ouvrir le portail ni d’avoir déjà une clé d’accès sur le téléphone. Une adresse localhost n’est accessible que sur l’appareil concerné."
+
+msgid "Names are labels, not verified devices. A synchronised passkey may work on several devices."
+msgstr "Les noms sont des libellés, pas des appareils vérifiés. Une clé d’accès synchronisée peut fonctionner sur plusieurs appareils."
+
+msgid "Follow the instructions in the browser prompt."
+msgstr "Suivez les instructions dans la fenêtre du navigateur."
+
+msgid "Creation did not finish. Nothing was activated. You can try again."
+msgstr "La création n’a pas abouti. Rien n’a été activé. Vous pouvez réessayer."
+
+msgid "The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager."
+msgstr "Le navigateur a indiqué cet appareil au lieu d’un autre. Le portail n’a pas enregistré la clé d’accès. Elle peut toutefois se trouver dans votre gestionnaire de mots de passe."

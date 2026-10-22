@@ -2,35 +2,56 @@
 {% block extra_head %}{% if allowed %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endif %}{% endblock %}
 {% block title %}{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}{% endblock %}
 {% block content %}
-<section class="profile-card">
+{% if not user.is_authenticated or frame_restricted %}{% include "_frame_icons.html" %}{% endif %}
+<section class="profile-card passkey-setup">
   <h1>{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}</h1>
   {% if not allowed %}
-    <p>{% translate "Confirm your current sign-in method before setting up passkeys." %}</p>
+    <p>{% translate "Confirm your current sign-in method first." %}</p>
     <form method="post" class="profile-form" novalidate>
       {% csrf_token %}{% include "accounts/_error_summary.html" %}
       {% include "accounts/profile/_proof_fields.html" %}
-      <button class="btn btn-primary" type="submit">{% translate "Continue" %}</button>
+      <button class="btn btn-primary" type="submit">{% translate "Confirm sign-in method" %}</button>
     </form>
+    <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
   {% else %}
-    {% if recovering %}<p>{% translate "Your previous sign-in methods no longer work. Set up new passkeys to restore access." %}</p>
-    {% elif adding %}<p>{% translate "Add another passkey. Your existing passkeys remain usable." %}</p>
-    {% else %}<p>{% translate "Your current sign-in method stays valid until you finish setting up passkeys. Finishing replaces it with passkeys." %}</p>{% endif %}
-    <p>{% translate "One passkey is enough. We strongly recommend an additional passkey on another device to protect against losing access." %}</p>
-    {% include "accounts/_passkey_add_help.html" %}
-    <ul>{% for key in keys %}<li>{{ key.name }}</li>{% endfor %}</ul>
-    <form data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be created. If no suitable device is offered, cancel the browser prompt and choose another available method. The new passkey is not activated until you finish.' %}" class="profile-form">
-      {% csrf_token %}{% include "accounts/_field.html" with field=form.name %}
-      <p>{% translate "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there." %}</p>
-      <button class="btn btn-secondary-action" type="submit" name="mode" value="another_device">{% translate "Create passkey on another phone or device" %}</button>
-      <button class="btn btn-secondary-action" type="submit" name="mode" value="this_device">{% translate "Create passkey on this device" %}</button>
-      <p>{% translate "If no phone, tablet or external security key is offered, cancel the prompt. You can try another supported browser or explicitly choose this device instead. The portal cannot guarantee which options your browser supports." %}</p>
-      <p role="status" data-passkey-status></p>
-    </form>
-    <form method="post" class="profile-form">
-      {% csrf_token %}<input type="hidden" name="activate" value="yes">
-      <button class="btn btn-primary" type="submit">{% if adding %}{% translate "Save passkey" %}{% else %}{% translate "Use passkeys" %}{% endif %}</button>
-    </form>
+    {% if recovering %}<p>{% translate "Your previous sign-in methods no longer work. Save a new passkey to restore access." %}</p>{% endif %}
+    <ol class="passkey-steps" role="list">
+      <li>
+        <h2 class="passkey-step-title"><svg class="frame-icon" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg>{% translate "Name" context "Passkey setup step" %}</h2>
+        {% include "accounts/_field.html" with field=form.name %}
+      </li>
+      <li>
+        <h2 class="passkey-step-title"><img src="{% static 'vendor/tabler-icons/lock.svg' %}" width="20" height="20" alt="" aria-hidden="true">{% translate "Create" context "Passkey setup step" %}</h2>
+        <form id="passkey-create" data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-pending="{% translate 'Follow the instructions in the browser prompt.' %}" data-error="{% translate 'Creation did not finish. Nothing was activated. You can try again.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
+          {% csrf_token %}
+          <div class="passkey-device-actions">
+            <button class="btn btn-secondary-action" type="submit" name="mode" value="another_device">{% translate "Create passkey on another device" %}</button>
+            <button class="btn btn-secondary-action" type="submit" name="mode" value="this_device">{% translate "Create passkey on this device" %}</button>
+          </div>
+          <p>{% translate "For another device, select your phone or tablet in the browser prompt, if offered. If a QR code appears, scan it with that device." %}</p>
+          {% include "accounts/_passkey_add_help.html" %}
+          <p role="status" data-passkey-status></p>
+        </form>
+      </li>
+      <li>
+        <h2 class="passkey-step-title"><svg class="frame-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg>{% translate "Save" context "Passkey setup step" %}</h2>
+        <p>{% translate "The passkey is activated only when you save." %}</p>
+        {% if keys %}<ul class="passkey-key-names">{% for key in keys %}<li>{{ key.name }}{% if not key.active %} — {% translate "Not yet activated" %}{% endif %}</li>{% endfor %}</ul>{% endif %}
+        <form method="post">
+          {% csrf_token %}<input type="hidden" name="activate" value="yes">
+          {% if adding %}
+            <p>{% translate "Your existing passkeys and this session stay active. Saving ends all other sessions and sends a notice to every confirmed email address." %}</p>
+          {% elif not recovering %}
+            <p>{% translate "Until you save, your current sign-in method stays active. Saving removes your password, app and recovery codes, ends all other sessions and notifies every confirmed email address. This session stays active." %}</p>
+          {% endif %}
+          <div class="passkey-save-actions">
+            <button class="btn btn-primary" type="submit">{% if adding %}{% translate "Save passkey" %}{% else %}{% translate "Save and use passkeys" %}{% endif %}</button>
+            <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
+          </div>
+        </form>
+      </li>
+    </ol>
+    <p class="form-hint">{% translate "One passkey is enough. We strongly recommend another on a different device in case you lose access." %}</p>
   {% endif %}
-  <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
 </section>
 {% endblock %}

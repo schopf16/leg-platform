@@ -572,13 +572,13 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
             }),
         }, secure=True).status_code, 302)
         setup = self.client.get(path, secure=True)
-        self.assertContains(setup, "Your current session and existing passkeys are retained; all other sessions end")
-        self.assertContains(setup, "security notices are sent to all confirmed email addresses after saving.")
+        self.assertContains(setup, "Your existing passkeys and this session stay active.")
+        self.assertContains(setup, "Saving ends all other sessions and sends a notice to every confirmed email address.")
         self.assertContains(setup, "We strongly recommend")
         self.assertContains(setup, 'name="mode" value="another_device"')
         self.assertContains(setup, 'name="mode" value="this_device"')
-        self.assertContains(setup, "Do not open the portal on the phone")
-        self.assertContains(setup, "If no suitable cross-device option is offered, cancel the prompt.")
+        self.assertContains(setup, "You do not need to open the portal or already have a passkey on the phone.")
+        self.assertContains(setup, "Your browser may not offer another device or a QR code.")
         self.assertNotContains(setup, "On the other phone or computer, open this portal")
         self.assertNotContains(setup, 'name="two_devices"')
         self.credential_id = secrets.token_bytes(32)
@@ -776,17 +776,116 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
                 self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
                 response = self.client.get("/passkeys/setup/", secure=True)
                 for source in (
-                    "Create passkey on another phone or device",
+                    "Create passkey on another device",
                     "Create passkey on this device",
-                    "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there.",
+                    "Choose a name you recognise.",
+                    "For another device, select your phone or tablet in the browser prompt, if offered. If a QR code appears, scan it with that device.",
+                    "More help",
+                    "A password manager may open even after you choose another device. Cancel that prompt if it has no suitable option. Your browser may not offer another device or a QR code.",
+                    "Keep this page open. You do not need to open the portal or already have a passkey on the phone. A localhost address only opens on its own device.",
+                    "Names are labels, not verified devices. A synchronised passkey may work on several devices.",
+                    "Follow the instructions in the browser prompt.",
+                    "Creation did not finish. Nothing was activated. You can try again.",
+                    "The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.",
+                    "The passkey is activated only when you save.",
+                    "One passkey is enough. We strongly recommend another on a different device in case you lose access.",
+                    "Your existing passkeys and this session stay active. Saving ends all other sessions and sends a notice to every confirmed email address.",
                 ):
                     text = translation.gettext(source)
                     self.assertContains(response, text)
                     if language != "en":
                         self.assertNotEqual(text, source)
-                self.assertContains(response, "127.0.0.1")
+                self.assertContains(response, "localhost")
+                for step in ("Name", "Create", "Save"):
+                    text = translation.pgettext("Passkey setup step", step)
+                    self.assertContains(response, text)
+                    if language != "en":
+                        self.assertNotEqual(text, step)
                 self.assertContains(response, 'value="another_device"')
                 self.assertContains(response, 'value="this_device"')
+                if language == "de-ch":
+                    self.assertContains(response, '>Passkey auf anderem Gerät erstellen</button>')
+                    self.assertContains(response, '>Passkey auf diesem Gerät erstellen</button>')
+                self.assertNotContains(response, "another phone or device")
+
+    def test_setup_compact_steps_forms_staging_and_context_specific_safety_copy(self):
+        from html.parser import HTMLParser
+        from types import SimpleNamespace
+        from django.template.loader import render_to_string
+        from django.utils import translation
+        from leg_platform.accounts.passkey_views import CredentialNameForm
+
+        class Elements(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.elements = []
+                self.form_depth = 0
+                self.nested_form = False
+
+            def handle_starttag(self, tag, attrs):
+                self.elements.append((tag, dict(attrs)))
+                if tag == "form":
+                    self.nested_form |= self.form_depth > 0
+                    self.form_depth += 1
+
+            def handle_endtag(self, tag):
+                if tag == "form":
+                    self.form_depth -= 1
+
+        for language in ("en", "de-ch", "fr", "it"):
+            for context in ("adding", "switching", "recovering"):
+                with self.subTest(language=language, context=context), translation.override(language):
+                    content = render_to_string("accounts/passkey_setup.html", {
+                        "allowed": True, "adding": context == "adding", "recovering": context == "recovering",
+                        "form": CredentialNameForm(),
+                        "keys": [SimpleNamespace(name="<Synthetic pending>", active=False),
+                                 SimpleNamespace(name="Synthetic active", active=True)],
+                    }, request=self.request)
+                    parsed = Elements()
+                    parsed.feed(content.split('<section class="profile-card passkey-setup">')[1].split("</section>")[0])
+                    elements = parsed.elements
+                    self.assertFalse(parsed.nested_form)
+                    self.assertEqual(parsed.form_depth, 0)
+                    self.assertEqual(sum(tag == "form" for tag, _ in elements), 2)
+                    self.assertEqual(sum(tag == "h2" and attrs.get("class") == "passkey-step-title"
+                                         for tag, attrs in elements), 3)
+                    self.assertIn(("ol", {"class": "passkey-steps", "role": "list"}), elements)
+                    details = [attrs for tag, attrs in elements if tag == "details"]
+                    self.assertEqual(len(details), 1)
+                    self.assertNotIn("open", details[0])
+                    help_content = content.split('<div class="help-details-body">')[1].split("</div>")[0]
+                    self.assertEqual(help_content.count("<p>"), 3)
+                    self.assertNotIn("<ol", help_content)
+                    primary = [attrs for tag, attrs in elements
+                               if tag == "button" and "btn-primary" in attrs.get("class", "")]
+                    self.assertEqual(len(primary), 1)
+                    modes = [attrs for tag, attrs in elements if tag == "button" and attrs.get("name") == "mode"]
+                    self.assertEqual([attrs["value"] for attrs in modes], ["another_device", "this_device"])
+                    self.assertTrue(all(attrs["class"] == "btn btn-secondary-action" for attrs in modes))
+                    field = next(attrs for tag, attrs in elements if tag == "input" and attrs.get("name") == "name")
+                    self.assertEqual(field["form"], "passkey-create")
+                    self.assertIn("id_name_helptext", field["aria-describedby"])
+                    self.assertEqual(sum(tag == "input" and attrs.get("name") == "csrfmiddlewaretoken"
+                                         for tag, attrs in elements), 2)
+                    self.assertIn(("p", {"role": "status", "data-passkey-status": None}), elements)
+                    self.assertIn("&lt;Synthetic pending&gt;", content)
+                    self.assertEqual(content.count(translation.gettext("Not yet activated")), 1)
+                    for tag, attrs in elements:
+                        if tag in {"svg", "img"} and (
+                            attrs.get("class") == "frame-icon" or attrs.get("width") == "20"
+                        ):
+                            self.assertEqual(attrs.get("aria-hidden"), "true")
+                            if tag == "svg":
+                                self.assertEqual(attrs.get("focusable"), "false")
+                    adding = translation.gettext("Your existing passkeys and this session stay active. Saving ends all other sessions and sends a notice to every confirmed email address.")
+                    switching = translation.gettext("Until you save, your current sign-in method stays active. Saving removes your password, app and recovery codes, ends all other sessions and notifies every confirmed email address. This session stays active.")
+                    recovery = translation.gettext("Your previous sign-in methods no longer work. Save a new passkey to restore access.")
+                    for expected_context, notice in (("adding", adding), ("switching", switching), ("recovering", recovery)):
+                        self.assertEqual(notice in content, context == expected_context)
+                    if context != "recovering":
+                        notice = adding if context == "adding" else switching
+                        self.assertLess(content.index('name="activate"'), content.index(notice))
+                        self.assertLess(content.index(notice), content.index('<button class="btn btn-primary"'))
 
     def test_cross_device_registration_keeps_csrf_rate_limit_and_expired_proof_checks(self):
         self.client.force_login(self.user)

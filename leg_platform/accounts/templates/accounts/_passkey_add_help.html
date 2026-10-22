@@ -1,13 +1,9 @@
 {% load i18n %}
 <details class="help-details">
-  <summary>{% translate "How to add a passkey on another device" %}</summary>
-  <ol>
-    <li>{% translate "Stay signed in on this computer. In Profile, choose Add a passkey on another device and confirm with an existing passkey. You do not need to select your sign-in method again." %}</li>
-    <li>{% translate "Enter a recognizable name, then choose Create passkey on another phone or device. This asks the browser for a phone, tablet or external security key rather than this computer." %}</li>
-    <li>{% translate "In the browser or operating-system prompt, choose your phone or tablet if offered. If a QR code appears, scan it with that device and follow its instructions to create the passkey. You do not need an existing passkey on that device." %}</li>
-    <li>{% translate "Do not open the portal on the phone for this flow. A localhost or 127.0.0.1 address only reaches the device where it is opened; the phone communicates through the browser's credential prompt instead." %}</li>
-    <li>{% translate "If no suitable cross-device option is offered, cancel the prompt. Try another supported browser or an available external security key, or explicitly choose Create passkey on this device. Browser and device support varies; no automatic fallback to this computer is requested." %}</li>
-    <li>{% translate "After creation, choose Save passkey to finish adding it (Use passkeys during initial setup). Only then is the new passkey activated. Your current session and existing passkeys are retained; all other sessions end, and security notices are sent to all confirmed email addresses after saving." %}</li>
-  </ol>
-  <p>{% translate "The available devices and choices depend on your browser and passkey provider. A synchronized passkey may already work on several devices; a device name does not prove a separate backup." %}</p>
+  <summary>{% translate "More help" %}</summary>
+  <div class="help-details-body">
+    <p>{% translate "A password manager may open even after you choose another device. Cancel that prompt if it has no suitable option. Your browser may not offer another device or a QR code." %}</p>
+    <p>{% translate "Keep this page open. You do not need to open the portal or already have a passkey on the phone. A localhost address only opens on its own device." %}</p>
+    <p>{% translate "Names are labels, not verified devices. A synchronised passkey may work on several devices." %}</p>
+  </div>
 </details>

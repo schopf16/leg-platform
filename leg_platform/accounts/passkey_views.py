@@ -117,7 +117,11 @@ class LoginView(View):
 
 
 class CredentialNameForm(PortalFormMixin, forms.Form):
-    name = forms.CharField(label=gettext_lazy("Passkey name"), max_length=80)
+    name = forms.CharField(
+        label=gettext_lazy("Passkey name"), max_length=80,
+        help_text=gettext_lazy("Choose a name you recognise."),
+        widget=forms.TextInput(attrs={"form": "passkey-create"}),
+    )
 
 
 @method_decorator(never_cache, name="dispatch")

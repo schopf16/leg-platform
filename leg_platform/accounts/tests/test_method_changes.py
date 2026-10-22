@@ -264,7 +264,7 @@ class MethodTransitionTests(TestCase):
         session.save()
         self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = "en"
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Your current sign-in method stays valid")
+        self.assertContains(response, "Until you save, your current sign-in method stays active.")
         self.assertContains(response, "One passkey is enough.")
         self.assertContains(response, "Create passkey")
         self.assertNotContains(response, 'name="two_devices"')
@@ -282,7 +282,7 @@ class MethodTransitionTests(TestCase):
         }
         session.save()
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Your existing passkeys remain usable.")
+        self.assertContains(response, "Your existing passkeys and this session stay active.")
         self.assertContains(response, "Save passkey")
         self.assertNotContains(response, 'name="two_devices"')
         response = self.client.get(reverse("accounts:profile") + "?edit=password")
@@ -307,10 +307,10 @@ class MethodTransitionTests(TestCase):
             self.activate()
             self.login_client()
             for language, action, recommendation, summary in (
-                ("de-ch", "Passkey auf einem anderen Gerät hinzufügen", "Wir empfehlen dringend", "So fügen Sie einen Passkey"),
-                ("fr", "Ajouter une clé d’accès sur un autre appareil", "Nous recommandons vivement", "Comment ajouter une clé d’accès"),
-                ("it", "Aggiungere una passkey su un altro dispositivo", "Consigliamo vivamente", "Come aggiungere una passkey"),
-                ("en", "Add a passkey on another device", "We strongly recommend", "How to add a passkey"),
+                ("de-ch", "Passkey auf einem anderen Gerät hinzufügen", "Wir empfehlen dringend", "Weitere Hilfe"),
+                ("fr", "Ajouter une clé d’accès sur un autre appareil", "Nous recommandons vivement", "Aide complémentaire"),
+                ("it", "Aggiungere una passkey su un altro dispositivo", "Consigliamo vivamente", "Altre informazioni"),
+                ("en", "Add a passkey on another device", "We strongly recommend", "More help"),
             ):
                 with self.subTest(role=role, language=language):
                     self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
