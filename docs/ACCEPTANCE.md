@@ -15,7 +15,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 * [ ] Users can set up an authenticator app (TOTP) optionally and remove it after re-authentication; staff users and system administrators must set it up before using any function; recovery codes are issued at setup and can be regenerated.
 * [ ] A system administrator can reset or remove another account's second factor (`docs/SECURITY.md`, section 3); the last system administrator's only via the management command on the server.
-* [ ] Completion of the second factor is checked in one central place, TOTP-specific parts separate (`docs/PROJECT.md`, "AGOV and Passkeys").
+* [ ] Completion of the second factor is checked in one central place, TOTP-specific parts separate.
 
 ## 4. Profile and Account Lifecycle
 
@@ -90,4 +90,4 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 ## Not Required for Acceptance
 
-Everything in `docs/PROJECT.md`, "Explicitly Not Included"; AGOV only as the preparation of section 3.
+Everything in `docs/PROJECT.md`, "Explicitly Not Included".

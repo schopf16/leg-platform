@@ -11,8 +11,8 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 ## Technology Direction
 
 * Python, Django, MariaDB (minimum 10.11, used 12.3 LTS; MySQL not supported; D-002, D-030). Tabler (responsive; `docs/DESIGN.md`). Django admin for system administration.
-* Email: Microsoft Graph, configured in the Django admin. Login: email address with password.
-* Two-factor: authenticator app (TOTP), mandatory for staff users and system administrators. A later switch to AGOV is prepared (approval requested, answer pending).
+* Email: Microsoft Graph, configured in the Django admin. Login: email address with password, or passkey (D-106).
+* Two-factor: authenticator app (TOTP), mandatory for staff users and system administrators.
 * Environments: local, stage, production. Hosting of the Ittigen instance: Infomaniak "VPS Lite 1" (owner, 2026-10-11, D-008); other hosting details open.
 * One independent instance per municipality. Minimum versions only: as old as possible while still receiving vendor security updates (D-015).
 * Software and documentation in English. User interface: Swiss German (`de-ch`, no "ß") by default; French, Italian and English can be chosen (D-056).
@@ -39,13 +39,12 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 
 ## First Phase
 
-Scope: `docs/PROJECT.md`. In short: login page as entry point (no public home page, D-025); registration with email verification; login protected against automated attacks; password change and reset; two-factor (TOTP, mandatory for staff users and system administrators); own profile (view, edit, delete); account lifecycle with deactivation for retention obligations; user, role and role-assignment management; Microsoft Graph configuration with a test send; security logging; instance configuration outside the code; all user functions usable on mobile phones; AGOV preparation (central second-factor check; a switch needs a new security review, `docs/PROJECT.md`, "AGOV and Passkeys").
+Scope: `docs/PROJECT.md`. In short: login page as entry point (no public home page, D-025); registration with email verification; login protected against automated attacks; password change and reset; two-factor (TOTP, mandatory for staff users and system administrators); own profile (view, edit, delete); account lifecycle with deactivation for retention obligations; user, role and role-assignment management; Microsoft Graph configuration with a test send; security logging; instance configuration outside the code; all user functions usable on mobile phones.
 
 ## Not Part of the First Phase
 
 * LEGs as entities and all domain functions (phase 2 starts with them, D-077; see "Current Status").
 * Billing, invoicing, calculation of electricity costs or energy distribution, productive financial processes, bank file processing, payout processes.
-* AGOV integration (only prepared) and passkeys.
 * Multi-tenancy. User interface languages beyond Swiss German, French, Italian and English. Public home page and publication of aggregated figures (D-025).
 
 ## Licence
@@ -68,7 +67,6 @@ BSD 3-Clause License (`LICENSE`), the same as Django (D-029). Dependencies are i
 **Open, by who acts.**
 
 * **Owner:**
-  * the AGOV answer (waiting; D-004);
   * the own human review of the security-critical changes (D-019): second factor, reset, account lifecycle, administration, stage equal to production (D-070), logo upload and the right to change the portal settings (D-073), the access rule of the management area (D-086).
 * **Owner decisions open (from the onboarding work, D-103 to D-105):**
   * buildings are shared by all customers of one EGID, each sees only the own metering points; staff who also take part as customers need a separate account (staff get no customer pages);

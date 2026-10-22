@@ -38,11 +38,11 @@
   * Address and instance limits apply to every invitation; the client-address limit does not (offices create many persons). A limit of 60 per hour per staff account and a pause of 60 seconds per invited account apply.
   * A duplicate address is answered to staff with "already in use" only. Expiry deletes the account.
   * Creation, resend and every change of customer data by staff are in the security log (actor, account number) and the person's history.
-* **Two-factor authentication (TOTP app) is mandatory for staff users and system administrators, optional for users (D-004).**
+* **Two-factor authentication (TOTP app) is mandatory for staff users and system administrators, optional for users (D-004).** Administrators (`is_staff`, `is_superuser`) may use a passkey-only account instead (D-106).
   * `is_staff` and `is_superuser` go only to an account that has already set up two-factor (D-042). Otherwise whoever knows its password could enrol their own app.
   * An account with these rights but no second factor (the initial administrator, or after a reset) must set it up at its next login before using any function. Such sessions have no privileges.
-  * Completion is checked in one central place, independent of the method, so a later switch to AGOV does not change the check (`docs/PROJECT.md`, "AGOV and Passkeys"). A switch must keep at least the current level. No function checks TOTP devices directly.
-* Recovery codes are issued at setup, single-use, regenerated after re-authentication (old ones become invalid). A recovery code counts as a second factor at login and in "phone lost". It is no proof in confirmations of the profile (D-062).
+  * Completion is checked in one central place, independent of the method. A new method must keep at least the current level. No function checks TOTP devices directly.
+* Passkey-only accounts have no recovery codes (D-106). Recovery codes are issued at setup, single-use, regenerated after re-authentication (old ones become invalid). A recovery code counts as a second factor at login and in "phone lost". It is no proof in confirmations of the profile (D-062).
 * **Budget of wrong codes at the second login step (D-040).**
   * Per account, a window of 24 hours from the first wrong code.
   * At 10 wrong codes the owner is notified by email without a link (once per window).
@@ -51,9 +51,10 @@
   * A successful login does not clear the budget. It applies to the second login step **only**. The pending login between password and code ends when the password changes.
 * **Lost second factor (no recovery code).**
   * Users: a system administrator starts the removal. A time-limited (24 hours), single-use link goes to the registered address. Opening it changes nothing, only the confirmation does. The sender address of an incoming email is no proof (RFC 7489).
-  * Staff and system administrators: reset only by a system administrator, only after verifying the identity in person or by calling back a phone number known independently of the account (not its editable profile), confirmed in the administration. Never for the administrator's own account.
+  * Identity check for resets (D-106): the person sends an official ID document by email to the LEG administrator. The administrator compares the name with the stored values and starts the reset with a red button. The same applies to staff and system administrators. Never for the administrator's own account.
   * The factor of the last system administrator is reset only by `manage.py emergency_access` on the server (resets any account).
   * Every reset ends all sessions, notifies the owner without a link, is logged and deletes the account's open address-change requests and links. A password reset never removes or bypasses the second factor.
+* **Passkeys (D-106).** Reset by a staff user or system administrator (`is_staff` or `is_superuser`); staff may reset other staff. A red button starts the reset after a warning dialog that names the consequences. A single-use link (24 hours) goes to the registered address; the old passkeys stay valid until the link is clicked. Every reset is notified to all addresses and logged.
 * **Re-authentication (D-062, "2FA wins")** is required to change the email address or password, delete the account, remove two-factor and generate recovery codes.
   * It asks for **exactly one proof**: the 6-digit app code if a second factor is set up (**a recovery code is no proof here**), otherwise the current password, never both (OWASP Authentication Cheat Sheet; NIST SP 800-63B-4). The form shows only the needed field. A posted `current_password` is ignored when a code is required.
   * An input that is not exactly 6 digits (after removing spaces and hyphens) is refused **before** the check and **counts nowhere**. The code field never writes its value back.
@@ -135,7 +136,6 @@
   * Its email address is entered by the operator on the server and counts as verified.
   * The setup command treats any account with `is_superuser`, also blocked and deactivated ones, as an existing administrator.
   * Until the password is changed the session can only change it (to a different one) and log out. Then the factor must be set up before anything else.
-* Introduce AGOV and passkeys only after their integration and security requirements have been reviewed. Account linking must reliably confirm the identity.
 
 ## 4. Authorization
 
@@ -145,7 +145,7 @@
 * Only system administrators create and change roles and their permissions, assign roles, grant or remove direct permissions and grant or remove `is_staff` and `is_superuser`.
   * Enforced technically, also against staff who may add or change users. Django documentation ("Using the Django authentication system"): such a right "is ultimately the same as giving them superuser status because they will be able to elevate permissions of users including themselves".
   * Delegating role assignment to other roles needs a separate reviewed decision.
-* Staff can never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin). Staff never change the password, email address or second factor of another account.
+* Staff can never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin). Staff never change the password, email address or second factor of another account, except by starting a reset under D-106.
 * Changes by an administrator to another account's password or email address are logged and notified.
 * **Customer onboarding (D-103; `community.applications`, `application_staff`, `deregistrations`, `contracts`, `own_iban`).**
   * Authorization is in the services. A customer service takes the account and reads every object through it (`Application` with `person=`, rows of the application, assignments): an id of another account is "not found", the same answer as a missing one. A staff service re-reads the actor from the database (active `is_staff`); a customer, a blocked or a demoted account is refused.
