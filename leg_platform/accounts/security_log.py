@@ -12,6 +12,8 @@ logger = logging.getLogger("leg_platform.security")
 Event = SecurityEvent.Event
 
 MESSAGES = {
+    Event.PASSKEYS_CHANGED: "The passkeys were changed",
+    Event.SIGN_IN_METHOD_CHANGED: "The sign-in method was changed",
     Event.PASSWORD_CHANGED: "The password was changed",
     Event.PASSWORD_RESET: "The password was reset by link",
     Event.EMAIL_CHANGE_REQUESTED: "An email address change was requested",

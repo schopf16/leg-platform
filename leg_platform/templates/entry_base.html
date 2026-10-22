@@ -25,7 +25,7 @@ column, max. 400 px).
       {% endblock %}
     </aside>
     <main class="entry-form">
-      <div class="entry-card">
+      <div class="entry-card{% block entry_card_class %}{% endblock %}">
         {% include "_messages.html" %}
         {% block form %}{% endblock %}
         {% include "_legal_links.html" %}

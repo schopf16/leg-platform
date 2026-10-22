@@ -2,6 +2,8 @@
 # Tabler: @tabler/core 1.6.1 from the npm registry (tarball checked against the registry's SHA-512 integrity value).
 # Fonts: github.com/google/fonts (ofl/...), unmodified. Tabler Icons: github.com/tabler/tabler-icons, tag v3.49.0.
 # Check with: Get-FileHash -Algorithm SHA256 <file>
+29bb0699b45bc39a350d992a13bfc1a4d40d89531390581e1f57f1142c6e221d  simplewebauthn/index.umd.min.js
+bd9e3f45696472076c7160c7f66e54b2d62d38bc2646c812d19be83ee4400c63  simplewebauthn/LICENSE.md
 413e7357809ddd12fd80a96a8a396de0e401638d4acd3cb3e37532f0472ac682  fonts/BricolageGrotesque.ttf
 6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46  fonts/IBMPlexMono-Regular.ttf
 4b5a7d8f37f5602621c8a8d7358a6a2e71317e6c231c661e15aef0275d3e07ba  fonts/OFL-BricolageGrotesque.txt

@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% translate "Check your email" %}{% endblock %}
+{% block content %}<section class="profile-card"><h1>{% translate "Check your email" %}</h1>
+<p>{% translate "Your passkeys stay valid. Confirm the completed new method using the single-use link sent to your addresses within 24 hours." %}</p>
+<a href="{% url 'accounts:login_method' %}">{% translate "Sign-in method" %}</a></section>{% endblock %}

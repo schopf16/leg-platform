@@ -1,0 +1,6 @@
+{% extends "entry_base.html" %}{% load i18n %}
+{% block title %}{% translate "Confirm sign-in method" %}{% endblock %}
+{% block form %}<h1>{% translate "Confirm sign-in method" %}</h1>
+<p>{% translate "Your new password and, if chosen, authenticator app are ready. Confirming deletes all passkeys and ends all sessions." %}</p>
+<form method="post">{% csrf_token %}<button class="btn btn-primary" type="submit">{% translate "Confirm" %}</button></form>
+{% endblock %}

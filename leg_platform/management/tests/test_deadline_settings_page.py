@@ -352,7 +352,7 @@ class ChapterAccessTests(DeadlinesBase):
         self.assertEqual(Client().post(URL, VALID).status_code, 302)
         late = Client()
         late.force_login(staff_user("deadline.nosecond@example.org"))
-        self.assertRedirects(late.post(URL, VALID), reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
+        self.assertRedirects(late.post(URL, VALID), reverse("accounts:login_method"), fetch_redirect_response=False)
         self.assertEqual(deadline_settings.current_values(), before)
 
     def test_the_token_is_needed_and_other_methods_are_refused(self):

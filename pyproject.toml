@@ -45,6 +45,8 @@ dependencies = [
     # Checksum and structure of the IBAN of a person (D-087): the established package, pure Python, no
     # dependencies, no network access; the newest release at the decision.
     "python-stdnum>=2.2",
+    # WebAuthn verification; D-106. Browser credentials are never verified by custom cryptography.
+    "webauthn>=3.0.1",
 ]
 
 [tool.setuptools.packages.find]

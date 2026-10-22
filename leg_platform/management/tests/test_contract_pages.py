@@ -321,7 +321,7 @@ class ContractDownloadTests(ContractBase):
         self.assertEqual(Client().get(url).status_code, 302)
         late = Client()
         late.force_login(staff_user("contract.nosecond@example.org"))
-        self.assertRedirects(late.get(url), reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
+        self.assertRedirects(late.get(url), reverse("accounts:login_method"), fetch_redirect_response=False)
 
 
 @tag("mariadb")

@@ -11,7 +11,7 @@ import uuid
 from datetime import timedelta
 from typing import NamedTuple
 
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connections, transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -19,6 +19,7 @@ from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
 from .models import Directory, ImportRequest
+from .storage import DIRECTORY_ALIAS, reset_marker
 
 logger = logging.getLogger(__name__)
 AUTOMATIC_INTERVAL = timedelta(days=90)
@@ -139,6 +140,11 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False):
         ImportRequest.objects.get_or_create(pk=1)
         job = ImportRequest.objects.select_for_update().get(pk=1)
         now = timezone.now()
+        # Setup commits the replacement queue before publishing the rebuilt schema. Never
+        # consume that request (or start an automatic run) until its marker is removed.
+        # Checking under this row lock also closes the race with setup taking the same lock.
+        if reset_marker(connections[DIRECTORY_ALIAS].settings_dict["NAME"]).exists():
+            return None
         if job.state == ImportRequest.State.RUNNING:
             if _is_running(job, now):
                 return None

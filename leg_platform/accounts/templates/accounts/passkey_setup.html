@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load i18n static %}
+{% block extra_head %}{% if allowed %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endif %}{% endblock %}
+{% block title %}{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}{% endblock %}
+{% block content %}
+<section class="profile-card">
+  <h1>{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}</h1>
+  {% if not allowed %}
+    <p>{% translate "Confirm your current sign-in method before setting up passkeys." %}</p>
+    <form method="post" class="profile-form" novalidate>
+      {% csrf_token %}{% include "accounts/_error_summary.html" %}
+      {% include "accounts/profile/_proof_fields.html" %}
+      <button class="btn btn-primary" type="submit">{% translate "Continue" %}</button>
+    </form>
+  {% else %}
+    {% if recovering %}<p>{% translate "Your previous sign-in methods no longer work. Set up new passkeys to restore access." %}</p>
+    {% elif adding %}<p>{% translate "Add another passkey. Your existing passkeys remain usable." %}</p>
+    {% else %}<p>{% translate "Your current sign-in method stays valid until you finish setting up passkeys. Finishing replaces it with passkeys." %}</p>{% endif %}
+    {% if require_two_devices %}<p>{% translate "First set up two passkeys on two devices." %}</p>
+    {% elif not privileged %}<p>{% translate "One passkey is enough. We recommend a second passkey on another device." %}</p>{% endif %}
+    <ul>{% for key in keys %}<li>{{ key.name }}</li>{% endfor %}</ul>
+    <form data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}" class="profile-form">
+      {% csrf_token %}{% include "accounts/_field.html" with field=form.name %}
+      <button class="btn btn-secondary-action" type="submit">{% translate "Create passkey" %}</button>
+      <p role="status" data-passkey-status></p>
+    </form>
+    <form method="post" class="profile-form">
+      {% csrf_token %}<input type="hidden" name="activate" value="yes">
+      {% if require_two_devices %}<label class="entry-check"><input type="checkbox" name="two_devices" required><span>{% translate "I set up these passkeys on two devices." %}</span></label>{% endif %}
+      <button class="btn btn-primary" type="submit">{% if adding %}{% translate "Save passkey" %}{% else %}{% translate "Use passkeys" %}{% endif %}</button>
+    </form>
+  {% endif %}
+  <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
+</section>
+{% endblock %}

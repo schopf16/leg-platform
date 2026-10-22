@@ -1,14 +1,14 @@
 {% extends "entry_base.html" %}
 {% load i18n %}
-{% block title %}{% translate "Remove two-factor authentication" %}{% endblock %}
+{% block title %}{% translate "Recover sign-in method" %}{% endblock %}
 {% block panel %}{% include "accounts/_panel_account.html" %}{% endblock %}
 {% block form %}
-  <h1>{% translate "Remove two-factor authentication" %}</h1>
-  <p>{% blocktranslate %}{{ instance_name }} started the removal of two-factor authentication for your account. After this you only need your password to log in. Your authenticator app and your recovery codes stop working, and all sessions of your account end. You can set up two-factor authentication again in your profile.{% endblocktranslate %}</p>
+  <h1>{% translate "Recover sign-in method" %}</h1>
+  <p>{% translate "Confirming removes your old sign-in methods and ends all sessions. You then choose and set up a new method in a restricted session. Opening this page changes nothing." %}</p>
   <p>{% translate "Did you not expect this? Then close this page. Nothing changes." %}</p>
   <form method="post" novalidate>
     {% csrf_token %}
-    <button type="submit" class="btn btn-primary">{% translate "Remove now" %}</button>
+    <button type="submit" class="btn btn-danger">{% translate "Remove old sign-in methods and continue" %}</button>
   </form>
   <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "Cancel" %}</a>
 {% endblock %}

@@ -11,7 +11,7 @@ from typing import NamedTuple
 RESEND_COOLDOWN_SECONDS = 60
 REGISTRATION = "registration"
 PASSWORD_RESET = "password_reset"
-_PURPOSES = (REGISTRATION, PASSWORD_RESET)
+_PURPOSES = (REGISTRATION, PASSWORD_RESET, "recovery")
 _KEY = "mail_request_%s"
 
 

@@ -34,6 +34,7 @@ class UserQuerySet(models.QuerySet):
             "session_version",
             "password_change_required",
             "invited_at",
+            "authentication_method",
         }
     )
 
@@ -70,6 +71,7 @@ class UserManager(BaseUserManager.from_queryset(UserQuerySet)):
     # Fields that only the account logic sets; never accepted when an account is created.
     _CONTROLLED_FIELDS = frozenset(
         {
+            "authentication_method",
             "id",
             "pk",
             "status",

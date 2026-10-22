@@ -102,13 +102,20 @@ class AdminAuthorizationTests(TestCase):
             with self.subTest(account=account.pk):
                 url = reverse("admin:accounts_user_change", args=(account.pk,))
                 response = self.client.get(url)
-                self.assertEqual(response.status_code, 302)
-                self.assertEqual(response["Location"], reverse("admin:index"))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response, reverse("admin:accounts_user_reset_second_factor", args=(account.pk,))
+                )
+                self.assertNotContains(response, 'name="is_staff"')
+                self.assertNotContains(response, 'name="is_superuser"')
+                self.assertNotContains(response, 'name="groups"')
+                if account.pk != self.staff_user.pk:
+                    self.assertNotContains(response, account.email)
                 response = self.client.post(
                     url,
                     {"is_staff": "on", "is_superuser": "on", "groups": ["1"]},
                 )
-                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.status_code, 403)
                 account.refresh_from_db()
                 if account.pk == self.staff_user.pk:
                     self.assertFalse(account.is_superuser)
@@ -316,7 +323,7 @@ class AdminAuthorizationTests(TestCase):
                 unverified.force_login(self.staff_user)
                 self.assertRedirects(
                     unverified.get("/admin/"),
-                    reverse("accounts:two_factor_setup"),
+                    reverse("accounts:login_method"),
                     fetch_redirect_response=False,
                 )
         # Only after the loop: the verified login creates the staff user's second factor.

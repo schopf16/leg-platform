@@ -20,7 +20,7 @@ _SLASH = r"(?:/|%2[Ff])"
 # redirect and render nothing, but the token is still in the request line and in "Not Found"
 # lines of the log.
 TOKEN_URL_PATTERN = re.compile(
-    rf"({_SLASH}(?:(?:register|password-reset|two-factor-reset|email-change){_SLASH}verify"
+    rf"({_SLASH}(?:(?:register|password-reset|two-factor-reset|email-change|sign-in-method){_SLASH}verify"
     rf"|email-change{_SLASH}stop){_SLASH})"
     r"[^/\s\"'?#]+"
 )

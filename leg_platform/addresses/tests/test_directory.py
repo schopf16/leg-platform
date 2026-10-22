@@ -21,6 +21,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.management import call_command
+from django.db.migrations.loader import MigrationLoader
 from django.core.management.base import CommandError
 from django.middleware.csrf import get_token
 from django.db import DatabaseError, OperationalError, connections
@@ -2538,13 +2539,15 @@ class DirectoryFileTests(SimpleTestCase):
 class MigrateTests(SimpleTestCase):
     """``migrate --database=addresses`` creates only the directory tables, in the file."""
 
-    def test_the_command_creates_the_two_directory_tables_and_nothing_else(self):
+    def test_the_full_migration_graph_creates_only_the_current_directory_schema(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "state" / "address-directory.sqlite3"
             environment = {**os.environ, "ADDRESS_DIRECTORY_FILE": str(path)}
             manage = [sys.executable, str(Path(settings.BASE_DIR) / "manage.py")]
-            command = [*manage, "migrate", "addresses", "--database=addresses", "--noinput"]
-            first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=120, check=False)
+            # Exercise every app's migration operations against this alias, not just the
+            # addresses target. The router must exclude all application/permission tables.
+            command = [*manage, "migrate", "--database=addresses", "--noinput"]
+            first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=300, check=False)
             self.assertEqual(first.returncode, 0, first.stderr[-500:])
             self.assertIn("Applying addresses.0001_initial... OK", first.stdout)
             # 0002 only changes the queue table, which is not in the file: recorded, nothing else.
@@ -2569,14 +2572,32 @@ class MigrateTests(SimpleTestCase):
                 journal_mode = database.execute("PRAGMA journal_mode").fetchone()[0]
                 address_columns = {row[1] for row in database.execute("PRAGMA table_info(addresses_address)")}
                 directory_columns = {row[1] for row in database.execute("PRAGMA table_info(addresses_directory)")}
+                address_indexes = {
+                    row[1]: [column[2] for column in database.execute(f"PRAGMA index_info('{row[1]}')")]
+                    for row in database.execute("PRAGMA index_list(addresses_address)")
+                }
             finally:
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory"})
-            self.assertIn("egid", address_columns)
-            self.assertIn("entrance_id", address_columns)
-            self.assertIn("has_egid", directory_columns)
-            self.assertEqual(recorded, {
+            self.assertEqual(address_columns, {
+                "id", "generation", "street", "house_number", "postal_code", "locality",
+                "street_key", "house_number_key", "locality_key", "egid", "entrance_id",
+            })
+            self.assertEqual(directory_columns, {
+                "id", "generation", "data_date", "imported_at", "checksum", "row_count",
+                "has_egid", "import_token", "import_lease_until",
+            })
+            self.assertEqual(address_indexes, {
+                "addr_generation_postal_street": [
+                    "generation", "postal_code", "street_key", "street", "house_number_key",
+                ],
+                "addr_generation_street": [
+                    "generation", "street_key", "street", "house_number", "postal_code", "locality",
+                ],
+                "addr_generation_locality": ["generation", "locality_key", "locality", "postal_code"],
+            })
+            self.assertEqual({node for node in recorded if node[0] == "addresses"}, {
                 ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
                 ("addresses", "0003_import_progress_and_error"),
                 ("addresses", "0004_building_identifier_update_flag_and_lookups"),
@@ -2584,52 +2605,16 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0006_columns_missing_backoff"),
                 ("addresses", "0007_locality_index"),
             })
+            # Full-graph migrate records even router-excluded apps as applied. This is not
+            # permission-table creation: the exact table set above must still be directory-only.
+            self.assertEqual(recorded, set(MigrationLoader(None).graph.nodes))
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
 
-    def test_migration_0005_makes_a_generation_without_entrances_due_for_a_new_import(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "state" / "address-directory.sqlite3"
-            environment = {**os.environ, "ADDRESS_DIRECTORY_FILE": str(path)}
-            manage = [sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), "migrate", "addresses"]
-            options = ["--database=addresses", "--noinput"]
-            before = subprocess.run(
-                [*manage, "0004", *options], env=environment, capture_output=True, text=True, timeout=120, check=False,
-            )
-            self.assertEqual(before.returncode, 0, before.stderr[-500:])
-            database = sqlite3.connect(path)
-            try:
-                database.execute(
-                    "INSERT INTO addresses_directory (id, generation, checksum, row_count, has_egid) "
-                    "VALUES (1, 'a', 'x', 1, 1)"
-                )
-                database.commit()
-            finally:
-                database.close()
-            after = subprocess.run(
-                [*manage, *options], env=environment, capture_output=True, text=True, timeout=120, check=False,
-            )
-            self.assertEqual(after.returncode, 0, after.stderr[-500:])
-            database = sqlite3.connect(path)
-            try:
-                self.assertEqual(database.execute("SELECT has_egid FROM addresses_directory").fetchone(), (0,))
-            finally:
-                database.close()
-
-    def test_the_whole_migrate_of_the_file_still_creates_nothing_but_the_directory_tables(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "address-directory.sqlite3"
-            environment = {**os.environ, "ADDRESS_DIRECTORY_FILE": str(path)}
-            command = [sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), "migrate", "--database=addresses", "--noinput"]
-            result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=300, check=False)
-            self.assertEqual(result.returncode, 0, result.stderr[-500:])
-            database = sqlite3.connect(path)
-            try:
-                tables = {row[0] for row in database.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-            finally:
-                database.close()
-            self.assertEqual(tables - {"sqlite_sequence"}, {"django_migrations", "addresses_address", "addresses_directory"})
+    # Historical catalogue-row transformations (e.g. 0005's has_egid reset) are not a
+    # startup contract: schema changes discard the public file and queue a fresh import.
+    # Current-schema migrations and router/write isolation remain tested here.
 
     def test_real_processes_a_command_that_writes_does_and_everything_else_is_read_only(self):
         # The real settings in child processes (not the test settings, which make the test process

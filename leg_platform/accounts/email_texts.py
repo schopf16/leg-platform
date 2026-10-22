@@ -99,6 +99,12 @@ class Definition:
 
 
 DEFINITIONS = {
+    Key.SIGN_IN_CHANGED: Definition(
+        "accounts/email/sign_in_changed.txt",
+        lambda: gettext("Your sign-in method or passkeys at %(instance_name)s changed"),
+        (GREETING, CONTACT_URL),
+        (),
+    ),
     Key.REGISTRATION_VERIFICATION: Definition(
         "accounts/email/registration_verification.txt",
         lambda: gettext("Your registration at %(instance_name)s"),
@@ -122,6 +128,18 @@ DEFINITIONS = {
         lambda: gettext("Choose a new password for %(instance_name)s"),
         (RESET_URL, LIFETIME_HOURS),
         (RESET_URL,),
+    ),
+    Key.METHOD_RETURN: Definition(
+        "accounts/email/method_return.txt",
+        lambda: gettext("Confirm your sign-in method at %(instance_name)s"),
+        (GREETING, RESET_URL, LIFETIME_HOURS, CONTACT_URL),
+        (RESET_URL,),
+    ),
+    Key.RECOVERY_GUIDANCE: Definition(
+        "accounts/email/recovery_guidance.txt",
+        lambda: gettext("Sign-in recovery at %(instance_name)s"),
+        (CONTACT_URL,),
+        (),
     ),
     Key.EMAIL_CHANGE_VERIFICATION: Definition(
         "accounts/email/email_change_verification.txt",
@@ -185,13 +203,13 @@ DEFINITIONS = {
     ),
     Key.TWO_FACTOR_RESET_LINK: Definition(
         "accounts/email/two_factor_reset_link.txt",
-        lambda: gettext("Remove two-factor authentication at %(instance_name)s"),
+        lambda: gettext("Recover access to %(instance_name)s"),
         (GREETING, TWO_FACTOR_RESET_URL, LIFETIME_HOURS),
         (TWO_FACTOR_RESET_URL,),
     ),
     Key.TWO_FACTOR_RESET: Definition(
         "accounts/email/two_factor_reset.txt",
-        lambda: gettext("Two-factor authentication was reset at %(instance_name)s"),
+        lambda: gettext("Sign-in recovery confirmed for %(instance_name)s"),
         (GREETING,),
         (),
     ),

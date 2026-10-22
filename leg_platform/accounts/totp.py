@@ -132,9 +132,14 @@ def relieve_code_budget(user):
 
 def delete_abandoned_enrolments(now=None):
     """Delete secrets whose setup was never confirmed; return their number."""
+    from leg_platform.accounts.models import PendingSignInChange
+
+    now = now or timezone.now()
     count, _ = AuthenticatorDevice.objects.filter(
         confirmed=False, created_at__lt=(now or timezone.now()) - ENROLMENT_LIFETIME
-    ).delete()
+    ).exclude(user_id__in=PendingSignInChange.objects.filter(
+        ready=True, app_confirmed=True, expires_at__gt=now,
+    ).values("user_id")).delete()
     return count
 
 

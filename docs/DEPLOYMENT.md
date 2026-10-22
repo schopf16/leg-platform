@@ -684,11 +684,15 @@ All units share one hardening (block H, 8.0). **UNVERIFIED:** the syscall filter
 
 `manage.py setup_instance` is idempotent:
 
-1. Applies pending migrations (never `flush`, never a deletion).
+1. Applies pending application migrations (never `flush`, never deletes application data).
 2. **Only while the account table is completely empty:** creates the first system administrator from the two `BOOTSTRAP_SYSTEM_ADMIN_*` variables. **Accounts exist but no system administrator: creates nothing**, writes `System administrator: NONE EXISTS, but accounts exist ...` to standard error, exits 0 (recovery: section 9).
-3. Creates the SQLite file of the address directory and its tables. Never fatal: a failure is logged by class name and retried at the next start.
+3. Prepares the optional SQLite address schema. Missing files are initialised; changed address schemas are rebuilt by deleting only the configured public catalogue file and its exact SQLite sidecars, without historical data transfer. The official import is durably queued in MariaDB, not downloaded by setup. Application data and job rows are never deleted. Current clean schemas do not queue again on every start; application-only migrations do not reset the catalogue. A failure is logged by class name, never fatal, and retried at the next setup.
 
 A MariaDB lock serialises two runs. A refused migration or administrator on a first start fails the unit; the services that require it do not start.
+
+`Before=`/`After=` order newly starting services; they do **not** stop already running readers/importers. Keep the quiescence procedure of 12.3 for code/schema updates. Rebuild uses a short connection-opening mutex (`.open-lock`, not held for normal reads), a `.reset` marker and SQLite's exclusive transition out of WAL; a busy file or live import defers the optional step without stopping the application. New directory cursors refuse the marker; retained connections refuse a replaced inode. A failure after the marker was created leaves it in place, so a partial schema is not exposed. Do not delete either coordination file to bypass setup. Retry setup after readers/importers close; a crash releases the OS mutex automatically. Server/systemd behaviour still requires live verification.
+
+The job row is locked against claims while rebuilding. The queue commits before the marker is removed; claimants check that marker under the row lock and leave the request queued until publication. This avoids a worker consuming the request while the new schema is still unavailable. A replacement request invalidates an expired holder's token so a late failure cannot overwrite the queue. A live holder is not replaced.
 
 `/etc/systemd/system/leg-setup.service`:
 
@@ -820,6 +824,8 @@ Outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com` is neede
 ### 8.3 Scheduled tasks (every 15 minutes)
 
 `run_scheduled_tasks` runs every cleanup task once and then the daily address directory run (`scheduled_address_import`, D-090; KONZEPT 3a). A failing task fails the unit.
+
+**Queued imports take priority:** the address task consumes an already queued request (including setup after a missing/changed schema) before daily time, once-per-day, missing-column backoff and `ADDRESS_IMPORT_AUTOMATIC` checks. This is the default installation's asynchronous fallback without the optional importer. Setup queues immediately; the download waits until this task tick (up to 15 minutes plus timer delay and any earlier cleanup runtime), or the optional worker's next poll. No running consumer means the job stays queued. Normal automatic refresh still uses the daily policy below; normal CSV imports never delete the database.
 
 `/etc/systemd/system/leg-platform-tasks.service` differs from 8.1 in:
 
@@ -994,11 +1000,11 @@ The importer (`leg_platform/addresses/importer.py`; started by the administrator
 * Measure `du -sh /var/lib/leg-platform` after the first and second import and report (F-4).
 * Less than 4 GB free on the disk of `/var/lib/leg-platform`: the import is refused (job `failed`, reason on the page, nothing written). The database must never run out of space because of the directory (12.4).
 
-**Start the first import** (no extra service needed):
+**Observe the first import** (no extra service needed if the scheduled-task timer runs):
 
-1. The system administrator (or staff with the right `addresses.request_directory_import`) opens the administration, "Adressverzeichnis", and presses "Aktualisierung des Verzeichnisses anfordern" (logged in the security log).
+1. Startup queues a first/replacement import immediately after preparing the schema. The task tick (8.3) or optional worker claims it, without waiting for the daily import time. Open the address-directory administration page to observe it. A visit starts nothing.
 2. The page shows phase, download progress and result. The status is also written to the application log and the security log (`address_import_succeeded` / `address_import_failed`).
-3. Without a press, the daily run of the scheduled tasks (8.3) starts it at the next run after the configured time (default 03:00): an empty directory is due at once and again every 24 hours; an unknown address (update flag) and the regular refresh (90 days) also make it due. A visit of a staff member starts nothing.
+3. After the initial queued attempt, normal automatic refresh follows the daily policy (8.3); a failed attempt is recorded as failed, not silently requeued at each application start. The administrator's button can request a retry of a failed/completed job. A still-queued job needs its consumer; pressing the button does not duplicate it. Until successful import, address validation/suggestions are unavailable; the rest of the application and its stored data remain.
 4. Watch it:
 
    ```bash
@@ -1021,22 +1027,22 @@ sudo ls -l /var/lib/leg-platform/
 
 **Recovery of a corrupted directory file** (L-12; e.g. `file is not a database`, or `PRAGMA quick_check` reports errors). The file is public and rebuildable; the application database is not touched.
 
-1. Make sure no import is running (state not `running`/alive). **Stop the web service** (and the optional importer, 8.4): `sudo systemctl stop leg-platform-web` (never `leg-setup`).
-2. `sudo rm -f /var/lib/leg-platform/address-directory.sqlite3 /var/lib/leg-platform/address-directory.sqlite3-wal /var/lib/leg-platform/address-directory.sqlite3-shm` (the path of `ADDRESS_DIRECTORY_FILE` if set). Suggestions are missing until the rebuild.
+1. Quiesce address consumers as in 12.3: stop the task timer, wait for any active task/import, stop web and the optional importer (8.4). Never stop `leg-setup`. No manual reader/writer may remain.
+2. `sudo rm -f /var/lib/leg-platform/address-directory.sqlite3 /var/lib/leg-platform/address-directory.sqlite3-wal /var/lib/leg-platform/address-directory.sqlite3-shm /var/lib/leg-platform/address-directory.sqlite3-journal` (use only the exact configured `ADDRESS_DIRECTORY_FILE` and its three sidecars if set). Do not remove coordination files or any application database. Suggestions are missing until the rebuild.
 3. `sudo systemctl start leg-setup.service`. Check `sudo journalctl -u leg-setup -n 20 --no-pager` for `Address directory: file prepared`. Then `sudo systemctl start leg-platform-web`.
-4. The next daily run after the configured time imports it (an empty directory is due at once; otherwise an administrator presses the button). Check as above.
+4. Restore the timer/optional worker's recorded service states. Setup has queued the import; the next task tick or worker poll processes it independently of the daily time. Check as above.
 
 **Repair: `no such table: addresses_directory`** (the import or the page fails; found on stage 2026-10-21). The file exists but has no tables: the setup unit never ran (it did not exist on that host, or the units differ from 8.0 to 8.3), so no run of `manage.py setup_instance` created the tables (8.0, D-076). Any process that opens the directory may create an empty file (`INSTALLATION.md`, "Address Directory"). There is no separate importer migration step and no manual `migrate addresses` on a server.
 
 1. Compare the units with 8.0 to 8.3 (`systemctl cat <unit>`; do not dump files with inline credentials). Create `leg-setup.service` as in 8.0 with the **same** `User=`, `Group=`, `EnvironmentFile=` and `WorkingDirectory=` as the web unit. Add `StateDirectory=leg-platform` to the web unit and to the scheduled-tasks unit (and the optional importer). **Remove** any hand-added `ReadWritePaths=` for `/var/lib/leg-platform`. Web and mail name the setup unit with `Requires=` and `After=` (8.1, 8.2).
 2. `sudo systemctl daemon-reload`, `sudo systemctl enable leg-setup.service`. Check `ls -ld /var/lib/leg-platform /var/lib/leg-platform/*`: directory and file must belong to the service user and group. If the file is owned by someone else (for example a hand-run `migrate` as root) or holds no tables and no import ran, treat it as rebuildable: stop the web service when no import runs (state not `running`; never stop `leg-setup`), delete the file and its `-wal`/`-shm` as in the recovery above.
 3. `sudo systemctl start leg-setup.service`, then `sudo journalctl -u leg-setup -n 20 --no-pager` must show `Address directory: file prepared, N migration(s) applied.` (or `file ready`), no `NOT set up`. Start the web service again and run V3 and V3a.
-4. The next daily run imports the directory, or an administrator presses the button.
+4. Setup has queued the import; the next scheduled-task tick or optional worker processes it (8.3). If no consumer runs it remains queued. Do not reset the MariaDB job/account database to repair the catalogue.
 
 **Open operator step (D-065, D-075, UNVERIFIED):** after the first import run `EXPLAIN QUERY PLAN` (`leg-manage web shell`, connection `addresses`) for the two lookup queries of `PrefixSearchTests` (`leg_platform/addresses/tests/test_directory.py`) on the largest postal code.
 
 * Expected: `SEARCH ... USING (COVERING) INDEX addr_generation_postal_street` and `addr_generation_street`; no `SCAN addresses_address`.
-* Since D-111 also the town queries (`test_typeahead.QueryPlanTests`, on the town "Bern" and on a postal code): `addr_generation_locality` for the town prefix, `addr_generation_postal_street` for a postal code. The index is created by migration `addresses.0007` (`manage.py migrate addresses --database=addresses`, run by the setup unit and `setup_instance`, also on an existing file); size and duration on the 3.3 million rows are **not measured** (an estimate: some tens of seconds and about 100 MB). Run `ANALYZE` again afterwards (the next import does).
+* Since D-111 also the town queries (`test_typeahead.QueryPlanTests`, on the town "Bern" and on a postal code): `addr_generation_locality` for the town prefix, `addr_generation_postal_street` for a postal code. Migration `addresses.0007` defines the index. Startup now rebuilds an older catalogue schema empty and queues a fresh import, rather than indexing historical rows in place (D-075 amendment). The importer runs `ANALYZE` after publication. Index size and import duration on the official dataset remain **UNVERIFIED** on a server.
 * The typing suggestions rank the addresses of the LEG's own postal code and town first (the "Invoice sender" of the settings, D-111); with an empty sender address nothing is ranked.
 * A scan blocks the release: report to the owner. Report plans and lookup/cleanup times before go-live.
 
@@ -1213,7 +1219,7 @@ Use the paths, profiles and unit names of the instance record (0.6). Do the step
 * Keep traffic in maintenance. Report the failure and the last completed step.
 * No migration applied: return to the recorded previous code **and package environment**, restore static files, service states and (if settings changed, 5.3) the saved environment file. Repeat the checks before reopening.
 * Any migration applied (also an earlier one in a failed migration command): do not assume the previous code matches the schema. Inspect the migration state and propose a compatible forward fix or an approved restore.
-* Database restoration/reversal and any data loss need the owner's explicit approval. Never automatically drop/recreate a database.
+* Application database restoration/reversal and any data loss need the owner's explicit approval. Never automatically drop/recreate the application database. The disposable public address SQLite file alone follows the owner-approved startup rebuild of D-075/D-076 (8.0).
 * Report a failed deployment or recovery as failed, even if some services start.
 
 **OS/MariaDB maintenance:**

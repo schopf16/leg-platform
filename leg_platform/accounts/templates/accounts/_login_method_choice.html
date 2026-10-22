@@ -3,8 +3,7 @@ The choice "Sign-in method" (D-106, "Guidance", docs/DESIGN.md "Choice cards"): 
 decision helper and one card per method. The page that includes it supplies the form, the error summary and the
 buttons. Context: ``methods`` (the ``login_methods.Method`` objects this account is offered, in the order of the page:
 the options are decided on the server, never here), ``selected`` (the key checked now), ``current``, ``recommended``,
-``recommended_title``, ``privileged`` (staff user or system administrator), ``passkeys_available`` (every passkey
-sentence is inside ``{% if passkeys_available %}`` or comes from a method that exists only while it is true) and
+``recommended_title``, ``privileged`` (staff user or system administrator), and
 ``choose_form`` (its errors).
 {% endcomment %}<fieldset class="choice-group">
   <legend class="choice-legend">{% translate "How do you want to sign in?" %}</legend>

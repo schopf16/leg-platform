@@ -38,7 +38,7 @@ def frame_restricted(request):
     user = getattr(request, "user", None)
     if user is None or not user.is_authenticated:
         return False
-    if user.password_change_required:
+    if user.password_change_required or user.authentication_method == "recovery":
         return True
     return requires_second_factor(user) and not is_second_factor_complete(user)
 

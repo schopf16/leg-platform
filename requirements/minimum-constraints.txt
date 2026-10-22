@@ -17,3 +17,4 @@ idna==3.15
 requests==2.34.2
 reportlab==5.0.1
 python-stdnum==2.2
+webauthn==3.0.1

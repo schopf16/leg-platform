@@ -1,0 +1,6 @@
+{% load i18n %}{% autoescape off %}{% translate "If you have another passkey, use it to sign in. If your authenticator app is unavailable, sign in with your password and enter a recovery code at the next step." %}
+
+{% translate "Without a working sign-in method, send an official ID document by email to the operator. The operator compares your name with the account and starts recovery. Never send your password, passkeys or app codes." %}
+
+{% if contact_url %}{{ contact_url }}{% else %}{% translate "Please contact the operator of this portal." %}{% endif %}
+{% endautoescape %}

@@ -10,6 +10,9 @@ from django.utils.cache import add_never_cache_headers
 # routes ``add`` and ``history`` all reach the same admin and must be limited as well. The
 # prefix has no trailing slash, so that the spelling without it is covered too.
 BODY_LIMITS = (
+    ("/passkeys/", 32768),
+    ("/sign-in-method/", 32768),
+    ("/recovery/", 8192),
     ("/addresses/lookup/", 4096),
     # The language menu: two short fields and the CSRF token (the address of the page can be long).
     ("/language/", 8192),
@@ -36,7 +39,7 @@ class NoStoreForManagementMiddleware:
     a prefix passes. (The name is kept: ``settings.MIDDLEWARE`` names it.)
     """
 
-    PREFIXES = ("/management/", "/participation/")
+    PREFIXES = ("/management/", "/participation/", "/passkeys/", "/sign-in-method/", "/recovery/")
     PREFIX = PREFIXES[0]
 
     def __init__(self, get_response):

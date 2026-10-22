@@ -388,7 +388,7 @@ class StartPageTests(TestCase):
         html = self.client.get(HOME_URL).content.decode()
         self.assertEqual(html.count('<article class="task-tile"'), 1)
         self.assertIn("Anmeldemethode wählen", html)
-        self.assertIn("Nur Passwort, oder Passwort und Code aus einer App auf Ihrem Smartphone.", html)
+        self.assertIn("Wählen Sie Passwort, Passwort und App oder Passkey.", html)
         self.assertIn(">Wählen</a>", html)
         self.assertNotIn("Adresse ergänzen", html)
         self.assertNotIn("Keine offenen Aufgaben", html)
@@ -595,7 +595,7 @@ class ReviewFollowUpTests(TestCase):
 
         response = client.post(reverse("accounts:task_hide", args=["two_factor"]))
 
-        self.assertRedirects(response, SETUP_URL, fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("accounts:login_method"), fetch_redirect_response=False)
         self.assertFalse(HiddenTask.objects.exists())
 
     def test_an_account_with_a_mandatory_but_incomplete_second_factor_gets_the_slim_frame(self):

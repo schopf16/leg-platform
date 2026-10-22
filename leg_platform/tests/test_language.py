@@ -213,8 +213,12 @@ class SwitchTests(TestCase):
                     for marker in GERMAN_MARKERS:
                         self.assertNotIn(marker, html)
                 if code == "en":
-                    for text in ("Email address", "Password", "Log in", "Forgot password?", "Stay signed in"):
+                    for text in ("Email address", "Password", "Log in", "Trouble signing in?", "Stay signed in"):
                         self.assertIn(text, html)
+                    self.assertIn(f'href="{reverse("accounts:login_help")}"', html)
+                    help_page = self.client.get(reverse("accounts:login_help"))
+                    self.assertContains(help_page, f'href="{reverse("accounts:password_reset")}"')
+                    self.assertContains(help_page, f'href="{reverse("accounts:recovery")}"')
                     self.assertIn('aria-label="Language: English"', html)
 
     def test_the_other_entry_pages_and_the_error_page_follow_the_choice(self):

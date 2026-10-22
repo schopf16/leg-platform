@@ -1,18 +1,12 @@
 """The choice "Sign-in method" (D-106, "Guidance"): which methods an account is offered, the page in the profile card,
 the start-page tile, the routing into the existing flows and the server-side validation of the posted method.
 
-Passkeys are not built: while ``PASSKEYS_ENABLED`` is off (the default) no page may mention them and a forged
-``passkey`` is refused.
+All methods are implemented; unsupported values and privileged password-only choices are refused.
 """
 
-from io import StringIO
 from unittest import mock
 
 from django.conf import settings
-from django.core import checks
-from django.core.checks.registry import registry
-from django.core.management import call_command
-from django.core.management.base import SystemCheckError
 from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
@@ -51,34 +45,31 @@ def keys(user):
 class AvailableMethodsTests(SimpleTestCase):
     """``available(user)`` decides the options; the templates and the form only follow it."""
 
-    def test_a_user_may_choose_between_password_and_app_while_passkeys_are_off(self):
+    def test_a_user_may_choose_password_app_or_passkey(self):
         user = User(email="user@example.org")
 
-        self.assertEqual(keys(user), [PASSWORD_ONLY, APP])
+        self.assertEqual(keys(user), [PASSWORD_ONLY, APP, PASSKEY])
         self.assertTrue(login_methods.has_choice(user))
         self.assertEqual(login_methods.recommended(user), APP)
 
-    def test_staff_and_system_administrators_have_only_the_app_and_nothing_to_choose(self):
+    def test_staff_and_system_administrators_choose_app_or_passkey(self):
         for field in ("is_staff", "is_superuser"):
             with self.subTest(field=field):
                 administrator = User(email="admin@example.org", **{field: True})
 
-                self.assertEqual(keys(administrator), [APP])
-                self.assertFalse(login_methods.has_choice(administrator))
+                self.assertEqual(keys(administrator), [APP, PASSKEY])
+                self.assertTrue(login_methods.has_choice(administrator))
 
-    @override_settings(PASSKEYS_ENABLED=True)
-    def test_a_passkey_is_offered_last_once_the_setting_is_on(self):
+    def test_passkeys_are_offered_last_for_every_access_level(self):
         self.assertEqual(keys(User(email="user@example.org")), [PASSWORD_ONLY, APP, PASSKEY])
         administrator = User(email="admin@example.org", is_staff=True)
         self.assertEqual(keys(administrator), [APP, PASSKEY])
         self.assertTrue(login_methods.has_choice(administrator))
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_the_recommendation_is_the_app_for_users_and_the_passkey_for_administrators(self):
         self.assertEqual(login_methods.recommended(User(email="user@example.org")), APP)
         self.assertEqual(login_methods.recommended(User(email="admin@example.org", is_superuser=True)), PASSKEY)
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_the_administrator_card_names_the_two_devices(self):
         administrator = User(email="admin@example.org", is_staff=True)
 
@@ -86,41 +77,6 @@ class AvailableMethodsTests(SimpleTestCase):
             notes = {method.key: str(method.note) for method in login_methods.available(administrator)}
 
         self.assertIn("two passkeys on two devices", notes[PASSKEY])
-
-    def test_the_setting_defaults_to_off(self):
-        self.assertFalse(login_methods.passkeys_available())
-
-
-class PasskeySystemCheckTests(SimpleTestCase):
-    """L-2: ``PASSKEYS_ENABLED=True`` before a passkey flow exists is a configuration error, not a promise.
-
-    System checks run at ``manage.py check``, ``runserver`` and ``migrate``, never on ``override_settings``: the
-    tests above that turn the setting on keep working.
-    """
-
-    def test_the_check_is_registered(self):
-        self.assertIn(login_methods.check_passkey_flow, registry.get_checks())
-
-    def test_no_error_while_the_setting_is_off(self):
-        self.assertEqual(login_methods.check_passkey_flow(None), [])
-        call_command("check", stdout=StringIO())
-
-    @override_settings(PASSKEYS_ENABLED=True)
-    def test_an_error_while_the_setting_is_on_and_no_flow_exists(self):
-        self.assertFalse(login_methods.PASSKEY_FLOW_BUILT)
-
-        errors = login_methods.check_passkey_flow(None)
-
-        self.assertEqual([error.id for error in errors], ["accounts.E001"])
-        self.assertEqual(errors[0].level, checks.ERROR)
-        with self.assertRaisesMessage(SystemCheckError, "accounts.E001"):
-            call_command("check", stdout=StringIO(), stderr=StringIO())
-
-    @override_settings(PASSKEYS_ENABLED=True)
-    def test_no_error_once_the_flow_is_built(self):
-        with mock.patch.object(login_methods, "PASSKEY_FLOW_BUILT", True):
-            self.assertEqual(login_methods.check_passkey_flow(None), [])
-
 
 class LoginMethodFormTests(SimpleTestCase):
     def valid(self, method, user):
@@ -131,7 +87,8 @@ class LoginMethodFormTests(SimpleTestCase):
 
         self.assertTrue(self.valid(APP, user))
         self.assertTrue(self.valid(PASSWORD_ONLY, user))
-        for forged in (PASSKEY, "", "Passkey", "app ", "<script>", "x" * 500):
+        self.assertTrue(self.valid(PASSKEY, user))
+        for forged in ("", "Passkey", "app ", "<script>", "x" * 500):
             with self.subTest(forged=forged):
                 self.assertFalse(self.valid(forged, user))
 
@@ -141,7 +98,6 @@ class LoginMethodFormTests(SimpleTestCase):
         self.assertTrue(self.valid(APP, administrator))
         self.assertFalse(self.valid(PASSWORD_ONLY, administrator))
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_a_passkey_is_valid_only_while_the_setting_is_on(self):
         self.assertTrue(self.valid(PASSKEY, User(email="user@example.org")))
         self.assertFalse(self.valid(PASSWORD_ONLY, User(email="admin@example.org", is_staff=True)))
@@ -174,7 +130,7 @@ class LoginMethodPageTests(TestCase):
         self.assertIn("Wie möchten Sie sich anmelden?", html)
         self.assertIn("Nur Passwort", html)
         self.assertIn("Passwort und Code aus einer App", html)
-        self.assertEqual(html.count('name="method"'), 2)
+        self.assertEqual(html.count('name="method"'), 3)
         self.assertEqual(html.count("Empfohlen"), 1)
         self.assertIn("Unsicher? Wir empfehlen: Passwort und Code aus einer App.", html)
         self.assertIn("Was passt zu mir?", html)
@@ -191,7 +147,7 @@ class LoginMethodPageTests(TestCase):
         html = self.page()
 
         self.assertIn('<details class="help-details">', html)
-        self.assertIn("<summary>Was ist eine Authenticator-App?</summary>", html)
+        self.assertIn("<summary>Was ist eine Authenticator-App? Was ist ein Passkey?</summary>", html)
         self.assertIn("kostenlose App aus dem App-Store Ihres Smartphones", html)
         for brand in ("Google", "Microsoft", "Aegis"):
             self.assertNotIn(brand, html)
@@ -201,23 +157,22 @@ class LoginMethodPageTests(TestCase):
 
         self.assertIn('<fieldset class="choice-group">', html)
         self.assertIn('<legend class="choice-legend">Wie möchten Sie sich anmelden?</legend>', html)
-        self.assertEqual(html.count('<label class="choice-card"'), 2)
+        self.assertEqual(html.count('<label class="choice-card"'), 3)
         self.assertRegex(html, r'type="radio" name="method" id="id_method_0" value="password"')
         self.assertIn('aria-describedby="choice-app-benefit choice-app-need choice-app-lose"', html)
 
-    def test_the_word_passkey_is_on_no_page_while_the_setting_is_off(self):
+    def test_choice_pages_do_not_mutate_credentials(self):
         pages = {
             "choose": self.client.get(CARD_CHOOSE_URL),
             "profile": self.client.get(PROFILE_URL),
             "home": self.client.get(HOME_URL),
             "setup": self.client.get(f"{PROFILE_URL}?edit=two_factor&step=setup"),
-            "forged": self.client.post(CHOOSE_URL, {"method": PASSKEY}),
             "empty": self.client.post(CHOOSE_URL, {}),
         }
         for name, response in pages.items():
             with self.subTest(page=name):
                 self.assertEqual(response.status_code, 200)
-                self.assertNotIn("passkey", response.content.decode().lower())
+        self.assertFalse(self.user.passkeys.exists())
 
     def test_the_other_languages_show_the_card_too(self):
         for code, text in (("fr", "Méthode de connexion"), ("it", "Metodo di accesso"), ("en", "Sign-in method")):
@@ -306,7 +261,7 @@ class LoginMethodRoutingTests(TestCase):
         self.assertEqual(AuthenticatorDevice.objects.filter(user=user).count(), 1)
 
     def test_a_forged_method_is_refused_with_the_error_summary_and_changes_nothing(self):
-        for forged in (PASSKEY, "Passkey", "", "unknown", "app\x00"):
+        for forged in ("Passkey", "", "unknown", "app\x00"):
             with self.subTest(forged=forged):
                 response = self.client.post(CHOOSE_URL, {"method": forged})
 
@@ -316,7 +271,7 @@ class LoginMethodRoutingTests(TestCase):
         self.assertFalse(AuthenticatorDevice.objects.exists())
 
     def test_a_get_with_the_step_in_the_address_shows_the_same_choice(self):
-        self.assertContains(self.client.get(CHOOSE_URL), 'name="method"', count=2)
+        self.assertContains(self.client.get(CHOOSE_URL), 'name="method"', count=3)
 
     def test_the_other_flows_stay_as_they_were(self):
         # The old button posted to the setup address: it still works (the card's setup state and the forced setup).
@@ -337,29 +292,28 @@ class AdministratorLoginMethodTests(TestCase):
         client.force_login(self.administrator)
         return client
 
-    def test_there_is_no_choice_page_while_passkeys_are_off(self):
+    def test_privileged_accounts_have_a_choice_page(self):
         client = self.verified()
 
-        for response in (client.get(CHOOSE_URL), client.post(CHOOSE_URL, {"method": APP})):
-            self.assertRedirects(response, TWO_FACTOR_URL, fetch_redirect_response=False)
-        # The address of the card state falls back to the view, without the choice.
+        self.assertContains(client.get(CHOOSE_URL), 'name="method"', count=2)
+        self.assertRedirects(client.post(CHOOSE_URL, {"method": APP}), f"{PROFILE_URL}#card-two-factor", fetch_redirect_response=False)
         html = client.get(CARD_CHOOSE_URL).content.decode()
-        self.assertNotIn('name="method"', html)
-        self.assertNotIn("step=choose", html)
+        self.assertIn('value="passkey"', html)
+        self.assertNotIn('value="password"', html)
 
     def test_a_forged_password_only_does_not_turn_the_app_off(self):
         client = self.verified()
 
         response = client.post(CHOOSE_URL, {"method": PASSWORD_ONLY})
 
-        self.assertRedirects(response, TWO_FACTOR_URL, fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["choose_form"].errors)
         self.assertTrue(AuthenticatorDevice.objects.filter(user=self.administrator, confirmed=True).exists())
 
-    def test_the_card_shows_no_change_button_and_no_passkey_while_the_setting_is_off(self):
+    def test_the_card_shows_a_change_button_for_privileged_accounts(self):
         html = self.verified().get(PROFILE_URL).content.decode()
 
-        self.assertNotIn(">Ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
-        self.assertNotIn("passkey", html.lower())
+        self.assertIn(">Ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
 
     def test_a_restricted_session_cannot_reach_the_choice_and_is_sent_to_the_setup(self):
         newcomer = create_active_user("new.staff@example.org")
@@ -367,13 +321,10 @@ class AdministratorLoginMethodTests(TestCase):
         restricted = Client()
         restricted.force_login(newcomer)
 
-        for response in (
-            restricted.get(CHOOSE_URL),
-            restricted.post(CHOOSE_URL, {"method": APP}),
-            restricted.get(CARD_CHOOSE_URL),
-        ):
-            self.assertRedirects(response, SETUP_URL, fetch_redirect_response=False)
-        self.assertFalse(AuthenticatorDevice.objects.filter(user=newcomer).exists())
+        self.assertContains(restricted.get(CHOOSE_URL), 'value="passkey"')
+        self.assertRedirects(restricted.get(CARD_CHOOSE_URL), CHOOSE_URL, fetch_redirect_response=False)
+        self.assertRedirects(restricted.post(CHOOSE_URL, {"method": APP}), CONFIRM_URL, fetch_redirect_response=False)
+        self.assertFalse(AuthenticatorDevice.objects.get(user=newcomer).confirmed)
 
     def test_the_restricted_setup_shows_the_app_without_a_choice_or_a_passkey(self):
         newcomer = create_active_user("new.staff@example.org")
@@ -384,9 +335,8 @@ class AdministratorLoginMethodTests(TestCase):
         html = restricted.get(SETUP_URL).content.decode()
 
         self.assertNotIn('name="method"', html)
-        self.assertNotIn("passkey", html.lower())
+        self.assertNotIn('name="passkey_assertion"', html)
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_with_passkeys_on_an_administrator_sees_the_app_and_the_passkey_but_not_password_only(self):
         client = self.verified()
 
@@ -407,7 +357,7 @@ class AdministratorLoginMethodTests(TestCase):
 
 @tag("mariadb")
 class PasskeysOnTests(TestCase):
-    """With the setting on, the passkey is offered and explained; it has no flow yet, so choosing it changes nothing."""
+    """The choice explains passkeys and routes into setup without itself changing credentials."""
 
     @classmethod
     def setUpTestData(cls):
@@ -416,7 +366,6 @@ class PasskeysOnTests(TestCase):
     def setUp(self):
         self.client.force_login(self.user)
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_a_user_sees_three_cards_and_the_passkey_explainer(self):
         html = self.client.get(CARD_CHOOSE_URL).content.decode()
 
@@ -427,11 +376,10 @@ class PasskeysOnTests(TestCase):
         self.assertIn("Ihr Passwort und Ihre App werden gelöscht.", html)
         self.assertEqual(html.count("Empfohlen"), 1)
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_choosing_a_passkey_without_a_flow_is_not_found_and_changes_nothing(self):
         response = self.client.post(CHOOSE_URL, {"method": PASSKEY})
 
-        self.assertEqual(response.status_code, 404)
+        self.assertRedirects(response, reverse("accounts:passkey_setup"), fetch_redirect_response=False)
         self.assertFalse(AuthenticatorDevice.objects.exists())
 
 
@@ -534,23 +482,17 @@ class PrivilegedWithoutSecondFactorTests(TestCase):
         self.restricted = Client()
         self.restricted.force_login(self.newcomer)
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_with_passkeys_on_the_choose_url_and_the_card_lead_to_the_setup(self):
-        for response in (
-            self.restricted.get(CHOOSE_URL),
-            self.restricted.post(CHOOSE_URL, {"method": APP}),
-            self.restricted.post(CHOOSE_URL, {"method": PASSWORD_ONLY}),
-            self.restricted.post(CHOOSE_URL, {"method": PASSKEY}),
-            self.restricted.get(CARD_CHOOSE_URL),
-        ):
-            self.assertRedirects(response, SETUP_URL, fetch_redirect_response=False)
+        self.assertContains(self.restricted.get(CHOOSE_URL), 'name="method"', count=2)
+        self.assertEqual(self.restricted.post(CHOOSE_URL, {"method": PASSWORD_ONLY}).status_code, 200)
+        self.assertRedirects(self.restricted.post(CHOOSE_URL, {"method": PASSKEY}), reverse("accounts:passkey_setup"), fetch_redirect_response=False)
+        self.assertRedirects(self.restricted.get(CARD_CHOOSE_URL), CHOOSE_URL, fetch_redirect_response=False)
         self.assertFalse(AuthenticatorDevice.objects.filter(user=self.newcomer).exists())
 
-    @override_settings(PASSKEYS_ENABLED=True)
     def test_the_card_state_never_shows_the_choice_without_a_second_factor(self):
         from leg_platform.accounts.profile_views import two_factor_state
 
-        self.assertEqual(two_factor_state(self.newcomer, "two_factor", "choose", {}), "setup")
+        self.assertEqual(two_factor_state(self.newcomer, "two_factor", "choose", {}), "choose")
 
 
 @tag("mariadb")

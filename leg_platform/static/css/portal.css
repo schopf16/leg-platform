@@ -486,6 +486,30 @@ body {
   min-height: 48px;
 }
 
+/* Accepted D-106 login grouping: never change spacing of the shared entry shell. */
+.entry-card.login-card { gap: 0; }
+.login-card h1 { margin-bottom: 24px; }
+.login-card .login-password,
+.login-card .login-actions form { gap: 0; }
+.login-card .entry-field + .entry-field { margin-top: 24px; }
+.login-card .entry-check { margin-top: 16px; }
+.login-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.login-card .btn { min-height: 48px; border-radius: 8px; }
+.login-help-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 16px;
+}
+.login-card > .legal-links { margin-top: 24px; }
+.login-help-details { display: grid; gap: 16px; }
+.login-help-choices { display: grid; gap: 12px; }
+.login-help-back { display: flex; align-items: center; min-height: 44px; }
+
 .entry-divider {
   text-align: center;
   font-size: 14px;

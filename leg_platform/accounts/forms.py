@@ -485,8 +485,8 @@ class StartSetupForm(PortalFormMixin, forms.Form):
 class LoginMethodForm(PortalFormMixin, forms.Form):
     """The choice "Sign-in method" (D-106): the posted method must be one of ``login_methods.available(user)``.
 
-    The browser's value is never trusted: a method that is not offered to this account (for example "passkey" while
-    ``PASSKEYS_ENABLED`` is off, or "password" for an administrator) is refused like a missing choice.
+    Choices are built from the server-side account-specific list. Missing or unoffered browser
+    values, including password-only for a staff user or system administrator, are refused.
     """
 
     choose_message = _("Choose how you want to sign in.")
@@ -509,6 +509,19 @@ class ProofCodeInput(forms.TextInput):
 
     def format_value(self, value):
         return None
+
+
+class PasskeyProofInput(forms.HiddenInput):
+    template_name = "accounts/widgets/passkey_proof.html"
+
+    def format_value(self, value):
+        return None
+
+
+def passkey_proof_field():
+    return forms.CharField(
+        label=_("Confirm with your passkey"), max_length=32768, required=False, widget=PasskeyProofInput()
+    )
 
 
 # An app code after ``totp.normalize_code``; anything else is refused before the abuse protection counts it (D-062).
@@ -536,6 +549,13 @@ class OneProofMixin:
     code_lead = _("Enter the 6-digit code from your authenticator app. Your password is not needed here.")
 
     def use_one_proof(self, user, *, autofocus=True):
+        if user.authentication_method == User.AuthenticationMethod.PASSKEY:
+            self.proof = "passkey"
+            del self.fields["otp_token"]
+            del self.fields["current_password"]
+            self.fields["passkey_assertion"] = passkey_proof_field()
+            return
+        self.fields.pop("passkey_assertion", None)
         field = self.fields["otp_token"]
         if not second_factor.has_second_factor(user):
             self.proof = "password"
@@ -557,7 +577,9 @@ class OneProofMixin:
 
     def proof_changed(self):
         """Whether the second factor was set up or removed since the form was built (then fail closed)."""
-        return second_factor.has_second_factor(self.user) != (self.proof == "code")
+        if self.user.authentication_method == User.AuthenticationMethod.PASSKEY:
+            return self.proof != "passkey"
+        return self.proof == "passkey" or second_factor.has_second_factor(self.user) != (self.proof == "code")
 
     changed_message = _("Your account was changed in the meantime. Please try again.")
 
@@ -573,6 +595,12 @@ class OneProofMixin:
         When the budget is used up, ``verify_second_factor`` marks the request as locked out and the
         lockout page answers. A wrong code is counted per session; the fifth ends it (D-062).
         """
+        if self.proof == "passkey":
+            if not self.errors and not second_factor.verify_passkey(
+                self.request, self.user, cleaned_data.get("passkey_assertion", "")
+            ):
+                self.add_error("passkey_assertion", _("The passkey could not be verified. Please try again."))
+            return
         if self.proof != "code" or self.errors or "otp_token" not in cleaned_data:
             return
         if second_factor.verify_second_factor(
@@ -588,6 +616,7 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
     """
 
     current_password = _current_password_field()
+    passkey_assertion = passkey_proof_field()
     # Instead of the password where a second factor is set up; only an app code counts, a recovery code is refused.
     otp_token = forms.CharField(
         label=_("Code from the app"),
@@ -713,7 +742,9 @@ class EmailChangeForm(ReauthenticationForm):
         self.initial.setdefault("email", request.user.email)
         self.initial.setdefault("secondary_email", request.user.secondary_email)
         # The proof is the third field: no autofocus; the note stands below it.
-        proof_field = self.fields["otp_token" if self.proof == "code" else "current_password"]
+        proof_field = self.fields[
+            {"code": "otp_token", "passkey": "passkey_assertion", "password": "current_password"}[self.proof]
+        ]
         proof_field.widget.attrs.pop("autofocus", None)
         proof_field.closing_note = self.link_note
         proof_field.described_by = (*getattr(proof_field, "described_by", ()), "note")

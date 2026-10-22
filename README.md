@@ -37,6 +37,8 @@ The first phase creates a secure, extensible foundation. LEG domain functions, b
 * `docs/INSTALLATION.md`: configuration variables, local MariaDB setup, Microsoft Graph steps, address directory.
 * `docs/OPERATIONS.md`: roles, rules, CI, step list for stage and production.
 
+Address catalogue startup (D-075/D-076): missing/changed SQLite schemas are rebuilt from disposable public data and an official import is queued durably, without a startup download. The optional worker or the next scheduled-task tick processes it. Until successful import, address validation/suggestions are unavailable; application/MariaDB data is never reset. Normal CSV refresh keeps atomic generations. Setup errors are nonfatal; recovery and consumer requirements: `docs/INSTALLATION.md`, "Address Directory".
+
 ## First Phase
 
 Scope: `docs/PROJECT.md`. In short: login page as entry point (no public home page, D-025); registration with email verification; login protected against automated attacks; password change and reset; two-factor (TOTP, mandatory for staff users and system administrators); own profile (view, edit, delete); account lifecycle with deactivation for retention obligations; user, role and role-assignment management; Microsoft Graph configuration with a test send; security logging; instance configuration outside the code; all user functions usable on mobile phones.
@@ -55,10 +57,10 @@ BSD 3-Clause License (`LICENSE`), the same as Django (D-029). Dependencies are i
 
 **What exists.**
 
+* D-106 passkeys are always enabled. Registration, username-free sign-in, management, method changes and recovery are implemented. Acceptance remains open for genuine username-free and backup-only browser sign-in and human security review. Details: `docs/ACCEPTANCE.md`, section 3. Do not deploy before those gates.
 * Phase 1: login and entry pages, the frame with start page and task tiles, three-step registration, the profile in cards with a second email address and the second factor, address suggestions, security notifications, portal settings, error pages, grouped administration.
 * Phase 2: the management area ("Verwaltung") for staff (locations, metering points, LEGs, persons, overview, PDF printing, "Person anlegen", support dialogs). Open to every active staff user with a completed second factor (D-086). Details: `docs/DECISIONS.md`.
 * Onboarding, staff side (D-103, D-104): the overview queues, the list "Vorgänge" with the page of an application (review, return, registration at the grid operator, confirmation, completion, roll back; since D-109 also the staff's corrections of the address of a new building and of the number, direction and plant details of a metering point while the LEG works on it) and of a deregistration (confirm the date), notices, the list "Verträge" (upload, set as current, delete, download) and the chapter "Erinnerungen und Fristen" in the settings. A metering point number is shown on one line in blocks (D-109). Staff pages: not verified in a real browser. The customer pages are built (D-105): the menu and the start page with the card "Ihr Weg in die LEG", the page "Gebäude", the registration wizard and the contract page and download; the deregistration pages and the profile cards of the owner's design are built (D-105); a staff account has no customer pages. Customer pages: rendered in Edge, not verified on a real phone; the deregistration page and the new profile cards are verified by automated server tests only, not yet in a browser.
-* The automated tests pass locally (`scripts/test.ps1`, `docs/STARTUP.md` section 13).
 * The work is **not yet formally accepted**: `docs/ACCEPTANCE.md` is ticked only for what was verified on a real system.
 * Imprint and privacy notice are not part of the portal. The portal only links their two addresses (portal settings); the operator maintains the texts elsewhere (D-022, D-074). Operator notes: `docs/DEPLOYMENT.md`, section 14.
 

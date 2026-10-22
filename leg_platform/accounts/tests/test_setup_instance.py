@@ -10,8 +10,10 @@ created from the environment.
 import contextlib
 import logging
 import os
+import sqlite3
 import tempfile
 import threading
+import uuid
 from io import StringIO
 from pathlib import Path
 from unittest import mock
@@ -19,6 +21,7 @@ from unittest import mock
 from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import OperationalError, connection, connections
+from django.db import migrations, models
 from django.test import Client, SimpleTestCase, TransactionTestCase, tag
 from django.urls import reverse
 
@@ -26,7 +29,8 @@ from leg_platform.accounts.management.commands import setup_instance
 from leg_platform.accounts.models import SecurityEvent, User
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses.models import Directory, ImportRequest
-from leg_platform.addresses.storage import DIRECTORY_ALIAS
+from leg_platform.addresses import setup as directory_setup
+from leg_platform.addresses.storage import DIRECTORY_ALIAS, directory_open_guard, reset_marker
 from leg_platform.environment import parse_bootstrap_administrator
 
 
@@ -466,7 +470,7 @@ class SetupInstanceTests(TransactionTestCase):
         self.assertEqual(changed.status_code, 302)
         user = User.objects.get()
         self.assertFalse(user.password_change_required)
-        self.assertEqual(client.get(PROFILE_URL)["Location"], reverse("accounts:two_factor_setup"))
+        self.assertEqual(client.get(PROFILE_URL)["Location"], reverse("accounts:login_method"))
         self.assertEqual(client.get(reverse("admin:index")).status_code, 302)
 
 
@@ -508,6 +512,9 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                     set(alias.introspection.table_names()),
                     {"django_migrations", "addresses_address", "addresses_directory"},
                 )
+                job = ImportRequest.objects.get(pk=1)
+                self.assertEqual(job.state, ImportRequest.State.QUEUED)
+                self.assertIsNotNone(job.requested_at)
         self.assertEqual(errors, "")
         self.assertIn(f"Address directory: file prepared, {addresses_migration_count()} migration(s) applied.", output)
         self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
@@ -518,12 +525,17 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
             with directory_file(path):
                 self.run_command()
                 Directory.objects.create(pk=1, row_count=7, checksum="a" * 64)
+                ImportRequest.objects.filter(pk=1).update(state=ImportRequest.State.SUCCEEDED)
+                before = ImportRequest.objects.values().get(pk=1)
 
-                output, errors = self.run_command()
+                with mock.patch.object(directory_setup, "_remove_catalogue") as remove:
+                    output, errors = self.run_command()
 
+                remove.assert_not_called()
                 self.assertEqual(errors, "")
                 self.assertIn("Address directory: file ready, none pending.", output)
                 self.assertEqual(Directory.objects.get(pk=1).row_count, 7)
+                self.assertEqual(ImportRequest.objects.values().get(pk=1), before)
 
     def test_missing_tables_of_an_existing_file_are_created_again(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -537,6 +549,18 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
 
                 self.assertIn(f"file prepared, {addresses_migration_count()} migration(s) applied", output)
                 self.assertIn("addresses_directory", alias.introspection.table_names())
+
+    def test_an_empty_current_file_does_not_requeue_a_failed_import_on_each_start(self):
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3"):
+            self.run_command()
+            ImportRequest.objects.filter(pk=1).update(
+                state=ImportRequest.State.FAILED, last_error="Official download failed.",
+            )
+            before = ImportRequest.objects.values().get(pk=1)
+            output, errors = self.run_command()
+            self.assertEqual(errors, "")
+            self.assertNotIn("import queued", output)
+            self.assertEqual(ImportRequest.objects.values().get(pk=1), before)
 
     def test_a_directory_path_that_cannot_be_used_is_reported_and_does_not_stop_the_administrator(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -559,8 +583,9 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                 raise RuntimeError("detail that must not be shown /secret/path")
             return real(*args, **options)
 
-        with mock.patch.object(setup_instance, "call_command", side_effect=fail_for_the_directory):
-            output, errors = self.run_command()
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3"):
+            with mock.patch.object(directory_setup, "call_command", side_effect=fail_for_the_directory):
+                output, errors = self.run_command()
         self.assertIn("Address directory: NOT set up (RuntimeError)", errors)
         self.assertNotIn("detail that must not be shown", output + errors)
         self.assertNotIn("/secret/path", output + errors)
@@ -571,3 +596,429 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
             with self.assertRaisesMessage(CommandError, "not accepted"):
                 call_command("setup_instance", stdout=StringIO(), stderr=StringIO())
         self.assertFalse(User.objects.exists())
+
+    def test_pending_catalogue_migration_discards_rows_and_queues_once_without_changing_application_data(self):
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3") as alias:
+            self.run_command()
+            call_command("migrate", "addresses", "0006", database=DIRECTORY_ALIAS, verbosity=0)
+            Directory.objects.create(pk=1, row_count=7, checksum="a" * 64)
+            ImportRequest.objects.filter(pk=1).update(
+                state=ImportRequest.State.FAILED, last_error="Official download failed.",
+                bytes_done=123, rows_done=12,
+            )
+            user = User.objects.values().get()
+            events = list(SecurityEvent.objects.values())
+            tables = connection.introspection.table_names()
+            with mock.patch("leg_platform.addresses.importer.import_directory") as download:
+                output, errors = self.run_command()
+                requested_at = ImportRequest.objects.get(pk=1).requested_at
+                self.run_command()
+            download.assert_not_called()
+            self.assertEqual(errors, "")
+            self.assertIn("import queued", output)
+            self.assertFalse(Directory.objects.exists())
+            with alias.cursor() as cursor:
+                self.assertIn("addr_generation_locality", alias.introspection.get_constraints(
+                    cursor, "addresses_address"))
+            job = ImportRequest.objects.get(pk=1)
+            self.assertEqual((job.state, job.requested_at), (ImportRequest.State.QUEUED, requested_at))
+            self.assertEqual(User.objects.values().get(), user)
+            self.assertEqual(list(SecurityEvent.objects.values()), events)
+            self.assertEqual(connection.introspection.table_names(), tables)
+
+    def test_missing_index_with_current_migration_records_also_rebuilds(self):
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3") as alias:
+            self.run_command()
+            Directory.objects.create(pk=1, row_count=7)
+            with alias.cursor() as cursor:
+                cursor.execute("DROP INDEX addr_generation_locality")
+            output, errors = self.run_command()
+            self.assertEqual(errors, "")
+            self.assertIn("import queued", output)
+            self.assertFalse(Directory.objects.exists())
+
+    def test_only_application_model_operations_do_not_trigger_a_reset(self):
+        migration = migrations.Migration("application_only", "addresses")
+        migration.operations = [
+            migrations.AddField("importrequest", "test_field", models.IntegerField(null=True)),
+            migrations.CreateModel("BuildingLookup", []),
+        ]
+        self.assertFalse(directory_setup._changes_directory(migration))
+        migration.operations = [migrations.AddField("address", "test_field", models.IntegerField(null=True))]
+        self.assertTrue(directory_setup._changes_directory(migration))
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3"):
+            self.run_command()
+            Directory.objects.create(pk=1, row_count=7)
+            migration.operations = [migrations.AddField("importrequest", "test_field", models.IntegerField(null=True))]
+            real_executor = directory_setup.MigrationExecutor(connections[DIRECTORY_ALIAS])
+            with mock.patch.object(directory_setup, "MigrationExecutor", return_value=real_executor):
+                with mock.patch.object(real_executor, "migration_plan", return_value=[(migration, False)]):
+                    with mock.patch.object(directory_setup, "_remove_catalogue") as remove:
+                        output, errors = self.run_command()
+            remove.assert_not_called()
+            self.assertEqual(errors, "")
+            self.assertNotIn("import queued", output)
+            self.assertEqual(Directory.objects.get(pk=1).row_count, 7)
+
+    def test_live_job_is_not_reset_or_replaced_but_an_expired_job_is_requeued(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3"):
+            self.run_command()
+            call_command("migrate", "addresses", "0006", database=DIRECTORY_ALIAS, verbosity=0)
+            old_token = uuid.uuid4()
+            ImportRequest.objects.filter(pk=1).update(
+                state=ImportRequest.State.RUNNING, started_at=timezone.now(), claim_token=old_token,
+            )
+            before = ImportRequest.objects.values().get(pk=1)
+            with mock.patch.object(directory_setup, "_remove_catalogue") as remove:
+                _output, errors = self.run_command()
+            self.assertIn("NOT set up (OperationalError)", errors)
+            remove.assert_not_called()
+            self.assertEqual(ImportRequest.objects.values().get(pk=1), before)
+            ImportRequest.objects.filter(pk=1).update(started_at=timezone.now() - timedelta(hours=7))
+            _output, errors = self.run_command()
+            self.assertEqual(errors, "")
+            self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+            from leg_platform.addresses import jobs
+            jobs.record_failure(jobs.Claim(old_token, False, False), RuntimeError("late old holder"))
+            self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+    def test_unlink_failure_is_nonfatal_and_leaves_directory_unavailable_until_retry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path) as alias:
+                self.run_command()
+                call_command("migrate", "addresses", "0006", database=DIRECTORY_ALIAS, verbosity=0)
+                before = ImportRequest.objects.values().get(pk=1)
+                with mock.patch.object(Path, "unlink", side_effect=PermissionError("private detail")):
+                    output, errors = self.run_command()
+                self.assertIn("NOT set up (PermissionError)", errors)
+                self.assertNotIn("private detail", output + errors)
+                self.assertTrue(path.exists())
+                self.assertTrue(reset_marker(path).exists())
+                self.assertEqual(ImportRequest.objects.values().get(pk=1), before)
+                with self.assertRaises(OperationalError):
+                    Directory.objects.exists()
+                _output, errors = self.run_command()
+                self.assertEqual(errors, "")
+                self.assertFalse(reset_marker(path).exists())
+                self.assertIn("addresses_directory", alias.introspection.table_names())
+
+    def test_open_reader_refuses_reset_nonfatally_then_retry_succeeds(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path):
+                self.run_command()
+                call_command("migrate", "addresses", "0006", database=DIRECTORY_ALIAS, verbosity=0)
+                reader = sqlite3.connect(path)
+                reader.execute("SELECT * FROM addresses_directory").fetchall()
+                try:
+                    output, errors = self.run_command()
+                    self.assertIn("NOT set up (OperationalError)", errors)
+                    self.assertNotIn("import queued", output)
+                    self.assertTrue(path.exists())
+                finally:
+                    reader.close()
+                _output, errors = self.run_command()
+                self.assertEqual(errors, "")
+
+    def test_queue_failure_does_not_publish_partial_setup_and_retry_recovers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path):
+                with mock.patch.object(directory_setup.jobs, "request_import", side_effect=OperationalError("private")):
+                    _output, errors = self.run_command()
+                self.assertIn("NOT set up (OperationalError)", errors)
+                self.assertTrue(reset_marker(path).exists())
+                self.assertFalse(ImportRequest.objects.exists())
+                self.assertTrue(User.objects.filter(is_superuser=True).exists())
+                _output, errors = self.run_command()
+                self.assertEqual(errors, "")
+                self.assertFalse(reset_marker(path).exists())
+                self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+
+    def test_reset_marker_blocks_retained_and_new_connections_but_not_application_queries(self):
+        from leg_platform.addresses import jobs
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path) as alias:
+                self.run_command()
+                reset_marker(path).touch()
+                self.assertIsNone(jobs.claim())
+                self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+                with self.assertRaises(OperationalError):
+                    Directory.objects.exists()
+                alias.close()
+                with self.assertRaises(OperationalError):
+                    Directory.objects.exists()
+                self.assertTrue(User.objects.filter(is_superuser=True).exists())
+                reset_marker(path).unlink()
+                self.assertFalse(Directory.objects.exists())
+
+    def test_the_committed_queue_waits_until_schema_publication_before_becoming_claimable(self):
+        from leg_platform.addresses import jobs
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            real_unlink = Path.unlink
+            checked = []
+
+            def unlink(candidate, **kwargs):
+                if candidate == reset_marker(path):
+                    # The transaction has committed, but consumers must leave the queue alone.
+                    self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.QUEUED)
+                    self.assertIsNone(jobs.claim())
+                    checked.append(True)
+                return real_unlink(candidate, **kwargs)
+
+            with directory_file(path), mock.patch.object(Path, "unlink", unlink):
+                _output, errors = self.run_command()
+                self.assertEqual(errors, "")
+                self.assertEqual(checked, [True])
+                self.assertIsNotNone(jobs.claim())
+
+    def test_opening_a_connection_cannot_overlap_the_reset_opening_guard(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path) as alias:
+                self.run_command()
+                alias.close()
+                with directory_open_guard(path):
+                    with self.assertRaises(OperationalError):
+                        Directory.objects.exists()
+                self.assertFalse(Directory.objects.exists())
+
+    def _assert_paused_cursor_refuses_reset(self, *, replace_file):
+        """Pause after cursor creation, then resume SQL only after reset begins/replacement."""
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path) as alias:
+                self.run_command()
+                options = {**alias.settings_dict, "NAME": str(path)}
+                alias.close()
+                ready, resume = threading.Event(), threading.Event()
+                outcomes = []
+
+                def use_retained_cursor():
+                    database = directory_setup.DatabaseWrapper(options, alias=DIRECTORY_ALIAS)
+                    try:
+                        with database.cursor() as cursor:
+                            # Also prove Django's mapping and generator parameter conversion
+                            # still works through the subclass before the reset starts.
+                            cursor.execute("SELECT %(value)s", {"value": 7})
+                            outcomes.append(cursor.fetchone())
+                            cursor.execute("CREATE TABLE cursor_probe (value integer)")
+                            cursor.executemany(
+                                "INSERT INTO cursor_probe VALUES (%s)", ((value,) for value in (1, 2)),
+                            )
+                            ready.set()
+                            if not resume.wait(timeout=15):
+                                raise RuntimeError("The reset test did not resume the cursor.")
+                            for query, params, many in (
+                                ("SELECT * FROM cursor_probe", None, False),
+                                ("INSERT INTO cursor_probe VALUES (%s)", [3], False),
+                                ("INSERT INTO cursor_probe VALUES (%s)", [(4,), (5,)], True),
+                            ):
+                                try:
+                                    if many:
+                                        cursor.executemany(query, params)
+                                    else:
+                                        cursor.execute(query, params)
+                                except OperationalError:
+                                    outcomes.append("refused")
+                                else:
+                                    outcomes.append("unexpected execution")
+                    except Exception as error:
+                        outcomes.append(error)
+                    finally:
+                        ready.set()
+                        database.close()
+
+                thread = threading.Thread(target=use_retained_cursor)
+                thread.start()
+                try:
+                    self.assertTrue(ready.wait(timeout=15))
+                    self.assertEqual(outcomes, [(7,)])
+                    if replace_file:
+                        # The supported reset refuses a live WAL reader. Simulate a POSIX
+                        # replacement anyway to exercise the retained cursor's identity guard.
+                        replacement = Path(folder) / "replacement.sqlite3"
+                        with contextlib.closing(sqlite3.connect(replacement)) as database:
+                            with database:
+                                database.execute("CREATE TABLE cursor_probe (value integer)")
+                                database.execute("INSERT INTO cursor_probe VALUES (99)")
+                        replacement.replace(path)
+                    else:
+                        reset_marker(path).touch()
+                finally:
+                    resume.set()
+                    thread.join(timeout=15)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(outcomes, [(7,), "refused", "refused", "refused"])
+                if replace_file:
+                    with contextlib.closing(sqlite3.connect(path)) as database:
+                        self.assertEqual(database.execute("SELECT * FROM cursor_probe").fetchall(), [(99,)])
+                else:
+                    reset_marker(path).unlink()
+                    with contextlib.closing(sqlite3.connect(path)) as database:
+                        self.assertEqual(database.execute("SELECT * FROM cursor_probe").fetchall(), [(1,), (2,)])
+
+    def test_cursor_created_before_reset_refuses_execution_after_marker_appears(self):
+        self._assert_paused_cursor_refuses_reset(replace_file=False)
+
+    def test_cursor_created_before_replacement_refuses_stale_reads_and_writes(self):
+        if os.name != "posix":
+            self.skipTest("Windows refuses replacing an open SQLite file; marker regression runs on both platforms.")
+        self._assert_paused_cursor_refuses_reset(replace_file=True)
+
+    def _assert_parameter_consumption_excludes_reset(self, *, many):
+        """Block inside SQL parameter consumption, after the execution guard was entered."""
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path) as alias:
+                self.run_command()
+                # Require a real schema rebuild, rather than a no-op setup.
+                with alias.cursor() as cursor:
+                    cursor.execute("DROP INDEX addr_generation_locality")
+                    cursor.execute("CREATE TABLE cursor_probe (value integer)")
+                options = {**alias.settings_dict, "NAME": str(path)}
+                alias.close()
+                consuming, resume = threading.Event(), threading.Event()
+                outcomes = []
+
+                def pause():
+                    consuming.set()
+                    if not resume.wait(timeout=15):
+                        raise RuntimeError("The parameter test did not resume SQL execution.")
+
+                def parameters():
+                    yield (1,)
+                    pause()
+                    yield (2,)
+
+                class DelayedSequence:
+                    def __len__(self):
+                        return 1
+
+                    def __getitem__(self, index):
+                        if index != 0:
+                            raise IndexError(index)
+                        pause()
+                        return 1
+
+                def execute():
+                    database = directory_setup.DatabaseWrapper(options, alias=DIRECTORY_ALIAS)
+                    try:
+                        with database.cursor() as cursor:
+                            if many:
+                                cursor.executemany("INSERT INTO cursor_probe VALUES (%s)", parameters())
+                            else:
+                                cursor.execute("INSERT INTO cursor_probe VALUES (%s)", DelayedSequence())
+                        outcomes.append("executed")
+                    except Exception as error:
+                        outcomes.append(error)
+                    finally:
+                        consuming.set()
+                        database.close()
+
+                thread = threading.Thread(target=execute)
+                thread.start()
+                try:
+                    self.assertTrue(consuming.wait(timeout=15))
+                    self.assertEqual(outcomes, [])
+                    # Try the real reset entry point while the generator/sequence is paused.
+                    # It must fail nonblockingly before any marker, unlink or replacement.
+                    with mock.patch.object(directory_setup, "_remove_catalogue") as remove:
+                        with self.assertRaises(OSError):
+                            directory_setup.prepare_directory(stdout=StringIO(), stderr=StringIO())
+                    remove.assert_not_called()
+                    self.assertFalse(reset_marker(path).exists())
+                    self.assertTrue(path.exists())
+                finally:
+                    resume.set()
+                    thread.join(timeout=15)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(outcomes, ["executed"])
+                with alias.cursor() as cursor:
+                    cursor.execute("SELECT value FROM cursor_probe ORDER BY value")
+                    self.assertEqual(cursor.fetchall(), [(1,), (2,)] if many else [(1,)])
+                # With parameter consumption finished and the writer closed, retry really
+                # rebuilds the catalogue and cannot inherit any writes into the old file.
+                _pending, queued = directory_setup.prepare_directory(stdout=StringIO(), stderr=StringIO())
+                self.assertTrue(queued)
+                self.assertNotIn("cursor_probe", alias.introspection.table_names())
+                self.assertFalse(reset_marker(path).exists())
+
+    def test_blocking_executemany_generator_prevents_reset_until_execution_finishes(self):
+        self._assert_parameter_consumption_excludes_reset(many=True)
+
+    def test_blocking_execute_parameter_sequence_prevents_reset_until_execution_finishes(self):
+        self._assert_parameter_consumption_excludes_reset(many=False)
+
+    def test_retained_posix_connection_refuses_a_replaced_file(self):
+        if os.name != "posix":
+            self.skipTest("Windows refuses unlinking an open database; inode replacement is a POSIX case.")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_file(path):
+                self.run_command()
+                # Simulate replacement outside the backend, on disposable test files only.
+                replacement = Path(folder) / "replacement.sqlite3"
+                replacement.touch()
+                replacement.replace(path)
+                with self.assertRaises(OperationalError):
+                    Directory.objects.exists()
+
+
+class CatalogueRemovalTests(SimpleTestCase):
+    """File removal is narrowly scoped; the MariaDB job/account data is never a target."""
+
+    def test_unrelated_and_state_only_migrations_do_not_require_catalogue_removal(self):
+        migration = migrations.Migration("metadata_only", "addresses")
+        migration.operations = [
+            migrations.AlterModelOptions("address", {"verbose_name": "Address"}),
+            migrations.AlterModelManagers("directory", []),
+            migrations.RunPython(migrations.RunPython.noop, hints={"model_name": "importrequest"}),
+        ]
+        self.assertFalse(directory_setup._changes_directory(migration))
+        unrelated = migrations.Migration("application_only", "accounts")
+        unrelated.operations = [migrations.AddField("user", "test_field", models.IntegerField(null=True))]
+        self.assertFalse(directory_setup._changes_directory(unrelated))
+
+    def test_only_the_configured_file_and_exact_sqlite_sidecars_are_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            removed = [path, *(Path(str(path) + suffix) for suffix in ("-wal", "-shm", "-journal"))]
+            unrelated = [Path(folder) / "application.sqlite3", Path(str(path) + "-wal.backup")]
+            for candidate in [*removed, *unrelated]:
+                candidate.write_bytes(b"disposable test data")
+            alias = mock.MagicMock()
+            alias.cursor.return_value.__enter__.return_value.fetchone.return_value = ("delete",)
+            directory_setup._remove_catalogue(alias, path)
+            self.assertTrue(all(not candidate.exists() for candidate in removed))
+            self.assertTrue(all(candidate.exists() for candidate in unrelated))
+            alias.close.assert_called_once()
+
+    def test_a_symbolic_link_is_never_unlinked_as_a_catalogue(self):
+        if os.name != "posix":
+            self.skipTest("Creating symlinks needs extra privileges on Windows.")
+        with tempfile.TemporaryDirectory() as folder:
+            original = Path(folder) / "application.sqlite3"
+            original.write_bytes(b"protected")
+            path = Path(folder) / "directory.sqlite3"
+            path.symlink_to(original)
+            with self.assertRaises(OperationalError):
+                directory_setup._remove_catalogue(mock.MagicMock(), path)
+            self.assertEqual(original.read_bytes(), b"protected")
+
+    def test_the_opening_guard_is_nonblocking_and_is_released_on_failure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "directory.sqlite3"
+            with directory_open_guard(path):
+                with self.assertRaises(OSError):
+                    with directory_open_guard(path):
+                        self.fail("A second connection/reset entered the same opening guard.")
+            with self.assertRaises(RuntimeError):
+                with directory_open_guard(path):
+                    raise RuntimeError("test failure")
+            with directory_open_guard(path):
+                pass

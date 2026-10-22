@@ -491,7 +491,7 @@ class NotificationGreetingTests(TestCase):
             MailJob.Kind.RECOVERY_CODES_RENEWED: "Für Ihr Konto bei",
             MailJob.Kind.RECOVERY_CODE_USED: "Zum Einloggen in Ihr Konto",
             MailJob.Kind.CODE_ATTEMPTS_WARNING: "Für Ihr Konto bei",
-            MailJob.Kind.TWO_FACTOR_RESET: "Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos",
+            MailJob.Kind.TWO_FACTOR_RESET: "Die Wiederherstellung der Anmeldung für Ihr Konto",
         }
         for kind, start in senders.items():
             with self.subTest(kind=kind):
@@ -524,7 +524,7 @@ class NotificationGreetingTests(TestCase):
         run_mail_queue()
         self.assertEqual(mail.outbox[0].to, ["person@example.org"])
         self.assertTrue(
-            mail.outbox[0].body.startswith("Guten Tag Maria Muster\n\nDie Betreiber haben"),
+            mail.outbox[0].body.startswith("Guten Tag Maria Muster\n\nDer Betreiber hat"),
             mail.outbox[0].body,
         )
 

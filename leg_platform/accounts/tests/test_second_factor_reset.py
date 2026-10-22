@@ -16,10 +16,11 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts import second_factor_reset
+from leg_platform.accounts import email_change, second_factor_reset
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     MailJob,
+    PendingEmailChange,
     RecoveryCodeDevice,
     SecurityEvent,
     User,
@@ -70,6 +71,286 @@ def has_second_factor(user):
     )
 
 
+def login_change_token(user, address):
+    """Prepare the same pending request/token consumed by the real confirmation service."""
+    PendingEmailChange.objects.create(
+        user=user, kind=PendingEmailChange.Kind.LOGIN, address=address,
+        expires_at=timezone.now() + timedelta(hours=24),
+    )
+    raw = VerificationToken.objects.issue(
+        user, VerificationToken.Purpose.EMAIL_CHANGE, timedelta(hours=24), target_email=address,
+    )
+    return VerificationToken.objects.find_valid(raw, VerificationToken.Purpose.EMAIL_CHANGE)
+
+
+@tag("mariadb")
+class RecoveryAddressBindingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = create_active_user("recovery.owner@example.org")
+        with_second_factor(cls.user)
+
+    def issued_link(self):
+        send = second_factor_reset.process_reset_link(self.user.pk, self.user.email)
+        self.assertIsNotNone(send)
+        with mock.patch.object(second_factor_reset.emails, "send_two_factor_reset_link") as delivery:
+            send()
+        raw = delivery.call_args.args[1]
+        return raw, second_factor_reset.find_link(raw)
+
+    def test_issued_and_opened_link_is_revoked_by_confirmed_login_change_and_fresh_link_works(self):
+        raw, old_token = self.issued_link()
+        self.assertEqual(old_token.target_email, self.user.normalized_email)
+        owner = Client()
+        path = reverse("accounts:two_factor_reset_verify", args=[raw])
+        confirm_path = owner.get(path)["Location"]
+        self.assertTrue(has_second_factor(self.user))
+        token = login_change_token(self.user, "new.recovery.owner@example.org")
+        self.assertIsNotNone(email_change.confirm_change(token))
+        self.user.refresh_from_db()
+        self.assertFalse(VerificationToken.objects.filter(pk=old_token.pk).exists())
+        self.assertIsNone(second_factor_reset.find_link(raw))
+        self.assertIsNone(second_factor_reset.find_link_by_digest(old_token.digest))
+        self.assertIsNone(second_factor_reset.confirm_link(old_token))
+        self.assertContains(owner.post(confirm_path, follow=True), "Link nicht mehr gültig")
+        self.assertTrue(has_second_factor(self.user))
+        fresh_raw, fresh_token = self.issued_link()
+        self.assertNotEqual(raw, fresh_raw)
+        self.assertEqual(fresh_token.target_email, self.user.normalized_email)
+        self.assertIsNotNone(second_factor_reset.confirm_link(fresh_token))
+        self.assertFalse(has_second_factor(self.user))
+
+    def test_lookup_and_locked_confirmation_reject_mismatched_and_unbound_tokens(self):
+        for address in ("", "former.owner@example.org"):
+            with self.subTest(address=address):
+                raw = VerificationToken.objects.issue(
+                    self.user, VerificationToken.Purpose.TWO_FACTOR_RESET,
+                    timedelta(hours=24), target_email=address,
+                )
+                token = VerificationToken.objects.find_valid(
+                    raw, VerificationToken.Purpose.TWO_FACTOR_RESET
+                )
+                self.assertIsNone(second_factor_reset.find_link(raw))
+                self.assertIsNone(second_factor_reset.find_link_by_digest(token.digest))
+                self.assertIsNone(second_factor_reset.confirm_link(token))
+                self.assertTrue(has_second_factor(self.user))
+
+    def test_locked_confirmation_rechecks_address_after_lookup(self):
+        raw, token = self.issued_link()
+        self.user.change_email("changed.after.lookup@example.org")
+        self.assertTrue(VerificationToken.objects.filter(pk=token.pk).exists())
+        self.assertIsNone(second_factor_reset.find_link(raw))
+        self.assertIsNone(second_factor_reset.find_link_by_digest(token.digest))
+        self.assertIsNone(second_factor_reset.confirm_link(token))
+        self.assertTrue(has_second_factor(self.user))
+
+    def test_pending_login_change_and_confirmed_secondary_change_keep_current_mailbox_link(self):
+        raw, token = self.issued_link()
+        login_change_token(self.user, "still.pending@example.org")
+        self.assertIsNotNone(email_change.process_request(self.user.pk, "still.pending@example.org"))
+        self.assertIsNotNone(second_factor_reset.find_link(raw))
+        PendingEmailChange.objects.create(
+            user=self.user, kind=PendingEmailChange.Kind.SECONDARY,
+            address="new.secondary@example.org", expires_at=timezone.now() + timedelta(hours=24),
+        )
+        secondary_raw = VerificationToken.objects.issue(
+            self.user, VerificationToken.Purpose.SECONDARY_EMAIL, timedelta(hours=24),
+            target_email="new.secondary@example.org",
+        )
+        secondary_token = VerificationToken.objects.find_valid(
+            secondary_raw, VerificationToken.Purpose.SECONDARY_EMAIL
+        )
+        self.assertIsNotNone(email_change.confirm_change(secondary_token))
+        self.assertIsNotNone(second_factor_reset.find_link(raw))
+        self.assertIsNotNone(second_factor_reset.confirm_link(token))
+
+    def test_delayed_dispatch_rechecks_recipient_and_superseded_token(self):
+        old_send = second_factor_reset.process_reset_link(self.user.pk, self.user.email)
+        newer_send = second_factor_reset.process_reset_link(self.user.pk, self.user.email)
+        with mock.patch.object(second_factor_reset.emails, "send_two_factor_reset_link") as delivery:
+            old_send()
+            delivery.assert_not_called()
+            newer_send()
+            delivery.assert_called_once()
+        delayed_send = second_factor_reset.process_reset_link(self.user.pk, self.user.email)
+        self.assertIsNotNone(email_change.confirm_change(
+            login_change_token(self.user, "changed.before.dispatch@example.org")
+        ))
+        with mock.patch.object(second_factor_reset.emails, "send_two_factor_reset_link") as delivery:
+            delayed_send()
+            delivery.assert_not_called()
+
+
+@tag("mariadb")
+class RecoveryIssuanceRaceTests(TransactionTestCase):
+    def setUp(self):
+        if connection.vendor != "mysql":
+            self.skipTest("Real row-lock races require MariaDB.")
+        self.user = create_active_user("recovery.race@example.org")
+        with_second_factor(self.user)
+
+    def test_dispatch_holds_account_lock_until_delivery_returns_then_address_change_revokes_link(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections
+
+        token = login_change_token(self.user, "changed.during.dispatch@example.org")
+        send = second_factor_reset.process_reset_link(self.user.pk, self.user.email)
+        self.assertIsNotNone(send)
+        delivering, change_query, delivered, changed = Event(), Event(), Event(), Event()
+        observed = {}
+
+        def pause_delivery(address, raw, lifetime, greeting_name):
+            # Pause inside the actual delivery boundary, not token issuance.
+            observed["dispatch_atomic"] = connections["default"].in_atomic_block
+            observed["address"], observed["raw"] = address, raw
+            delivering.set()
+            if not change_query.wait(timeout=10):
+                raise AssertionError("Address change did not reach its account lock.")
+            observed["changed_before_delivery_returned"] = changed.wait(timeout=1)
+            delivered.set()
+
+        def dispatch():
+            connections.close_all()
+            try:
+                send()
+            finally:
+                connections.close_all()
+
+        def change():
+            connections.close_all()
+            try:
+                if not delivering.wait(timeout=10):
+                    raise AssertionError("Dispatch did not enter the delivery callback.")
+
+                def record_lock(execute, sql, params, many, context):
+                    if "FOR UPDATE" in sql.upper() and User._meta.db_table in sql:
+                        change_query.set()
+                    return execute(sql, params, many, context)
+
+                with connections["default"].execute_wrapper(record_lock):
+                    result = email_change.confirm_change(token)
+                observed["delivery_returned_before_change"] = delivered.is_set()
+                changed.set()
+                return result is not None
+            finally:
+                connections.close_all()
+
+        with mock.patch.object(
+            second_factor_reset.emails, "send_two_factor_reset_link", side_effect=pause_delivery
+        ) as delivery:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                dispatch_future = executor.submit(dispatch)
+                change_future = executor.submit(change)
+                dispatch_future.result(timeout=20)
+                self.assertTrue(change_future.result(timeout=20))
+            delivery.assert_called_once()
+        self.assertTrue(observed["dispatch_atomic"])
+        self.assertFalse(observed["changed_before_delivery_returned"])
+        self.assertTrue(observed["delivery_returned_before_change"])
+        self.assertEqual(observed["address"], self.user.email)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, "changed.during.dispatch@example.org")
+        self.assertIsNone(second_factor_reset.find_link(observed["raw"]))
+        self.assertFalse(VerificationToken.objects.filter(
+            user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
+        ).exists())
+        self.assertTrue(has_second_factor(self.user))
+
+    def test_worker_issuance_serializes_with_confirmed_login_change(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections
+
+        token = login_change_token(self.user, "recovery.race.changed@example.org")
+        issuing, change_query, changed = Event(), Event(), Event()
+        real_issue = VerificationToken.objects.issue
+        observed = {}
+        user_id, address = self.user.pk, self.user.email
+
+        def pause_issue(user, purpose, lifetime, **kwargs):
+            issuing.set()
+            if not change_query.wait(timeout=10):
+                raise AssertionError("Address change did not reach its account lock.")
+            observed["change_completed_before_issue"] = changed.wait(timeout=1)
+            observed["raw"] = real_issue(user, purpose, lifetime, **kwargs)
+            return observed["raw"]
+
+        def worker():
+            connections.close_all()
+            try:
+                with mock.patch.object(VerificationToken.objects, "issue", side_effect=pause_issue):
+                    return second_factor_reset.process_reset_link(user_id, address)
+            finally:
+                connections.close_all()
+
+        def change():
+            connections.close_all()
+            try:
+                if not issuing.wait(timeout=10):
+                    raise AssertionError("Worker did not reach issuance.")
+
+                def record_lock(execute, sql, params, many, context):
+                    if "FOR UPDATE" in sql.upper() and User._meta.db_table in sql:
+                        change_query.set()
+                    return execute(sql, params, many, context)
+
+                with connections["default"].execute_wrapper(record_lock):
+                    result = email_change.confirm_change(token)
+                changed.set()
+                return result is not None
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            worker_future = executor.submit(worker)
+            change_future = executor.submit(change)
+            send = worker_future.result(timeout=20)
+            self.assertTrue(change_future.result(timeout=20))
+        self.assertFalse(observed["change_completed_before_issue"])
+        self.assertIsNone(second_factor_reset.find_link(observed["raw"]))
+        self.assertFalse(VerificationToken.objects.filter(
+            user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
+        ).exists())
+        with mock.patch.object(second_factor_reset.emails, "send_two_factor_reset_link") as delivery:
+            send()
+            delivery.assert_not_called()
+        self.user.refresh_from_db()
+        self.assertIsNone(second_factor_reset.process_reset_link(user_id, address))
+        self.assertIsNotNone(second_factor_reset.process_reset_link(user_id, self.user.email))
+        self.assertTrue(has_second_factor(self.user))
+
+    def test_parallel_workers_leave_only_one_current_link(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        from django.db import connections
+
+        barrier = Barrier(2)
+        user_id, address = self.user.pk, self.user.email
+
+        def worker(_):
+            connections.close_all()
+            try:
+                barrier.wait(timeout=10)
+                return second_factor_reset.process_reset_link(user_id, address)
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            sends = list(executor.map(worker, range(2)))
+        self.assertEqual(VerificationToken.objects.filter(
+            user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
+        ).count(), 1)
+        with mock.patch.object(second_factor_reset.emails, "send_two_factor_reset_link") as delivery:
+            for send in sends:
+                self.assertIsNotNone(send)
+                send()
+            delivery.assert_called_once()
+        token = second_factor_reset.find_link(delivery.call_args.args[1])
+        self.assertEqual(token.target_email, self.user.normalized_email)
+        self.assertIsNotNone(second_factor_reset.confirm_link(token))
+
+
 @tag("mariadb")
 class AdministrationResetTests(TestCase):
     client_class = VerifiedClient
@@ -80,34 +361,34 @@ class AdministrationResetTests(TestCase):
         cls.user = create_active_user("member@example.org")
         with_second_factor(cls.user)
 
-    def test_the_account_page_offers_the_reset_for_other_accounts_only(self):
+    def test_account_settings_offer_recovery_including_the_own_account(self):
         self.client.force_login(self.administrator)
         other = self.client.get(reverse("admin:accounts_user_change", args=(self.user.pk,)))
         self.assertContains(other, reset_url(self.user))
         own = self.client.get(reverse("admin:accounts_user_change", args=(self.administrator.pk,)))
-        self.assertNotContains(own, reset_url(self.administrator))
+        self.assertContains(own, reset_url(self.administrator))
 
-    def test_a_staff_user_cannot_use_the_reset_even_with_every_permission(self):
+    def test_staff_can_open_recovery_but_must_confirm_the_id_check(self):
         staff = create_active_user("staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)
         from django.contrib.auth.models import Permission
 
         staff.user_permissions.set(Permission.objects.filter(content_type__app_label="accounts"))
         self.client.force_login(staff)
-        self.assertEqual(self.client.get(reset_url(self.user)).status_code, 403)
-        self.assertEqual(self.client.post(reset_url(self.user), {}).status_code, 403)
+        self.assertEqual(self.client.get(reset_url(self.user)).status_code, 200)
+        self.assertEqual(self.client.post(reset_url(self.user), {}).status_code, 200)
         self.assertTrue(has_second_factor(self.user))
         self.assertFalse(MailJob.objects.exists())
 
-    def test_nobody_can_reset_their_own_second_factor_there(self):
+    def test_own_recovery_requires_the_same_id_confirmation(self):
         self.client.force_login(self.administrator)
-        self.assertEqual(self.client.get(reset_url(self.administrator)).status_code, 403)
-        self.assertEqual(self.client.post(reset_url(self.administrator), {}).status_code, 403)
+        self.assertEqual(self.client.get(reset_url(self.administrator)).status_code, 200)
+        self.assertEqual(self.client.post(reset_url(self.administrator), {}).status_code, 200)
         self.assertTrue(has_second_factor(self.administrator))
 
     def test_a_user_gets_a_link_and_keeps_the_factor_until_it_is_confirmed(self):
         self.client.force_login(self.administrator)
-        response = self.client.post(reset_url(self.user), {})
+        response = self.client.post(reset_url(self.user), {"identity_verified": "on"})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(has_second_factor(self.user))
         self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_RESET_LINK)
@@ -126,7 +407,7 @@ class AdministrationResetTests(TestCase):
         member.force_login(self.user)
         self.assertEqual(member.get(PROFILE_URL).status_code, 200)
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         path = link_in(mail.outbox[0])
         owner = Client()
@@ -140,13 +421,13 @@ class AdministrationResetTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertTrue(has_second_factor(self.user))
         done = owner.post(opened["Location"])
-        self.assertRedirects(done, LOGIN_URL, fetch_redirect_response=False)
+        self.assertRedirects(done, reverse("accounts:login_method"), fetch_redirect_response=False)
         self.assertFalse(has_second_factor(self.user))
-        # Every session of the account ended; the owner can log in with the password only.
+        # Every prior session ended; old passwords cannot bypass restricted recovery.
         self.assertEqual(member.get(PROFILE_URL).status_code, 302)
         self.assertEqual(
             Client().post(LOGIN_URL, {"username": self.user.email, "password": PASSWORD}).status_code,
-            302,
+            200,
         )
         reset = SecurityEvent.objects.get(event="two_factor_reset")
         self.assertEqual((reset.account_id, reset.actor_id, reset.long_retention), (self.user.pk, None, False))
@@ -155,10 +436,10 @@ class AdministrationResetTests(TestCase):
 
     def test_the_link_works_once_and_a_newer_link_replaces_the_older(self):
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         first = link_in(mail.outbox[0])
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         second = link_in(mail.outbox[1])
         self.assertNotEqual(first, second)
@@ -173,23 +454,26 @@ class AdministrationResetTests(TestCase):
 
     def test_an_expired_link_is_not_valid(self):
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         path = link_in(mail.outbox[0])
         VerificationToken.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
         self.assertContains(Client().get(path, follow=True), "Link nicht mehr gültig")
         self.assertTrue(has_second_factor(self.user))
 
-    def test_a_link_stops_working_when_the_account_becomes_a_staff_user(self):
+    def test_a_recovery_link_stays_valid_after_promotion_without_mutating_the_factor(self):
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         path = link_in(mail.outbox[0])
         self.user.set_privileges(is_staff=True, is_superuser=False)
-        self.assertContains(Client().get(path, follow=True), "Link nicht mehr gültig")
+        self.assertEqual(Client().get(path).status_code, 302)
+        self.assertEqual(second_factor_reset.find_link_by_digest(
+            VerificationToken.objects.get(user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET).digest
+        ).user_id, self.user.pk)
         self.assertTrue(has_second_factor(self.user))
 
-    def test_a_link_is_not_sent_if_the_account_has_no_factor_or_is_privileged(self):
+    def test_a_link_is_sent_for_both_password_only_and_staff_accounts(self):
         plain = create_active_user("plain@example.org")
         MailJob.objects.create(
             kind=MailJob.Kind.TWO_FACTOR_RESET_LINK,
@@ -205,12 +489,15 @@ class AdministrationResetTests(TestCase):
             next_attempt_at=timezone.now(),
         )
         run_mail_queue()
-        self.assertEqual(mail.outbox, [])
-        self.assertFalse(VerificationToken.objects.exists())
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual({message.to[0] for message in mail.outbox}, {plain.email, self.user.email})
+        self.assertEqual(set(VerificationToken.objects.filter(
+            purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
+        ).values_list("user_id", flat=True)), {plain.pk, self.user.pk})
 
     def test_a_link_does_not_reach_another_account_after_the_address_changed(self):
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         requested_address = self.user.email
         self.user.change_email("moved.person@example.org")
         # Another person now holds the address of the request and has a second factor.
@@ -224,7 +511,7 @@ class AdministrationResetTests(TestCase):
         self.assertFalse(MailJob.objects.exists())
         self.assertTrue(has_second_factor(taker))
 
-    def test_a_staff_user_is_reset_at_once_after_the_identity_confirmation(self):
+    def test_staff_recovery_waits_for_owner_confirmation_then_ends_all_sessions(self):
         staff = create_active_user("staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)
         with_second_factor(staff)
@@ -238,34 +525,42 @@ class AdministrationResetTests(TestCase):
         self.assertTrue(has_second_factor(staff))
         done = self.client.post(reset_url(staff), {"identity_verified": "on"})
         self.assertEqual(done.status_code, 302)
+        self.assertTrue(has_second_factor(staff))
+        self.assertEqual(staff_client.get(reverse("admin:index")).status_code, 200)
+        run_mail_queue()
+        token = VerificationToken.objects.get(user=staff, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET)
+        self.assertIsNotNone(second_factor_reset.confirm_link(token))
         self.assertFalse(has_second_factor(staff))
-        # The sessions of the account ended.
         self.assertEqual(staff_client.get(reverse("admin:index")).status_code, 302)
         entry = SecurityEvent.objects.get(event="two_factor_reset")
         self.assertEqual(
             (entry.account_id, entry.actor_id, entry.long_retention),
-            (staff.pk, self.administrator.pk, True),
+            (staff.pk, None, True),
         )
         self.assertEqual(MailJob.objects.get().kind, MailJob.Kind.TWO_FACTOR_RESET)
         # At the next login the account must set the factor up before anything else.
         fresh = Client()
-        fresh.post(LOGIN_URL, {"username": staff.email, "password": PASSWORD})
-        self.assertEqual(fresh.get(PROFILE_URL)["Location"], reverse("accounts:two_factor_setup"))
+        self.assertEqual(fresh.post(LOGIN_URL, {"username": staff.email, "password": PASSWORD}).status_code, 200)
+        self.assertTrue(fresh.get(PROFILE_URL)["Location"].startswith(LOGIN_URL))
 
     def test_a_system_administrator_can_be_reset_by_another(self):
         other = administrator("other.admin@example.org")
         self.client.force_login(self.administrator)
         self.client.post(reset_url(other), {"identity_verified": "on"})
-        self.assertFalse(has_second_factor(other))
+        self.assertTrue(has_second_factor(other))
+        self.assertTrue(MailJob.objects.filter(kind=MailJob.Kind.TWO_FACTOR_RESET_LINK, account=other).exists())
         self.assertTrue(has_second_factor(self.administrator))
 
-    def test_an_account_without_a_factor_has_nothing_to_reset(self):
+    def test_an_active_account_without_a_factor_uses_the_same_recovery_link(self):
         plain = create_active_user("plain@example.org")
         self.client.force_login(self.administrator)
-        self.assertContains(self.client.get(reset_url(plain)), "keine Zwei-Faktor-Anmeldung (2FA)")
-        self.client.post(reset_url(plain), {})
-        self.assertFalse(MailJob.objects.exists())
-        self.assertFalse(SecurityEvent.objects.exists())
+        self.assertContains(self.client.get(reset_url(plain)), 'name="identity_verified"')
+        self.client.post(reset_url(plain), {"identity_verified": "on"})
+        self.assertTrue(MailJob.objects.filter(
+            kind=MailJob.Kind.TWO_FACTOR_RESET_LINK, account=plain
+        ).exists())
+        plain.refresh_from_db()
+        self.assertTrue(plain.check_password(PASSWORD))
 
     def test_the_rules_are_checked_again_in_the_account_logic(self):
         staff = create_active_user("staff@example.org")
@@ -274,10 +569,6 @@ class AdministrationResetTests(TestCase):
         plain_actor = create_active_user("actor@example.org")
         refused = (
             (plain_actor, self.user, second_factor_reset.request_link),
-            (staff, self.user, second_factor_reset.request_link),
-            (self.administrator, self.administrator, second_factor_reset.reset_privileged),
-            (self.administrator, self.user, second_factor_reset.reset_privileged),
-            (self.administrator, staff, second_factor_reset.request_link),
         )
         for actor, target, function in refused:
             with self.subTest(actor=actor.email, target=target.email, function=function.__name__):
@@ -293,7 +584,7 @@ class AdministrationResetTests(TestCase):
 
     def test_a_password_reset_does_not_remove_or_replace_the_link(self):
         self.client.force_login(self.administrator)
-        self.client.post(reset_url(self.user), {})
+        self.client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         self.assertTrue(VerificationToken.objects.filter(purpose="two_factor_reset").exists())
         self.assertTrue(has_second_factor(self.user))
@@ -630,7 +921,7 @@ class InitialAdministratorTests(TransactionTestCase):
         self.assertFalse(user.password_change_required)
         self.assertTrue(user.check_password(NEW_PASSWORD))
         # Now the second factor is the next thing, and the administration stays closed.
-        self.assertEqual(client.get(PROFILE_URL)["Location"], reverse("accounts:two_factor_setup"))
+        self.assertEqual(client.get(PROFILE_URL)["Location"], reverse("accounts:login_method"))
         self.assertEqual(client.get(reverse("accounts:two_factor_setup")).status_code, 200)
         self.assertEqual(client.get(reverse("admin:index")).status_code, 302)
 

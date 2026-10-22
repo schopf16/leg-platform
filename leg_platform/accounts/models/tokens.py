@@ -53,6 +53,7 @@ class VerificationToken(models.Model):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
+        METHOD_RETURN = "method_return", "Sign-in method return"
         EMAIL_CHANGE = "email_change", "Email address change"
         SECONDARY_EMAIL = "secondary_email", "Second email address"
         EMAIL_CHANGE_STOP = "email_change_stop", "Stop an email address change"

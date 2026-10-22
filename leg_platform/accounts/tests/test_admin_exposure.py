@@ -133,7 +133,7 @@ class AdministrationExposureTests(TestCase):
         client = Client()
         client.force_login(self.staff)
 
-        self.assert_every_path_redirects_to(client, reverse("accounts:two_factor_setup"))
+        self.assert_every_path_redirects_to(client, reverse("accounts:login_method"))
 
     def test_a_staff_account_without_permissions_gets_no_data_from_any_route(self):
         client = VerifiedClient()

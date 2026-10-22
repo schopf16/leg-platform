@@ -52,6 +52,8 @@ def _notification(sender, greets=True):
 
 
 HANDLERS = {
+    MailJob.Kind.RECOVERY_GUIDANCE: _notification(emails.send_recovery_guidance, greets=False),
+    MailJob.Kind.SIGN_IN_CHANGED: _notification(emails.send_sign_in_changed),
     MailJob.Kind.REGISTRATION: registration.process_registration,
     MailJob.Kind.PASSWORD_RESET: password_reset.process_reset_request,
     MailJob.Kind.PASSWORD_CHANGED: password_reset.process_password_changed,
@@ -94,7 +96,14 @@ def _application_reminder(account_id, address, greeting_name=""):
 
 
 # Handlers of jobs about an account get the account key and the address (D-044).
+def _method_return(*args):
+    from leg_platform.accounts.method_changes import process_return_link
+
+    return process_return_link(*args)
+
+
 ACCOUNT_HANDLERS = {
+    MailJob.Kind.METHOD_RETURN: _method_return,
     MailJob.Kind.TWO_FACTOR_RESET_LINK: second_factor_reset.process_reset_link,
     MailJob.Kind.INVITATION: invitations.process_invitation,
     MailJob.Kind.APPLICATION_REMINDER: _application_reminder,
@@ -188,6 +197,7 @@ def enqueue(kind, address, account=None, greeting_name=""):
 
 # The jobs that keep the account key, because the worker makes a personal link for them.
 ACCOUNT_KEY_KINDS = (
+    MailJob.Kind.METHOD_RETURN,
     MailJob.Kind.EMAIL_CHANGE_NOTICE,
     MailJob.Kind.TWO_FACTOR_RESET_LINK,
     # The reminder names the deletion day, which the worker reads from the account's paused drafts.

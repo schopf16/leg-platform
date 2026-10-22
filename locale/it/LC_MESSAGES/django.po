@@ -44,7 +44,7 @@ msgid "Produced locally, shared together"
 msgstr "Prodotta localmente, condivisa insieme"
 
 msgid "Stay signed in"
-msgstr "Rimani connesso"
+msgstr "Mantieni l’accesso"
 
 msgid "Legal notice"
 msgstr "Note legali"
@@ -1224,7 +1224,7 @@ msgid "No account yet?"
 msgstr "Non ha ancora un conto?"
 
 msgid "Register as a new user"
-msgstr "Registrati come nuovo utente"
+msgstr "Crea un account"
 
 msgid "Here you manage your account and, later, your locations, energy data and invoices."
 msgstr "Qui gestisce il Suo conto e, in seguito, le Sue ubicazioni, i dati energetici e le fatture."
@@ -6855,3 +6855,260 @@ msgstr "Dati modificati dopo la registrazione presso %(operator)s: verificare di
 
 msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
 msgstr "Più di %(max)d richieste o uscite corrispondono. Sono elencate solo quelle modificate più di recente, le richieste inoltrate prima delle bozze. Restringa l'elenco con la ricerca o i filtri."
+
+msgid "Sign-in method setup"
+msgstr "Configurare il metodo di accesso"
+
+msgid "authentication method"
+msgstr "metodo di accesso"
+
+msgid "Passkey name"
+msgstr "Nome della passkey"
+
+msgid "passkey"
+msgstr "passkey"
+
+msgid "passkeys"
+msgstr "passkey"
+
+msgid "Passkeys changed"
+msgstr "Passkey modificate"
+
+msgid "Sign-in method changed"
+msgstr "Metodo di accesso modificato"
+
+msgid "Notification: sign-in method or passkeys changed"
+msgstr "Notifica: metodo di accesso o passkey modificati"
+
+#, python-format
+msgid "Your sign-in method or passkeys at %(instance_name)s changed"
+msgstr "Il Suo metodo di accesso o le Sue passkey su %(instance_name)s sono stati modificati"
+
+#, python-format
+msgid "Your sign-in method or registered passkeys at %(instance_name)s changed."
+msgstr "Il Suo metodo di accesso o le Sue passkey registrate su %(instance_name)s sono stati modificati."
+
+msgid "Confirm with your passkey"
+msgstr "Confermare con la Sua passkey"
+
+msgid "The passkey could not be verified. Please try again."
+msgstr "Non è stato possibile verificare la passkey. Riprovi."
+
+msgid "Set up passkeys"
+msgstr "Configurare le passkey"
+
+msgid "Confirm your current sign-in method before setting up passkeys."
+msgstr "Confermi il Suo metodo di accesso attuale prima di configurare le passkey."
+
+msgid "Your password, app and recovery codes stay valid until you finish. Afterwards you sign in only with passkeys."
+msgstr "La Sua password, la Sua app e i Suoi codici di recupero rimangono validi fino al termine della configurazione. In seguito accederà solo con le passkey."
+
+msgid "I set up these passkeys on two devices."
+msgstr "Ho configurato queste passkey su due dispositivi."
+
+msgid "Add passkey"
+msgstr "Aggiungere una passkey"
+
+msgid "Use passkeys"
+msgstr "Usare le passkey"
+
+msgid "Confirm this change with your passkey when you continue."
+msgstr "Confermi questa modifica con la Sua passkey quando continua."
+
+msgid "If you did not request this change, contact the operator immediately."
+msgstr "Se non ha richiesto questa modifica, contatti immediatamente il gestore."
+
+msgid "Passkeys"
+msgstr "Passkey"
+
+msgid "You sign in with a passkey. Your account has no password, app or recovery codes."
+msgstr "Accede con una passkey. Il Suo account non ha password, app o codici di recupero."
+
+msgid "Manage passkeys"
+msgstr "Gestire le passkey"
+
+msgid "Back to profile"
+msgstr "Tornare al profilo"
+
+msgid "Sign-in method: confirmation link"
+msgstr "Metodo di accesso: link di conferma"
+
+msgid "Sign-in recovery instructions"
+msgstr "Istruzioni per il recupero dell’accesso"
+
+msgid "Confirm your sign-in method at %(instance_name)s"
+msgstr "Confermi il suo metodo di accesso a %(instance_name)s"
+
+msgid "Sign-in recovery at %(instance_name)s"
+msgstr "Recupero dell’accesso a %(instance_name)s"
+
+msgid "Sign in with a passkey"
+msgstr "Accedi con una passkey"
+
+msgid "Trouble signing in?"
+msgstr "Problemi di accesso?"
+
+msgid "What do you need help with?"
+msgstr "Per cosa ha bisogno di aiuto?"
+
+msgid "Forgot your password?"
+msgstr "Password dimenticata?"
+
+msgid "App or passkey unavailable?"
+msgstr "App o passkey non disponibile?"
+
+msgid "Back to sign in"
+msgstr "Torna all’accesso"
+
+msgid "Send recovery instructions"
+msgstr "Invia le istruzioni di recupero"
+
+msgid "If you have another passkey, use it to sign in. If your authenticator app is unavailable, sign in with your password and enter a recovery code at the next step."
+msgstr "Se dispone di un’altra passkey, la utilizzi per accedere. Se l’app di autenticazione non è disponibile, acceda con la password e inserisca un codice di recupero nel passaggio successivo."
+
+msgid "Enter your sign-in email address to request recovery instructions."
+msgstr "Inserisca il suo indirizzo e-mail di accesso per richiedere le istruzioni di recupero."
+
+msgid "Lost your sign-in method?"
+msgstr "Ha perso il mezzo di accesso?"
+
+msgid "Your current passkeys stay valid until you confirm the completed new sign-in method."
+msgstr "Le passkey attuali restano valide finché non conferma il nuovo metodo interamente configurato."
+
+msgid "To confirm, open this single-use link within %(lifetime_hours)s hours. Opening it changes nothing; confirm on the following page."
+msgstr "Per confermare, apra questo link monouso entro %(lifetime_hours)s ore. L’apertura non modifica nulla; confermi nella pagina seguente."
+
+msgid "If you have another passkey, sign in with it. For an authenticator app, you can also use an unused recovery code."
+msgstr "Se ha un’altra passkey, acceda con quella. Per un’app di autenticazione può anche usare un codice di recupero inutilizzato."
+
+msgid "Without a working sign-in method, send an official ID document by email to the operator. The operator compares your name with the account and starts recovery. Never send your password, passkeys or app codes."
+msgstr "Senza un mezzo di accesso funzionante, invii un documento d’identità ufficiale per e-mail al gestore. Il gestore confronta il nome con il conto e avvia il recupero. Non invii mai password, passkey o codici dell’app."
+
+msgid "Please contact the operator of this portal."
+msgstr "Contatti il gestore di questo portale."
+
+msgid "Your sign-in method was changed. Please sign in again."
+msgstr "Il metodo di accesso è stato modificato. Acceda nuovamente."
+
+msgid "Set a password"
+msgstr "Impostare una password"
+
+msgid "Your passkeys stay valid. Confirm the completed new method using the single-use link sent to your addresses within 24 hours."
+msgstr "Le passkey restano valide. Confermi il nuovo metodo configurato entro 24 ore con il link monouso inviato ai suoi indirizzi."
+
+msgid "Confirm sign-in method"
+msgstr "Confermare il metodo di accesso"
+
+msgid "Your new password and, if chosen, authenticator app are ready. Confirming deletes all passkeys and ends all sessions."
+msgstr "La nuova password e l’eventuale app di autenticazione sono pronte. La conferma elimina tutte le passkey e termina tutte le sessioni."
+
+msgid "Save these recovery codes now. They are shown only once."
+msgstr "Conservi ora questi codici di recupero. Vengono mostrati una sola volta."
+
+msgid "Sign-in recovery"
+msgstr "Recupero dell’accesso"
+
+msgid "We send instructions to the address you enter. With a second passkey or a recovery code you can sign in directly."
+msgstr "Inviamo istruzioni all’indirizzo inserito. Con una seconda passkey o un codice di recupero può accedere direttamente."
+
+msgid "If delivery is possible, recovery instructions will arrive shortly. No sign-in method has been changed."
+msgstr "Se la consegna è possibile, riceverà presto le istruzioni. Nessun metodo di accesso è stato modificato."
+
+msgid "Keep at least the required number of passkeys. Add a replacement first."
+msgstr "Mantenga almeno il numero richiesto di passkey. Aggiunga prima una sostituzione."
+
+msgid "Labels are names you choose, not verified device identities. A synchronized passkey may work on several devices. We recommend a spare passkey."
+msgstr "Le etichette sono nomi scelti da lei, non identità verificate dei dispositivi. Una passkey sincronizzata può funzionare su più dispositivi. Consigliamo una passkey di riserva."
+
+msgid "Keep at least %(minimum)s active passkeys. Add a replacement before removing a lost one. Removing a passkey ends all sessions."
+msgstr "Mantenga almeno %(minimum)s passkey attive. Aggiunga una sostituzione prima di eliminare quella persa. La rimozione termina tutte le sessioni."
+
+msgid "Last used"
+msgstr "Ultimo utilizzo"
+
+msgid "Synchronization supported"
+msgstr "Sincronizzazione supportata"
+
+msgid "Remove passkey and end all sessions"
+msgstr "Eliminare la passkey e terminare tutte le sessioni"
+
+msgid "Change sign-in method"
+msgstr "Cambia metodo di accesso"
+
+msgid "Recover sign-in method"
+msgstr "Ripristinare l’accesso"
+
+msgid "Your current sign-in method stays valid until you finish setting up passkeys. Finishing replaces it with passkeys."
+msgstr "Il metodo di accesso attuale resta valido fino al completamento della configurazione delle passkey. Al termine viene sostituito dalle passkey."
+
+msgid "Your previous sign-in methods no longer work. Set up new passkeys to restore access."
+msgstr "I precedenti metodi di accesso non funzionano più. Configuri nuove passkey per ripristinare l’accesso."
+
+msgid "Add another passkey. Your existing passkeys remain usable."
+msgstr "Aggiunga un’altra passkey. Le passkey esistenti restano utilizzabili."
+
+msgid "One passkey is enough. We recommend a second passkey on another device."
+msgstr "Una passkey è sufficiente. Consigliamo una seconda passkey su un altro dispositivo."
+
+msgid "Add a passkey"
+msgstr "Aggiungere una passkey"
+
+msgid "Create passkey"
+msgstr "Crea passkey"
+
+msgid "The person has confirmed to me that their passkeys are set up on two devices."
+msgstr "La persona mi ha confermato che le sue passkey sono configurate su due dispositivi."
+
+msgid "Add a second active passkey before granting these rights."
+msgstr "Aggiunga una seconda passkey attiva prima di concedere questi diritti."
+
+msgid "The two-device confirmation is required before granting these rights."
+msgstr "La conferma della configurazione su due dispositivi è necessaria prima di concedere questi diritti."
+
+msgid "Save passkey"
+msgstr "Salva passkey"
+
+msgid "You use passkeys and have no password. To return to a password, change your sign-in method."
+msgstr "Utilizza le passkey e non ha una password. Per tornare a usare una password, cambi il metodo di accesso."
+
+#, python-format
+msgid "Recover access to %(instance_name)s"
+msgstr "Ripristinare l’accesso a %(instance_name)s"
+
+#, python-format
+msgid "Sign-in recovery confirmed for %(instance_name)s"
+msgstr "Recupero dell’accesso a %(instance_name)s confermato"
+
+msgid "Remove old sign-in methods and continue"
+msgstr "Rimuovi i precedenti metodi di accesso e prosegui"
+
+#, python-format
+msgid "Customer number %(number)s"
+msgstr "Numero cliente %(number)s"
+
+msgid "Choose a password, password and app, or passkey."
+msgstr "Scelga password, password e app oppure passkey."
+
+msgid "Confirming removes your old sign-in methods and ends all sessions. You then choose and set up a new method in a restricted session. Opening this page changes nothing."
+msgstr "La conferma elimina i vecchi mezzi di accesso e termina tutte le sessioni. Poi sceglie e configura un nuovo metodo in una sessione limitata. L’apertura di questa pagina non modifica nulla."
+
+msgid "I compared the name on the official ID document received by email with this account."
+msgstr "Ho confrontato il nome sul documento d’identità ufficiale ricevuto per e-mail con questo conto."
+
+msgid "The sign-in recovery link was requested."
+msgstr "È stato richiesto il link per il recupero dell’accesso."
+
+msgid "These settings grant recovery access only, not permission to edit this account or its privileges."
+msgstr "Queste impostazioni consentono solo il recupero, non la modifica del conto o dei suoi diritti."
+
+msgid "Account settings"
+msgstr "Impostazioni del conto"
+
+msgid "Send a single-use recovery link valid for 24 hours. Only the account owner's confirmation removes the old password, passkeys, app and recovery codes and ends all sessions. The owner then chooses a new sign-in method."
+msgstr "Inviare un link di recupero monouso valido 24 ore. Solo la conferma del titolare elimina la vecchia password, le passkey, l’app e i codici di recupero e termina tutte le sessioni. Il titolare sceglie poi un nuovo metodo."
+
+msgid "The operator started sign-in recovery for your account at %(instance_name)s.\n\nTo choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n\n%(two_factor_reset_url)s\n\nThe link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
+msgstr "Il gestore ha avviato il recupero dell’accesso al suo conto presso %(instance_name)s.\n\nPer scegliere un nuovo metodo, apra questo link entro %(lifetime_hours)s ore:\n\n%(two_factor_reset_url)s\n\nIl link è monouso. L’apertura non modifica nulla. La conferma nella pagina seguente elimina la vecchia password, le passkey, l’app e i codici di recupero e termina tutte le sessioni. Se non l’ha richiesto, non confermi."
+
+msgid "Sign-in recovery of your account at %(instance_name)s was confirmed. The earlier password, passkeys, app and recovery codes no longer work, and all sessions were ended. A restricted session lets you choose and set up a new sign-in method."
+msgstr "Il recupero dell’accesso al suo conto presso %(instance_name)s è stato confermato. La vecchia password, le passkey, l’app e i codici di recupero non funzionano più; tutte le sessioni sono terminate. Una sessione limitata permette di scegliere e configurare un nuovo metodo."

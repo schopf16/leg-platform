@@ -161,7 +161,7 @@ def two_factor_state(user, edit, step, session):
     active = second_factor.has_second_factor(user)
     if edit != "two_factor":
         return "setup" if second_factor.requires_second_factor(user) and not active else "view"
-    if step == "choose" and login_methods.has_choice(user) and (active or not second_factor.requires_second_factor(user)):
+    if step == "choose" and login_methods.has_choice(user):
         return "choose"
     if active:
         if step == "codes_new":
@@ -209,6 +209,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         "general_messages": general_messages,
         **{f"messages_{card}": items for card, items in card_messages.items()},
         "account": user,
+        "passkey_account": user.authentication_method == User.AuthenticationMethod.PASSKEY,
         "edit": edit,
         "second_factor_active": second_factor.has_second_factor(user),
         "second_factor_required": second_factor.requires_second_factor(user),
@@ -217,7 +218,6 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         "privacy_url": legal_links(request).privacy_url,
         "password_rules": password_rules(),
         "can_choose": login_methods.has_choice(user),
-        "passkeys_available": login_methods.passkeys_available(),
     }
     if not only_two_factor:
         context["address_building"] = address_building(user)
@@ -281,7 +281,7 @@ class ProfileCardView(NeverCacheMixin, LoginRequiredMixin, View):
     """Base of the card views: a login, no caching, passwords and codes masked in error reports."""
 
     @method_decorator(
-        sensitive_post_parameters("current_password", "new_password1", "new_password2", "otp_token")
+        sensitive_post_parameters("current_password", "new_password1", "new_password2", "otp_token", "passkey_assertion")
     )
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
@@ -465,23 +465,38 @@ class LoginMethodView(ProfileCardView):
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
-        return render_profile(request, edit="two_factor", step="choose")
+        return self.choice(request)
+
+    def choice(self, request, form=None):
+        user = request.user
+        form = form or LoginMethodForm(user=user, initial={"method": login_methods.current(user)})
+        return render(request, "accounts/method_choice.html", {
+            "form": form, "choose_form": form, "methods": login_methods.available(user),
+            "selected": form["method"].value(), "current": login_methods.current(user),
+            "recommended": login_methods.recommended(user),
+            "recommended_title": login_methods.title_of(login_methods.recommended(user)),
+            "privileged": login_methods.is_privileged(user),
+        })
 
     def post(self, request):
         user = request.user
         form = LoginMethodForm(request.POST, user=user)
         if not form.is_valid():
-            return render_profile(request, edit="two_factor", step="choose", forms={"choose": form})
+            return self.choice(request, form)
         method = form.cleaned_data["method"]
         if method == login_methods.current(user):
             messages.info(request, _("Your sign-in method stays as it is."), extra_tags="card-two_factor")
             return back_to("two_factor")
+        if method == login_methods.PASSKEY:
+            return redirect("accounts:passkey_setup")
+        if user.authentication_method != User.AuthenticationMethod.PASSWORD:
+            request.session["chosen_password_method"] = method
+            return redirect("accounts:method_password")
         if method == login_methods.PASSWORD_AND_APP:
             # The same start as the button "Set up 2FA" had: no password within five minutes of the login, else asked.
             return TwoFactorSetupView.as_view()(request)
         if method == login_methods.PASSWORD_ONLY:
             return redirect(card_url("two_factor", "disable"))
-        # A method that is offered but has no flow yet: passkeys (D-106) are not built.
         raise Http404
 
 

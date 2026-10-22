@@ -153,7 +153,9 @@ class ResetRequestTests(TestCase):
         self.assertEqual(len(mail.outbox), limit)
 
     def test_the_login_page_links_to_the_reset(self):
-        self.assertContains(Client().get(LOGIN_URL), f'href="{REQUEST_URL}"')
+        help_url = reverse("accounts:login_help")
+        self.assertContains(Client().get(LOGIN_URL), f'href="{help_url}"')
+        self.assertContains(Client().get(help_url), f'href="{REQUEST_URL}"')
 
 
 @tag("mariadb")

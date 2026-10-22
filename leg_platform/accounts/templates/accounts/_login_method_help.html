@@ -1,12 +1,11 @@
 {% load i18n %}{% comment %}
 The explainer of the choice "Sign-in method" (D-106, "Guidance"): a native <details>, closed, no script. Context:
-``passkeys_available`` (the passkey paragraph and the passkey words of the summary exist only while it is true). Also
-usable alone, without the cards.
+Also usable alone, without the cards.
 {% endcomment %}<details class="help-details">
-  <summary>{% if passkeys_available %}{% translate "What is an authenticator app? What is a passkey?" %}{% else %}{% translate "What is an authenticator app?" %}{% endif %}</summary>
+  <summary>{% translate "What is an authenticator app? What is a passkey?" %}</summary>
   <div class="help-details-body">
     <p>{% translate "An authenticator app is a free app from your phone's app store. It shows a new 6-digit code every 30 seconds. After your password you type the current code. This proves that you hold your phone." %}</p>
-    {% if passkeys_available %}<p>{% translate "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, and it cannot be guessed." %}</p>{% endif %}
+    <p>{% translate "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, and it cannot be guessed." %}</p>
     <p>{% translate "You can change your choice at any time in your profile." %}</p>
   </div>
 </details>

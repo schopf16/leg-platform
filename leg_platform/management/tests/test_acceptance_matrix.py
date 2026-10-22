@@ -76,7 +76,7 @@ from leg_platform.management.tests.test_access import PATHS
 User = get_user_model()
 TODAY = timezone.localdate()
 LOGIN = reverse("accounts:login")
-SETUP = reverse("accounts:two_factor_setup")
+SETUP = reverse("accounts:login_method")
 
 # One route: its name, the arguments of the address, the data of a POST that works for a staff account,
 # whether that POST changes the domain (the control proves it), JSON instead of a form, and the query of

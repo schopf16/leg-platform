@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% translate "Set up the app" %}{% endblock %}
+{% block content %}<section class="profile-card">
+<h1>{% translate "Set up the app" %}</h1>
+<p>{% translate "Scan this code with your authenticator app." %}</p>
+<img src="{% url 'accounts:method_app_qr' %}" alt="{% translate 'QR code for the authenticator app' %}">
+<p>{{ secret }}</p>
+<form method="post" class="profile-form" novalidate>{% csrf_token %}
+{% include "accounts/_error_summary.html" %}{% include "accounts/_field.html" with field=form.otp_token %}
+<button class="btn btn-primary" type="submit">{% translate "Continue" %}</button>
+</form></section>{% endblock %}

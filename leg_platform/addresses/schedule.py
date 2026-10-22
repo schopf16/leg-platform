@@ -14,7 +14,8 @@ button starts immediately and does not depend on this run. ``ADDRESS_IMPORT_AUTO
 The run writes heartbeats like the web thread (``_execute_with_heartbeat``). When the official file lacks a required
 column the run waits a week before it downloads again (``COLUMNS_RETRY_INTERVAL``, ``ImportRequest.columns_missing_at``).
 
-The run is idempotent: a second call on the same day, or before the time, changes nothing.
+Already queued requests (including setup imports) are consumed first, even with automatic refresh off,
+before the time, or after today's daily check. Without a queued request the daily run is idempotent.
 """
 
 import logging
@@ -77,13 +78,26 @@ def refresh_is_due(job, now):
 
 
 def run_daily(now=None):
-    """Check once per day, from the configured time on, and run the import if it is due; return one of the words above.
+    """Consume a queued request, otherwise check the daily policy; return one of the words above.
 
     Raises what the import raised (it is recorded in the job row and the logs by ``jobs.execute``).
     """
+    # Explicit durable requests (including setup after a schema rebuild) must not be stranded
+    # when the optional worker is absent. They are independent of automatic refresh policy.
+    now = timezone.localtime(now or timezone.now())
+    with transaction.atomic():
+        if ImportRequest.objects.filter(pk=1, state=ImportRequest.State.QUEUED).exists():
+            claimed = jobs.claim(web=True)
+        else:
+            claimed = None
+        if claimed is not None:
+            # Retain the task's existing once-per-day accounting when consuming a queue.
+            ImportRequest.objects.filter(pk=1).update(last_scheduled_run_on=now.date())
+    if claimed is not None:
+        _execute_with_heartbeat(claimed)
+        return IMPORTED
     if not settings.ADDRESS_IMPORT_AUTOMATIC:
         return DISABLED
-    now = timezone.localtime(now or timezone.now())
     if now.time() < import_run_time():
         return BEFORE_TIME
     today = now.date()

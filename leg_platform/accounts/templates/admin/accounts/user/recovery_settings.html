@@ -1,0 +1,6 @@
+{% extends "admin/base_site.html" %}{% load i18n %}
+{% block content %}
+<p>{% if target_number %}{% blocktranslate with number=target_number %}Customer number {{ number }}{% endblocktranslate %} — {% endif %}{{ target_name }}</p>
+<p>{% translate "These settings grant recovery access only, not permission to edit this account or its privileges." %}</p>
+<a class="button recovery-action" href="{{ reset_url }}">{% translate "Recover sign-in method" %}</a>
+{% endblock %}

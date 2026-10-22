@@ -1,0 +1,7 @@
+{% load i18n %}{% autoescape off %}{{ greeting }}
+
+{% blocktranslate %}Your sign-in method or registered passkeys at {{ instance_name }} changed.{% endblocktranslate %}
+
+{% translate "If you did not request this change, contact the operator immediately." %}
+{% if contact_url %}{{ contact_url }}{% endif %}
+{% endautoescape %}

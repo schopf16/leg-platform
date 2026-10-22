@@ -54,6 +54,8 @@ class Flow:
     def issue(self, purpose=None):
         purpose = purpose or self.purpose
         target = NEW_ADDRESS if purpose in (Purpose.EMAIL_CHANGE, Purpose.SECONDARY_EMAIL) else ""
+        if purpose == Purpose.TWO_FACTOR_RESET:
+            target = self.user.normalized_email
         return VerificationToken.objects.issue(self.user, purpose, LIFETIME, target_email=target)
 
     def break_state(self, change=None):
@@ -161,7 +163,7 @@ class TwoFactorResetFlow(Flow):
         self.user, _device = create_user_with_totp("holder.person@example.org")
 
     def break_account(self):
-        AuthenticatorDevice.objects.filter(user=self.user).delete()
+        self.user.set_status(User.Status.BLOCKED)
 
 
 def all_flows():

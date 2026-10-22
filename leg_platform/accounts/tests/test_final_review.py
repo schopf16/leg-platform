@@ -169,7 +169,7 @@ class RequestsEndWithTheHoldOnTheAccountTests(TestCase):
         boss = administrator()
         client = VerifiedClient()
         client.force_login(boss)
-        client.post(reset_url(self.user), {})
+        client.post(reset_url(self.user), {"identity_verified": "on"})
         run_mail_queue()
         owner = Client()
         owner.get(reset_link_in(mail.outbox[-1]))
@@ -185,6 +185,9 @@ class RequestsEndWithTheHoldOnTheAccountTests(TestCase):
         boss = administrator()
 
         second_factor_reset.reset_privileged(boss, self.user)
+        run_mail_queue()
+        token = VerificationToken.objects.get(user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET)
+        self.assertIsNotNone(second_factor_reset.confirm_link(token))
 
         self.assert_discarded()
 
@@ -279,7 +282,7 @@ class ResetLinkSessionTests(TestCase):
         boss = administrator()
         client = VerifiedClient()
         client.force_login(boss)
-        client.post(reset_url(user), {})
+        client.post(reset_url(user), {"identity_verified": "on"})
         run_mail_queue()
         path = reset_link_in(mail.outbox[-1])
         owner = Client()

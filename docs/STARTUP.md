@@ -21,7 +21,7 @@ Never (`AGENTS.md` sections 8 and 9, `CONDUCT.md`, D-020, D-027):
 | --- | --- | --- |
 | MariaDB 12.3 | Windows service `MySQL` (name given by the setup script), `127.0.0.1:3306` only | Databases `leg_platform` (data) and `test_leg_platform` (created and dropped by the test runner). |
 | Python environment | `.venv` in the repository root | `.venv\Scripts\python.exe` |
-| Development server | `http://127.0.0.1:8000/` (designer and acceptance); `http://127.0.0.1:8001/` (the developer's own server) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use the host `127.0.0.1`, never `localhost` (cookies are host-only, email links use `127.0.0.1`). **Port 8000 belongs to the session that checks the design or accepts the work. The developer uses 8001 (`$Port = 8001`, section 6).** Restart after a template change (no reload). |
+| Development server | `http://127.0.0.1:8000/` (designer and acceptance); `http://127.0.0.1:8001/` (the developer's own server) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use one canonical host consistently (host-only cookies). **D-106 passkey checks require `localhost`, not an IP RP-ID: set `INSTANCE_BASE_URL=http://localhost:<port>` for server and worker, then browse only that address.** Port 8000 belongs to the session that checks the design or accepts the work. The developer uses 8001 (`$Port = 8001`, section 6). Restart after a template change (no reload). |
 | Mail worker | background process | `manage.py process_mail_queue --loop`. Required (section 6). |
 | Address directory (optional) | SQLite file `$HOME\.leg-platform-dev\address-directory.sqlite3` | Synthetic data only (section 10). |
 | Logs and process IDs | `$HOME\.leg-platform-dev\` | Outside the repository. |
@@ -62,7 +62,7 @@ Configuration comes only from environment variables (`leg_platform/settings.py`,
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY` | user variables (setup script) | Local MariaDB, its application account, the local secret key. |
 | `EMAIL_MODE` | not set; default `console` | Emails go to the standard output of the mail worker (section 6). `allowlist` only with a dedicated development registration from the owner (D-028). `graph` is refused. |
 | `DJANGO_ALLOWED_HOSTS` | per process, start block (section 6) | `127.0.0.1,localhost`. Not a permanent user variable. |
-| `INSTANCE_BASE_URL` | not set; default `http://127.0.0.1:8000` | Base of all email links. Another port: `http://127.0.0.1:<port>` for server and worker. |
+| `INSTANCE_BASE_URL` | per process for passkey work | Canonical origin for email links and WebAuthn. Use `http://localhost:<port>` consistently for server, worker and browser; do not mix it with the loopback IP hostname. |
 | `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, start block (section 6) | **Fallback** for "Portal-Einstellungen" (D-056, D-073). Logos: `$HOME\.leg-platform-dev\instance-static\instance\LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg` (copied from `LEG-Design-Vorgaben\logo\`). Without them the pages show the name as text. |
 | `DJANGO_DEBUG` | not set (False) | `True` only with `APP_ENV=local`; not needed (production-like errors and the full CSP suit a design review). |
 
@@ -86,13 +86,15 @@ The local database `leg_platform` is **throw-away** (D-027, D-030). Check withou
 .\.venv\Scripts\python manage.py migrate addresses --database=addresses
 ```
 
-The second command creates the tables of the address directory (own SQLite file, D-075). **One command for both (D-076):** `manage.py setup_instance` (`docs/INSTALLATION.md`, "Setup of the instance and initial system administrator") also creates the first system administrator, only while the account table is empty and the email variable is set. Idempotent; never deletes or flushes data:
+The second command creates the tables of the address directory (own SQLite file, D-075). **Normal setup/schema upgrades (D-075/D-076):** prefer `manage.py setup_instance` (`docs/INSTALLATION.md`, "Setup of the instance and initial system administrator"). It also creates the first system administrator, only while the account table is empty and the email variable is set. It never deletes or flushes application data. The optional public address file is disposable: missing/changed address schemas are created/rebuilt and an official import is queued in MariaDB, without downloading or waiting during setup:
 
 ```powershell
 .\.venv\Scripts\python manage.py setup_instance
 ```
 
-Without the bootstrap variables it only migrates (design review accounts: section 9). To also create an administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`. Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
+Without the bootstrap variables it prepares the databases and any required address import, but creates no administrator (design review accounts: section 9). To also create an administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`. Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
+
+The queued address import needs the optional worker or a later `run_scheduled_tasks` invocation; the latter consumes queued requests even before the daily import time or with automatic refresh disabled. No consumer means no import. Current clean address schemas do not requeue on each startup. Busy-file/rebuild errors are nonfatal and retried on a later setup; until setup/import succeeds only address validation/suggestions are unavailable. Do not bypass a `.reset` marker; let setup retry after readers/importers have closed. Normal CSV refresh never deletes the file.
 
 ## 6. Start the development server and the mail worker
 
@@ -115,7 +117,9 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
     $env:DJANGO_ALLOWED_HOSTS = '127.0.0.1,localhost'
     # D-090: no automatic download of the real address directory on a development machine.
     $env:ADDRESS_IMPORT_AUTOMATIC = 'False'
-    if ($Port -ne 8000) { $env:INSTANCE_BASE_URL = "http://127.0.0.1:$Port" }
+    # D-106: localhost is a potentially trustworthy WebAuthn origin with a domain RP-ID.
+    # Open only this canonical hostname; the listener remains loopback-only.
+    $env:INSTANCE_BASE_URL = "http://localhost:$Port"
     # Local instance presentation (section 4)
     $env:INSTANCE_NAME = 'LEG-Portal'
     $env:INSTANCE_WEBSITE_URL = 'https://leg-ittigen.ch'
@@ -144,6 +148,7 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
 * The venv `python.exe` is a launcher with the real interpreter as child: each process appears twice. The PID file holds the parent; section 11 stops both.
 * `runserver.err.log` shows verification tokens as `<redacted>`. The console email in `worker.out.log` holds the **complete link** (hence `EMAIL_MODE=console` is refused in stage and production).
 * Server does not come up: read `runserver.err.log` (section 14), wait about five seconds, run section 7.
+* After CSS/JavaScript changes, refresh the browser's static cache (hard reload or disable caching in development tools). Restarting `--noreload` refreshes Python/templates, not an already cached browser stylesheet. With `--insecure`, first verify that the static endpoint serves the current source before considering `collectstatic`; do not add duplicate CSS overrides to compensate for an old cached file.
 
 ## 7. Health checks (read-only)
 

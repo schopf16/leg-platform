@@ -5,9 +5,9 @@ The history of accounts is shown only to system administrators (UserAdmin.histor
 so the link is shown only to them. The same holds for the reset of the second factor (D-041),
 which is not offered for the own account.
 {% endcomment %}
-{% block object-tools-items %}{% if request.user.is_superuser %}{% if original and original.pk != request.user.pk %}
-<li><a href="{% url 'admin:accounts_user_reset_second_factor' original.pk %}">{% translate "Reset two-factor authentication" %}</a></li>
-{% endif %}{% if original and original.pk != request.user.pk and original.status != "deactivated" %}
+{% block object-tools-items %}{% if original and request.user.is_staff %}
+<li><a href="{% url 'admin:accounts_user_reset_second_factor' original.pk %}">{% translate "Recover sign-in method" %}</a></li>
+{% endif %}{% if request.user.is_superuser %}{% if original and original.pk != request.user.pk and original.status != "deactivated" %}
 <li><a href="{% url 'admin:accounts_user_lifecycle' original.pk 'end_sessions' %}">{% translate "End all sessions" %}</a></li>
 {% endif %}{% if original %}
   {% if original.status == "active" %}

@@ -30,7 +30,8 @@ Profile addresses never leave the application; suggestions query only a local co
 * Default outside `APP_ENV=local`: `/var/lib/leg-platform/address-directory.sqlite3` (`StateDirectory=leg-platform` in the systemd units). With `APP_ENV=local`: `~/.leg-platform-dev/address-directory.sqlite3`.
 * A missing file is created with mode 0600 (folder 0700). Processes open it read-only unless they are writers (worker, `import_address_directory`, `seed_local_address_directory`, `setup_instance`, `migrate`; never the web processes). Web and worker run on the same host with the same settings. No network file system.
 * `python manage.py setup_instance` (below) creates the file and tables. Manual equivalent for local development only (`migrate` alone never creates them): `python manage.py migrate addresses --database=addresses`. On a server never run it by hand (D-076): start `leg-setup.service`; a hand-run as `root` would create a root-owned 0600 file the service cannot open (`docs/DEPLOYMENT.md`, 10.2, "Repair").
-* **Restore:** the file is not restored from a backup. Start the services (`setup_instance` recreates it). The daily run of the scheduled tasks imports it at the next run after the configured time (default 03:00; within 24 hours of an empty directory), or an administrator presses the button (about 12 minutes, about 143 MB; D-075, D-090). A corrupted file is deleted and rebuilt (`docs/DEPLOYMENT.md`, section 10.2).
+* **Restore/schema changes (D-075/D-076, owner 2026-10-22):** public catalogue rows are disposable; no historical catalogue data transfer is needed. `setup_instance` creates a missing file or rebuilds a changed address schema, then durably queues the official import in MariaDB. It never downloads during setup and never deletes application data. A current clean schema does not requeue on each start. Migrations affecting only the application-side job/lookup models do not reset SQLite. Normal CSV refresh remains generation-based and atomic, without deleting the file.
+* **Availability:** the optional worker processes the queued request on its next poll; otherwise `run_scheduled_tasks` consumes it at its next tick (the server timer runs every 15 minutes, plus random delay), independently of daily refresh time and `ADDRESS_IMPORT_AUTOMATIC`. Without either consumer it stays queued. Until import succeeds, address validation/suggestions are unavailable; the application and its stored data remain. A busy file, live import or rebuild/queue failure is reported non-fatally; retry setup later, preferably with address consumers stopped. Never delete the `.reset` marker to bypass a failed rebuild; setup recovers it. Corruption repair: `docs/DEPLOYMENT.md`, section 10.2.
 
 **The button needs no extra service (D-090); the automatic refresh is the daily run of `run_scheduled_tasks`.** Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.3, 8.4 and 10.2.
 
@@ -163,8 +164,8 @@ The scheduler is decided with the hosting (D-008, D-037, D-038, D-041).
 D-005, D-041, D-076. `python manage.py setup_instance` is idempotent and runs on every start of the services (on a server via `leg-setup.service`, `docs/DEPLOYMENT.md`, section 8.0; locally by hand, `docs/STARTUP.md`). It:
 
 1. applies pending migrations (`migrate --noinput`);
-2. while no system administrator exists and `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` is set, creates the initial system administrator with `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`;
-3. creates the address directory file and tables (a failure there never stops the rest).
+2. only while the account table is completely empty and `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` is set, creates the initial system administrator with `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`;
+3. creates/rebuilds the disposable public address schema when missing/changed and durably queues its official import, without downloading during setup (a failure there never stops the rest; see "Address Directory").
 
 An installation needs only an **empty** database with its one account ("Database privileges") and the environment file.
 

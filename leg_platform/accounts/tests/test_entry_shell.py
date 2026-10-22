@@ -64,8 +64,8 @@ class EntryShellTests(TestCase):
         html = self.client.get(LOGIN_URL).content.decode()
         for text in LOGIN_PANEL:
             self.assertIn(text, html)
-        for text in ("Anmelden", "E-Mail-Adresse", "Passwort", "Passwort vergessen?",
-                     "Angemeldet bleiben", "Noch kein Konto?", "Neu registrieren"):
+        for text in ("Anmelden", "E-Mail-Adresse", "Passwort", "Probleme beim Anmelden?",
+                     "Angemeldet bleiben", "Mit Passkey anmelden", "Neu registrieren"):
             self.assertIn(text, html)
 
     def test_the_registration_pages_have_the_registration_panel(self):
@@ -194,4 +194,3 @@ class DesignRefinementTests(SimpleTestCase):
                 self.assertIn(setting, block)
         # The cards have no shadow either; the focus ring of a field is the one of the design.
         self.assertRegex(self.CSS, r"\.register-clear \.card \{[^}]*box-shadow: none;")
-

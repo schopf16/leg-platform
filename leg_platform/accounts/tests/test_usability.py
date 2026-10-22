@@ -324,7 +324,22 @@ class InputTypeTests(TestCase):
         field = element(html, "id_username")
         for attribute in ('type="email"', 'inputmode="email"', 'autocapitalize="none"', 'spellcheck="false"'):
             self.assertIn(attribute, field)
-        self.assertRegex(html, r"<form method=\"post\" novalidate>")
+        from html.parser import HTMLParser
+
+        class Forms(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.forms = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag == "form":
+                    self.forms.append(dict(attrs))
+
+        parser = Forms()
+        parser.feed(html)
+        password_form = next(form for form in parser.forms if form.get("id") == "login-password")
+        self.assertEqual(password_form["method"], "post")
+        self.assertIn("novalidate", password_form)
 
     def test_the_login_still_accepts_what_the_browser_would_not(self):
         user = create_active_user("active.person@example.org")

@@ -109,7 +109,10 @@ class PortalSettingsAdmin(admin.ModelAdmin):
             fieldsets.append(
                 (
                     _("Confirmation"),
-                    {"fields": (("otp_token" if second_factor.has_second_factor(request.user) else "current_password"),)},
+                    {"fields": (
+                        "passkey_assertion" if request.user.authentication_method == request.user.AuthenticationMethod.PASSKEY
+                        else "otp_token" if second_factor.has_second_factor(request.user) else "current_password",
+                    )},
                 )
             )
         return fieldsets

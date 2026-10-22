@@ -1,0 +1,7 @@
+{% extends "entry_base.html" %}{% load i18n %}
+{% block title %}{% translate "Recovery codes" %}{% endblock %}
+{% block form %}<h1>{% translate "Recovery codes" %}</h1>
+<p>{% translate "Save these recovery codes now. They are shown only once." %}</p>
+<ul>{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+<a class="btn btn-primary" href="{% url 'accounts:login' %}">{% translate "Log in" %}</a>
+{% endblock %}

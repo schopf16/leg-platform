@@ -16,6 +16,7 @@ Licences as declared in the package metadata (`License-Expression`, `License` or
 | django-axes | MIT | Login abuse protection (D-017) |
 | django-ipware | MIT | Trusted-proxy-aware client IP resolution for login abuse protection (D-017) |
 | django-otp | Unlicense | Two-factor authentication (D-004) |
+| webauthn | BSD-3-Clause | WebAuthn verification (D-106); 3.0.1 metadata and version-tagged source checked 2026-10-22 |
 | cryptography | Apache-2.0 OR BSD-3-Clause | Encryption of the Microsoft Graph certificate private key, second factor secrets, keyed hashes (D-006, D-023, D-040) |
 | mysqlclient | GPL-2.0-or-later | Database driver of Django's MySQL backend, used for MariaDB (D-030); see the note on MariaDB Connector/C below |
 | msal | MIT | Microsoft Graph token acquisition (D-026) |
@@ -44,6 +45,9 @@ Transitive dependencies:
 | pycparser | BSD-3-Clause | cffi |
 | typing_extensions | PSF-2.0 | django-countries |
 | python-ipware | MIT | django-ipware |
+| pyasn1, pyasn1-modules | BSD-2-Clause | webauthn |
+| cbor2 | MIT | webauthn |
+| pyOpenSSL | Apache-2.0 | webauthn |
 
 Notes:
 
@@ -60,6 +64,7 @@ The following third-party assets are part of this repository, below `leg_platfor
 
 | Asset | Version and source | Licence | Used for |
 | ----- | ------------------ | ------- | -------- |
+| SimpleWebAuthn Browser (`simplewebauthn/index.umd.min.js`) | `@simplewebauthn/browser` 14.0.0, unmodified UMD bundle; SHA-256 `29bb0699b45bc39a350d992a13bfc1a4d40d89531390581e1f57f1142c6e221d`, matches published package metadata; upstream tag `v14.0.0` | MIT (`simplewebauthn/LICENSE.md`) | Browser WebAuthn JSON conversion and ceremonies (D-106), no CDN at runtime |
 | Tabler (`css/tabler.min.css`) | 1.6.1, `@tabler/core` from the npm registry; the tarball matched the registry's SHA-512 integrity value; SHA-256 of the file: `370A2D4E608AE518351D10528FC7DBE19B354AE5062C51B2A9CB294850D65403` | MIT (`tabler/LICENSE`) | Application interface (D-003, D-024) |
 | Source Sans 3 (`fonts/SourceSans3.ttf`) | repository `google/fonts`, `ofl/sourcesans3`, unmodified | SIL Open Font License 1.1, Reserved Font Name "Source" (`fonts/OFL-SourceSans3.txt`) | Text typeface (D-024) |
 | Bricolage Grotesque (`fonts/BricolageGrotesque.ttf`) | repository `google/fonts`, `ofl/bricolagegrotesque`, unmodified | SIL Open Font License 1.1 (`fonts/OFL-BricolageGrotesque.txt`) | Headings in the register "Warm" (D-024) |

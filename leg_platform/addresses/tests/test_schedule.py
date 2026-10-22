@@ -88,6 +88,29 @@ class DailyRunTests(TestCase):
         self.assertEqual((job.state, job.last_scheduled_run_on), (State.IDLE, None))
         self.assertIsNotNone(job.update_flag_set_at)
 
+    @override_settings(ADDRESS_IMPORT_AUTOMATIC=False)
+    def test_a_durable_setup_request_runs_before_time_even_if_automatic_refresh_is_disabled(self):
+        # The default installation has no separate importer worker. A queued setup request
+        # must therefore be consumed at the next task tick, not wait for the daily policy.
+        ImportRequest.objects.filter(pk=1).update(
+            state=State.QUEUED, last_scheduled_run_on=at(0).date(), columns_missing_at=at(0),
+        )
+        with patch(IMPORT, return_value=3) as download:
+            self.assertEqual(schedule.run_daily(at(0, 1)), schedule.IMPORTED)
+            self.assertEqual(schedule.run_daily(at(0, 2)), schedule.DISABLED)
+        download.assert_called_once_with(repair=True, progress=ANY)
+        self.assertEqual(self.job().state, State.SUCCEEDED)
+
+    def test_failure_of_a_durable_request_is_recorded_and_not_requeued_by_the_task_tick(self):
+        ImportRequest.objects.filter(pk=1).update(state=State.QUEUED)
+        with patch(IMPORT, side_effect=importer.ImportFailure("Official download failed.")) as download:
+            with self.assertRaises(importer.ImportFailure), self.assertLogs("leg_platform.addresses.jobs", "ERROR"):
+                schedule.run_daily(at(0, 1))
+            self.assertEqual(schedule.run_daily(at(0, 2)), schedule.BEFORE_TIME)
+            self.assertEqual(schedule.run_daily(at(3, 1)), schedule.ALREADY_RAN)
+        download.assert_called_once()
+        self.assertEqual(self.job().state, State.FAILED)
+
     def test_the_time_is_the_one_of_the_instance_not_of_utc(self):
         self.flag()
         schedule.set_import_run_time(time(3, 0))

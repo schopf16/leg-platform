@@ -72,8 +72,9 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 ## Authentication
 
+* D-106: `webauthn` verifies discoverable, user-verified credentials. The browser helper is self-hosted. `PasskeyIdentity` stores an opaque stable handle; `Passkey` stores only public material and necessary metadata; `PasskeyChallenge` binds a five-minute, single-use ceremony to the server session, purpose, action and account authentication hash. Failed verification also consumes the challenge. Account locks precede credential/challenge/counter locks. Staged credentials cannot sign in. Atomic activation removes password, app, recovery codes, pending changes and old links; it increments the session version and queues a notice for all confirmed addresses. `PendingSignInChange` stores only a pending password hash, method and proof/session binding; a completed app remains inactive until email confirmation. The old method stays active until that atomic transition. Recovery enters a centrally restricted account mode without a usable password; the confirmed email link grants setup only.
 * Password login with the email address (D-021), or passkey-only login for administrators and optionally for users (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
-* The login method is chosen in the step "Sign-in method" (D-106, "Guidance"); the offered methods come from `accounts/login_methods.py`. The setting `PASSKEYS_ENABLED` (default False) is a plain Django setting with no environment variable and no entry in `settings.py`; it stays off until passkeys are built, and no operator changes it.
+* The login method is chosen in the step "Sign-in method" (D-106, "Guidance"); the offered methods come from `accounts/login_methods.py`, shared by profile, registration follow-up, recovery and first administrator login. No feature flag.
 
 ## Email
 

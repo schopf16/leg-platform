@@ -160,7 +160,7 @@ class AccessTests(TestCase):
             for method in ("get", "post"):
                 with self.subTest(path=path, method=method):
                     response = getattr(client, method)(path)
-                    self.assertRedirects(response, reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
+                    self.assertRedirects(response, reverse("accounts:login_method"), fetch_redirect_response=False)
 
     def test_a_staff_account_that_was_blocked_after_the_login_is_refused_on_every_route(self):
         user = staff_user("late.blocked@example.org")

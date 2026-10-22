@@ -11,7 +11,6 @@ class AccountsConfig(AppConfig):
     def ready(self):
         # Side-effect import: connects the receiver that starts a session's timeouts at login (D-041).
         from leg_platform.accounts import session_timeout  # noqa: F401
-        from leg_platform.accounts import login_methods  # noqa: F401  (registers the system check of D-106)
         from leg_platform.language import install_english_fallback
 
         # No German text on a French or Italian page for a text that its catalogue lacks.

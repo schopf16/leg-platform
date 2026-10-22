@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from leg_platform.accounts import profile_views, views
+from leg_platform.accounts import method_views, passkey_views, profile_views, views
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
@@ -10,7 +10,21 @@ from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 app_name = "accounts"
 
 urlpatterns = [
+    path("sign-in-method/password/", method_views.PasswordMethodView.as_view(), name="method_password"),
+    path("sign-in-method/app/", method_views.AppMethodView.as_view(), name="method_app"),
+    path("sign-in-method/app/qr.svg", method_views.AppMethodQrView.as_view(), name="method_app_qr"),
+    path("sign-in-method/verify/<slug:token>/", method_views.ReturnVerifyView.as_view(), name="method_return_verify"),
+    path("sign-in-method/confirm/", method_views.ReturnConfirmView.as_view(), name="method_return_confirm"),
+    path("recovery/", method_views.RecoveryRequestView.as_view(), name="recovery"),
+    path("recovery/sent/", views.LinkNoLongerValidView.as_view(
+        template_name="accounts/recovery_sent.html"
+    ), name="recovery_sent"),
+    path("passkeys/options/", passkey_views.OptionsView.as_view(), name="passkey_options"),
+    path("passkeys/login/", passkey_views.LoginView.as_view(), name="passkey_login"),
+    path("passkeys/setup/", passkey_views.SetupView.as_view(), name="passkey_setup"),
+    path("passkeys/", passkey_views.ManageView.as_view(), name="passkeys"),
     path("login/", views.PortalLoginView.as_view(), name="login"),
+    path("login/help/", method_views.LoginHelpView.as_view(), name="login_help"),
     path(
         "login/two-factor/",
         views.SecondFactorLoginView.as_view(),

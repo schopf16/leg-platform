@@ -34,6 +34,9 @@ class MailJob(models.Model):
         EMAIL_CHANGE = "email_change", "Email address change"
         EMAIL_CHANGE_REQUEST = "email_change_request", "Email address change request"
         PASSWORD_CHANGED = "password_changed", "Password changed"
+        SIGN_IN_CHANGED = "sign_in_changed", "Sign-in method or passkeys changed"
+        METHOD_RETURN = "method_return", "Confirm sign-in method return"
+        RECOVERY_GUIDANCE = "recovery_guidance", "Sign-in recovery instructions"
         EMAIL_CHANGED = "email_changed", "Email address changed"
         EMAIL_CHANGE_EXISTING_ACCOUNT = "email_change_existing_account", (
             "Email change: target address already has an account"
@@ -70,6 +73,8 @@ class MailJob(models.Model):
     # Notifications about a change of the account, as opposed to the requests of a person who
     # may have no account (D-038, D-040).
     NOTIFICATION_KINDS = (
+        Kind.SIGN_IN_CHANGED,
+        Kind.METHOD_RETURN,
         Kind.PASSWORD_CHANGED,
         Kind.EMAIL_CHANGED,
         Kind.SECONDARY_EMAIL_CHANGED,
@@ -147,6 +152,9 @@ class EmailText(models.Model):
         )
         PASSWORD_RESET = "password_reset", _("Password reset: link to choose a new password")
         PASSWORD_CHANGED = "password_changed", _("Notification: password changed")
+        SIGN_IN_CHANGED = "sign_in_changed", _("Notification: sign-in method or passkeys changed")
+        METHOD_RETURN = "method_return", _("Sign-in method: confirmation link")
+        RECOVERY_GUIDANCE = "recovery_guidance", _("Sign-in recovery instructions")
         EMAIL_CHANGE_VERIFICATION = "email_change_verification", _(
             "Email address change: link to confirm the new address"
         )

@@ -238,7 +238,11 @@ class TwoFactorResetOriginTests(BrowserOriginMixin, TestCase):
         with_second_factor(self.user)
         starter = VerifiedClient()
         starter.force_login(admin)
-        starter.post(reset_url(self.user), {})
+        refused = starter.post(reset_url(self.user), {})
+        self.assertEqual(refused.status_code, 200)
+        self.assertIn("identity_verified", refused.context["form"].errors)
+        requested = starter.post(reset_url(self.user), {"identity_verified": "on"})
+        self.assertEqual(requested.status_code, 302)
         run_mail_queue()
         self.link = link_in(mail.outbox[-1])
         self.url = reverse("accounts:two_factor_reset_confirm")
@@ -254,7 +258,7 @@ class TwoFactorResetOriginTests(BrowserOriginMixin, TestCase):
         self.client.get(self.link)
 
         self.assert_the_form_works_like_in_a_browser(
-            self.client, self.url, {}, reverse("accounts:login")
+            self.client, self.url, {}, reverse("accounts:login_method")
         )
 
         self.assertTrue(

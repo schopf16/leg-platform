@@ -1,12 +1,12 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}The operator started the removal of two-factor authentication for your account at {{ instance_name }}.
+{% blocktranslate %}The operator started sign-in recovery for your account at {{ instance_name }}.
 
-To remove it, open this link within {{ lifetime_hours }} hours:
+To choose a new sign-in method, open this link within {{ lifetime_hours }} hours:
 
 {{ two_factor_reset_url }}
 
-The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged.{% endblocktranslate %}{% if contact_url %}
+The link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it.{% endblocktranslate %}{% if contact_url %}
 
 {% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
 {% endautoescape %}

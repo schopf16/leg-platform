@@ -106,6 +106,25 @@ _FLOW_REVIEWS = _labels(
 )
 
 AREAS: dict[str, Area] = {
+    "passkeys": Area(
+        "D-106 WebAuthn ceremonies and method transitions.",
+        paths=(
+            "leg_platform/accounts/passkeys.py", "leg_platform/accounts/passkey_methods.py",
+            "leg_platform/accounts/passkey_views.py", "leg_platform/accounts/tests/test_passkeys.py",
+            "leg_platform/accounts/method_changes.py", "leg_platform/accounts/method_views.py",
+            "leg_platform/accounts/tests/test_method_changes.py",
+            "leg_platform/accounts/templates/accounts/method*.html",
+            "leg_platform/accounts/templates/accounts/recovery*.html",
+            "leg_platform/accounts/templates/accounts/login_help.html",
+            "leg_platform/accounts/templates/accounts/_recovery_clarification.html",
+            "leg_platform/accounts/templates/accounts/passkeys.html",
+            "leg_platform/static/js/passkeys.js", "leg_platform/static/vendor/simplewebauthn/",
+            "leg_platform/accounts/templates/accounts/passkey_setup.html",
+            "leg_platform/accounts/templates/accounts/widgets/",
+        ),
+        tests=_labels(A, "test_passkeys", "test_method_changes", "test_login_methods"),
+        checks=("makemigrations", "system-check"),
+    ),
     "docs": Area(
         "Documentation and agent instructions only: nothing but the repository checks run.",
         paths=(

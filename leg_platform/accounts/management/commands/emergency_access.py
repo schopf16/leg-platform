@@ -6,7 +6,8 @@ rights. Accounts with staff or administrator rights must be confirmed by typing 
 and cannot be changed with ``--no-input``.
 
 * ``reset-second-factor N``: remove the second factor, end all sessions, notify the owner. The last
-  active system administrator needs ``--allow-last-administrator``.
+  active system administrator needs ``--allow-last-administrator``. For passkey/recovery accounts,
+  request the unified 24-hour recovery link instead: there is no password to restore or bypass.
 * ``unblock-account N``: set a blocked account active again.
 * ``reencrypt-second-factor-keys``: re-encrypt the second factor keys with the current ``SECRET_KEY``
   after it was replaced and the old one is in ``SECRET_KEY_FALLBACKS``.
@@ -123,6 +124,7 @@ class Command(BaseCommand):
             has_devices = (
                 AuthenticatorDevice.objects.filter(user=account).exists()
                 or RecoveryCodeDevice.objects.filter(user=account).exists()
+                or account.authentication_method != User.AuthenticationMethod.PASSWORD
             )
             if not has_devices:
                 raise CommandError(f"Account {number} has no second factor.")
@@ -136,6 +138,18 @@ class Command(BaseCommand):
                     f"Account {number} is the last active system administrator. Repeat the command "
                     "with --allow-last-administrator only if this is intended."
                 )
+            if account.authentication_method != User.AuthenticationMethod.PASSWORD:
+                from leg_platform.accounts.mail_queue import enqueue_for_account
+                from leg_platform.accounts.models import MailJob
+
+                enqueue_for_account(
+                    MailJob.Kind.TWO_FACTOR_RESET_LINK, account, addresses=[account.email]
+                )
+                security_log.record(
+                    Event.TWO_FACTOR_RESET_REQUESTED, account=account, long_retention=True
+                )
+                self.stdout.write(f"A recovery link was requested for account {number}; no method was removed.")
+                return
             second_factor_reset.remove_second_factor(account, Event.EMERGENCY_TWO_FACTOR_RESET)
         self.stdout.write(f"The second factor of account {number} was removed.")
 

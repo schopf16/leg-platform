@@ -7,16 +7,11 @@ methods route into the existing flows (``profile_views.LoginMethodView``); this 
 * ``PASSWORD_ONLY``: password without a second factor. Users only (D-004: the second factor is mandatory for
   staff users and system administrators).
 * ``PASSWORD_AND_APP``: password and a code from an authenticator app (TOTP).
-* ``PASSKEY``: offered only while ``settings.PASSKEYS_ENABLED`` is True. The setting is a plain Django setting
-  that is not set in ``settings.py`` (default False) until passkeys are built; no template or message
-  mentions a passkey while it is off. While ``PASSKEY_FLOW_BUILT`` is False, turning the setting on fails the
-  system check ``accounts.E001``.
+* ``PASSKEY``: discoverable, user-verified credential without a password or app.
 """
 
 from dataclasses import dataclass, replace
 
-from django.conf import settings
-from django.core import checks
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import second_factor
@@ -24,11 +19,6 @@ from leg_platform.accounts import second_factor
 PASSWORD_ONLY = "password"
 PASSWORD_AND_APP = "app"
 PASSKEY = "passkey"
-
-# Flip to True in the change that builds the passkey flow (registration, sign-in, removal of the password and
-# the app). While it is False, ``PASSKEYS_ENABLED=True`` is a configuration error (``check_passkey_flow``): the
-# page must never promise a passkey that the server cannot keep.
-PASSKEY_FLOW_BUILT = False
 
 
 @dataclass(frozen=True)
@@ -82,26 +72,6 @@ _METHODS = {
 _ADMINISTRATOR_PASSKEY_NOTE = _("First set up two passkeys on two devices.")
 
 
-def passkeys_available():
-    """Whether passkeys are offered at all (``settings.PASSKEYS_ENABLED``, default False; D-106)."""
-    return bool(getattr(settings, "PASSKEYS_ENABLED", False))
-
-
-@checks.register()
-def check_passkey_flow(app_configs, **kwargs):
-    """Error while ``PASSKEYS_ENABLED`` is True but no passkey flow exists (``PASSKEY_FLOW_BUILT``; D-106, L-2)."""
-    if passkeys_available() and not PASSKEY_FLOW_BUILT:
-        return [
-            checks.Error(
-                "PASSKEYS_ENABLED is True, but the passkey flow is not built: the choice would offer a method "
-                "that the server cannot provide.",
-                hint="Remove PASSKEYS_ENABLED (default False) until passkeys are implemented (D-106).",
-                id="accounts.E001",
-            )
-        ]
-    return []
-
-
 def is_privileged(user):
     """Staff users and system administrators: no "password only" (D-004)."""
     return second_factor.requires_second_factor(user)
@@ -111,8 +81,7 @@ def available_keys(user):
     """The keys of the methods this account may choose, in the order of the page (most familiar first)."""
     keys = [] if is_privileged(user) else [PASSWORD_ONLY]
     keys.append(PASSWORD_AND_APP)
-    if passkeys_available():
-        keys.append(PASSKEY)
+    keys.append(PASSKEY)
     return keys
 
 
@@ -128,18 +97,22 @@ def available(user):
 
 
 def has_choice(user):
-    """Whether there is anything to choose between (an administrator has only one method while passkeys are off)."""
+    """Whether there is more than one permitted method."""
     return len(available_keys(user)) > 1
 
 
 def current(user):
     """The key of the method the account uses now."""
+    if user.authentication_method == "passkey":
+        return PASSKEY
+    if user.authentication_method == "recovery":
+        return ""
     return PASSWORD_AND_APP if second_factor.has_second_factor(user) else PASSWORD_ONLY
 
 
 def recommended(user):
     """The key of the recommended method: the app for users (D-106); a passkey for administrators once it exists."""
-    if is_privileged(user) and passkeys_available():
+    if is_privileged(user):
         return PASSKEY
     return PASSWORD_AND_APP
 

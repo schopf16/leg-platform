@@ -375,7 +375,7 @@ class CentralCheckTests(TestCase):
                 response = client.get(url)
                 self.assertRedirects(
                     response,
-                    reverse("accounts:two_factor_setup"),
+                    reverse("accounts:login_method"),
                     fetch_redirect_response=False,
                 )
         self.assertEqual(client.get(reverse("accounts:two_factor_setup")).status_code, 200)
@@ -416,7 +416,7 @@ class CentralCheckTests(TestCase):
 
         self.assertRedirects(
             client.get(reverse("accounts:profile")),
-            reverse("accounts:two_factor_setup"),
+            reverse("accounts:login_method"),
             fetch_redirect_response=False,
         )
 

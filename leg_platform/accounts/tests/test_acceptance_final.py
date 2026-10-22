@@ -198,6 +198,14 @@ class OpenChangesEndWithTheHoldOnTheAccountTests(TestCase):
         with_second_factor(self.holder)
 
         second_factor_reset.reset_privileged(administrator(), self.holder)
+        # D-106: requesting never clears anything; explicit owner confirmation does.
+        from leg_platform.accounts.tests.helpers import run_mail_queue
+
+        run_mail_queue()
+        token = VerificationToken.objects.get(
+            user=self.holder, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
+        )
+        self.assertIsNotNone(second_factor_reset.confirm_link(token))
 
         self.assert_only_the_holder_is_cleared()
 

@@ -1,0 +1,10 @@
+{% extends "entry_base.html" %}{% load i18n %}
+{% block title %}{% translate "Sign-in recovery" %}{% endblock %}
+{% block form %}<h1>{% translate "Sign-in recovery" %}</h1>
+<p>{% translate "Enter your sign-in email address to request recovery instructions." %}</p>
+{% include "accounts/_recovery_clarification.html" %}
+<form method="post" novalidate>{% csrf_token %}{% include "accounts/_error_summary.html" %}
+{% include "accounts/_bot_check.html" %}
+{% include "accounts/_field.html" with field=form.email %}
+<button class="btn btn-primary" type="submit">{% translate "Send recovery instructions" %}</button></form>
+{% endblock %}

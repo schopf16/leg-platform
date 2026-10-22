@@ -428,7 +428,7 @@ class PersonDataPageTests(TestCase):
         for url, method in self.routes():
             response = getattr(client, method)(url, CREATE)
             self.assertEqual(response.status_code, 302, url)
-            self.assertEqual(response["Location"], reverse("accounts:two_factor_setup"))
+            self.assertEqual(response["Location"], reverse("accounts:login_method"))
         self.assertFalse(User.objects.filter(email=CREATE["email"]).exists())
 
     def test_every_post_needs_the_csrf_token(self):

@@ -112,7 +112,7 @@ TASKS = (
     Task(
         key="two_factor",
         title=_("Choose how you sign in"),
-        description=_("Password only, or password and a code from an app on your phone."),
+        description=_("Choose a password, password and app, or passkey."),
         button=_("Choose"),
         is_open=lambda user: not second_factor.has_second_factor(user),
         method="link",

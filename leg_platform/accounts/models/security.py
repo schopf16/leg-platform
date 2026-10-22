@@ -148,6 +148,8 @@ class SecurityEvent(models.Model):
     class Event(models.TextChoices):
         PASSWORD_CHANGED = "password_changed", _("Password changed")
         PASSWORD_RESET = "password_reset", _("Password reset by link")
+        PASSKEYS_CHANGED = "passkeys_changed", _("Passkeys changed")
+        SIGN_IN_METHOD_CHANGED = "sign_in_method_changed", _("Sign-in method changed")
         EMAIL_CHANGE_REQUESTED = "email_change_requested", _("Email address change requested")
         EMAIL_CHANGED = "email_changed", _("Email address changed")
         ACCOUNT_BLOCKED = "account_blocked", _("Account blocked")

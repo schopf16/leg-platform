@@ -33,6 +33,8 @@ def process_reset_request(address):
         )
         if user is None:
             return None
+        if user.authentication_method != User.AuthenticationMethod.PASSWORD:
+            return None
         # Only the newest link is valid. A request above the per-address limit never reaches here,
         # so links already sent stay valid then.
         VerificationToken.objects.filter(
@@ -56,13 +58,19 @@ def delete_expired_reset_tokens(now=None):
     The links and requests hold the proposed address (``target_email``), which must not stay after
     expiry (D-016). Stop links of an account without an open request go too.
     """
-    from leg_platform.accounts.models import PendingEmailChange
+    from leg_platform.accounts.models import Passkey, PasskeyChallenge, PendingEmailChange, PendingSignInChange
 
     now = now or timezone.now()
+    PendingSignInChange.objects.filter(expires_at__lte=now).delete()
+    PasskeyChallenge.objects.filter(expires_at__lte=now).delete()
+    from leg_platform.accounts.passkeys import LIFETIME
+
+    Passkey.objects.filter(active=False, created_at__lte=now - LIFETIME).delete()
     count, _ = VerificationToken.objects.filter(
         purpose__in=(
             VerificationToken.Purpose.PASSWORD_RESET,
             VerificationToken.Purpose.TWO_FACTOR_RESET,
+            VerificationToken.Purpose.METHOD_RETURN,
             VerificationToken.Purpose.EMAIL_CHANGE,
             VerificationToken.Purpose.SECONDARY_EMAIL,
             VerificationToken.Purpose.EMAIL_CHANGE_STOP,
@@ -100,7 +108,7 @@ def complete_reset(token, form):
             )
             .first()
         )
-        if user is None or locked_token is None:
+        if user is None or locked_token is None or user.authentication_method != User.AuthenticationMethod.PASSWORD:
             return None
         form.user = user
         user.password_change_required = False

@@ -13,7 +13,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import second_factor, security_log
-from leg_platform.accounts.forms import OneProofMixin
+from leg_platform.accounts.forms import OneProofMixin, passkey_proof_field
 from leg_platform.accounts.logo_images import (
     FAVICON_MAX_UPLOAD_BYTES,
     MAX_UPLOAD_BYTES,
@@ -89,6 +89,7 @@ def colour_message(problem):
 
 
 class PortalSettingsForm(OneProofMixin, forms.ModelForm):
+    passkey_assertion = passkey_proof_field()
     # Set by ``PortalSettingsAdmin.get_form``: a rejected upload is a security event (D-073) and a
     # save needs one proof of identity. None outside the administration (fails closed).
     actor = None
@@ -179,7 +180,7 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
 
     @property
     def proof_field(self):
-        return "otp_token" if self.proof == "code" else "current_password"
+        return {"code": "otp_token", "passkey": "passkey_assertion", "password": "current_password"}[self.proof]
 
     def _add_server_hints(self):
         """Under every field with a server value: what an empty field means (D-073). Only public values; escaped."""

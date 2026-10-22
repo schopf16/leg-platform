@@ -1,0 +1,7 @@
+{% load i18n static %}{% include "django/forms/widgets/hidden.html" %}
+<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script>
+<script src="{% static 'js/passkeys.js' %}" defer></script>
+<p data-passkey-proof data-field="{{ widget.attrs.id }}" data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}">
+  {% translate "Confirm this change with your passkey when you continue." %}
+  <span role="status" data-passkey-status></span>
+</p>

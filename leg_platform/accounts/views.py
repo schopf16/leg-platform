@@ -783,8 +783,10 @@ class TwoFactorResetConfirmView(NeverCacheMixin, FormView):
         self.request.session.pop(TWO_FACTOR_RESET_SESSION_KEY, None)
         if confirmed is None:
             return redirect("accounts:two_factor_reset_invalid")
-        messages.success(
-            self.request,
-            _("Two-factor authentication was removed. You can now log in with your password."),
-        )
-        return redirect(self.get_success_url())
+        from leg_platform.accounts import passkey_methods
+
+        # This login is restricted centrally for every account, including ordinary users.
+        login(self.request, confirmed, backend=second_factor.LOGIN_BACKEND)
+        self.request.user = confirmed
+        passkey_methods.allow_setup(self.request)
+        return redirect("accounts:login_method")

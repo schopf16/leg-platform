@@ -987,7 +987,7 @@ class ProcessAccessTests(ProcessBase):
         ):
             with self.subTest(url=url):
                 response = client.get(url)
-                self.assertRedirects(response, reverse("accounts:two_factor_setup"), fetch_redirect_response=False)
+                self.assertRedirects(response, reverse("accounts:login_method"), fetch_redirect_response=False)
         self.assertEqual(self.state(application), State.SUBMITTED)
 
     def test_the_customer_and_the_anonymous_visitor_cannot_take_a_step(self):

@@ -1,5 +1,15 @@
 /* Additions for the portal's own pages in the Django admin (widths and small boxes only). */
 
+.button.recovery-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+}
+
 .field-subject input[type="text"],
 .field-body textarea,
 .field-name input,

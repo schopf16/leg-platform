@@ -71,6 +71,7 @@ invited and who has not completed the registration has no customer number yet; t
           <div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd>{% if person.secondary_email %}{{ person.secondary_email }}{% elif second_pending %}{% translate "Pending" %}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Phone" %}</dt><dd>{% if phone %}{{ phone }}{% else %}–{% endif %}</dd></div>
         </dl>
+        {% if person.is_active %}<a class="btn btn-danger-outline" href="{% url 'admin:accounts_user_reset_second_factor' person.pk %}">{% translate "Recover sign-in method" %}</a>{% endif %}
       </section>
 
       <section class="mgmt-card" data-order="3">

@@ -5,7 +5,11 @@ worker, operator commands, ``migrate``). This guards against code mistakes, not 
 compromised web process (same service user).
 """
 
+import os
+import stat
 import threading
+from contextlib import contextmanager
+from pathlib import Path
 
 from django.db.backends.signals import connection_created
 
@@ -41,6 +45,56 @@ def unmark_thread_writer():
 
 def is_writer():
     return _writer or getattr(_thread, "writer", False) is True
+
+
+def reset_marker(path):
+    """A failed or in-progress schema rebuild makes only the directory unavailable."""
+    return Path(str(path) + ".reset")
+
+
+@contextmanager
+def rebuilding_directory():
+    """Only setup's thread may open the directory while its reset marker exists."""
+    previous = getattr(_thread, "rebuilding", False)
+    _thread.rebuilding = True
+    try:
+        yield
+    finally:
+        _thread.rebuilding = previous
+
+
+def is_rebuilding():
+    return getattr(_thread, "rebuilding", False)
+
+
+@contextmanager
+def directory_open_guard(path):
+    """An OS mutex for connection opening/SQL execution versus reset, not reader lifetime.
+
+    Nonblocking: contention makes the optional directory unavailable, never delays startup.
+    SQL execution holds it through parameter consumption, including a lazy generator.
+    Closing the descriptor releases the lock, including after a killed process. Keep the
+    empty lock file in place so concurrent callers always lock the same inode.
+    """
+    lock = Path(str(path) + ".open-lock")
+    if lock.is_symlink():
+        raise OSError("The directory opening lock is a symbolic link.")
+    descriptor = os.open(lock, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise OSError("The directory opening lock is not a private regular file.")
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def directory_database(path):

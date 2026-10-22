@@ -2,7 +2,7 @@
 
 ``manage.py setup_instance`` is idempotent and safe to run on every start (``leg-setup.service``):
 
-1. Applies pending migrations (like ``migrate --noinput``); never flushes or deletes data.
+1. Applies pending application migrations (like ``migrate --noinput``); never deletes application data.
 2. Only if the account table is completely empty and ``BOOTSTRAP_SYSTEM_ADMIN_EMAIL`` is set, creates
    the initial system administrator with ``BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`` via the locked
    ``User.objects.create_superuser()`` path (validated, never printed or logged, no command line
@@ -12,8 +12,8 @@
    never create a privileged account later.
 3. Once an administrator exists, the password variable is not read; a still-set variable only
    produces a reminder.
-4. Creates the SQLite file of the address directory and migrates it. Last and never fatal: the
-   directory is optional (D-066) and not backed up (D-075).
+4. Creates/rebuilds the disposable address SQLite schema and queues its import. Last and never
+   fatal: the directory is optional (D-066) and not backed up (D-075).
 
 A named database lock serialises concurrent runs. Exit status: 0 when set up (also if only the
 directory step failed, or accounts exist without an administrator); non-zero when migrating fails or
@@ -35,7 +35,8 @@ from leg_platform.accounts.initial_administrator import (
     create_initial_administrator,
     system_administrator_exists,
 )
-from leg_platform.addresses.storage import DIRECTORY_ALIAS, mark_writer
+from leg_platform.addresses.storage import mark_writer
+from leg_platform.addresses.setup import prepare_directory
 from leg_platform.environment import (
     BOOTSTRAP_ADMIN_EMAIL_VARIABLE,
     BOOTSTRAP_ADMIN_PASSWORD_VARIABLE,
@@ -94,25 +95,23 @@ class Command(BaseCommand):
         return ["Database migrations: none pending."]
 
     def _directory(self):
-        """Create the SQLite file of the address directory and its tables (D-075).
+        """Prepare the disposable SQLite schema and queue an asynchronous import (D-075).
 
         A failure is reported on stderr (exception class only) but never stops the start; the next run tries again.
         """
         try:
-            connection = connections[DIRECTORY_ALIAS]
-            executor = MigrationExecutor(connection)  # opens, and so creates, the file
-            pending = len(executor.migration_plan(executor.loader.graph.leaf_nodes("addresses")))
-            call_command("migrate", "addresses", database=DIRECTORY_ALIAS, interactive=False,
-                         verbosity=0, stdout=self.stdout, stderr=self.stderr)
+            pending, queued = prepare_directory(stdout=self.stdout, stderr=self.stderr)
         except Exception as error:  # noqa: BLE001 - optional step, reported below
             self.stderr.write(
                 f"Address directory: NOT set up ({type(error).__name__}). Address suggestions "
                 "are unavailable until this is fixed (check that the state folder of the service "
-                "is writable); the rest of the instance is set up. The next start tries again."
+                "is writable and retry after directory readers/importers close); the rest of the "
+                "instance is set up. The next start tries again."
             )
             return
-        if pending:
+        if queued:
             self.stdout.write(f"Address directory: file prepared, {pending} migration(s) applied.")
+            self.stdout.write("Address directory: import queued; the worker or scheduled tasks will process it.")
         else:
             self.stdout.write("Address directory: file ready, none pending.")
 

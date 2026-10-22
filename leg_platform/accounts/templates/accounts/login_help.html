@@ -1,0 +1,14 @@
+{% extends "entry_base.html" %}{% load i18n %}
+{% block title %}{% translate "Trouble signing in?" %}{% endblock %}
+{% block form %}
+<h1>{% translate "Trouble signing in?" %}</h1>
+<p>{% translate "What do you need help with?" %}</p>
+<div class="login-help-details">
+  <div class="login-help-choices">
+    <a class="btn btn-secondary-action" href="{% url 'accounts:password_reset' %}">{% translate "Forgot your password?" %}</a>
+    <a class="btn btn-secondary-action" href="{% url 'accounts:recovery' %}">{% translate "App or passkey unavailable?" %}</a>
+  </div>
+  {% include "accounts/_recovery_clarification.html" %}
+</div>
+<a class="login-help-back" href="{% url 'accounts:login' %}">{% translate "Back to sign in" %}</a>
+{% endblock %}

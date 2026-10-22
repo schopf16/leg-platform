@@ -33,7 +33,10 @@ EMAIL_TEXT_PROCESSES = (
         _("Registration"),
         (_Key.REGISTRATION_VERIFICATION, _Key.REGISTRATION_EXISTING_ACCOUNT, _Key.INVITATION),
     ),
-    (_("Login and password"), (_Key.PASSWORD_RESET, _Key.PASSWORD_CHANGED)),
+    (_("Login and password"), (
+        _Key.PASSWORD_RESET, _Key.PASSWORD_CHANGED, _Key.SIGN_IN_CHANGED,
+        _Key.METHOD_RETURN, _Key.RECOVERY_GUIDANCE,
+    )),
     (
         _("Email addresses"),
         (

@@ -27,6 +27,21 @@ def absolute_url(path):
     return f"{settings.INSTANCE_BASE_URL}{path}"
 
 
+def send_sign_in_changed(address, greeting_name=""):
+    _send(address, Key.SIGN_IN_CHANGED, {}, greeting_name)
+
+
+def send_method_return(address, token, greeting_name=""):
+    _send(address, Key.METHOD_RETURN, {
+        "reset_url": absolute_url(reverse("accounts:method_return_verify", kwargs={"token": token})),
+        "lifetime_hours": "24",
+    }, greeting_name)
+
+
+def send_recovery_guidance(address):
+    _send(address, Key.RECOVERY_GUIDANCE, {})
+
+
 def _values(specific, key=None, greeting_name=""):
     # The portal name is re-checked for control characters when read, so it cannot inject a header (D-073).
     portal = portal_values()

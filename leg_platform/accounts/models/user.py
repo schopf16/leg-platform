@@ -60,6 +60,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         MR = "mr", _("Mr")
         FAMILY = "family", _("Family")
 
+    class AuthenticationMethod(models.TextChoices):
+        PASSWORD = "password", _("Password")
+        PASSKEY = "passkey", _("Passkey")
+        RECOVERY = "recovery", _("Sign-in method setup")
+
+    authentication_method = models.CharField(
+        _("authentication method"), max_length=8, choices=AuthenticationMethod, default=AuthenticationMethod.PASSWORD,
+        editable=False,
+    )
+
     email = models.EmailField(_("email address"), max_length=EMAIL_MAX_LENGTH)
     # Information and notifications only (D-059): never a login name, unique or used for a
     # password reset. Stored once confirmed; a requested address waits in ``PendingEmailChange``.
@@ -175,6 +185,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     # Fields that change only through the account logic, with their values at creation.
     _CONTROLLED_DEFAULTS = {
+        "authentication_method": AuthenticationMethod.PASSWORD,
         "status": Status.UNVERIFIED,
         "email": None,
         "is_staff": False,
@@ -364,8 +375,21 @@ class User(AbstractBaseUser, PermissionsMixin):
                 raise AccountIntegrityError("Unverified accounts have no customer number.")
             if self._has_usable_password(values["password"]):
                 raise AccountIntegrityError("Unverified accounts have no usable password.")
-        if status == self.Status.ACTIVE and not self._has_usable_password(values["password"]):
+        method = values["authentication_method"]
+        if method not in self.AuthenticationMethod.values:
+            raise AccountIntegrityError("Unknown authentication method.")
+        if method != self.AuthenticationMethod.PASSWORD and self._has_usable_password(values["password"]):
+            raise AccountIntegrityError("Passkey and recovery accounts have no usable password.")
+        if (
+            status == self.Status.ACTIVE
+            and method == self.AuthenticationMethod.PASSWORD
+            and not self._has_usable_password(values["password"])
+        ):
             raise AccountIntegrityError("Active accounts need a usable password.")
+        if status == self.Status.ACTIVE and method == self.AuthenticationMethod.PASSKEY:
+            minimum = 2 if values["is_staff"] or values["is_superuser"] else 1
+            if self._state.adding or self.passkeys.filter(active=True).count() < minimum:
+                raise AccountIntegrityError("Passkey accounts need an active credential.")
 
     def _check_privilege_grant(self, values, previous):
         """Refuse to grant staff or administrator rights to an account that is not active."""
@@ -374,6 +398,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         )
         if granted and values["status"] != self.Status.ACTIVE:
             raise AccountIntegrityError("Only active accounts can receive privileges.")
+        if granted and values["authentication_method"] == self.AuthenticationMethod.PASSKEY:
+            from leg_platform.accounts.models.passkeys import PasskeyIdentity
+
+            if (
+                self.passkeys.filter(active=True).count() < 2
+                or not PasskeyIdentity.objects.filter(user=self, two_devices_confirmed=True).exists()
+            ):
+                raise AccountIntegrityError("Privileged passkey accounts need two confirmed credentials.")
 
     def _check_against_stored(self, using, update_fields):
         def written(name):

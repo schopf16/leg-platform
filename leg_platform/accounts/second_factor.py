@@ -48,6 +48,7 @@ LOGIN_BACKEND = "leg_platform.accounts.backends.EmailModelBackend"
 # time is written by the server. Removing 2FA, new recovery codes, email change and deletion always ask.
 RECENT_AUTHENTICATION_WINDOW = timedelta(minutes=5)
 AUTHENTICATED_AT_KEY = "authenticated_at"
+PASSKEY_SESSION_KEY = "passkey_verified_account"
 
 # Wrong entries in profile confirmations (D-062) count per session and per account, never as a failed
 # login: the session ends after ``SESSION_CODE_LIMIT``, all sessions after ``ACCOUNT_FAILURE_LIMIT`` per window.
@@ -75,6 +76,14 @@ UNRESTRICTED_VIEWS = frozenset(
         "accounts:two_factor_setup",
         "accounts:two_factor_confirm",
         "accounts:two_factor_qr",
+        "accounts:login_method",
+        "accounts:passkey_setup",
+        "accounts:passkey_options",
+        "accounts:method_password",
+        "accounts:method_app",
+        "accounts:method_app_qr",
+        "accounts:method_return_verify",
+        "accounts:method_return_confirm",
         # Public endpoints used before authentication; they do not expose account data.
         "instance_stylesheet",
         "instance_logo",
@@ -98,6 +107,12 @@ PASSWORD_CHANGE_VIEWS = frozenset(
 # session or account data reaches them and nothing from the session reaches a cache (D-073). The
 # presentation files set no cookie; the language menu sets only the language cookie (D-056).
 SESSION_FREE_VIEWS = frozenset({"instance_logo", "instance_favicon", "set_language"})
+RECOVERY_VIEWS = frozenset({
+    "accounts:logout", "accounts:login_method", "accounts:passkey_setup", "accounts:passkey_options",
+    "accounts:method_password", "accounts:method_app", "accounts:method_app_qr",
+    "accounts:two_factor_reset_verify", "accounts:two_factor_reset_confirm", "accounts:two_factor_reset_invalid",
+    "instance_stylesheet", "instance_logo", "instance_favicon", "set_language",
+})
 
 
 def is_session_free(request):
@@ -115,11 +130,16 @@ def requires_second_factor(user):
 
 def has_second_factor(user):
     """Whether the account has set up a second factor (not whether the session completed it)."""
+    if getattr(user, "authentication_method", None) == User.AuthenticationMethod.PASSKEY:
+        minimum = 2 if requires_second_factor(user) else 1
+        return user.passkeys.filter(active=True).count() >= minimum
     return totp.has_authenticator(user)
 
 
 def is_second_factor_complete(user):
     """Whether this session completed the second factor (django-otp ``is_verified()``); fails closed if the middleware is missing."""
+    if getattr(user, "authentication_method", None) == User.AuthenticationMethod.PASSKEY:
+        return bool(user.is_authenticated and getattr(user, "_passkey_verified", False) and has_second_factor(user))
     is_verified = getattr(user, "is_verified", None)
     return bool(user.is_authenticated and is_verified is not None and is_verified())
 
@@ -170,6 +190,18 @@ class SecondFactorMiddleware:
             # Before ``request.user`` is read: reading it touches the session.
             return None
         user = request.user
+        if user.is_authenticated and user.authentication_method == User.AuthenticationMethod.RECOVERY:
+            if request.resolver_match.view_name in RECOVERY_VIEWS:
+                return None
+            return redirect("accounts:login_method")
+        if user.is_authenticated and user.authentication_method == User.AuthenticationMethod.PASSKEY:
+            user._passkey_verified = request.session.get(PASSKEY_SESSION_KEY) == user.pk
+            if request.resolver_match.view_name in {
+                "accounts:two_factor_setup", "accounts:two_factor_confirm", "accounts:two_factor_qr",
+                "accounts:two_factor_disable", "accounts:recovery_codes", "accounts:recovery_codes_done",
+                "accounts:two_factor_lost_phone", "accounts:password_change",
+            }:
+                return redirect("accounts:passkeys")
         if user.is_authenticated and user.password_change_required:
             if request.resolver_match.view_name in PASSWORD_CHANGE_VIEWS:
                 return None
@@ -186,7 +218,45 @@ class SecondFactorMiddleware:
             request,
             gettext("Your account needs two-factor authentication. Set it up to continue."),
         )
-        return redirect("accounts:two_factor_setup")
+        return redirect("accounts:login_method")
+
+
+def mark_passkey_session(request, user):
+    request.session[PASSKEY_SESSION_KEY] = user.pk
+    user._passkey_verified = True
+
+
+def verify_passkey(request, user, assertion):
+    """One action-bound assertion, under the same confirmation limits as password/app proof."""
+    import json
+
+    from leg_platform.accounts import passkeys
+
+    try:
+        payload = json.loads(assertion)
+        ceremony = payload["ceremony"]
+        response = payload["credential"]
+    except (ValueError, TypeError, KeyError):
+        return False
+    with transaction.atomic():
+        locked = User.objects.select_for_update().filter(pk=user.pk).first()
+        if confirmation_refused(request, user, locked):
+            return False
+        try:
+            AxesStandaloneBackend().authenticate(request, username=user.email)
+        except PermissionDenied:
+            user_login_failed.send(
+                sender=__name__, credentials={"username": user.email}, request=request
+            )
+            return False
+        checked = passkeys.authenticate(request, ceremony, response, user=user, action=request.path)
+        if checked is None:
+            record_confirmation_failure(request, user)
+        else:
+            reset_confirmation_failures(request, user)
+    # Confirmations never consume the login IP budget, whether the proof was right or wrong.
+    settle_client_ip_attempt(request, succeeded=True)
+    return checked is not None
 
 
 class PendingLogin(NamedTuple):
