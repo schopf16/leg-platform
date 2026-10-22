@@ -6972,8 +6972,5 @@ msgstr "Données modifiées après l’annonce auprès du gestionnaire de résea
 msgid "Data changed after the registration at the %(operator)s: check the registration again"
 msgstr "Données modifiées après l’annonce auprès de %(operator)s : vérifier à nouveau l’annonce"
 
-msgid "You changed this application too often today. Please try again tomorrow."
-msgstr "Vous avez modifié cette demande trop souvent aujourd’hui. Veuillez réessayer demain."
-
 msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
 msgstr "Plus de %(max)d demandes ou désinscriptions correspondent. Seules les plus récemment modifiées sont listées, les demandes soumises avant les brouillons. Restreignez la liste avec la recherche ou les filtres."

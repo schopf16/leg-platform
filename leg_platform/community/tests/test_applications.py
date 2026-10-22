@@ -1,13 +1,12 @@
 """The customer's application (D-103): draft services, steps, identity of buildings by EGID, number rules, neutral
 refusals, caps, submit/withdraw/cancel, and the safety of a rollback."""
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase, tag
-from django.utils import timezone
 
 from leg_platform.accounts.models import MailJob
 from leg_platform.community import (
@@ -26,7 +25,6 @@ from leg_platform.community.models import (
     ApplicationMeteringPoint,
     ApplicationNotice,
     Direction,
-    HistoryEntry,
     Location,
     MeteringPoint,
     PersonAssignment,
@@ -791,46 +789,53 @@ class SubmitTests(TestCase):
         other = customer("reopen.other@example.org")
         self.assertEqual(code_of(lambda: applications.reopen_for_change(other, application)), "not_found")
 
-    def test_a_change_is_capped_per_application_and_day_and_the_cap_is_counted_per_application(self):
+    def test_there_is_no_cap_of_changes_and_the_submission_mail_is_sent_once_per_application(self):
+        """Owner decision 2026-10-22: no cap of change cycles; the mail only at the first submission (D-107)."""
         publish_contract(self.staff)
         application, _building = ready_draft(self.person)
         other_application, _other = ready_draft(self.person, egid=EGID + 31, number=21, address={"house_number": "31"})
-        for _cycle in range(applications.MAX_CHANGES_PER_DAY):
-            applications.submit(self.person, application, today=TODAY)
-            applications.reopen_for_change(self.person, application)
-        applications.submit(self.person, application, today=TODAY)
+        mails = MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED)
 
-        self.assertEqual(applications.MAX_CHANGES_PER_DAY, 10)
-        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "too_many_changes")
+        applications.submit(self.person, application, today=TODAY)
+        self.assertEqual(mails.count(), 1)
+        for _cycle in range(12):
+            applications.reopen_for_change(self.person, application)
+            applications.submit(self.person, application, today=TODAY)
+
         application.refresh_from_db()
         self.assertEqual(application.state, Application.State.SUBMITTED)
-        # The refusal wrote nothing; the count does not grow and another application of the account has its own.
+        # Every submission is in the history (audit trail), only the first one sent a mail.
         self.assertEqual(
-            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_WITHDRAWN).count(),
-            applications.MAX_CHANGES_PER_DAY,
+            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).count(), 13
         )
+        self.assertEqual(mails.count(), 1)
+        # Another application of the account has its own first submission (and its own mail).
         applications.submit(self.person, other_application, today=TODAY)
-        applications.reopen_for_change(self.person, other_application)
-        # The withdrawal is not a change (it is not counted and not refused by this cap).
-        applications.withdraw(self.person, application)
+        self.assertEqual(mails.count(), 2)
 
-    def test_a_change_of_more_than_a_day_ago_is_not_counted(self):
+    def test_a_submission_after_a_withdrawal_sends_no_second_mail(self):
+        """The application was submitted before: "once per application" holds after a withdrawal too."""
         publish_contract(self.staff)
         application, _building = ready_draft(self.person)
-        for _cycle in range(applications.MAX_CHANGES_PER_DAY):
-            applications.submit(self.person, application, today=TODAY)
-            applications.reopen_for_change(self.person, application)
         applications.submit(self.person, application, today=TODAY)
-        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "too_many_changes")
-        # The entries are older than 24 hours now: the day has passed.
-        HistoryEntry.objects.filter(subject_type="application", subject_id=application.pk).update(
-            created_at=timezone.now() - timedelta(hours=25)
-        )
+        applications.withdraw(self.person, application)
 
-        applications.reopen_for_change(self.person, application)
+        applications.submit(self.person, application, today=TODAY)
 
         application.refresh_from_db()
-        self.assertEqual(application.state, Application.State.DRAFT)
+        self.assertEqual(application.state, Application.State.SUBMITTED)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
+        self.assertEqual(
+            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).count(), 2
+        )
+
+    def test_a_refused_submission_is_no_submission_and_the_mail_follows_the_first_real_one(self):
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        Application.objects.filter(pk=application.pk).update(start_choice="", desired_start_date=None)
+        self.assertEqual(code_of(lambda: applications.submit(self.person, application, today=TODAY)), "incomplete")
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 0)
+        self.assertFalse(history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).exists())
 
     def test_a_withdrawal_is_refused_while_the_account_holds_the_most_drafts_it_may_have(self):
         publish_contract(self.staff)

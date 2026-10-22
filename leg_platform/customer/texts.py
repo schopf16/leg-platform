@@ -50,7 +50,6 @@ MESSAGES = {
         "Until the registration at the grid operator starts, you can still withdraw it."
     ),
     "wrong_state": _("This is not possible any more."),
-    "too_many_changes": _("You changed this application too often today. Please try again tomorrow."),
     "step_not_available": _("This step is not available yet."),
     "building_fixed": _("This building is fixed and cannot be changed."),
     "rate_limited": _("You changed your bank connection too often. Please try again later."),

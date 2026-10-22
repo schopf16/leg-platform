@@ -16,7 +16,6 @@ application started) or ``OPEN``; the start date is chosen only after the contra
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -70,9 +69,6 @@ START_AFTER_MONTHS = 3
 PLAUSIBLE_MAXIMUM = {"pv_power_kwp": Decimal(1000), "battery_kwh": Decimal(2000), "wallbox_kw": Decimal(1000)}
 
 UNSET = object()
-
-# A customer may reopen the same application for a change at most this often within 24 hours (D-107).
-MAX_CHANGES_PER_DAY = 10
 
 
 @dataclass(frozen=True)
@@ -426,28 +422,15 @@ def cancel(person, application):
         delete_application(draft, "cancelled", fresh)
 
 
-def _changes_in_last_day(application, now):
-    """How often the customer reopened this application for a change in the last 24 hours (the history entries
-    ``application_withdrawn`` with the purpose ``change``)."""
-    details = history.entries_for(application).filter(
-        event=HistoryEvent.APPLICATION_WITHDRAWN, created_at__gte=now - timedelta(days=1)
-    ).values_list("detail", flat=True)
-    return sum(1 for detail in details if isinstance(detail, dict) and detail.get("purpose") == "change")
-
-
 def _take_back(person, application, states, detail=None):
     """Submitted application -> draft again with all its data, under the account's and the application's row lock (the
     staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies; the staff's
-    ``return_for_correction`` is exempt. A change (``purpose`` ``change``) is also capped per application and day
-    (``MAX_CHANGES_PER_DAY``, ``too_many_changes``): every cycle of change and submission puts the application at the
-    end of the queue and writes history rows, so an endless cycle is no use to the customer and a cost to the LEG."""
+    ``return_for_correction`` is exempt."""
     with transaction.atomic():
         fresh = locked_customer(person)
         locked = _lock_draft(fresh, application, states=states)
         if Application.objects.filter(person=fresh, state__in=Application.DRAFT_STATES).count() >= MAX_DRAFTS_PER_PERSON:
             raise ApplicationError("too_many_drafts")
-        if (detail or {}).get("purpose") == "change" and _changes_in_last_day(locked, timezone.now()) >= MAX_CHANGES_PER_DAY:
-            raise ApplicationError("too_many_changes")
         locked.state = Application.State.DRAFT
         locked.submitted_at = None
         history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh, detail)
@@ -468,8 +451,8 @@ def reopen_for_change(person, application):
     data, the customer edits it in the wizard and submits it again (the queue position is the new submission's). Only
     state ``submitted`` qualifies; once the staff took it into review (or started the registration at the grid operator)
     the customer cannot change it any more (``review_started`` / ``not_editable``). The check is made under the row lock
-    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two. At
-    most ``MAX_CHANGES_PER_DAY`` changes per application in 24 hours (``too_many_changes``)."""
+    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two. There
+        is no cap of changes (owner decision 2026-10-22); the wizard rate limit applies to the view."""
     try:
         return _take_back(person, application, (Application.State.SUBMITTED,), {"purpose": "change"})
     except ApplicationError as error:
@@ -787,7 +770,9 @@ def submit(person, application, *, today=None):
     """Submit the draft: building with a draw, IBAN if there is a feed-in, the contract accepted and a start date.
 
     ``ApplicationError("incomplete", missing=[...])`` lists the open steps. Metering point numbers and EGIDs are checked
-    again; another account's is the neutral refusal. The confirmation mail goes to every address of the account."""
+    again; another account's is the neutral refusal. The confirmation mail goes to every address of the account, but only
+    at the first submission of the application (no history entry ``application_submitted`` yet); every later submission
+    sends none."""
     today = today or timezone.localdate()
     try:
         with transaction.atomic():
@@ -816,8 +801,13 @@ def submit(person, application, *, today=None):
                     "returned_at", "returned_reason", "updated_at",
                 ]
             )
+            # The confirmation mail is sent once per application, at its first submission (D-107): a later submission
+            # (after a change, a withdrawal or a return for correction) is a resubmission and sends no mail. The history
+            # entry of every submission is kept (audit trail). Read before the new entry is written, under the row lock.
+            first_submission = not history.entries_for(draft).filter(event=HistoryEvent.APPLICATION_SUBMITTED).exists()
             history.record(draft, HistoryEvent.APPLICATION_SUBMITTED, fresh)
-            mail_queue.enqueue_for_account(MailJob.Kind.APPLICATION_SUBMITTED, fresh)
+            if first_submission:
+                mail_queue.enqueue_for_account(MailJob.Kind.APPLICATION_SUBMITTED, fresh)
     except buildings.Refusal as refusal:
         buildings.refuse(refusal, person)
     return draft

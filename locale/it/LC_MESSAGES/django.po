@@ -6853,8 +6853,5 @@ msgstr "Dati modificati dopo la registrazione presso il gestore di rete: verific
 msgid "Data changed after the registration at the %(operator)s: check the registration again"
 msgstr "Dati modificati dopo la registrazione presso %(operator)s: verificare di nuovo la registrazione"
 
-msgid "You changed this application too often today. Please try again tomorrow."
-msgstr "Oggi ha modificato questa richiesta troppe volte. Riprovi domani."
-
 msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
 msgstr "Più di %(max)d richieste o uscite corrispondono. Sono elencate solo quelle modificate più di recente, le richieste inoltrate prima delle bozze. Restringa l'elenco con la ricerca o i filtri."

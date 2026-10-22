@@ -6936,8 +6936,5 @@ msgstr "Daten nach der Anmeldung beim Netzbetreiber geändert: Anmeldung erneut 
 msgid "Data changed after the registration at the %(operator)s: check the registration again"
 msgstr "Daten nach der Anmeldung bei %(operator)s geändert: Anmeldung erneut prüfen"
 
-msgid "You changed this application too often today. Please try again tomorrow."
-msgstr "Sie haben diese Anmeldung heute zu oft geändert. Bitte versuchen Sie es morgen wieder."
-
 msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
 msgstr "Mehr als %(max)d Anmeldungen oder Abmeldungen passen. Es werden nur die zuletzt geänderten aufgeführt, eingereichte Anmeldungen vor Entwürfen. Grenzen Sie die Liste mit der Suche oder den Filtern ein."

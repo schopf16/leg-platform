@@ -95,6 +95,8 @@ class TransitionTests(StaffCase):
         applications.submit(self.person, application, today=TODAY)
         application.refresh_from_db()
         self.assertIsNone(application.returned_at)
+        # The resubmission after the return sends no second submission mail (once per application, D-107).
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
         self.assertEqual((application.returned_reason, applications.returned_reason(application)), ("", ""))
         events = list(history.entries_for(application).values_list("event", flat=True))
         self.assertEqual(

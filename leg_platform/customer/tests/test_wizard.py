@@ -879,16 +879,27 @@ class SubmittedAndWithdrawTests(WizardCase):
         self.assertContains(response, "Sie haben zu viele Entwürfe.")
         self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
 
-    def test_the_change_is_refused_with_a_plain_message_after_too_many_changes_of_the_day(self):
+    def test_the_change_has_no_cap_and_the_resubmission_sends_no_second_mail(self):
+        """Owner decision 2026-10-22: no cap of change cycles; the mail only at the first submission (D-107). The queue
+        shows the application once, with the newest submission time."""
         url = reverse("customer:application_change", args=[self.application.pk])
-        with patch.object(applications, "MAX_CHANGES_PER_DAY", 0):
-            response = self.client.post(url, follow=True)
-        self.assertRedirects(response, BUILDINGS)
-        self.assertContains(response, "Sie haben diese Anmeldung heute zu oft geändert. Bitte versuchen Sie es morgen wieder.")
+        mails = MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED)
+        self.assertEqual(mails.count(), 1)  # the first submission (setUp)
+        for _cycle in range(12):
+            self.assertEqual(self.client.post(url).status_code, 302)
+            self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.DRAFT)
+            applications.submit(self.mine, self.application)
         self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.SUBMITTED)
-        # Within the cap the same click works.
+        self.assertEqual(mails.count(), 1)
+        self.assertEqual(Application.objects.filter(state=Application.State.SUBMITTED).count(), 1)
+        # Through the wizard: the normal confirmation page (it promises no mail from the portal), no second mail.
         self.client.post(url)
-        self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.DRAFT)
+        response = self.client.post(step_url(self.application, "start_date"), {"start": "asap"})
+        self.assertRedirects(response, self.submitted, fetch_redirect_response=False)
+        html = text(self.client.get(self.submitted))
+        self.assertIn("Ihre Anmeldung ist abgeschickt", html)
+        self.assertNotIn("bestätigung per E-Mail", html.lower())
+        self.assertEqual(mails.count(), 1)
 
     def test_withdrawing_asks_first_and_makes_a_draft_again_with_all_its_details(self):
         url = reverse("customer:application_withdraw", args=[self.application.pk])
