@@ -70,13 +70,15 @@ class AvailableMethodsTests(SimpleTestCase):
         self.assertEqual(login_methods.recommended(User(email="user@example.org")), APP)
         self.assertEqual(login_methods.recommended(User(email="admin@example.org", is_superuser=True)), PASSKEY)
 
-    def test_the_administrator_card_names_the_two_devices(self):
+    def test_passkey_card_has_the_same_requirements_and_consequences_for_everyone(self):
         administrator = User(email="admin@example.org", is_staff=True)
 
         with translation.override("en"):
-            notes = {method.key: str(method.note) for method in login_methods.available(administrator)}
-
-        self.assertIn("two passkeys on two devices", notes[PASSKEY])
+            ordinary = next(method for method in login_methods.available(User()) if method.key == PASSKEY)
+            privileged = next(method for method in login_methods.available(administrator) if method.key == PASSKEY)
+            self.assertEqual(ordinary, privileged)
+            self.assertIn("Your password and app are deleted.", str(privileged.note))
+            self.assertIn("recommend a second device", str(privileged.need))
 
 class LoginMethodFormTests(SimpleTestCase):
     def valid(self, method, user):
@@ -346,8 +348,9 @@ class AdministratorLoginMethodTests(TestCase):
         self.assertIn('value="app"', html)
         self.assertIn('value="passkey"', html)
         self.assertNotIn('value="password"', html)
-        self.assertIn("Unsicher? Wir empfehlen einen Passkey auf zwei Geräten.", html)
-        self.assertIn("Richten Sie zuerst zwei Passkeys auf zwei Geräten ein.", html)
+        self.assertIn("Unsicher? Wir empfehlen einen Passkey. Ein Passkey genügt.", html)
+        self.assertIn("Wir empfehlen dringend einen zusätzlichen Passkey", html)
+        self.assertNotIn("Richten Sie zuerst zwei Passkeys", html)
         # A forged "password only" is refused; the app stays on.
         forged = client.post(CHOOSE_URL, {"method": PASSWORD_ONLY})
         self.assertEqual(forged.status_code, 200)

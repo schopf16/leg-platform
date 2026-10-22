@@ -15,8 +15,8 @@
     {% if recovering %}<p>{% translate "Your previous sign-in methods no longer work. Set up new passkeys to restore access." %}</p>
     {% elif adding %}<p>{% translate "Add another passkey. Your existing passkeys remain usable." %}</p>
     {% else %}<p>{% translate "Your current sign-in method stays valid until you finish setting up passkeys. Finishing replaces it with passkeys." %}</p>{% endif %}
-    {% if require_two_devices %}<p>{% translate "First set up two passkeys on two devices." %}</p>
-    {% elif not privileged %}<p>{% translate "One passkey is enough. We recommend a second passkey on another device." %}</p>{% endif %}
+    <p>{% translate "One passkey is enough. We strongly recommend an additional passkey on another device to protect against losing access." %}</p>
+    {% include "accounts/_passkey_add_help.html" %}
     <ul>{% for key in keys %}<li>{{ key.name }}</li>{% endfor %}</ul>
     <form data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}" class="profile-form">
       {% csrf_token %}{% include "accounts/_field.html" with field=form.name %}
@@ -25,7 +25,6 @@
     </form>
     <form method="post" class="profile-form">
       {% csrf_token %}<input type="hidden" name="activate" value="yes">
-      {% if require_two_devices %}<label class="entry-check"><input type="checkbox" name="two_devices" required><span>{% translate "I set up these passkeys on two devices." %}</span></label>{% endif %}
       <button class="btn btn-primary" type="submit">{% if adding %}{% translate "Save passkey" %}{% else %}{% translate "Use passkeys" %}{% endif %}</button>
     </form>
   {% endif %}

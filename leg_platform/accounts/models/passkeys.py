@@ -23,6 +23,8 @@ class PasskeyIdentity(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="passkey_identity"
     )
     handle = models.BinaryField(default=new_user_handle, max_length=32, unique=True, editable=False)
+    # Legacy D-106 metadata only; never read or written by authentication or promotion.
+    # Retained to avoid an unnecessary destructive migration (owner clarification 2026-10-22).
     two_devices_confirmed = models.BooleanField(default=False, editable=False)
 
     class Meta:

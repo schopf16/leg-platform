@@ -10,7 +10,7 @@ methods route into the existing flows (``profile_views.LoginMethodView``); this 
 * ``PASSKEY``: discoverable, user-verified credential without a password or app.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from django.utils.translation import gettext_lazy as _
 
@@ -69,7 +69,6 @@ _METHODS = {
         note=_("Your password and app are deleted. You cannot combine a password with a passkey."),
     ),
 }
-_ADMINISTRATOR_PASSKEY_NOTE = _("First set up two passkeys on two devices.")
 
 
 def is_privileged(user):
@@ -87,13 +86,7 @@ def available_keys(user):
 
 def available(user):
     """The methods this account may choose, in the order of the page: ``Method`` objects."""
-    methods = []
-    for key in available_keys(user):
-        method = _METHODS[key]
-        if key == PASSKEY and is_privileged(user):
-            method = replace(method, note=_ADMINISTRATOR_PASSKEY_NOTE)
-        methods.append(method)
-    return methods
+    return [_METHODS[key] for key in available_keys(user)]
 
 
 def has_choice(user):

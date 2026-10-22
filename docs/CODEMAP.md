@@ -53,16 +53,16 @@ Models (`accounts/models/`, a package; `__init__.py` re-exports every public nam
 | `security.py` | `SecurityEvent` (`Event`, `LONG_RETENTION`, append-only manager `record`, `delete_expired`), `LoginIpAttempt`, `SessionCodeFailure`, `ConfirmationFailure`, `RateLimitBucket`, `RateLimitEvent`. |
 | `tokens.py`, `mail.py` | `VerificationToken` (digests only), `PendingEmailChange`; `MailJob` (`Kind`, `NOTIFICATION_KINDS`), `EmailText` (`Key`), `EmailTextVersion`, `GraphConfiguration`. |
 | `portal.py`, `second_factor.py` | `PortalSettings` (one row), `HiddenTask`; `AuthenticatorDevice`, `RecoveryCodeDevice`, `RecoveryCode`. |
-| `passkeys.py` | `PasskeyIdentity` (opaque handle and device confirmation), `Passkey` (public credential, staging and counter), `PasskeyChallenge` (single-use session/purpose/action binding), `PendingSignInChange` (pending password hash, app completion, expiry and binding). |
+| `passkeys.py` | `PasskeyIdentity` (opaque handle; legacy `two_devices_confirmed` column unused, retained to avoid destructive migration), `Passkey` (public credential, staging and counter), `PasskeyChallenge` (single-use session/purpose/action binding), `PendingSignInChange` (pending password hash, app completion, expiry and binding). |
 
 Logic (`accounts/*.py`):
 
 `passkeys.py`: D-106 WebAuthn primitives (`begin`, `register`, `authenticate`, `relying_party`).
-`passkey_methods.py`: current-proof setup grant, atomic `activate`, `remove` with permanent user/administrator minima.
-`activate` records self-service device confirmation only for an already privileged account. Ordinary-to-privileged promotion in `admin/users.py` always requires the foreign administrator's statement, independently of an old stored flag.
+`passkey_methods.py`: current-proof setup grant, atomic `activate`, `remove` with a uniform permanent one-active-key minimum.
+`activate` never reads or writes device confirmation. Activation and additional-key saving preserve only the current session, retain existing keys and notify confirmed addresses; removal ends all sessions.
 `passkey_views.py`: JSON `OptionsView`, username-free `LoginView`, current-proof `SetupView`, `ManageView` under `/passkeys/`.
-`SetupView.page` supplies `adding`/`recovering` and administrator-confirmation context to `passkey_setup.html`; `_password.html` routes passkey accounts directly to the shared choice. `admin/users.py` recovery eligibility is active-account-based, including password-only/first-login accounts; recovery-only settings display the formatted customer number and native admin action.
-`admin/users.py`: `UserAdmin.get_form` binds the acting administrator to `UserAdminForm`; its promotion-only `passkey_devices_confirmed` statement is shown in the existing privilege section for eligible foreign passkey accounts. Form validation reports missing second key/statement; `save_model` rechecks under account-first locking and atomically records device confirmation with promotion. Tests use actual admin GET/POST in `test_method_changes.py`.
+`SetupView.page` supplies `adding`/`recovering` context to `passkey_setup.html`; `_password.html` routes passkey accounts directly to the shared choice. The active passkey card `_two_factor.html` links directly to setup; `_passkey_add_help.html` shares native another-device guidance between profile, management and setup, including add-key session consequences. `admin/users.py` recovery eligibility is active-account-based, including password-only/first-login accounts; recovery-only settings display the formatted customer number and native admin action.
+`admin/users.py`: `UserAdminForm` and locked `save_model` recheck a completed factor for promotion; one active passkey suffices. No device-statement field or legacy flag gates promotion. Foreign system-administrator authority and unrelated privilege protections remain. Tests use actual admin GET/POST in `test_method_changes.py` and `test_passkeys.py`.
 `method_changes.py`: staged hash/app, `start`, `confirm_app`, outbox `process_return_link`, atomic `complete`.
 `method_views.py`: `PasswordMethodView`, `AppMethodView` / `AppMethodQrView`, scanner-safe `ReturnVerifyView` / `ReturnConfirmView`, anonymous GET-only `LoginHelpView` (`/login/help/`, `login_help.html`) and public `RecoveryRequestView`. Routes `/sign-in-method/`, `/recovery/`. `_recovery_clarification.html` explains the second-passkey and password-then-recovery-code alternatives in both help pages.
 
@@ -215,6 +215,7 @@ Pages of the customer's participation under `/participation/`, namespace `custom
 | `docs` | `docs/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `.claude/` (runs `T.test_repository` only) |
 | `testing`, `local-scripts` | `scripts/test_areas.py`, `scripts/test.ps1`; `scripts/local/` (no Django tests; run `scripts/local/test-setup-dev-windows.ps1` by hand) |
 | `translations` | `locale/` (de_CH, fr, it) |
+| `passkeys` | `accounts/passkeys.py`, `passkey_methods.py`, `passkey_views.py`, `method_changes.py`, `method_views.py`, their tests/templates and the browser helper (runs `A.test_passkeys`, `A.test_method_changes`, `A.test_login_methods`; migration and system checks). |
 | `language` | `language.py`, `accounts/templatetags/language_menu.py`, `templates/_corner_controls.html`, `static/js/corner-controls.js` |
 | `templates`, `static` | `*/templates/`, `*/templatetags/`; `static/`, `*/static/` |
 | `branding` | `branding.py`, `presentation.py`, `context_processors.py`, `accounts/portal_settings*.py`, `accounts/logo_images.py` |

@@ -23,7 +23,6 @@ from leg_platform.accounts.models import (
     AccountIntegrityError,
     AuthenticatorDevice,
     IssuedCustomerNumber,
-    PasskeyIdentity,
     SecurityEvent,
     User,
     customer_numbers_nearly_exhausted,
@@ -46,30 +45,13 @@ def privileges_granted(account, is_staff, is_superuser):
 
 class UserAdminForm(forms.ModelForm):
     postal_code = postal_code_field()
-    passkey_devices_confirmed = forms.BooleanField(
-        required=False,
-        label=_("The person has confirmed to me that their passkeys are set up on two devices."),
-    )
 
     class Meta:
         model = User
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
-        self.actor = kwargs.pop("actor", None)
         super().__init__(*args, **kwargs)
-        if not (
-            self.actor and self.actor.is_active and self.actor.is_superuser
-            and self.actor.pk != self.instance.pk
-            and self.instance.authentication_method == User.AuthenticationMethod.PASSKEY
-            and (
-                not (self.instance.is_staff or self.instance.is_superuser)
-                or not PasskeyIdentity.objects.filter(
-                    user=self.instance, two_devices_confirmed=True
-                ).exists()
-            )
-        ):
-            self.fields.pop("passkey_devices_confirmed", None)
         # Also for bound forms: has_changed() compares the posted value with the initial one.
         self.initial.setdefault("postal_code", self.instance.postal_code_display)
 
@@ -94,21 +76,6 @@ class UserAdminForm(forms.ModelForm):
                 )
                 return
         if privileges_granted(self.instance, cleaned_data["is_staff"], cleaned_data["is_superuser"]):
-            if self.instance.authentication_method == User.AuthenticationMethod.PASSKEY:
-                field = "is_staff" if not self.instance.is_staff else "is_superuser"
-                if self.instance.passkeys.filter(active=True).count() < 2:
-                    self.add_error(field, _("Add a second active passkey before granting these rights."))
-                elif not (self.instance.is_staff or self.instance.is_superuser) or not PasskeyIdentity.objects.filter(
-                    user=self.instance, two_devices_confirmed=True
-                ).exists():
-                    if "passkey_devices_confirmed" not in self.fields:
-                        self.add_error(field, _("The two-device confirmation is required before granting these rights."))
-                    elif not cleaned_data.get("passkey_devices_confirmed"):
-                        self.add_error(
-                            "passkey_devices_confirmed",
-                            _("The two-device confirmation is required before granting these rights."),
-                        )
-                return
             if not second_factor.has_second_factor(self.instance):
                 field = "is_staff" if not self.instance.is_staff else "is_superuser"
                 self.add_error(field, SECOND_FACTOR_REQUIRED_MESSAGE)
@@ -241,29 +208,8 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
         if request.user.is_superuser and obj is not None and obj.pk != request.user.pk:
-            fields = self.privilege_fields
-            if (
-                obj.authentication_method == User.AuthenticationMethod.PASSKEY
-                and (
-                    not (obj.is_staff or obj.is_superuser)
-                    or not PasskeyIdentity.objects.filter(
-                        user=obj, two_devices_confirmed=True
-                    ).exists()
-                )
-            ):
-                fields = (*fields, "passkey_devices_confirmed")
-            return (*fieldsets, (None, {"fields": fields}))
+            return (*fieldsets, (None, {"fields": self.privilege_fields}))
         return fieldsets
-
-    def get_form(self, request, obj=None, **kwargs):
-        base_form = super().get_form(request, obj, **kwargs)
-
-        class ActorBoundUserAdminForm(base_form):
-            def __init__(self, *args, **form_kwargs):
-                form_kwargs["actor"] = request.user
-                super().__init__(*args, **form_kwargs)
-
-        return ActorBoundUserAdminForm
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = super().get_readonly_fields(request, obj)
@@ -576,15 +522,8 @@ class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
                 if (
                     not request.user.is_active or not request.user.is_superuser
                     or request.user.pk == stored.pk
-                    or stored.passkeys.filter(active=True).count() < 2
                 ):
                     raise PermissionDenied
-                identity = PasskeyIdentity.objects.select_for_update().get(user=stored)
-                if not (stored.is_staff or stored.is_superuser) or not identity.two_devices_confirmed:
-                    if not form.cleaned_data.get("passkey_devices_confirmed"):
-                        raise PermissionDenied
-                    identity.two_devices_confirmed = True
-                    identity.save(update_fields=["two_devices_confirmed"])
             super().save_model(request, obj, form, change)
             if privileges is not None and privileges != (obj.is_staff, obj.is_superuser):
                 obj.set_privileges(is_staff=privileges[0], is_superuser=privileges[1])

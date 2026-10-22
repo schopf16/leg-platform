@@ -9,7 +9,7 @@ the options are decided on the server, never here), ``selected`` (the key checke
   <legend class="choice-legend">{% translate "How do you want to sign in?" %}</legend>
   {% include "accounts/_login_method_help.html" %}
   <p class="choice-recommendation" id="choice-recommendation">
-    {% if privileged and recommended == "passkey" %}{% translate "Not sure? We recommend a passkey on two devices. Without a second device, choose Password and code from an app." %}
+    {% if privileged and recommended == "passkey" %}{% translate "Not sure? We recommend a passkey. One passkey is enough. We strongly recommend an additional passkey on another device." %}
     {% else %}{% blocktranslate with title=recommended_title %}Not sure? We recommend: {{ title }}.{% endblocktranslate %}{% endif %}
   </p>
   <div class="choice-helper">

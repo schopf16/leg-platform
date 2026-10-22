@@ -178,10 +178,12 @@ class PasskeyCeremonyTests(TestCase):
         self.assertIsNone(password_reset.process_reset_request(self.user.email))
         self.assertFalse(VerificationToken.objects.filter(user=self.user).exists())
 
-    def test_promotion_requires_two_distinct_credentials_and_device_confirmation(self):
+    def test_promotion_accepts_one_active_credential_without_device_confirmation(self):
         self.activate()
-        with self.assertRaises(AccountIntegrityError):
-            self.user.set_privileges(is_staff=True, is_superuser=False)
+        self.user.set_privileges(is_staff=True, is_superuser=False)
+        self.assertTrue(second_factor.has_second_factor(self.user))
+        self.user.set_privileges(is_staff=True, is_superuser=True)
+        self.assertTrue(second_factor.has_second_factor(self.user))
 
     def test_public_handle_is_opaque_and_stable(self):
         first = passkeys.begin(self.request, "register", user=self.user)
@@ -261,14 +263,45 @@ class PasskeyCeremonyTests(TestCase):
         self.assertFalse(Passkey.objects.filter(pk=stale.pk).exists())
         self.assertTrue(Passkey.objects.filter(pk=active.pk, active=True).exists())
 
-    def test_one_credential_cannot_record_two_device_confirmation(self):
+    def test_staff_can_activate_exactly_one_credential(self):
         self.user.set_privileges(is_staff=True, is_superuser=False)
         passkey_methods.allow_setup(self.request)
         self.assertIsNotNone(self.stage())
-        self.assertIsNone(passkey_methods.activate(self.request, two_devices=True))
+        self.assertIsNotNone(passkey_methods.activate(self.request))
         self.user.refresh_from_db()
-        self.assertEqual(self.user.authentication_method, User.AuthenticationMethod.PASSWORD)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
+        self.assertEqual(self.user.authentication_method, User.AuthenticationMethod.PASSKEY)
+        self.assertFalse(self.user.has_usable_password())
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
+        self.assertTrue(second_factor.has_second_factor(self.user))
+
+    def test_one_key_activation_atomically_removes_app_password_and_real_recovery_codes(self):
+        from leg_platform.accounts import totp
+        from leg_platform.accounts.models import RecoveryCode
+
+        self.user.set_privileges(is_staff=True, is_superuser=True)
+        AuthenticatorDevice.objects.create_device(self.user, confirmed=True)
+        totp._replace_recovery_codes(self.user)
+        self.assertEqual(RecoveryCode.objects.filter(device__user=self.user).count(), 10)
+        passkey_methods.allow_setup(self.request)
+        staged = self.stage()
+        with patch.object(User, "end_all_sessions", side_effect=RuntimeError("Synthetic rollback")):
+            with self.assertRaisesMessage(RuntimeError, "Synthetic rollback"):
+                passkey_methods.activate(self.request)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.has_usable_password())
+        self.assertEqual(self.user.authentication_method, "password")
+        self.assertTrue(AuthenticatorDevice.objects.filter(user=self.user, confirmed=True).exists())
+        self.assertEqual(RecoveryCode.objects.filter(device__user=self.user).count(), 10)
+        staged.refresh_from_db()
+        self.assertFalse(staged.active)
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.SIGN_IN_CHANGED).exists())
+        self.user = passkey_methods.activate(self.request)
+        self.assertIsNotNone(self.user)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
+        self.assertFalse(self.user.has_usable_password())
+        self.assertFalse(AuthenticatorDevice.objects.filter(user=self.user).exists())
+        self.assertFalse(RecoveryCodeDevice.objects.filter(user=self.user).exists())
+        self.assertFalse(RecoveryCode.objects.filter(device__user=self.user).exists())
 
     def test_fresh_setup_grant_does_not_activate_abandoned_staging(self):
         staged = self.stage()
@@ -281,18 +314,15 @@ class PasskeyCeremonyTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.authentication_method, User.AuthenticationMethod.PASSWORD)
 
-    def test_ordinary_user_cannot_self_confirm_two_credentials_before_promotion(self):
+    def test_passkey_promotion_refuses_staged_only_credentials(self):
         passkey_methods.allow_setup(self.request)
         self.assertIsNotNone(self.stage())
-        self.credential_id = secrets.token_bytes(32)
-        self.assertIsNotNone(self.stage())
-        self.user = passkey_methods.activate(self.request, two_devices=True)
-        self.assertIsNotNone(self.user)
+        # The active-method invariant refuses a passkey account without an active key.
         with self.assertRaises(AccountIntegrityError):
-            self.user.set_privileges(is_staff=True, is_superuser=False)
+            self.user._change(authentication_method=User.AuthenticationMethod.PASSKEY)
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
+        self.assertFalse(second_factor.has_second_factor(self.user))
 
     def test_internal_models_offer_no_role_permissions(self):
         from leg_platform.accounts.models import PasskeyIdentity
@@ -450,7 +480,7 @@ class CeremonyFixture:
         self.stage()
         self.credential_id = secrets.token_bytes(32)
         self.stage()
-        self.user = passkey_methods.activate(self.request, two_devices=True)
+        self.user = passkey_methods.activate(self.request)
         self.request.user = self.user
 
 
@@ -458,7 +488,61 @@ class CeremonyFixture:
 class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
     """D-106: real signature verification through HTTP, not a mocked verifier."""
 
-    def test_ordinary_forged_setup_statement_does_not_authorize_later_promotion(self):
+    def test_add_key_from_profile_requires_current_proof_and_preserves_disclosed_session_policy(self):
+        from django.conf import settings
+        from django.urls import reverse
+        from leg_platform.accounts.models import SecurityEvent
+
+        self.user.set_privileges(is_staff=True, is_superuser=True)
+        self.activate()
+        self.signed_in()
+        other_session = Client()
+        other_session.force_login(self.user)
+        session = other_session.session
+        session[second_factor.PASSKEY_SESSION_KEY] = self.user.pk
+        session.save()
+        original = self.user.passkeys.get()
+        version = self.user.session_version
+        self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = "en"
+        path = reverse("accounts:passkey_setup")
+        self.assertContains(self.client.get(reverse("accounts:profile"), secure=True), f'href="{path}"')
+        self.assertContains(self.client.get(reverse("accounts:passkeys"), secure=True), "Keep at least one active passkey.")
+        self.assertContains(self.client.get(path, secure=True), "Add a passkey")
+        self.assertEqual(self.json_post("/passkeys/options/", {"purpose": "register"}).status_code, 400)
+        self.assertEqual(self.client.post(path, {"activate": "yes"}, secure=True).status_code, 200)
+        options = self.options("proof", action=path)
+        self.assertEqual(self.client.post(path, {
+            "passkey_assertion": json.dumps({
+                "ceremony": options["ceremony"], "credential": self.assertion(options),
+            }),
+        }, secure=True).status_code, 302)
+        setup = self.client.get(path, secure=True)
+        self.assertContains(setup, "Other sessions end and you receive a security notice.")
+        self.assertContains(setup, "We strongly recommend")
+        self.assertNotContains(setup, 'name="two_devices"')
+        self.credential_id = secrets.token_bytes(32)
+        options = self.options("register")
+        self.assertEqual(self.json_post(path, {
+            "ceremony": options["ceremony"], "credential": self.registration(options),
+            "name": "Synthetic additional computer",
+        }).status_code, 200)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
+        MailJob.objects.all().delete()
+        self.assertEqual(self.client.post(path, {"activate": "yes"}, secure=True).status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.authentication_method, "passkey")
+        self.assertFalse(self.user.has_usable_password())
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.assertTrue(self.user.passkeys.filter(pk=original.pk, active=True).exists())
+        self.assertGreater(self.user.session_version, version)
+        self.assertEqual(self.client.get(reverse("accounts:profile"), secure=True).status_code, 200)
+        self.assertEqual(other_session.get(reverse("accounts:profile"), secure=True).status_code, 302)
+        self.assertTrue(MailJob.objects.filter(kind=MailJob.Kind.SIGN_IN_CHANGED, address=self.user.email).exists())
+        self.assertTrue(SecurityEvent.objects.filter(
+            event=SecurityEvent.Event.PASSKEYS_CHANGED, account_id=self.user.pk, long_retention=True,
+        ).exists())
+
+    def test_obsolete_setup_statement_is_ignored_and_promotion_needs_no_statement(self):
         from django.urls import reverse
         from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient
         from leg_platform.accounts.tests.test_admin import PROFILE_DATA
@@ -487,15 +571,13 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         admin_client = VerifiedClient()
         admin_client.force_login(actor)
         url = reverse("admin:accounts_user_change", args=[self.user.pk])
-        self.assertContains(admin_client.get(url, secure=True), 'name="passkey_devices_confirmed"')
+        self.assertNotContains(admin_client.get(url, secure=True), 'name="passkey_devices_confirmed"')
         response = admin_client.post(
             url, {**PROFILE_DATA, "is_staff": "on", "_save": "Save"}, secure=True,
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("passkey_devices_confirmed", response.context["adminform"].form.errors)
+        self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
+        self.assertTrue(self.user.is_staff)
 
     def test_corrupted_signature_is_refused_without_session_or_counter_change(self):
         self.activate()
@@ -626,8 +708,10 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         ))
         self.assertFalse(PasskeyChallenge.objects.filter(pk=options["ceremony"]).exists())
 
-    def test_privileged_removal_endpoint_cannot_break_permanent_two_key_minimum(self):
+    def test_privileged_removal_endpoint_cannot_remove_the_last_active_key(self):
         self.privileged(system=True)
+        self.assertTrue(passkey_methods.remove(self.user, self.user.passkeys.first().pk))
+        self.user.refresh_from_db()
         self.signed_in()
         from django.urls import reverse
 
@@ -642,7 +726,7 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         }, secure=True)
         self.assertEqual(response.status_code, 200)
         self.user.refresh_from_db()
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
         self.assertEqual(self.user.session_version, version)
 
     def test_registration_without_user_verification_cannot_stage_a_key(self):
@@ -999,7 +1083,7 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
                             reverse("accounts:login_method"), {"method": chosen}, secure=True
                         )
                         if chosen == "passkey":
-                            for index in range(1 if role == "user" else 2):
+                            for index in range(1):
                                 self.credential_id = secrets.token_bytes(32)
                                 options = self.options("register")
                                 response = self.json_post(reverse("accounts:passkey_setup"), {
@@ -1009,8 +1093,6 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
                                 })
                                 self.assertEqual(response.status_code, 200)
                             data = {"activate": "yes"}
-                            if role != "user":
-                                data["two_devices"] = "on"
                             self.client.post(reverse("accounts:passkey_setup"), data, secure=True)
                         else:
                             response = self.client.post(reverse("accounts:method_password"), {
@@ -1044,7 +1126,7 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
                             self.assertFalse(self.user.passkeys.exists())
                         else:
                             self.assertEqual(
-                                self.user.passkeys.filter(active=True).count(), 1 if role == "user" else 2
+                                self.user.passkeys.filter(active=True).count(), 1
                             )
                         self.assertEqual(
                             RecoveryCodeDevice.objects.filter(user=self.user).exists(), chosen == "app"
@@ -1095,7 +1177,7 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
                 else:
                     proof = {"current_password": PASSWORD}
                 self.assertEqual(self.client.post(path, proof, secure=True).status_code, 302)
-                for index in range(1 if role == "user" else 2):
+                for index in range(1):
                     self.credential_id = secrets.token_bytes(32)
                     options = self.options("register")
                     response = self.json_post(path, {
@@ -1107,8 +1189,6 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
                     self.assertTrue(self.user.check_password(PASSWORD))
                     self.assertEqual(self.user.authentication_method, "password")
                 data = {"activate": "yes"}
-                if role != "user":
-                    data["two_devices"] = "on"
                 self.assertEqual(self.client.post(path, data, secure=True).status_code, 302)
                 self.user.refresh_from_db()
                 self.assertEqual(self.user.authentication_method, "passkey")
@@ -1257,7 +1337,7 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
 
 @override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
-    """Owner-approved device statement belongs to the existing rights-change POST."""
+    """One active passkey satisfies promotion; existing authorization remains mandatory."""
 
     def setUp(self):
         CeremonyFixture.setUp(self)
@@ -1273,11 +1353,8 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
         for _ in range(count):
             self.credential_id = secrets.token_bytes(32)
             self.assertIsNotNone(self.stage())
-        # An ordinary account is allowed two credentials without a device
-        # statement. Promotion must collect that statement from the administrator.
-        self.user = passkey_methods.activate(self.request, two_devices=False)
+        self.user = passkey_methods.activate(self.request)
         self.request.user = self.user
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
         self.assertEqual(self.user.passkeys.filter(active=True).count(), count)
 
     def change_path(self, user=None):
@@ -1285,7 +1362,7 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
 
         return reverse("admin:accounts_user_change", args=[(user or self.user).pk])
 
-    def statement_field(self):
+    def assert_no_statement_field(self):
         from django import forms
 
         response = self.client.get(self.change_path(), secure=True)
@@ -1296,10 +1373,7 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
             name for name, field in form.fields.items()
             if isinstance(field, forms.BooleanField) and name not in model_fields
         ]
-        # The implemented owner-approved statement is a non-model field on
-        # the existing administration form, never an editable identity flag.
-        self.assertEqual(statements, ["passkey_devices_confirmed"])
-        return statements[0]
+        self.assertEqual(statements, [])
 
     def post_rights(self, **extra):
         data = {
@@ -1317,72 +1391,92 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
         }
         return self.client.post(self.change_path(), data, secure=True)
 
-    def test_two_active_keys_without_administrator_statement_do_not_grant_rights(self):
-        self.target_keys(2)
-        field = self.statement_field()
-        response = self.post_rights()
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["adminform"].form.errors)
-        self.assertIn(field, response.context["adminform"].form.fields)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff or self.user.is_superuser)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
-
-    def test_ordinary_stored_flag_never_skips_foreign_administrator_statement(self):
-        from leg_platform.accounts.models import PasskeyIdentity
-
-        self.target_keys(2)
-        # Legacy/corrupt state must not substitute for a foreign administrator's statement.
-        PasskeyIdentity.objects.filter(user=self.user).update(two_devices_confirmed=True)
-        self.statement_field()
-        response = self.post_rights()
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("passkey_devices_confirmed", response.context["adminform"].form.errors)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff or self.user.is_superuser)
-
-    def test_statement_with_only_one_key_is_a_form_error_not_a_server_error(self):
+    def test_one_active_key_without_statement_grants_rights(self):
         self.target_keys(1)
-        field = self.statement_field()
-        response = self.post_rights(**{field: "on"})
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["adminform"].form.errors)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff or self.user.is_superuser)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
-
-    def test_posted_identity_flag_cannot_replace_the_administrator_statement(self):
-        self.target_keys(2)
-        self.statement_field()
-        response = self.post_rights(
-            two_devices_confirmed="on",
-            **{"passkey_identity.two_devices_confirmed": "on"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["adminform"].form.errors)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff or self.user.is_superuser)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
-
-    def test_two_keys_and_administrator_statement_promote_and_record_device_confirmation(self):
-        from leg_platform.accounts.models import SecurityEvent
-
-        self.target_keys(2)
-        field = self.statement_field()
-        response = self.post_rights(**{field: "on"})
+        self.assert_no_statement_field()
+        response = self.post_rights()
         self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_staff and self.user.is_superuser)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
+
+    def test_no_active_key_is_a_form_error_not_a_server_error(self):
+        self.target_keys(1)
+        self.user.passkeys.update(active=False)
+        self.assert_no_statement_field()
+        response = self.post_rights()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("is_staff", response.context["adminform"].form.errors)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_staff or self.user.is_superuser)
+
+    def test_locked_save_rechecks_the_active_key_after_form_validation(self):
+        from django.contrib import admin
+        from django.core.exceptions import PermissionDenied
+        from leg_platform.accounts.admin.users import UserAdmin
+
+        self.target_keys(1)
+        request = RequestFactory().get(self.change_path())
+        request.user = self.actor
+        model_admin = UserAdmin(User, admin.site)
+        form = model_admin.get_form(request, self.user)(data={
+            "first_name": self.user.first_name, "last_name": self.user.last_name,
+            "salutation": self.user.salutation, "street": self.user.street,
+            "house_number": self.user.house_number, "postal_code": self.user.postal_code_display,
+            "town": self.user.town, "country": str(self.user.country),
+            "is_staff": "on", "is_superuser": "on",
+        }, instance=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.user.passkeys.update(active=False)
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(request, form.instance, form, change=True)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_staff or self.user.is_superuser)
+
+    def test_posted_obsolete_identity_flags_are_ignored(self):
+        self.target_keys(1)
+        self.assert_no_statement_field()
+        response = self.post_rights(
+            passkey_devices_confirmed="on",
+            two_devices_confirmed="on",
+            **{"passkey_identity.two_devices_confirmed": "on"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_staff and self.user.is_superuser)
+        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
+
+    def test_legacy_true_device_flag_does_not_gate_or_change_on_promotion(self):
+        from leg_platform.accounts.models import PasskeyIdentity
+
+        self.target_keys(1)
+        PasskeyIdentity.objects.filter(user=self.user).update(two_devices_confirmed=True)
+        self.assert_no_statement_field()
+        self.assertEqual(self.post_rights().status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_staff and self.user.is_superuser)
         self.assertTrue(self.user.passkey_identity.two_devices_confirmed)
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+
+    def test_promotion_with_one_key_is_logged_and_ends_existing_sessions(self):
+        from leg_platform.accounts.models import SecurityEvent
+
+        self.target_keys(1)
+        version = self.user.session_version
+        self.assert_no_statement_field()
+        response = self.post_rights()
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_staff and self.user.is_superuser)
+        self.assertGreater(self.user.session_version, version)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
         self.assertTrue(SecurityEvent.objects.filter(
             account_id=self.user.pk, actor_id=self.actor.pk,
         ).exists())
 
-    def test_foreign_credentials_cannot_satisfy_the_target_two_key_requirement(self):
+    def test_foreign_credentials_cannot_satisfy_the_target_active_key_requirement(self):
         self.target_keys(1)
-        field = self.statement_field()
+        self.user.passkeys.update(active=False)
+        self.assert_no_statement_field()
         target = self.user
         other = create_active_user("foreign.promotion.keys@example.org")
         self.user = other
@@ -1390,32 +1484,30 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
         self.target_keys(2)
         self.user = target
         self.request.user = target
-        response = self.post_rights(**{field: "on"})
+        response = self.post_rights()
         self.assertEqual(response.status_code, 200)
         target.refresh_from_db()
         self.assertFalse(target.is_staff or target.is_superuser)
-        self.assertFalse(target.passkey_identity.two_devices_confirmed)
 
     def test_staff_forged_statement_cannot_promote_a_customer(self):
         from django.contrib.auth.models import Permission
 
         self.target_keys(2)
-        field = self.statement_field()
+        self.assert_no_statement_field()
         staff = create_active_user("forging.promotion.staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)
         staff.user_permissions.set(Permission.objects.filter(
             content_type__app_label="accounts", codename__in=("view_user", "change_user")
         ))
         self.client.force_login(staff)
-        response = self.post_rights(**{field: "on"})
+        response = self.post_rights(passkey_devices_confirmed="on")
         self.assertIn(response.status_code, (200, 302))
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff or self.user.is_superuser)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
 
     def test_staff_forged_statement_cannot_promote_their_own_account(self):
         self.target_keys(2)
-        field = self.statement_field()
+        self.assert_no_statement_field()
         from django.contrib.auth.models import Permission
 
         staff = create_active_user("self.promotion.staff@example.org")
@@ -1425,7 +1517,7 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
         ))
         self.client.force_login(staff)
         response = self.client.post(self.change_path(staff), {
-            "is_staff": "on", "is_superuser": "on", field: "on",
+            "is_staff": "on", "is_superuser": "on", "passkey_devices_confirmed": "on",
         }, secure=True)
         self.assertEqual(response.status_code, 403)
         staff.refresh_from_db()
@@ -1560,7 +1652,7 @@ class MethodReturnRaceAcceptanceTests(CeremonyFixture, TransactionTestCase):
             ).count(), 1
         )
 
-    def test_competing_administrator_key_removals_preserve_two_active_credentials(self):
+    def test_competing_administrator_key_removals_preserve_one_active_credential(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier
         from django.db import connection, connections
@@ -1568,12 +1660,8 @@ class MethodReturnRaceAcceptanceTests(CeremonyFixture, TransactionTestCase):
         if connection.vendor != "mysql":
             self.skipTest("Real row-lock race requires MariaDB.")
         self.privileged(system=True)
-        passkey_methods.allow_setup(self.request)
-        self.credential_id = secrets.token_bytes(32)
-        self.stage()
-        self.user = passkey_methods.activate(self.request, two_devices=True)
         keys = list(self.user.passkeys.values_list("pk", flat=True))
-        self.assertEqual(len(keys), 3)
+        self.assertEqual(len(keys), 2)
         barrier = Barrier(2)
         user_id = self.user.pk
 
@@ -1589,9 +1677,9 @@ class MethodReturnRaceAcceptanceTests(CeremonyFixture, TransactionTestCase):
         with ThreadPoolExecutor(max_workers=2) as executor:
             results = list(executor.map(remove, keys[:2]))
         self.assertEqual(sorted(results), [False, True])
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
 
-    def test_first_admin_changes_password_before_two_real_passkeys_unlock_normal_access(self):
+    def test_first_admin_changes_password_before_one_real_passkey_unlocks_normal_access(self):
         from django.urls import reverse
         from leg_platform.accounts.tests.helpers import PASSWORD, OTHER_PASSWORD
 
@@ -1619,25 +1707,18 @@ class MethodReturnRaceAcceptanceTests(CeremonyFixture, TransactionTestCase):
         self.assertEqual(self.client.post(path, {
             "current_password": OTHER_PASSWORD,
         }, secure=True).status_code, 302)
-        for index in range(2):
+        for index in range(1):
             self.credential_id = secrets.token_bytes(32)
             options = self.options("register")
             self.assertEqual(self.json_post(path, {
                 "ceremony": options["ceremony"], "credential": self.registration(options),
                 "name": f"First admin synthetic key {index}",
             }).status_code, 200)
-            if index == 0:
-                self.assertEqual(self.client.post(path, {
-                    "activate": "yes", "two_devices": "on",
-                }, secure=True).status_code, 200)
-                self.user.refresh_from_db()
-                self.assertEqual(self.user.authentication_method, "password")
-        self.assertEqual(self.client.post(path, {"activate": "yes"}, secure=True).status_code, 200)
         self.assertEqual(self.client.post(path, {
-            "activate": "yes", "two_devices": "on",
+            "activate": "yes",
         }, secure=True).status_code, 302)
         self.user.refresh_from_db()
         self.assertFalse(self.user.password_change_required)
         self.assertFalse(self.user.has_usable_password())
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
         self.assertEqual(self.client.get("/admin/", secure=True).status_code, 200)

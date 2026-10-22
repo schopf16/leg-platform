@@ -5,9 +5,10 @@
   <h1>{% translate "Passkeys" %}</h1>
   <p>{% translate "You sign in with a passkey. Your account has no password, app or recovery codes." %}</p>
   <p>{% translate "Labels are names you choose, not verified device identities. A synchronized passkey may work on several devices. We recommend a spare passkey." %}</p>
-  <p>{% blocktranslate %}Keep at least {{ minimum }} active passkeys. Add a replacement before removing a lost one. Removing a passkey ends all sessions.{% endblocktranslate %}</p>
+  <p>{% translate "Keep at least one active passkey. Add a replacement before removing the last one. Removing a passkey ends all sessions." %}</p>
   <ul>{% for key in keys %}<li>{{ key.name }} — {% translate "Created" %} {{ key.created_at|date:"SHORT_DATE_FORMAT" }}; {% translate "Last used" %} {{ key.last_used_at|default:"—" }}{% if key.backup_eligible %}; {% translate "Synchronization supported" %}{% endif %}</li>{% endfor %}</ul>
   <a class="btn btn-primary" href="{% url 'accounts:passkey_setup' %}">{% translate "Add passkey" %}</a>
+  {% include "accounts/_passkey_add_help.html" %}
   <form method="post" class="profile-form">{% csrf_token %}
     {% include "accounts/_error_summary.html" %}
     <label for="id_credential">{% translate "Passkey" %}</label>

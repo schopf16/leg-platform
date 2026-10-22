@@ -19,6 +19,9 @@ form that made them; nothing about them is stored (D-059).
   {% if tf_state == "view" %}
     {% if passkey_account %}
       <p class="profile-text">{% translate "You sign in with a passkey. Your account has no password, app or recovery codes." %}</p>
+      <p class="profile-note">{% translate "One passkey is enough. We strongly recommend an additional passkey on another device to protect against losing access." %}</p>
+      <a class="btn btn-secondary-action" href="{% url 'accounts:passkey_setup' %}">{% translate "Add a passkey on another device" %}</a>
+      {% include "accounts/_passkey_add_help.html" %}
       <a class="btn btn-primary" href="{% url 'accounts:passkeys' %}">{% translate "Manage passkeys" %}</a>
       <a class="btn btn-secondary-action" href="{% url 'accounts:login_method' %}">{% translate "Change sign-in method" %}</a>
     {% elif second_factor_active %}

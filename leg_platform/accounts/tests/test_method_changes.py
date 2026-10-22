@@ -115,7 +115,7 @@ class MethodTransitionTests(TestCase):
         import secrets
         self.credential_id = secrets.token_bytes(32)
         self.stage()
-        self.user = passkey_methods.activate(self.request, two_devices=True)
+        self.user = passkey_methods.activate(self.request)
         self.request.user = self.user
         self.assertIsNone(self.pending("password"))
         pending = self.pending("app")
@@ -219,23 +219,26 @@ class MethodTransitionTests(TestCase):
         self.assertGreater(self.user.session_version, old_version)
         self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
 
-    def test_administrator_always_retains_two_keys_and_can_replace_one(self):
+    def test_administrator_can_remove_a_backup_but_always_retains_one_key(self):
         import secrets
         self.user.set_privileges(is_staff=True, is_superuser=False)
         passkey_methods.allow_setup(self.request)
         self.stage()
         self.credential_id = secrets.token_bytes(32)
         self.stage()
-        self.user = passkey_methods.activate(self.request, two_devices=True)
+        self.user = passkey_methods.activate(self.request)
         self.request.user = self.user
         first = self.user.passkeys.first()
-        self.assertFalse(passkey_methods.remove(self.user, first.pk))
+        self.assertTrue(passkey_methods.remove(self.user, first.pk))
+        remaining = self.user.passkeys.get()
+        self.assertFalse(passkey_methods.remove(self.user, remaining.pk))
+        self.request.user.refresh_from_db()
         self.credential_id = secrets.token_bytes(32)
         passkey_methods.allow_setup(self.request)
         self.stage()
-        self.user = passkey_methods.activate(self.request, two_devices=True)
-        self.assertTrue(passkey_methods.remove(self.user, first.pk))
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.user = passkey_methods.activate(self.request)
+        self.assertTrue(passkey_methods.remove(self.user, remaining.pk))
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
 
     def test_password_return_outbox_sends_canonical_links_to_every_address(self):
         self.activate()
@@ -292,6 +295,36 @@ class MethodTransitionTests(TestCase):
         self.assertNotIn("••••", card)
         self.assertIn(reverse("accounts:login_method"), card)
 
+    def test_additional_passkey_guidance_is_localized_and_direct_for_every_access_level(self):
+        import secrets
+
+        for role in ("user", "staff", "system_admin"):
+            self.user = create_active_user(f"guide.{role}@example.org")
+            if role != "user":
+                self.user.set_privileges(is_staff=True, is_superuser=role == "system_admin")
+            self.request.user = self.user
+            self.credential_id = secrets.token_bytes(32)
+            self.activate()
+            self.login_client()
+            for language, action, recommendation, summary in (
+                ("de-ch", "Passkey auf einem anderen Gerät hinzufügen", "Wir empfehlen dringend", "So fügen Sie einen Passkey"),
+                ("fr", "Ajouter une clé d’accès sur un autre appareil", "Nous recommandons vivement", "Comment ajouter une clé d’accès"),
+                ("it", "Aggiungere una passkey su un altro dispositivo", "Consigliamo vivamente", "Come aggiungere una passkey"),
+                ("en", "Add a passkey on another device", "We strongly recommend", "How to add a passkey"),
+            ):
+                with self.subTest(role=role, language=language):
+                    self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
+                    profile = self.client.get(reverse("accounts:profile"))
+                    self.assertContains(profile, action)
+                    self.assertContains(profile, recommendation)
+                    self.assertContains(profile, summary)
+                    self.assertContains(profile, f'href="{reverse("accounts:passkey_setup")}"')
+                    response = self.client.get(reverse("accounts:passkeys"))
+                    self.assertContains(response, summary)
+                    setup = self.client.get(reverse("accounts:passkey_setup"))
+                    self.assertContains(setup, 'name="passkey_assertion"')
+                    self.assertNotContains(setup, 'name="two_devices"')
+
     def test_method_password_uses_existing_rules_and_accessible_association(self):
         self.activate()
         self.login_client()
@@ -320,36 +353,22 @@ class MethodTransitionTests(TestCase):
         self.user = passkey_methods.activate(self.request)
         self.request.user = self.user
 
-    def test_real_admin_promotion_requires_two_keys_and_explicit_actor_statement(self):
+    def test_real_admin_promotion_accepts_one_key_without_a_device_statement(self):
         from leg_platform.accounts.tests.test_admin import PROFILE_DATA
 
         self.activate()
         client = self.promotion_client()
         url = reverse("admin:accounts_user_change", args=[self.user.pk])
         response = client.get(url)
-        self.assertContains(response, 'name="passkey_devices_confirmed"')
-        self.assertContains(response, "The person has confirmed to me")
+        self.assertNotContains(response, 'name="passkey_devices_confirmed"')
         data = {**PROFILE_DATA, "is_staff": "on", "_save": "Save"}
-        response = client.post(url, {**data, "passkey_devices_confirmed": "on"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("is_staff", response.context["adminform"].form.errors)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
-        self.stage_second_active_key()
         response = client.post(url, data)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("passkey_devices_confirmed", response.context["adminform"].form.errors)
-        self.user.refresh_from_db()
-        self.assertFalse(self.user.is_staff)
-        response = client.post(url, {**data, "passkey_devices_confirmed": "on"})
         self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_staff)
-        self.assertTrue(self.user.passkey_identity.two_devices_confirmed)
-        self.assertEqual(self.user.passkeys.filter(active=True).count(), 2)
+        self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
 
-    def test_device_statement_without_promotion_does_not_record_confirmation(self):
+    def test_obsolete_device_statement_without_promotion_grants_no_rights(self):
         from leg_platform.accounts.tests.test_admin import PROFILE_DATA
 
         self.activate()
@@ -362,7 +381,6 @@ class MethodTransitionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff)
-        self.assertFalse(self.user.passkey_identity.two_devices_confirmed)
 
     def test_promotion_statement_is_absent_for_self_and_ordinary_staff(self):
         from django.test import RequestFactory

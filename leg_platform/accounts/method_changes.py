@@ -8,7 +8,7 @@ from django.utils.crypto import constant_time_compare
 
 from leg_platform.accounts import passkeys, security_log, totp
 from leg_platform.accounts.models import (
-    AuthenticatorDevice, MailJob, PasskeyIdentity, PendingSignInChange, RecoveryCodeDevice,
+    AuthenticatorDevice, MailJob, PendingSignInChange, RecoveryCodeDevice,
     SecurityEvent, User, VerificationToken,
 )
 
@@ -126,7 +126,6 @@ def complete(user_id, *, token_id=None, recovery=False):
             AuthenticatorDevice.objects.filter(user=user).delete()
             RecoveryCodeDevice.objects.filter(user=user).delete()
         user.passkeys.all().delete()
-        PasskeyIdentity.objects.filter(user=user).update(two_devices_confirmed=False)
         user.password = pending.password_hash
         user.password_change_required = False
         user._change(authentication_method=User.AuthenticationMethod.PASSWORD, password=user.password)

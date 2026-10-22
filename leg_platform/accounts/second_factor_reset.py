@@ -195,11 +195,10 @@ def confirm_link(token):
         )
         if user is None or locked_token is None or not _usable_for_link(user, locked_token):
             return None
-        from leg_platform.accounts.models import PasskeyIdentity, PendingSignInChange
+        from leg_platform.accounts.models import PendingSignInChange
         from leg_platform.accounts.mail_queue import enqueue_for_account
 
         user.passkeys.all().delete()
-        PasskeyIdentity.objects.filter(user=user).update(two_devices_confirmed=False)
         AuthenticatorDevice.objects.filter(user=user).delete()
         RecoveryCodeDevice.objects.filter(user=user).delete()
         PendingSignInChange.objects.filter(user=user).delete()

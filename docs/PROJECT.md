@@ -134,7 +134,7 @@ Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email";
 
 ## Passkeys
 
-Passkeys are an optional login method next to password with authenticator app (TOTP). Administrators may use a passkey-only account with at least two active credentials and explicit two-device confirmation. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). Registration, username-free sign-in, management, atomic method changes and unified recovery are implemented; independent acceptance remains pending.
+Passkeys are an optional login method next to password with authenticator app (TOTP). One active credential suffices for every access level, including administrator activation and promotion; the last active passkey cannot be removed. An additional passkey on another device is strongly recommended for recovery protection. The active passkey profile card links directly to adding another key, with guided help and disclosure that saving ends other sessions while keeping the current session. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). Registration, username-free sign-in, management, atomic method changes and unified recovery are implemented; independent acceptance remains pending.
 
 Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language (what you need, what happens if you lose it) and recommends "password and app" to users. It is offered after registration (start tile "Choose how you sign in"), in the profile card "Sign-in method", after a reset and at the first login of an administrator. Users choose password, password and app, or passkey; administrators choose password and app or passkey.
 

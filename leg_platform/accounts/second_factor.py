@@ -131,8 +131,7 @@ def requires_second_factor(user):
 def has_second_factor(user):
     """Whether the account has set up a second factor (not whether the session completed it)."""
     if getattr(user, "authentication_method", None) == User.AuthenticationMethod.PASSKEY:
-        minimum = 2 if requires_second_factor(user) else 1
-        return user.passkeys.filter(active=True).count() >= minimum
+        return user.passkeys.filter(active=True).exists()
     return totp.has_authenticator(user)
 
 

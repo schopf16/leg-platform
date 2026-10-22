@@ -9,7 +9,7 @@ from django.utils.crypto import constant_time_compare
 from leg_platform.accounts import passkeys, security_log
 from leg_platform.accounts.mail_queue import enqueue_for_account
 from leg_platform.accounts.models import (
-    AuthenticatorDevice, MailJob, PasskeyIdentity, PendingSignInChange, RecoveryCodeDevice,
+    AuthenticatorDevice, MailJob, PendingSignInChange, RecoveryCodeDevice,
     SecurityEvent, User, VerificationToken,
 )
 
@@ -35,7 +35,7 @@ def setup_allowed(request, user=None):
     )
 
 
-def activate(request, *, two_devices=False):
+def activate(request):
     """Keep current session only; delete password, app, codes, old links and pending changes."""
     with transaction.atomic():
         user = User.objects.select_for_update().get(pk=request.user.pk)
@@ -45,18 +45,10 @@ def activate(request, *, two_devices=False):
             active=False, created_at__lte=timezone.now() - passkeys.LIFETIME
         ).delete()
         keys = user.passkeys.filter(setup_binding=passkeys.binding(request))
-        existing = user.passkeys.filter(active=True)
         privileged = user.is_staff or user.is_superuser
         if not keys.exists():
             return None
-        count = existing.count() + keys.filter(active=False).count()
-        identity = PasskeyIdentity.objects.get(user=user)
-        if privileged and (not (two_devices or identity.two_devices_confirmed) or count < 2):
-            return None
         keys.update(active=True, setup_binding="")
-        if privileged and two_devices:
-            identity.two_devices_confirmed = True
-            identity.save(update_fields=["two_devices_confirmed"])
         changed_method = user.authentication_method != User.AuthenticationMethod.PASSKEY
         if changed_method:
             AuthenticatorDevice.objects.filter(user=user).delete()
@@ -84,12 +76,11 @@ def remove(user, credential_id):
         user = User.objects.select_for_update().get(pk=user.pk)
         if not user.is_active or user.authentication_method != User.AuthenticationMethod.PASSKEY:
             return False
-        minimum = 2 if user.is_staff or user.is_superuser else 1
         try:
             key = user.passkeys.filter(pk=credential_id, active=True).first()
         except (TypeError, ValueError):
             return False
-        if key is None or user.passkeys.filter(active=True).count() <= minimum:
+        if key is None or user.passkeys.filter(active=True).count() <= 1:
             return False
         key.delete()
         user.end_all_sessions()
@@ -98,6 +89,7 @@ def remove(user, credential_id):
         VerificationToken.objects.filter(user=user).delete()
         enqueue_for_account(MailJob.Kind.SIGN_IN_CHANGED, user)
         security_log.record(
-            SecurityEvent.Event.PASSKEYS_CHANGED, account=user, long_retention=minimum == 2,
+            SecurityEvent.Event.PASSKEYS_CHANGED, account=user,
+            long_retention=user.is_staff or user.is_superuser,
         )
         return True

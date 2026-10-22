@@ -387,8 +387,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ):
             raise AccountIntegrityError("Active accounts need a usable password.")
         if status == self.Status.ACTIVE and method == self.AuthenticationMethod.PASSKEY:
-            minimum = 2 if values["is_staff"] or values["is_superuser"] else 1
-            if self._state.adding or self.passkeys.filter(active=True).count() < minimum:
+            if self._state.adding or not self.passkeys.filter(active=True).exists():
                 raise AccountIntegrityError("Passkey accounts need an active credential.")
 
     def _check_privilege_grant(self, values, previous):
@@ -398,14 +397,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         )
         if granted and values["status"] != self.Status.ACTIVE:
             raise AccountIntegrityError("Only active accounts can receive privileges.")
-        if granted and values["authentication_method"] == self.AuthenticationMethod.PASSKEY:
-            from leg_platform.accounts.models.passkeys import PasskeyIdentity
-
-            if (
-                self.passkeys.filter(active=True).count() < 2
-                or not PasskeyIdentity.objects.filter(user=self, two_devices_confirmed=True).exists()
-            ):
-                raise AccountIntegrityError("Privileged passkey accounts need two confirmed credentials.")
 
     def _check_against_stored(self, using, update_fields):
         def written(name):

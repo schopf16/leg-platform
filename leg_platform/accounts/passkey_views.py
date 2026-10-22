@@ -25,7 +25,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from leg_platform.accounts import passkey_methods, passkeys, rate_limits, second_factor
 from leg_platform.accounts.forms import PortalFormMixin, ReauthenticationForm
 from leg_platform.accounts.login_protection import axes_client_ip
-from leg_platform.accounts.models import Passkey, PasskeyIdentity, User
+from leg_platform.accounts.models import Passkey, User
 
 ERROR = gettext_lazy("The passkey could not be verified. Please try again.")
 
@@ -140,11 +140,8 @@ class SetupView(LoginRequiredMixin, View):
         return render(request, "accounts/passkey_setup.html", {
             "allowed": allowed, "form": form or (CredentialNameForm() if allowed else ReauthenticationForm(request=request)),
             "keys": request.user.passkeys.filter(active=True) | request.user.passkeys.filter(setup_binding=passkeys.binding(request)) if allowed else [],
-            "privileged": request.user.is_staff or request.user.is_superuser,
             "adding": request.user.authentication_method == User.AuthenticationMethod.PASSKEY,
             "recovering": request.user.authentication_method == User.AuthenticationMethod.RECOVERY,
-            "require_two_devices": (request.user.is_staff or request.user.is_superuser) and not
-                PasskeyIdentity.objects.filter(user=request.user, two_devices_confirmed=True).exists(),
         })
 
     def post(self, request):
@@ -162,7 +159,7 @@ class SetupView(LoginRequiredMixin, View):
             except (ValueError, KeyError, TypeError):
                 return JsonResponse({"error": str(ERROR)}, status=400)
         if request.POST.get("activate") == "yes":
-            user = passkey_methods.activate(request, two_devices=request.POST.get("two_devices") == "on")
+            user = passkey_methods.activate(request)
             if user is None:
                 messages.error(request, ERROR)
                 return self.page(request)
@@ -189,7 +186,6 @@ class ManageView(LoginRequiredMixin, View):
         return render(request, "accounts/passkeys.html", {
             "keys": request.user.passkeys.filter(active=True).order_by("created_at", "pk"),
             "form": ReauthenticationForm(request=request),
-            "minimum": 2 if request.user.is_staff or request.user.is_superuser else 1,
         })
 
     def post(self, request):
@@ -209,13 +205,11 @@ class ManageView(LoginRequiredMixin, View):
                 return redirect("accounts:login")
             return render(request, "accounts/passkeys.html", {
                 "keys": request.user.passkeys.filter(active=True), "form": form,
-                "minimum": 2 if request.user.is_staff or request.user.is_superuser else 1,
             })
         if not passkey_methods.remove(request.user, request.POST.get("credential")):
             form.add_error(None, _("Keep at least the required number of passkeys. Add a replacement first."))
             return render(request, "accounts/passkeys.html", {
                 "keys": request.user.passkeys.filter(active=True), "form": form,
-                "minimum": 2 if request.user.is_staff or request.user.is_superuser else 1,
             })
         logout(request)
         return redirect("accounts:login")

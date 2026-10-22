@@ -6774,9 +6774,6 @@ msgstr "Mon téléphone ou mon ordinateur se déverrouille par empreinte digital
 msgid "Your password and app are deleted. You cannot combine a password with a passkey."
 msgstr "Votre mot de passe et votre application sont supprimés. Un mot de passe et une clé d’accès ne peuvent pas être combinés."
 
-msgid "First set up two passkeys on two devices."
-msgstr "Configurez d’abord deux clés d’accès sur deux appareils."
-
 msgid "What is an authenticator app? What is a passkey?"
 msgstr "Qu’est-ce qu’une application d’authentification ? Qu’est-ce qu’une clé d’accès ?"
 
@@ -6795,8 +6792,8 @@ msgstr "Vous pouvez modifier votre choix à tout moment dans votre profil."
 msgid "How do you want to sign in?"
 msgstr "Comment souhaitez-vous vous connecter ?"
 
-msgid "Not sure? We recommend a passkey on two devices. Without a second device, choose Password and code from an app."
-msgstr "Pas sûr ? Nous recommandons une clé d’accès sur deux appareils. Sans second appareil, choisissez Mot de passe et code d’une application."
+msgid "Not sure? We recommend a passkey. One passkey is enough. We strongly recommend an additional passkey on another device."
+msgstr "Pas sûr ? Nous recommandons une clé d’accès. Une clé d’accès suffit. Nous recommandons vivement une clé d’accès supplémentaire sur un autre appareil."
 
 #, python-format
 msgid "Not sure? We recommend: %(title)s."
@@ -7022,9 +7019,6 @@ msgstr "Confirmez votre méthode de connexion actuelle avant de configurer des c
 msgid "Your password, app and recovery codes stay valid until you finish. Afterwards you sign in only with passkeys."
 msgstr "Votre mot de passe, votre application et vos codes de récupération restent valables jusqu’à la fin de la configuration. Ensuite, vous vous connecterez uniquement avec des clés d’accès."
 
-msgid "I set up these passkeys on two devices."
-msgstr "J’ai configuré ces clés d’accès sur deux appareils."
-
 msgid "Add passkey"
 msgstr "Ajouter une clé d’accès"
 
@@ -7139,8 +7133,8 @@ msgstr "Conservez au moins le nombre de clés d’accès requis. Ajoutez d’abo
 msgid "Labels are names you choose, not verified device identities. A synchronized passkey may work on several devices. We recommend a spare passkey."
 msgstr "Les libellés sont des noms de votre choix, pas des identités d’appareil vérifiées. Une clé synchronisée peut fonctionner sur plusieurs appareils. Nous recommandons une clé de réserve."
 
-msgid "Keep at least %(minimum)s active passkeys. Add a replacement before removing a lost one. Removing a passkey ends all sessions."
-msgstr "Conservez au moins %(minimum)s clés d’accès actives. Ajoutez un remplacement avant de supprimer une clé perdue. La suppression termine toutes les sessions."
+msgid "Keep at least one active passkey. Add a replacement before removing the last one. Removing a passkey ends all sessions."
+msgstr "Conservez au moins une clé d’accès active. Ajoutez une clé de remplacement avant de supprimer la dernière. La suppression d’une clé d’accès termine toutes les sessions."
 
 msgid "Last used"
 msgstr "Dernière utilisation"
@@ -7166,23 +7160,35 @@ msgstr "Vos anciens moyens de connexion ne fonctionnent plus. Configurez de nouv
 msgid "Add another passkey. Your existing passkeys remain usable."
 msgstr "Ajoutez une autre clé d’accès. Vos clés d’accès existantes restent utilisables."
 
-msgid "One passkey is enough. We recommend a second passkey on another device."
-msgstr "Une clé d’accès suffit. Nous recommandons une deuxième clé d’accès sur un autre appareil."
+msgid "One passkey is enough. We strongly recommend an additional passkey on another device to protect against losing access."
+msgstr "Une clé d’accès suffit. Nous recommandons vivement une clé d’accès supplémentaire sur un autre appareil pour éviter de perdre l’accès."
+
+msgid "Add a passkey on another device"
+msgstr "Ajouter une clé d’accès sur un autre appareil"
+
+msgid "How to add a passkey on another device"
+msgstr "Comment ajouter une clé d’accès sur un autre appareil"
+
+msgid "On the other phone or computer, open this portal and sign in with an existing passkey. If offered by your browser, use your phone or another device to sign in."
+msgstr "Sur l’autre téléphone ou ordinateur, ouvrez ce portail et connectez-vous avec une clé d’accès existante. Si votre navigateur le propose, utilisez votre téléphone ou un autre appareil pour vous connecter."
+
+msgid "Open Profile, then choose Add a passkey on another device. You do not need to change or select your sign-in method again."
+msgstr "Ouvrez Profil, puis choisissez Ajouter une clé d’accès sur un autre appareil. Vous n’avez pas besoin de modifier ou de sélectionner à nouveau votre méthode de connexion."
+
+msgid "Confirm with an existing passkey. Enter a recognizable name for the additional passkey, then choose Create passkey. In the browser prompt, choose where to save it."
+msgstr "Confirmez avec une clé d’accès existante. Donnez un nom reconnaissable à la clé supplémentaire, puis choisissez Créer une clé d’accès. Dans la fenêtre du navigateur, choisissez où l’enregistrer."
+
+msgid "Choose Save passkey to finish. Your existing passkeys remain usable. Other sessions end and you receive a security notice."
+msgstr "Choisissez Enregistrer la clé d’accès pour terminer. Vos clés existantes restent utilisables. Les autres sessions sont fermées et vous recevez une notification de sécurité."
+
+msgid "The available devices and choices depend on your browser and passkey provider. A synchronized passkey may already work on several devices; a device name does not prove a separate backup."
+msgstr "Les appareils et les choix disponibles dépendent de votre navigateur et de votre fournisseur de clés d’accès. Une clé synchronisée peut déjà fonctionner sur plusieurs appareils ; un nom d’appareil ne prouve pas l’existence d’une sauvegarde distincte."
 
 msgid "Add a passkey"
 msgstr "Ajouter une clé d’accès"
 
 msgid "Create passkey"
 msgstr "Créer une clé d’accès"
-
-msgid "The person has confirmed to me that their passkeys are set up on two devices."
-msgstr "La personne m’a confirmé que ses clés d’accès sont configurées sur deux appareils."
-
-msgid "Add a second active passkey before granting these rights."
-msgstr "Ajoutez une deuxième clé d’accès active avant d’accorder ces droits."
-
-msgid "The two-device confirmation is required before granting these rights."
-msgstr "La confirmation de la configuration sur deux appareils est requise avant d’accorder ces droits."
 
 msgid "Save passkey"
 msgstr "Enregistrer la clé d’accès"
