@@ -73,7 +73,9 @@ class OptionsView(View):
                 raise ValueError("Invalid action.")
             if purpose != "proof":
                 action = ""
-            return JsonResponse(passkeys.begin(request, purpose, user=user, action=action))
+            return JsonResponse(passkeys.begin(
+                request, purpose, user=user, action=action, mode=data.get("mode"),
+            ))
         except (ValueError, KeyError, TypeError):
             return JsonResponse({"error": str(ERROR)}, status=400)
 

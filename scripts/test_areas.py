@@ -113,6 +113,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/passkey_views.py", "leg_platform/accounts/tests/test_passkeys.py",
             "leg_platform/accounts/method_changes.py", "leg_platform/accounts/method_views.py",
             "leg_platform/accounts/tests/test_method_changes.py",
+            "leg_platform/accounts/tests/test_passkey_script.py",
             "leg_platform/accounts/templates/accounts/method*.html",
             "leg_platform/accounts/templates/accounts/recovery*.html",
             "leg_platform/accounts/templates/accounts/login_help.html",
@@ -122,7 +123,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/templates/accounts/passkey_setup.html",
             "leg_platform/accounts/templates/accounts/widgets/",
         ),
-        tests=_labels(A, "test_passkeys", "test_method_changes", "test_login_methods"),
+        tests=_labels(A, "test_passkeys", "test_passkey_script", "test_method_changes", "test_login_methods"),
         checks=("makemigrations", "system-check"),
     ),
     "docs": Area(

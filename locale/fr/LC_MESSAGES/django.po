@@ -7169,17 +7169,38 @@ msgstr "Ajouter une clé d’accès sur un autre appareil"
 msgid "How to add a passkey on another device"
 msgstr "Comment ajouter une clé d’accès sur un autre appareil"
 
-msgid "On the other phone or computer, open this portal and sign in with an existing passkey. If offered by your browser, use your phone or another device to sign in."
-msgstr "Sur l’autre téléphone ou ordinateur, ouvrez ce portail et connectez-vous avec une clé d’accès existante. Si votre navigateur le propose, utilisez votre téléphone ou un autre appareil pour vous connecter."
+msgid "Stay signed in on this computer. In Profile, choose Add a passkey on another device and confirm with an existing passkey. You do not need to select your sign-in method again."
+msgstr "Restez connecté sur cet ordinateur. Dans Profil, choisissez Ajouter une clé d’accès sur un autre appareil et confirmez avec une clé d’accès existante. Vous n’avez pas besoin de sélectionner à nouveau votre méthode de connexion."
 
-msgid "Open Profile, then choose Add a passkey on another device. You do not need to change or select your sign-in method again."
-msgstr "Ouvrez Profil, puis choisissez Ajouter une clé d’accès sur un autre appareil. Vous n’avez pas besoin de modifier ou de sélectionner à nouveau votre méthode de connexion."
+msgid "Enter a recognizable name, then choose Create passkey on another phone or device. This asks the browser for a phone, tablet or external security key rather than this computer."
+msgstr "Saisissez un nom reconnaissable, puis choisissez Créer une clé d’accès sur un autre téléphone ou appareil. Le navigateur recherchera un téléphone, une tablette ou une clé de sécurité externe plutôt que cet ordinateur."
 
-msgid "Confirm with an existing passkey. Enter a recognizable name for the additional passkey, then choose Create passkey. In the browser prompt, choose where to save it."
-msgstr "Confirmez avec une clé d’accès existante. Donnez un nom reconnaissable à la clé supplémentaire, puis choisissez Créer une clé d’accès. Dans la fenêtre du navigateur, choisissez où l’enregistrer."
+msgid "In the browser or operating-system prompt, choose your phone or tablet if offered. If a QR code appears, scan it with that device and follow its instructions to create the passkey. You do not need an existing passkey on that device."
+msgstr "Dans la fenêtre du navigateur ou du système, choisissez votre téléphone ou tablette si cette option est proposée. Si un code QR apparaît, scannez-le avec cet appareil et suivez ses instructions pour créer la clé d’accès. Aucune clé d’accès existante n’est nécessaire sur cet appareil."
 
-msgid "Choose Save passkey to finish. Your existing passkeys remain usable. Other sessions end and you receive a security notice."
-msgstr "Choisissez Enregistrer la clé d’accès pour terminer. Vos clés existantes restent utilisables. Les autres sessions sont fermées et vous recevez une notification de sécurité."
+msgid "Do not open the portal on the phone for this flow. A localhost or 127.0.0.1 address only reaches the device where it is opened; the phone communicates through the browser's credential prompt instead."
+msgstr "N’ouvrez pas le portail sur le téléphone pour cette procédure. Une adresse localhost ou 127.0.0.1 ne mène qu’à l’appareil sur lequel elle est ouverte ; le téléphone communique plutôt par la fenêtre d’identification du navigateur."
+
+msgid "If no suitable cross-device option is offered, cancel the prompt. Try another supported browser or an available external security key, or explicitly choose Create passkey on this device. Browser and device support varies; no automatic fallback to this computer is requested."
+msgstr "Si aucune option interappareils adaptée n’est proposée, annulez la fenêtre. Essayez un autre navigateur compatible ou une clé de sécurité externe disponible, ou choisissez explicitement Créer une clé d’accès sur cet appareil. La prise en charge varie selon le navigateur et l’appareil ; aucun repli automatique vers cet ordinateur n’est demandé."
+
+msgid "After creation, choose Save passkey to finish adding it (Use passkeys during initial setup). Only then is the new passkey activated. Your current session and existing passkeys are retained; all other sessions end, and security notices are sent to all confirmed email addresses after saving."
+msgstr "Après la création, choisissez Enregistrer la clé d’accès pour terminer l’ajout (Utiliser les clés d’accès lors de la configuration initiale). La nouvelle clé n’est activée qu’à ce moment-là. Votre session actuelle et vos clés existantes sont conservées ; toutes les autres sessions sont fermées et des notifications de sécurité sont envoyées à toutes les adresses e-mail confirmées après l’enregistrement."
+
+msgid "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there."
+msgstr "Choisissez où créer la clé d’accès. Pour un autre téléphone ou une tablette, restez sur cette page et utilisez la fenêtre du navigateur ; vous n’avez pas besoin d’y ouvrir le portail."
+
+msgid "Create passkey on another phone or device"
+msgstr "Créer une clé d’accès sur un autre téléphone ou appareil"
+
+msgid "Create passkey on this device"
+msgstr "Créer une clé d’accès sur cet appareil"
+
+msgid "If no phone, tablet or external security key is offered, cancel the prompt. You can try another supported browser or explicitly choose this device instead. The portal cannot guarantee which options your browser supports."
+msgstr "Si aucun téléphone, aucune tablette ou clé de sécurité externe n’est proposé, annulez la fenêtre. Vous pouvez essayer un autre navigateur compatible ou choisir explicitement cet appareil. Le portail ne peut pas garantir les options prises en charge par votre navigateur."
+
+msgid "The passkey could not be created. If no suitable device is offered, cancel the browser prompt and choose another available method. The new passkey is not activated until you finish."
+msgstr "La clé d’accès n’a pas pu être créée. Si aucun appareil adapté n’est proposé, annulez la fenêtre du navigateur et choisissez une autre méthode disponible. La nouvelle clé d’accès n’est activée qu’à la fin de la procédure."
 
 msgid "The available devices and choices depend on your browser and passkey provider. A synchronized passkey may already work on several devices; a device name does not prove a separate backup."
 msgstr "Les appareils et les choix disponibles dépendent de votre navigateur et de votre fournisseur de clés d’accès. Une clé synchronisée peut déjà fonctionner sur plusieurs appareils ; un nom d’appareil ne prouve pas l’existence d’une sauvegarde distincte."

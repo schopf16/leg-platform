@@ -66,7 +66,7 @@ class PasskeyCeremonyTests(TestCase):
         }
 
     def stage(self):
-        options = passkeys.begin(self.request, "register", user=self.user)
+        options = passkeys.begin(self.request, "register", user=self.user, mode="this_device")
         return passkeys.register(self.request, options["ceremony"], self.registration(options), "Synthetic key")
 
     def activate(self):
@@ -186,16 +186,67 @@ class PasskeyCeremonyTests(TestCase):
         self.assertTrue(second_factor.has_second_factor(self.user))
 
     def test_public_handle_is_opaque_and_stable(self):
-        first = passkeys.begin(self.request, "register", user=self.user)
-        second = passkeys.begin(self.request, "register", user=self.user)
+        first = passkeys.begin(self.request, "register", user=self.user, mode="this_device")
+        second = passkeys.begin(self.request, "register", user=self.user, mode="another_device")
         self.assertEqual(first["options"]["user"]["id"], second["options"]["user"]["id"])
         self.assertNotIn(self.user.email, first["options"]["user"]["id"])
 
     def test_registration_requires_discoverable_credential_and_verification(self):
-        options = passkeys.begin(self.request, "register", user=self.user)
-        selection = options["options"]["authenticatorSelection"]
-        self.assertEqual(selection["residentKey"], "required")
-        self.assertEqual(selection["userVerification"], "required")
+        staged = self.stage()
+        for mode, attachment, hint in (
+            ("this_device", "platform", "client-device"),
+            ("another_device", "cross-platform", "hybrid"),
+        ):
+            with self.subTest(mode=mode):
+                result = passkeys.begin(self.request, "register", user=self.user, mode=mode)
+                options = result["options"]
+                selection = options["authenticatorSelection"]
+                self.assertEqual(selection["authenticatorAttachment"], attachment)
+                self.assertEqual(selection["residentKey"], "required")
+                self.assertTrue(selection["requireResidentKey"])
+                self.assertEqual(selection["userVerification"], "required")
+                self.assertEqual(options["hints"], [hint])
+                self.assertEqual(options["excludeCredentials"], [{
+                    "id": bytes_to_base64url(bytes(staged.credential_id)), "type": "public-key",
+                }])
+                row = PasskeyChallenge.objects.get(pk=result["ceremony"])
+                self.assertEqual(row.binding, passkeys.binding(self.request))
+                self.assertEqual(row.auth_hash, self.user.get_session_auth_hash())
+
+    def test_begin_rejects_missing_or_invalid_registration_modes_before_creating_state(self):
+        for mode in (None, "", "hybrid", "platform", "ANOTHER_DEVICE", [], {}, True, 1):
+            with self.subTest(mode=mode):
+                with self.assertRaisesMessage(ValueError, "Invalid registration mode."):
+                    passkeys.begin(self.request, "register", user=self.user, mode=mode)
+                self.assertFalse(PasskeyChallenge.objects.exists())
+                self.assertFalse(self.user.passkeys.exists())
+                self.assertNotIn(passkeys.SESSION_KEY, self.request.session)
+
+    def test_authentication_does_not_accept_registration_modes_or_emit_device_filters(self):
+        for purpose in ("login", "proof"):
+            user = self.user if purpose == "proof" else None
+            for mode in ("this_device", "another_device", "", [], True):
+                with self.subTest(purpose=purpose, mode=mode):
+                    with self.assertRaises(ValueError):
+                        passkeys.begin(self.request, purpose, user=user, mode=mode)
+            options = passkeys.begin(self.request, purpose, user=user)["options"]
+            self.assertNotIn("hints", options)
+            self.assertNotIn("authenticatorSelection", options)
+
+    def test_cross_device_registration_is_session_bound_single_use_and_staged(self):
+        options = passkeys.begin(self.request, "register", user=self.user, mode="another_device")
+        credential = self.registration(options)
+        other = RequestFactory().post("/passkeys/setup/")
+        other.user = self.user
+        other.session = SessionStore()
+        self.assertIsNone(passkeys.register(other, options["ceremony"], credential, "Foreign session"))
+        self.assertTrue(PasskeyChallenge.objects.filter(pk=options["ceremony"]).exists())
+        key = passkeys.register(self.request, options["ceremony"], credential, "Synthetic phone")
+        self.assertIsNotNone(key)
+        self.assertFalse(key.active)
+        self.assertEqual(key.setup_binding, passkeys.binding(self.request))
+        self.assertFalse(PasskeyChallenge.objects.filter(pk=options["ceremony"]).exists())
+        self.assertIsNone(passkeys.register(self.request, options["ceremony"], credential, "Replay"))
 
     def test_rp_uses_canonical_configuration_not_request_headers(self):
         self.request.META["HTTP_HOST"] = "attacker.example.org"
@@ -259,7 +310,7 @@ class PasskeyCeremonyTests(TestCase):
         Passkey.objects.filter(pk__in=[active.pk, stale.pk]).update(
             created_at=timezone.now() - timedelta(minutes=10)
         )
-        passkeys.begin(self.request, "register", user=self.user)
+        passkeys.begin(self.request, "register", user=self.user, mode="this_device")
         self.assertFalse(Passkey.objects.filter(pk=stale.pk).exists())
         self.assertTrue(Passkey.objects.filter(pk=active.pk, active=True).exists())
 
@@ -437,7 +488,7 @@ class PasskeyCeremonyTests(TestCase):
 
     def test_duplicate_registration_does_not_overwrite_public_key(self):
         first = self.stage()
-        options = passkeys.begin(self.request, "register", user=self.user)
+        options = passkeys.begin(self.request, "register", user=self.user, mode="this_device")
         self.assertIsNone(passkeys.register(
             self.request, options["ceremony"], self.registration(options), "Duplicate"
         ))
@@ -464,6 +515,8 @@ class CeremonyFixture:
         )
 
     def options(self, purpose="login", **extra):
+        if purpose == "register":
+            extra.setdefault("mode", "this_device")
         response = self.json_post("/passkeys/options/", {"purpose": purpose, **extra})
         self.assertEqual(response.status_code, 200)
         return response.json()
@@ -508,7 +561,9 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         self.assertContains(self.client.get(reverse("accounts:profile"), secure=True), f'href="{path}"')
         self.assertContains(self.client.get(reverse("accounts:passkeys"), secure=True), "Keep at least one active passkey.")
         self.assertContains(self.client.get(path, secure=True), "Add a passkey")
-        self.assertEqual(self.json_post("/passkeys/options/", {"purpose": "register"}).status_code, 400)
+        self.assertEqual(self.json_post("/passkeys/options/", {
+            "purpose": "register", "mode": "another_device",
+        }).status_code, 400)
         self.assertEqual(self.client.post(path, {"activate": "yes"}, secure=True).status_code, 200)
         options = self.options("proof", action=path)
         self.assertEqual(self.client.post(path, {
@@ -517,17 +572,33 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
             }),
         }, secure=True).status_code, 302)
         setup = self.client.get(path, secure=True)
-        self.assertContains(setup, "Other sessions end and you receive a security notice.")
+        self.assertContains(setup, "Your current session and existing passkeys are retained; all other sessions end")
+        self.assertContains(setup, "security notices are sent to all confirmed email addresses after saving.")
         self.assertContains(setup, "We strongly recommend")
+        self.assertContains(setup, 'name="mode" value="another_device"')
+        self.assertContains(setup, 'name="mode" value="this_device"')
+        self.assertContains(setup, "Do not open the portal on the phone")
+        self.assertContains(setup, "If no suitable cross-device option is offered, cancel the prompt.")
+        self.assertNotContains(setup, "On the other phone or computer, open this portal")
         self.assertNotContains(setup, 'name="two_devices"')
         self.credential_id = secrets.token_bytes(32)
-        options = self.options("register")
+        MailJob.objects.all().delete()
+        options = self.options("register", mode="another_device")
+        self.assertEqual(options["options"]["authenticatorSelection"]["authenticatorAttachment"], "cross-platform")
+        self.assertEqual(options["options"]["hints"], ["hybrid"])
+        self.assertIn(
+            bytes_to_base64url(bytes(original.credential_id)),
+            [item["id"] for item in options["options"]["excludeCredentials"]],
+        )
         self.assertEqual(self.json_post(path, {
             "ceremony": options["ceremony"], "credential": self.registration(options),
             "name": "Synthetic additional computer",
         }).status_code, 200)
         self.assertEqual(self.user.passkeys.filter(active=True).count(), 1)
-        MailJob.objects.all().delete()
+        self.assertEqual(self.user.passkeys.filter(active=False).count(), 1)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.session_version, version)
+        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.SIGN_IN_CHANGED).exists())
         self.assertEqual(self.client.post(path, {"activate": "yes"}, secure=True).status_code, 302)
         self.user.refresh_from_db()
         self.assertEqual(self.user.authentication_method, "passkey")
@@ -651,7 +722,85 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
 
     def test_registration_endpoint_requires_a_current_proof_grant(self):
         self.client.force_login(self.user)
-        self.assertEqual(self.json_post("/passkeys/options/", {"purpose": "register"}).status_code, 400)
+        for mode in ("this_device", "another_device"):
+            self.assertEqual(self.json_post("/passkeys/options/", {
+                "purpose": "register", "mode": mode,
+            }).status_code, 400)
+        self.assertFalse(PasskeyChallenge.objects.exists())
+        self.assertFalse(self.user.passkeys.exists())
+
+    def test_registration_endpoint_validates_modes_and_ignores_client_option_overrides(self):
+        self.client.force_login(self.user)
+        request = self.request
+        request.session = self.client.session
+        passkey_methods.allow_setup(request)
+        request.session.save()
+        for data in (
+            {"purpose": "register"},
+            *({"purpose": "register", "mode": mode}
+              for mode in (None, "", "cross-platform", [], {}, True, 3)),
+            {"purpose": "login", "mode": "another_device"},
+        ):
+            with self.subTest(data=data):
+                response = self.json_post("/passkeys/options/", data)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("no-store", response["Cache-Control"])
+                self.assertFalse(PasskeyChallenge.objects.exists())
+        for mode, attachment, hint in (
+            ("another_device", "cross-platform", "hybrid"),
+            ("this_device", "platform", "client-device"),
+        ):
+            result = self.options(
+                "register", mode=mode,
+                authenticatorSelection={"authenticatorAttachment": "untrusted", "userVerification": "discouraged"},
+                hints=["untrusted"], excludeCredentials=[],
+            )
+            self.assertEqual(result["options"]["authenticatorSelection"], {
+                "authenticatorAttachment": attachment, "residentKey": "required",
+                "requireResidentKey": True, "userVerification": "required",
+            })
+            self.assertEqual(result["options"]["hints"], [hint])
+        self.assertEqual(PasskeyChallenge.objects.count(), 1)
+
+    def test_setup_device_actions_and_guidance_are_localized_in_all_supported_languages(self):
+        from django.conf import settings
+        from django.utils import translation
+
+        self.activate()
+        self.signed_in()
+        self.request.session = self.client.session
+        passkey_methods.allow_setup(self.request)
+        self.request.session.save()
+        for language in ("en", "de-ch", "fr", "it"):
+            with self.subTest(language=language), translation.override(language):
+                self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
+                response = self.client.get("/passkeys/setup/", secure=True)
+                for source in (
+                    "Create passkey on another phone or device",
+                    "Create passkey on this device",
+                    "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there.",
+                ):
+                    text = translation.gettext(source)
+                    self.assertContains(response, text)
+                    if language != "en":
+                        self.assertNotEqual(text, source)
+                self.assertContains(response, "127.0.0.1")
+                self.assertContains(response, 'value="another_device"')
+                self.assertContains(response, 'value="this_device"')
+
+    def test_cross_device_registration_keeps_csrf_rate_limit_and_expired_proof_checks(self):
+        self.client.force_login(self.user)
+        self.request.session = self.client.session
+        passkey_methods.allow_setup(self.request)
+        self.request.session.save()
+        strict = Client(enforce_csrf_checks=True)
+        strict.cookies = self.client.cookies.copy()
+        data = {"purpose": "register", "mode": "another_device"}
+        self.assertEqual(self.json_post("/passkeys/options/", data, client=strict).status_code, 403)
+        with patch("leg_platform.accounts.passkey_views.rate_limits.consume", return_value=False):
+            self.assertEqual(self.json_post("/passkeys/options/", data).status_code, 429)
+        with patch("leg_platform.accounts.passkey_methods.time.time", return_value=timezone.now().timestamp() + 301):
+            self.assertEqual(self.json_post("/passkeys/options/", data).status_code, 400)
         self.assertFalse(PasskeyChallenge.objects.exists())
         self.assertFalse(self.user.passkeys.exists())
 
@@ -730,7 +879,7 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         self.assertEqual(self.user.session_version, version)
 
     def test_registration_without_user_verification_cannot_stage_a_key(self):
-        options = passkeys.begin(self.request, "register", user=self.user)
+        options = passkeys.begin(self.request, "register", user=self.user, mode="another_device")
         credential = self.registration(options)
         from webauthn.helpers import base64url_to_bytes
 

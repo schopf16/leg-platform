@@ -25,8 +25,10 @@ from webauthn import (
 from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers.structs import (
+    AuthenticatorAttachment,
     AuthenticatorSelectionCriteria,
     PublicKeyCredentialDescriptor,
+    PublicKeyCredentialHint,
     ResidentKeyRequirement,
     UserVerificationRequirement,
 )
@@ -91,10 +93,15 @@ def _client_context(response):
         raise ValueError("Cross-origin ceremonies are refused.")
 
 
-def begin(request, purpose, *, user=None, action=""):
+def begin(request, purpose, *, user=None, action="", mode=None):
     """Create bounded, short-lived options. No credential ids are disclosed for public login."""
     if purpose not in {"login", "register", "proof"} or len(action) > 200:
         raise ValueError("Invalid ceremony purpose.")
+    if purpose == "register":
+        if not isinstance(mode, str) or mode not in {"this_device", "another_device"}:
+            raise ValueError("Invalid registration mode.")
+    elif mode is not None:
+        raise ValueError("Registration mode is not valid for authentication.")
     if purpose != "login" and (user is None or not user.is_active):
         raise ValueError("An active account is required.")
     rp_id, _origin = relying_party()
@@ -116,9 +123,19 @@ def begin(request, purpose, *, user=None, action=""):
                 rp_id=rp_id, rp_name=settings.INSTANCE_NAME,
                 user_name=user.email, user_id=bytes(identity.handle),
                 authenticator_selection=AuthenticatorSelectionCriteria(
+                    authenticator_attachment=(
+                        AuthenticatorAttachment.CROSS_PLATFORM if mode == "another_device"
+                        else AuthenticatorAttachment.PLATFORM
+                    ),
                     resident_key=ResidentKeyRequirement.REQUIRED,
                     user_verification=UserVerificationRequirement.REQUIRED,
                 ),
+                # W3C Level 3: pair HYBRID with cross-platform for older user agents.
+                # This guides the native prompt, not proof of a physical device's identity.
+                hints=[
+                    PublicKeyCredentialHint.HYBRID if mode == "another_device"
+                    else PublicKeyCredentialHint.CLIENT_DEVICE
+                ],
                 exclude_credentials=[
                     PublicKeyCredentialDescriptor(id=bytes(key.credential_id))
                     for key in user.passkeys.all()

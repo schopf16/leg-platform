@@ -18,9 +18,12 @@
     <p>{% translate "One passkey is enough. We strongly recommend an additional passkey on another device to protect against losing access." %}</p>
     {% include "accounts/_passkey_add_help.html" %}
     <ul>{% for key in keys %}<li>{{ key.name }}</li>{% endfor %}</ul>
-    <form data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}" class="profile-form">
+    <form data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be created. If no suitable device is offered, cancel the browser prompt and choose another available method. The new passkey is not activated until you finish.' %}" class="profile-form">
       {% csrf_token %}{% include "accounts/_field.html" with field=form.name %}
-      <button class="btn btn-secondary-action" type="submit">{% translate "Create passkey" %}</button>
+      <p>{% translate "Choose where to create the passkey. For another phone or tablet, stay on this page and use the browser prompt; you do not need to open the portal there." %}</p>
+      <button class="btn btn-secondary-action" type="submit" name="mode" value="another_device">{% translate "Create passkey on another phone or device" %}</button>
+      <button class="btn btn-secondary-action" type="submit" name="mode" value="this_device">{% translate "Create passkey on this device" %}</button>
+      <p>{% translate "If no phone, tablet or external security key is offered, cancel the prompt. You can try another supported browser or explicitly choose this device instead. The portal cannot guarantee which options your browser supports." %}</p>
       <p role="status" data-passkey-status></p>
     </form>
     <form method="post" class="profile-form">

@@ -40,10 +40,19 @@
     if (button) button.disabled = true;
     try {
       const purpose = proof ? "proof" : register ? "register" : "login";
-      const options = await post(control.dataset.options, {
+      const request = {
         purpose,
         action: proof ? new URL(form.action, location.href).pathname : ""
-      }, form);
+      };
+      // No implicit platform fallback: registration must name an explicit action.
+      if (register) {
+        const mode = button?.value;
+        if (mode !== "this_device" && mode !== "another_device") {
+          throw new Error("Choose a registration mode");
+        }
+        request.mode = mode;
+      }
+      const options = await post(control.dataset.options, request, form);
       const credential = await SimpleWebAuthnBrowser[
         register ? "startRegistration" : "startAuthentication"
       ]({optionsJSON: options.options});
