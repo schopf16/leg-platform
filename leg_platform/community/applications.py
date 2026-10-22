@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from leg_platform.accounts import mail_queue
@@ -41,6 +42,7 @@ from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
     ApplicationMeteringPoint,
+    ContractAcceptance,
     Direction,
     Location,
     ManagementSettings,
@@ -175,13 +177,13 @@ def next_deletion_date(person_id):
     return min(dates) if dates else None
 
 
-def _draw_present(building, today):
+def _draw_present(building, occupied):
+    """A draw is entered in the building, or the account has one at the stored building already. ``occupied(location)``
+    gives the directions the account has there."""
     rows = list(building.metering_points.all())
     if any(row.direction == Direction.CONSUMPTION for row in rows):
         return True
-    return building.location is not None and Direction.CONSUMPTION in buildings.occupied_directions(
-        building.location, building.application.person_id, today
-    )
+    return building.location is not None and Direction.CONSUMPTION in occupied(building.location)
 
 
 def _start_valid(application, today):
@@ -196,6 +198,67 @@ def progress(application, today=None):
     """The steps, how many are done and the next open one (wizard state computed from the stored rows)."""
     today = today or timezone.localdate()
     listed = list(application.buildings.select_related("location").prefetch_related("metering_points"))
+    acceptance = contracts.acceptance_of(application.person, contracts.current_version())
+    return _progress(
+        application, listed, today,
+        accepted_at=acceptance.accepted_at if acceptance is not None else None,
+        has_iban=lambda: own_iban.has_iban(application.person),
+        occupied=lambda location: buildings.occupied_directions(location, application.person_id, today),
+    )
+
+
+def progress_many(drafts, today=None):
+    """``{application id: Progress}`` for many applications with a fixed number of queries (the list of the staff shows
+    the progress of every draft; one ``progress`` per draft would be several queries each). The same computation as
+    ``progress``; the buildings and their points must be prefetched on each application (``buildings`` with
+    ``select_related("location")`` and ``prefetch_related("metering_points")``, ``select_related("person")``)."""
+    today = today or timezone.localdate()
+    drafts = list(drafts)
+    if not drafts:
+        return {}
+    version = contracts.current_version()
+    accepted = {}
+    if version is not None:
+        accepted = dict(
+            ContractAcceptance.objects.filter(version=version, person_id__in={row.person_id for row in drafts})
+            .values_list("person_id", "accepted_at")
+        )
+    # The directions each account has at the stored buildings its drafts name: one query for all of them.
+    locations = {
+        building.location_id for row in drafts for building in row.buildings.all() if building.location_id is not None
+    }
+    held = {}
+    if locations:
+        live = (
+            PersonAssignment.objects.not_ended(today)
+            .filter(
+                person_id__in={row.person_id for row in drafts}, metering_point__location_id__in=locations,
+                metering_point__is_archived=False,
+            )
+            .exclude(Q(metering_point__terminated_on__isnull=False, metering_point__terminated_on__lte=today))
+            .values_list("person_id", "metering_point__location_id", "metering_point__direction")
+        )
+        for person_id, location_id, direction in live:
+            held.setdefault((person_id, location_id), set()).add(direction)
+    with_feed_in = {
+        row.person_id for row in drafts
+        if any(point.direction == Direction.FEED_IN for building in row.buildings.all()
+               for point in building.metering_points.all())
+    }
+    with_iban = own_iban.accounts_with_iban(with_feed_in) if with_feed_in else set()
+    result = {}
+    for row in drafts:
+        result[row.pk] = _progress(
+            row, list(row.buildings.all()), today, accepted_at=accepted.get(row.person_id),
+            has_iban=lambda row=row: row.person_id in with_iban,
+            occupied=lambda location, row=row: held.get((row.person_id, location.pk), set()),
+        )
+    return result
+
+
+def _progress(application, listed, today, *, accepted_at, has_iban, occupied):
+    """The one computation behind ``progress`` and ``progress_many``. ``has_iban()`` is asked only for a feed-in;
+    ``occupied(location)`` gives the directions the account has at a stored building."""
     rows = [row for building in listed for row in building.metering_points.all()]
     has_feed_in = any(row.direction == Direction.FEED_IN for row in rows)
 
@@ -205,17 +268,15 @@ def progress(application, today=None):
         building_state = KNOWN
     else:
         building_state = DONE
-    points_state = DONE if rows and all(_draw_present(building, today) for building in listed) else OPEN
-    if has_feed_in and own_iban.has_iban(application.person):
+    points_state = DONE if rows and all(_draw_present(building, occupied) for building in listed) else OPEN
+    if has_feed_in and has_iban():
         bank_state = KNOWN if application.bank_known_at_start else DONE
     else:
         bank_state = OPEN
-    version = contracts.current_version()
-    acceptance = contracts.acceptance_of(application.person, version)
-    if acceptance is None:
+    if accepted_at is None:
         contract_state = OPEN
     else:
-        contract_state = KNOWN if acceptance.accepted_at < application.created_at else DONE
+        contract_state = KNOWN if accepted_at < application.created_at else DONE
     start_state = DONE if _start_valid(application, today) else OPEN
 
     steps = (
@@ -361,21 +422,45 @@ def cancel(person, application):
         delete_application(draft, "cancelled", fresh)
 
 
-def withdraw(person, application):
-    """Take a submitted application back, as long as the registration at the grid operator has not started: it becomes a
-    draft again with all its data (``wrong_state`` later: only the staff can act then). A draft is created by this, so the
-    cap of drafts per account applies (``too_many_drafts``; the staff's ``return_for_correction`` is exempt)."""
+def _take_back(person, application, states, detail=None):
+    """Submitted application -> draft again with all its data, under the account's and the application's row lock (the
+    staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies; the staff's
+    ``return_for_correction`` is exempt."""
     with transaction.atomic():
         fresh = locked_customer(person)
-        locked = _lock_draft(fresh, application, states=Application.WITHDRAWABLE_STATES)
+        locked = _lock_draft(fresh, application, states=states)
         if Application.objects.filter(person=fresh, state__in=Application.DRAFT_STATES).count() >= MAX_DRAFTS_PER_PERSON:
             raise ApplicationError("too_many_drafts")
         locked.state = Application.State.DRAFT
         locked.submitted_at = None
-        history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh)
+        history.record(locked, HistoryEvent.APPLICATION_WITHDRAWN, fresh, detail)
         _changed(locked)
         locked.save(update_fields=["submitted_at", "updated_at"])
     return locked
+
+
+def withdraw(person, application):
+    """Take a submitted application back, as long as the registration at the grid operator has not started: it becomes a
+    draft again with all its data (``wrong_state`` later: only the staff can act then). A draft is created by this, so the
+    cap of drafts per account applies (``too_many_drafts``; the staff's ``return_for_correction`` is exempt)."""
+    return _take_back(person, application, Application.WITHDRAWABLE_STATES)
+
+
+def reopen_for_change(person, application):
+    """Change a submitted application that the LEG has not picked up yet (D-107): it becomes a draft again with all its
+    data, the customer edits it in the wizard and submits it again (the queue position is the new submission's). Only
+    state ``submitted`` qualifies; once the staff took it into review (or started the registration at the grid operator)
+    the customer cannot change it any more (``review_started`` / ``not_editable``). The check is made under the row lock
+    that ``application_staff.start_review`` takes too, so a click that races a review ends in exactly one of the two. There
+        is no cap of changes (owner decision 2026-10-22); the wizard rate limit applies to the view."""
+    try:
+        return _take_back(person, application, (Application.State.SUBMITTED,), {"purpose": "change"})
+    except ApplicationError as error:
+        if error.code == "not_editable" and Application.objects.filter(
+            pk=getattr(application, "pk", None), person=person, state=Application.State.IN_REVIEW
+        ).exists():
+            raise ApplicationError("review_started") from None
+        raise
 
 
 def go_to_step(person, application, step):
@@ -685,7 +770,9 @@ def submit(person, application, *, today=None):
     """Submit the draft: building with a draw, IBAN if there is a feed-in, the contract accepted and a start date.
 
     ``ApplicationError("incomplete", missing=[...])`` lists the open steps. Metering point numbers and EGIDs are checked
-    again; another account's is the neutral refusal. The confirmation mail goes to every address of the account."""
+    again; another account's is the neutral refusal. The confirmation mail goes to every address of the account, but only
+    at the first submission of the application (no history entry ``application_submitted`` yet); every later submission
+    sends none."""
     today = today or timezone.localdate()
     try:
         with transaction.atomic():
@@ -714,8 +801,13 @@ def submit(person, application, *, today=None):
                     "returned_at", "returned_reason", "updated_at",
                 ]
             )
+            # The confirmation mail is sent once per application, at its first submission (D-107): a later submission
+            # (after a change, a withdrawal or a return for correction) is a resubmission and sends no mail. The history
+            # entry of every submission is kept (audit trail). Read before the new entry is written, under the row lock.
+            first_submission = not history.entries_for(draft).filter(event=HistoryEvent.APPLICATION_SUBMITTED).exists()
             history.record(draft, HistoryEvent.APPLICATION_SUBMITTED, fresh)
-            mail_queue.enqueue_for_account(MailJob.Kind.APPLICATION_SUBMITTED, fresh)
+            if first_submission:
+                mail_queue.enqueue_for_account(MailJob.Kind.APPLICATION_SUBMITTED, fresh)
     except buildings.Refusal as refusal:
         buildings.refuse(refusal, person)
     return draft

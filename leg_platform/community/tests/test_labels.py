@@ -47,6 +47,10 @@ class HelperTests(TestCase):
             )
             self.assertEqual(labels.application_state_label("operator_confirmed"), "Confirmed by the Example Grid")
             self.assertIn("Example Grid", labels.notice_kind_label(ApplicationNotice.Kind.OPERATOR_CONFIRMATION_LAPSED))
+            self.assertEqual(
+                labels.notice_kind_label(ApplicationNotice.Kind.OPERATOR_DATA_CHANGED),
+                "Data changed after the registration at the Example Grid: check the registration again",
+            )
 
     def test_a_paused_draft_is_labelled_paused_for_the_customer_without_the_operator(self):
         with translation.override("de-ch"):

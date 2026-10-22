@@ -387,22 +387,24 @@ class StartPageTests(TestCase):
     def test_a_complete_account_without_a_second_factor_has_the_one_tile(self):
         html = self.client.get(HOME_URL).content.decode()
         self.assertEqual(html.count('<article class="task-tile"'), 1)
-        self.assertIn("Zwei-Faktor-Anmeldung", html)
-        self.assertIn("Schützt Ihr Konto zusätzlich mit einem Code aus einer App.", html)
-        self.assertIn("2FA einrichten", html)
+        self.assertIn("Anmeldemethode wählen", html)
+        self.assertIn("Nur Passwort, oder Passwort und Code aus einer App auf Ihrem Smartphone.", html)
+        self.assertIn(">Wählen</a>", html)
         self.assertNotIn("Adresse ergänzen", html)
         self.assertNotIn("Keine offenen Aufgaben", html)
 
     def test_the_tile_has_a_status_with_a_word_a_button_and_a_hide_button(self):
         html = self.client.get(HOME_URL).content.decode()
         tile = part(html, '<article class="task-tile"', "</article>")
-        self.assertIn('<span class="status-dot status-open" aria-hidden="true"></span>Offen', tile)
-        # The setup is started by a POST.
-        self.assertRegex(tile, r'<form method="post" action="/profile/two-factor/setup/">')
+        # The choice is optional: the grey dot and the word "Optional" (D-106, "Guidance").
+        self.assertIn('<span class="status-dot" aria-hidden="true"></span>Optional', tile)
+        # The button is a link to the choice in the profile card, not a POST that starts the setup.
+        self.assertRegex(tile, r'<a class="btn btn-secondary-action" href="/profile/\?edit=two_factor&amp;step=choose#card-two-factor">Wählen</a>')
+        self.assertNotIn("/profile/two-factor/setup/", tile)
         self.assertRegex(tile, r'<form method="post" action="/tasks/two_factor/hide/">')
         self.assertIn(">Ausblenden</button>", tile)
-        self.assertIn('aria-label="Ausblenden: Zwei-Faktor-Anmeldung"', tile)
-        self.assertEqual(tile.count("csrfmiddlewaretoken"), 2)
+        self.assertIn('aria-label="Ausblenden: Anmeldemethode wählen"', tile)
+        self.assertEqual(tile.count("csrfmiddlewaretoken"), 1)
 
     def test_an_account_without_an_address_gets_the_address_tile_first(self):
         incomplete = create_active_user(
@@ -412,7 +414,7 @@ class StartPageTests(TestCase):
         client, _user = login(incomplete)
         html = client.get(HOME_URL).content.decode()
         self.assertEqual(html.count('<article class="task-tile"'), 2)
-        self.assertLess(html.index("Adresse ergänzen"), html.index("Zwei-Faktor-Anmeldung"))
+        self.assertLess(html.index("Adresse ergänzen"), html.index("Anmeldemethode wählen"))
         self.assertIn("Ihre Adresse fehlt noch.", html)
         self.assertIn('href="/profile/edit/"', html)
         # No address: no "·" and no street in the line under the title.
@@ -524,7 +526,7 @@ class HideTaskTests(TestCase):
         self.client.post(self.url)
         self.assertFalse(HiddenTask.objects.filter(user=stranger).exists())
         other, _u = login(stranger)
-        self.assertIn("Zwei-Faktor-Anmeldung", other.get(HOME_URL).content.decode())
+        self.assertIn("Anmeldemethode wählen", other.get(HOME_URL).content.decode())
         # The account cannot be chosen: any extra field of the request is ignored.
         self.client.post(reverse("accounts:task_hide", args=["address"]), {"user": stranger.pk, "user_id": stranger.pk})
         self.assertFalse(HiddenTask.objects.filter(user=stranger).exists())
@@ -554,7 +556,7 @@ class HideTaskTests(TestCase):
         admin_client.force_login(administrator)
         response = admin_client.get(reverse("admin:accounts_user_change", args=[self.user.pk]))
         self.assertContains(response, "Ausgeblendete Aufgaben")
-        self.assertContains(response, "Zwei-Faktor-Anmeldung")
+        self.assertContains(response, "Anmeldemethode wählen")
         self.assertNotContains(response, 'name="hidden_tasks_display"')
         # Not a model of the administration of its own.
         self.assertNotIn(HiddenTask, admin_site._registry)

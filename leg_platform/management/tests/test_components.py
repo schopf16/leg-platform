@@ -173,6 +173,17 @@ class StyleAndScriptTests(SimpleTestCase):
         self.assertNotIn("http://", LIST_JS)
         self.assertNotIn("https://", LIST_JS)
 
+    def test_the_whole_row_toggles_but_links_buttons_and_a_text_selection_do_not(self):
+        # D-110: the click on the row (a card on a phone) opens it; the elements inside that act on their own do not.
+        self.assertIn('"tr.mgmt-site.is-expandable, article.mgmt-place.is-expandable"', LIST_JS)
+        self.assertIn('"a, button, input, select, textarea, label, [data-expand-for]"', LIST_JS)
+        self.assertIn('window.getSelection().toString() !== ""', LIST_JS)
+        self.assertIn('button.setAttribute("aria-expanded"', LIST_JS)  # the arrow button follows the state
+        self.assertNotIn("onclick", LIST_JS)
+        for rule in (".mgmt-site.is-expandable,\n.mgmt-place.is-expandable {\n  cursor: pointer;",
+                     ".mgmt-site.is-expandable:focus-within > td", ".mgmt-site.is-expandable:hover > td"):
+            self.assertIn(rule, CSS)
+
     def test_a_goto_link_leads_only_to_a_path_of_this_site(self):
         for url in ("https://evil.example/", "//evil.example/", "javascript:alert(1)", "legs/3/", "", "\\evil"):
             self.assertEqual(render("_goto.html", url=url, label="x"), "", url)

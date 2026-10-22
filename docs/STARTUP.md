@@ -243,15 +243,16 @@ Replace the example key with the one on the page. Only for throw-away local acco
 
 ## 10. Synthetic address directory (optional)
 
-Without a directory the forms show no suggestions and say nothing (D-066). To test suggestions, load invented addresses:
+Without a directory the forms show no suggestions and say nothing to customers (D-066); a staff account is told that there are no suggestions because the directory is not available or not imported yet (D-111). To test suggestions, load invented addresses:
 
 ```powershell
 .\.venv\Scripts\python manage.py seed_local_address_directory
 ```
 
-* Loads eight invented addresses (postal codes 9997 to 9999) into the local directory file. The tables must exist (section 5).
+* Loads eight invented addresses (postal codes 9997 to 9999) into the local directory file. The tables must exist (section 5). After a pull that adds a directory migration (0007: the index of the towns), run the second command of section 5 again.
 * **Refuses to run unless `APP_ENV=local`.** Refuses to replace a directory whose checksum is not its synthetic marker (a real import is never overwritten). Run it again to replace the synthetic rows. No restart needed.
-* Typing `Exa` in the street field gives "Example Street".
+* Typing `Exa` in the street field gives "Example Street"; typing `9999` in the postal code gives "Example Town", typing `Tes` in the town gives "9997 Test Village". Real street names such as "Gantrischweg" give nothing here: the file holds only these invented rows (the real directory is imported by the button in the administration, which downloads 143 MB: do not press it casually).
+* The ranking of the LEG's area (D-111) follows the "Invoice sender" address in the settings of the management area: set its postal code to 9999 and its town to "Example Town" to see these addresses first.
 
 Remove the synthetic rows: stop the processes, delete only that file with its `-wal` and `-shm` files (`Remove-Item "$HOME\.leg-platform-dev\address-directory.sqlite3*"`), run the two commands of section 5 again. Do not run the real import casually (`docs/INSTALLATION.md`, "Address Directory").
 

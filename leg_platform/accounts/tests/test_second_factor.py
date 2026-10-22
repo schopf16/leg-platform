@@ -1077,8 +1077,8 @@ class PasswordChangeTests(TestCase):
 
         # The cards open in place: the links lead to the state of the card (D-059).
         self.assertContains(response, "?edit=password#card-password")
-        self.assertContains(response, "2FA einrichten")
-        self.assertContains(response, "Zwei-Faktor-Anmeldung (2FA)")
+        self.assertContains(response, "?edit=two_factor&amp;step=choose#card-two-factor")
+        self.assertContains(response, "Anmeldemethode")
 
 
 @tag("mariadb")

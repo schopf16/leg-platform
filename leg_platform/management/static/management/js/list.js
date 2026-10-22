@@ -5,9 +5,11 @@
      width is saved for the account (POST to data-widths-url, protected by the CSRF header);
    - a field with data-autosubmit sends its form when it changes; the search field a short moment
      after typing;
-    - a row with data-expand-id opens and closes by a click on the row or on its arrow; the state is
-     saved for the account (POST to data-expand-url). A click on a link or a button inside the row
-     does not toggle it (the link to the detail page never opens or closes the row);
+    - a row with data-expand-id opens and closes by a click anywhere on the row (a card on a phone) or
+     on its arrow; the state is saved for the account (POST to data-expand-url). A click on a link, a
+     button or a field inside the row, and a click that ends a text selection, does not toggle it (the
+     link to the detail page never opens or closes the row); the arrow button keeps aria-expanded in
+     step for the keyboard;
    - the strip of the quick filters (.mgmt-chips) scrolls so that the active filter stands at the left.
 
    Nothing is read from the page except these attributes; no network except the two addresses above;
@@ -132,6 +134,9 @@
       if (row.hasAttribute("aria-expanded")) {
         row.setAttribute("aria-expanded", state ? "true" : "false");
       }
+      row.querySelectorAll("[data-expand-toggle]").forEach((button) => {
+        button.setAttribute("aria-expanded", state ? "true" : "false");
+      });
     });
     document.querySelectorAll('[data-expand-for="' + id + '"]').forEach((part) => {
       part.hidden = !state;
@@ -170,8 +175,15 @@
       toggle(caret.closest("[data-expand-id]").dataset.expandId);
       return;
     }
-    const row = event.target.closest("tr.mgmt-site.is-expandable");
-    if (row && !event.target.closest("a, button, input, select, textarea, label")) {
+    // The whole row (desktop) or card (phone) is the target of the click, not only the arrow. The elements
+    // inside that act on their own (the link to the detail page, buttons, fields, labels) and a text that is
+    // being selected do not toggle; neither does the opened part of a card (its links and text).
+    const row = event.target.closest("tr.mgmt-site.is-expandable, article.mgmt-place.is-expandable");
+    if (
+      row &&
+      !event.target.closest("a, button, input, select, textarea, label, [data-expand-for]") &&
+      !(window.getSelection && window.getSelection().toString() !== "")
+    ) {
       toggle(row.dataset.expandId);
     }
     const all = event.target.closest("[data-expand-all]");

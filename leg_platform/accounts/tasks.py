@@ -72,6 +72,12 @@ def _feed_in_url(user):
     return journey.feed_in_building(user)[1]
 
 
+def _sign_in_method_url(user):
+    """The choice "Sign-in method" in the profile card (D-106); an account with nothing to choose lands on the card's
+    setup step (``profile_views.two_factor_state``)."""
+    return f"{reverse('accounts:profile')}?edit=two_factor&step=choose#card-two-factor"
+
+
 TASKS = (
     Task(
         key="address",
@@ -105,12 +111,14 @@ TASKS = (
     ),
     Task(
         key="two_factor",
-        title=_("Two-factor sign-in"),
-        description=_("Protects your account additionally with a code from an app."),
-        button=_("Set up 2FA"),
+        title=_("Choose how you sign in"),
+        description=_("Password only, or password and a code from an app on your phone."),
+        button=_("Choose"),
         is_open=lambda user: not second_factor.has_second_factor(user),
-        method="post",
-        url_name="accounts:two_factor_setup",
+        method="link",
+        url_name="accounts:profile",
+        status="optional",
+        url_for=_sign_in_method_url,
     ),
 )
 TASKS_BY_KEY = {task.key: task for task in TASKS}

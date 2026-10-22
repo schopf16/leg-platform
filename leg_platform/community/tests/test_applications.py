@@ -366,10 +366,16 @@ class AddMeteringPointTests(TestCase):
         self.assertEqual(self.add(Direction.FEED_IN, last="00000000000000000000099").point.number, full_number(99))
 
     def test_invalid_numbers_are_refused(self):
-        for bad in ("", "  ", "ä", "1" * 21, "12 34", "1.5"):
+        for bad in ("", "  ", "ä", "1" * 21, "1.5", "12 3!"):
             with self.subTest(bad=bad), self.assertRaises(ValidationError):
                 self.add(last=bad)
         self.assertEqual(ApplicationMeteringPoint.objects.count(), 0)
+
+    def test_white_space_in_the_number_is_ignored_and_a_pasted_complete_number_loses_its_prefix(self):
+        # D-109: the blocks of the display (no-break spaces, or normal ones after a copy) are no part of the number.
+        self.assertEqual(self.add(Direction.CONSUMPTION, last="12 34").point.number, full_number(1234))
+        pasted = "CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00099"
+        self.assertEqual(self.add(Direction.FEED_IN, last=pasted).point.number, full_number(99))
 
     def test_without_the_identifier_of_the_settings_nothing_is_added(self):
         from leg_platform.community.models import ManagementSettings
@@ -756,6 +762,80 @@ class SubmitTests(TestCase):
         applications.submit(self.person, application, today=TODAY)
         Application.objects.filter(pk=application.pk).update(state=Application.State.OPERATOR_STARTED)
         self.assertEqual(code_of(lambda: applications.withdraw(self.person, application)), "not_editable")
+
+    def test_reopen_for_change_only_while_the_leg_has_not_picked_the_application_up(self):
+        publish_contract(self.staff)
+        application, building = ready_draft(self.person)
+        # A draft cannot be reopened: nothing was submitted.
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "not_editable")
+        applications.submit(self.person, application, today=TODAY)
+
+        applications.reopen_for_change(self.person, application)
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.DRAFT)
+        self.assertIsNone(application.submitted_at)
+        self.assertEqual(ApplicationMeteringPoint.objects.filter(building=building).count(), 1)
+        entry = history.entries_for(application).get(event=HistoryEvent.APPLICATION_WITHDRAWN)
+        self.assertEqual(entry.detail, {"purpose": "change"})
+        # The details are editable again and the application is submitted again.
+        applications.submit(self.person, application, today=TODAY)
+        # From the start of the review on the customer cannot change it (the withdrawal stays until the operator).
+        Application.objects.filter(pk=application.pk).update(state=Application.State.IN_REVIEW)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "review_started")
+        Application.objects.filter(pk=application.pk).update(state=Application.State.OPERATOR_STARTED)
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(self.person, application)), "not_editable")
+        # Another account's application is "not found", never a hint.
+        other = customer("reopen.other@example.org")
+        self.assertEqual(code_of(lambda: applications.reopen_for_change(other, application)), "not_found")
+
+    def test_there_is_no_cap_of_changes_and_the_submission_mail_is_sent_once_per_application(self):
+        """Owner decision 2026-10-22: no cap of change cycles; the mail only at the first submission (D-107)."""
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        other_application, _other = ready_draft(self.person, egid=EGID + 31, number=21, address={"house_number": "31"})
+        mails = MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED)
+
+        applications.submit(self.person, application, today=TODAY)
+        self.assertEqual(mails.count(), 1)
+        for _cycle in range(12):
+            applications.reopen_for_change(self.person, application)
+            applications.submit(self.person, application, today=TODAY)
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.SUBMITTED)
+        # Every submission is in the history (audit trail), only the first one sent a mail.
+        self.assertEqual(
+            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).count(), 13
+        )
+        self.assertEqual(mails.count(), 1)
+        # Another application of the account has its own first submission (and its own mail).
+        applications.submit(self.person, other_application, today=TODAY)
+        self.assertEqual(mails.count(), 2)
+
+    def test_a_submission_after_a_withdrawal_sends_no_second_mail(self):
+        """The application was submitted before: "once per application" holds after a withdrawal too."""
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        applications.submit(self.person, application, today=TODAY)
+        applications.withdraw(self.person, application)
+
+        applications.submit(self.person, application, today=TODAY)
+
+        application.refresh_from_db()
+        self.assertEqual(application.state, Application.State.SUBMITTED)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
+        self.assertEqual(
+            history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).count(), 2
+        )
+
+    def test_a_refused_submission_is_no_submission_and_the_mail_follows_the_first_real_one(self):
+        publish_contract(self.staff)
+        application, _building = ready_draft(self.person)
+        Application.objects.filter(pk=application.pk).update(start_choice="", desired_start_date=None)
+        self.assertEqual(code_of(lambda: applications.submit(self.person, application, today=TODAY)), "incomplete")
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 0)
+        self.assertFalse(history.entries_for(application).filter(event=HistoryEvent.APPLICATION_SUBMITTED).exists())
 
     def test_a_withdrawal_is_refused_while_the_account_holds_the_most_drafts_it_may_have(self):
         publish_contract(self.staff)

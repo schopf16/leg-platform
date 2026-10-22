@@ -17,7 +17,7 @@ from leg_platform.accounts.models import EMAIL_MAX_LENGTH, SWITZERLAND, User, va
 from leg_platform.accounts.normalization import normalize_email_address
 from leg_platform.community import grid_operator, persons
 from leg_platform.community import iban as iban_module
-from leg_platform.management.form_fields import REMARK_ROWS
+from leg_platform.management.form_fields import REMARK_ROWS, address_suggestions
 
 CONTROL = {"class": "form-control", "autocomplete": "off"}
 SELECT = {"class": "form-select", "autocomplete": "off"}
@@ -138,10 +138,9 @@ class PersonDataForm(forms.Form):
             self.fields["postal_code"].label = _("Postal code")
             self.fields["postal_code"].widget = forms.TextInput(attrs={**CONTROL, "maxlength": "15", "autocomplete": "off"})
         if "street" in self.fields:
-            # Address directory suggestions under the street field, as in the registration and the profile.
-            self.fields["street"].after_template = "addresses/widget.html"
-            if "town" in self.fields:
-                self.fields["town"].after_template = "addresses/widget_notice.html"
+            # Address directory suggestions under the street field, as in the registration and the profile; the
+            # country is the form's own field.
+            address_suggestions(self)
         if "post_office_box_number" in self.fields:
             self.fields["post_office_box_number"].help_text = _("Only if you have no street address.")
 

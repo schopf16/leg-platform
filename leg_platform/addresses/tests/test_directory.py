@@ -1916,7 +1916,11 @@ class DirectoryDatabaseTests(TestCase):
         self.assertEqual(self.client.get("/addresses/lookup/").status_code, 405)
 
     def test_public_endpoint_returns_kind_and_only_directory_data_for_an_approximate_match(self):
+        # The approximate search is for a signed-in account only (L-1): an anonymous client gets the prefix search.
+        from leg_platform.accounts.tests.helpers import create_active_user
+
         self.add_addresses(("Bahnhofstrasse", "5", "9999", "Example Town"))
+        self.client.force_login(create_active_user("approximate-endpoint@example.org"))
         with patch("leg_platform.addresses.views.allow_request", return_value=True):
             response = self.client.post(
                 "/addresses/lookup/", urlencode({"street": "Bahnhofstrase", "postal_code": "9999"}),
@@ -2551,6 +2555,8 @@ class MigrateTests(SimpleTestCase):
             self.assertIn("Applying addresses.0004_building_identifier_update_flag_and_lookups... OK", first.stdout)
             self.assertIn("Applying addresses.0005_entrance_identifier... OK", first.stdout)
             self.assertIn("Applying addresses.0006_columns_missing_backoff... OK", first.stdout)
+            # 0007 adds the index of the towns (the suggestions of the postal code and the town, D-111).
+            self.assertIn("Applying addresses.0007_locality_index... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2576,6 +2582,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0004_building_identifier_update_flag_and_lookups"),
                 ("addresses", "0005_entrance_identifier"),
                 ("addresses", "0006_columns_missing_backoff"),
+                ("addresses", "0007_locality_index"),
             })
             self.assertEqual(journal_mode.lower(), "wal")
             if os.name == "posix":

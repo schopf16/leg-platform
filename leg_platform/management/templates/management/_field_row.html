@@ -1,6 +1,7 @@
 {% load i18n %}{% comment %}
 One row of a card with a label on the left and the field on the right (the settings page; D-077).
-Context: ``field`` (a bound field), ``optional`` (the label says "optional") and ``unit`` (a sign after
+Context: ``field`` (a bound field), ``optional`` (the label says "optional"), ``after`` (the name of a template that is
+included under the field: the address suggestions of the sender address, D-111) and ``unit`` (a sign after
 the field, for example "%"; on a phone it is part of the label instead: "Warning threshold in %", as in
 the phone template). The id of the error is the one that Django puts into ``aria-describedby``.
 {% endcomment %}<div class="mgmt-row">
@@ -8,5 +9,6 @@ the phone template). The id of the error is the one that Django puts into ``aria
   <div>
     {% if unit %}<div class="mgmt-field-unit">{{ field }}<span class="mgmt-desktop-only">{{ unit }}</span></div>{% else %}{{ field }}{% endif %}
     {% if field.errors %}<div class="mgmt-field-error" id="{{ field.auto_id }}_error">{% for error in field.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+    {% if after %}{% include after %}{% endif %}
   </div>
 </div>

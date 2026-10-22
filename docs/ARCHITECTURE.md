@@ -73,6 +73,7 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 ## Authentication
 
 * Password login with the email address (D-021), or passkey-only login for administrators and optionally for users (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
+* The login method is chosen in the step "Sign-in method" (D-106, "Guidance"); the offered methods come from `accounts/login_methods.py`. The setting `PASSKEYS_ENABLED` (default False) is a plain Django setting with no environment variable and no entry in `settings.py`; it stays off until passkeys are built, and no operator changes it.
 
 ## Email
 
@@ -123,7 +124,7 @@ Three Django apps (D-077 to D-087, D-105):
   * Every view uses `access.ManagementAccessMixin` or `@management_view` (`docs/SECURITY.md`, section 4). A test walks the URL configuration and fails for a route without the access check.
   * Lists share one list framework (state parsed from the address on the server).
   * Printing builds PDFs with ReportLab in memory from the same list functions as the pages. One module knows ReportLab markup and escapes every text.
-  * Onboarding pages (D-104): the list "Processes" (`community.process_list`: applications that were submitted and deregistrations that are running, never a draft), the page of an application or a deregistration, the staff's steps as dialogs, notices, the list "Contracts" with upload and download, and the chapter "Reminders and deadlines" of the settings page. They show and call; every rule is in `community` (`application_staff`, `application_queue`, `deregistrations`, `contracts`, `deadline_settings`).
+  * Onboarding pages (D-104): the list "Processes" (`community.process_list`: applications that were submitted, drafts shown read-only and marked "Draft / not submitted" (D-107), and deregistrations that are running), the page of an application or a deregistration, the staff's steps as dialogs, notices, the list "Contracts" with upload and download, and the chapter "Reminders and deadlines" of the settings page. They show and call; every rule is in `community` (`application_staff`, `application_queue`, `deregistrations`, `contracts`, `deadline_settings`).
 * Every active staff account may use every page of the area (D-086, approved deviation from D-012). The Django administration keeps its permission model.
 * **`leg_platform.customer`** (D-105; no models): the pages of the customer's participation under `/participation/` (the page "Buildings", the registration wizard with its server-held draft, the contract page and download, a placeholder for the deregistration) and the card and tiles of the start page. Every view uses `access.CustomerAccessMixin` (logged in, active, customer number, not staff; a route walk test fails for a route without it). Pages call the `community` services only; every id is resolved through the account; POSTs have a request budget per account (`customer.limits`).
 * The address directory is advisory (D-066). A suggestion is stored on the location so lists can filter without asking the directory per row.

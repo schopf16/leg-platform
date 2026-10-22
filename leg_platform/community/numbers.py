@@ -22,6 +22,10 @@ COUNTRY_LENGTH = 2
 IDENTIFIER_LENGTH = 11
 SUFFIX_LENGTH = 20
 METERING_POINT_LENGTH = COUNTRY_LENGTH + IDENTIFIER_LENGTH + SUFFIX_LENGTH  # 33
+# The display (D-109): country and identifier are one block, the rest follows in blocks of four.
+HEAD_LENGTH = COUNTRY_LENGTH + IDENTIFIER_LENGTH  # 13
+GROUP_SIZE = 4
+NO_BREAK_SPACE = "\u00a0"
 TRANSFORMER_CIRCUIT_MAX_LENGTH = 20
 # The longest entry that is looked at: a longer text is "too long" at once (the field has no ``maxlength``, so that a
 # paste is never cut silently).
@@ -72,15 +76,25 @@ def validate_metering_point_number(value):
         raise ValidationError(METERING_POINT_MESSAGE, code="invalid_metering_point_number")
 
 
-def normalise_entered_number(value):
+def compact_number(value):
+    """The text without any white space (D-109): the optical separators of the display (the no-break space of
+    ``format_metering_point_number``, also a normal, a narrow or a thin space) never belong to the number, so a number
+    that was copied from a page and pasted into a field or the search means the same as the plain one."""
+    return "".join((value or "").split())
+
+
+def normalise_entered_number(value, prefix=""):
     """The typed last characters of a metering point number, made exactly ``SUFFIX_LENGTH`` characters long (D-102).
 
-    Letters A-Z (small ones become capitals), digits and the hyphen only. Shorter: zeros on the left ("23" becomes
-    eighteen zeros and 23). Longer: **only leading zeros are removed**, as many as needed; if the entry has fewer
-    leading zeros than that, or is longer than ``MAX_ENTRY_LENGTH``, it is invalid. No other character is ever removed.
-    Raises ``ValidationError`` with the code ``empty``, ``not_allowed`` or ``too_long``. (Zeros are put in front by
-    hand, not with ``zfill``: it would put them behind a leading hyphen.)"""
-    text = (value or "").strip()
+    White space is ignored (D-109: ``compact_number``). A complete number of ``METERING_POINT_LENGTH`` characters that
+    starts with ``prefix`` (country and identifier of the settings, when given) is taken as the number that it is: the
+    prefix is dropped, so that a pasted number is not "too long". Letters A-Z (small ones become capitals), digits and
+    the hyphen only. Shorter: zeros on the left ("23" becomes eighteen zeros and 23). Longer: **only leading zeros are
+    removed**, as many as needed; if the entry has fewer leading zeros than that, or is longer than
+    ``MAX_ENTRY_LENGTH``, it is invalid. No other character is ever removed. Raises ``ValidationError`` with the code
+    ``empty``, ``not_allowed`` or ``too_long``. (Zeros are put in front by hand, not with ``zfill``: it would put them
+    behind a leading hyphen.)"""
+    text = compact_number(value)
     if not text:
         raise ValidationError(NO_DIGITS_MESSAGE, code="empty")
     if ENTERED_CHARACTERS.fullmatch(text) is None:
@@ -91,6 +105,8 @@ def normalise_entered_number(value):
     if len(text) > MAX_ENTRY_LENGTH:
         raise too_long
     text = text.upper()
+    if prefix and len(prefix) == HEAD_LENGTH and len(text) == METERING_POINT_LENGTH and text.startswith(prefix.upper()):
+        text = text[len(prefix):]
     if len(text) > SUFFIX_LENGTH:
         extra = len(text) - SUFFIX_LENGTH
         leading_zeros = len(text) - len(text.lstrip("0"))
@@ -106,7 +122,7 @@ def compose_metering_point_number(country, identifier, entered):
     Country and identifier are checked again; raises ``ValidationError``."""
     validate_country(country)
     validate_identifier(identifier)
-    return f"{country}{identifier}{normalise_entered_number(entered)}"
+    return f"{country}{identifier}{normalise_entered_number(entered, prefix=f'{country}{identifier}')}"
 
 
 def split_metering_point_number(number):
@@ -121,19 +137,35 @@ def split_metering_point_number(number):
 
 
 def normalise_metering_point_number(value):
-    """Surrounding white space removed, capital letters (the stored form)."""
-    return (value or "").strip().upper()
+    """White space removed (D-109), capital letters (the stored form)."""
+    return compact_number(value).upper()
 
 
-def format_metering_point_number(number):
-    """The number as the person page shows it: "CH 1A2B 3C4D ..." (country, then groups of four).
-    An invalid value is returned as it is; a missing number gives ""."""
-    if not number:
+def pasted_number(text):
+    """The compact capital text of ``text`` if it looks like a number copied from a page (D-109): several words (the blocks
+    of the display, separated by spaces or no-break spaces), together more than a block of the display and only the
+    characters of a number. None otherwise. The lists use it to search a pasted number as one piece instead of word by
+    word; whether a stored number contains it is the list's question."""
+    words = (text or "").split()
+    compact = normalise_metering_point_number(text)
+    if len(words) < 2 or len(compact) <= HEAD_LENGTH or len(compact) > METERING_POINT_LENGTH:
+        return None
+    return compact if ENTERED_CHARACTERS.fullmatch(compact) else None
+
+
+def format_metering_point_number(number, separator=NO_BREAK_SPACE):
+    """The number as every page shows it (D-109): the first ``HEAD_LENGTH`` characters (country and identifier: the
+    grid operator's part) as one block, then the characters the grid operator assigned in blocks of four, separated by a
+    no-break space (``NO_BREAK_SPACE``: the number never wraps, and the separator is white space that every field and the
+    search ignore, see ``compact_number``). The 33 characters of the standard give 13 + 5 x 4. Any other length is
+    grouped the same way (the tail in fours; a value of at most 13 characters is one block). The value is not
+    validated and white space in it is ignored, so the function is idempotent; a missing number gives "". ``separator``
+    is for a place where the number may wrap between blocks (a PDF cell): pass a normal space."""
+    text = compact_number(number)
+    if not text:
         return ""
-    if not is_valid_metering_point_number(number):
-        return number
-    rest = number[COUNTRY_LENGTH:]
-    return " ".join([number[:COUNTRY_LENGTH], *(rest[i : i + 4] for i in range(0, len(rest), 4))])
+    groups = [text[:HEAD_LENGTH], *(text[i : i + GROUP_SIZE] for i in range(HEAD_LENGTH, len(text), GROUP_SIZE))]
+    return separator.join(group for group in groups if group)
 
 
 def normalise_transformer_circuit_number(value):

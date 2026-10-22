@@ -322,8 +322,8 @@ class CrossAccountTests(TestCase):
 
         self.assertRedirects(response, HOME_URL, fetch_redirect_response=False)
         self.assertEqual(list(HiddenTask.objects.values_list("user_id", "task_key")), [(self.a.pk, "two_factor")])
-        self.assertNotContains(self.client_a.get(HOME_URL), "2FA einrichten")
-        self.assertContains(self.client_b.get(HOME_URL), "2FA einrichten")
+        self.assertNotContains(self.client_a.get(HOME_URL), "Anmeldemethode wählen")
+        self.assertContains(self.client_b.get(HOME_URL), "Anmeldemethode wählen")
 
     def test_cancelling_a_request_leaves_the_requests_and_links_of_another_account_alone(self):
         for user in (self.a, self.b):

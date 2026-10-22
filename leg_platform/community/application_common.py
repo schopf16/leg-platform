@@ -29,7 +29,10 @@ class ApplicationError(Exception):
     ``no_contract``, ``both_ticks_required``, ``version_changed``, ``already_accepted``, ``start_invalid``,
     ``step_not_available``, ``incomplete`` (``details["missing"]`` lists the open items), ``wrong_state``.
     Staff codes add: ``date_in_future``, ``date_before_start``, ``start_too_early``, ``number_exists``,
-    ``cannot_terminate``, ``not_eligible``, ``nothing_to_deregister``, ``date_before_earliest``, ``not_month_end``."""
+    ``cannot_terminate``, ``not_eligible``, ``nothing_to_deregister``, ``date_before_earliest``, ``not_month_end``;
+    the corrections of D-109 (``application_corrections``): ``changed`` (the row is not the one the dialog showed),
+    ``unchanged``, ``building_stored``, ``number_taken``, ``iban_required``, ``draw_required``, ``plant_data_swap``,
+    ``direction_invalid``."""
 
     def __init__(self, code, **details):
         super().__init__(code)

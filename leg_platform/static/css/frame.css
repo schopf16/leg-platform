@@ -981,6 +981,25 @@
   overflow-wrap: anywhere;
 }
 
+/* A metering point number (D-109, template filter ``metering_point``): one line, never wrapped, the blocks of the grid
+   operator's part and of the customer's part stay readable. The separators are no-break spaces. */
+.mp-number {
+  display: inline-block;
+  max-width: 100%;
+  font-family: var(--tblr-font-monospace);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+@media (max-width: 760px) {
+  .mp-number {
+    font-size: 0.86em;
+    letter-spacing: -0.02em;
+  }
+}
+
 @media (max-width: 760px) {
   .profile-cards {
     margin-top: 24px;

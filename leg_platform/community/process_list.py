@@ -1,17 +1,19 @@
-"""The list "Processes" (owner design ``verwaltung/vorgaenge``; D-103): the running applications and deregistrations of
-all customers in one list. Pure query code, no pages.
+"""The list "Processes" (owner design ``verwaltung/vorgaenge``; D-103, D-107): the running applications and deregistrations
+of all customers in one list. Pure query code, no pages.
 
-* Only running processes are listed: applications that were submitted and are not completed (never a draft or a paused
-  draft: the staff does not work on drafts, KONZEPT 5.6) and deregistrations that are not yet effective.
+* Listed are the applications that were submitted and are not completed, the drafts and paused drafts of the customers
+  (since D-107; the owner wants to see what customers have started; they are marked "Draft / not submitted", the staff
+  cannot act on them and they are in no work count of the overview) and the deregistrations that are not yet effective.
 * The search finds the name, the customer number, the address and the EGID, never a note or an IBAN. Every word must
   match (AND). The filters are the kind (application / deregistration) and the state.
-* Rows are built in Python and sorted there (empty values always last). Both queries are bounded by ``MAX_ROWS``.
+* Rows are built in Python and sorted there (empty values always last). Both queries are bounded by ``MAX_ROWS``: the
+  cap keeps submitted work before drafts and the newest changes first, and a cut is reported (``RowList.truncated``).
 """
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db.models import Prefetch, Q
+from django.db.models import Case, IntegerField, Prefetch, Q, When
 
 from leg_platform.community import applications, deregistrations, person_list
 from leg_platform.community.models import (
@@ -32,10 +34,16 @@ STATE_ALL = "all"
 # model's values are ``submitted`` and ``confirmed``, which would clash with the application state ``submitted``).
 STATE_DEREGISTRATION_SUBMITTED = "deregistration_submitted"
 STATE_DEREGISTRATION_CONFIRMED = "deregistration_confirmed"
-ROW_STATES = (*Application.IN_FLIGHT_STATES, STATE_DEREGISTRATION_SUBMITTED, STATE_DEREGISTRATION_CONFIRMED)
-# The state FILTER: the two states at the grid operator are one choice (the overview counts them together).
+ROW_STATES = (
+    *Application.DRAFT_STATES, *Application.IN_FLIGHT_STATES, STATE_DEREGISTRATION_SUBMITTED,
+    STATE_DEREGISTRATION_CONFIRMED,
+)
+# The state FILTER: the two states at the grid operator are one choice (the overview counts them together), and so are
+# the two draft states (a paused draft is a draft that nobody touched for a while).
 STATE_AT_OPERATOR = "at_operator"
+STATE_DRAFT = Application.State.DRAFT.value
 APPLICATION_FILTER = {
+    STATE_DRAFT: Application.DRAFT_STATES,
     Application.State.SUBMITTED.value: (Application.State.SUBMITTED,),
     Application.State.IN_REVIEW.value: (Application.State.IN_REVIEW,),
     STATE_AT_OPERATOR: (Application.State.OPERATOR_STARTED, Application.State.OPERATOR_CONFIRMED),
@@ -130,10 +138,17 @@ def _address_text(address):
     return f"{street} {house_number}, {postal_code} {town}".strip(" ,")
 
 
-def _application_row(application):
+def _application_row(application, draft_progress=None):
     buildings = list(application.buildings.all())
     first = buildings[0] if buildings else None
-    done = sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE)
+    if application.state in Application.DRAFT_STATES:
+        # A draft has no way after the submission yet: its progress is what the customer completed in the form
+        # (computed for all drafts together by ``applications.progress_many``, never one by one).
+        current = (draft_progress or {}).get(application.pk) or applications.progress(application)
+        done, total = current.done, current.total
+    else:
+        done = sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE)
+        total = len(applications.STEPS)
     name, contact = person_list.display_names(application.person)
     egid = None
     if first is not None:
@@ -145,7 +160,7 @@ def _application_row(application):
         address=_address_text(first.current_address()) if first is not None else "",
         more_buildings=max(len(buildings) - 1, 0), egid=egid,
         points=sum(len(building.metering_points.all()) for building in buildings),
-        state=application.state, progress_done=done, progress_total=len(applications.STEPS),
+        state=application.state, progress_done=done, progress_total=total,
         date=start, start_choice=application.start_choice, changed=application.updated_at,
     )
 
@@ -175,8 +190,8 @@ def _deregistration_row(deregistration):
 
 
 def application_queryset(text="", state=STATE_ALL):
-    """The running applications (never a draft), narrowed by the state filter and the search."""
-    states = tuple(Application.IN_FLIGHT_STATES) if state == STATE_ALL else APPLICATION_FILTER[state]
+    """The applications that are not completed (drafts included, D-107), narrowed by the state filter and the search."""
+    states = tuple(Application.OPEN_STATES) if state == STATE_ALL else APPLICATION_FILTER[state]
     queryset = (
         Application.objects.filter(state__in=states)
         .select_related("person")
@@ -203,20 +218,47 @@ def deregistration_queryset(text="", state=STATE_ALL):
     return _deregistration_search(queryset, text)
 
 
+class RowList(list):
+    """The rows of the list; ``truncated`` is True when ``MAX_ROWS`` cut the applications or the deregistrations."""
+
+    truncated = False
+
+
+def _capped(queryset):
+    """``(rows, truncated)``: at most ``MAX_ROWS`` of an already ordered queryset (one more is read to know)."""
+    found = list(queryset[: MAX_ROWS + 1])
+    return found[:MAX_ROWS], len(found) > MAX_ROWS
+
+
 def rows(*, text="", kind=KIND_ALL, state=STATE_ALL, sort=DEFAULT_SORT, descending=False):
-    """The rows of the list as the address asks for them (unknown values are the defaults)."""
+    """The rows of the list as the address asks for them (unknown values are the defaults).
+
+    The cap keeps the work that is not a draft first and, within it, the most recently changed rows: with more than
+    ``MAX_ROWS`` open applications the oldest drafts drop out, never the newest submissions. A cut sets ``truncated``
+    on the result (the page tells the staff to narrow the search)."""
     kind = kind if kind in KINDS else KIND_ALL
     state = state if state in STATES else STATE_ALL
     found = []
+    truncated = False
     wants_applications = kind in (KIND_ALL, KIND_APPLICATION) and state not in DEREGISTRATION_FILTER
     wants_deregistrations = kind in (KIND_ALL, KIND_DEREGISTRATION) and (
         state == STATE_ALL or state in DEREGISTRATION_FILTER
     )
     if wants_applications:
-        found += [_application_row(row) for row in application_queryset(text, state).order_by("pk")[:MAX_ROWS]]
+        queryset = application_queryset(text, state).annotate(
+            draft_rank=Case(When(state__in=Application.DRAFT_STATES, then=1), default=0, output_field=IntegerField())
+        )
+        listed, cut = _capped(queryset.order_by("draft_rank", "-updated_at", "-pk"))
+        truncated |= cut
+        progress = applications.progress_many(row for row in listed if row.state in Application.DRAFT_STATES)
+        found += [_application_row(row, progress) for row in listed]
     if wants_deregistrations:
-        found += [_deregistration_row(row) for row in deregistration_queryset(text, state).order_by("pk")[:MAX_ROWS]]
-    return sort_rows(found, sort, descending)
+        listed, cut = _capped(deregistration_queryset(text, state).order_by("-submitted_at", "-pk"))
+        truncated |= cut
+        found += [_deregistration_row(row) for row in listed]
+    result = RowList(sort_rows(found, sort, descending))
+    result.truncated = truncated
+    return result
 
 
 def _key(row, sort):

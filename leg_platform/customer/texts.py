@@ -45,6 +45,10 @@ MESSAGES = {
     "contract_missing": _("Please agree to the contract first."),
     "start_invalid": _("Choose as soon as possible or a day that is not too early."),
     "not_editable": _("This application cannot be changed any more."),
+    "review_started": _(
+        "The LEG has already started checking your application, so you can no longer change it here. "
+        "Until the registration at the grid operator starts, you can still withdraw it."
+    ),
     "wrong_state": _("This is not possible any more."),
     "step_not_available": _("This step is not available yet."),
     "building_fixed": _("This building is fixed and cannot be changed."),

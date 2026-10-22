@@ -61,6 +61,8 @@ SESSION_COUNTER_KEY = "confirmation_counter_id"
 SESSION_CODE_FAILURE_RETENTION = timedelta(days=30)
 # Request attribute that says "end this session": set by the check, read by the view.
 SESSION_ENDED_ATTRIBUTE = "_session_ended_wrong_codes"
+# Set once the end was carried out (log out and notice), so that a second pass over the same request does nothing.
+SESSION_END_HANDLED_ATTRIBUTE = "_session_end_wrong_codes_handled"
 SESSION_ENDED_MESSAGE = gettext_lazy(
     "For your safety you were logged out: wrong codes or passwords were entered several times. "
     "Please log in again."
@@ -429,7 +431,14 @@ def forget_confirmation_failures(request, user):
 
 
 def end_session_for_wrong_codes(request):
-    """End this session only (the others stay) and tell the person at the next page of the login."""
+    """End this session only (the others stay) and tell the person at the next page of the login.
+
+    Idempotent per request: a view that runs another card view on the same request
+    (``profile_views.LoginMethodView``) passes the end twice, but the notice is added once.
+    """
+    if getattr(request, SESSION_END_HANDLED_ATTRIBUTE, False):
+        return
+    setattr(request, SESSION_END_HANDLED_ATTRIBUTE, True)
     logout(request)
     messages.warning(request, SESSION_ENDED_MESSAGE)
 

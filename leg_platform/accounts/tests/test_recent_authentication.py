@@ -379,10 +379,11 @@ class RegistrationLoginTests(TestCase):
 
         self.assertContains(page, "Guten Tag, Anna Example")
         self.assertContains(page, user.customer_number_display)
-        self.assertContains(page, "Zwei-Faktor-Anmeldung")
-        self.assertContains(page, f'<form method="post" action="{SETUP_URL}"')
+        self.assertContains(page, "Anmeldemethode wählen")
+        self.assertNotContains(page, f'<form method="post" action="{SETUP_URL}"')
+        self.assertContains(page, "step=choose#card-two-factor")
         self.assertNotContains(page, "Melden Sie sich mit Ihrer E-Mail-Adresse")
-        # The button starts the setup in one more step; the old welcome page is gone (D-058).
+        # The setup itself still starts with one more step; the old welcome page is gone (D-058).
         self.assertRedirects(self.client.post(SETUP_URL, {}), CONFIRM_URL, fetch_redirect_response=False)
         self.assertEqual(Client().get("/welcome/").status_code, 404)
 

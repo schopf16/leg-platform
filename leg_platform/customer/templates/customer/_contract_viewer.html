@@ -1,0 +1,10 @@
+{% load i18n %}{% comment %}
+The current contract, readable in the page (D-108): a frame on the same-origin reading view, then the note and the
+download. Phones do not show an embedded PDF reliably, so the frame is hidden on narrow screens (customer.css) and the
+download button is the way to read it. ``without_download``: the page lists the downloads itself.
+{% endcomment %}<div class="contract-reader">
+  <iframe class="contract-frame" src="{% url 'customer:contract_read' %}#view=FitH&amp;navpanes=0" title="{% translate 'Articles of association' %}" loading="lazy" referrerpolicy="no-referrer"></iframe>
+  <p class="contract-reader-note muted contract-reader-wide">{% translate "If the contract is not shown here, please download it." %}</p>
+  <p class="contract-reader-note contract-reader-phone">{% translate "Please download the contract to read it." %}</p>
+  {% if not without_download %}<p><a class="btn btn-secondary-action" href="{% url 'customer:contract_download' %}">{% translate "Download contract" %}</a></p>{% endif %}
+</div>

@@ -51,14 +51,14 @@ class CardLayoutTests(TestCase):
         # The rule is bound to the profile form: the pairs of the registration are not touched.
         self.assertNotRegex(CSS, r"(?m)^\s*\.field-pair-street \{")
 
-    def test_the_button_to_set_up_2fa_is_wide_on_a_phone_and_primary_only_when_no_card_is_open(self):
+    def test_the_button_to_change_the_method_is_primary_only_when_no_card_is_open(self):
         view = card(self.page(), "two-factor")
-        self.assertRegex(view, r'<div class="profile-actions"><button type="submit" class="btn btn-primary">2FA einrichten')
+        self.assertRegex(view, r'<a class="btn btn-primary" href="[^"]*step=choose#card-two-factor">Ändern</a>')
         for query in ("?edit=personal", "?edit=email", "?edit=password", "?edit=delete"):
             with self.subTest(query=query):
                 self.assertRegex(
                     card(self.page(query), "two-factor"),
-                    r'class="btn btn-secondary-action">2FA einrichten',
+                    r'class="btn btn-secondary-action" href="[^"]*step=choose#card-two-factor">Ändern</a>',
                 )
 
     def test_the_postal_code_is_called_plz_in_the_profile_only(self):

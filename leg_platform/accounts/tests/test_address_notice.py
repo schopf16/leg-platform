@@ -54,7 +54,10 @@ class ScriptRuleTests(SimpleTestCase):
 
     def test_the_check_never_runs_on_change_or_blur_and_the_list_keeps_the_focus_in_the_field(self):
         self.assertNotRegex(CODE, r"""addEventListener\(\s*["'](?:change|blur|focusout)["']""")
-        self.assertRegex(CODE, r"""panel\.addEventListener\(\s*"mousedown",\s*\(event\)\s*=>\s*event\.preventDefault\(\)""")
+        # A press on a panel never moves the focus out of its input; nothing is closed by a press elsewhere (a closing
+        # panel would shift the button that is being pressed).
+        self.assertRegex(CODE, r"""popup\.addEventListener\(\s*"mousedown",\s*\(event\)\s*=>\s*event\.preventDefault\(\)""")
+        self.assertNotRegex(CODE, r"""document\.addEventListener\(\s*["'](?:mousedown|pointerdown|click)["']""")
 
     def test_options_are_built_with_text_content_and_the_request_stays_on_the_own_origin(self):
         for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write"):
@@ -69,14 +72,16 @@ class ScriptRuleTests(SimpleTestCase):
         self.assertRegex(CODE, r"\.replace\(/%\\\(\(\\w\+\)\\\)s/g,\s*\(token,\s*name\)\s*=>")
         self.assertNotIn(".split(`%(", CODE)
 
-    def test_the_only_notice_is_the_not_found_warning_of_an_available_directory(self):
-        # D-066: no info notice, no text for an unavailable, old or limited directory, a failed
-        # request or an invalid answer. Only one call shows a notice, and only for this case.
-        self.assertEqual(CODE.count("showNotice("), 1)  # the one call
+    def test_the_notices_are_the_not_found_warning_and_the_sentence_for_staff_about_an_empty_directory(self):
+        # D-066: no info notice, no text for an old or limited directory, a failed request or an invalid answer, and the
+        # state of the directory is only said where the server gave the sentence (``data-directory-missing``: staff
+        # only, D-111). Two calls show a notice, and only for these two cases.
+        self.assertEqual(CODE.count("showNotice("), 2)  # the two calls
         self.assertIn('showNotice("warning", data.warning)', CODE)
+        self.assertIn('showNotice("secondary", text.directoryMissing, "directory")', CODE)
         self.assertNotIn('"info"', CODE)
         self.assertNotIn("alert-info", CODE)
-        self.assertNotIn("unavailable", CODE)
+        self.assertRegex(CODE, r"Boolean\(text\.directoryMissing\) && Boolean\(data\)")
         self.assertRegex(CODE, r'data\.status === "available" && data\.match === false')
         self.assertRegex(CODE, r"if \(!answer \|\| !answer\.ok\) return;")
 
@@ -84,9 +89,32 @@ class ScriptRuleTests(SimpleTestCase):
         self.assertIn("widget.dataset.countryValue", CODE)
         self.assertRegex(CODE, r'const isSwiss = \(\) => country\(\) === "CH";')
         # The country is always sent, so the server decides (it answers only for "CH").
-        self.assertIn('name === "country" ? country() : field.value', CODE)
+        self.assertIn('name === "country" ? country() : fields[name].value', CODE)
         # Without a country field and without a fixed value the widget does nothing.
         self.assertRegex(CODE, r"if \(!fields\.country && !fixedCountry\) return;")
+
+    def test_the_three_inputs_are_comboboxes_with_the_attributes_of_the_aria_pattern(self):
+        for needle in (
+            'setAttribute("role", "combobox")', 'setAttribute("aria-autocomplete", "list")',
+            'setAttribute("aria-haspopup", "listbox")', 'setAttribute("aria-expanded"', 'setAttribute("aria-controls"',
+            '"aria-activedescendant"', 'setAttribute("role", "listbox")', 'setAttribute("role", "option")',
+            'setAttribute("aria-selected"', '"ArrowDown"', '"ArrowUp"', '"Enter"', '"Escape"', '"Tab"',
+        ):
+            self.assertIn(needle, CODE, needle)
+        # The street, the postal code and the town; the house number only narrows an open list.
+        for name in ('combobox("street"', 'combos.postal_code = combobox("postal_code"', 'combos.locality = combobox("locality"'):
+            self.assertIn(name, CODE, name)
+
+    def test_the_requests_start_at_three_characters_and_at_a_complete_postal_code_after_a_short_delay(self):
+        self.assertIn("const MIN_CHARS = 3;", CODE)
+        self.assertIn("const POSTAL_CODE_LENGTH = 4;", CODE)
+        self.assertIn("const SUGGEST_DELAY = 200;", CODE)
+        self.assertRegex(CODE, r"street\(\)\.length < MIN_CHARS")
+        self.assertRegex(CODE, r"locality\(\)\.length >= MIN_CHARS")
+        # The script fills the town or the postal code only into an empty field or one that it filled itself, and says so.
+        self.assertIn("autoFilled", CODE)
+        self.assertIn("text.filledLocality", CODE)
+        self.assertIn("text.filledPostalCode", CODE)
 
 
 class CatalogueTests(SimpleTestCase):

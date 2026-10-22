@@ -689,6 +689,10 @@ class Application(TimestampedModel):
     )
     # Submitted, i.e. visible to the staff and holding its numbers and buildings against other customers.
     IN_FLIGHT_STATES = (State.SUBMITTED, State.IN_REVIEW, State.OPERATOR_STARTED, State.OPERATOR_CONFIRMED)
+    # The staff may correct the address and the metering points (D-109): while the LEG works on the application. Not a
+    # draft (the customer edits it), not completed (the rows are real then; the pages of the locations and metering
+    # points change them).
+    CORRECTABLE_STATES = IN_FLIGHT_STATES
 
     person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="applications")
     state = models.CharField(max_length=20, choices=State, default=State.DRAFT)
@@ -822,6 +826,10 @@ class ApplicationNotice(models.Model):
         # Static (see ``Application.State``); ``community.labels.notice_kind_label`` names the operator at display time.
         OPERATOR_CONFIRMATION_LAPSED = "operator_lapsed", _(
             "Confirmation by the grid operator did not arrive: withdraw the registration there"
+        )
+        # A correction after the registration at the grid operator started (D-109): the data now differs from it.
+        OPERATOR_DATA_CHANGED = "operator_changed", _(
+            "Data changed after the registration at the grid operator: check the registration again"
         )
 
     person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")

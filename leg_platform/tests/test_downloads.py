@@ -3,7 +3,24 @@ protective headers, and the name is encoded by Django."""
 
 from django.test import SimpleTestCase
 
-from leg_platform.downloads import PDF_CONTENT_SECURITY_POLICY, pdf_attachment
+from leg_platform.downloads import (
+    PDF_CONTENT_SECURITY_POLICY, PDF_INLINE_CONTENT_SECURITY_POLICY, pdf_attachment, pdf_inline,
+)
+
+
+class PdfInlineTests(SimpleTestCase):
+    def test_inline_differs_in_the_disposition_the_policy_and_the_framing_only(self):
+        inline = pdf_inline(b"%PDF-1.4", "contract-2026-10-07.pdf")
+        attachment = pdf_attachment(b"%PDF-1.4", "contract-2026-10-07.pdf")
+
+        self.assertEqual(inline["Content-Disposition"], 'inline; filename="contract-2026-10-07.pdf"')
+        self.assertEqual(inline["Content-Security-Policy"], PDF_INLINE_CONTENT_SECURITY_POLICY)
+        self.assertEqual(PDF_INLINE_CONTENT_SECURITY_POLICY, "default-src 'none'; frame-ancestors 'self'")
+        self.assertEqual(inline["X-Frame-Options"], "SAMEORIGIN")
+        self.assertNotIn("X-Frame-Options", attachment)
+        for name in ("Content-Type", "X-Content-Type-Options", "Cross-Origin-Resource-Policy", "Referrer-Policy"):
+            self.assertEqual(inline[name], attachment[name], name)
+        self.assertEqual(inline["X-Content-Type-Options"], "nosniff")
 
 
 class PdfAttachmentTests(SimpleTestCase):

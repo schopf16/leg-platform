@@ -9,6 +9,7 @@ import logging
 import time
 
 from django.db import DatabaseError
+from django.db.models import Q
 from django.utils.connection import ConnectionDoesNotExist
 from django.utils.translation import gettext as _
 
@@ -18,8 +19,16 @@ from .models import Address, Directory
 FIELDS = ("street", "house_number", "postal_code", "locality")
 # Street key first, so the index addr_generation_street delivers the rows in this order.
 ANSWER_ORDER = ("street_key", "street", "house_number", "postal_code", "locality")
+# Town first, so the index addr_generation_locality delivers the rows in this order (D-111).
+LOCALITY_FIELDS = ("postal_code", "locality")
+LOCALITY_ORDER = ("locality_key", "locality", "postal_code")
 LIMITS = {"street": 255, "house_number": 32, "postal_code": 4, "locality": 255, "country": 2}
+MODES = {"suggest", "check", "locality"}
 RESULT_LIMIT = 10
+# The typing suggestions of the forms (D-111) start at three characters; ``lookup`` keeps the old two for the
+# server-side advice of the community domain (``minimum``).
+TYPEAHEAD_MINIMUM = 3
+POSTAL_CODE_LENGTH = 4
 # Approximate matching (D-065) runs only after the prefix search found nothing, for a complete
 # postal code only; every bound fails closed (no result): at most APPROXIMATE_STREET_LIMIT streets
 # in the postal code; typed street of APPROXIMATE_MIN/MAX_LENGTH characters before and after
@@ -133,16 +142,81 @@ def approximate_matches(query, values):
     return rows, kind
 
 
-def lookup(values, *, mode="suggest"):
+def home_filter(home):
+    """The ``Q`` of the home area (the LEG's own postal code and town) or None while none is known (D-111).
+
+    The directory holds the postal locality, not the political municipality (D-049: ``COM_NAME`` is not stored), so the
+    area is what the LEG's own address names: its postal code and its town."""
+    postal_code, town = home or ("", "")
+    condition = None
+    if len(postal_code) == POSTAL_CODE_LENGTH and postal_code.isascii() and postal_code.isdigit():
+        condition = Q(postal_code=postal_code)
+    if key(town or ""):
+        by_town = Q(locality_key=key(town))
+        condition = by_town if condition is None else condition | by_town
+    return condition
+
+
+def in_home(row, home):
+    """Whether an answer row (a dict with ``postal_code`` and ``locality``) lies in the home area."""
+    postal_code, town = home or ("", "")
+    return bool(
+        (postal_code and row["postal_code"] == postal_code) or (key(town or "") and key(row["locality"]) == key(town))
+    )
+
+
+def ranked_rows(query, home, *, order, columns, limit=RESULT_LIMIT):
+    """At most ``limit`` distinct rows: those of the home area first, then all others (D-111); each part in ``order``.
+
+    Two index-ordered queries instead of one sort, so the cost stays that of the plain prefix search."""
+    condition = home_filter(home)
+    if condition is None:
+        return list(query.order_by(*order).values(*columns).distinct()[:limit])
+    rows = list(query.filter(condition).order_by(*order).values(*columns).distinct()[:limit])
+    if len(rows) < limit:
+        rows += list(query.exclude(condition).order_by(*order).values(*columns).distinct()[:limit - len(rows)])
+    return rows
+
+
+def locality_matches(query, values, home):
+    """Towns and postal codes for the typed postal code and/or town (D-111).
+
+    A complete postal code gives its towns (a town typed besides narrows them); without one, the typed town (at
+    least ``TYPEAHEAD_MINIMUM`` characters) gives its postal codes, narrowed by a typed part of the postal code. The home
+    area comes first, then all others. Nothing else is returned."""
+    postal_code, typed = values["postal_code"], key(values["locality"])
+    if len(postal_code) == POSTAL_CODE_LENGTH:
+        query = query.filter(postal_code=postal_code)
+        if typed:
+            query = query.filter(**prefix_range("locality_key", typed))
+    elif len(typed) >= TYPEAHEAD_MINIMUM:
+        query = query.filter(**prefix_range("locality_key", typed))
+        if postal_code:
+            query = query.filter(**prefix_range("postal_code", postal_code))
+    else:
+        return []
+    return ranked_rows(query, home, order=LOCALITY_ORDER, columns=LOCALITY_FIELDS)
+
+
+def lookup(values, *, mode="suggest", home=None, minimum=2, approximate=True):
     """The JSON answer of the lookup endpoint.
 
     ``warning`` is non-empty only in mode "check" when a current directory does not know the
     complete address (D-066); directory problems are logged and shown to the operator only.
+    Mode "locality" (D-111) answers ``results`` of ``{"postal_code", "locality"}`` for the typed postal code or town.
+    ``home`` is ``(postal code, town)`` of the LEG: its addresses come first. ``minimum`` is the shortest street
+    or town that is searched. ``approximate`` allows the approximate street search after a prefix search without a hit
+    (True, False, or a function that is called only when the search would run and says whether it may; the endpoint
+    gives it a budget and refuses it to an anonymous client, ``limits.allow_approximate``).
     """
     values = clean_input(values)
-    if mode not in {"suggest", "check"}:
+    if mode not in MODES:
         raise ValueError("Invalid lookup mode.")
-    if values["country"] != "CH" or not values["street"]:
+    if mode == "locality":
+        asked = len(values["postal_code"]) == POSTAL_CODE_LENGTH or len(key(values["locality"])) >= TYPEAHEAD_MINIMUM
+    else:
+        asked = bool(values["street"])
+    if values["country"] != "CH" or not asked:
         return {
             "status": "not_checked", "data_date": None, "stale": False,
             "warning": "", "results": [], "match": None, "kind": "prefix",
@@ -150,13 +224,15 @@ def lookup(values, *, mode="suggest"):
     status, directory = directory_status()
     result = {
         "status": status["status"], "data_date": status["data_date"], "stale": status["stale"],
-        "warning": "", "results": [], "match": None, "kind": "prefix",
+        "warning": "", "results": [], "match": None, "kind": "locality" if mode == "locality" else "prefix",
     }
     if directory is None:
         return result
     try:
         query = Address.objects.filter(generation=directory.generation)
-        if mode == "check":
+        if mode == "locality":
+            result["results"] = locality_matches(query, values, home)
+        elif mode == "check":
             if len(values["postal_code"]) != 4 or not values["locality"]:
                 result["match"] = False
             else:
@@ -170,25 +246,30 @@ def lookup(values, *, mode="suggest"):
                     "This address was not found. Please check street, "
                     "house number, postal code and town. You can still save it as entered."
                 )
-        elif len(values["street"]) >= 2 and key(values["street"]):
-            prefix_query = query.filter(**prefix_range("street_key", key(values["street"])))
+        elif len(values["street"]) >= minimum and key(values["street"]):
+            street_query = query.filter(**prefix_range("street_key", key(values["street"])))
+            if values["house_number"]:
+                street_query = street_query.filter(
+                    **prefix_range("house_number_key", key(values["house_number"]))
+                )
+            prefix_query = street_query
             postal_code = values["postal_code"]
             if len(postal_code) == 4:
                 prefix_query = prefix_query.filter(postal_code=postal_code)
             elif postal_code:
                 prefix_query = prefix_query.filter(**prefix_range("postal_code", postal_code))
-            if values["house_number"]:
-                prefix_query = prefix_query.filter(**prefix_range("house_number_key", key(values["house_number"])))
             if values["locality"]:
                 prefix_query = prefix_query.filter(**prefix_range("locality_key", key(values["locality"])))
-            result["results"] = list(
-                prefix_query.order_by(*ANSWER_ORDER).values(*FIELDS).distinct()[:RESULT_LIMIT]
-            )
-            # Only a complete postal code bounds the candidates.
-            if not result["results"] and len(values["postal_code"]) == 4:
+            result["results"] = ranked_rows(prefix_query, home, order=ANSWER_ORDER, columns=FIELDS)
+            # Only a complete postal code bounds the candidates. The approximate search is the one expensive step: the
+            # caller decides (``approximate``: True, False or a function asked just before the search runs, so a budget
+            # is counted only for a search that happens).
+            if not result["results"] and len(values["postal_code"]) == 4 and (
+                APPROXIMATE_MIN_LENGTH <= len(values["street"]) <= APPROXIMATE_MAX_LENGTH
+            ) and (approximate() if callable(approximate) else approximate):
                 rows, kind = approximate_matches(query, values)
                 if rows:
-                    result["results"], result["kind"] = rows, kind
+                    result["results"], result["kind"] = sorted(rows, key=lambda row: not in_home(row, home)), kind
     except (DatabaseError, ConnectionDoesNotExist):
         logger.warning("Address directory lookup is unavailable.")
         result.update(status="unavailable", results=[], match=None, kind="prefix", warning="")

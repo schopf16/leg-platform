@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import assignments, history, metering_points
+from leg_platform.community import assignments, history, metering_points, numbers
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Direction,
@@ -35,6 +35,10 @@ from leg_platform.community.tests.helpers import (
 
 TODAY = timezone.localdate()
 
+
+def shown(last_digits):
+    """The number of the examples as every page shows it (D-109)."""
+    return numbers.format_metering_point_number(number(last_digits))
 
 def d(offset=0):
     return TODAY + timedelta(days=offset)
@@ -99,7 +103,7 @@ class MeteringPointPageTests(TestCase):
         page = self.login(self.staff).get(LIST)
         for text in (
             "Alle (6)", "Bei Netzbetreiber Beispiel anmelden (3)", "Bestätigung ausstehend (1)",
-            "Startdatum ausstehend (1)", "archiviert (0)", number(5), "aktiv", "registriert", "Probleme filtern (5)",
+            "Startdatum ausstehend (1)", "archiviert (0)", shown(5), "aktiv", "registriert", "Probleme filtern (5)",
             "Messpunkt anlegen",
         ):
             self.assertContains(page, text)
@@ -110,8 +114,10 @@ class MeteringPointPageTests(TestCase):
         self.assertNotContains(page, "BKW")
         # The warning triangle names the problem in text.
         self.assertContains(page, "Dieser Messpunkt ist keiner LEG zugeordnet.")
-        # The full number with the direction, never cut; the column widths have their handle.
-        self.assertContains(page, f'{number(5)[:13]}<wbr>{number(5)[13:]}')
+        # The full number on one line with the direction, never cut or wrapped: the grid operator's block, then blocks of
+        # four (D-109); the column widths have their handle.
+        self.assertContains(page, f'<span class="mp-number">{shown(5)}</span>')
+        self.assertNotContains(page, "<wbr>")
         self.assertContains(page, 'class="mgmt-grip"')
         self.assertContains(page, 'name="leg"')  # the filter by LEG
 
@@ -121,7 +127,7 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(page, f'href="{self.url("notify", self.registered)}?next=')
         self.assertContains(page, "Als angemeldet setzen")
         self.assertContains(page, "LEG fehlt")  # a metering point without a LEG has no button yet
-        self.assertNotContains(page, number(3)[13:] + "</span>")  # not in this view (point 3 is notified)
+        self.assertNotContains(page, shown(3))  # not in this view (point 3 is notified)
         self.assertNotContains(page, "registriert</span>")  # no status column here
         self.assertContains(client.get(LIST, {"step": "confirm"}), "Bestätigung erfassen")
         self.assertContains(client.get(LIST, {"step": "start"}), "Startdatum erfassen")
@@ -131,12 +137,12 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(client.get(LIST, {"step": "notify"}), "Probleme filtern (3)")
         self.assertNotContains(client.get(LIST, {"q": "000005"}), "Probleme filtern")  # point 5 has none
         page = client.get(LIST, {"problems": "1"})
-        self.assertNotContains(page, number(5)[13:])
+        self.assertNotContains(page, shown(5))
         self.assertContains(page, "Alle (5)")  # the counts follow the view
 
     def test_search_filters_and_sort_come_from_the_address_and_wrong_values_do_no_harm(self):
         client = self.login(self.staff)
-        self.assertNotContains(client.get(LIST, {"q": "hidden note"}), number(1)[13:])  # never the remark
+        self.assertNotContains(client.get(LIST, {"q": "hidden note"}), shown(1))  # never the remark
         # The address, the LEG name and the name of the person are searched (every staff account, D-086).
         self.assertContains(client.get(LIST, {"q": "musterweg"}), "Alle (5)")
         self.assertContains(client.get(LIST, {"q": "bahnhof"}), "Alle (3)")
@@ -163,14 +169,14 @@ class MeteringPointPageTests(TestCase):
             "Dieser Messpunkt ist keiner LEG zugeordnet.", "Dieser Messpunkt ist keiner Person zugeordnet.",
             "Als angemeldet setzen", "LEG zuweisen", "Person zuweisen",
             "Messpunkt löschen",  # without a history the one button is "delete"
-            "Erfasst, noch nicht bei Netzbetreiber Beispiel angemeldet.", "TRA21359", number(2),
+            "Erfasst, noch nicht bei Netzbetreiber Beispiel angemeldet.", "TRA21359", shown(2),
         ):
             self.assertIn(text, page)
         self.assertNotIn("BKW", page)
         # The remarks and the figures are shown.
-        shown = self.login(self.staff).get(self.detail(self.registered)).content.decode()
-        self.assertIn("hidden note", shown)
-        self.assertIn("5.50 kWp", shown)
+        registered_page = self.login(self.staff).get(self.detail(self.registered)).content.decode()
+        self.assertIn("hidden note", registered_page)
+        self.assertIn("5.50 kWp", registered_page)
 
     def test_the_states_show_their_step_and_the_start_date(self):
         client = self.login(self.staff)
@@ -231,8 +237,8 @@ class MeteringPointPageTests(TestCase):
         self.assertIn("Messpunkt wiederherstellen", page)
         for text in ("Als angemeldet setzen", "LEG zuweisen", "Person zuweisen", "Messpunkt archivieren"):
             self.assertNotIn(text, page)
-        self.assertContains(client.get(LIST, {"step": "archived"}), number(7)[13:])
-        self.assertNotContains(client.get(LIST), number(7)[13:])
+        self.assertContains(client.get(LIST, {"step": "archived"}), shown(7))
+        self.assertNotContains(client.get(LIST), shown(7))
         client.post(self.url("archive", point), {"archive": "0"})
         point.refresh_from_db()
         self.assertFalse(point.is_archived)
@@ -490,10 +496,10 @@ class MeteringPointPageTests(TestCase):
         switch = self.url("leg", self.active)
         page = client.get(switch)
         self.assertContains(page, "LEG wechseln")
-        self.assertContains(page, "Messpunkt " + number(5) + " (Bezug) bei Musterweg 12 wechselt von LEG Quartier zu:")
+        self.assertContains(page, "Messpunkt " + shown(5) + " (Bezug) bei Musterweg 12 wechselt von LEG Quartier zu:")
         self.assertContains(page, "Auch zusammengehörig: 1 weiterer Messpunkt")
-        self.assertContains(page, f"{number(8)} (Einspeisung, Musterweg 12, Anna Muster)")
-        self.assertNotContains(page, number(9))  # another location
+        self.assertContains(page, f"{shown(8)} (Einspeisung, Musterweg 12, Anna Muster)")
+        self.assertNotContains(page, shown(9))  # another location
         self.assertNotContains(page, " checked")  # none is preselected
         self.assertNotContains(page, 'value="%d"' % self.leg_b.pk)  # the LEG it has is not offered
 
@@ -587,14 +593,14 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(again, "Diese Messpunkt-Nummer gibt es schon.")
         self.assertEqual(MeteringPoint.objects.filter(number=prefix + "A" * 20).count(), 1)
         # A page shown again holds the normalised value.
-        shown = client.post(url, {**base, "number_digits": "5", "pv_power_kwp": "x"})
-        self.assertContains(shown, 'value="00000000000000000005"')
+        again = client.post(url, {**base, "number_digits": "5", "pv_power_kwp": "x"})
+        self.assertContains(again, 'value="00000000000000000005"')
         too_long = "Die Messpunktnummer ist ungültig: Sie ist zu lang."
         not_allowed = "Erlaubt sind nur die Buchstaben A–Z, die Ziffern 0–9 und der Bindestrich."
         before = MeteringPoint.objects.count()
         for typed, message in (
             ("", "Geben Sie die letzten Zeichen der Nummer ein."),
-            ("12!", not_allowed), ("1 2", not_allowed), ("٣", not_allowed), ("ß", not_allowed), ("a_b", not_allowed),
+            ("12!", not_allowed), ("1 !", not_allowed), ("٣", not_allowed), ("ß", not_allowed), ("a_b", not_allowed),
             ("1" * 21, too_long + " Es sind höchstens 20 Zeichen erlaubt"),
             ("0" + "1" * 21, "(eingegeben: 22)"),  # 22 characters with one leading zero
             ("1" + "0" * 20, too_long),  # a zero that is not at the start stays
@@ -653,7 +659,7 @@ class MeteringPointPageTests(TestCase):
         page = client.get(url)
         # The same form as "Create metering point": number and direction are facts, the LEG has its own dialog.
         self.assertContains(page, "Messpunkt bearbeiten")
-        self.assertContains(page, point.number)
+        self.assertContains(page, numbers.format_metering_point_number(point.number))  # the locked row shows it grouped
         self.assertNotContains(page, 'name="number_digits"')
         self.assertNotContains(page, 'name="direction"')
         self.assertContains(page, self.url("leg", point))
@@ -701,7 +707,7 @@ class MeteringPointPageTests(TestCase):
         self.assertEqual((ok["message"], ok["duplicate"]), ("", None))
         self.assertTrue(client.get(check, {"digits": "x!"}).json()["message"])
         duplicate = client.get(check, {"digits": "2"}).json()
-        self.assertEqual(duplicate["duplicate"]["number"], number(2))
+        self.assertEqual(duplicate["duplicate"]["number"], shown(2))
         self.assertEqual(duplicate["duplicate"]["url"], self.detail(self.no_leg_point))
 
     def test_deleting_is_a_question_and_only_possible_without_a_history(self):
@@ -709,7 +715,7 @@ class MeteringPointPageTests(TestCase):
         history.record(fresh, HistoryEvent.CREATED, self.staff)
         client = self.login(self.staff)
         question = client.get(self.url("delete", fresh))
-        self.assertContains(question, "Der Messpunkt " + number(11) + " wird endgültig gelöscht.")
+        self.assertContains(question, "Der Messpunkt " + shown(11) + " wird endgültig gelöscht.")
         self.assertRedirects(client.post(self.url("delete", fresh)), LIST, fetch_redirect_response=False)
         self.assertFalse(MeteringPoint.objects.filter(pk=fresh.pk).exists())
         # With a history: no question, and a forged post is refused with a message.

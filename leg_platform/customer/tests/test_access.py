@@ -181,7 +181,7 @@ class AccessTests(TestCase):
             ("customer:deregistration_start", []),
             ("customer:application_building", [application.pk]),
             ("customer:application_metering_points", [application.pk]),
-            ("customer:contract_download", []),
+            ("customer:contract_download", []), ("customer:contract_read", []),
         ):
             with self.subTest(name=name):
                 response = client.get(reverse(name, args=args))
@@ -204,7 +204,7 @@ class AccessTests(TestCase):
         for name in (
             "application", "application_building", "application_metering_points", "application_bank_connection",
             "application_contract", "application_start_date", "application_cancel", "application_submitted",
-            "application_withdraw",
+            "application_withdraw", "application_change",
         ):
             view_class = resolve(reverse(f"customer:{name}", args=[1])).func.view_class
             for method in ("get", "post"):

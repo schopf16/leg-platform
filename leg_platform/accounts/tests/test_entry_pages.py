@@ -250,6 +250,121 @@ class PasswordResetPagesTests(TestCase):
         self.assertContains(page, "Zur Anmeldung")
 
 
+def inputs_of(html):
+    """Every ``<input>`` tag of the page as a string."""
+    return re.findall(r"<input\b[^>]*>", html)
+
+
+def input_named(html, name):
+    found = [tag_text for tag_text in inputs_of(html) if f'name="{name}"' in tag_text]
+    assert len(found) == 1, f"expected one input named {name}, found {len(found)}"
+    return found[0]
+
+
+def assert_account_name_is_text_and_a_hidden_context(test, html, address):
+    """The fixed account name of a password page: plain text for the eye, a read-only hidden field for the password manager.
+
+    Chromium, "Create Amazing Password Forms" (a hidden field with the user name on a form that does not ask for
+    it) and "Password Form Styles that Chromium Understands" (``username``, ``new-password``); WHATWG HTML,
+    autofill field names.
+    """
+    # The text the person reads is no form control: nothing can fill, overwrite or edit it.
+    test.assertRegex(html, rf'<span class="plain-value" id="id_username_display">{re.escape(address)}</span>')
+    # The username context: one field, read-only, out of the tab order, hidden from assistive technology.
+    context = input_named(html, "username")
+    test.assertIn('type="text"', context)
+    test.assertIn('autocomplete="username"', context)
+    test.assertRegex(context, r"\breadonly\b")
+    test.assertIn('tabindex="-1"', context)
+    test.assertIn('aria-hidden="true"', context)
+    test.assertRegex(context, r'class="account-name-input\b')
+    test.assertIn(f'value="{address}"', context)
+    # No editable control carries the address.
+    for control in inputs_of(html):
+        if address in control:
+            test.assertRegex(control, r"\breadonly\b", control)
+    # A password manager must see a new password on both fields.
+    for name in [match for match in re.findall(r'name="(new_password[12]|password[12])"', html)]:
+        test.assertIn('autocomplete="new-password"', input_named(html, name))
+
+
+@tag("mariadb")
+class AccountNameOnPasswordPagesTests(TestCase):
+    """The fixed account name beside the new password (reset link, registration step 2).
+
+    Regression (stage walkthrough): the name was a visible input, and a browser password manager
+    overwrote it with another saved account. It is plain text now; the field for the manager is
+    hidden and read-only, and the server never reads the posted name.
+    """
+
+    def test_the_new_password_page_shows_the_name_as_text_and_keeps_a_hidden_username_for_the_manager(self):
+        user = create_active_user("known.person@example.org")
+        request_reset(user.email)
+        self.client.get(reset_path(mail.outbox[0]))
+
+        html = self.client.get(reverse("accounts:password_reset_set")).content.decode()
+
+        assert_account_name_is_text_and_a_hidden_context(self, html, "known.person@example.org")
+        self.assertIn("E-Mail-Adresse (Benutzername)", html)
+
+    def test_a_posted_name_changes_neither_the_account_nor_the_page_of_the_reset(self):
+        user = create_active_user("known.person@example.org")
+        other = create_active_user("other.person@example.org")
+        other_hash = other.password
+        request_reset(user.email)
+        self.client.get(reset_path(mail.outbox[0]))
+        url = reverse("accounts:password_reset_set")
+
+        # An invalid entry shows the page again: with the name of the link, never the posted one.
+        page = self.client.post(
+            url,
+            {"username": other.email, "new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD + "x"},
+        )
+        html = page.content.decode()
+        self.assertEqual(page.status_code, 200)
+        assert_account_name_is_text_and_a_hidden_context(self, html, "known.person@example.org")
+        self.assertNotIn("other.person@example.org", html)
+
+        # A valid entry changes the account of the link only, whatever name the request carries.
+        response = self.client.post(
+            url, {"username": other.email, "new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD}
+        )
+        self.assertRedirects(response, reverse("accounts:login"))
+        user.refresh_from_db()
+        other.refresh_from_db()
+        self.assertTrue(user.check_password(NEW_PASSWORD))
+        self.assertEqual(other.password, other_hash)
+        self.assertFalse(other.check_password(NEW_PASSWORD))
+
+    def test_the_password_step_of_the_registration_has_the_same_pattern_and_ignores_a_posted_name(self):
+        register(self.client)
+        self.client.get(verification_path(mail.outbox[0]))
+        user = User.objects.get()
+        url = reverse("accounts:registration_password")
+        page = self.client.get(url)
+        html = page.content.decode()
+        assert_account_name_is_text_and_a_hidden_context(self, html, "new.person@example.org")
+        reference = re.search(r'name="registration" value="(\d+)"', html).group(1)
+
+        page = self.client.post(
+            url,
+            {
+                "registration": reference,
+                "username": "attacker@example.org",
+                "password1": "a long unusual passphrase here",
+                "password2": "another one entirely different",
+            },
+        )
+
+        html = page.content.decode()
+        self.assertEqual(page.status_code, 200)
+        assert_account_name_is_text_and_a_hidden_context(self, html, "new.person@example.org")
+        self.assertNotIn("attacker@example.org", html)
+        user.refresh_from_db()
+        self.assertEqual(user.email, "new.person@example.org")
+        self.assertFalse(User.objects.filter(email="attacker@example.org").exists())
+
+
 @tag("mariadb")
 class SecondStepOfTheLoginTests(TestCase):
     def test_the_page_has_the_texts_of_the_package(self):

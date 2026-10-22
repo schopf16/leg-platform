@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.community import leg_list, location_list, person_list, persons
+from leg_platform.community import leg_list, location_list, numbers, person_list, persons
 from leg_platform.community.models import REMARK_MAX_LENGTH, Direction, ManagementSettings, PersonRecord
 from leg_platform.community.tests.helpers import (
     assign_leg,
@@ -269,7 +269,9 @@ class ReviewRoundTests(TestCase):
         point_url = reverse("management:metering_points_detail", args=[self.point.pk])
         detail = client.get(reverse("management:locations_detail", args=[self.place.pk])).content.decode()
         self.assertEqual(detail.count(f'href="{point_url}"'), 2)  # the link column and the card of a phone
-        self.assertIn(f'aria-label="Zur Detailseite des Messpunkts: {self.point.number}"', detail)
+        self.assertIn(
+            f'aria-label="Zur Detailseite des Messpunkts: {numbers.format_metering_point_number(self.point.number)}"', detail
+        )
         self.assertIn('class="mgmt-grip"', detail)
         leg = client.get(reverse("management:legs_detail", args=[self.leg.pk])).content.decode()
         self.assertEqual(leg.count(f'href="{point_url}"'), 2)

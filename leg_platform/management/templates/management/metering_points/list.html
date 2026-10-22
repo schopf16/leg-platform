@@ -1,5 +1,5 @@
 {% extends "management/page.html" %}
-{% load i18n static management_ui %}{% comment %}
+{% load i18n static management_ui metering_points %}{% comment %}
 The list of metering points (LEG-Design-Vorgaben/verwaltung/messpunkte/referenz/messpunkte-liste-desktop and
 handy/referenz/messpunkte-liste-handy; D-079). On a desktop a table, on a phone one card per metering point.
 The quick filters are links; with a quick filter that has a step the last column shows the next step (a
@@ -42,7 +42,7 @@ the form on change.
             <tr>
               <td>
                 <div class="mgmt-nr-row">
-                  {% if point.number %}<a class="mgmt-row-link mgmt-nr" href="{{ entry.detail_url }}">{{ point.number|slice:":13" }}<wbr>{{ point.number|slice:"13:" }}</a>{% else %}<a class="mgmt-row-link mgmt-muted" href="{{ entry.detail_url }}">–</a>{% endif %}
+                  {% if point.number %}<a class="mgmt-row-link mgmt-nr" href="{{ entry.detail_url }}">{{ point.number|metering_point }}</a>{% else %}<a class="mgmt-row-link mgmt-muted" href="{{ entry.detail_url }}">–</a>{% endif %}
                   {% include "management/_direction.html" with direction=point.direction %}
                   {% if entry.problem_text %}{% include "management/_warning.html" with text=entry.problem_text %}{% endif %}
                 </div>
@@ -73,7 +73,7 @@ the form on change.
         {% with point=entry.point %}
         <article class="mgmt-place">
           <div class="mgmt-mp-nr mgmt-point-nr">
-            <a class="mgmt-row-link" href="{{ entry.detail_url }}">{% if point.number %}{{ point.number }}{% else %}–{% endif %}</a>
+            <a class="mgmt-row-link" href="{{ entry.detail_url }}">{% if point.number %}{{ point.number|metering_point }}{% else %}–{% endif %}</a>
             {% include "management/_direction.html" with direction=point.direction %}
             {% if entry.problem_text %}{% include "management/_warning.html" with text=entry.problem_text %}{% endif %}
             {% translate "Go to the details of the metering point" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label %}

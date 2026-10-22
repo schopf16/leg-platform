@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static management_ui %}{% comment %}
+{% load i18n static management_ui metering_points %}{% comment %}
 The page of one deregistration (owner design ``vorgaenge/referenz/vorgang-abmeldung-desktop``, ``VORGABEN.md`` section 10,
 ``ABMELDUNG.md``; D-103): three steps (submitted, date confirmed by the LEG, deregistered at the grid operator), the metering points,
 the dates and the one button of the staff: "Confirm the date" (records the termination at every point), in the card "Next step" like
@@ -54,29 +54,21 @@ step is done by the system on the confirmed date (the scheduled tasks mark it ef
         <p class="mgmt-note">{% blocktranslate %}The LEG deregisters the metering points at the {{ operator }}. The portal marks the deregistration effective by itself on the confirmed date.{% endblocktranslate %}</p>
       </section>
 
-      <section class="mgmt-card mgmt-card-flush" aria-labelledby="points-title">
-        <div class="mgmt-card-head mgmt-card-pad"><h2 id="points-title">{% translate "Metering points" %}</h2></div>
-        <div class="mgmt-table-view">
-          <table class="mgmt-table">
-            <thead><tr><th>{% translate "Number" %}</th><th>{% translate "Direction" %}</th><th>{% translate "Building" %}</th><th>{% translate "Terminated to" %}</th><th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th></tr></thead>
-            <tbody>
-              {% for point in points %}
-                <tr>
-                  <td class="tnum">{{ point.number }}</td>
-                  <td>{{ point.direction }}</td>
-                  <td>{{ point.address }}{% if point.egid %}<div class="mgmt-person-contact tnum">{% blocktranslate with egid=point.egid %}EGID {{ egid }}{% endblocktranslate %}</div>{% endif %}</td>
-                  <td class="tnum">{% if point.terminated_on %}{% blocktranslate with date=point.terminated_on %}Terminated to {{ date }}{% endblocktranslate %}{% else %}{% include "management/_open.html" %}{% endif %}</td>
-                  <td class="mgmt-link-col">{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=point.url label=goto_label subject=point.number %}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <dl class="mgmt-facts mgmt-cards-view mgmt-card-pad">
-          {% for point in points %}
-            <div class="mgmt-fact"><dt>{{ point.direction }}</dt><dd class="tnum">{{ point.number }}<br>{{ point.address }}{% if point.egid %}<br>{% blocktranslate with egid=point.egid %}EGID {{ egid }}{% endblocktranslate %}{% endif %}<br>{% if point.terminated_on %}{% blocktranslate with date=point.terminated_on %}Terminated to {{ date }}{% endblocktranslate %}{% else %}{% include "management/_open.html" %}{% endif %}{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=point.url label=goto_label subject=point.number %}</dd></div>
-          {% endfor %}
-        </dl>
+      <section class="mgmt-card" aria-labelledby="points-title">
+        <h2 id="points-title">{% translate "Metering points" %}</h2>
+        {% for point in points %}
+          <div class="mgmt-point-block">
+            <div class="mgmt-point-head">
+              <span class="mgmt-point-id">{{ point.number|metering_point }}</span>
+              {% include "management/_direction.html" with direction=point.direction_value %}
+              <span class="mgmt-point-tools">{% translate "Go to the metering point" as goto_label %}{% include "management/_goto.html" with url=point.url label=goto_label subject=point.number|metering_point_text %}</span>
+            </div>
+            <dl class="mgmt-facts mgmt-point-facts">
+              <div class="mgmt-fact"><dt>{% translate "Building" %}</dt><dd>{{ point.address }}{% if point.egid %}<br><span class="mgmt-muted tnum">{% blocktranslate with egid=point.egid %}EGID {{ egid }}{% endblocktranslate %}</span>{% endif %}</dd></div>
+              <div class="mgmt-fact"><dt>{% translate "Terminated to" %}</dt><dd class="tnum">{% if point.terminated_on %}{{ point.terminated_on }}{% else %}{% include "management/_open.html" %}{% endif %}</dd></div>
+            </dl>
+          </div>
+        {% endfor %}
       </section>
     </div>
 

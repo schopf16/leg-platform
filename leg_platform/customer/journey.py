@@ -41,6 +41,7 @@ READY = (
     "customer:application_start_date",
 )
 IN_REVIEW = _("The LEG is checking your details. You do not need to do anything.")
+SUBMITTED = _("Your application is submitted. You can still change it until the LEG starts checking it.")
 RETURNED = (
     _("Please correct what the LEG described. Then submit the application again."), _("Check your details"),
 )
@@ -116,6 +117,7 @@ def for_account(person):
         for _key, state, label, word in steps_module.post_submit_steps(application, grid_operator.name())
     ]
     sentence = {
+        Application.State.SUBMITTED: SUBMITTED,
         Application.State.OPERATOR_STARTED: AT_OPERATOR,
         Application.State.OPERATOR_CONFIRMED: CONFIRMED,
     }.get(application.state, IN_REVIEW)

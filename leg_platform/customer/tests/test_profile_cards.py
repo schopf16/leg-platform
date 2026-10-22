@@ -309,9 +309,9 @@ class EmailAndTwoFactorCardTests(TestCase):
         self.assertIn("Anfrage abbrechen", email)
         self.assertIn("Bis dahin gilt weiter mine.cards@example.org.", email)
 
-    def test_the_two_factor_card_says_active_or_not_set_up_and_a_customer_can_turn_it_off(self):
+    def test_the_two_factor_card_says_active_and_a_customer_can_turn_it_off(self):
         user = customer("tf.cards@example.org")
-        self.assertIn("Nicht eingerichtet", card(self.get(user), "two-factor"))
+        self.assertIn("Sie melden sich nur mit Ihrem Passwort an.", card(self.get(user), "two-factor"))
         AuthenticatorDevice.objects.create_device(user, confirmed=True)
         html = card(self.get(user), "two-factor")
         self.assertIn("Aktiv", html)

@@ -81,6 +81,12 @@ class Address(models.Model):
                 fields=["generation", "street_key", "street", "house_number", "postal_code", "locality"],
                 name="addr_generation_street",
             ),
+            # Towns and their postal codes (D-111): prefix range on the town key, covering, in answer order. The
+            # postal code comes last, so that the check of a complete address still prefers the index of the postal code.
+            models.Index(
+                fields=["generation", "locality_key", "locality", "postal_code"],
+                name="addr_generation_locality",
+            ),
         ]
 
     def fill_keys(self):

@@ -4,7 +4,7 @@ The list "Processes" (LEG-Design-Vorgaben/verwaltung/vorgaenge/referenz/vorgaeng
 applications and deregistrations in one table, the kind in a column and in a filter. On a desktop a table, on a phone one card
 per process. The name is plain text (the link icon at the right opens the page of the process); the status is a dot and a
 word; missing values are the grey word "open", never a dash; the progress is a native progress element with its words.
-Drafts are never listed (KONZEPT 5.6). No warning triangle and no button "Filter problems": no problems of processes are
+Drafts are listed and marked "Draft / not submitted" (D-107). No warning triangle and no button "Filter problems": no problems of processes are
 defined (LISTEN-STANDARD, section 12). The button "Notices" appears only while the staff has open notices. The page works
 without a script: the filters are a GET form.
 {% endcomment %}
@@ -76,6 +76,7 @@ without a script: the filters are a GET form.
     </div>
   </div>
 
+  {% if truncated_text %}<p class="mgmt-hint" role="status">{{ truncated_text }}</p>{% endif %}
   {% include "management/_list_foot.html" %}
 {% endblock %}
 {% block scripts %}

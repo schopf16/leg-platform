@@ -813,8 +813,44 @@ class ApplicationSubmittedView(CustomerAccessMixin, View):
             "application": application, "steps": steps, "done": sum(s["state"] == "done" for s in steps),
             "total": len(steps), "building": building, "points": points,
             "withdrawable": application.state in Application.WITHDRAWABLE_STATES,
+            "changeable": application.state == Application.State.SUBMITTED,
             "days": ManagementSettings.load().operator_confirmation_days, "operator": operator_name(),
         })
+
+
+class ApplicationChangeView(CustomerAccessMixin, View):
+    """"Change application" (D-107): a submitted application that the LEG has not taken into review yet becomes a draft
+    again; the customer changes it and submits it again. A confirmation page first; once the LEG started checking, the
+    page says why the application can no longer be changed here."""
+
+    def get(self, request, pk):
+        application = applications.own_application(request.user, pk)
+        if application.state != Application.State.SUBMITTED:
+            messages.error(request, self.refusal_text(application))
+            return redirect("customer:buildings")
+        return render(request, "customer/application_change.html", {"application": application})
+
+    def post(self, request, pk):
+        if not limits.allow_wizard(request.user):
+            return too_many_requests(request)
+        application = applications.own_application(request.user, pk)
+        try:
+            applications.reopen_for_change(request.user, application)
+        except ApplicationError as error:
+            if error.code in ("not_found", "not_allowed"):
+                raise Http404 from None
+            messages.error(request, texts.message("wrong_state" if error.code == "not_editable" else error.code))
+            return redirect("customer:buildings")
+        messages.success(
+            request, _("Your application is open for changes. Change what you need, then submit it again.")
+        )
+        return redirect("customer:application_start")
+
+    @staticmethod
+    def refusal_text(application):
+        if application.state == Application.State.IN_REVIEW:
+            return texts.message("review_started")
+        return texts.message("wrong_state")
 
 
 class ApplicationWithdrawView(CustomerAccessMixin, View):

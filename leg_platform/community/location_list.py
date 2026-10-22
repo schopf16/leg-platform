@@ -11,6 +11,7 @@ from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Q, 
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone
 
+from leg_platform.community import numbers
 from leg_platform.community.models import LegAssignment, Location, MeteringPoint, PersonAssignment
 
 OCCUPANCY_ALL = "all"
@@ -73,6 +74,10 @@ def apply_search(queryset, text, *, include_assignments=True, today=None):
     """Every word must match the address parts, the circuit (number, name), a metering point number and,
     with ``include_assignments``, a LEG name or a person name. Identifiers are compared in capitals."""
     today = today or timezone.localdate()
+    pasted = numbers.pasted_number(text)
+    if pasted is not None and MeteringPoint.objects.filter(number__contains=pasted).exists():
+        # A number copied from a page (its blocks stand apart, D-109): the locations that have it.
+        return queryset.filter(Exists(MeteringPoint.objects.filter(location=OuterRef("pk"), number__contains=pasted)))
     for word in (text or "").split():
         upper = word.upper()
         condition = (

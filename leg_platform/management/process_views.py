@@ -1,11 +1,11 @@
-"""The pages of the processes (owner design ``verwaltung/vorgaenge``; D-103): the list of the running applications and
+"""The pages of the processes (owner design ``verwaltung/vorgaenge``; D-103, D-107): the list of the applications and
 deregistrations, the page of one application, the page of one deregistration and the notices for the staff.
 
 Every view uses ``management.access`` (every active staff account, D-086). The rules live in ``community``
 (``process_list``, ``applications.progress``, ``application_staff``, ``deregistrations``, ``application_notices``); a page
-only reads and shows. Drafts and paused drafts are never shown (KONZEPT 5.6): their pages are 404. The page of an
-application shows what the customer entered; it never shows the IBAN (only whether one is on file, D-087) and no
-proof of a confirmation.
+only reads and shows. Drafts and paused drafts are listed and have a read-only page marked "Draft / not submitted" (D-107,
+which replaces KONZEPT 5.6 and the 404 of D-104); no staff step applies to them. The page of an application shows what the
+customer entered; it never shows the IBAN (only whether one is on file, D-087) and no proof of a confirmation.
 """
 
 from django.contrib import messages
@@ -25,7 +25,6 @@ from leg_platform.community import (
     grid_operator,
     history,
     labels,
-    numbers,
     own_iban,
     process_list,
 )
@@ -43,10 +42,13 @@ from leg_platform.management.location_views import event_label
 from leg_platform.management.metering_point_views import format_date
 from leg_platform.management.returns import return_url, with_next
 
-# The applications the staff can open: submitted and later (never a draft).
-VISIBLE_APPLICATION_STATES = (*Application.IN_FLIGHT_STATES, Application.State.COMPLETED)
+# The applications the staff can open: the drafts too (D-107; read-only, marked as not submitted), the running ones and
+# the completed ones. The dialogs and services of the staff act only on the states they name.
+VISIBLE_APPLICATION_STATES = (*Application.OPEN_STATES, Application.State.COMPLETED)
 
 STATE_TONES = {
+    Application.State.DRAFT: "muted",
+    Application.State.PAUSED: "muted",
     Application.State.SUBMITTED: "warn",
     Application.State.IN_REVIEW: "accent",
     Application.State.OPERATOR_STARTED: "accent",
@@ -64,6 +66,11 @@ def state_label(state):
         return Deregistration.State.SUBMITTED.label
     if state == process_list.STATE_DEREGISTRATION_CONFIRMED:
         return Deregistration.State.CONFIRMED.label
+    # The staff's words for a draft say what matters to them: nothing was submitted yet (D-107).
+    if state == Application.State.DRAFT:
+        return _("Draft / not submitted")
+    if state == Application.State.PAUSED:
+        return _("Paused / not submitted")
     return labels.application_state_label(state)
 
 
@@ -127,13 +134,18 @@ def list_columns():
         lists.Column(
             "state", gettext_lazy("Status"), width=116,
             info=_(
-                "Submitted: waiting for the review. In review: the LEG checks it. Then the registration at the grid "
-                "operator. In deregistration: the notice was given and the LEG confirms the date."
+                "Draft / not submitted: the customer has started the application and not sent it yet; you can read "
+                "it, not change it. Submitted: waiting for the review. In review: the LEG checks it. Then the "
+                "registration at the grid operator. In deregistration: the notice was given and the LEG confirms "
+                "the date."
             ),
         ),
         lists.Column(
             "progress", gettext_lazy("Progress"), width=124,
-            info=_("Applications: the five steps from the submission to the completion. Deregistrations: three steps."),
+            info=_(
+                "Applications: the five steps from the submission to the completion; a draft shows the steps the "
+                "customer has completed in the form. Deregistrations: three steps."
+            ),
         ),
         lists.Column(
             "date", gettext_lazy("Date"), width=104,
@@ -158,6 +170,7 @@ def kind_options():
 def state_options():
     return [
         (process_list.STATE_ALL, _("All")),
+        (process_list.STATE_DRAFT, _("Draft / not submitted")),
         (Application.State.SUBMITTED.value, Application.State.SUBMITTED.label),
         (Application.State.IN_REVIEW.value, Application.State.IN_REVIEW.label),
         (process_list.STATE_AT_OPERATOR, _("At the %(operator)s") % {"operator": grid_operator.name()}),
@@ -180,7 +193,9 @@ def build_list(params):
         text=state.query, kind=state.values["kind"], state=state.values["state"], sort=state.sort,
         descending=state.descending,
     )
-    return state, columns, lists.ListRows(found)
+    listed = lists.ListRows(found)
+    listed.truncated = found.truncated
+    return state, columns, listed
 
 
 def list_entry(row):
@@ -229,13 +244,17 @@ class ProcessListView(ManagementAccessMixin, View):
         )
         context.update(
             page_title=_("Processes"),
-            page_subtitle=_("Running applications and deregistrations of the customers."),
+            page_subtitle=_("Applications, also drafts that are not submitted yet, and deregistrations of the customers."),
             entries=entries,
             kind_options=kind_options(),
             state_options=state_options(),
             notice_count=notice_count,
             notices_url=reverse("management:processes_notices"),
             empty_text=_("No running processes."),
+            truncated_text=_(
+                "More than %(max)d applications or deregistrations match. Only the most recently changed ones are "
+                "listed, submitted applications before drafts. Narrow the list with the search or the filters."
+            ) % {"max": process_list.MAX_ROWS} if found.truncated else "",
         )
         return render(request, "management/processes/list.html", context)
 
@@ -290,7 +309,35 @@ def way_steps(application):
     return steps
 
 
-def building_rows(application):
+def draft_steps(application):
+    """The steps of the form of a draft (building, metering points, bank connection if a feed-in is entered, contract,
+    start date) with their state: what the customer has completed so far (D-107). The staff only reads it."""
+    names = {
+        applications.BUILDING: _("Building"),
+        applications.METERING_POINTS: _("Metering points"),
+        applications.BANK_CONNECTION: _("Bank connection"),
+        applications.CONTRACT: _("Contract"),
+        applications.START: _("Start date"),
+    }
+    current = applications.progress(application)
+    words = step_words()
+    steps = []
+    for step in current.steps:
+        if not step.applicable:
+            continue
+        state = applications.DONE if step.state != applications.OPEN else (
+            "next" if step.key == current.next_step else applications.OPEN
+        )
+        steps.append({"label": names[step.key], "state_label": words[state], "tone": STEP_TONES[state], "note": ""})
+    return steps, current.done, current.total
+
+
+def building_rows(application, request=None):
+    """The buildings of an application with their metering points for the page. With a ``request`` and an application
+    that the staff may correct (D-109) every row has the address of its edit dialog (a new building; a stored building has
+    its address on the page of the location) and every point the address of its own, both with the current page as
+    ``next``."""
+    correctable = request is not None and application.state in Application.CORRECTABLE_STATES
     rows = []
     for building in application.buildings.select_related("location").prefetch_related("metering_points"):
         address = building.current_address()
@@ -298,12 +345,20 @@ def building_rows(application):
         for point in building.metering_points.all():
             points.append(
                 {
-                    "number": numbers.format_metering_point_number(point.number),
+                    "number": point.number,
                     "direction": Direction(point.direction).label,
+                    "direction_value": point.direction,
                     "name": point.name,
                     "pv": point.pv_power_kwp, "battery": point.battery_kwh, "wallbox": point.wallbox_kw,
+                    # Plant details are asked for a feed-in; a figure on another point is shown as well.
+                    "has_plant": point.direction == Direction.FEED_IN or any(
+                        value is not None for value in (point.pv_power_kwp, point.battery_kwh, point.wallbox_kw)
+                    ),
                     "url": reverse("management:metering_points_detail", args=[point.metering_point_id])
                     if point.metering_point_id else "",
+                    "edit_url": with_next(
+                        reverse("management:processes_application_point", args=[application.pk, point.pk]), request
+                    ) if correctable else "",
                 }
             )
         egid = building.egid or (building.location.egid if building.location_id else None)
@@ -316,6 +371,9 @@ def building_rows(application):
                 "existing": building.location_id is not None,
                 "url": reverse("management:locations_detail", args=[building.location_id])
                 if building.location_id else "",
+                "edit_url": with_next(
+                    reverse("management:processes_application_building", args=[application.pk, building.pk]), request
+                ) if correctable and building.location_id is None else "",
                 "points": points,
             }
         )
@@ -338,7 +396,7 @@ def notice_rows(queryset, request):
                 "egid": notice.egid,
                 "numbers": [
                     {
-                        "text": numbers.format_metering_point_number(number),
+                        "number": number,
                         "url": reverse("management:metering_points_detail", args=[known[number]])
                         if number in known else "",
                     }
@@ -363,13 +421,21 @@ class ApplicationDetailView(ManagementAccessMixin, View):
         progress = applications.progress(application)
         has_feed_in = progress.step(applications.BANK_CONNECTION).applicable
         acceptance = contracts.latest_acceptance(person)
-        buildings = building_rows(application)
+        buildings = building_rows(application, request)
         next_url = lambda name: with_next(reverse(name, args=[application.pk]), request)  # noqa: E731
         in_flight = state in Application.IN_FLIGHT_STATES
+        is_draft = state in Application.DRAFT_STATES
+        if is_draft:
+            way, done, total = draft_steps(application)
+        else:
+            way = way_steps(application)
+            done = sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE)
+            total = len(applications.STEPS)
         card = person_card(person)
         context = {
             "page_title": card["name"],
             "application": application,
+            "is_draft": is_draft,
             "person": card,
             "state_label": state_label(state),
             "state_tone": state_tone(state),
@@ -377,10 +443,11 @@ class ApplicationDetailView(ManagementAccessMixin, View):
                 "number": card["number"],
                 "date": format_date(application.updated_at.astimezone(timezone.get_current_timezone())),
             },
-            "way": way_steps(application),
-            "done": sum(1 for _key, step in applications.post_submit_progress(application) if step == applications.DONE),
-            "total": len(applications.STEPS),
+            "way": way,
+            "done": done,
+            "total": total,
             "buildings": buildings,
+            "has_points": any(building["points"] for building in buildings),
             "has_feed_in": has_feed_in,
             "step_numbers": self.step_numbers(has_feed_in),
             "iban_on_file": own_iban.has_iban(person) if has_feed_in else None,
@@ -395,6 +462,7 @@ class ApplicationDetailView(ManagementAccessMixin, View):
             "empty_points": _("No metering points."),
             "can_review": state == Application.State.SUBMITTED,
             "can_return": state in Application.WITHDRAWABLE_STATES,
+            "can_correct": state in Application.CORRECTABLE_STATES,
             "can_start_operator": state in Application.WITHDRAWABLE_STATES,
             "can_confirm": state == Application.State.OPERATOR_STARTED,
             "can_complete": state == Application.State.OPERATOR_CONFIRMED,
@@ -448,8 +516,9 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
             location = point.location
             points.append(
                 {
-                    "number": numbers.format_metering_point_number(point.number),
+                    "number": point.number,
                     "direction": Direction(point.direction).label,
+                    "direction_value": point.direction,
                     "address": f"{location.street} {location.house_number}, {location.postal_code} {location.town}"
                     if location is not None else "",
                     "egid": location.egid if location is not None else None,

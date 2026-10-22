@@ -63,6 +63,8 @@ class Block:
     deregistration: object = None
     resume: bool = False  # a draft: "Continue the registration"
     withdrawable: bool = False  # submitted and not yet at the grid operator
+    changeable: bool = False  # submitted and not yet taken into review: the customer may change it (D-107)
+    in_review: bool = False  # the LEG is checking it: no change any more (the card says why)
     paused: bool = False
     paused_date: date | None = None  # the day the scheduler deletes a paused draft
     reason: str = ""  # why the LEG returned the draft for correction
@@ -119,6 +121,8 @@ class Card:
     removal: str | None = None  # "link": a point can be deregistered; "withdraw": a submitted registration can be withdrawn
     # (``withdraw_pk``); "blocked": not possible yet
     withdraw_pk: int | None = None
+    change_pk: int | None = None  # a submitted application the LEG has not taken into review yet: "Change application"
+    review_locked: bool = False  # the LEG is checking it: the card says that it can no longer be changed here
     deregistrable: bool = False  # an active point that is in no deregistration
 
     @property
@@ -172,6 +176,8 @@ def _registration_block(application, operator):
     return Block(
         "registration", steps, sum(step.state == STEP_DONE for step in steps), len(steps), application=application,
         withdrawable=application.state in Application.WITHDRAWABLE_STATES,
+        changeable=application.state == Application.State.SUBMITTED,
+        in_review=application.state == Application.State.IN_REVIEW,
     )
 
 
@@ -273,6 +279,14 @@ def build(person, today=None):
         block = _registration_block(application, operator_text)
         state, tone, label = _application_state(application)
         started = timezone.localtime(application.submitted_at or application.created_at).date()
+        if not application.buildings.all():
+            # A draft whose building is not entered yet is still the account's registration: it gets a card of its own
+            # (progress, notes, "Continue"), never the empty state "No building registered yet" (walkthrough 3).
+            card = card_for(("draft", application.pk), None)
+            card.application_states.append(state)
+            card.application_labels.append(label)
+            card.extra_blocks.append(block)
+            continue
         for building in application.buildings.all():
             key = ("location", building.location_id) if building.location_id else ("application", building.pk)
             card = card_for(key, building.location)
@@ -320,7 +334,10 @@ def _finish(card, person, own_words, today):
     else:
         address = None
     if address is None:
-        card.title, card.address = _("Metering points without a building"), ""
+        if card.key[0] == "draft":
+            card.title, card.address = _("Building not entered yet"), ""
+        else:
+            card.title, card.address = _("Metering points without a building"), ""
     else:
         card.title, card.address = _lines(address, name)
     card.has_name = bool(name)
@@ -336,7 +353,11 @@ def _finish(card, person, own_words, today):
         card.state, card.tone, card.label = "registering", WARN, _("Registration running")
     elif DRAFT in states or DRAFT in card.application_states:
         draft_labels = [label for state, label in zip(card.application_states, card.application_labels) if state == DRAFT]
-        card.state, card.tone, card.label = "draft", MUTED, (draft_labels[0] if draft_labels else _("Draft"))
+        # A draft is a building that is not completely recorded yet: the card says so (walkthrough 3); a paused one
+        # keeps its own word.
+        card.state, card.tone, card.label = "draft", MUTED, (
+            draft_labels[0] if draft_labels and draft_labels[0] != _("Draft") else _("Draft, not completely recorded")
+        )
     elif card.application_states:
         card.state, card.tone, card.label = "registering", WARN, _("Registration running")
     else:
@@ -355,6 +376,10 @@ def _finish(card, person, own_words, today):
     # the LEG has not yet passed to the grid operator is withdrawn (no notice period, no proof: ABMELDUNG.md section 7).
     # After the start of the registration at the grid operator nothing can be withdrawn until the point is active.
     withdrawable = next((row.block.application for row in card.rows if row.block and row.block.withdrawable), None)
+    blocks = [row.block for row in card.rows if row.block]
+    changeable = next((block.application for block in blocks if block.changeable), None)
+    card.change_pk = changeable.pk if changeable is not None else None
+    card.review_locked = changeable is None and any(block.in_review for block in blocks)
     if ACTIVE in states:
         card.removal = "link"
     elif withdrawable is not None:

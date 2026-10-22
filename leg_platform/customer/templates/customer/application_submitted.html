@@ -1,5 +1,5 @@
 {% extends "customer/base.html" %}
-{% load i18n %}
+{% load i18n metering_points %}
 {% block title %}{% translate "Your application was submitted" %}{% endblock %}
 {% block content %}
   <div class="wizard">
@@ -29,14 +29,15 @@
             <div><dt>{% translate "Building" %}</dt><dd>{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}{% if building.egid %}<span class="mp-note">{% translate "EGID" %} {{ building.egid }}</span>{% endif %}</dd></div>
           {% endwith %}
         {% endif %}
-        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number }}</span><span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
+        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number|metering_point }}</span><span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
         <div><dt>{% if application.start_choice == "date" %}{% translate "Your desired date" %}{% else %}{% translate "Start date" %}{% endif %}</dt><dd>{% if application.start_choice == "date" %}{{ application.desired_start_date|date:"d.m.Y" }}{% else %}{% translate "As soon as possible" %}{% endif %}</dd></div>
       </dl>
-      <p class="muted">{% translate "Changes are now only possible through the LEG." %}</p>
+      <p class="muted">{% if changeable %}{% translate "You can still change your details until the LEG starts checking them." %}{% else %}{% translate "Changes are now only possible through the LEG." %}{% endif %}</p>
     </section>
 
     <div class="step-actions">
       <a class="btn btn-primary" href="{% url 'home' %}">{% translate "To the start page" %}</a>
+      {% if changeable %}<a class="btn btn-secondary-action" href="{% url 'customer:application_change' application.pk %}">{% translate "Change application" %}</a>{% endif %}
       {% if withdrawable %}<a class="btn btn-danger-outline" href="{% url 'customer:application_withdraw' application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
     </div>
     {% if withdrawable %}<p class="muted">{% translate "You can withdraw the application as long as the LEG has not yet submitted it to the grid operator." %}</p>{% endif %}

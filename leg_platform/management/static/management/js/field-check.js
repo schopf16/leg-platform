@@ -113,12 +113,13 @@
   };
 
   // ---- The typed last characters of a metering point number (D-102) ----
-  // The same rule as the server (``numbers.normalise_entered_number``): letters A-Z (small ones become capitals), digits
-  // and the hyphen; shorter than the limit: zeros on the left; longer: only leading zeros are left out, and only as
-  // many as needed; if that is not enough the number is invalid. Nothing else is ever removed.
+  // The same rule as the server (``numbers.normalise_entered_number``): white space is ignored (a number copied from a
+  // page has no-break spaces between its blocks), letters A-Z (small ones become capitals), digits and the hyphen;
+  // shorter than the limit: zeros on the left; longer: only leading zeros are left out, and only as many as needed; if
+  // that is not enough the number is invalid. Nothing else is ever removed.
   const enteredNumber = (input) => {
     const limit = Number(input.dataset.limit);
-    const value = input.value.trim();
+    const value = input.value.replace(/\s+/g, "");
     if (!/^[A-Za-z0-9-]+$/.test(value)) {
       return { problem: input.dataset.messageDigits };
     }
@@ -135,7 +136,7 @@
   };
 
   const digitsProblem = (input, leaving) => {
-    const value = input.value.trim();
+    const value = input.value.replace(/\s+/g, "");
     if (value === "") {
       return leaving && input.required ? input.dataset.messageEmpty : "";
     }
@@ -191,13 +192,23 @@
       .catch(() => {});
   };
 
+  // The number as every page shows it (``numbers.format_metering_point_number``, D-109): the first 13 characters as one
+  // block, then blocks of four, separated by no-break spaces.
+  const groupedNumber = (text) => {
+    const groups = [text.slice(0, 13)];
+    for (let index = 13; index < text.length; index += 4) {
+      groups.push(text.slice(index, index + 4));
+    }
+    return groups.filter(Boolean).join("\u00a0");
+  };
+
   const completeNumber = (input, padded) => {
     const line = input.closest(".mgmt-dialog-field").querySelector("[data-number-complete]");
     if (!line) {
       return;
     }
     if (padded) {
-      line.textContent = (input.dataset.completeLabel || "") + " " + (input.dataset.prefix || "") + padded;
+      line.textContent = (input.dataset.completeLabel || "") + " " + groupedNumber((input.dataset.prefix || "") + padded);
       line.hidden = false;
     } else {
       line.hidden = true;
@@ -230,9 +241,14 @@
       });
     } else if (kind === "digits") {
       input.addEventListener("input", () => {
+        // A pasted complete number (the prefix of the settings, with or without the spaces of the display) leaves the
+        // typed part; white space never stays in the field.
+        const compact = input.value.replace(/\s+/g, "");
         const prefix = (input.dataset.prefix || "").toUpperCase();
-        if (prefix && input.value.toUpperCase().startsWith(prefix)) {
-          input.value = input.value.slice(prefix.length);
+        if (prefix && compact.length > prefix.length && compact.toUpperCase().startsWith(prefix)) {
+          input.value = compact.slice(prefix.length);
+        } else if (compact !== input.value) {
+          input.value = compact;
         }
         clearFeedback(input);
         completeNumber(input, "");

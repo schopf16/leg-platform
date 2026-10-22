@@ -1,8 +1,9 @@
 """Data for the staff overview and the processing queue of the applications (D-103). Services only, no pages.
 
 Staff see every customer's data in the management area (D-086), so a row may hold the person's label (name and
-customer number, never the email address, like the person search). Drafts are never listed: the staff does not work on
-drafts (KONZEPT 5.6) and the counts do not include them. Lists are bounded.
+customer number, never the email address, like the person search). Drafts are never counted as work: the staff does not
+work on drafts. The process list shows them read-only (D-107, which replaces KONZEPT 5.6 for the list), the counts here
+do not include them. Lists are bounded.
 """
 
 from dataclasses import dataclass

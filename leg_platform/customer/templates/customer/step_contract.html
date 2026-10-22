@@ -7,7 +7,7 @@
     <section class="step-card" aria-label="{% translate 'Articles of association' %}">
       <p class="dotword"><span class="dot tone-ok" aria-hidden="true"></span>{% translate "Already agreed" %}</p>
       <p>{% blocktranslate with date=acceptance.accepted_at|date:"d.m.Y" %}You agreed to the contract on {{ date }}.{% endblocktranslate %}</p>
-      <p><a class="btn btn-secondary-action" href="{% url 'customer:contract_download' %}">{% translate "Download contract" %}</a></p>
+      {% include "customer/_contract_viewer.html" %}
       <div class="step-actions">
         <a class="btn btn-primary" href="{% url 'customer:application' application.pk %}">{% translate "Continue" %}</a>
         {% if not confirm_cancel %}<a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>{% endif %}
@@ -26,7 +26,7 @@
       {% include "customer/_error_summary.html" %}
       {{ form.version }}
       <p class="muted">{% blocktranslate with date=version_date|date:"j. F Y" %}Contract version of {{ date }}{% endblocktranslate %}</p>
-      <p><a class="btn btn-secondary-action" href="{% url 'customer:contract_download' %}">{% translate "Download contract" %}</a></p>
+      {% include "customer/_contract_viewer.html" %}
       <p class="muted">{% url 'customer:contract' as contract_url %}{% blocktranslate %}You can also find the contract under <a href="{{ contract_url }}">Information › Articles of association</a>.{% endblocktranslate %}</p>
       <div class="checks">
         <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.value %} checked{% endif %}><span>{% translate "I have read the articles of association and I agree to them." %}</span></label>

@@ -136,6 +136,8 @@ Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email";
 
 Passkeys are an optional login method next to password with authenticator app (TOTP). Administrators may use a passkey-only account. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). Not built yet.
 
+Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language (what you need, what happens if you lose it) and recommends "password and app" to users. It is offered after registration (start tile "Choose how you sign in"), in the profile card "Sign-in method", after a reset and at the first login of an administrator. Built now: password only or password and app (administrators have only the app and no choice page). The passkey option appears only once `PASSKEYS_ENABLED` is turned on.
+
 ## Environments
 
 Local; stage (identical to production in behaviour and configuration, sends real emails, D-070); production. Separate databases, secrets and email configurations; no production data on stage.

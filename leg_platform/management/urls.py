@@ -61,6 +61,15 @@ urlpatterns = [
         "processes/applications/<int:pk>/reject/", process_actions.ApplicationRejectView.as_view(),
         name="processes_application_reject",
     ),
+    # The staff's corrections of a building and of a metering point of an application in flight (D-109)
+    path(
+        "processes/applications/<int:pk>/buildings/<int:building_id>/address/",
+        process_actions.ApplicationBuildingView.as_view(), name="processes_application_building",
+    ),
+    path(
+        "processes/applications/<int:pk>/metering-points/<int:point_id>/edit/",
+        process_actions.ApplicationPointView.as_view(), name="processes_application_point",
+    ),
     path(
         "processes/deregistrations/<int:pk>/", process_views.DeregistrationDetailView.as_view(),
         name="processes_deregistration",

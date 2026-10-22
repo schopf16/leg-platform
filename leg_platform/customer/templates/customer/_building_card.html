@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n metering_points %}{% comment %}
 One card per building (GEBAEUDE.md, section 4). Context: ``card`` (customer.overview.Card), ``overview``,
 ``deregistration_url``. Only the account's own metering points are listed. Status: dot plus word. The EGID is shown
 where an address is; the EGRID is left out (no verified source). The pencils are links to a small form page, so they work
@@ -26,7 +26,7 @@ without a script.
     <ul class="mp-list" aria-label="{% blocktranslate with title=card.title %}Metering points of {{ title }}{% endblocktranslate %}">
       {% for row in card.rows %}
         <li>
-          <span class="mp-num">{{ row.number }}{% if row.name %}<span class="mp-note">{{ row.name }}</span>{% endif %}</span>
+          <span class="mp-num">{{ row.number|metering_point }}{% if row.name %}<span class="mp-note">{{ row.name }}</span>{% endif %}</span>
           <span class="mp-dir">{{ row.direction_label }}{% if row.since_kind == "since" %}<span class="mp-since">{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}</span>{% elif row.since_kind == "registered" %}<span class="mp-since">{% blocktranslate with date=row.since|date:"d.m.Y" %}Registered on {{ date }}{% endblocktranslate %}</span>{% endif %}</span>
           <span class="dotword"><span class="dot tone-{{ row.tone }}" aria-hidden="true"></span>{{ row.label }}{% if row.point_id %}<a class="icon-btn" href="{% url 'customer:metering_point_name' row.point_id %}" aria-label="{% translate 'Edit name of the metering point' %}"><svg class="frame-icon" aria-hidden="true"><use href="#i-pencil"/></svg></a>{% endif %}</span>
           {% if row.block %}{% include "customer/_progress_block.html" with block=row.block footer_withdraw=card.withdraw_in_footer %}{% endif %}
@@ -36,9 +36,11 @@ without a script.
   {% endif %}
   {% for extra in card.extra_blocks %}{% include "customer/_progress_block.html" with block=extra footer_withdraw=card.withdraw_in_footer %}{% endfor %}
 
-  {% if card.can_add_point or card.removal %}
+  {% if card.can_add_point or card.removal or card.change_pk or card.review_locked %}
     <div class="card-foot">
       {% if card.can_add_point %}<a class="btn btn-primary" href="{% url 'customer:application_start' %}?building={{ card.location.pk }}">{% translate "Add metering point" %}</a>{% endif %}
+      {% if card.change_pk %}<a class="btn btn-secondary-action" href="{% url 'customer:application_change' card.change_pk %}">{% translate "Change application" %}</a>{% endif %}
+      {% if card.review_locked %}<span class="card-note">{% translate "The LEG is checking your application. You can no longer change it here. Until the registration at the grid operator starts, you can still withdraw it." %}</span>{% endif %}
       {% if card.removal == "link" and deregistration_url %}
         <a class="btn btn-danger-outline end-action" href="{{ deregistration_url }}{% if card.location %}?building={{ card.location.pk }}{% endif %}">{% translate "Remove metering point" %}</a>
       {% elif card.removal == "withdraw" %}

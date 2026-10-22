@@ -1,16 +1,19 @@
-"""The list of the processes and the small services behind the management pages of the onboarding (D-103): the rows of
-``process_list`` (running applications and deregistrations, never a draft), their filters, search and sorting; the contract
+"""The list of the processes and the small services behind the management pages of the onboarding (D-103, D-107): the rows
+of ``process_list`` (applications including drafts, and deregistrations), their filters, search and sorting; the contract
 history and the newest acceptance for the staff; the time of the daily address directory run."""
 
 from datetime import date, time, timedelta
 from unittest.mock import patch
 
+from django.db import connection
 from django.test import TestCase, tag
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.addresses import schedule
 from leg_platform.community import (
+    application_queue,
     application_staff,
     applications,
     contracts,
@@ -48,18 +51,30 @@ class ProcessListTests(TestCase):
         application.refresh_from_db()
         return application
 
-    def test_only_running_applications_are_rows_and_never_a_draft(self):
+    def test_drafts_are_rows_marked_by_their_state_and_a_completed_application_is_not(self):
         anna = self.submitted(self.anna, 90004269, 1)
-        ready_draft(self.bert, egid=90004270, number=5)
+        draft, _building = ready_draft(self.bert, egid=90004270, number=5)
         paused, _building = ready_draft(self.carl, egid=90004271, number=9)
         Application.objects.filter(pk=paused.pk).update(state=State.PAUSED)
         rows = process_list.rows()
-        self.assertEqual([(row.kind, row.pk) for row in rows], [("application", anna.pk)])
+        self.assertEqual(
+            {(row.pk, row.state) for row in rows},
+            {(anna.pk, "submitted"), (draft.pk, "draft"), (paused.pk, "paused")},
+        )
+        # A draft shows the steps of the form (not the five steps after the submission); never a bank or IBAN value.
+        draft_row = next(row for row in rows if row.pk == draft.pk)
+        self.assertEqual(draft_row.progress_total, applications.progress(draft).total)
+        self.assertEqual(draft_row.progress_done, applications.progress(draft).done)
+        self.assertEqual({row.pk for row in process_list.rows(state="draft")}, {draft.pk, paused.pk})
+        self.assertEqual({row.pk for row in process_list.rows(state="submitted")}, {anna.pk})
+        self.assertEqual({row.pk for row in process_list.rows(text="Beispiel")}, {draft.pk})
         completed = self.submitted(self.bert, 90004272, 13, house="53")
         application_staff.mark_operator_started(completed, self.staff, STARTED, today=TODAY)
         application_staff.record_operator_confirmation(completed, self.staff, date(2026, 7, 1), today=TODAY)
         application_staff.complete(completed, self.staff, date(2026, 9, 1), today=TODAY)
         self.assertNotIn(completed.pk, [row.pk for row in process_list.rows()])
+        # A draft is no work for the staff: the queue counts of the overview never include it.
+        self.assertEqual(application_queue.queue_counts()["applications_submitted"], 1)
 
     def test_the_row_carries_what_the_list_shows(self):
         application = self.submitted(self.anna, 90004269, 1, feed_in=True)
@@ -142,7 +157,71 @@ class ProcessListTests(TestCase):
         for index in range(3):
             self.submitted(customer(f"many{index}.list@example.org"), 90004300 + index, 20 + index, house=str(60 + index))
         with patch.object(process_list, "MAX_ROWS", 2):
-            self.assertEqual(len(process_list.rows()), 2)
+            found = process_list.rows()
+        self.assertEqual(len(found), 2)
+        self.assertTrue(found.truncated)
+
+    def test_a_cut_keeps_the_submitted_work_before_the_drafts_and_the_newest_change_first(self):
+        old = self.submitted(self.anna, 90004269, 1)
+        new = self.submitted(self.bert, 90004270, 5, house="52")
+        draft, _building = ready_draft(self.carl, egid=90004271, number=9, address={"house_number": "53"})
+        now = timezone.now()
+        Application.objects.filter(pk=old.pk).update(updated_at=now - timedelta(days=3))
+        Application.objects.filter(pk=new.pk).update(updated_at=now - timedelta(days=1))
+        # The newest row of all is the draft: it must not push a submitted application out.
+        Application.objects.filter(pk=draft.pk).update(updated_at=now)
+        for cap, expected, truncated in (
+            (3, {old.pk, new.pk, draft.pk}, False),
+            (2, {old.pk, new.pk}, True),
+            (1, {new.pk}, True),
+        ):
+            with self.subTest(cap=cap), patch.object(process_list, "MAX_ROWS", cap):
+                found = process_list.rows()
+                self.assertEqual({row.pk for row in found}, expected)
+                self.assertEqual(found.truncated, truncated)
+        # Among drafts the most recently changed one stays.
+        other, _building = ready_draft(customer("other.draft@example.org"), egid=90004272, number=13)
+        Application.objects.filter(pk=other.pk).update(updated_at=now - timedelta(days=9))
+        with patch.object(process_list, "MAX_ROWS", 3):
+            self.assertEqual({row.pk for row in process_list.rows()}, {old.pk, new.pk, draft.pk})
+
+    def test_the_progress_of_many_drafts_costs_no_query_per_draft_and_equals_the_wizard_state(self):
+        def make(offset, count):
+            for index in range(offset, offset + count):
+                person = customer(f"bulk{index}.list@example.org")
+                ready_draft(
+                    person, egid=90005000 + index, number=100 + 3 * index, feed_in=index % 2 == 0,
+                    start=index % 3 != 0, address={"house_number": str(index + 1)},
+                )
+
+        make(0, 4)
+        # A draft at a building that is stored already, where the account has the draw: the draw counts as present.
+        owner = customer("stored.owner@example.org")
+        place = make_location("Gespeichert", "7", "3063", "Ittigen", egid=90005999)
+        point = make_metering_point(
+            900, location=place, registered_with_operator_on=STARTED, confirmed_on=STARTED, start_date=STARTED,
+        )
+        assign_person(point, owner, STARTED)
+        stored = applications.start_draft(owner, location=place)
+        applications.add_metering_point(
+            owner, stored, stored.buildings.get().pk, direction="feed_in", entered_number="950"
+        )
+        with CaptureQueriesContext(connection) as few:
+            found = process_list.rows()
+        make(4, 12)
+        with CaptureQueriesContext(connection) as many:
+            found = process_list.rows()
+        self.assertGreaterEqual(len(found), 17)
+        self.assertEqual(len(many), len(few), "the number of queries must not grow with the number of drafts")
+        self.assertLess(len(many), 25)
+        for row in found:
+            application = Application.objects.get(pk=row.pk)
+            expected = applications.progress(application)
+            self.assertEqual((row.progress_done, row.progress_total), (expected.done, expected.total), row.pk)
+        # The stored building's draft has its draw from the account's own metering point.
+        stored_row = next(row for row in found if row.pk == stored.pk)
+        self.assertEqual(applications.progress(stored).step("metering_points").state, "done")
+        self.assertEqual(stored_row.progress_done, applications.progress(stored).done)
 
     def test_a_deregistration_is_a_row_with_the_date_of_the_confirmation(self):
         today = timezone.localdate()

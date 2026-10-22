@@ -161,11 +161,11 @@ msgstr "Il Suo indirizzo manca ancora."
 msgid "Add address"
 msgstr "Aggiungi indirizzo"
 
-msgid "Two-factor sign-in"
-msgstr "Accesso a due fattori"
+msgid "Choose how you sign in"
+msgstr "Scegliere come accedere"
 
-msgid "Protects your account additionally with a code from an app."
-msgstr "Protegge ulteriormente il Suo conto con un codice generato da un'app."
+msgid "Password only, or password and a code from an app on your phone."
+msgstr "Solo password, oppure password e codice generato da un'app sul telefono."
 
 msgid "Set up 2FA"
 msgstr "Configura 2FA"
@@ -221,6 +221,29 @@ msgstr[1] "Nessuna corrispondenza esatta. %(count)s indirizzi simili disponibili
 #, python-format
 msgid "Address filled in: %(address)s."
 msgstr "Indirizzo compilato: %(address)s."
+
+msgid "Choose a town"
+msgstr "Scelga una località"
+
+msgid "Choose a postal code"
+msgstr "Scelga un NPA"
+
+#, python-format
+msgid "%(count)s match available. Press the down arrow key to choose it."
+msgid_plural "%(count)s matches available. Press the down arrow key to choose one."
+msgstr[0] "%(count)s risultato disponibile. Premere il tasto freccia giù per sceglierlo."
+msgstr[1] "%(count)s risultati disponibili. Premere il tasto freccia giù per sceglierne uno."
+
+#, python-format
+msgid "Town filled in: %(town)s."
+msgstr "Località compilata: %(town)s."
+
+#, python-format
+msgid "Postal code filled in: %(postal_code)s."
+msgstr "NPA compilato: %(postal_code)s."
+
+msgid "There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration."
+msgstr "Nessun suggerimento di indirizzo: l'elenco degli indirizzi non è disponibile oppure non è ancora stato importato. Un amministratore di sistema può importarlo nell'amministrazione di sistema."
 
 msgid "Can request an address directory import"
 msgstr "Può richiedere un'importazione dell'elenco degli indirizzi"
@@ -2226,8 +2249,8 @@ msgstr "Disattiva 2FA"
 msgid "New codes replace the old ones. The old codes no longer work afterwards."
 msgstr "I nuovi codici sostituiscono quelli vecchi. In seguito i vecchi codici non funzionano più."
 
-msgid "With a code from an app you protect your account additionally. This is voluntary."
-msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto. È facoltativo."
+msgid "You sign in with your password only. With a code from an app you protect your account additionally. This is voluntary."
+msgstr "Accede solo con la password. Con un codice generato da un'app protegge ulteriormente il Suo conto. È facoltativo."
 
 msgid "With a code from an app you protect your account additionally."
 msgstr "Con un codice generato da un'app protegge ulteriormente il Suo conto."
@@ -4964,8 +4987,8 @@ msgstr "Presso %(instance_name)s una richiesta è stata annullata perché la con
 msgid "Processes"
 msgstr "Pratiche"
 
-msgid "Running applications and deregistrations of the customers."
-msgstr "Richieste e uscite in corso dei clienti."
+msgid "Applications, also drafts that are not submitted yet, and deregistrations of the customers."
+msgstr "Richieste, anche le bozze non ancora inoltrate, e uscite dei clienti."
 
 msgid "No running processes."
 msgstr "Nessuna pratica in corso."
@@ -4994,11 +5017,11 @@ msgstr "aperto"
 msgid "Customer"
 msgstr "Cliente"
 
-msgid "Submitted: waiting for the review. In review: the LEG checks it. Then the registration at the grid operator. In deregistration: the notice was given and the LEG confirms the date."
-msgstr "Inoltrata: in attesa della verifica. In verifica: la CEL la controlla. Segue la registrazione presso il gestore di rete. In uscita: la disdetta è pervenuta e la CEL conferma la data."
+msgid "Draft / not submitted: the customer has started the application and not sent it yet; you can read it, not change it. Submitted: waiting for the review. In review: the LEG checks it. Then the registration at the grid operator. In deregistration: the notice was given and the LEG confirms the date."
+msgstr "Bozza / non inoltrata: il cliente ha iniziato la richiesta e non l'ha ancora inviata; è possibile leggerla, ma non modificarla. Inoltrata: in attesa della verifica. In verifica: la CEL la controlla. Segue la registrazione presso il gestore di rete. In uscita: la disdetta è pervenuta e la CEL conferma la data."
 
-msgid "Applications: the five steps from the submission to the completion. Deregistrations: three steps."
-msgstr "Richieste: i cinque passaggi dall'inoltro al completamento. Uscite: tre passaggi."
+msgid "Applications: the five steps from the submission to the completion; a draft shows the steps the customer has completed in the form. Deregistrations: three steps."
+msgstr "Richieste: i cinque passaggi dall'inoltro al completamento; una bozza mostra i passaggi che il cliente ha completato nel modulo. Uscite: tre passaggi."
 
 msgid "Applications: the start date the customer chose. Deregistrations: the date from which the deregistration is effective, once the LEG has confirmed it. Open until it is known."
 msgstr "Richieste: la data di inizio scelta dal cliente. Uscite: la data a partire dalla quale l'uscita è efficace, non appena la CEL l'ha confermata. Fino ad allora aperta."
@@ -5134,21 +5157,6 @@ msgstr "Descrizione"
 
 msgid "Number"
 msgstr "Numero"
-
-msgid "Plant"
-msgstr "Impianto"
-
-#, python-format
-msgid "PV %(value)s kWp"
-msgstr "FV %(value)s kWp"
-
-#, python-format
-msgid "Battery %(value)s kWh"
-msgstr "Batteria %(value)s kWh"
-
-#, python-format
-msgid "Wallbox %(value)s kW"
-msgstr "Wallbox %(value)s kW"
 
 msgid "Go to the metering point"
 msgstr "Vai al punto di misura"
@@ -5728,8 +5736,8 @@ msgstr "Inserisca un numero pari ad almeno 0."
 msgid "Metering point number for consumption"
 msgstr "Numero del punto di misura per il consumo"
 
-msgid "You find the number on your last electricity bill."
-msgstr "Il numero si trova sulla Sua ultima fattura dell'elettricità."
+msgid "You find the number on your electricity bill, with the details of your supply point. It is also called metering point ID and is not the shorter meter number."
+msgstr "Il numero si trova sulla Sua fattura dell'elettricità, tra i dati del Suo punto di fornitura. Si chiama anche ID del punto di misura e non è il numero del contatore, più breve."
 
 msgid "Name of the metering point"
 msgstr "Nome del punto di misura"
@@ -6111,6 +6119,12 @@ msgstr "Non ancora accettato"
 msgid "Download contract"
 msgstr "Scarica il contratto"
 
+msgid "If the contract is not shown here, please download it."
+msgstr "Se il contratto non viene visualizzato qui, lo scarichi."
+
+msgid "Please download the contract to read it."
+msgstr "Scarichi il contratto per leggerlo."
+
 msgid "The contract is not available yet"
 msgstr "Il contratto non è ancora disponibile"
 
@@ -6197,8 +6211,8 @@ msgstr "Il suo numero inizia con %(prefix)s."
 msgid "You enter the feed-in metering point."
 msgstr "Inserisce il punto di misura per l'immissione."
 
-msgid "You find the number in the documents of your grid operator."
-msgstr "Il numero si trova nei documenti del Suo gestore di rete."
+msgid "You find the number in the documents of your grid operator, with the details of your feed-in point. It is also called metering point ID and is not the shorter meter number."
+msgstr "Il numero si trova nei documenti del Suo gestore di rete, tra i dati del Suo punto di immissione. Si chiama anche ID del punto di misura e non è il numero del contatore, più breve."
 
 msgid "These details are optional and are used for statistics only."
 msgstr "Questi dati sono facoltativi e servono solo per la statistica."
@@ -6580,3 +6594,264 @@ msgstr "Stabilito dal gestore di rete"
 
 msgid "Your desired date"
 msgstr "La Sua data desiderata"
+
+msgid "Choose"
+msgstr "Scegli"
+
+msgid "Sign-in method"
+msgstr "Metodo di accesso"
+
+msgid "Choose how you want to sign in."
+msgstr "Scelga come desidera accedere."
+
+msgid "Your sign-in method stays as it is."
+msgstr "Il Suo metodo di accesso rimane invariato."
+
+msgid "Password only"
+msgstr "Solo password"
+
+msgid "The simplest way. Less protected: whoever knows your password can sign in."
+msgstr "Il modo più semplice. Meno protetto: chiunque conosca la Sua password può accedere."
+
+msgid "Your password."
+msgstr "La Sua password."
+
+msgid "If you forget your password, we send a link to your email address."
+msgstr "Se dimentica la password, Le inviamo un link via e-mail."
+
+msgid "I just want to sign in as before"
+msgstr "Voglio semplicemente accedere come prima"
+
+msgid "Password and code from an app"
+msgstr "Password e codice generato da un'app"
+
+msgid "Safer: after your password you enter a 6-digit code from an app on your phone."
+msgstr "Più sicuro: dopo la password inserisce un codice a 6 cifre generato da un'app sul Suo telefono."
+
+msgid "A smartphone with a free authenticator app."
+msgstr "Uno smartphone con un'app di autenticazione gratuita."
+
+msgid "Use one of your 10 recovery codes. Without them, contact the LEG administrator."
+msgstr "Utilizzi uno dei Suoi 10 codici di recupero. Senza di essi, contatti l'amministratore della LEG."
+
+msgid "I have a smartphone and can install an app"
+msgstr "Ho uno smartphone e posso installare un'app"
+
+msgid "Passkey"
+msgstr "Passkey (accesso senza password)"
+
+msgid "Quick and safe: you sign in with fingerprint, face or screen lock of your phone or computer. No password, no codes."
+msgstr "Rapido e sicuro: accede con impronta digitale, riconoscimento del volto o blocco schermo del telefono o del computer. Nessuna password, nessun codice."
+
+msgid "A phone or computer with a screen lock. We recommend a second device."
+msgstr "Un telefono o un computer con blocco schermo. Consigliamo un secondo dispositivo."
+
+msgid "Sign in with your second device. Without one, you send an ID document by email to the LEG administrator, who resets your account."
+msgstr "Acceda con il secondo dispositivo. Senza un secondo dispositivo, invia un documento d'identità via e-mail all'amministratore della LEG, che reimposta il Suo conto."
+
+msgid "My phone or computer unlocks with fingerprint, face or PIN"
+msgstr "Il mio telefono o computer si sblocca con impronta digitale, volto o PIN"
+
+msgid "Your password and app are deleted. You cannot combine a password with a passkey."
+msgstr "La Sua password e la Sua app vengono eliminate. Password e passkey non si possono combinare."
+
+msgid "First set up two passkeys on two devices."
+msgstr "Configuri prima due passkey su due dispositivi."
+
+msgid "What is an authenticator app? What is a passkey?"
+msgstr "Che cos'è un'app di autenticazione? Che cos'è una passkey?"
+
+msgid "What is an authenticator app?"
+msgstr "Che cos'è un'app di autenticazione?"
+
+msgid "An authenticator app is a free app from your phone's app store. It shows a new 6-digit code every 30 seconds. After your password you type the current code. This proves that you hold your phone."
+msgstr "Un'app di autenticazione è un'app gratuita dell'app store del Suo telefono. Mostra un nuovo codice a 6 cifre ogni 30 secondi. Dopo la password digita il codice attuale. Così dimostra di avere il Suo telefono."
+
+msgid "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, and it cannot be guessed."
+msgstr "Una passkey sostituisce la password. Il Suo telefono o computer custodisce una chiave segreta. Conferma con impronta digitale, volto o blocco schermo, come quando sblocca il telefono. Non c'è nulla da ricordare o digitare e non può essere indovinata."
+
+msgid "You can change your choice at any time in your profile."
+msgstr "Può modificare la Sua scelta in qualsiasi momento nel profilo."
+
+msgid "How do you want to sign in?"
+msgstr "Come desidera accedere?"
+
+msgid "Not sure? We recommend a passkey on two devices. Without a second device, choose Password and code from an app."
+msgstr "Non è sicuro? Consigliamo una passkey su due dispositivi. Senza un secondo dispositivo, scelga Password e codice generato da un'app."
+
+#, python-format
+msgid "Not sure? We recommend: %(title)s."
+msgstr "Non è sicuro? Consigliamo: %(title)s."
+
+msgid "Which fits me?"
+msgstr "Quale fa per me?"
+
+msgid "Recommended"
+msgstr "Consigliato"
+
+msgid "You need:"
+msgstr "Serve:"
+
+msgid "If you lose it:"
+msgstr "Se lo perde:"
+
+msgid "Next: you may be asked for your password or code."
+msgstr "Dopo, potrebbe esserLe chiesta la password o il codice."
+
+msgid "Building not entered yet"
+msgstr "Edificio non ancora inserito"
+
+msgid "Draft, not completely recorded"
+msgstr "Bozza, non ancora registrata completamente"
+
+msgid "Change application"
+msgstr "Modifica la richiesta"
+
+msgid "Change application?"
+msgstr "Modificare la richiesta?"
+
+msgid "Your application becomes a draft again so that you can change it. The LEG does not check it until you submit it again."
+msgstr "La Sua richiesta torna a essere una bozza, così può modificarla. La CEL la controlla solo quando la inoltra di nuovo."
+
+msgid "A draft that you do not continue is deleted after a while. Submit it again when you are done."
+msgstr "Una bozza che non prosegue viene eliminata dopo un certo tempo. La inoltri di nuovo quando ha finito."
+
+msgid "Your application is open for changes. Change what you need, then submit it again."
+msgstr "La Sua richiesta può essere di nuovo modificata. Modifichi ciò che serve, poi la inoltri di nuovo."
+
+msgid "You can still change your details until the LEG starts checking them."
+msgstr "Può ancora modificare i Suoi dati finché la CEL non inizia a controllarli."
+
+msgid "The LEG is checking your application. You can no longer change it here. Until the registration at the grid operator starts, you can still withdraw it."
+msgstr "La CEL sta controllando la Sua richiesta. Qui non può più modificarla. Finché non inizia la registrazione presso il gestore di rete, può ancora ritirarla."
+
+msgid "The LEG has already started checking your application, so you can no longer change it here. Until the registration at the grid operator starts, you can still withdraw it."
+msgstr "La CEL ha già iniziato a controllare la Sua richiesta, quindi qui non può più modificarla. Finché non inizia la registrazione presso il gestore di rete, può ancora ritirarla."
+
+msgid "Your application is submitted. You can still change it until the LEG starts checking it."
+msgstr "La Sua richiesta è inoltrata. Può ancora modificarla finché la CEL non inizia a controllarla."
+
+msgid "Draft / not submitted"
+msgstr "Bozza / non inoltrata"
+
+msgid "Building corrected by the LEG"
+msgstr "Edificio corretto dalla CEL"
+
+msgid "Metering point corrected by the LEG"
+msgstr "Punto di misura corretto dalla CEL"
+
+msgid "This entry was changed in the meantime, for example by the customer. Nothing was saved. Go back and check the page."
+msgstr "Questa voce è stata nel frattempo modificata, ad esempio dal cliente. Non è stato salvato nulla. Torni indietro e controlli la pagina."
+
+msgid "This building is stored already. Change its address on the page of the location."
+msgstr "Questo edificio è già memorizzato. Modifichi il suo indirizzo nella pagina dell'ubicazione."
+
+msgid "This number belongs to a stored metering point or to another application. Nothing was saved."
+msgstr "Questo numero appartiene a un punto di misura memorizzato o a un'altra richiesta. Non è stato salvato nulla."
+
+msgid "This number is used already by a metering point or an application of the same customer."
+msgstr "Questo numero è già utilizzato da un punto di misura o da una richiesta dello stesso cliente."
+
+msgid "This number is used already by another metering point of this application."
+msgstr "Questo numero è già utilizzato da un altro punto di misura di questa richiesta."
+
+msgid "The building has a metering point with this direction already."
+msgstr "L'edificio ha già un punto di misura con questa direzione."
+
+msgid "Choose consumption or feed-in."
+msgstr "Scelga prelievo o immissione."
+
+msgid "A feed-in needs the bank connection of the customer. The customer enters it in the profile."
+msgstr "Un'immissione richiede le coordinate bancarie del cliente. Il cliente le inserisce nel profilo."
+
+msgid "A building needs a metering point for consumption. Change the other metering point of the building first."
+msgstr "Un edificio richiede un punto di misura per il prelievo. Modifichi prima l'altro punto di misura dell'edificio."
+
+msgid "Plant details apply to a feed-in only. Clear them or choose feed-in."
+msgstr "I dettagli dell'impianto valgono solo per un'immissione. Li cancelli o scelga immissione."
+
+msgid "The other metering point of the building has plant details, which a metering point for consumption cannot have. Clear them there first."
+msgstr "L'altro punto di misura dell'edificio ha dettagli dell'impianto, che un punto di misura di prelievo non può avere. Li cancelli prima lì."
+
+msgid "The application has this building already."
+msgstr "La richiesta contiene già questo edificio."
+
+msgid "The customer has another application for this building."
+msgstr "Il cliente ha un'altra richiesta per questo edificio."
+
+msgid "The EGID does not belong to this address."
+msgstr "L'EGID non appartiene a questo indirizzo."
+
+msgid "Enter the EGID as a number."
+msgstr "Inserisca l'EGID come numero."
+
+msgid "The address directory cannot be asked now. Try again later."
+msgstr "L'elenco degli indirizzi non può essere interrogato in questo momento. Riprovi più tardi."
+
+msgid "The address that the customer entered. It is checked against the address directory like the customer's entry. The customer sees the corrected address."
+msgstr "L'indirizzo inserito dal cliente. Viene controllato con l'elenco degli indirizzi come l'inserimento del cliente. Il cliente vede l'indirizzo corretto."
+
+#, python-format
+msgid "Several buildings have this address. Enter the EGID of one of them: %(egids)s."
+msgstr "Più edifici hanno questo indirizzo. Inserisca l'EGID di uno di essi: %(egids)s."
+
+msgid "Save as entered"
+msgstr "Salva come inserito"
+
+msgid "The metering point that the customer entered. The number, the direction and the plant details are checked like the customer's entry. The customer sees the corrected values."
+msgstr "Il punto di misura inserito dal cliente. Il numero, la direzione e i dettagli dell'impianto vengono controllati come l'inserimento del cliente. Il cliente vede i valori corretti."
+
+#, python-format
+msgid "The number starts with %(prefix)s, not with the country and the identifier of the settings. It stays so unless you change the number; a changed number starts with the ones of the settings."
+msgstr "Il numero inizia con %(prefix)s, non con il paese e l'identificativo delle impostazioni. Resta così finché non modifica il numero; un numero modificato inizia con quelli delle impostazioni."
+
+msgid "Leave it empty: the address directory gives the EGID. Enter it only when several buildings have this address."
+msgstr "Lasci il campo vuoto: l'elenco degli indirizzi fornisce l'EGID. La inserisca solo se più edifici hanno questo indirizzo."
+
+msgid "If the consumption and the feed-in were entered the wrong way round, choose the direction of the other metering point: the two exchange their directions."
+msgstr "Se il prelievo e l'immissione sono stati inseriti al contrario, scelga la direzione dell'altro punto di misura: i due scambiano le loro direzioni."
+
+msgid "Plant details apply to a feed-in only."
+msgstr "I dettagli dell'impianto valgono solo per un'immissione."
+
+msgid "Plant details"
+msgstr "Dettagli dell'impianto"
+
+#, python-format
+msgid "%(value)s kWp"
+msgstr "%(value)s kWp"
+
+#, python-format
+msgid "%(value)s kWh"
+msgstr "%(value)s kWh"
+
+#, python-format
+msgid "%(value)s kW"
+msgstr "%(value)s kW"
+
+msgid "The address of a stored building is changed on the page of the location."
+msgstr "L'indirizzo di un edificio memorizzato si modifica nella pagina dell'ubicazione."
+
+msgid "The address directory does not know this address."
+msgstr "L'elenco degli indirizzi non conosce questo indirizzo."
+
+msgid "Check the entry. If it is right, save it as entered: the building then has no EGID."
+msgstr "Controlli l'inserimento. Se è corretto, lo salvi come inserito: l'edificio non ha allora alcun EGID."
+
+msgid "Paused / not submitted"
+msgstr "In pausa / non inoltrata"
+
+msgid "The customer has started this application and has not submitted it. Nothing is to be done by the LEG. You can read it, but you cannot change it. The customer can still change it. A draft that the customer does not continue is deleted after the deadlines of the settings."
+msgstr "Il cliente ha iniziato questa richiesta e non l'ha inoltrata. La CEL non deve fare nulla. È possibile leggerla, ma non modificarla. Il cliente può ancora modificarla. Una bozza che il cliente non prosegue viene eliminata dopo i termini delle impostazioni."
+
+msgid "The customer has a metering point for consumption and one for feed-in at this building already."
+msgstr "Il cliente ha già un punto di misura per il consumo e uno per l'immissione in questo edificio."
+
+msgid "Data changed after the registration at the grid operator: check the registration again"
+msgstr "Dati modificati dopo la registrazione presso il gestore di rete: verificare di nuovo la registrazione"
+
+msgid "Data changed after the registration at the %(operator)s: check the registration again"
+msgstr "Dati modificati dopo la registrazione presso %(operator)s: verificare di nuovo la registrazione"
+
+msgid "More than %(max)d applications or deregistrations match. Only the most recently changed ones are listed, submitted applications before drafts. Narrow the list with the search or the filters."
+msgstr "Più di %(max)d richieste o uscite corrispondono. Sono elencate solo quelle modificate più di recente, le richieste inoltrate prima delle bozze. Restringa l'elenco con la ricerca o i filtri."

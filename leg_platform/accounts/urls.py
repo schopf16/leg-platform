@@ -141,6 +141,7 @@ urlpatterns = [
     path("profile/delete/", profile_views.AccountDeleteView.as_view(), name="account_delete"),
     path("profile/password/", profile_views.PasswordChangeView.as_view(), name="password_change"),
     path("profile/two-factor/", profile_views.TwoFactorOverviewView.as_view(), name="two_factor"),
+    path("profile/sign-in-method/", profile_views.LoginMethodView.as_view(), name="login_method"),
     path(
         "profile/two-factor/setup/",
         profile_views.TwoFactorSetupView.as_view(),

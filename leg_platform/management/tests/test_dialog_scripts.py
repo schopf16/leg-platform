@@ -46,7 +46,13 @@ class ScriptBehaviourTests(SimpleTestCase):
         ("1" + "0" * 20, "1" + "0" * 20, True),
         ("12!", "12!", True),
         ("ß", "ß", True),
-        ("1 2", "1 2", True),
+        ("1 !", "1!", True),  # white space is never kept, the rest is still refused
+        # D-109: white space is no part of a number, a copied number has no-break spaces between its blocks, and a
+        # pasted complete number loses the prefix of the settings (``data-prefix``).
+        ("1 2", "0" * 18 + "12", False),
+        ("0000\u00a00000\u00a00000\u00a00000\u00a00023", "0" * 18 + "23", False),
+        ("CH1A2B3C4D5E6\u00a00000\u00a00000\u00a00000\u00a00000\u00a00023", "0" * 18 + "23", False),
+        ("ch1a2b3c4d5e6" + "0" * 18 + "23", "0" * 18 + "23", False),
     )
 
     @staticmethod

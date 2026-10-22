@@ -20,7 +20,7 @@ from django.utils.translation import gettext_lazy, pgettext
 from django.views import View
 
 from leg_platform.accounts.models import PendingEmailChange
-from leg_platform.community import addressing, grid_operator, history, numbers, person_list, persons
+from leg_platform.community import addressing, grid_operator, history, person_list, persons
 from leg_platform.community import iban as iban_module
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import lists
@@ -361,7 +361,7 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
             entries.append(
                 {
                     "row": row,
-                    "number": numbers.format_metering_point_number(row.point.number),
+                    "number": row.point.number,
                     "assigned": assignment_lines(row.assignment),
                     "registration_lines": lines,
                     "registration_tone": tone,

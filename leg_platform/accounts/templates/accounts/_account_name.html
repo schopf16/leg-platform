@@ -1,0 +1,16 @@
+{% load i18n %}{% comment %}
+The fixed account name on a page that sets a password (registration step 2, new password after a
+reset link). Context: ``field`` (the bound "username" field of the form).
+
+Two parts, on purpose:
+* the name as plain text, which the person reads and cannot edit and which no password manager can
+  fill or overwrite (it is no form control);
+* the same value in a read-only text field with ``autocomplete="username"`` that is hidden from the
+  eye and from assistive technology, so that the browser saves the new password for this account
+  (Chromium, "Create Amazing Password Forms"; WHATWG HTML, autofill field name "username").
+The server ignores the posted value (``forms.pin_username``).
+{% endcomment %}<div class="mb-3">
+  <span class="form-label" id="{{ field.auto_id }}_caption">{{ field.label }}</span>
+  <p class="plain-line"><span class="plain-value" id="{{ field.auto_id }}_display">{{ field.value }}</span></p>
+  {{ field }}
+</div>

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from leg_platform.community import grid_operator, leg_services
+from leg_platform.community import grid_operator, leg_services, numbers
 from leg_platform.community.models import Direction, LegAssignment, MeteringPoint
 from leg_platform.management.form_fields import DecimalInputField, date_field, remark_field
 
@@ -131,7 +131,7 @@ class LegPointForm(forms.Form):
         self.points = {str(point.pk): point for point in points}
         choices = []
         for key, point in self.points.items():
-            parts = [point.number or "–", str(Direction(point.direction).label)]
+            parts = [numbers.format_metering_point_number(point.number) or "–", str(Direction(point.direction).label)]
             # The same words as in the location dialog: a point without a location says so (UX-011).
             parts.append(str(point.location) if point.location_id else gettext("no location"))
             choices.append((key, " · ".join(parts)))

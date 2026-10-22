@@ -1,4 +1,10 @@
 {% load i18n %}{% comment %}
-The plant figures of a metering point of an application (PV power, battery, wallbox), as the customer entered them; nothing for a
-figure that was left empty. Context: ``point`` (a dict of ``process_views.building_rows``).
-{% endcomment %}{% if point.pv is not None %}{% blocktranslate with value=point.pv|floatformat:"2u" %}PV {{ value }} kWp{% endblocktranslate %}{% endif %}{% if point.battery is not None %} {% blocktranslate with value=point.battery|floatformat:"2u" %}Battery {{ value }} kWh{% endblocktranslate %}{% endif %}{% if point.wallbox is not None %} {% blocktranslate with value=point.wallbox|floatformat:"2u" %}Wallbox {{ value }} kW{% endblocktranslate %}{% endif %}
+The plant details of a metering point of an application (D-109): one labelled line per figure the customer entered (PV power,
+battery, wallbox; at most three lines), the value after its label, nothing for a figure that was left empty and a grey dash
+when there is none. Stacked lines in a definition list, never one sentence. Context: ``point`` (a dict of
+``process_views.building_rows``).
+{% endcomment %}{% if point.pv is not None or point.battery is not None or point.wallbox is not None %}<dl class="mgmt-plant">
+  {% if point.pv is not None %}<div><dt>{% translate "PV power" %}</dt><dd class="tnum">{% blocktranslate with value=point.pv|floatformat:"2u" %}{{ value }} kWp{% endblocktranslate %}</dd></div>{% endif %}
+  {% if point.battery is not None %}<div><dt>{% translate "Battery" %}</dt><dd class="tnum">{% blocktranslate with value=point.battery|floatformat:"2u" %}{{ value }} kWh{% endblocktranslate %}</dd></div>{% endif %}
+  {% if point.wallbox is not None %}<div><dt>{% translate "Wallbox" %}</dt><dd class="tnum">{% blocktranslate with value=point.wallbox|floatformat:"2u" %}{{ value }} kW{% endblocktranslate %}</dd></div>{% endif %}
+</dl>{% else %}<span class="mgmt-muted">–</span>{% endif %}

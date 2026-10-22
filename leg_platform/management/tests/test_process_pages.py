@@ -2,7 +2,8 @@
 deregistrations, the page of one application and of one deregistration, the staff's steps as dialogs, the notices and the
 queues of the overview.
 
-What is proven: drafts are never shown; every staff step calls the service and the state is checked again (a step twice
+What is proven: drafts are listed as "not submitted" with a read-only page and no staff step (the dialogs and services
+refuse them); every staff step calls the service and the state is checked again (a step twice
 or out of order is refused with a message and changes nothing); a refused date shows its reason in the dialog; an unknown id
 is a 404; the IBAN is never on the page; the customer is told by the "rolled back" mail and keeps the account, the bank
 connection and the stored buildings; every route is closed to a customer, an anonymous visitor and a staff account without
@@ -11,6 +12,7 @@ the second factor (``test_access`` walks every route, ``test_acceptance_matrix``
 
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.test import Client, TestCase, tag
 from django.urls import reverse
@@ -24,6 +26,7 @@ from leg_platform.community import (
     applications,
     deregistrations,
     history,
+    numbers,
     own_iban,
     process_list,
 )
@@ -95,7 +98,7 @@ class ProcessBase(TestCase):
 class ProcessListTests(ProcessBase):
     URL = reverse("management:processes")
 
-    def test_it_lists_the_submitted_applications_and_never_a_draft_or_a_paused_draft(self):
+    def test_it_lists_drafts_marked_as_not_submitted_next_to_the_submitted_applications(self):
         shown = self.submitted(self.anna, egid=90004269)
         draft, _building = ready_draft(self.bert, egid=90004270, number=7, address={"house_number": "52"})
         paused, _building = ready_draft(
@@ -107,12 +110,23 @@ class ProcessListTests(ProcessBase):
         self.assertContains(page, "Anna Muster")
         self.assertContains(page, "Ittigenstrasse 51, 3063 Ittigen")
         self.assertContains(page, "EGID 90004269")
-        self.assertNotContains(page, "Bert Beispiel")
-        self.assertNotContains(page, "Paul Pause")
-        self.assertNotContains(page, "EGID 90004270")
-        self.assertContains(page, "1–1 von 1 Vorgängen")
-        self.assertContains(page, reverse("management:processes_application", args=[shown.pk]))
-        self.assertNotContains(page, reverse("management:processes_application", args=[draft.pk]))
+        # D-107: the drafts are listed, clearly marked, with a link to their read-only page.
+        self.assertContains(page, "Bert Beispiel")
+        self.assertContains(page, "Paul Pause")
+        self.assertContains(page, "EGID 90004270")
+        # Once in the table and once in the cards of a narrow screen (D-097).
+        self.assertContains(page, '<span class="mgmt-status is-muted">Entwurf / nicht eingereicht</span>', count=2)
+        self.assertContains(page, '<span class="mgmt-status is-muted">Pausiert / nicht eingereicht</span>', count=2)
+        self.assertContains(page, "1–3 von 3 Vorgängen")
+        for application in (shown, draft, paused):
+            self.assertContains(page, reverse("management:processes_application", args=[application.pk]))
+        # The filter "draft" joins the draft and the paused draft; the others do not show them.
+        only_drafts = self.client.get(self.URL, {"state": "draft"})
+        self.assertContains(only_drafts, "1–2 von 2 Vorgängen")
+        self.assertNotContains(only_drafts, "Anna Muster")
+        submitted_only = self.client.get(self.URL, {"state": "submitted"})
+        self.assertContains(submitted_only, "1–1 von 1 Vorgängen")
+        self.assertNotContains(submitted_only, "Bert Beispiel")
 
     def test_the_row_shows_the_status_as_dot_and_word_the_progress_and_the_start(self):
         self.submitted(self.anna)
@@ -139,7 +153,8 @@ class ProcessListTests(ProcessBase):
         page = self.client.get(self.URL)
         for word in ("Eingereicht", "In Prüfung", "Von Netzbetreiber bestätigt"):
             self.assertContains(page, word)
-        self.assertNotContains(page, "Entwurf")
+        # No draft in this data: no row carries the draft mark (the filter option and the column help name the word).
+        self.assertNotContains(page, 'is-muted">Entwurf')
         # An application whose start the customer left as "as soon as possible" has no date: the word, never a dash.
         Application.objects.filter(pk=first.pk).update(start_choice="", desired_start_date=None)
         self.assertContains(self.client.get(self.URL), '<span class="mgmt-open">offen</span>')
@@ -181,6 +196,19 @@ class ProcessListTests(ProcessBase):
 
     def test_the_empty_list_says_so(self):
         self.assertContains(self.client.get(self.URL), "Keine laufenden Vorgänge.")
+
+    def test_a_cut_of_the_list_is_said_on_the_page_and_a_complete_list_says_nothing(self):
+        self.submitted(self.anna, egid=90004269)
+        ready_draft(self.bert, egid=90004270, number=7, address={"house_number": "52"})
+        complete = self.client.get(self.URL)
+        self.assertNotContains(complete, "Grenzen Sie die Liste")
+        with patch.object(process_list, "MAX_ROWS", 1):
+            cut = self.client.get(self.URL)
+        self.assertContains(cut, "Mehr als 1 Anmeldungen oder Abmeldungen passen.")
+        self.assertContains(cut, "eingereichte Anmeldungen vor Entwürfen")
+        # The submitted application stays, the draft drops out.
+        self.assertContains(cut, "Anna Muster")
+        self.assertNotContains(cut, "Bert Beispiel")
 
     def test_the_rows_equal_the_counts_of_the_overview_queues(self):
         self.submitted(self.anna, egid=90004269)
@@ -234,7 +262,8 @@ class ApplicationPageTests(ProcessBase):
         self.assertContains(page, "Ittigenstrasse 51")
         self.assertContains(page, "3063 Ittigen")
         self.assertContains(page, "EGID 90004269")
-        self.assertContains(page, full_number(1)[:2] + " 1A2B")
+        # The number on one line: the grid operator's block, then blocks of four, no-break spaces (D-109).
+        self.assertContains(page, numbers.format_metering_point_number(full_number(1)))
         self.assertContains(page, "Bezug")
         self.assertContains(page, "Einspeisung")
         self.assertContains(page, "anna.process@example.org")
@@ -325,17 +354,55 @@ class ApplicationPageTests(ProcessBase):
         self.assertEqual(buttons(), set())
         self.assertContains(self.client.get(self.url(application)), "Die Anmeldung ist abgeschlossen.")
 
-    def test_a_draft_and_an_unknown_id_have_no_page(self):
+    def test_a_draft_has_a_read_only_page_and_no_staff_step_applies_to_it(self):
         draft, _building = ready_draft(self.bert, egid=90004270, number=5, address={"house_number": "52"})
-        for name in ("processes_application", "processes_application_review", "processes_application_return",
-                     "processes_application_operator_started", "processes_application_complete",
+        page = self.client.get(self.url(draft))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Entwurf / nicht eingereicht")
+        self.assertContains(page, "Der Kunde hat diese Anmeldung begonnen und nicht eingereicht.")
+        self.assertContains(page, "Ittigenstrasse 52")
+        # What the customer entered is readable; no button of a staff step is drawn, and the IBAN is never shown.
+        for name in ("review", "return", "operator_started", "operator_confirmed", "complete", "reject"):
+            self.assertNotContains(page, reverse(f"management:processes_application_{name}", args=[draft.pk]))
+        self.assertNotContains(page, "Anmeldung rückabwickeln")
+        self.assertNotContains(page, GOOD_IBAN)
+        # The services and dialogs refuse every step and change nothing (a second line of defence, not only hidden buttons).
+        for name in ("processes_application_return", "processes_application_operator_started",
+                     "processes_application_operator_confirmed", "processes_application_complete",
                      "processes_application_reject"):
             with self.subTest(name=name):
                 url = reverse(f"management:{name}", args=[draft.pk])
-                self.assertEqual(self.client.get(url).status_code, 404 if name != "processes_application_review" else 405)
-        self.assertEqual(self.client.post(reverse("management:processes_application_review", args=[draft.pk])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("management:processes_application", args=[999999])).status_code, 404)
+                self.assertEqual(self.client.get(url).status_code, 302)
+                self.assertEqual(self.client.post(url, {"reason": "x", "note": "", "next": ""}).status_code, 302)
+        self.assertEqual(self.client.get(reverse("management:processes_application_review", args=[draft.pk])).status_code, 405)
+        self.assertEqual(self.client.post(reverse("management:processes_application_review", args=[draft.pk])).status_code, 302)
         self.assertEqual(self.state(draft), State.DRAFT)
+        self.assertFalse(Application.objects.get(pk=draft.pk).returned_at)
+        # The customer's own route to the draft is closed to the staff (404), so the staff cannot edit it there either.
+        self.assertEqual(self.client.get(reverse("customer:application", args=[draft.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("customer:application_cancel", args=[draft.pk])).status_code, 404)
+        self.assertTrue(Application.objects.filter(pk=draft.pk).exists())
+
+    def test_a_paused_draft_page_says_paused_and_an_unknown_id_has_no_page(self):
+        paused, _building = ready_draft(self.bert, egid=90004270, number=5, address={"house_number": "52"})
+        Application.objects.filter(pk=paused.pk).update(state=State.PAUSED)
+        self.assertContains(self.client.get(self.url(paused)), "Pausiert / nicht eingereicht")
+        self.assertEqual(self.client.get(reverse("management:processes_application", args=[999999])).status_code, 404)
+
+    def test_an_application_the_customer_changed_meanwhile_is_not_stale_for_the_staff(self):
+        """The customer takes a submitted application back to change it; the open page of the staff still offers
+        "Take into review" and the click is refused: the state is read again under the row lock."""
+        application = self.submitted(self.anna)
+        self.assertContains(self.client.get(self.url(application)), "In Prüfung nehmen")
+        applications.reopen_for_change(self.anna, application)
+        response = self.client.post(
+            reverse("management:processes_application_review", args=[application.pk]), follow=True
+        )
+        self.assertContains(response, "Dieser Schritt ist im aktuellen Zustand nicht möglich.")
+        self.assertEqual(self.state(application), State.DRAFT)
+        page = self.client.get(self.url(application))
+        self.assertContains(page, "Entwurf / nicht eingereicht")
+        self.assertNotContains(page, "In Prüfung nehmen")
 
     def test_the_history_names_who_did_what_without_a_value(self):
         application = self.submitted(self.anna)
@@ -416,15 +483,15 @@ class ApplicationStepTests(ProcessBase):
             self.url(application, "return"), {"reason": "Nummer prüfen", "next": self.detail(application)},
             follow=True,
         )
-        # W2-02: the page of the application is gone (a draft has none), so the way on is the list, with a message.
+        # W2-02: after the step the way on is the list, with a message (the draft has a read-only page, D-107).
         self.assertRedirects(response, reverse("management:processes"))
         self.assertContains(response, "Die Anmeldung wurde zur Korrektur zurückgegeben.")
         application.refresh_from_db()
         self.assertEqual(application.state, State.DRAFT)
         self.assertIsNotNone(application.returned_at)
         self.assertEqual(application.returned_reason, "Nummer prüfen")
-        # A draft has no page for the staff any more.
-        self.assertEqual(self.client.get(self.detail(application)).status_code, 404)
+        # The returned draft is marked as not submitted on its read-only page.
+        self.assertContains(self.client.get(self.detail(application)), "Entwurf / nicht eingereicht")
         self.assertEqual(MailJob.objects.filter(kind="application_returned").count(), 1)
         self.assertEqual(MailJob.objects.filter(kind="application_rolled_back").count(), 0)
 
@@ -769,7 +836,7 @@ class NoticePageTests(ProcessBase):
         page = self.client.get(reverse("management:processes_notices"))
         self.assertContains(page, "Anna Muster")
         self.assertContains(page, "12345678")
-        self.assertContains(page, "CH 1A2B")
+        self.assertContains(page, "CH1A2B3C4D5E6")
         self.assertContains(page, "Als erledigt markieren")
         self.assertContains(page, "Gebäude für den Kunden nicht verfügbar")
 

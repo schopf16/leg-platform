@@ -29,7 +29,7 @@ Profile addresses never leave the application; suggestions query only a local co
 * Own SQLite file (D-075), **not part of any backup**. Optional `ADDRESS_DIRECTORY_FILE`: absolute path outside the repository, no control characters.
 * Default outside `APP_ENV=local`: `/var/lib/leg-platform/address-directory.sqlite3` (`StateDirectory=leg-platform` in the systemd units). With `APP_ENV=local`: `~/.leg-platform-dev/address-directory.sqlite3`.
 * A missing file is created with mode 0600 (folder 0700). Processes open it read-only unless they are writers (worker, `import_address_directory`, `seed_local_address_directory`, `setup_instance`, `migrate`; never the web processes). Web and worker run on the same host with the same settings. No network file system.
-* `python manage.py setup_instance` (below) creates the file and tables. Manual equivalent (`migrate` alone never creates them): `python manage.py migrate addresses --database=addresses`
+* `python manage.py setup_instance` (below) creates the file and tables. Manual equivalent for local development only (`migrate` alone never creates them): `python manage.py migrate addresses --database=addresses`. On a server never run it by hand (D-076): start `leg-setup.service`; a hand-run as `root` would create a root-owned 0600 file the service cannot open (`docs/DEPLOYMENT.md`, 10.2, "Repair").
 * **Restore:** the file is not restored from a backup. Start the services (`setup_instance` recreates it). The daily run of the scheduled tasks imports it at the next run after the configured time (default 03:00; within 24 hours of an empty directory), or an administrator presses the button (about 12 minutes, about 143 MB; D-075, D-090). A corrupted file is deleted and rebuilt (`docs/DEPLOYMENT.md`, section 10.2).
 
 **The button needs no extra service (D-090); the automatic refresh is the daily run of `run_scheduled_tasks`.** Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.3, 8.4 and 10.2.
@@ -201,7 +201,7 @@ Lockout paths (D-044):
 * IPware validates the chain strictly. An unexpected or malformed chain produces no client IP and the login is refused. A wrong value can group users under a proxy address or refuse logins: verify it against the actual proxy topology before enabling a stage or production instance.
 * Client IPs are not stored in Axes (D-017, D-023).
 
-**Address suggestions need the same setting (D-052, D-065).** `/addresses/lookup/` counts requests per client IP (60 per minute, 5 for administrators; IPv6 per /64) and for the whole instance (600 per minute). With the count at `0` behind a reverse proxy, all visitors share the proxy's budget and everybody sees "temporarily limited". Saving the profile is never affected.
+**Address suggestions need the same setting (D-052, D-065, D-111).** `/addresses/lookup/` counts requests per client IP for an anonymous visitor (60 per minute, 5 for administrators; IPv6 per /64), per account for a signed-in account (120 per minute) and for the whole instance (600 per minute). With the count at `0` behind a reverse proxy, all visitors share the proxy's budget and everybody sees "temporarily limited". Saving the profile is never affected.
 
 ### Changing `SECRET_KEY`
 

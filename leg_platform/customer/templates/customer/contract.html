@@ -6,6 +6,7 @@
     <p class="page-label">{% translate "Information" %}</p>
     <h1 class="start-title">{% translate "Articles of association" %}</h1>
     <p class="start-sub">{% translate "The current version and every version you agreed to." %}</p>
+    {% if current %}{% include "customer/_contract_viewer.html" with without_download=True %}{% endif %}
     {% if versions %}
       <ul class="contract-list">
         {% for version, acceptance in versions %}

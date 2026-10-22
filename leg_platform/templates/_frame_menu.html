@@ -23,7 +23,6 @@ D-102; the administration itself checks every request) and is the very last entr
 </p>
 <ul class="frame-sub">
   <li><a class="frame-sub-item{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>{% translate "Buildings" %}</a></li>
-  <li><a class="frame-sub-item" href="{% url 'customer:contract' %}">{% translate "Contract" %}</a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Start date" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Neighbourhood" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
 </ul>

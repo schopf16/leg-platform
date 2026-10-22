@@ -698,8 +698,9 @@ class TwoFactorCardTests(TestCase):
     def test_the_card_offers_the_setup_when_nothing_is_set_up(self):
         page = self.client.get(PROFILE_URL)
 
-        self.assertContains(page, "Nicht eingerichtet")
-        self.assertContains(page, "2FA einrichten")
+        self.assertContains(page, "Anmeldemethode")
+        self.assertContains(page, "Sie melden sich nur mit Ihrem Passwort an.")
+        self.assertRegex(page.content.decode(), r'step=choose#card-two-factor">Ändern</a>')
 
     def test_the_setup_has_two_steps_with_the_key_and_the_qr_code(self):
         self.assertEqual(self.start("wrong password for this account").status_code, 200)

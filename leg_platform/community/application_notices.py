@@ -21,7 +21,9 @@ def record(person, kind, *, egid=None, numbers=()):
 
     The notice ``OPERATOR_CONFIRMATION_LAPSED`` is exempt from the cap and from the deduplication and is always written:
     the application it names is deleted, so the notice is the staff's only way to learn which registration at the grid
-    operator must be withdrawn."""
+    operator must be withdrawn. The notice ``OPERATOR_DATA_CHANGED`` (a staff correction after the registration at the
+    grid operator started, D-109) is exempt from the cap (the staff causes it, a customer cannot flood with it) and
+    deduplicated like the others."""
     kind = Kind(kind).value
     numbers = sorted({str(number) for number in numbers})
     user_model = get_user_model()
@@ -32,7 +34,7 @@ def record(person, kind, *, egid=None, numbers=()):
             return None
         if not must_write:
             open_rows = list(ApplicationNotice.objects.filter(person_id=person.pk, resolved_at__isnull=True))
-            if len(open_rows) >= MAX_UNRESOLVED_NOTICES_PER_PERSON:
+            if len(open_rows) >= MAX_UNRESOLVED_NOTICES_PER_PERSON and kind != Kind.OPERATOR_DATA_CHANGED:
                 return None
             if any(row.kind == kind and row.egid == egid and sorted(row.numbers) == numbers for row in open_rows):
                 return None
