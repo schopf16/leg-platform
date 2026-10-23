@@ -69,6 +69,11 @@ def has_authenticator(user):
     return AuthenticatorDevice.objects.filter(user=user, confirmed=True).exists()
 
 
+def discard_unconfirmed(user):
+    """Delete the account's secrets that were never confirmed (the person cancelled the setup); a confirmed one stays."""
+    AuthenticatorDevice.objects.filter(user=user, confirmed=False).delete()
+
+
 def unconfirmed_totp_device(user, device_id):
     """The secret that this session started to set up, if it is still young enough."""
     if device_id is None:
@@ -221,6 +226,9 @@ def disable(user, *, via_recovery_code=False):
         locked = _lock_account(user)
         if requires_second_factor(locked):
             raise SecondFactorError("Staff users and system administrators need a second factor.")
+        if confirmed_totp_device(locked) is None:
+            # Nothing to turn off: no session ends, no mail, no event (a forged or repeated request).
+            raise SecondFactorError("The account has no second factor.")
         for device in list(devices_for_user(user, confirmed=None)):
             device.delete()
         # Other sessions end; the view keeps the session that made the change (D-044).

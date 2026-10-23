@@ -16,17 +16,24 @@ from leg_platform.accounts.models import (
 SETUP_KEY = "passkey_setup"
 
 
-def allow_setup(request):
-    """Called only after a successful current proof, never by the method-choice router."""
+def allow_setup(request, started=None):
+    """Called only after a successful current proof, never by the method-choice router. ``started`` is the time of that
+    proof when another grant (the flow "Change sign-in") hands it over: the window of five minutes then runs from the
+    original proof and is not doubled. A time in the future or not a number is ignored (now counts)."""
+    now = time.time()
+    if not isinstance(started, (int, float)) or isinstance(started, bool) or not 0 <= now - started:
+        started = now
     request.session[SETUP_KEY] = {
         "user": request.user.pk, "hash": request.user.get_session_auth_hash(),
-        "started": time.time(),
+        "started": started,
     }
 
 
 def setup_allowed(request, user=None):
     user = user or request.user
     setup = request.session.get(SETUP_KEY, {})
+    if not isinstance(setup, dict):
+        return False
     return (
         setup.get("user") == user.pk
         and isinstance(setup.get("started"), (int, float))

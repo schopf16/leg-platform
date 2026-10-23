@@ -2,6 +2,6 @@
 <script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script>
 <script src="{% static 'js/passkeys.js' %}" defer></script>
 <p data-passkey-proof data-field="{{ widget.attrs.id }}" data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}">
-  {% translate "Confirm this change with your passkey when you continue." %}
+  {% if widget.show_lead %}{% translate "Confirm this change with your passkey when you continue." %}{% endif %}
   <span role="status" data-passkey-status></span>
 </p>

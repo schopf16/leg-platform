@@ -114,16 +114,22 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/method_changes.py", "leg_platform/accounts/method_views.py",
             "leg_platform/accounts/tests/test_method_changes.py",
             "leg_platform/accounts/tests/test_passkey_script.py",
+            "leg_platform/accounts/tests/test_passkey_wizard.py",
+            "leg_platform/accounts/tests/test_proof_entry_points.py",
             "leg_platform/accounts/templates/accounts/method*.html",
             "leg_platform/accounts/templates/accounts/recovery*.html",
             "leg_platform/accounts/templates/accounts/login_help.html",
             "leg_platform/accounts/templates/accounts/_recovery_clarification.html",
             "leg_platform/accounts/templates/accounts/passkeys.html",
-            "leg_platform/static/js/passkeys.js", "leg_platform/static/vendor/simplewebauthn/",
+            "leg_platform/static/js/passkeys.js", "leg_platform/static/js/passkey-setup.js",
+            "leg_platform/static/vendor/simplewebauthn/",
             "leg_platform/accounts/templates/accounts/passkey_setup.html",
             "leg_platform/accounts/templates/accounts/widgets/",
         ),
-        tests=_labels(A, "test_passkeys", "test_passkey_script", "test_method_changes", "test_login_methods"),
+        tests=_labels(
+            A, "test_passkeys", "test_passkey_script", "test_passkey_wizard", "test_proof_entry_points",
+            "test_method_changes", "test_login_methods",
+        ),
         checks=("makemigrations", "system-check"),
     ),
     "docs": Area(
@@ -320,7 +326,7 @@ AREAS: dict[str, Area] = {
             _labels(A, "test_second_factor", "test_second_factor_reset", "test_lost_phone",
                     "test_one_proof", "test_one_proof_review", "test_recent_authentication",
                     "test_session_code_limit", "test_session_limit_review", "test_design_accounts",
-                    "test_setup_instance")
+                    "test_setup_instance", "test_proof_entry_points")
             + _FLOW_REVIEWS
         ),
     ),
@@ -329,12 +335,15 @@ AREAS: dict[str, Area] = {
         paths=(
             "leg_platform/accounts/profile_views.py", "leg_platform/accounts/email_change.py",
             "leg_platform/accounts/views.py", "leg_platform/accounts/forms.py",
-            "leg_platform/accounts/login_methods.py",
+            "leg_platform/accounts/login_methods.py", "leg_platform/accounts/sign_in_change.py",
+            "leg_platform/accounts/tests/test_sign_in_change.py",
+            "leg_platform/accounts/templates/accounts/sign_in_change.html",
+            "leg_platform/accounts/templates/accounts/_flow_progress.html",
         ),
         tests=(
             _labels(A, "test_profile", "test_profile_acceptance", "test_account_lifecycle",
                     "test_phase4_review", "test_address_notice", "test_recent_authentication",
-                    "test_login_methods")
+                    "test_login_methods", "test_sign_in_change", "test_proof_entry_points")
             + _FLOW_REVIEWS
             + ("leg_platform.customer.tests.test_profile_cards", C + "test_profile_address")
         ),

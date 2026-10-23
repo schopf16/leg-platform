@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+The bar and the line of a screen of "Change sign-in" (the building wizard's ``progress-block``, wizard_base.html). Context:
+``number``, ``total``, and either ``name`` ("Step n of m: name") or ``setup`` (the setup of the number code, its own two
+steps: "Set up number code, step n of 2").
+{% endcomment %}<div class="progress-block">
+  {% if setup %}
+    <progress class="path-bar" max="{{ total }}" value="{{ number }}" aria-label="{% blocktranslate %}Set up number code, step {{ number }} of {{ total }}{% endblocktranslate %}">{{ number }}/{{ total }}</progress>
+    <p class="step-note">{% blocktranslate %}Set up number code, step {{ number }} of {{ total }}{% endblocktranslate %}</p>
+  {% else %}
+    <progress class="path-bar" max="{{ total }}" value="{{ number }}" aria-label="{% blocktranslate with step_number=number step_total=total %}Step {{ step_number }} of {{ step_total }}{% endblocktranslate %}">{{ number }}/{{ total }}</progress>
+    <p class="step-note">{% blocktranslate with step_number=number step_total=total step_name=name %}Step {{ step_number }} of {{ step_total }}: {{ step_name }}{% endblocktranslate %}</p>
+  {% endif %}
+</div>

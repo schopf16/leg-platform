@@ -447,15 +447,16 @@ class TwoFactorPageTests(TestCase):
 
         response = self.client.get(PROFILE_URL)
 
-        self.assertContains(response, "Anmeldemethode")
+        self.assertContains(response, ">Anmeldung</h2>")
+        self.assertContains(response, "Nur Passwort")
         self.assertContains(
             response,
-            "Sie melden sich nur mit Ihrem Passwort an. Mit einem Code aus einer App schützen Sie Ihr Konto zusätzlich. "
-            "Das ist freiwillig.",
+            "Schützen Sie Ihr Konto zusätzlich mit einem Zahlencode vom Handy. "
+            "Oder ersetzen Sie das Passwort durch einen Passkey.",
         )
-        self.assertContains(response, "Ändern</a>")
+        self.assertContains(response, "Anmeldung ändern</a>")
 
-    def test_the_card_with_a_second_factor_counts_the_recovery_codes_and_turns_off_in_red(self):
+    def test_the_card_with_a_second_factor_counts_the_recovery_codes_and_changes_in_the_flow(self):
         user, _device = create_user_with_totp()
         client = VerifiedClient()
         client.force_login(user)
@@ -466,7 +467,9 @@ class TwoFactorPageTests(TestCase):
 
         self.assertContains(response, "Sie haben 3 unbenutzte Wiederherstellungscodes.")
         self.assertContains(response, "Neue Codes erzeugen")
-        self.assertRegex(html, r'class="btn btn-danger-outline" href="[^"]*step=disable[^"]*">2FA deaktivieren')
+        # The turn-off is the step "Zahlencode abschalten" of the flow: no red button on the card.
+        self.assertNotIn("2FA deaktivieren", html)
+        self.assertNotIn("step=disable", html)
         RecoveryCode.objects.filter(device__user=user).exclude(pk=RecoveryCode.objects.first().pk).delete()
         self.assertContains(client.get(PROFILE_URL), "Sie haben 1 unbenutzten Wiederherstellungscode.")
         RecoveryCode.objects.all().delete()
@@ -489,7 +492,7 @@ class TwoFactorPageTests(TestCase):
             follow=True,
         )
 
-        self.assertContains(response, "Die Zwei-Faktor-Anmeldung (2FA) wurde ausgeschaltet.")
+        self.assertContains(response, "Der Zahlencode ist abgeschaltet.")
         self.assertNotContains(response, "wurde entfernt")
 
     def test_the_setup_has_two_steps_one_form_each_and_the_manual_key_as_text(self):

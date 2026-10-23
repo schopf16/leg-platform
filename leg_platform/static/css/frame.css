@@ -857,7 +857,16 @@
   color: var(--muted);
 }
 
+/* A small text link inside a card with a tap area of at least 44 px. */
+.profile-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 /* A field that is locked (a confirmed address, W4-01) looks different from an editable one: grey background, muted text. */
+
+/* A field that is locked (a confirmed address, W4-01) looks different from an editable one: grey background, muted text. */ (a confirmed address, W4-01) looks different from an editable one: grey background, muted text. */
 .profile-form .form-control:disabled,
 .profile-form .form-control[readonly] {
   background-color: var(--bg);

@@ -24,6 +24,8 @@ PROFILE_VIEWS = frozenset(
         "accounts:email_change_request",
         "accounts:email_change_cancel",
         "accounts:recovery_codes_done",
+        "accounts:passkeys",
+        "accounts:passkey_setup",
     }
 )
 

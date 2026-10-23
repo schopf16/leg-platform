@@ -24,9 +24,11 @@ from django_otp import login as otp_login
 from leg_platform.accounts import (
     email_change,
     login_methods,
+    passkey_methods,
     password_reset,
     second_factor,
     security_log,
+    sign_in_change,
     totp,
 )
 from leg_platform.accounts.forms import (
@@ -38,6 +40,8 @@ from leg_platform.accounts.forms import (
     ProfileForm,
     ReauthenticationForm,
     SetupCodeForm,
+    SignInChangeCodeForm,
+    SignInChangeProofForm,
     StartSetupForm,
     password_rules,
 )
@@ -218,6 +222,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
         "privacy_url": legal_links(request).privacy_url,
         "password_rules": password_rules(),
         "can_choose": login_methods.has_choice(user),
+        "sign_in_flow": sign_in_change.uses_flow(user),
     }
     if not only_two_factor:
         context["address_building"] = address_building(user)
@@ -296,7 +301,12 @@ class ProfileView(ProfileCardView):
     """The profile; ``?edit=<card>&step=<step>`` opens one card in its edit state."""
 
     def get(self, request):
-        return render_profile(request, edit=request.GET.get("edit"), step=request.GET.get("step"))
+        edit, step = request.GET.get("edit"), request.GET.get("step")
+        if (edit, step) == ("two_factor", "choose") and sign_in_change.uses_flow(request.user):
+            # The tile "Choose how you sign in" and old links: the choice is the second screen of the flow, which
+            # starts with the proof.
+            return redirect(flow_url())
+        return render_profile(request, edit=edit, step=step)
 
 
 class ProfileEditView(ProfileCardView):
@@ -455,9 +465,12 @@ class TwoFactorOverviewView(ProfileCardView):
 
 
 class LoginMethodView(ProfileCardView):
-    """The choice "Sign-in method" (D-106): GET opens it in the card, POST validates the posted method on the server
-    and leads into the existing flows (setup of the app, turning it off). It adds no security logic of its own: the
-    flows ask for the password where they always did. An account with only one method has no choice page."""
+    """The choice "Sign-in method" (D-106) at ``/profile/sign-in-method/``.
+
+    A password account (with or without a number code) is served by the flow "Change sign-in" (``SignInChangeView``).
+    For every other account GET opens the choice, POST validates the posted method on the server and leads into the
+    existing flows (setup of the app, turning it off). It adds no security logic of its own: the flows ask for the
+    password where they always did. An account with only one method has no choice page."""
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and not login_methods.has_choice(request.user):
@@ -465,6 +478,8 @@ class LoginMethodView(ProfileCardView):
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
+        if sign_in_change.uses_flow(request.user):
+            return SignInChangeView.as_view()(request)
         return self.choice(request)
 
     def choice(self, request, form=None):
@@ -480,6 +495,8 @@ class LoginMethodView(ProfileCardView):
 
     def post(self, request):
         user = request.user
+        if sign_in_change.uses_flow(user):
+            return SignInChangeView.as_view()(request)
         form = LoginMethodForm(request.POST, user=user)
         if not form.is_valid():
             return self.choice(request, form)
@@ -498,6 +515,179 @@ class LoginMethodView(ProfileCardView):
         if method == login_methods.PASSWORD_ONLY:
             return redirect(card_url("two_factor", "disable"))
         raise Http404
+
+
+def flow_url(step=None):
+    """The address of a step of the flow "Change sign-in"; the first step has no query."""
+    base = reverse("accounts:login_method")
+    return base if step in (None, sign_in_change.PROOF) else f"{base}?step={step}"
+
+
+class SignInChangeView(ProfileCardView):
+    """The flow "Change sign-in" for a password account (``sign_in_change``; owner specification chapters 2 to 4).
+
+    One address, the step in ``?step=``: ``proof`` (the one proof, D-062), ``choose``, then ``same`` / ``disable`` /
+    ``passkey`` (the confirmations) or ``scan`` / ``number`` (the setup of the number code, the existing enrolment).
+    Opening a page never changes anything; a change is a POST. Every step after the proof needs the grant of the proof and
+    reads the state of the account again: the browser decides nothing. Reached only through ``LoginMethodView``.
+    """
+
+    http_method_names = ["get", "post"]
+
+    def step(self, request):
+        step = request.GET.get("step", sign_in_change.PROOF)
+        return step if step in sign_in_change.STEPS else sign_in_change.PROOF
+
+    def device(self, request):
+        """The secret this session started to set up inside the flow, while the account has no second factor."""
+        if second_factor.has_second_factor(request.user):
+            return None
+        return totp.unconfirmed_totp_device(request.user, request.session.get(ENROLMENT_SESSION_KEY))
+
+    def expired(self, request):
+        """No valid proof in this session (or it is too old): back to the proof, with one short sentence."""
+        sign_in_change.revoke(request)
+        messages.info(request, _("Please confirm again."))
+        return redirect(flow_url())
+
+    @sensitive_variables("codes", "context")
+    def page(self, request, step, *, form=None, status=200, codes=None):
+        user = request.user
+        context = {"flow": step, "has_code": second_factor.has_second_factor(user), "form": form}
+        if step == sign_in_change.PROOF:
+            context["form"] = form or SignInChangeProofForm(request=request)
+        elif step == sign_in_change.CHOOSE:
+            current = login_methods.current(user)
+            form = form or LoginMethodForm(user=user, initial={"method": current})
+            context.update(
+                form=form,
+                options=sign_in_change.options(user),
+                selected=form["method"].value(),
+                current=current,
+            )
+        elif step in (sign_in_change.SCAN, sign_in_change.NUMBER):
+            device = self.device(request)
+            context["secret"] = totp.secret_for_display(device)
+            context["form"] = form or SignInChangeCodeForm()
+        elif step == "codes":
+            # Only as the answer to the confirmation of the number code: shown once, never stored (D-059).
+            context["codes"] = codes
+        return render(request, "accounts/sign_in_change.html", context, status=status)
+
+    def get(self, request):
+        step = self.step(request)
+        user = request.user
+        if step == sign_in_change.PROOF:
+            # Starting again asks for the proof again: nothing from an earlier visit counts.
+            sign_in_change.revoke(request)
+            return self.page(request, step)
+        if step == sign_in_change.CANCEL:
+            return back_to("two_factor")
+        if step in (sign_in_change.SCAN, sign_in_change.NUMBER):
+            if self.device(request) is None:
+                return redirect(flow_url(sign_in_change.CHOOSE))
+            return self.page(request, step)
+        if not sign_in_change.granted(request):
+            return self.expired(request)
+        if step == sign_in_change.DISABLE and not (
+            second_factor.has_second_factor(user) and not second_factor.requires_second_factor(user)
+        ):
+            return redirect(flow_url(sign_in_change.CHOOSE))
+        return self.page(request, step)
+
+    def post(self, request):
+        step = self.step(request)
+        if step == sign_in_change.CANCEL:
+            sign_in_change.revoke(request)
+            request.session.pop(ENROLMENT_SESSION_KEY, None)
+            # The secret of a setup that was not finished goes with it (as the staged passkeys do on cancel).
+            totp.discard_unconfirmed(request.user)
+            return back_to("two_factor")
+        if step == sign_in_change.PROOF:
+            return self.post_proof(request)
+        if step == sign_in_change.NUMBER:
+            return self.post_number(request)
+        if not sign_in_change.granted(request):
+            return self.expired(request)
+        if step == sign_in_change.CHOOSE:
+            return self.post_choice(request)
+        if step == sign_in_change.DISABLE:
+            return self.post_disable(request)
+        return redirect(flow_url(step))
+
+    def post_proof(self, request):
+        form = SignInChangeProofForm(request.POST, request=request)
+        if not form.is_valid():
+            return self.page(request, sign_in_change.PROOF, form=form)
+        sign_in_change.grant(request)
+        return redirect(flow_url(sign_in_change.CHOOSE))
+
+    def post_choice(self, request):
+        user = request.user
+        form = LoginMethodForm(request.POST, user=user)
+        if not form.is_valid():
+            return self.page(request, sign_in_change.CHOOSE, form=form)
+        method = form.cleaned_data["method"]
+        if method == login_methods.current(user):
+            return redirect(flow_url(sign_in_change.SAME))
+        if method == login_methods.PASSKEY:
+            return self.post_passkey(request)
+        if method == login_methods.PASSWORD_ONLY:
+            return redirect(flow_url(sign_in_change.DISABLE))
+        if method == login_methods.PASSWORD_AND_APP:
+            try:
+                device = totp.start_enrolment(user)
+            except totp.SecondFactorError:
+                return refused_change(request)
+            # Only this session may finish the setup (D-040).
+            request.session[ENROLMENT_SESSION_KEY] = device.pk
+            return redirect(flow_url(sign_in_change.SCAN))
+        raise Http404
+
+    def post_disable(self, request):
+        user = request.user
+        # The same condition as the screen: nothing to turn off, or a mandatory number code, is refused without a side
+        # effect (``totp.disable`` checks again under the lock).
+        if not (second_factor.has_second_factor(user) and not second_factor.requires_second_factor(user)):
+            return back_to("two_factor")
+        try:
+            totp.disable(user)
+        except totp.SecondFactorError:
+            return refused_change(request)
+        sign_in_change.revoke(request)
+        # Other sessions ended with the removal; this one stays (D-044).
+        update_session_auth_hash(request, user)
+        messages.success(request, _("Number code was turned off."), extra_tags="card-two_factor")
+        return back_to("two_factor")
+
+    def post_passkey(self, request):
+        """The grant of this flow becomes the setup grant of the passkey setup (``passkey_methods.allow_setup``), which
+        then needs nothing further; the change itself is ``passkey_methods.activate`` after the key was created. The
+        setup grant keeps the time of the original proof, so the window of five minutes is not doubled (D-112)."""
+        started = request.session[sign_in_change.SESSION_KEY]["at"]
+        sign_in_change.revoke(request)
+        passkey_methods.allow_setup(request, started=started)
+        return redirect("accounts:passkey_setup")
+
+    @sensitive_variables("result", "codes")
+    def post_number(self, request):
+        device = self.device(request)
+        if device is None:
+            return redirect(flow_url(sign_in_change.CHOOSE))
+        form = SignInChangeCodeForm(request.POST)
+        if form.is_valid():
+            result = totp.confirm_enrolment(request.user, device.pk, form.cleaned_data["otp_token"])
+            if result is not None:
+                device, codes = result
+                sign_in_change.revoke(request)
+                # Other sessions ended with the confirmation; this one stays (D-044).
+                update_session_auth_hash(request, request.user)
+                request.session.pop(ENROLMENT_SESSION_KEY, None)
+                request.session.cycle_key()
+                otp_login(request, device)
+                return self.page(request, "codes", codes=[totp.format_recovery_code(code) for code in codes])
+            form.add_error("otp_token", form.invalid_code_message)
+        return self.page(request, sign_in_change.NUMBER, form=form)
 
 
 class TwoFactorSetupView(ProfileCardView):
@@ -660,7 +850,7 @@ class TwoFactorDisableView(ProfileCardView):
             return refused_change(request)
         # Other sessions ended with the removal; this session stays (D-044).
         update_session_auth_hash(request, request.user)
-        messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
+        messages.success(request, _("Number code was turned off."), extra_tags="card-two_factor")
         return back_to("two_factor")
 
 
@@ -694,7 +884,7 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
                 request, edit="two_factor", step="lost_phone", forms={"action": form}
             )
         update_session_auth_hash(request, request.user)
-        messages.success(request, _("Two-factor authentication was turned off."), extra_tags="card-two_factor")
+        messages.success(request, _("Number code was turned off."), extra_tags="card-two_factor")
         return back_to("two_factor")
 
 

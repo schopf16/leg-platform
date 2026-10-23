@@ -44,10 +44,10 @@ class MethodTransitionTests(TestCase):
                 self.activate()
             passkey_methods.allow_setup(self.request)
             for language, label in (
-                ("de-ch", "Name des Passkeys"),
-                ("fr", "Nom de la clé d’accès"),
-                ("it", "Nome della passkey"),
-                ("en", "Passkey name"),
+                ("de-ch", "Name"),
+                ("fr", "Nom"),
+                ("it", "Nome"),
+                ("en", "Name"),
             ):
                 with self.subTest(adding=adding, language=language):
                     with translation.override(language):
@@ -254,7 +254,7 @@ class MethodTransitionTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.authentication_method, "passkey")
 
-    def test_setup_switch_copy_has_recommendation_without_ordinary_device_assertion(self):
+    def test_setup_starts_with_the_name_and_asks_for_no_device_statement(self):
         self.login_client()
         session = self.client.session
         import time
@@ -264,9 +264,8 @@ class MethodTransitionTests(TestCase):
         session.save()
         self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = "en"
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Until you save, your current sign-in method stays active.")
-        self.assertContains(response, "One passkey is enough.")
-        self.assertContains(response, "Create passkey")
+        self.assertContains(response, "Step 1 of 3: Name")
+        self.assertContains(response, "What should the passkey be called?")
         self.assertNotContains(response, 'name="two_devices"')
 
     def test_existing_key_setup_and_profile_password_card_describe_real_state(self):
@@ -274,7 +273,8 @@ class MethodTransitionTests(TestCase):
         self.login_client()
         self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = "en"
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Add a passkey")
+        self.assertContains(response, "Set up another passkey")
+        self.assertContains(response, "Confirm with your passkey that it is you.")
         session = self.client.session
         import time
         session[passkey_methods.SETUP_KEY] = {
@@ -282,8 +282,7 @@ class MethodTransitionTests(TestCase):
         }
         session.save()
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Your existing passkeys and this session stay active.")
-        self.assertContains(response, "Save passkey")
+        self.assertContains(response, "What should the passkey be called?")
         self.assertNotContains(response, 'name="two_devices"')
         response = self.client.get(reverse("accounts:profile") + "?edit=password")
         self.assertContains(response, "You use passkeys and have no password.")
@@ -293,7 +292,7 @@ class MethodTransitionTests(TestCase):
             "user": self.user, "edit": "password",
         })
         self.assertNotIn("••••", card)
-        self.assertIn(reverse("accounts:login_method"), card)
+        self.assertNotIn(reverse("accounts:login_method"), card)
 
     def test_additional_passkey_guidance_is_localized_and_direct_for_every_access_level(self):
         import secrets
@@ -306,21 +305,18 @@ class MethodTransitionTests(TestCase):
             self.credential_id = secrets.token_bytes(32)
             self.activate()
             self.login_client()
-            for language, action, recommendation, summary in (
-                ("de-ch", "Passkey auf einem anderen Gerät hinzufügen", "Wir empfehlen dringend", "Weitere Hilfe"),
-                ("fr", "Ajouter une clé d’accès sur un autre appareil", "Nous recommandons vivement", "Aide complémentaire"),
-                ("it", "Aggiungere una passkey su un altro dispositivo", "Consigliamo vivamente", "Altre informazioni"),
-                ("en", "Add a passkey on another device", "We strongly recommend", "More help"),
+            for language, manage, further in (
+                ("de-ch", "Passkeys verwalten", "Weiteren Passkey einrichten"),
+                ("fr", "Gérer les clés d’accès", "Configurer une autre clé d’accès"),
+                ("it", "Gestire le passkey", "Configurare un’altra passkey"),
+                ("en", "Manage passkeys", "Set up another passkey"),
             ):
                 with self.subTest(role=role, language=language):
                     self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
                     profile = self.client.get(reverse("accounts:profile"))
-                    self.assertContains(profile, action)
-                    self.assertContains(profile, recommendation)
-                    self.assertContains(profile, summary)
-                    self.assertContains(profile, f'href="{reverse("accounts:passkey_setup")}"')
-                    response = self.client.get(reverse("accounts:passkeys"))
-                    self.assertContains(response, summary)
+                    self.assertContains(profile, manage)
+                    self.assertContains(profile, f'href="{reverse("accounts:passkeys")}"')
+                    self.assertNotContains(profile, "More help")
                     setup = self.client.get(reverse("accounts:passkey_setup"))
                     self.assertContains(setup, 'name="passkey_assertion"')
                     self.assertNotContains(setup, 'name="two_devices"')
@@ -467,7 +463,7 @@ class UnifiedRecoveryTests(TestCase):
         self.client.post(reverse("accounts:two_factor_reset_confirm"))
         self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = "en"
         response = self.client.get(reverse("accounts:passkey_setup"))
-        self.assertContains(response, "Your previous sign-in methods no longer work.")
+        self.assertContains(response, "What should the passkey be called?")
         self.assertNotContains(response, "stays valid until")
         self.assertNotContains(response, 'name="two_devices"')
 

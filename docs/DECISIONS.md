@@ -2,12 +2,12 @@
 
 CURRENT binding decisions by topic. Not a log (history: `git log -- docs/DECISIONS.md`).
 
-* IDs like `(D-012, D-086)` are cited by code and docs. Every ID D-001..D-111 appears here.
+* IDs like `(D-012, D-086)` are cited by code and docs. Every ID D-001..D-112 appears here.
 * Conflict: the later or owner decision wins; the older one says "Amends".
 * New decision: next free ID, entry `### D-xxx Title (date)` in section 18, 3-8 bullets (Decision, Why/source, Consequence, Residual risk, Amends). Name owner and date for owner decisions, sources for facts (D-011). Open points: section 15.
 * Merged decisions: the later number is the heading, the earlier one a stub (section 17). Style: `AGENTS.md` section 7.
 
-Contents: 1 Stack; 2 Language; 3 Instances, hosting; 4 Roles; 5 Accounts; 6 Authentication; 7 Security log; 8 Mail; 9 Web security; 10 Address directory; 11 Design; 12 Portal settings; 13 Management area; 14 Operations, tests; 15 Open points; 16 Agent workflow; 17 Superseded IDs; 18 D-089 to D-102.
+Contents: 1 Stack; 2 Language; 3 Instances, hosting; 4 Roles; 5 Accounts; 6 Authentication; 7 Security log; 8 Mail; 9 Web security; 10 Address directory; 11 Design; 12 Portal settings; 13 Management area; 14 Operations, tests; 15 Open points; 16 Agent workflow; 17 Superseded IDs; 18 D-089 to D-102; 19 D-103 to D-105; 20 D-106; 21 D-107 to D-111; 22 D-112.
 
 ## 1. Stack, versions, licence
 
@@ -648,3 +648,13 @@ Look rules: `docs/DESIGN.md` section 6. Owner orders and designer reports of 202
 * **Directory not available:** a **staff** account (`request.user.is_staff`, in the markup `data-directory-missing`) is told "There are no address suggestions: the directory is not available or has not been imported yet …" when the answer says `missing` or `unavailable`; everybody else sees nothing (D-066 unchanged for them).
 * **Not covered:** the Django administration (D-066).
 * **Residual risk / unverified:** run in a headless Chrome with a stubbed `fetch` only (`test_widget_script.py`), not against a real directory in a browser; screen readers not tried; the panels are in the flow of the page (a card never clips them) and a long one pushes the fields below it; ranking by postal code and town is a proxy for the municipality (a municipality with several postal codes ranks only the LEG's own).
+
+## 22. Decisions of 2026-10-23 (D-112)
+
+### D-112 A further passkey is activated directly after the ceremony; no step 4e (2026-10-23; amends D-106)
+
+* **Decision (owner's representative, 2026-10-23, on the designer review of the passkey wizard):** (1) The screen "Passkey einrichten" of the flow "Change sign-in" (warning and "Ja, Passkey einrichten") is removed: "Weiter" on "Passkey" goes straight to the passkey setup. The warning that the password (and number code) is deleted and all other sign-ins end stays on the confirmation screen **after** the first passkey was created, which is the screen that precedes the activation. (2) For an account that **already has an active passkey** nothing is deleted or replaced, so the confirmation screen is dropped: the activation follows the successful ceremony in the same request. For a first passkey (a password account) and for recovery the confirmation screen stays, because something is deleted or replaced.
+* **Unchanged (security):** the proof before setup and its five-minute grant (`passkey_methods.allow_setup`, `setup_allowed`), staging until activation, the atomic `passkey_methods.activate` (locked account row, only keys of this session binding, ends every other session, notice to all confirmed addresses, security event), challenge expiry and single use, abort or error changes nothing, removal and the one-active-key minimum. A forged `activate` POST or a direct address (`?step=confirm`) without a staged key of this session activates nothing. Only the order changes: `SetupView.post` (JSON register) calls `activate` itself when the account has an active passkey; if the activation fails the key stays staged and the confirmation screen shows it.
+* **Residual risk (accepted):** somebody with a stolen, unlocked session can add a passkey of his own. Mitigations: the proof before setup (a fresh passkey, so the session alone is not enough), the notice mail to every confirmed address, the end of all other sessions, and that removal of a passkey again needs a fresh proof of another passkey.
+* **Still open (owner):** the D-106 recommendation of a second passkey (strong, not mandatory) and its wording on the result screen; an e-mail confirmation for the removal (KAPITEL-PASSKEY 10d).
+* **Amends:** D-106 (confirmation before activation for a further passkey; owner clarification of 2026-10-22 of the compact setup).

@@ -475,6 +475,16 @@ class SetupCodeForm(CodeForm):
         self.fields["otp_token"].label = _("Code from the app")
 
 
+class SignInChangeCodeForm(SetupCodeForm):
+    """The first number code at the setup inside "Change sign-in" (never a recovery code); the labels of the flow."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["otp_token"]
+        field.label = _("Number code from your phone")
+        field.widget.attrs.update({"placeholder": "000 000", "inputmode": "numeric"})
+
+
 class StartSetupForm(PortalFormMixin, forms.Form):
     """Starts the setup of the authenticator app; no field, needs a recent authentication (D-055)."""
 
@@ -512,10 +522,19 @@ class ProofCodeInput(forms.TextInput):
 
 
 class PasskeyProofInput(forms.HiddenInput):
+    """The hidden field of a passkey proof. ``show_lead`` False leaves out the sentence of the widget where the page
+    explains the proof in its own words."""
+
     template_name = "accounts/widgets/passkey_proof.html"
+    show_lead = True
 
     def format_value(self, value):
         return None
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["show_lead"] = self.show_lead
+        return context
 
 
 def passkey_proof_field():
@@ -652,6 +671,28 @@ class ReauthenticationForm(OneProofMixin, PortalFormMixin, forms.Form):
         self.check_changes(cleaned_data)
         self.check_code(cleaned_data)
         return cleaned_data
+
+
+class SignInChangeProofForm(ReauthenticationForm):
+    """Step 1 of "Change sign-in": the one proof of D-062 (the number code if set up, else the password), nothing else.
+
+    Same checks, budgets and counters as every confirmation; a recovery code is refused. Only the labels are the ones of
+    the flow. The explanation stands above the field, so the field carries no lead of its own.
+    """
+
+    code_label = _("Number code from your phone")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.proof == "code":
+            field = self.fields["otp_token"]
+            field.widget.attrs.update({"placeholder": "000 000", "inputmode": "numeric"})
+            field.lead = None
+            field.described_first = ()
+        elif self.proof == "password":
+            self.fields["current_password"].label = _("Password")
+            # The error stands inline at the field and the focus returns to it (no summary box).
+            self.fields["current_password"].widget.attrs["autofocus"] = True
 
 
 class LostPhoneForm(PortalFormMixin, forms.Form):

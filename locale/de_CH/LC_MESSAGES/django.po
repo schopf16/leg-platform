@@ -7294,3 +7294,300 @@ msgstr "Die Erstellung wurde nicht abgeschlossen. Es wurde nichts aktiviert. Sie
 
 msgid "The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager."
 msgstr "Der Browser hat dieses statt eines anderen Geräts gemeldet. Das Portal hat den Passkey nicht gespeichert. Er kann dennoch in Ihrem Passwortmanager vorhanden sein."
+
+msgid "Sign-in"
+msgstr "Anmeldung"
+
+msgctxt "sign-in flow"
+msgid "Passkey"
+msgstr "Passkey"
+
+msgid "Password and number code"
+msgstr "Passwort und Zahlencode"
+
+msgid "You sign in with your password and a number code from your phone."
+msgstr "Sie melden sich mit Ihrem Passwort und einem Zahlencode vom Handy an."
+
+msgid "Protect your account additionally with a number code from your phone. Or replace the password with a passkey."
+msgstr "Schützen Sie Ihr Konto zusätzlich mit einem Zahlencode vom Handy. Oder ersetzen Sie das Passwort durch einen Passkey."
+
+msgid "Change sign-in"
+msgstr "Anmeldung ändern"
+
+msgid "My account · Profile"
+msgstr "Mein Konto · Profil"
+
+msgid "Confirm number code"
+msgstr "Zahlencode bestätigen"
+
+msgid "Confirm password"
+msgstr "Passwort bestätigen"
+
+msgid "Choose sign-in"
+msgstr "Anmeldung wählen"
+
+msgid "Please confirm it is you"
+msgstr "Bitte bestätigen Sie sich"
+
+msgid "For your safety, enter the number code that your phone shows right now."
+msgstr "Geben Sie zur Sicherheit den Zahlencode ein, den Ihr Handy gerade anzeigt."
+
+msgid "For your safety, enter your password once more before you change your sign-in."
+msgstr "Geben Sie zur Sicherheit noch einmal Ihr Passwort ein, bevor Sie die Anmeldung ändern."
+
+msgid "Number code from your phone"
+msgstr "Zahlencode vom Handy"
+
+msgid "What is this?"
+msgstr "Was ist das?"
+
+msgid "What happens?"
+msgstr "Was passiert?"
+
+msgid "Password and number code from your phone"
+msgstr "Passwort und Zahlencode vom Handy"
+
+msgid "A password is a secret word that only you know."
+msgstr "Ein Passwort ist ein Geheimwort, das nur Sie kennen."
+
+msgid "You enter only your password each time you sign in. Anyone who knows your password can sign in. The number code is turned off."
+msgstr "Sie geben bei jeder Anmeldung nur Ihr Passwort ein. Wer Ihr Passwort kennt, kann sich anmelden. Der Zahlencode wird abgeschaltet."
+
+msgid "You enter only your password each time you sign in. Anyone who knows your password can sign in."
+msgstr "Sie geben bei jeder Anmeldung nur Ihr Passwort ein. Wer Ihr Passwort kennt, kann sich anmelden."
+
+msgid "A number code is a six-digit number. It changes every 30 seconds and is shown by a program on your phone. Such programs are called authenticator apps. You find them in the app store or play store of your phone."
+msgstr "Ein Zahlencode ist eine sechsstellige Zahl. Sie ändert sich alle 30 Sekunden und wird von einem Programm auf Ihrem Handy angezeigt. Solche Programme heissen Authenticator-Apps. Diese finden Sie im App-Store oder Play-Store Ihres Telefons."
+
+msgid "You enter your password and then the number that the program shows right now. Without the number there is no access."
+msgstr "Sie geben Ihr Passwort ein und danach die Zahl, die im Programm gerade steht. Ohne die Zahl gibt es keinen Zugang."
+
+msgid "A passkey, also called a sign-in key, is a key that your device stores. It replaces the password. It is never sent to the website. It does not work on fake websites."
+msgstr "Ein Passkey, auch Anmeldeschlüssel genannt, ist ein Schlüssel, den Ihr Gerät speichert. Er ersetzt das Passwort. Er wird nie an die Webseite gesendet. Auf gefälschten Webseiten funktioniert er nicht."
+
+msgid "You confirm the sign-in on your device, for example with fingerprint, face recognition or device code. Your password and your number code are deleted in the process. You need neither afterwards."
+msgstr "Sie bestätigen die Anmeldung auf Ihrem Gerät, zum Beispiel mit Fingerabdruck, Gesichtserkennung oder Gerätecode. Ihr Passwort und Ihr Zahlencode werden dabei gelöscht. Sie brauchen beide danach nicht mehr."
+
+msgid "You confirm the sign-in on your device, for example with fingerprint, face recognition or device code. Your password is deleted in the process. You do not need it afterwards."
+msgstr "Sie bestätigen die Anmeldung auf Ihrem Gerät, zum Beispiel mit Fingerabdruck, Gesichtserkennung oder Gerätecode. Ihr Passwort wird dabei gelöscht. Sie brauchen es danach nicht mehr."
+
+msgid "No change"
+msgstr "Keine Änderung"
+
+msgid "You keep signing in with your password and the number code from your phone."
+msgstr "Sie melden sich weiter mit Ihrem Passwort und dem Zahlencode vom Handy an."
+
+msgid "You stay with your password. Nothing is changed."
+msgstr "Sie bleiben bei Ihrem Passwort. Nichts wird geändert."
+
+msgid "Turn off number code"
+msgstr "Zahlencode abschalten"
+
+msgid "Afterwards you sign in with your password only. We inform all your confirmed addresses."
+msgstr "Danach melden Sie sich nur noch mit Ihrem Passwort an. Wir informieren alle Ihre bestätigten Adressen."
+
+msgid "Yes, turn off number code"
+msgstr "Ja, Zahlencode abschalten"
+
+msgid "Set up a passkey"
+msgstr "Passkey einrichten"
+
+msgid "Your password and your number code will be deleted. You need neither afterwards."
+msgstr "Ihr Passwort und Ihr Zahlencode werden gelöscht. Sie brauchen beide danach nicht mehr."
+
+msgid "Your password will be deleted. You do not need it afterwards."
+msgstr "Ihr Passwort wird gelöscht. Sie brauchen es danach nicht mehr."
+
+msgid "All other sign-ins end. You receive a message at all your confirmed addresses."
+msgstr "Alle anderen Anmeldungen enden. Sie erhalten eine Nachricht an alle Ihre bestätigten Adressen."
+
+msgid "Yes, set up passkey"
+msgstr "Ja, Passkey einrichten"
+
+msgid "Set up the program on your phone"
+msgstr "Programm auf dem Handy einrichten"
+
+msgid "Open the program on your phone. You find it in the app store or play store of your phone."
+msgstr "Öffnen Sie das Programm auf Ihrem Handy. Sie finden es im App-Store oder Play-Store Ihres Telefons."
+
+msgid "Scan this code with the program:"
+msgstr "Scannen Sie mit dem Programm diesen Code:"
+
+msgid "Cannot scan? Enter this key in the program:"
+msgstr "Scannen nicht möglich? Geben Sie diesen Schlüssel im Programm ein:"
+
+msgid "Enter the number"
+msgstr "Zahl eingeben"
+
+msgid "Enter the number that the program shows right now."
+msgstr "Geben Sie die Zahl ein, die das Programm gerade anzeigt."
+
+msgid "Set up number code, step %(number)s of %(total)s"
+msgstr "Zahlencode einrichten, Schritt %(number)s von %(total)s"
+
+msgid "Please confirm again."
+msgstr "Bitte bestätigen Sie sich noch einmal."
+
+msgid "So you can find the passkey again later."
+msgstr "Damit finden Sie den Passkey später wieder."
+
+msgid "My phone"
+msgstr "Mein Handy"
+
+msgid "Set up another passkey"
+msgstr "Weiteren Passkey einrichten"
+
+msgid "What should the passkey be called?"
+msgstr "Wie soll der Passkey heissen?"
+
+msgid "Waiting for your confirmation …"
+msgstr "Warten auf Ihre Bestätigung …"
+
+msgid "Did not work. Nothing was changed."
+msgstr "Nicht geklappt. Es wurde nichts geändert."
+
+msgid "Where should the passkey be stored?"
+msgstr "Wo soll der Passkey liegen?"
+
+msgid "Device"
+msgstr "Gerät"
+
+msgid "On this device"
+msgstr "Auf diesem Gerät"
+
+msgid "This computer or this device."
+msgstr "Dieser Computer oder dieses Gerät."
+
+msgid "On another device"
+msgstr "Ein anderes Gerät"
+
+msgid "A QR code is shown to you. Photograph it with your phone."
+msgstr "Ihnen wird ein QR-Code angezeigt. Fotografieren Sie ihn mit Ihrem Handy."
+
+msgid "Confirm in the window"
+msgstr "Bestätigen Sie im Fenster"
+
+msgid "Your browser or password manager opens a window. Follow the instructions there."
+msgstr "Ihr Browser oder Passwortmanager öffnet ein Fenster. Folgen Sie dort den Anweisungen."
+
+msgctxt "passkey setup"
+msgid "Try again"
+msgstr "Noch einmal versuchen"
+
+msgid "Activate the passkey now?"
+msgstr "Passkey jetzt aktivieren?"
+
+msgid "Use the passkey from now on?"
+msgstr "Ab jetzt mit dem Passkey anmelden?"
+
+msgid "The passkey “%(name)s” is created."
+msgstr "Der Passkey «%(name)s» ist erstellt."
+
+msgid "Your existing passkeys and this session stay active."
+msgstr "Ihre bestehenden Passkeys und diese Sitzung bleiben aktiv."
+
+msgid "Yes, activate passkey"
+msgstr "Ja, Passkey aktivieren"
+
+msgid "Yes, sign in with the passkey from now on"
+msgstr "Ja, ab jetzt mit dem Passkey anmelden"
+
+msgid "Done. The passkey “%(name)s” is active."
+msgstr "Fertig. Der Passkey «%(name)s» ist aktiv."
+
+msgid "Your password was deleted. All other sign-ins were ended. You can now sign in with the passkey."
+msgstr "Ihr Passwort wurde gelöscht. Alle anderen Anmeldungen wurden beendet. Sie können sich ab jetzt mit dem Passkey anmelden."
+
+msgid "All other sign-ins were ended. You can now sign in with the passkey."
+msgstr "Alle anderen Anmeldungen wurden beendet. Sie können sich ab jetzt mit dem Passkey anmelden."
+
+msgid "Recommended:"
+msgstr "Empfohlen:"
+
+msgid "Set up a second passkey on another device. Then you can sign in if a device breaks or is stolen."
+msgstr "Richten Sie einen zweiten Passkey auf einem anderen Gerät ein. Dann können Sie sich anmelden, wenn ein Gerät defekt ist oder gestohlen wird."
+
+msgid "With a passkey you sign in."
+msgstr "Mit einem Passkey melden Sie sich an."
+
+msgid "You have set up one passkey."
+msgstr "Sie haben einen Passkey eingerichtet."
+
+msgid "You have set up %(counter)s passkeys."
+msgstr "Sie haben %(counter)s Passkeys eingerichtet."
+
+msgid "Remove “%(name)s”?"
+msgstr "«%(name)s» entfernen?"
+
+msgid "Remove “%(name)s”"
+msgstr "«%(name)s» entfernen"
+
+msgid "You can then no longer sign in with this passkey. All your sessions end."
+msgstr "Sie melden sich danach nicht mehr mit diesem Passkey an. Alle Ihre Sitzungen enden."
+
+msgid "For your safety, confirm with another passkey that you still have. You do not need the device with this passkey for that."
+msgstr "Zur Sicherheit bestätigen Sie mit einem anderen Passkey, den Sie noch haben. Das Gerät mit diesem Passkey müssen Sie dafür nicht dabeihaben."
+
+msgid "Yes, remove and sign out"
+msgstr "Ja, entfernen und abmelden"
+
+msgid "No, keep it"
+msgstr "Nein, behalten"
+
+msgid "Created on"
+msgstr "Erstellt am"
+
+msgctxt "passkey card"
+msgid "Last used"
+msgstr "Zuletzt benutzt"
+
+msgid "This passkey is your only one. Set up another passkey before you remove this one."
+msgstr "Dieser Passkey ist Ihr einziger. Richten Sie zuerst einen weiteren Passkey ein, bevor Sie diesen entfernen."
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "Number code was turned off."
+msgstr "Der Zahlencode ist abgeschaltet."
+
+msgid "Activate passkey"
+msgstr "Passkey aktivieren"
+
+msgid "Confirm with your passkey that it is you."
+msgstr "Bestätigen Sie mit Ihrem Passkey, dass Sie es sind."
+
+msgid "If this device already has a passkey for this portal, choose “On another device”."
+msgstr "Wenn dieses Gerät schon einen Passkey für dieses Portal hat, wählen Sie «Ein anderes Gerät»."
+
+msgid "You sign in with a passkey."
+msgstr "Sie melden sich mit einem Passkey an."
+
+msgid "Never used"
+msgstr "Noch nie benutzt"
+
+msgid "The passkey was removed. You were signed out."
+msgstr "Der Passkey wurde entfernt. Sie wurden abgemeldet."
+
+msgid "Number code is set up."
+msgstr "Der Zahlencode ist eingerichtet."
+
+msgid "You have set up two passkeys."
+msgstr "Sie haben zwei Passkeys eingerichtet."
+
+msgid "Your browser opens a window. Follow the instructions there."
+msgstr "Ihr Browser öffnet ein Fenster. Folgen Sie dort den Anweisungen."
+
+msgid "You need these codes if you have no access to your number code from your phone."
+msgstr "Diese Codes brauchen Sie, wenn Sie keinen Zugang zu Ihrem Zahlencode vom Handy haben."
+
+msgid "Each code works only once. They are shown only now."
+msgstr "Jeder Code funktioniert nur einmal. Sie werden nur jetzt angezeigt."
+
+msgid "Your account must use a number code. It cannot be turned off."
+msgstr "Ihr Konto muss einen Zahlencode verwenden. Er kann nicht abgeschaltet werden."
+
+msgid "If you cannot use your number code, you can turn it off with your password and one of your recovery codes. Afterwards only your password protects the account. You can set up the number code again at any time."
+msgstr "Wenn Sie Ihren Zahlencode nicht verwenden können, schalten Sie ihn mit Ihrem Passwort und einem Ihrer Wiederherstellungscodes ab. Danach schützt nur noch Ihr Passwort das Konto. Sie können den Zahlencode jederzeit wieder einrichten."
+
+msgid "You have neither your phone nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of the number code, and you confirm it with a link that is sent to your email address."
+msgstr "Sie haben weder Ihr Handy noch einen Wiederherstellungscode? Dann wenden Sie sich an den Betrieb des Portals. Ein Administrator kann das Entfernen des Zahlencodes starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-Adresse gesendet wird."

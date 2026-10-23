@@ -172,7 +172,7 @@ class LostPhoneRefusalTests(TestCase):
             with self.subTest(case=label):
                 response = self.lost(**data)
                 self.assertEqual(response.status_code, 200)
-                self.assertNotContains(response, "Zwei-Faktor-Anmeldung (2FA) wurde ausgeschaltet")
+                self.assertNotContains(response, "Der Zahlencode ist abgeschaltet")
                 self.assert_nothing_changed(before)
 
     def test_an_app_code_and_a_shapeless_value_are_not_a_recovery_code(self):
@@ -363,7 +363,7 @@ class LostPhonePageTests(TestCase):
         self.assertIn("Wiederherstellungscode", html)
         self.assertIn("Handy verloren?", html)
         # The way for somebody with neither the app nor a code.
-        self.assertIn("Sie haben weder die App noch einen Wiederherstellungscode?", html)
+        self.assertIn("Sie haben weder Ihr Handy noch einen Wiederherstellungscode?", html)
         self.assertIn("Betrieb", html)
 
     def test_a_failing_form_does_not_write_the_values_back(self):
@@ -391,7 +391,7 @@ class LostPhonePageTests(TestCase):
     def test_the_way_back_is_called_cancel_like_everywhere_else(self):
         html = self.client.get(LOST_PAGE).content.decode()
 
-        self.assertRegex(html, r'step=disable#card-two-factor">Abbrechen</a>')
+        self.assertRegex(html, r'href="/profile/#card-two-factor">Abbrechen</a>')
         self.assertNotIn("Zurück", html)
 
 

@@ -1,57 +1,163 @@
-{% extends "base.html" %}{% load i18n static %}
-{% block extra_head %}{% if allowed %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endif %}{% endblock %}
-{% block title %}{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}{% endblock %}
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+The setup of a passkey (owner specification ``profil/umsetzung/KAPITEL-PASSKEY.md``, chapters 8 and 9; ``passkey_views.SetupView``):
+the look of the building wizard (customer.css: the bar, "Step n of 3", one screen per task, "Continue", "Back", "Cancel"), inside the
+frame. Context: ``step`` (proof, name, device, confirm, done), ``adding`` (the account has a passkey), ``recovering``,
+``has_code``, ``form``, ``name`` (step 2), ``names`` (the staged keys, confirm; the activated ones, done), ``password_deleted`` and
+``recommend`` (done), ``back_url``. "Cancel" is a POST button (form ``flow-cancel``): it ends the grant and drops the keys of this
+session that were never activated. The screens "Confirm in the window" and "Did not work" belong to the device step: the one form
+``passkey-create`` holds the three panels and ``passkey-setup.js`` only shows the panel that fits; the browser ceremony itself is
+``passkeys.js`` (the hidden field ``name``, the button ``mode``, ``data-*`` texts), unchanged.
+{% endcomment %}
+{% block title %}{% if step == "done" %}{% if further %}{% translate "Set up another passkey" %}{% else %}{% translate "Set up a passkey" %}{% endif %}{% elif adding %}{% translate "Set up another passkey" %}{% else %}{% translate "Set up a passkey" %}{% endif %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% if step == "device" %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endif %}{% endblock %}
+{% block inner_class %}{% endblock %}
 {% block content %}
-{% if not user.is_authenticated or frame_restricted %}{% include "_frame_icons.html" %}{% endif %}
-<section class="profile-card passkey-setup">
-  <h1>{% if adding %}{% translate "Add a passkey" %}{% else %}{% translate "Set up passkeys" %}{% endif %}</h1>
-  {% if not allowed %}
-    <p>{% translate "Confirm your current sign-in method first." %}</p>
-    <form method="post" class="profile-form" novalidate>
-      {% csrf_token %}{% include "accounts/_error_summary.html" %}
-      {% include "accounts/profile/_proof_fields.html" %}
-      <button class="btn btn-primary" type="submit">{% translate "Confirm sign-in method" %}</button>
-    </form>
-    <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
-  {% else %}
-    {% if recovering %}<p>{% translate "Your previous sign-in methods no longer work. Save a new passkey to restore access." %}</p>{% endif %}
-    <ol class="passkey-steps" role="list">
-      <li>
-        <h2 class="passkey-step-title"><svg class="frame-icon" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg>{% translate "Name" context "Passkey setup step" %}</h2>
+  {% url 'accounts:passkey_setup' as setup_url %}
+  <div class="wizard">
+    <div>
+      <p class="page-label">{% translate "My account · Profile" %}</p>
+      <h1 class="start-title">{% if step == "done" %}{% if further %}{% translate "Set up another passkey" %}{% else %}{% translate "Set up a passkey" %}{% endif %}{% elif adding %}{% translate "Set up another passkey" %}{% else %}{% translate "Set up a passkey" %}{% endif %}</h1>
+    </div>
+
+    {% if step == "proof" %}
+      <form method="post" action="{{ setup_url }}" class="step-card" novalidate aria-labelledby="flow-title">
+        {% csrf_token %}
+        <h2 id="flow-title">{% if form.proof == "passkey" %}{% translate "Confirm with your passkey that it is you." %}{% else %}{% translate "Please confirm it is you" %}{% endif %}</h2>
+        {% if form.proof == "passkey" %}
+          {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>{% endif %}
+          <p>{% translate "Your browser opens a window. Follow the instructions there." %}</p>
+          {{ form.passkey_assertion }}
+          {% for error in form.passkey_assertion.errors %}<p role="alert">{{ error }}</p>{% endfor %}
+        {% elif form.proof == "code" %}
+          {% include "accounts/_error_summary.html" %}
+          <p>{% translate "For your safety, enter the number code that your phone shows right now." %}</p>
+          {% include "accounts/_field.html" with field=form.otp_token %}
+        {% else %}
+          {% include "accounts/_error_summary.html" %}
+          <p>{% translate "For your safety, enter your password once more before you change your sign-in." %}</p>
+          {% include "accounts/_field.html" with field=form.current_password %}
+        {% endif %}
+        <div class="step-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+          <button type="submit" form="flow-cancel" formnovalidate class="btn btn-danger-outline end-action">{% translate "Cancel" %}</button>
+        </div>
+      </form>
+
+    {% elif step == "name" %}
+      <form method="post" action="{{ setup_url }}?step=name" class="step-card" novalidate data-submit-once aria-labelledby="flow-title">
+        {% csrf_token %}
+        {% translate "Name" as step_name %}
+        {% include "accounts/_flow_progress.html" with number=1 total=3 name=step_name %}
+        <h2 id="flow-title">{% translate "What should the passkey be called?" %}</h2>
         {% include "accounts/_field.html" with field=form.name %}
-      </li>
-      <li>
-        <h2 class="passkey-step-title"><img src="{% static 'vendor/tabler-icons/lock.svg' %}" width="20" height="20" alt="" aria-hidden="true">{% translate "Create" context "Passkey setup step" %}</h2>
-        <form id="passkey-create" data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-pending="{% translate 'Follow the instructions in the browser prompt.' %}" data-error="{% translate 'Creation did not finish. Nothing was activated. You can try again.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
-          {% csrf_token %}
-          <div class="passkey-device-actions">
-            <button class="btn btn-secondary-action" type="submit" name="mode" value="another_device">{% translate "Create passkey on another device" %}</button>
-            <button class="btn btn-secondary-action" type="submit" name="mode" value="this_device">{% translate "Create passkey on this device" %}</button>
+        <div class="step-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+          <a class="btn btn-secondary-action" href="{% if adding %}{% url 'accounts:passkeys' %}{% else %}{% url 'accounts:login_method' %}{% endif %}">{% translate "Back" %}</a>
+          <button type="submit" form="flow-cancel" formnovalidate class="btn btn-danger-outline end-action">{% translate "Cancel" %}</button>
+        </div>
+      </form>
+
+    {% elif step == "device" %}
+      <form id="passkey-create" class="wizard-form" data-passkey-register data-options="{% url 'accounts:passkey_options' %}" data-pending="{% translate 'Waiting for your confirmation …' %}" data-error="{% translate 'Did not work. Nothing was changed.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
+        {% csrf_token %}
+        <input type="hidden" name="name" value="{{ name }}">
+        <section class="step-card" data-passkey-panel="device" aria-labelledby="flow-title">
+          {% translate "Device" as step_name %}
+          {% include "accounts/_flow_progress.html" with number=2 total=3 name=step_name %}
+          <h2 id="flow-title" tabindex="-1">{% translate "Where should the passkey be stored?" %}</h2>
+          <fieldset class="choice-group" aria-labelledby="flow-title">
+            <div class="choice-cards">
+              <label class="choice-card" for="id_device_this">
+                <input class="form-check-input choice-radio" type="radio" name="device_choice" id="id_device_this" value="this_device"{% if not adding %} checked{% endif %} aria-describedby="device-this-detail">
+                <span class="choice-body">
+                  <span class="choice-title">{% translate "On this device" %}</span>
+                  <span class="choice-detail" id="device-this-detail">{% translate "This computer or this device." %}</span>
+                </span>
+              </label>
+              <label class="choice-card" for="id_device_other">
+                <input class="form-check-input choice-radio" type="radio" name="device_choice" id="id_device_other" value="another_device"{% if adding %} checked{% endif %} aria-describedby="device-other-detail">
+                <span class="choice-body">
+                  <span class="choice-title">{% translate "On another device" %}</span>
+                  <span class="choice-detail" id="device-other-detail">{% translate "A QR code is shown to you. Photograph it with your phone." %}</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="step-actions">
+            <button type="submit" class="btn btn-primary" name="mode" value="this_device">{% translate "Continue" %}</button>
+            <a class="btn btn-secondary-action" href="{{ setup_url }}?step=name">{% translate "Back" %}</a>
+            <button type="submit" form="flow-cancel" formnovalidate class="btn btn-danger-outline end-action">{% translate "Cancel" %}</button>
           </div>
-          <p>{% translate "For another device, select your phone or tablet in the browser prompt, if offered. If a QR code appears, scan it with that device." %}</p>
-          {% include "accounts/_passkey_add_help.html" %}
-          <p role="status" data-passkey-status></p>
-        </form>
-      </li>
-      <li>
-        <h2 class="passkey-step-title"><svg class="frame-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg>{% translate "Save" context "Passkey setup step" %}</h2>
-        <p>{% translate "The passkey is activated only when you save." %}</p>
-        {% if keys %}<ul class="passkey-key-names">{% for key in keys %}<li>{{ key.name }}{% if not key.active %} — {% translate "Not yet activated" %}{% endif %}</li>{% endfor %}</ul>{% endif %}
-        <form method="post">
-          {% csrf_token %}<input type="hidden" name="activate" value="yes">
-          {% if adding %}
-            <p>{% translate "Your existing passkeys and this session stay active. Saving ends all other sessions and sends a notice to every confirmed email address." %}</p>
-          {% elif not recovering %}
-            <p>{% translate "Until you save, your current sign-in method stays active. Saving removes your password, app and recovery codes, ends all other sessions and notifies every confirmed email address. This session stays active." %}</p>
+        </section>
+
+        <section class="step-card" data-passkey-panel="waiting" aria-labelledby="waiting-title" hidden>
+          {% translate "Confirm" as step_name %}
+          {% include "accounts/_flow_progress.html" with number=3 total=3 name=step_name %}
+          <h2 id="waiting-title" tabindex="-1">{% translate "Confirm in the window" %}</h2>
+          <p>{% translate "Your browser or password manager opens a window. Follow the instructions there." %}</p>
+          <p class="card-note" role="status" data-passkey-status></p>
+          <div class="step-actions">
+            <button type="submit" form="flow-cancel" formnovalidate class="btn btn-danger-outline end-action">{% translate "Cancel" %}</button>
+          </div>
+        </section>
+
+        <section class="step-card is-error" data-passkey-panel="failed" aria-labelledby="failed-title" hidden>
+          <h2 id="failed-title" tabindex="-1">{% translate "Did not work. Nothing was changed." %}</h2>
+          <p data-passkey-error-text hidden></p>
+          <p>{% translate "If this device already has a passkey for this portal, choose “On another device”." %}</p>
+          <div class="step-actions">
+            <a class="btn btn-primary" href="{{ setup_url }}?step=device">{% translate "Try again" context "passkey setup" %}</a>
+            <button type="submit" form="flow-cancel" formnovalidate class="btn btn-secondary-action">{% translate "Back to profile" %}</button>
+          </div>
+        </section>
+      </form>
+
+    {% elif step == "confirm" %}
+      <form method="post" action="{{ setup_url }}" class="step-card" novalidate data-submit-once aria-labelledby="flow-title">
+        {% csrf_token %}<input type="hidden" name="activate" value="yes">
+        {% translate "Activate passkey" as step_name %}
+        {% include "accounts/_flow_progress.html" with number=3 total=3 name=step_name %}
+        <h2 id="flow-title">{% if adding or recovering %}{% translate "Activate the passkey now?" %}{% else %}{% translate "Use the passkey from now on?" %}{% endif %}</h2>
+        <p>{% blocktranslate with name=names %}The passkey “{{ name }}” is created.{% endblocktranslate %}</p>
+        {% if adding %}
+          <p>{% translate "Your existing passkeys and this session stay active." %}</p>
+          <p>{% translate "All other sign-ins end. You receive a message at all your confirmed addresses." %}</p>
+        {% elif recovering %}
+          <p>{% translate "Your previous sign-in methods no longer work. Save a new passkey to restore access." %}</p>
+          <p>{% translate "All other sign-ins end. You receive a message at all your confirmed addresses." %}</p>
+        {% else %}
+          <div class="step-warning">
+            <strong>{% if has_code %}{% translate "Your password and your number code will be deleted. You need neither afterwards." %}{% else %}{% translate "Your password will be deleted. You do not need it afterwards." %}{% endif %}</strong>
+            <p>{% translate "All other sign-ins end. You receive a message at all your confirmed addresses." %}</p>
+          </div>
+        {% endif %}
+        <div class="step-actions">
+          <button type="submit" class="btn btn-primary">{% if adding or recovering %}{% translate "Yes, activate passkey" %}{% else %}{% translate "Yes, sign in with the passkey from now on" %}{% endif %}</button>
+          <button type="submit" form="flow-cancel" formnovalidate class="btn btn-danger-outline end-action">{% translate "Cancel" %}</button>
+        </div>
+      </form>
+
+    {% elif step == "done" %}
+      <section class="step-card" aria-labelledby="flow-title">
+        <p class="step-ok" id="flow-title" role="status">{% blocktranslate with name=names %}Done. The passkey “{{ name }}” is active.{% endblocktranslate %}</p>
+        <p>{% if password_deleted %}{% translate "Your password was deleted. All other sign-ins were ended. You can now sign in with the passkey." %}{% else %}{% translate "All other sign-ins were ended. You can now sign in with the passkey." %}{% endif %}</p>
+        {% if recommend %}<p class="step-hint"><strong>{% translate "Recommended:" %}</strong> {% translate "Set up a second passkey on another device. Then you can sign in if a device breaks or is stolen." %}</p>{% endif %}
+        <div class="step-actions">
+          {% if recommend %}
+            <a class="btn btn-primary" href="{{ setup_url }}">{% translate "Set up another passkey" %}</a>
+            <a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Back to profile" %}</a>
+          {% else %}
+            <a class="btn btn-primary" href="{{ back_url }}">{% translate "Back to profile" %}</a>
           {% endif %}
-          <div class="passkey-save-actions">
-            <button class="btn btn-primary" type="submit">{% if adding %}{% translate "Save passkey" %}{% else %}{% translate "Save and use passkeys" %}{% endif %}</button>
-            <a href="{% url 'accounts:profile' %}">{% translate "Cancel" %}</a>
-          </div>
-        </form>
-      </li>
-    </ol>
-    <p class="form-hint">{% translate "One passkey is enough. We strongly recommend another on a different device in case you lose access." %}</p>
-  {% endif %}
-</section>
+        </div>
+      </section>
+    {% endif %}
+  </div>
+  {% if step != "done" %}<form id="flow-cancel" method="post" action="{{ setup_url }}" hidden>{% csrf_token %}<input type="hidden" name="cancel" value="yes"></form>{% endif %}
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {% if step == "device" %}<script defer src="{% static 'js/passkey-setup.js' %}"></script>{% endif %}
+  {% if step == "name" or step == "confirm" %}<script defer src="{% static 'js/submit-once.js' %}"></script>{% endif %}
 {% endblock %}

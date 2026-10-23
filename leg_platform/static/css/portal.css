@@ -488,6 +488,9 @@ body {
 
 /* Accepted D-106 login grouping: never change spacing of the shared entry shell. */
 .entry-card.login-card { gap: 0; }
+/* A message above the heading (for example after a removal or an ended session) keeps a space before "Log in". */
+.login-card > [role="status"],
+.login-card > .alert { margin-bottom: 16px; }
 .login-card h1 { margin-bottom: 24px; }
 .login-card .login-password,
 .login-card .login-actions form { gap: 0; }
@@ -886,6 +889,22 @@ input.account-name-input:focus {
   color: var(--fg);
 }
 
+/* "Change sign-in" (profile chapter 3): per option "What is this?" and "What happens?", 16 px, the question in bold on its
+   own line. */
+.choice-detail {
+  display: block;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.choice-question {
+  display: block;
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
 /* The explainer: a native <details>, closed, no script. */
 .help-details summary {
   min-height: 44px;
@@ -904,56 +923,6 @@ input.account-name-input:focus {
 
 .help-details-body p {
   margin: 0;
-}
-
-.passkey-steps {
-  display: grid;
-  gap: 24px;
-  padding-left: 24px;
-  margin-block: 24px;
-}
-.passkey-steps > li {
-  min-width: 0;
-  padding-left: 4px;
-}
-.passkey-steps > li > :not(.passkey-step-title) {
-  margin-left: 32px;
-}
-.passkey-setup .passkey-step-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  margin: 0 0 12px;
-}
-.passkey-step-title > svg,
-.passkey-step-title > img {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-}
-.passkey-device-actions {
-  display: grid;
-  gap: 12px;
-}
-.passkey-device-actions + p { margin-top: 12px; }
-.passkey-setup .passkey-device-actions .btn,
-.passkey-setup .passkey-save-actions .btn {
-  min-height: 48px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.passkey-save-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.passkey-setup [data-passkey-status]:empty { display: none; }
-.passkey-key-names { overflow-wrap: anywhere; }
-[data-theme="dark"] .passkey-step-title > img { filter: invert(1); }
-@media (max-width: 767px) {
-  .passkey-save-actions { align-items: stretch; flex-direction: column; }
 }
 
 @media print {

@@ -1,22 +1,57 @@
-{% extends "base.html" %}{% load i18n %}
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+The page "Passkeys" (owner specification ``profil/umsetzung/KAPITEL-PASSKEY.md``, chapter 10; ``passkey_views.ManageView``), in the
+look of the wizard (customer.css). Context: ``keys`` (the active passkeys), ``only_one`` (the last one: no button "Remove", the
+reason instead, 10c) and, for the screen of the removal (10b, ``?remove=<id>``), ``remove`` (the key) and ``form`` (the proof). The
+proof is a fresh passkey proof (D-106); the sentence of the screen says why, so the widget adds none. No device information.
+{% endcomment %}
 {% block title %}{% translate "Passkeys" %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
+{% block inner_class %}{% endblock %}
 {% block content %}
-<section class="profile-card">
-  <h1>{% translate "Passkeys" %}</h1>
-  <p>{% translate "You sign in with a passkey. Your account has no password, app or recovery codes." %}</p>
-  <p>{% translate "Labels are names you choose, not verified device identities. A synchronized passkey may work on several devices. We recommend a spare passkey." %}</p>
-  <p>{% translate "Keep at least one active passkey. Add a replacement before removing the last one. Removing a passkey ends all sessions." %}</p>
-  <ul>{% for key in keys %}<li>{{ key.name }} — {% translate "Created" %} {{ key.created_at|date:"SHORT_DATE_FORMAT" }}; {% translate "Last used" %} {{ key.last_used_at|default:"—" }}{% if key.backup_eligible %}; {% translate "Synchronization supported" %}{% endif %}</li>{% endfor %}</ul>
-  <a class="btn btn-primary" href="{% url 'accounts:passkey_setup' %}">{% translate "Add passkey" %}</a>
-  {% include "accounts/_passkey_add_help.html" %}
-  <form method="post" class="profile-form">{% csrf_token %}
-    {% include "accounts/_error_summary.html" %}
-    <label for="id_credential">{% translate "Passkey" %}</label>
-    <select id="id_credential" name="credential">{% for key in keys %}<option value="{{ key.pk }}">{{ key.name }}</option>{% endfor %}</select>
-    {% include "accounts/profile/_proof_fields.html" %}
-    <button class="btn btn-danger-outline" type="submit">{% translate "Remove passkey and end all sessions" %}</button>
-  </form>
-  <a class="btn btn-secondary-action" href="{% url 'accounts:login_method' %}">{% translate "Change sign-in method" %}</a>
-  <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}">{% translate "Back to profile" %}</a>
-</section>
+  {% url 'accounts:passkeys' as manage_url %}
+  <div class="wizard">
+    <div>
+      <p class="page-label">{% translate "My account · Profile" %}</p>
+      <h1 class="start-title">{% translate "Passkeys" %}</h1>
+      {% if not remove %}<p class="start-sub">{% translate "With a passkey you sign in." %} {% if keys|length == 1 %}{% translate "You have set up one passkey." %}{% elif keys|length == 2 %}{% translate "You have set up two passkeys." %}{% else %}{% blocktranslate with counter=keys|length %}You have set up {{ counter }} passkeys.{% endblocktranslate %}{% endif %}</p>{% endif %}
+    </div>
+
+    {% if remove %}
+      <form method="post" action="{{ manage_url }}" class="step-card" novalidate aria-labelledby="flow-title">
+        {% csrf_token %}<input type="hidden" name="credential" value="{{ remove.pk }}">
+        <h2 id="flow-title">{% blocktranslate with name=remove.name %}Remove “{{ name }}”?{% endblocktranslate %}</h2>
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>{% endif %}
+        <p>{% translate "You can then no longer sign in with this passkey. All your sessions end." %}</p>
+        <p class="card-note">{% translate "For your safety, confirm with another passkey that you still have. You do not need the device with this passkey for that." %}</p>
+        {{ form.passkey_assertion }}
+        {% for error in form.passkey_assertion.errors %}<p role="alert">{{ error }}</p>{% endfor %}
+        <div class="step-actions">
+          <button type="submit" class="btn btn-danger-outline">{% translate "Yes, remove and sign out" %}</button>
+          <a class="btn btn-secondary-action" href="{{ manage_url }}">{% translate "No, keep it" %}</a>
+        </div>
+      </form>
+    {% else %}
+      {% for key in keys %}
+        <section class="step-card" aria-labelledby="key-{{ key.pk }}">
+          <h2 id="key-{{ key.pk }}">{{ key.name }}</h2>
+          <dl class="key-facts">
+            <dt>{% translate "Created on" %}</dt><dd>{{ key.created_at|date:"DATE_FORMAT" }}</dd>
+            <dt>{% translate "Last used" context "passkey card" %}</dt><dd>{% if key.last_used_at %}{{ key.last_used_at|date:"DATE_FORMAT" }}, {{ key.last_used_at|time:"TIME_FORMAT" }}{% else %}{% translate "Never used" %}{% endif %}</dd>
+          </dl>
+          {% if only_one %}
+            <p>{% translate "This passkey is your only one. Set up another passkey before you remove this one." %}</p>
+          {% else %}
+            <div class="step-actions">
+              <a class="btn btn-danger-outline end-action" href="{{ manage_url }}?remove={{ key.pk }}" aria-label="{% blocktranslate with name=key.name %}Remove “{{ name }}”{% endblocktranslate %}">{% translate "Remove" %}</a>
+            </div>
+          {% endif %}
+        </section>
+      {% endfor %}
+      <div class="step-actions page-actions">
+        <a class="btn btn-primary" href="{% url 'accounts:passkey_setup' %}">{% translate "Set up another passkey" %}</a>
+        <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}">{% translate "Back to profile" %}</a>
+      </div>
+    {% endif %}
+  </div>
 {% endblock %}

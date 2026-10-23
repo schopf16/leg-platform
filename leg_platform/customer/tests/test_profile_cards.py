@@ -309,15 +309,19 @@ class EmailAndTwoFactorCardTests(TestCase):
         self.assertIn("Anfrage abbrechen", email)
         self.assertIn("Bis dahin gilt weiter mine.cards@example.org.", email)
 
-    def test_the_two_factor_card_says_active_and_a_customer_can_turn_it_off(self):
+    def test_the_sign_in_card_names_the_state_and_a_customer_changes_it_in_the_flow(self):
         user = customer("tf.cards@example.org")
-        self.assertIn("Sie melden sich nur mit Ihrem Passwort an.", card(self.get(user), "two-factor"))
+        html = card(self.get(user), "two-factor")
+        self.assertIn("Nur Passwort", html)
+        self.assertIn("Anmeldung ändern", html)
         AuthenticatorDevice.objects.create_device(user, confirmed=True)
         html = card(self.get(user), "two-factor")
-        self.assertIn("Aktiv", html)
-        self.assertIn("2FA deaktivieren", html)
+        self.assertIn("Passwort und Zahlencode", html)
+        self.assertIn("Anmeldung ändern", html)
         self.assertIn("Neue Codes erzeugen", html)
-        self.assertNotIn("kann nicht ausgeschaltet werden", html)
+        # Turning the number code off is a step of the flow, not a button of the card.
+        self.assertNotIn("2FA deaktivieren", html)
+        self.assertNotIn("kann nicht abgeschaltet werden", html)
 
     def test_a_staff_account_keeps_the_sentence_that_two_factor_cannot_be_turned_off(self):
         staff = staff_user("staff.cards@example.org")
@@ -325,7 +329,7 @@ class EmailAndTwoFactorCardTests(TestCase):
 
         html = card(self.get(staff), "two-factor")
 
-        self.assertIn("kann nicht ausgeschaltet werden", html)
+        self.assertIn("kann nicht abgeschaltet werden", html)
         self.assertNotIn("2FA deaktivieren", html)
 
 
