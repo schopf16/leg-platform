@@ -7508,3 +7508,27 @@ msgstr "Se non può usare il codice numerico, può disattivarlo con la password 
 
 msgid "You have neither your phone nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of the number code, and you confirm it with a link that is sent to your email address."
 msgstr "Non ha né il telefono né un codice di recupero? Si rivolga allora al gestore del portale. Un amministratore può avviare la rimozione del codice numerico e Lei la conferma con un link inviato al suo indirizzo e-mail."
+
+msgid "Staff area"
+msgstr "Area collaboratori"
+
+msgid "Staff area: %(page)s"
+msgstr "Area collaboratori: %(page)s"
+
+msgid "For staff"
+msgstr "Per i collaboratori"
+
+msgid "Management and system"
+msgstr "Gestione e sistema"
+
+msgid "Back to My area"
+msgstr "Torna a La mia area"
+
+msgid "Participation, information and profile"
+msgstr "Partecipazione, informazioni e profilo"
+
+msgid "Start and profile"
+msgstr "Inizio e profilo"
+
+msgid "Open staff area"
+msgstr "Apri l’area collaboratori"

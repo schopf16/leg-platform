@@ -1,14 +1,56 @@
 {% load i18n management_ui customer_ui %}{% comment %}
 The entries of the menu, shared by the left menu of the desktop and the menu of the phone
-(LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Entries marked "later" are no links
-(team lead decision K10): no href, aria-disabled and a hidden note. The active page is marked with
-aria-current. Log out is a real POST form. "System administration" (the Django administration) is shown only to an
-active staff account for which the administration lists at least one thing (``navigation.system_administration_visible``,
-D-102; the administration itself checks every request) and is the very last entry, in its own group "System" below
-"Coming next" (D-096). The group
-"Management" lists the entries of leg_platform.management.navigation.MENU that the account may use
-(D-077); it is left out when there are none.
+(LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Two workspaces (D-113), chosen by ``frame_workspace``
+(``context_processors.frame_workspace``, from the resolved view name):
+
+* "My area" (every page that is not management or administration): My area (Start, Profile), the group "For staff"
+  with the entry "Staff area" (a new tab) for an account that may use the management area, Participation and
+  Information for an account that takes part (``participates``), "Coming next" (singular names). The staff group stands
+  before Participation so that the sticky foot never hides it at a low window (designer review, D-113).
+* "Staff area" (``management:*`` and ``admin:*``): the way back to "My area" (same tab), the group "Management"
+  (leg_platform.management.navigation.MENU), the group "System" with "System administration" (the Django
+  administration) only to an active staff account for which the administration lists at least one thing
+  (``navigation.system_administration_visible``, D-102; the administration itself checks every request), and "Coming
+  next" (plural names).
+
+Entries marked "later" are no links (team lead decision K10): no href, aria-disabled and a hidden note. The active page
+is marked with aria-current. Log out is a real POST form. Showing an entry is not authorisation.
 {% endcomment %}{% with view=request.resolver_match.view_name %}
+{% if frame_workspace == "staff" %}
+{% participates as is_participant %}
+<div class="frame-back">
+  <a class="frame-item frame-item-two-line" href="{% url 'home' %}">
+    <svg class="frame-icon" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+    <span class="frame-item-text"><span>{% translate "Back to My area" %}</span><span class="frame-item-sub">{% if is_participant %}{% translate "Participation, information and profile" %}{% else %}{% translate "Start and profile" %}{% endif %}</span></span>
+  </a>
+</div>
+{% management_menu as management_entries %}{% if management_entries %}
+<p class="frame-group">{% translate "Management" %}</p>
+{% for entry in management_entries %}
+<a class="frame-item{% if entry.active %} is-active{% endif %}" href="{{ entry.url }}"{% if entry.active %} aria-current="page"{% endif %}>
+  <svg class="frame-icon" aria-hidden="true"><use href="#{{ entry.icon }}"/></svg><span>{{ entry.label }}</span>
+</a>
+{% endfor %}{% endif %}
+{% system_administration as show_system %}{% if show_system %}
+<p class="frame-group">{% translate "System" %}</p>
+<a class="frame-item" href="{% url 'admin:index' %}">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-server"/></svg><span>{% translate "System administration" %}</span>
+</a>
+{% endif %}
+<p class="frame-group">{% translate "Coming next" %}</p>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoices" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg><span>{% translate "Energy" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Messages" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+{% else %}
 <p class="frame-group">{% translate "My area" %}</p>
 <a class="frame-item{% if view == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if view == 'home' %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg><span>{% translate "Start" %}</span>
@@ -16,7 +58,19 @@ D-102; the administration itself checks every request) and is the very last entr
 <a class="frame-item{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span>{% translate "Profile" %}</span>
 </a>
-{% if not user.is_staff %}{% customer_menu as customer_state %}
+{# The group "For staff" stands directly under "My area", before Participation (D-113, designer review): at a low window the sticky foot of the menu would hide it at the bottom. #}
+{% staff_area as can_open_staff_area %}{% if can_open_staff_area %}
+<div class="frame-staff-block">
+<p class="frame-group">{% translate "For staff" %}</p>
+{# The staff area opens in a new tab (D-113): the person switches between two tabs. No named target. #}
+{% system_administration as has_system %}
+<a class="frame-item frame-item-two-line" href="{% url 'management:overview' %}" target="_blank" rel="noopener noreferrer">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-overview"/></svg>
+  <span class="frame-item-text"><span>{% translate "Staff area" %}</span><span class="frame-item-sub">{% if has_system %}{% translate "Management and system" %}{% else %}{% translate "Management" %}{% endif %}<svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg><span class="visually-hidden"> ({% translate "opens in a new tab" %})</span></span></span>
+</a>
+</div>
+{% endif %}
+{% participates as is_participant %}{% if is_participant %}{% customer_menu as customer_state %}
 {# A customer (MENU-STANDARD.md): Participation and Information with their entries always open. Entries whose page does not exist yet are marked "later" (no link). #}
 <p class="frame-item frame-parent{% if customer_state.participation %} is-active{% endif %}">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg><span>{% translate "Participation" %}</span>
@@ -33,31 +87,10 @@ D-102; the administration itself checks every request) and is the very last entr
   <li><a class="frame-sub-item{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Questions and answers" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Event" context "customer menu" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
-  {% if instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<li><a class="frame-sub-item" href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}<span class="visually-hidden"> ({% translate "opens in a new tab" %})</span></a></li>{% endif %}
+  {% if instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<li><a class="frame-sub-item" href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}<span class="visually-hidden"> ({% translate "opens in a new tab" %})</span><svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg></a></li>{% endif %}
 </ul>
 {% endif %}
-{% management_menu as management_entries %}{% if management_entries %}
-<p class="frame-group">{% translate "Management" %}</p>
-{% for entry in management_entries %}
-<a class="frame-item{% if entry.active %} is-active{% endif %}" href="{{ entry.url }}"{% if entry.active %} aria-current="page"{% endif %}>
-  <svg class="frame-icon" aria-hidden="true"><use href="#{{ entry.icon }}"/></svg><span>{{ entry.label }}</span>
-</a>
-{% endfor %}{% endif %}
 <p class="frame-group">{% translate "Coming next" %}</p>
-{% if user.is_staff %}
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoices" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg><span>{% translate "Energy" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Messages" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-{% else %}
 {# The names of the customer menu are singular (MENU-STANDARD.md). #}
 <a class="frame-item is-later" role="link" aria-disabled="true">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoice" %}</span>
@@ -70,12 +103,6 @@ D-102; the administration itself checks every request) and is the very last entr
 <a class="frame-item is-later" role="link" aria-disabled="true">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Message" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-{% endif %}
-{% system_administration as show_system %}{% if show_system %}
-<p class="frame-group">{% translate "System" %}</p>
-<a class="frame-item" href="{% url 'admin:index' %}">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-server"/></svg><span>{% translate "System administration" %}</span>
 </a>
 {% endif %}
 <div class="frame-menu-foot">

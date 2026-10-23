@@ -70,11 +70,18 @@ class ContractDownloadTests(TestCase):
         spare = contracts.upload_version(self.staff, pdf(b"spare"), date(2026, 12, 1))
         self.assertEqual(self.client.get(reverse("customer:contract_version_download", args=[spare.pk])).status_code, 404)
 
-    def test_a_staff_account_and_a_visitor_get_nothing(self):
-        self.assertEqual(login(self.staff).get(DOWNLOAD).status_code, 404)
+    def test_a_staff_account_with_a_number_gets_what_a_customer_gets_and_a_visitor_nothing(self):
+        # D-113: staff accounts take part like everybody else; the answer is the one of a customer.
+        response = login(self.staff).get(DOWNLOAD)
+        self.assertEqual((response.status_code, response.content), (200, bytes(self.version.pdf)))
         from django.test import Client
 
         self.assertEqual(Client().get(DOWNLOAD).status_code, 302)
+        # A version the staff account never accepted and that is not current stays a 404 for it as for everybody.
+        spare = contracts.upload_version(self.staff, pdf(b"spare2"), date(2026, 12, 2))
+        self.assertEqual(
+            login(self.staff).get(reverse("customer:contract_version_download", args=[spare.pk])).status_code, 404
+        )
 
     def test_the_download_is_get_only(self):
         self.assertEqual(self.client.post(DOWNLOAD).status_code, 405)
@@ -127,10 +134,11 @@ class ContractReadingTests(TestCase):
         ContractVersion.objects.update(current_marker=None)
         self.assertEqual(self.client.get(READ).status_code, 404)
 
-    def test_a_staff_account_and_a_visitor_get_nothing(self):
+    def test_a_staff_account_with_a_number_gets_what_a_customer_gets_and_a_visitor_nothing(self):
         from django.test import Client
 
-        self.assertEqual(login(self.staff).get(READ).status_code, 404)
+        response = login(self.staff).get(READ)
+        self.assertEqual((response.status_code, response.content), (200, bytes(self.version.pdf)))
         response = Client().get(READ)
         self.assertEqual(response.status_code, 302)
         self.assertNotEqual(response.content, bytes(self.version.pdf))

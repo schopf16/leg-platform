@@ -1,7 +1,24 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load i18n static %}
 {# The own stylesheet of the administration: a few additions for the pages of the portal. The look #}
 {# of the administration stays Django's (docs/DESIGN.md). #}
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin-portal.css' %}">{% endblock %}
 {# The browser tab icon of the portal (an uploaded favicon or the built-in one) on every administration page. #}
 {% block extrahead %}{{ block.super }}{% include "_favicon.html" with address=instance_favicon kind=instance_favicon_type %}{% endblock %}
+{# The administration is part of the staff area (D-113, DESIGN section 6, "Two workspaces"): the title of the tab starts with #}
+{# "Staff area: ...", the header shows the chip "Staff area", and "View site" is replaced by the two ways back into the portal #}
+{# (the same tab). The title is Django's: "subtitle | title | site title". Without a login (has_permission) nothing is added. #}
+{% block title %}{% if has_permission %}{% if subtitle %}{% blocktranslate with page=subtitle %}Staff area: {{ page }}{% endblocktranslate %} | {{ title }}{% else %}{% blocktranslate with page=title %}Staff area: {{ page }}{% endblocktranslate %}{% endif %} | {{ site_title|default:_('Django site admin') }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block branding %}{{ block.super }}{% if has_permission %}<span class="admin-workspace">{% translate "Staff area" %}</span>{% endif %}{% endblock %}
+{% block userlinks %}
+  <a href="{% url 'management:overview' %}">{% translate "Management" %}</a> /
+  <a href="{% url 'home' %}">{% translate "My area" %}</a> /
+  {% if user.has_usable_password %}
+  <a href="{% url 'admin:password_change' %}">{% translate 'Change password' %}</a> /
+  {% endif %}
+  <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+    {% csrf_token %}
+    <button type="submit">{% translate 'Log out' %}</button>
+  </form>
+  {% include "admin/color_theme_toggle.html" %}
+{% endblock %}

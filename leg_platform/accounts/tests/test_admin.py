@@ -380,7 +380,7 @@ class AdminPresentationTests(TestCase):
         self.assertNotIn("Django", content)
         self.assertIn("Verwaltung", content)
         # One name for the portal and its administration (WL-23).
-        self.assertIn("<title>Verwaltung | LEG-Portal</title>", content)
+        self.assertIn("<title>Mitarbeitenden-Bereich: Verwaltung | LEG-Portal</title>", content)
         self.assertIn("LEG-Portal", content)
         self.assertNotIn("LEG-Plattform", content)
 

@@ -520,6 +520,164 @@
   }
 }
 
+/* ---- Two workspaces (D-113): "My area" and the staff area ---- */
+/* The staff area is told apart from "My area" by the tokens that exist (no new colour): a warm header with an accent bar on
+   top and the chip "Staff area" behind the logo. The bar is a pseudo-element, not a border, so the logo and the header
+   content do not move (the header stays 64 px, the menu at top: 64 px does not move). The chip is text, not a control;
+   the place is never told by colour alone. */
+.frame--staff .frame-header {
+  background: var(--warm);
+  box-sizing: border-box;
+}
+
+.frame--staff .frame-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent);
+}
+
+.frame-workspace {
+  flex: none;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* In the drawer the chip has its own row below the head (the close button never covers it). */
+.frame-drawer-brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0 4px 8px;
+}
+
+.frame-drawer-brand .frame-workspace {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The sticky foot (about 99 px high, plus the 24 px of padding of the menu below it, plus a wrapped legal line) never hides
+   an entry that gets the focus or is scrolled to: WCAG 2.4.11. */
+.frame-menu,
+.frame-drawer-panel {
+  scroll-padding-bottom: 136px;
+}
+
+/* The foot is sticky at the end of the content box; the padding of the menu (24 px, 16 px in the drawer) below it would
+   show the entries that scroll past. The foot covers that strip with the panel colour; its own height does not change. */
+.frame-menu-foot::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  background: var(--panel);
+}
+
+.frame-drawer-nav .frame-menu-foot::after {
+  height: 16px;
+}
+
+@media (max-width: 760px) {
+  .frame-header .frame-workspace {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 399px) {
+  .frame-header .frame-workspace {
+    display: none;
+  }
+}
+
+/* The way back to "My area" in the menu of the staff area, and the group "For staff" in "My area": apart from the
+   entries below by a line. */
+.frame-back,
+.frame-staff-block {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.frame-back .frame-item-text > span:first-child {
+  text-wrap: balance;
+}
+
+/* An entry with a second line (12 px, muted), and the mark of a link that opens a new tab (at the end of that line). The
+   entry is narrow (136 px of text in the menu of 232 px with a classic scrollbar): its title is 14 px (the size of the
+   entries below a parent, the scale has it), the gap to the icon 8 px and the right padding 4 px, so that "Mitarbeitenden-
+   Bereich" stays on one line (about 138 px of 148 px) and the entry is about 52 px high (designer review, D-113). */
+.frame-item.frame-item-two-line {
+  min-height: 52px;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.frame-item-two-line .frame-item-text > span:first-child {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.frame-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.frame-item-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.frame-external {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.frame-item-sub .frame-external {
+  margin-left: 0;
+}
+
+/* The button of the start page that opens the staff area: on a phone only (the menu is behind a button there). */
+.start-staff-link {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .start-staff-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+  }
+}
+
 /* ---- Start page ---- */
 .start-title {
   margin: 0;

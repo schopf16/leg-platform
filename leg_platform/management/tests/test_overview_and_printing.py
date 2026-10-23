@@ -201,7 +201,7 @@ class OverviewTests(Fixture):
         last = entries[-2]
         self.assertEqual((last["key"], last["url"]), ("email_texts", "/admin/accounts/emailtext/"))
         self.assertEqual(entries[-1]["key"], "contracts")
-        home = self.login(editor).get(reverse("home")).content.decode()
+        home = self.login(editor).get(reverse("management:overview")).content.decode()
         self.assertIn('href="/admin/accounts/emailtext/"', home)
         self.assertIn("Mailtexte", home)
 

@@ -1,5 +1,58 @@
 /* Additions for the portal's own pages in the Django admin (widths and small boxes only). */
 
+/* The administration is part of the staff area (D-113): the chip next to the name in the header, in the colours of the
+   header (the admin's own variable ``--header-color``: about 5:1 on the header, the yellow of the site name has 3.65:1),
+   a line and text, never colour alone; and the links of the header that lead back into the portal. */
+.admin-workspace {
+  align-self: center;
+  box-sizing: border-box;
+  padding: 2px 10px;
+  border: 1px solid var(--header-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--header-color);
+  white-space: nowrap;
+}
+
+/* On a touch screen and up to 767 px the links of the header are at least 44 px high (DESIGN section 1), underlined (the
+   admin's faint bottom border is no sign of a link there) and the theme button is a 44 px target. */
+@media (pointer: coarse), (max-width: 767px) {
+  #user-tools a,
+  #user-tools #logout-form button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+
+  #user-tools a {
+    border-bottom: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* "Ausloggen" is a button of the form ``#logout-form`` (Django's admin/base.html), not a link: the same sign. */
+  #user-tools #logout-form button {
+    border-bottom: 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  #header .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  #branding {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
 .button.recovery-action {
   display: inline-flex;
   align-items: center;

@@ -7627,3 +7627,27 @@ msgstr "Si vous ne pouvez pas utiliser votre code numérique, vous pouvez le dé
 
 msgid "You have neither your phone nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of the number code, and you confirm it with a link that is sent to your email address."
 msgstr "Vous n’avez ni votre téléphone ni code de récupération ? Contactez alors l’exploitant du portail. Un administrateur peut lancer la suppression du code numérique, et vous la confirmez avec un lien envoyé à votre adresse e-mail."
+
+msgid "Staff area"
+msgstr "Espace collaborateurs"
+
+msgid "Staff area: %(page)s"
+msgstr "Espace collaborateurs : %(page)s"
+
+msgid "For staff"
+msgstr "Pour les collaborateurs"
+
+msgid "Management and system"
+msgstr "Gestion et système"
+
+msgid "Back to My area"
+msgstr "Retour à Mon espace"
+
+msgid "Participation, information and profile"
+msgstr "Participation, information et profil"
+
+msgid "Start and profile"
+msgstr "Accueil et profil"
+
+msgid "Open staff area"
+msgstr "Ouvrir l’espace collaborateurs"

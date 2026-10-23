@@ -1,7 +1,8 @@
 """The customer-side findings of the designer walkthrough (W1 to W4; D-105): one progress list, the one-time banners, the
 returned reason, the paused date, the status lines, the contact link, the prefilled address, the short error summary, one
 withdraw button, the dates of a registration, the earliest date of a deregistration and the texts of the profile. Negative
-cases stay: another account's messages are never shown or marked, a staff account gets none of it, hostile text is escaped."""
+cases stay: another account's messages are never shown or marked, an account that does not take part gets none of it
+(staff accounts with a customer number do take part, D-113), hostile text is escaped."""
 
 from datetime import date, timedelta
 from pathlib import Path
@@ -102,11 +103,22 @@ class BannerTests(TestCase):
         self.assertNotIn("Fremd", html)
         self.assertEqual(len(customer_messages.messages_for(self.other)), 1)
 
-    def test_a_staff_account_gets_no_banner_and_nothing_is_marked(self):
+    def test_a_staff_account_with_a_number_gets_the_banner_and_it_is_marked_seen(self):
+        # D-113: staff accounts take part like everybody else.
         staff = staff_user("banner.staff@example.org")
         customer_messages.record(staff, Kind.APPLICATION_REJECTED, "Intern")
 
         html = text(login(staff).get(HOME))
+
+        self.assertIn("Intern", html)
+        self.assertEqual(customer_messages.messages_for(staff), [])
+
+    def test_an_account_that_does_not_take_part_gets_no_banner_and_nothing_is_marked(self):
+        staff = staff_user("banner.nopart@example.org")
+        customer_messages.record(staff, Kind.APPLICATION_REJECTED, "Intern")
+
+        with patch("leg_platform.customer.access.is_customer", return_value=False):
+            html = text(login(staff).get(HOME))
 
         self.assertNotIn("Intern", html)
         self.assertEqual(len(customer_messages.messages_for(staff)), 1)
@@ -287,9 +299,17 @@ class StatusLineTests(TestCase):
     def test_no_line_without_a_participation(self):
         self.assertNotIn("status-lines", text(self.client.get(HOME)))
 
-    def test_a_staff_account_has_none(self):
+    def test_a_staff_account_with_a_number_gets_the_line_too(self):
+        # D-113: staff accounts take part like everybody else.
         with self.lines(participation.StatusLine(participation.PARTICIPATION_STARTED, date(2027, 1, 1))):
-            self.assertNotIn("status-line", text(login(staff_user("status.staff2@example.org")).get(HOME)))
+            html = text(login(staff_user("status.staff2@example.org")).get(HOME))
+        self.assertIn("Sie nehmen seit dem 01.01.2027 an der LEG teil.", html)
+
+    def test_an_account_that_does_not_take_part_has_none(self):
+        with self.lines(participation.StatusLine(participation.PARTICIPATION_STARTED, date(2027, 1, 1))), patch(
+            "leg_platform.customer.access.is_customer", return_value=False
+        ):
+            self.assertNotIn("status-line", text(login(staff_user("status.staff3@example.org")).get(HOME)))
 
 
 @tag("mariadb")
@@ -302,16 +322,17 @@ class ContactLinkTests(TestCase):
     def test_the_menu_has_the_link_for_a_customer_where_the_instance_has_a_website(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         html = text(login(self.mine).get(HOME))
-        self.assertIn('href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">Kontakt zur LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>', html)
+        self.assertIn('href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">Kontakt zur LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span><svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg></a>', html)
 
     def test_without_a_website_there_is_no_link_and_no_dead_entry(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": ""})
         html = text(login(self.mine).get(HOME))
         self.assertNotIn("Kontakt zur LEG", html)
 
-    def test_a_staff_account_does_not_get_the_customer_link(self):
+    def test_a_staff_account_with_a_number_gets_the_customer_link_too(self):
+        # D-113: staff accounts take part like everybody else.
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
-        self.assertNotIn("Kontakt zur LEG", text(login(staff_user("contact.staff@example.org")).get(HOME)))
+        self.assertIn("Kontakt zur LEG", text(login(staff_user("contact.staff@example.org")).get(HOME)))
 
 
 class LegLinkTagTests(SimpleTestCase):

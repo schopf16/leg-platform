@@ -153,13 +153,24 @@ class BankCardTests(TestCase):
         self.assertEqual(self.client.post(BANK, data="iban=" + "a" * 20000, content_type="application/x-www-form-urlencoded").status_code, 413)
         self.assertEqual(own_iban.own_iban(self.mine), "")
 
-    def test_a_staff_account_has_no_card_and_no_route(self):
+    def test_a_staff_account_with_a_number_has_the_card_and_the_route(self):
+        # D-113: staff accounts take part like everybody else, bank connection included.
         staff_client = login(self.staff)
         html = self.page(client=staff_client)
-        self.assertNotIn('id="card-bank"', html)
-        self.assertNotIn('id="card-bank"', self.page("?edit=bank", staff_client))
-        self.assertEqual(staff_client.post(BANK, {"iban": GOOD_IBAN}).status_code, 404)
-        self.assertEqual(staff_client.get(BANK).status_code, 404)
+        self.assertIn('id="card-bank"', html)
+        self.assertIn('id="card-bank"', self.page("?edit=bank", staff_client))
+        self.assertEqual(staff_client.get(BANK).status_code, 302)
+        self.assertEqual(staff_client.post(BANK, {"iban": GOOD_IBAN}).status_code, 302)
+        self.assertEqual(own_iban.own_iban(self.staff), GOOD_IBAN)
+        self.assertEqual(own_iban.own_iban(self.mine), "")
+
+    def test_an_account_that_does_not_take_part_has_no_card_and_no_route(self):
+        staff_client = login(self.staff)
+        with patch("leg_platform.customer.access.is_customer", return_value=False):
+            self.assertNotIn('id="card-bank"', self.page(client=staff_client))
+            self.assertNotIn('id="card-bank"', self.page("?edit=bank", staff_client))
+            self.assertEqual(staff_client.post(BANK, {"iban": GOOD_IBAN}).status_code, 404)
+            self.assertEqual(staff_client.get(BANK).status_code, 404)
         self.assertEqual(own_iban.own_iban(self.staff), "")
 
     def test_an_anonymous_visitor_is_sent_to_the_login(self):

@@ -217,9 +217,10 @@ class AccessTests(TestCase):
                 self.assertIn("no-store", response["Cache-Control"])
         self.assertEqual(responses["CSRF refusal"].status_code, 403)
 
-    def menu_parts(self, user):
-        """The menu of the frame and the drawer on the home page for the account."""
-        html = self.login(user).get(reverse("home")).content.decode()
+    def menu_parts(self, user, url=None):
+        """The menu of the frame and the drawer on a page of the staff area (D-113) for the account (``url`` for an
+        account that has no page there)."""
+        html = self.login(user).get(url or reverse("management:overview")).content.decode()
         menu = html[html.index('<nav class="frame-menu'): html.index("</nav>", html.index('<nav class="frame-menu'))]
         drawer = html[html.index('class="frame-drawer-nav"'):]
         return menu, drawer[: drawer.index("</nav>")]
@@ -234,10 +235,16 @@ class AccessTests(TestCase):
                     for link in links:
                         self.assertIn(f'href="{link}"', part)
                     self.assertIn('<p class="frame-group">Verwaltung</p>', part)
-        for part in self.menu_parts(self.plain):
+        for part in self.menu_parts(self.plain, reverse("home")):
             for link in links:
                 self.assertNotIn(f'href="{link}"', part)
             self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
+        # D-113: the menu of "My area" has the entry "Staff area" (one link to the overview, a new tab), no group.
+        for user in (self.staff, self.administrator):
+            for part in self.menu_parts(user, reverse("home")):
+                with self.subTest(user=user.email, area="my area"):
+                    self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
+                    self.assertEqual([link for link in links if f'href="{link}"' in part], [reverse("management:overview")])
 
     def test_the_active_entry_is_marked_in_the_menu(self):
         html = self.login(self.staff).get(reverse("management:settings")).content.decode()
@@ -252,9 +259,11 @@ class AccessTests(TestCase):
     def test_the_system_administration_link_has_its_own_name_and_is_for_accounts_that_can_use_it(self):
         # D-102: a superuser sees it; staff without any right of the administration do not (see
         # ``test_review_corrections.SystemAdministrationMenuTests`` for the full set of accounts).
-        html = self.login(self.administrator).get(reverse("home")).content.decode()
+        html = self.login(self.administrator).get(reverse("management:overview")).content.decode()
         self.assertIn("Systemverwaltung", html)
-        self.assertNotIn("Systemverwaltung", self.login(self.staff).get(reverse("home")).content.decode())
+        self.assertNotIn("Systemverwaltung", self.login(self.staff).get(reverse("management:overview")).content.decode())
+        # D-113: the entry is a group of the staff area, never of "My area".
+        self.assertNotIn("Systemverwaltung", self.login(self.administrator).get(reverse("home")).content.decode())
 
 
 class MenuRuleTests(SimpleTestCase):

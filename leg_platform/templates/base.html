@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {# The portal is not a public page (docs/PROJECT.md, "Instances"). #}
   <meta name="robots" content="noindex, nofollow">
-  <title>{% block title %}{% endblock %} – {{ instance_name }}</title>
+  <title>{% with workspace=frame_workspace|default:"participant" %}{% filter staff_page_title:workspace %}{% block title %}{% endblock %}{% endfilter %}{% endwith %} – {{ instance_name }}</title>
   {% include "_favicon.html" with address=instance_favicon kind=instance_favicon_type %}
   {# Not deferred: sets the colour mode of this tab before the page is painted (D-056). #}
   <script src="{% static 'js/theme-init.js' %}"></script>
@@ -27,7 +27,7 @@
     account that must replace its password gets the header and "Log out" only.
     {% endcomment %}
     {% if user.is_authenticated and not frame_restricted %}{% include "_frame_icons.html" %}{% endif %}
-    <div class="frame{% if not user.is_authenticated or frame_restricted %} frame-bare{% endif %}">
+    <div class="frame{% if not user.is_authenticated or frame_restricted %} frame-bare{% elif frame_workspace == 'staff' %} frame--staff{% endif %}">
       <header class="frame-header d-print-none">
         {% if user.is_authenticated and not frame_restricted %}
           <a class="frame-round frame-menu-btn" id="menu-btn" href="#frame-drawer" role="button"
@@ -36,6 +36,7 @@
           </a>
         {% endif %}
         <a class="frame-logo" href="{% url 'home' %}"><span class="logo-plate">{% include "_brand.html" %}</span></a>
+        {% if frame_workspace == "staff" and user.is_authenticated and not frame_restricted %}<span class="frame-workspace">{% translate "Staff area" %}</span>{% endif %}
         {% if user.is_authenticated %}
           <span class="frame-name">{{ user.display_name }}</span>
           {% if frame_restricted %}
@@ -61,6 +62,8 @@
                 <svg class="frame-icon" aria-hidden="true"><use href="#i-close"/></svg>
               </button>
             </div>
+            {# The chip has its own row below the head: the close button never covers it (designer review). #}
+            {% if frame_workspace == "staff" %}<div class="frame-drawer-brand"><span class="frame-workspace">{% translate "Staff area" %}</span></div>{% endif %}
             <nav aria-label="{% translate 'Main navigation' %}" class="frame-drawer-nav">
               {% include "_frame_menu.html" %}
             </nav>
@@ -68,11 +71,11 @@
           </div>
         </div>
         <nav class="frame-bottombar d-print-none" aria-label="{% translate 'Quick access' %}">
-          {% if user.is_staff %}
-          {# Staff (walkthrough W5-11): Start, Overview, Processes and the menu; the entries that are "later" stay in the menu. #}
-          <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
-            <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
-            <span>{% translate "Start" %}</span>
+          {% if frame_workspace == "staff" %}
+          {# Staff area (D-113; walkthrough W5-11): My area (the way back, same tab), Overview, Processes and the menu; the entries that are "later" stay in the menu. #}
+          <a class="frame-tab" href="{% url 'home' %}">
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>{% translate "My area" %}</span>
           </a>
           {% management_menu as bar_entries %}{% for entry in bar_entries %}{% if entry.key == "overview" or entry.key == "processes" %}
           <a class="frame-tab{% if entry.active %} is-active{% endif %}" href="{{ entry.url }}"{% if entry.active %} aria-current="page"{% endif %}>
@@ -84,12 +87,13 @@
             <svg class="frame-icon" aria-hidden="true"><use href="#i-menu"/></svg>
             <span>{% translate "Menu" %}</span>
           </a>
-          {% else %}{% customer_menu as customer_state %}
-          {# A customer (START-SEITE.md, section 7): Start, Participation, Information, Profile. #}
+          {% else %}{% customer_menu as customer_state %}{% participates as is_participant %}
+          {# My area for everybody, staff included (START-SEITE.md, section 7): Start, Participation, Information, Profile. An account that does not take part (no customer number) has no page behind Participation and Information: Start, Profile and the menu (the way to the staff area). #}
           <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span>{% translate "Start" %}</span>
           </a>
+          {% if is_participant %}
           <a class="frame-tab{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg>
             <span>{% translate "Participation" %}</span>
@@ -98,10 +102,17 @@
             <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg>
             <span>{% translate "Information" %}</span>
           </a>
+          {% endif %}
           <a class="frame-tab{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg>
             <span>{% translate "Profile" %}</span>
           </a>
+          {% if not is_participant %}
+          <a class="frame-tab" href="#frame-drawer" role="button" data-menu-open aria-controls="frame-drawer" aria-expanded="false">
+            <svg class="frame-icon" aria-hidden="true"><use href="#i-menu"/></svg>
+            <span>{% translate "Menu" %}</span>
+          </a>
+          {% endif %}
           {% endif %}
         </nav>
       {% endif %}

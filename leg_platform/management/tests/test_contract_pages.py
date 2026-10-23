@@ -155,7 +155,7 @@ class ContractListTests(ContractBase):
 
     def test_the_menu_has_the_entry_and_it_follows_the_mail_texts(self):
         self.assertIn("contracts", [entry.key for entry in navigation.MENU])
-        html = self.client.get(reverse("home")).content.decode()
+        html = self.client.get(reverse("management:overview")).content.decode()
         self.assertIn(f'href="{LIST}"', html)
         self.assertContains(self.client.get(LIST), 'aria-current="page"')
 

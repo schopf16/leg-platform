@@ -9,6 +9,8 @@ from django import template
 from django.utils.html import format_html
 from django.utils.translation import gettext
 
+from leg_platform.customer import access
+
 register = template.Library()
 
 INFORMATION_VIEWS = frozenset({"customer:contract"})
@@ -28,6 +30,15 @@ def leg_link(context):
         '<a href="{}" target="_blank" rel="noopener noreferrer">{}<span class="visually-hidden"> ({})</span></a>',
         url, word, gettext("opens in a new tab"),
     )
+
+
+@register.simple_tag(takes_context=True)
+def participates(context):
+    """Whether the account takes part as a customer (``customer.access.is_customer``: active, a customer number; staff
+    and system administrators too, D-113): ``{% participates as is_participant %}``. Participation, Information and the
+    matching tabs are shown only then, so no link leads to a 404."""
+    user = getattr(context.get("request"), "user", None)
+    return bool(user is not None and access.is_customer(user))
 
 
 @register.simple_tag(takes_context=True)

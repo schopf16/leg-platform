@@ -47,8 +47,8 @@ class Task:
 
 
 def _customer(user):
-    """The tiles about the participation are for customers (not for staff accounts, which do not take part): the one
-    predicate of the customer pages, ``customer.access.is_customer`` (imported when needed)."""
+    """The tiles about the participation are for customers (staff accounts take part too, D-113): the one predicate of the
+    customer pages, ``customer.access.is_customer`` (imported when needed)."""
     from leg_platform.customer import access
 
     return access.is_customer(user)

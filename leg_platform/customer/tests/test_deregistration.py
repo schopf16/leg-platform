@@ -481,11 +481,17 @@ class ResultAndAccessTests(DeregistrationCase):
         self.assertEqual(login(self.other).get(self.done).status_code, 404)
         self.assertEqual(self.client.get(reverse("customer:deregistration_done", args=[987654])).status_code, 404)
 
-    def test_staff_and_anonymous_visitors_get_nothing(self):
-        for path in (START, self.done):
+    def test_staff_with_a_number_cannot_reach_the_deregistration_of_a_customer_and_anonymous_visitors_nothing(self):
+        # D-113: a staff account takes part like everybody else, but an id of another account is a 404 for it too.
+        for path in (self.done,):
             with self.subTest(path=path):
                 self.assertEqual(login(self.staff).get(path).status_code, 404)
-                self.assertEqual(login(self.staff).post(path, self.data()).status_code, 404)
+        for query in ({"point": [self.draw.pk]}, {"building": self.location.pk}):
+            with self.subTest(query=query):
+                self.assertEqual(login(self.staff).get(START, query).status_code, 404)
+        self.assertEqual(login(self.staff).post(START, self.data()).status_code, 404)
+        for path in (START, self.done):
+            with self.subTest(path=path):
                 self.assertEqual(Client().get(path).status_code, 302)
                 self.assertEqual(Client().post(path, self.data())["Location"], reverse("accounts:login"))
         self.assertEqual(Deregistration.objects.count(), 1)

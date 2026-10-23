@@ -292,10 +292,14 @@ class WordsOfTheAdministrationTests(TestCase):
         self.client, self.administrator = administrator_client()
         self.other = create_active_user("other.person@example.org")
 
-    def test_the_header_has_a_link_to_the_portal(self):
+    def test_the_header_has_the_two_ways_back_into_the_portal_and_no_view_site_link(self):
+        # D-113: "Zum Portal" (the old link "View site") is replaced by "Verwaltung" (the management area) and "Mein
+        # Bereich" (the start page), both in the same tab.
         page = self.client.get(INDEX_URL).content.decode()
 
-        self.assertRegex(page, r'<a href="/">Zum Portal</a>')
+        self.assertRegex(page, r'<a href="/management/">Verwaltung</a>')
+        self.assertRegex(page, r'<a href="/">Mein Bereich</a>')
+        self.assertNotIn("Zum Portal", page)
 
     def test_the_path_reads_users_accounts_and_the_history_is_the_change_history(self):
         page = self.client.get(

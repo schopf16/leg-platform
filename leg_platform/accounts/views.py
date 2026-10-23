@@ -123,8 +123,12 @@ class HomeView(NeverCacheMixin, TemplateView):
         banners = []
         status_lines = []
         requested_note = ""
-        if not user.is_staff:
-            # The card "Your way into the LEG" (D-103): only while an application of the account is open.
+        from leg_platform.customer.access import is_customer
+
+        if is_customer(user):
+            # The card "Your way into the LEG" (D-103): only while an application of the account is open. Staff accounts
+            # with a customer number take part and see the same page (D-113); an account without a number sees the greeting
+            # and its tasks only.
             from leg_platform.community import participation
             from leg_platform.customer import banners as customer_banners
             from leg_platform.customer import journey as customer_journey

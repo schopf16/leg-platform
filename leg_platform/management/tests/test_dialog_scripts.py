@@ -388,7 +388,9 @@ class MenuOrderTests(TestCase):
     def setUpTestData(cls):
         cls.staff = staff_user("staff.menu@example.org", superuser=True)  # can use the administration (D-102)
 
-    def test_the_system_administration_is_the_very_last_entry_of_the_menu_on_a_desktop_and_a_phone(self):
+    def test_the_system_administration_follows_the_management_entries_and_comes_before_coming_next_on_a_desktop_and_a_phone(self):
+        # D-113 (designer review DA-1): in the menu of the staff area "System" stands before "Coming next", so the
+        # sticky foot does not hide it at a low window.
         client = VerifiedClient()
         client.force_login(self.staff)
         html = client.get(reverse("management:overview")).content.decode()
@@ -396,14 +398,15 @@ class MenuOrderTests(TestCase):
         self.assertGreaterEqual(len(menus), 2)  # the left menu and the menu of the phone
         all_items = re.findall(r'<(?:a|button)[^>]*class="frame-item[^"]*"[^>]*>.*?</(?:a|button)>', html, re.S)
         labels = [re.sub(r"<[^>]+>|\s+", " ", item).strip() for item in all_items]
-        # In every copy of the menu "Systemverwaltung" comes after "Mitteilungen" and before "Ausloggen".
+        # In every copy of the menu "Systemverwaltung" comes after the entries of the management and before the
+        # placeholders ("Rechnungen" is the first of them).
         for index, label in enumerate(labels):
             if label.startswith("Systemverwaltung"):
-                self.assertTrue(labels[index - 1].startswith("Mitteilungen"), labels[index - 1])
-                self.assertTrue(labels[index + 1].startswith("Ausloggen"), labels[index + 1])
+                self.assertTrue(labels[index - 1].startswith("Verträge"), labels[index - 1])
+                self.assertTrue(labels[index + 1].startswith("Rechnungen"), labels[index + 1])
         self.assertEqual(sum(label.startswith("Systemverwaltung") for label in labels), 2)
         for part in menus:
             self.assertLess(part.index("Verwaltung</p>"), part.index("Systemverwaltung"))
-            self.assertLess(part.index("Demnächst"), part.index("Systemverwaltung"))
+            self.assertLess(part.index("Systemverwaltung"), part.index("Demnächst"))
             self.assertIn('<p class="frame-group">System</p>', part)
             self.assertIn("#i-server", part)  # its own icon, not the gear of "Einstellungen"

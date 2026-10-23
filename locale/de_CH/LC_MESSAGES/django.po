@@ -7591,3 +7591,27 @@ msgstr "Wenn Sie Ihren Zahlencode nicht verwenden können, schalten Sie ihn mit 
 
 msgid "You have neither your phone nor a recovery code? Then contact the operator of the portal. An administrator can start the removal of the number code, and you confirm it with a link that is sent to your email address."
 msgstr "Sie haben weder Ihr Handy noch einen Wiederherstellungscode? Dann wenden Sie sich an den Betrieb des Portals. Ein Administrator kann das Entfernen des Zahlencodes starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-Adresse gesendet wird."
+
+msgid "Staff area"
+msgstr "Mitarbeitenden-Bereich"
+
+msgid "Staff area: %(page)s"
+msgstr "Mitarbeitenden-Bereich: %(page)s"
+
+msgid "For staff"
+msgstr "Für Mitarbeitende"
+
+msgid "Management and system"
+msgstr "Verwaltung und System"
+
+msgid "Back to My area"
+msgstr "Zurück zu Mein Bereich"
+
+msgid "Participation, information and profile"
+msgstr "Teilnahme, Information und Profil"
+
+msgid "Start and profile"
+msgstr "Start und Profil"
+
+msgid "Open staff area"
+msgstr "Mitarbeitenden-Bereich öffnen"

@@ -3,6 +3,7 @@ LEG-Design-Vorgaben/navigation/VORGABEN.md; team lead decisions K1, K2, K4, K5, 
 
 import re
 from pathlib import Path
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.admin.sites import site as admin_site
@@ -95,7 +96,7 @@ class FrameTests(TestCase):
         staff.set_privileges(is_staff=True, is_superuser=False)
         staff_client = VerifiedClient()
         staff_client.force_login(staff)
-        staff_html = staff_client.get(HOME_URL).content.decode()
+        staff_html = staff_client.get("/management/").content.decode()
         containers += [part(staff_html, '<nav class="frame-menu', "</nav>")]
         for container in containers:
             later = re.findall(r'<a class="frame-(?:item|tab) is-later"[^>]*>', container)
@@ -144,20 +145,47 @@ class FrameTests(TestCase):
         self.assertEqual(labels, ["Start", "Teilnahme", "Information", "Profil"])
         self.assertIn('class="frame-tab is-active"', bar)
 
-    def test_the_bottom_bar_of_a_staff_account_has_start_overview_processes_and_the_menu(self):
+    def test_the_bottom_bar_of_the_staff_area_has_my_area_overview_processes_and_the_menu(self):
         # W5-11 (design walkthrough, team lead decision): no entry that is "later" in the bar; the menu opens the drawer.
+        # D-113: the first tab leads back to "My area" (the same tab); the bar follows the workspace, not is_staff.
         staff = create_active_user("bar.staff@example.org")
         staff.set_privileges(is_staff=True, is_superuser=False)
         client = VerifiedClient()
         client.force_login(staff)
-        bar = part(client.get(HOME_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Übersicht", "Vorgänge", "Menü"])
+        bar = part(client.get("/management/").content.decode(), '<nav class="frame-bottombar', "</nav>")
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Mein Bereich", "Übersicht", "Vorgänge", "Menü"])
+        self.assertIn('href="/"', bar)
+        self.assertIn('#i-arrow-left', bar)
         self.assertIn('href="/management/"', bar)
         self.assertIn('href="/management/processes/"', bar)
         self.assertIn('href="#frame-drawer" role="button" data-menu-open aria-controls="frame-drawer"', bar)
         self.assertIn('aria-expanded="false"', bar)
         self.assertNotIn("Profil", bar)
         self.assertNotIn("Energie", bar)
+
+    def test_the_bottom_bar_of_a_staff_account_in_my_area_is_the_one_of_a_customer(self):
+        # D-113: staff accounts with a customer number take part; the bar follows the workspace.
+        staff = create_active_user("bar.mine@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        client = VerifiedClient()
+        client.force_login(staff)
+        bar = part(client.get(HOME_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Teilnahme", "Information", "Profil"])
+        self.assertNotIn("/management/", bar)
+
+    def test_the_bottom_bar_of_an_account_that_does_not_take_part_has_no_link_to_a_404(self):
+        staff = create_active_user("bar.nopart@example.org")
+        staff.set_privileges(is_staff=True, is_superuser=False)
+        client = VerifiedClient()
+        client.force_login(staff)
+        with patch("leg_platform.customer.access.is_customer", return_value=False):
+            html = client.get(HOME_URL).content.decode()
+        bar = part(html, '<nav class="frame-bottombar', "</nav>")
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Profil", "Menü"])
+        self.assertNotIn("/participation/", bar)
+        menu = part(html, '<nav class="frame-menu', "</nav>")
+        self.assertNotIn("/participation/", menu)
+        self.assertIn('href="/management/"', menu)  # the way to the staff area stays
 
     def test_the_active_page_of_the_bottom_bar_of_a_staff_account_is_marked(self):
         staff = create_active_user("bar.active@example.org")
@@ -178,7 +206,7 @@ class FrameTests(TestCase):
         self.assertNotIn("eval(", text)
 
     def test_on_the_profile_only_the_profile_entry_of_the_bottom_bar_is_active(self):
-        # K4 for staff (no profile entry in the bar); a customer's bar has one and marks it.
+        # K4: a customer's bar has a profile entry and marks it; so has the bar of a staff account in "My area" (D-113).
         bar = part(self.client.get(PROFILE_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
         self.assertEqual(bar.count("is-active"), 1)
         self.assertIn(f'<a class="frame-tab is-active" href="{PROFILE_URL}" aria-current="page">', bar)
@@ -187,12 +215,12 @@ class FrameTests(TestCase):
         client = VerifiedClient()
         client.force_login(staff)
         staff_bar = part(client.get(PROFILE_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
-        self.assertNotIn("is-active", staff_bar)
-        self.assertNotIn("aria-current", staff_bar)
+        self.assertEqual(staff_bar.count("is-active"), 1)
+        self.assertIn(f'<a class="frame-tab is-active" href="{PROFILE_URL}" aria-current="page">', staff_bar)
 
     def test_administration_is_in_the_menu_for_accounts_that_can_use_it_only(self):
         # K13, D-102: not for a member, not for staff without any right of the administration, yes for a system
-        # administrator.
+        # administrator. D-113: the group "System" is in the menu of the staff area only, never in "My area".
         member_menu = part(self.client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
         self.assertNotIn("Verwaltung", member_menu)
         self.assertNotIn("/admin/", member_menu)
@@ -200,16 +228,19 @@ class FrameTests(TestCase):
         staff.set_privileges(is_staff=True, is_superuser=False)
         client = VerifiedClient()
         client.force_login(staff)
-        staff_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
+        staff_menu = part(client.get("/management/").content.decode(), '<nav class="frame-menu', "</nav>")
         self.assertNotIn('href="/admin/"', staff_menu)
         self.assertNotIn("Systemverwaltung", staff_menu)
         administrator = create_active_user("administrator.member@example.org")
         administrator.set_privileges(is_staff=True, is_superuser=True)
         client = VerifiedClient()
         client.force_login(administrator)
-        admin_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
+        admin_menu = part(client.get("/management/").content.decode(), '<nav class="frame-menu', "</nav>")
         self.assertIn('href="/admin/"', admin_menu)
         self.assertIn("Systemverwaltung", admin_menu)
+        own_menu = part(client.get(HOME_URL).content.decode(), '<nav class="frame-menu', "</nav>")
+        self.assertNotIn('href="/admin/"', own_menu)
+        self.assertNotIn("Systemverwaltung", own_menu)
 
     def test_a_link_with_a_token_renders_no_page_and_the_fixed_page_has_no_logout_form(self):
         # D-054, D-067: the link of an email only redirects (with no-referrer); the fixed page it

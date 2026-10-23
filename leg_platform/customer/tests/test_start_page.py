@@ -2,6 +2,7 @@
 the tiles about the participation, the progress and the next step."""
 
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase, tag
 from django.urls import reverse
@@ -190,8 +191,18 @@ class StartPageCardTests(TestCase):
         html = text(self.client.get(HOME))
         self.assertIn("Keine offenen Aufgaben", html)
 
-    def test_a_staff_account_gets_no_card_and_no_tile_about_the_participation(self):
+    def test_a_staff_account_with_a_number_gets_the_card_and_the_tiles_of_a_participant(self):
+        # D-113: staff accounts take part like everybody else.
         html = text(login(self.staff).get(HOME))
+        self.assertNotIn("Ihr Weg in die LEG", html)  # no application is open
+        self.assertIn("task-register_building-title", html)
+        draft_with_building(self.staff, egid=90004288, street="Staffstrasse", house_number="3")
+        html = text(login(self.staff).get(HOME))
+        self.assertIn("Ihr Weg in die LEG", html)
+
+    def test_an_account_that_does_not_take_part_gets_no_card_and_no_tile_about_the_participation(self):
+        with patch("leg_platform.customer.access.is_customer", return_value=False):
+            html = text(login(self.staff).get(HOME))
         self.assertNotIn("Ihr Weg in die LEG", html)
         self.assertNotIn("task-register_building-title", html)
         self.assertNotIn("task-feed_in-title", html)

@@ -899,17 +899,19 @@ class AdministrationAccessTests(TestCase):
                 staff_page = staff_client.get(url)
                 self.assertNotContains(staff_page, 'href="/admin/"')
                 self.assertNotContains(staff_page, "Systemverwaltung")
-        # With one right of the administration the entry is there (the administration checks every request anyway).
+        # With one right of the administration the entry is there (the administration checks every request anyway); it is a
+        # group of the staff area (D-113), not of "My area".
         self.staff.set_access_relations(
             groups=[], user_permissions=[Permission.objects.get(codename="view_portalsettings")]
         )
         allowed = VerifiedClient()
         allowed.force_login(self.staff)
+        page = allowed.get(reverse("management:overview"))
+        self.assertContains(page, 'href="/admin/"')
+        self.assertContains(page, "Systemverwaltung")
         for url in (HOME_URL, PROFILE_URL):
             with self.subTest(url=url, right=True):
-                page = allowed.get(url)
-                self.assertContains(page, 'href="/admin/"')
-                self.assertContains(page, "Systemverwaltung")
+                self.assertNotContains(allowed.get(url), "Systemverwaltung")
 
 
 @tag("mariadb")

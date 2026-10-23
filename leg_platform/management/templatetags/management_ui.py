@@ -2,11 +2,15 @@
 
 from django import forms, template
 from django.urls import NoReverseMatch, reverse
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext
 
 from leg_platform.community import grid_operator
 from leg_platform.community.models import Direction
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import navigation
+from leg_platform.management.access import is_management_user
 from leg_platform.management.returns import return_url
 
 register = template.Library()
@@ -27,6 +31,27 @@ def system_administration(context):
     """Whether the menu shows "System administration": ``{% system_administration as show_system %}`` (D-102)."""
     request = context.get("request")
     return request is not None and navigation.system_administration_visible(request)
+
+
+@register.simple_tag(takes_context=True)
+def staff_area(context):
+    """Whether the account may open the staff area (management and system administration, D-113): the entry "Staff
+    area" of the menu of "My area" and the button of the start page. The same test as the management area itself
+    (``management.access.is_management_user``); the second factor and every request are checked by the views."""
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    return bool(user is not None and is_management_user(user))
+
+
+@register.filter
+def staff_page_title(title, workspace):
+    """The title of a page of the staff area with the prefix "Staff area: ..." (D-113): ``{% filter
+    staff_page_title:frame_workspace %}{% block title %}{% endblock %}{% endfilter %}``. The title arrives escaped from
+    the template; a raw string is escaped here (``conditional_escape`` leaves safe text alone and escapes any other),
+    and so is the text of the catalogue. Any other workspace leaves the title alone."""
+    if workspace != "staff":
+        return title
+    return mark_safe(conditional_escape(gettext("Staff area: %(page)s")) % {"page": conditional_escape(title)})
 
 
 @register.simple_tag

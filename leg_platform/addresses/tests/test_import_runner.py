@@ -475,7 +475,14 @@ class StatusEndpointTests(TestCase):
 
         css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
         self.assertRegex(css, r"@media \(prefers-reduced-motion: reduce\) \{[^{}]*\{[^{}]*animation: none;")  # UX-006
-        touch = css.split("@media (pointer: coarse), (max-width: 767px)", 1)[1].split("@media (max-width: 767px)", 1)[0]
+        # The block that holds the buttons of the import and the logs: found by its content, not by its place (the
+        # file has more than one media query for touch screens, e.g. the links of the header, D-113).
+        touch_blocks = [
+            block for block in css.split("@media (pointer: coarse), (max-width: 767px)")[1:]
+            if ".import-form input[type=\"submit\"]" in block.split("\n}\n", 1)[0]
+        ]
+        self.assertEqual(len(touch_blocks), 1, "exactly one touch block holds the buttons of the import and the logs")
+        touch = touch_blocks[0].split("\n}\n", 1)[0]
         for needle in (".import-form input[type=\"submit\"]", ".log-controls .button", ".log-files a", "min-height: 44px"):
             self.assertIn(needle, touch, needle)  # UX-003
         self.assertIn(".log-files thead", css)  # UX-002: the phone shows each file as a block

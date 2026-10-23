@@ -192,7 +192,8 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     only_two_factor = (
         second_factor.requires_second_factor(user) and not second_factor.is_second_factor_complete(user)
     )
-    # The card "Bank or postal connection" is the customer's (a staff account has none: it takes no part).
+    # The card "Bank or postal connection" is the customer's (an account without a customer number has none; staff
+    # accounts with a customer number take part and have it, D-113).
     from leg_platform.customer import access as customer_access
 
     bank_card = not only_two_factor and customer_access.is_customer(user)

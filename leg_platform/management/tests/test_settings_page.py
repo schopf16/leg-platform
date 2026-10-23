@@ -60,7 +60,7 @@ class SettingsPageTests(TestCase):
         html = self.page()
 
         for text in (
-            "<title>Einstellungen",
+            "<title>Mitarbeitenden-Bereich: Einstellungen",
             ">Verwaltung</p>", ">Einstellungen</h1>",
             ">Absender der Rechnungen</h2>", ">Messpunkte</h2>", ">Produktionsquote</h2>",
             ">Strasse</label>", ">Hausnummer</label>", "Adresszusatz", "(optional)", ">PLZ</label>", ">Ort</label>",

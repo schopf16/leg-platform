@@ -45,6 +45,24 @@ def frame_restricted(request):
     return requires_second_factor(user) and not is_second_factor_complete(user)
 
 
+STAFF_NAMESPACES = ("management:", "admin:")
+
+
+def frame_workspace(request):
+    """The workspace the page belongs to: "staff" (the staff area: the management area and the system administration,
+    D-113) or "participant" ("My area": everything else). Derived from the resolved view name only; the staff
+    workspace is shown only to an account that may use the management area, so a page that is refused (a 404 for a
+    customer under ``/management/``) never wears the staff look. The menu and the header show a place, they do not
+    authorise anything."""
+    from leg_platform.management.access import is_management_user
+
+    user = getattr(request, "user", None)
+    name = getattr(getattr(request, "resolver_match", None), "view_name", "") or ""
+    if user is not None and name.startswith(STAFF_NAMESPACES) and is_management_user(user):
+        return "staff"
+    return "participant"
+
+
 def instance(request):
     # The values of the portal settings (name, addresses, logos) are read from the database only
     # when a template uses them: an error page, which does not show the footer, does not need
@@ -55,6 +73,7 @@ def instance(request):
     values = SimpleLazyObject(lambda: portal_values(request))
     return {
         "frame_restricted": frame_restricted(request),
+        "frame_workspace": frame_workspace(request),
         # The "Profile" entry of the menu is active on the profile pages only (review N-/E-4).
         "frame_profile_active": getattr(
             getattr(request, "resolver_match", None), "view_name", None

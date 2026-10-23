@@ -159,7 +159,7 @@ class MeteringPointPageTests(TestCase):
             self.assertEqual(client.get(LIST, params).status_code, 200)
 
     def test_the_menu_has_the_entry(self):
-        self.assertIn(LIST, self.login(self.staff).get(reverse("home")).content.decode())
+        self.assertIn(LIST, self.login(self.staff).get(reverse("management:overview")).content.decode())
 
     # The detail page ----------------------------------------------------------------------------
 

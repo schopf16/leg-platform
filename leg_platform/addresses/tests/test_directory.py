@@ -2073,6 +2073,16 @@ class DirectoryDatabaseTests(TestCase):
             self.assertEqual(client.post(url).status_code, 403)
         self.assertFalse(ImportRequest.objects.exists())
 
+    def test_the_admin_shell_renders_under_this_url_configuration(self):
+        # The shell of the administration links into the portal ("home", "management:overview", D-113): the pages render
+        # under the URL configuration of these tests, so a new ``{% url %}`` of the shell surfaces here at once.
+        client = self._staff_client(True)
+        for url in (reverse("admin:index"), reverse("admin:addresses_importrequest_changelist")):
+            with self.subTest(url=url):
+                response = client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'class="admin-workspace"')
+
     def test_admin_status_and_enqueue_never_download(self):
         client = self._staff_client(True)
         url = reverse("admin:addresses_importrequest_changelist")

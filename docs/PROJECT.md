@@ -14,10 +14,11 @@ These terms are binding for all project documents and for naming in code.
 | LEG | Local electricity community ("lokale Elektrizitätsgemeinschaft") under Art. 17d of the Swiss Electricity Supply Act (StromVG). By law an LEG covers at most the area of one political municipality; it may span several localities with different postal codes within it. |
 | Instance | One independent installation with its own database, configuration and users, operated for one municipality. |
 | Instance configuration | All instance-specific values (name, domain, canonical base URL, contact details, privacy notice and website links, branding such as logo and accent colour), kept outside the code: the server environment and, for the presentation (name, website, privacy and legal addresses, colours, logos), the portal settings of the administration with the environment as fallback (D-073). |
-| System administrator | Responsible for one instance: configuration, users, roles and permissions; all permissions. A Django superuser (`is_superuser` with `is_staff`). |
-| Staff user | `is_staff` without superuser status; only assigned permissions, plus the management area (D-086). |
+| System administrator | Responsible for one instance: configuration, users, roles and permissions; all permissions. A Django superuser (`is_superuser` with `is_staff`). Takes part in the LEG like every account (D-113). |
+| Staff user | `is_staff` without superuser status; only assigned permissions, plus the management area (D-086). Takes part in the LEG like every account (D-113). |
+| Staff area | The management area (`/management/`) and the system administration (`/admin/`); opens in a second browser tab from the start page of "My area" (D-113). |
 | User | A person who can log in: email address verified and password set. |
-| Authenticated user | A logged-in user without additional permissions; accesses only their own profile. |
+| Authenticated user | A logged-in user without additional permissions; accesses only their own profile and, with a customer number, the participation (D-105). |
 | Customer number | Unique, random six-digit number assigned when the registration is completed, never reused; displayed in two blocks of three digits (`482 915`); identifies the account (e.g. later on invoices), not a login identifier (D-021). |
 | Role | A named set of permissions, maintained at runtime in the admin (Django group). |
 | Permission | A right to perform a specific function, defined in code with an English codename. |
@@ -108,7 +109,7 @@ Defined in D-016:
 
 The role model is D-012; levels and enforcement: `docs/ARCHITECTURE.md`, "Users and Roles"; rules: `AGENTS.md`, section 6, and `docs/SECURITY.md`, section 4.
 
-* **Fixed access levels.** Two-factor is mandatory for system administrators and staff users, optional for authenticated users. Only system administrators manage roles and permissions, assign roles and change `is_staff`, `is_superuser` and direct permissions. Staff users never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin) and never change another account's password, email address or second factor.
+* **Fixed access levels.** Two-factor is mandatory for system administrators and staff users, optional for authenticated users. Only system administrators manage roles and permissions, assign roles and change `is_staff`, `is_superuser` and direct permissions. Staff users never change, block, deactivate or delete accounts of staff or system administrators (including their own in the admin) and never change another account's password, email address or second factor. **Every level may take part in the LEG** with its own account (a customer number is enough; D-113, owner decision 2026-10-23): staff users and system administrators register buildings and metering points like everybody and, in addition, work in the staff area. The owner accepts that such an account can approve its own application in the management area (D-086).
 * **Further roles.** None is defined or hard-coded. They are created later in the admin as Django groups, named freely and linked to permissions. Authorization checks use permissions, never role names. Roles are never implemented by granting superuser status.
 
 ## Instances

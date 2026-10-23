@@ -166,7 +166,7 @@ AREAS: dict[str, Area] = {
                     "test_acceptance_owner_decisions", "test_admin_acceptance",
                     "test_portal_branding", "test_portal_favicon")
             + _labels(T, "test_error_pages", "test_presentation", "test_language")
-            + ("leg_platform.customer.tests.test_translations",)
+            + ("leg_platform.customer.tests.test_translations", A + "test_workspaces")
         ),
     ),
     "language": Area(
@@ -194,7 +194,7 @@ AREAS: dict[str, Area] = {
                     "test_profile", "test_profile_acceptance", "test_address_notice",
                     "test_admin_acceptance", "test_admin_spotcheck", "test_registration",
                     "test_password_reset", "test_phase4_review", "test_portal_branding",
-                    "test_portal_favicon")
+                    "test_portal_favicon", "test_workspaces")
             + _FLOW_REVIEWS
             + _labels(T, "test_error_pages", "test_presentation", "test_sizes", "test_design_assets")
             + _labels(M, "test_access", "test_settings_page", "test_components", "test_onboarding_assets")
@@ -207,7 +207,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(T, "test_design_assets", "test_sizes", "test_presentation", "test_error_pages")
             + _labels(A, "test_entry_shell", "test_frame", "test_usability", "test_address_notice",
-                      "test_portal_branding", "test_portal_favicon")
+                      "test_portal_branding", "test_portal_favicon", "test_workspaces")
             + _labels(M, "test_components", "test_onboarding_assets")
             + ("leg_platform.customer.tests.test_templates",)
         ),
@@ -224,7 +224,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(T, "test_presentation", "test_instance_configuration", "test_design_assets",
                     "test_sizes", "test_request_body_limit")
-            + _labels(A, "test_entry_shell", "test_portal_settings", "test_frame",
+            + _labels(A, "test_entry_shell", "test_portal_settings", "test_frame", "test_workspaces",
                       "test_logo_images", "test_portal_branding", "test_portal_favicon")
         ),
     ),
@@ -244,7 +244,8 @@ AREAS: dict[str, Area] = {
     ),
     "address-directory": Area(
         "The address directory, its import jobs and the address suggestions.",
-        paths=("leg_platform/addresses/",),
+        paths=("leg_platform/addresses/", "leg_platform/static/css/admin-portal.css",
+               "leg_platform/templates/admin/base_site.html"),
         exclude=("leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py"),
         tests=("leg_platform.addresses.tests", A + "test_address_notice", C + "test_address_check"),
     ),
@@ -268,6 +269,7 @@ AREAS: dict[str, Area] = {
         tests=(
             "leg_platform.customer.tests",
             A + "test_frame",
+            A + "test_workspaces",
             C + "test_contracts",
             C + "test_building_review",
             T + "test_downloads",
@@ -360,8 +362,8 @@ AREAS: dict[str, Area] = {
             _labels(A, "test_admin", "test_admin_acceptance", "test_admin_exposure",
                     "test_admin_spotcheck", "test_portal_settings", "test_graph_test_email_limits",
                     "test_email_texts", "test_translations", "test_acceptance_negative_authorization",
-                    "test_portal_branding", "test_portal_favicon")
-            + _labels(T, "test_mail_graph", "test_logs")
+                    "test_portal_branding", "test_portal_favicon", "test_workspaces")
+            + _labels(T, "test_mail_graph", "test_logs", "test_language")
             + _labels(C, "test_rights", "test_admin_tables", "test_admin_raw_tables")
         ),
     ),

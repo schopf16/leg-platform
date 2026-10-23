@@ -116,16 +116,28 @@ class CustomerMenuTests(TestCase):
         self.assertEqual(html.count("frame-parent"), 4)  # two parents, desktop menu and drawer
         self.assertEqual(html.count('action="/logout/"'), 2)
 
-    def test_a_staff_account_keeps_its_menu_and_its_bottom_bar(self):
+    def test_a_staff_account_has_the_menu_of_a_customer_in_my_area_and_its_own_menu_in_the_staff_area(self):
+        # D-113: two workspaces. Staff accounts with a customer number take part; the staff area has the menu it had.
         staff_client = login(self.staff)
         menu = menu_of(staff_client.get(HOME))
-        for label in ("Rechnungen", "Energie", "Mitteilungen", "Verwaltung"):
+        for label in ("Teilnahme", "Gesellschaftsvertrag", "Für Mitarbeitende", "Mitarbeitenden-Bereich", "Rechnung"):
             self.assertIn(label, menu)
-        for gone in ("Teilnahme", "Gesellschaftsvertrag", "frame-sub"):
+        for gone in ("Rechnungen", "Mitteilungen", 'frame-group">Verwaltung<'):
             self.assertNotIn(gone, menu)
-        bar = bar_of(staff_client.get(HOME))
-        # The bar of the staff changed with the staff walkthrough (W5-11): Start, Overview, Processes and the menu.
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Übersicht", "Vorgänge", "Menü"])
+        staff_menu = menu_of(staff_client.get(reverse("management:overview")))
+        for label in ("Rechnungen", "Energie", "Mitteilungen", "Verwaltung", "Zurück zu Mein Bereich"):
+            self.assertIn(label, staff_menu)
+        for gone in ("frame-parent", "Gesellschaftsvertrag", "frame-sub"):
+            self.assertNotIn(gone, staff_menu)
+        # The bar follows the workspace: the one of a customer in My area, the staff bar in the staff area.
+        self.assertEqual(
+            re.findall(r"<span>([^<]+)</span>", bar_of(staff_client.get(HOME))),
+            ["Start", "Teilnahme", "Information", "Profil"],
+        )
+        self.assertEqual(
+            re.findall(r"<span>([^<]+)</span>", bar_of(staff_client.get(reverse("management:overview")))),
+            ["Mein Bereich", "Übersicht", "Vorgänge", "Menü"],
+        )
 
     def test_the_menu_has_no_inline_script_or_style(self):
         html = self.client.get(BUILDINGS).content.decode()
