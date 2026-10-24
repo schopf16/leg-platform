@@ -8,10 +8,11 @@ import re
 from datetime import date, timedelta
 from pathlib import Path
 
-from django.test import SimpleTestCase, TestCase, tag
+from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
 from leg_platform.community import applications, contracts, deregistrations, numbers
@@ -48,7 +49,7 @@ def complete_draft(person):
     """A draft whose five steps are done (nothing is open)."""
     application, building = draft_with_points(person)
     applications.accept_contract_step(
-        person, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+        person, application, contracts.current_version().pk, agrees_contract=True
     )
     applications.set_start(person, application, asap=True)
     return application, building
@@ -164,7 +165,7 @@ class SubmittedPageTests(TestCase):
 
         applications.save_bank_connection(mine, application, GOOD_IBAN)
         applications.accept_contract_step(
-            mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            mine, application, contracts.current_version().pk, agrees_contract=True
         )
         wish = applications.earliest_start_date() + timedelta(days=40)
         client.post(step_url(application, "start_date"), {"start": "date", "desired_date": wish.isoformat()})
@@ -271,14 +272,14 @@ class StepOneAndMenuTests(TestCase):
         application.buildings.all().delete()
         self.assertNotIn(sentence, text(self.client.get(url)))
 
+    @portal_addresses(contact_address="leg@example.org")
     def test_the_contact_link_is_in_the_information_group_not_in_the_foot(self):
-        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         html = text(self.client.get(HOME))
         menu = html[html.index('<nav class="frame-menu') :]; menu = menu[: menu.index("</nav>")]
         information = menu[menu.index('<ul class="frame-sub">', menu.index("Information")) :]
         information = information[: information.index("</ul>")]
-        self.assertIn('href="https://leg.example.org/"', information)
-        self.assertIn('<span class="visually-hidden"> (öffnet in neuem Tab)</span>', information)
+        self.assertIn('href="/participation/contact/"', information)
+        self.assertIn(">Kontakt zur LEG</a>", information)
         foot = menu[menu.index("frame-menu-foot") :]
         self.assertNotIn("Kontakt zur LEG", foot)
         self.assertIn("Ausloggen", foot)

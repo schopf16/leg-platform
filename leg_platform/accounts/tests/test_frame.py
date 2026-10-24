@@ -10,6 +10,7 @@ from django.contrib.admin.sites import site as admin_site
 from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import tasks
 from leg_platform.accounts.models import HiddenTask, PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user
@@ -124,6 +125,7 @@ class FrameTests(TestCase):
 
     @override_settings(INSTANCE_PRIVACY_URL="")
     def test_the_legal_links_of_the_menu_come_from_the_portal_settings(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(
             id=1, privacy_url="https://www.example.org/privacy", imprint_url="https://www.example.org/imprint"
         )

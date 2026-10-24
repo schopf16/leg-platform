@@ -350,7 +350,7 @@ class AccountDeletionTests(TestCase):
         self.assertIn("Alle Angaben werden gelöscht.", page)
         self.assertIn("Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind.", page)
         self.assertIn("Konto unwiderruflich löschen</button>", page)
-        self.assertIn("Diese Kündigung kann nicht mehr zurückgezogen oder aufgehoben werden.", page)
+        self.assertIn("Diese Löschung kann nicht mehr zurückgezogen oder aufgehoben werden.", page)
 
     def test_the_card_of_the_profile_is_one_sentence_and_leads_to_the_page(self):
         card = re.search(

@@ -20,6 +20,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils.csp import CSP
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform import branding
 from leg_platform.accounts import emails, second_factor
 from leg_platform.accounts.models import (
@@ -233,6 +234,7 @@ class AccessorTests(TestCase):
                 )
 
     def test_a_database_error_gives_the_server_configuration_and_never_raises(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(pk=1, name="Row name")
         for error in (OperationalError("down"), RuntimeError("anything"), ValueError("odd")):
             with self.subTest(error=type(error).__name__):
@@ -244,6 +246,7 @@ class AccessorTests(TestCase):
                 self.assertEqual(values.accent_light, "#005BA2")
 
     def test_an_unexpected_failure_while_applying_the_values_gives_the_server_configuration(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(pk=1, name="Row name")
         with mock.patch(
             "leg_platform.accounts.portal_settings._stored_logos", side_effect=RuntimeError("boom")
@@ -1489,9 +1492,15 @@ class ServerConfigurationPanelTests(TestCase):
         staff_page = staff.get(SETTINGS_URL).content.decode()
 
         self.assertIn("Serverkonfiguration (nur lesen)", admin_page)
-        self.assertIn("Basisadresse des Portals", admin_page)
+        self.assertIn("Adresse des Portals", admin_page)
         self.assertNotIn("Serverkonfiguration (nur lesen)", staff_page)
-        self.assertNotIn("Basisadresse des Portals", staff_page)
+        self.assertNotIn('name="base_url"', staff_page)
+
+    def test_a_staff_user_cannot_change_the_addresses_of_the_instance(self):
+        staff, _staff = staff_with("change.addresses@example.org", "view_portalsettings", "change_portalsettings")
+        before = (PortalSettings.instance_origin(), PortalSettings.sender())
+        staff.post(SETTINGS_URL, form_data(base_url="https://evil.example.org", sender_address="x@evil.example.org"))
+        self.assertEqual((PortalSettings.instance_origin(), PortalSettings.sender()), before)
 
     def test_the_panel_shows_the_public_values_read_only_and_no_secret(self):
         client, _person = administrator()
@@ -1500,8 +1509,8 @@ class ServerConfigurationPanelTests(TestCase):
 
         panel = page[page.index('class="portal-server"'):]
         panel = panel[: panel.index("</table>")]
-        for text in ("Umgebung", "local", "Basisadresse des Portals", settings.INSTANCE_BASE_URL,
-                     "Erlaubte Host-Namen", "E-Mail-Versand", "Absenderadresse der E-Mails",
+        for text in ("Umgebung", "local",
+                     "Erlaubte Host-Namen", "E-Mail-Versand",
                      "Sicherheitsprotokoll: Aufbewahrung in Tagen", "HSTS, Sekunden"):
             with self.subTest(text=text):
                 self.assertIn(text, panel)
@@ -1513,25 +1522,17 @@ class ServerConfigurationPanelTests(TestCase):
                      "BOOTSTRAP_SYSTEM_ADMIN_PASSWORD", "ADDRESS_", "PRIVATE KEY"):
             self.assertNotIn(name, page)
 
-    def test_the_allowed_recipients_are_only_counted(self):
-        client, _person = administrator()
-
-        with override_settings(EMAIL_ALLOWED_RECIPIENTS=["secret.person@example.org", "other.person@example.org"]):
-            page = client.get(SETTINGS_URL).content.decode()
-
-        self.assertNotIn("secret.person@example.org", page)
-        self.assertIn("Anzahl erlaubter Empfänger (nur Entwicklung)</th><td>2</td>", page)
-
-    def test_the_host_and_the_base_address_have_no_field_and_cannot_be_posted(self):
+    def test_the_base_address_is_a_field_and_a_foreign_host_is_refused(self):
         client, _person = administrator()
         page = client.get(SETTINGS_URL).content.decode()
 
-        for name in ("allowed_hosts", "base_url", "instance_base_url", "host", "csrf_trusted_origins", "email_mode"):
+        for name in ("allowed_hosts", "host", "csrf_trusted_origins", "email_mode"):
             self.assertNotIn(f'name="{name}"', page)
-        before = (list(settings.ALLOWED_HOSTS), settings.INSTANCE_BASE_URL)
-        client.post(SETTINGS_URL, form_data(allowed_hosts="evil.example", instance_base_url="https://evil.example"))
-        self.assertEqual((list(settings.ALLOWED_HOSTS), settings.INSTANCE_BASE_URL), before)
-        self.assertFalse([f.name for f in PortalSettings._meta.get_fields() if "host" in f.name or "base_url" in f.name])
+        self.assertIn('name="base_url"', page)
+        before = (list(settings.ALLOWED_HOSTS), PortalSettings.instance_origin())
+        client.post(SETTINGS_URL, form_data(allowed_hosts="evil.example", base_url="https://evil.example"))
+        self.assertEqual((list(settings.ALLOWED_HOSTS), PortalSettings.instance_origin()), before)
+        self.assertFalse([f.name for f in PortalSettings._meta.get_fields() if "host" in f.name])
 
 
 @override_settings(**SERVER)
@@ -1692,8 +1693,10 @@ class NoDataMigrationTests(SimpleTestCase):
 
 @tag("mariadb")
 class NoRowAfterTheMigrationsTests(TestCase):
-    def test_a_fresh_database_has_no_portal_settings_row_and_no_group(self):
-        self.assertEqual(PortalSettings.objects.count(), 0)
+    def test_a_fresh_database_has_no_branding_and_no_group(self):
+        # The test settings store the addresses of a test instance; no branding value is set by a migration.
+        row = PortalSettings.objects.get()
+        self.assertEqual((row.name, row.accent_light, row.privacy_url), ("", "", ""))
         self.assertEqual(Group.objects.count(), 0)
 
 

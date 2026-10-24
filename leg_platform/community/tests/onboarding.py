@@ -82,7 +82,7 @@ def ready_draft(person, *, egid=90004269, feed_in=False, accept=True, start=True
     if accept and not contracts.has_accepted_current(person):
         version = contracts.current_version() or publish_contract()
         applications.accept_contract_step(
-            person, application, version.pk, agrees_contract=True, agrees_data_exchange=True
+            person, application, version.pk, agrees_contract=True
         )
     if start:
         applications.set_start(person, application, asap=True, today=TODAY)

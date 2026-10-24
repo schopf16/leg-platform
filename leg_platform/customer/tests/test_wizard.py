@@ -78,7 +78,7 @@ class StartPageTests(WizardCase):
     def test_what_is_on_file_is_green_and_counts_as_done(self):
         own_iban.set_own_iban(self.mine, GOOD_IBAN)
         publish = contracts.current_version()
-        contracts.accept_contract(self.mine, publish.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.mine, publish.pk, agrees_contract=True)
         html = text(self.client.get(START))
         self.assertIn("1 von 4 Schritten erledigt", html)
         self.assertEqual(html.count("Bereits hinterlegt</span>"), 2)
@@ -136,7 +136,7 @@ class StartPageTests(WizardCase):
         self.assertIn(banner, text(self.client.get(START)))
         self.assertIn(banner, text(self.client.get(step_url(draft, "contract"))))
         # Any change ends the pause.
-        self.client.post(step_url(draft, "contract"), {"version": self.version.pk, "agrees_contract": "on", "agrees_data_exchange": "on"})
+        self.client.post(step_url(draft, "contract"), {"version": self.version.pk, "agrees_contract": "on"})
         self.assertEqual(self.draft().state, Application.State.DRAFT)
 
     def test_a_draft_returned_by_the_leg_says_so(self):
@@ -169,7 +169,7 @@ class ResumeTests(WizardCase):
     def test_a_submitted_application_is_no_wizard_any_more(self):
         application, _building = draft_with_points(self.mine)
         applications.accept_contract_step(
-            self.mine, application, self.version.pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, application, self.version.pk, agrees_contract=True
         )
         applications.set_start(self.mine, application, asap=True)
         applications.submit(self.mine, application)
@@ -623,37 +623,34 @@ class ContractStepTests(WizardCase):
             '<iframe class="contract-frame" src="/participation/contract/read/#view=FitH&amp;navpanes=0"',
             "Wenn der Vertrag hier nicht angezeigt wird, laden Sie ihn bitte herunter.",
             "Den Vertrag finden Sie auch unter", 'href="/participation/contract/"', "Information › Gesellschaftsvertrag",
-            "Ich habe den Gesellschaftsvertrag gelesen und stimme ihm zu.",
-            "Ich bin damit einverstanden, dass der Netzbetreiber meine Messdaten an die LEG übermittelt.",
-            'data-gate-all="id_agrees_contract id_agrees_data_exchange"',
+            "Ich habe die aktuelle Fassung vom 07.10.2026 gelesen und stimme ihr zu.",
+            'data-gate-all="id_agrees_contract"',
         ):
             self.assertIn(marker, html)
-        self.assertEqual(html.count('type="checkbox"'), 2)
+        self.assertEqual(html.count('type="checkbox"'), 1)
         self.assertNotIn("checked", html.split("<main")[1])
 
     def post(self, **values):
         return self.client.post(self.url, {"version": self.version.pk, **values})
 
-    def test_both_ticks_save_the_acceptance_and_lead_to_the_start_date(self):
-        response = self.post(agrees_contract="on", agrees_data_exchange="on")
+    def test_the_tick_saves_the_acceptance_and_leads_to_the_start_date(self):
+        response = self.post(agrees_contract="on")
         self.assertRedirects(response, step_url(self.application, "start_date"), fetch_redirect_response=False)
         acceptance = ContractAcceptance.objects.get(person=self.mine)
         self.assertEqual((acceptance.version_id, acceptance.sha256, acceptance.data_exchange_accepted),
                          (self.version.pk, self.version.sha256, True))
 
-    def test_one_tick_or_none_stores_nothing_and_says_so(self):
-        for values in ({}, {"agrees_contract": "on"}, {"agrees_data_exchange": "on"}):
-            with self.subTest(values=values):
-                response = self.post(**values)
-                self.assertEqual(response.status_code, 200)
-                self.assertIn("Bitte setzen Sie beide Häkchen.", text(response))
+    def test_without_the_tick_nothing_is_stored_and_the_page_says_so(self):
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Bitte setzen Sie das Häkchen, um zuzustimmen.", text(response))
         self.assertFalse(ContractAcceptance.objects.exists())
 
     def test_a_version_that_was_replaced_meanwhile_shows_the_new_one_with_empty_boxes(self):
         staff = staff_user("contract.staff.wizard@example.org")
         newer = contracts.upload_version(staff, pdf(b"new"), date(2026, 11, 3))
         contracts.make_current(staff, newer)
-        response = self.post(agrees_contract="on", agrees_data_exchange="on")
+        response = self.post(agrees_contract="on")
         html = text(response)
         self.assertIn("Der Vertrag wurde inzwischen ersetzt. Bitte lesen Sie die neue Fassung.", html)
         self.assertIn("Vertragsfassung vom 3. November 2026", html)
@@ -664,11 +661,11 @@ class ContractStepTests(WizardCase):
 
         ContractVersion.objects.update(current_marker=None)
         self.assertIn("Der Vertrag ist noch nicht verfügbar.", text(self.client.get(self.url)))
-        self.assertEqual(self.client.post(self.url, {"version": 1, "agrees_contract": "on", "agrees_data_exchange": "on"}).status_code, 200)
+        self.assertEqual(self.client.post(self.url, {"version": 1, "agrees_contract": "on"}).status_code, 200)
         self.assertFalse(ContractAcceptance.objects.exists())
 
     def test_an_accepted_contract_is_green_and_skipped(self):
-        contracts.accept_contract(self.mine, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.mine, self.version.pk, agrees_contract=True)
         html = text(self.client.get(self.url))
         self.assertIn("Bereits zugestimmt", html)
         self.assertEqual(html.count('type="checkbox"'), 0)
@@ -687,7 +684,7 @@ class StartDateStepTests(WizardCase):
         super().setUp()
         self.application, self.building = draft_with_points(self.mine)
         applications.accept_contract_step(
-            self.mine, self.application, self.version.pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, self.application, self.version.pk, agrees_contract=True
         )
         self.url = step_url(self.application, "start_date")
 
@@ -759,7 +756,7 @@ class SubmittedAndWithdrawTests(WizardCase):
         self.application, self.building = draft_with_points(self.mine, feed_in=True)
         applications.save_bank_connection(self.mine, self.application, GOOD_IBAN)
         applications.accept_contract_step(
-            self.mine, self.application, self.version.pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, self.application, self.version.pk, agrees_contract=True
         )
         self.client.post(step_url(self.application, "start_date"), {"start": "asap"})
         self.submitted = reverse("customer:application_submitted", args=[self.application.pk])
@@ -987,7 +984,7 @@ class CancelTests(WizardCase):
 
     def test_a_submitted_application_is_not_cancelled_this_way(self):
         application, _building = draft_with_points(self.mine)
-        applications.accept_contract_step(self.mine, application, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        applications.accept_contract_step(self.mine, application, self.version.pk, agrees_contract=True)
         applications.set_start(self.mine, application, asap=True)
         applications.submit(self.mine, application)
         self.client.post(reverse("customer:application_cancel", args=[application.pk]))

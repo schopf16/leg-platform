@@ -26,7 +26,7 @@ class ApplicationError(Exception):
     about another account), ``directory_unavailable``, ``egid_invalid``, ``building_not_found``, ``ambiguous``,
     ``egid_not_offered``, ``already_added``, ``building_fixed``, ``direction_taken``, ``number_own``,
     ``number_in_application``, ``number_unavailable`` (neutral), ``prefix_not_configured``, ``contract_missing``,
-    ``no_contract``, ``both_ticks_required``, ``version_changed``, ``already_accepted``, ``start_invalid``,
+    ``no_contract``, ``agreement_required``, ``version_changed``, ``already_accepted``, ``start_invalid``,
     ``step_not_available``, ``incomplete`` (``details["missing"]`` lists the open items), ``wrong_state``.
     Staff codes add: ``date_in_future``, ``date_before_start``, ``start_too_early``, ``number_exists``,
     ``cannot_terminate``, ``not_eligible``, ``nothing_to_deregister``, ``date_before_earliest``, ``not_month_end``;

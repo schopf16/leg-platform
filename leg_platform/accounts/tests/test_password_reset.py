@@ -22,6 +22,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import mail_queue, password_reset, rate_limits
 from leg_platform.accounts.forms import NewPasswordForm
 from leg_platform.accounts.models import LoginIpAttempt, MailJob, User, VerificationToken
@@ -56,7 +57,7 @@ def reset_path(message):
     match = re.search(r"^(https?://\S+/password-reset/verify/\S+)$", message.body, re.MULTILINE)
     assert match, "The email contains no reset link."
     link = match.group(1)
-    assert link.startswith(settings.INSTANCE_BASE_URL + "/")
+    assert link.startswith(PortalSettings.instance_origin() + "/")
     return urlsplit(link).path
 
 
@@ -81,7 +82,7 @@ class ResetRequestTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["active.person@example.org"])
         reset_path(mail.outbox[0])
         self.assertEqual(mail.outbox[0].extra_headers["Auto-Submitted"], "auto-generated")
-        self.assertEqual(mail.outbox[0].from_email, settings.DEFAULT_FROM_EMAIL)
+        self.assertEqual(mail.outbox[0].from_email, PortalSettings.sender())
 
     def test_no_email_is_sent_to_other_addresses_and_the_response_is_the_same(self):
         blocked = create_active_user("blocked.person@example.org")

@@ -18,7 +18,7 @@ from leg_platform.community.models import (
     METERING_POINT_NAME_MAX_LENGTH,
     Direction,
 )
-from leg_platform.customer import texts
+from leg_platform.customer import contact, texts
 
 YES, NO = "yes", "no"
 ASAP, DATE = "asap", "date"
@@ -159,11 +159,10 @@ class BankForm(CustomerForm):
 
 
 class ContractForm(CustomerForm):
-    """Step 4: the version shown and the two ticks (both are required; the service checks)."""
+    """Step 4 and the Information page: the version shown and the tick (required; the service checks)."""
 
     version = forms.IntegerField(widget=forms.HiddenInput)
     agrees_contract = forms.BooleanField(required=False)
-    agrees_data_exchange = forms.BooleanField(required=False)
 
 
 class StartForm(CustomerForm):
@@ -273,3 +272,39 @@ class DeregistrationForm(ReauthenticationForm):
         ):
             self.iban_missing = True
             self.add_error(None, texts.IBAN_NEEDED)
+
+
+class ContactForm(CustomerForm):
+    """The contact form "Contact the LEG" (D-115): the message, the answer by mail or by phone, a copy. The mail address
+    is prefilled from the account and changed only for this message; the phone number is checked and saved to the profile
+    when it is sent."""
+
+    message = forms.CharField(
+        label=_("Your message"), max_length=4000, widget=forms.Textarea(attrs={"rows": 6}),
+        help_text=_("Please do not enter passwords or access data."),
+    )
+    reply_by = forms.ChoiceField(
+        label=_("How should we answer you?"),
+        choices=((contact.REPLY_EMAIL, _("By email")), (contact.REPLY_PHONE, _("By phone"))),
+        widget=forms.RadioSelect, initial=contact.REPLY_EMAIL,
+    )
+    email = forms.EmailField(label=_("Email address"), max_length=254, required=False)
+    phone = forms.CharField(
+        label=_("Telephone number"), max_length=30, required=False,
+        widget=forms.TextInput(attrs={"type": "tel", "placeholder": "+41 79 123 45 67", "autocomplete": "tel"}),
+    )
+    copy = forms.BooleanField(label=_("I would like a copy of this message by email."), required=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("reply_by") == contact.REPLY_EMAIL and not cleaned.get("email"):
+            self.add_error("email", _("Please enter an email address."))
+        if cleaned.get("reply_by") == contact.REPLY_PHONE:
+            try:
+                cleaned["phone"] = contact.swiss_phone(cleaned.get("phone") or "")
+            except ValueError:
+                self.add_error(
+                    "phone",
+                    _("Please enter a valid telephone number, for example +41 79 123 45 67 or 079 123 45 67."),
+                )
+        return cleaned

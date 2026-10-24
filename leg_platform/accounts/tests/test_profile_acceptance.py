@@ -51,15 +51,15 @@ class CardLayoutTests(TestCase):
         # The rule is bound to the profile form: the pairs of the registration are not touched.
         self.assertNotRegex(CSS, r"(?m)^\s*\.field-pair-street \{")
 
-    def test_the_button_to_change_the_sign_in_is_primary_only_when_no_card_is_open(self):
-        view = card(self.page(), "two-factor")
-        self.assertRegex(view, r'<a class="btn btn-primary" href="/profile/sign-in-method/">Anmeldung ändern</a>')
-        for query in ("?edit=personal", "?edit=email", "?edit=password", "?edit=delete"):
+    def test_the_sign_in_card_has_the_change_button_in_its_head_like_the_other_cards(self):
+        for query in ("", "?edit=personal", "?edit=email", "?edit=password", "?edit=delete"):
             with self.subTest(query=query):
+                view = card(self.page(query), "two-factor")
                 self.assertRegex(
-                    card(self.page(query), "two-factor"),
-                    r'class="btn btn-secondary-action" href="/profile/sign-in-method/">Anmeldung ändern</a>',
+                    view,
+                    r'(?s)<div class="profile-card-head has-action">.*?<a class="btn btn-secondary-action" href="/profile/sign-in-method/">Ändern</a>',
                 )
+                self.assertNotIn("btn-primary", view)
 
     def test_the_postal_code_is_called_plz_in_the_profile_only(self):
         self.assertRegex(self.page("?edit=personal"), r'<label[^>]*for="id_postal_code"[^>]*>PLZ</label>')

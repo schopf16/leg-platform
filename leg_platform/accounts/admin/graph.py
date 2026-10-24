@@ -25,7 +25,7 @@ from leg_platform.accounts.models import (
     GraphConfiguration,
     SecurityEvent,
 )
-from leg_platform.environment import EMAIL_MODE_ALLOWLIST, EMAIL_MODE_CONSOLE
+from leg_platform.environment import EMAIL_MODE_CONSOLE
 from leg_platform.mail import GraphEmailBackend, GraphEmailError
 
 logger = logging.getLogger(__name__)
@@ -198,7 +198,7 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
         return False
 
     # Test email: through GraphEmailBackend, never the email framework, and only to the address
-    # of the person who asks (in allowlist mode only to an allowed address).
+    # of the person who asks.
 
     def get_urls(self):
         info = self.opts.app_label, self.opts.model_name
@@ -225,12 +225,6 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
             return _(
                 "In console mode, no test email is sent, so the Microsoft Graph delivery is "
                 "not tested."
-            )
-        allowed = {recipient.lower() for recipient in settings.EMAIL_ALLOWED_RECIPIENTS}
-        if settings.EMAIL_MODE == EMAIL_MODE_ALLOWLIST and address.lower() not in allowed:
-            return _(
-                "In this mode, email goes only to the allowed recipients. Your address is not "
-                "one of them, so no test email was sent."
             )
         return None
 

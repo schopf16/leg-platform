@@ -92,7 +92,7 @@ class StaffCustomerFlowTests(TestCase):
     def test_the_mail_of_the_application_goes_to_the_account_like_for_everybody(self):
         application, _building = draft_with_points(self.staff, number=33)
         applications.accept_contract_step(
-            self.staff, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            self.staff, application, contracts.current_version().pk, agrees_contract=True
         )
         applications.set_start(self.staff, application, asap=True)
         applications.submit(self.staff, application)

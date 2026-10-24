@@ -43,6 +43,16 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         "preview",
         "server_configuration",
     )
+    # The addresses of the instance decide where the links and the email sender point (D-116): only system
+    # administrators change them; other staff see them read only.
+    instance_address_fields = ("base_url", "sender_address", "contact_address")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = tuple(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser:
+            fields += self.instance_address_fields
+        return fields
+
     # The own preview link opens a new tab; the standard "Currently" link of the widget is not
     # needed.
     formfield_overrides = {models.URLField: {"widget": forms.URLInput()}}
@@ -55,6 +65,16 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         can_change = self.has_change_permission(request, obj)
         fieldsets = [
             (_("Name and website"), {"fields": ("name", "website_url")}),
+            (
+                _("Addresses of the instance"),
+                {
+                    "description": _(
+                        "The address of the portal and the addresses of the emails. Without the address of the "
+                        "portal no email with a link is sent; without the sender no email is sent."
+                    ),
+                    "fields": ("base_url", "sender_address", "contact_address"),
+                },
+            ),
             (
                 _("Legal notices"),
                 {
@@ -97,9 +117,8 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                         "classes": ("collapse",),
                         "description": _(
                             "These values are set by the operator in the server configuration and "
-                            "cannot be changed here: the host name, the allowed hosts and the base "
-                            "address decide where the links in emails and the security settings "
-                            "point, so they are not stored where the portal settings can change them."
+                            "cannot be changed here: the host name, the allowed hosts and the security "
+                            "settings decide how the portal is reached."
                         ),
                         "fields": ("server_configuration",),
                     },
@@ -206,15 +225,9 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         rows = [
             (_("Environment"), settings.APP_ENV),
             (_("Debug mode"), on_off(settings.DEBUG)),
-            (_("Base address of the portal (links in emails)"), settings.INSTANCE_BASE_URL),
             (_("Allowed host names"), listed(settings.ALLOWED_HOSTS)),
             (_("Trusted origins of forms"), listed(settings.CSRF_TRUSTED_ORIGINS)),
             (_("Email delivery"), settings.EMAIL_MODE),
-            (_("Sender address of emails"), settings.DEFAULT_FROM_EMAIL),
-            (
-                _("Number of allowed recipients (development only)"),
-                str(len(settings.EMAIL_ALLOWED_RECIPIENTS)),
-            ),
             (
                 _("Security log: days kept (usual, long)"),
                 f"{settings.SECURITY_LOG_RETENTION_DAYS}, {settings.SECURITY_LOG_LONG_RETENTION_DAYS}",
@@ -237,6 +250,10 @@ class PortalSettingsAdmin(admin.ModelAdmin):
             field.help_text = "{} {}".format(
                 field.help_text, gettext("It must start with https://. It opens in a new tab.")
             ).strip()
+        if field is not None and db_field.name == "base_url":
+            field.widget.attrs["placeholder"] = gettext("https://portal.example.org")
+        if field is not None and db_field.name in ("sender_address", "contact_address"):
+            field.widget.attrs["placeholder"] = gettext("noreply@example.org")
         if field is not None and db_field.name == "website_url":
             field.widget.attrs["placeholder"] = gettext("https://www.example.org")
         return field
@@ -303,12 +320,15 @@ class PortalSettingsAdmin(admin.ModelAdmin):
         lines = []
         if stored.name != obj.name:
             lines.append(f"name changed, {self._quoted(stored.name)} -> {self._quoted(obj.name)}")
-        for name in ("website_url", "privacy_url", "imprint_url"):
+        for name in ("base_url", "website_url", "privacy_url", "imprint_url"):
             if getattr(stored, name) != getattr(obj, name):
                 lines.append(
                     f"{name} changed, host {self._host(getattr(stored, name))} -> "
                     f"{self._host(getattr(obj, name))}"
                 )
+        for name in ("sender_address", "contact_address"):
+            if getattr(stored, name) != getattr(obj, name):
+                lines.append(f"{name} changed")
         changed = [
             field for field in PortalSettings.COLOUR_FIELDS if getattr(stored, field) != getattr(obj, field)
         ]

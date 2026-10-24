@@ -2,26 +2,44 @@
 {% load i18n %}
 {% block title %}{% translate "Articles of association" %}{% endblock %}
 {% block content %}
-  <div class="narrow-page">
+  <div class="narrow-page contract-page">
     <p class="page-label">{% translate "Information" %}</p>
     <h1 class="start-title">{% translate "Articles of association" %}</h1>
-    <p class="start-sub">{% translate "The current version and every version you agreed to." %}</p>
-    {% if current %}{% include "customer/_contract_viewer.html" with without_download=True %}{% endif %}
+    <p class="start-sub">{% translate "Here you find the current contract and all earlier versions." %}</p>
+    {% if current %}
+      <div class="contract-reader">
+        <iframe class="contract-frame" src="{% url 'customer:contract_read' %}#view=FitH&amp;navpanes=0" title="{% translate 'Articles of association' %}" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        <p class="contract-reader-note muted contract-reader-wide">{% translate "If the contract is not shown here, download the current version below." %}</p>
+        <p class="contract-reader-note contract-reader-phone">{% translate "Please download the current version below to read it." %}</p>
+      </div>
+      <form class="step-card contract-consent{% if acceptance %} is-accepted{% endif %}" method="post" action="{% url 'customer:contract_accept' %}" data-submit-once aria-label="{% translate 'Articles of association' %}">
+        {% csrf_token %}
+        {{ form.version }}
+        <div class="checks">
+          <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if acceptance %} checked disabled{% endif %}><span>{% blocktranslate with date=current.version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
+        </div>
+        <div class="step-actions">
+          {% if acceptance %}
+            <button class="btn btn-primary" type="button" disabled>{% translate "You have already agreed to this version." %}</button>
+          {% else %}
+            <button type="submit" class="btn btn-primary" data-gate-all="id_agrees_contract">{% translate "Accept this version" %}</button>
+          {% endif %}
+        </div>
+      </form>
+    {% endif %}
     {% if versions %}
-      <ul class="contract-list">
-        {% for version, acceptance in versions %}
-          <li class="step-card contract-version">
-            <div>
-              <h2>{% blocktranslate with date=version.version_date|date:"d.m.Y" %}Version of {{ date }}{% endblocktranslate %}</h2>
-              <p class="dotword">
-                {% if version.is_current %}<span class="dot tone-accent" aria-hidden="true"></span>{% translate "Current version" %}{% else %}<span class="dot tone-muted" aria-hidden="true"></span>{% translate "Replaced version" %}{% endif %}
-                {% if acceptance %} · <span class="dot tone-ok" aria-hidden="true"></span>{% blocktranslate with date=acceptance.accepted_at|date:"d.m.Y" %}You agreed on {{ date }}{% endblocktranslate %}{% else %} · <span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not agreed yet" %}{% endif %}
-              </p>
-            </div>
-            <a class="btn btn-secondary-action" href="{% if version.is_current %}{% url 'customer:contract_download' %}{% else %}{% url 'customer:contract_version_download' version.pk %}{% endif %}">{% translate "Download contract" %}</a>
-          </li>
-        {% endfor %}
-      </ul>
+      <section class="step-card contract-list-card" aria-label="{% translate 'Versions of the contract' %}">
+        <ul class="contract-rows">
+          {% for version, accepted in versions %}
+            <li class="contract-row{% if not version.is_current %} is-replaced{% endif %}">
+              <span class="contract-row-title">{% blocktranslate with date=version.version_date|date:"d.m.Y" %}Version of {{ date }}{% endblocktranslate %}{% if version.is_current %} <span class="contract-row-tag">({% translate "Current version" %})</span>{% endif %}</span>
+              <a class="contract-download" href="{% if version.is_current %}{% url 'customer:contract_download' %}{% else %}{% url 'customer:contract_version_download' version.pk %}{% endif %}" title="{% translate 'Download contract' %}" aria-label="{% translate 'Download contract' %}: {% blocktranslate with date=version.version_date|date:'d.m.Y' %}Version of {{ date }}{% endblocktranslate %}">
+                <svg class="contract-download-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 18a3.5 3.5 0 0 0 0 -7h-1a5 4.5 0 0 0 -11 -2a4.6 4.4 0 0 0 -2.1 8.4"/><path d="M12 13l0 9"/><path d="M9 19l3 3l3 -3"/></svg>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
     {% else %}
       <div class="empty-state">
         <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-document"/></svg></span>

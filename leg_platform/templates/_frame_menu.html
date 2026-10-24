@@ -84,10 +84,10 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
   <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg><span>{% translate "Information" %}</span>
 </p>
 <ul class="frame-sub">
-  <li><a class="frame-sub-item{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
+  <li><a class="frame-sub-item{% if customer_state.contract %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.contract %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Questions and answers" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Event" context "customer menu" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
-  {% if instance_website_url and instance_website_url|slice:":8"|lower == "https://" %}<li><a class="frame-sub-item" href="{{ instance_website_url }}" target="_blank" rel="noopener noreferrer">{% translate "Contact the LEG" %}<span class="visually-hidden"> ({% translate "opens in a new tab" %})</span><svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg></a></li>{% endif %}
+  {% contact_available as contact_open %}{% if contact_open %}<li><a class="frame-sub-item{% if customer_state.contact %} is-active{% endif %}" href="{% url 'customer:contact' %}"{% if customer_state.contact %} aria-current="page"{% endif %}>{% translate "Contact the LEG" %}</a></li>{% endif %}
 </ul>
 {% endif %}
 <p class="frame-group">{% translate "Coming next" %}</p>
@@ -101,7 +101,7 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
 <a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-mail"/></svg><span>{% translate "Message" %}</span>
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-bell"/></svg><span>{% translate "Message" %}</span>
   <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
 </a>
 {% endif %}

@@ -125,8 +125,8 @@ class CustomerTextsTests(SimpleTestCase):
             "Report feed-in later": "Einspeisung nachmelden",
             "Register building": "Gebäude anmelden",
             "Submit application": "Anmeldung abschicken",
-            "I agree that the grid operator transmits my measurement data to the LEG.":
-                "Ich bin damit einverstanden, dass der Netzbetreiber meine Messdaten an die LEG übermittelt.",
+            "I have read the current version of %(date)s and agree to it.":
+                "Ich habe die aktuelle Fassung vom %(date)s gelesen und stimme ihr zu.",
         }
         for msgid, german in owner.items():
             with self.subTest(msgid=msgid):

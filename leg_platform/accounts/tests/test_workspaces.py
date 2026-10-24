@@ -10,10 +10,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.conf import settings
-from django.test import Client, RequestFactory, SimpleTestCase, TestCase, tag
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.context_processors import frame_workspace
@@ -378,10 +379,12 @@ class MenuTests(TestCase):
 
     # ---- The sign of a new tab ----------------------------------------------------------------------------------
 
-    def test_the_contact_link_has_the_sign_of_a_new_tab(self):
+    @portal_addresses(contact_address="leg@example.org")
+    def test_the_contact_link_is_a_page_of_the_portal_not_a_new_tab(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         menu = menu_of(client_of(self.customer).get(HOME))
-        self.assertIn('<svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg></a>', menu)
+        self.assertIn('href="/participation/contact/"', menu)
+        self.assertNotIn('target="_blank"', menu[menu.index("/participation/contact/") - 200 : menu.index("/participation/contact/") + 200])
 
     def test_the_icons_exist(self):
         sprite = (TEMPLATES / "_frame_icons.html").read_text(encoding="utf-8")

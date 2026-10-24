@@ -86,7 +86,6 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 | Value | `local` | `stage` | `production` | Behaviour |
 | ----- | ------- | ------- | ------------ | --------- |
 | `console` | allowed (default) | refused | refused | Console or test output only (elsewhere, security links would end up in server logs). |
-| `allowlist` | allowed | refused | refused | Sent via Graph only to `EMAIL_ALLOWED_RECIPIENTS`; others are discarded and logged without content. Only locally, with a dedicated development app registration and sender mailbox (D-020, `docs/SECURITY.md`, sections 7 and 8). Recipients live only in the developer's user environment variable. Without recipients, or with an entry that is not one complete address, the application refuses to start. A non-empty value is refused in stage and production (D-070). |
 | `graph` | refused | required | required | Sent via Graph without restriction (on stage: real emails to real addresses, D-070). |
 
 * Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; "refused" means the application refuses to start. A missing or unknown `APP_ENV` prevents the start. `leg_platform/environment.py` has no rule distinguishing stage from production (`docs/SECURITY.md`, sections 3, 8, 11).

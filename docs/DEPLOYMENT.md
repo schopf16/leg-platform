@@ -373,9 +373,9 @@ Expected: `No broken requirements found.`; Python 3.12 or newer; Django 6.1.x (a
 `leg_platform/environment.py` validates at start and refuses unsafe values. Defaults: `.env.example`. Outside `local` required: `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `INSTANCE_BASE_URL`, `INSTANCE_PRIVACY_URL`, `EMAIL_MODE`.
 
 * **Secret** (never printed): `DJANGO_SECRET_KEY` (3.1; at least 50 characters, 5 distinct, no `django-insecure-` prefix, never reused across instances); `DJANGO_SECRET_KEY_FALLBACKS` (empty; during a rotation the previous key, 12.3); `DB_PASSWORD` (3.1).
-* Stay unset: `DJANGO_DEBUG`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `EMAIL_ALLOWED_RECIPIENTS` (a non-empty value is refused on stage and production, D-070).
-* `DJANGO_ALLOWED_HOSTS=<HOST>` exactly, no wildcard. `INSTANCE_BASE_URL=https://<HOST>` (origin without path; email links are built from it). `INSTANCE_PRIVACY_URL`: absolute `https://` URL.
-* `APP_ENV`: `production` or `stage` (O-2). `EMAIL_MODE=graph` (the only mode on stage and production, D-070). `EMAIL_SENDER_ADDRESS` optional (default `noreply@<host of INSTANCE_BASE_URL>`).
+* Stay unset: `DJANGO_DEBUG`, `DJANGO_CSRF_TRUSTED_ORIGINS`. `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` and `EMAIL_ALLOWED_RECIPIENTS` are not read any more: a value refuses the start (D-116).
+* `DJANGO_ALLOWED_HOSTS=<HOST>` exactly, no wildcard. `INSTANCE_PRIVACY_URL`: absolute `https://` URL. The address of the portal (`https://<HOST>`, origin without path) and the sender of emails are set in the administration after the first start (D-116).
+* `APP_ENV`: `production` or `stage` (O-2). `EMAIL_MODE=graph` (the only mode on stage and production, D-070).
 * `DB_NAME`=`DB_USER`=`leg_platform`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`.
 * `DJANGO_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https`: only because nginx sets `X-Forwarded-Proto https` on every forwarded request (section 7).
 * `AXES_IPWARE_PROXY_COUNT=1` with the header format of 7.4 (O-16). `0` groups all visitors under `127.0.0.1`.
@@ -394,7 +394,6 @@ file=/etc/leg-platform/app.env
 append 'APP_ENV=production' "$file"
 append 'EMAIL_MODE=graph' "$file"
 append 'DJANGO_ALLOWED_HOSTS=<HOST>' "$file"
-append 'INSTANCE_BASE_URL=https://<HOST>' "$file"
 append 'INSTANCE_PRIVACY_URL=<PRIVACY_URL>' "$file"
 append 'DJANGO_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https' "$file"
 append 'AXES_IPWARE_PROXY_COUNT=1' "$file"
@@ -413,8 +412,8 @@ sudo stat -c '%a %U:%G %n' /etc/leg-platform/app.env
 
 * Expected `600 root:root`.
 * Stage: `APP_ENV=stage`, every other line identical (D-070). Own database, `DJANGO_SECRET_KEY` and Graph configuration. Never reuse production values.
-* **Existing stage instance on `EMAIL_MODE=allowlist` (M-2, D-070)** refuses to start with the current release. After the confirmation of 5.4, in the update (12.3 step 1):
-  1. Set `EMAIL_MODE=graph`. Delete the `EMAIL_ALLOWED_RECIPIENTS` line. Keep the old values outside the checkout (a code rollback before D-070 needs them).
+* **Existing stage instance with `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` or `EMAIL_ALLOWED_RECIPIENTS` in its environment (D-116)** refuses to start with the current release. Before the update: set the address of the portal and the sender in the administration (Portal-Einstellungen), then remove those lines from `/etc/leg-platform/app.env` (keep a copy outside the checkout). An instance still on `EMAIL_MODE=allowlist` (D-070) sets `EMAIL_MODE=graph`.
+  1. Remove the moved lines from the environment file as described above.
   2. Before step 8 of 12.3, with web and mail stopped, count queued mail: `sudo leg-manage web shell -c "from leg_platform.accounts.models import MailJob; print(MailJob.objects.count())"`. It is sent at the first restart with `graph`.
   3. If not `0`, purge on stage (`MailJob.objects.all().delete()` the same way) unless the owner wants it sent. Record count and decision.
 

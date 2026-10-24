@@ -11,6 +11,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import login_methods, second_factor
 from leg_platform.accounts.forms import LoginMethodForm
 from leg_platform.accounts.models import AuthenticatorDevice, HiddenTask, SessionCodeFailure, User
@@ -114,7 +115,7 @@ class LoginMethodFormTests(SimpleTestCase):
         self.assertEqual(form.errors["method"], [str(LoginMethodForm.choose_message)])
 
 
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 @tag("mariadb")
 class LoginMethodPageTests(CeremonyFixture, TestCase):
     """The shared choice component (``_login_method_choice.html``), served now to the accounts that are not served by the
@@ -203,7 +204,7 @@ class LoginMethodPageTests(CeremonyFixture, TestCase):
         html = self.client.get(PROFILE_URL).content.decode()
 
         self.assertNotIn("Zwei-Faktor-Anmeldung (2FA)", html)
-        self.assertRegex(html, r'href="/profile/sign-in-method/">Anmeldung ändern</a>')
+        self.assertRegex(html, r'href="/profile/sign-in-method/">Ändern</a>')
 
     def test_anonymous_visitors_are_sent_to_the_login(self):
         anonymous = Client()
@@ -308,7 +309,7 @@ class AdministratorLoginMethodTests(TestCase):
     def test_the_card_shows_a_change_button_for_privileged_accounts(self):
         html = self.verified().get(PROFILE_URL).content.decode()
 
-        self.assertIn(">Anmeldung ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
+        self.assertIn(">Ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
 
     def test_a_restricted_session_cannot_reach_the_choice_and_is_sent_to_the_setup(self):
         newcomer = create_active_user("new.staff@example.org")

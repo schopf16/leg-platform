@@ -112,7 +112,7 @@ class ContractRowsTests(TestCase):
 
         person = customer("kept.customer@example.org")
         version = publish_contract(self.staff)
-        contracts.accept_contract(person, version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(person, version.pk, agrees_contract=True)
         Application.objects.create(person=person)
 
         self.assertEqual(person.delete_or_deactivate(), "deactivated")

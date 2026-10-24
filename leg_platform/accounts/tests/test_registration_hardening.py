@@ -14,6 +14,7 @@ from django.core import mail, signing
 from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import bot_check, mail_queue, rate_limits
 from leg_platform.accounts.forms import (
     NewPasswordForm,

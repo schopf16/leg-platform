@@ -111,17 +111,16 @@ py -3.14 -m venv .venv
 
 Checks, tests, development server, test accounts, address directory seed: `docs/STARTUP.md` (`check` and `makemigrations` need the running MariaDB).
 
-Email: locally emails go to the console (`EMAIL_MODE=console`). To test Graph delivery use `EMAIL_MODE=allowlist` (only with `APP_ENV=local`) with a dedicated development app registration and mailbox, never stage or production credentials. Set the recipients only as the user environment variable `EMAIL_ALLOWED_RECIPIENTS` (D-028). Stage and production allow only `EMAIL_MODE=graph` (D-070).
+Email: locally emails go to the console (`EMAIL_MODE=console`). Graph delivery is configured only for stage and production; locally it is refused (D-116).
 
 ### Instance Configuration
 
 Each instance sets its values in the environment (`.env.example`, D-013, D-037). They are validated at startup; invalid values prevent the start:
 
 * `INSTANCE_NAME`: shown in pages and email subjects (optional, default "LEG Platform"; the administration value wins, D-073).
-* `INSTANCE_BASE_URL`: canonical `https://` origin without path, e.g. `https://portal.example.org`. Email links are built from it, never from the request. Its host must be in `DJANGO_ALLOWED_HOSTS`. Required outside `APP_ENV=local`.
+* Address of the portal (links in emails and WebAuthn), sender of emails and address for the messages of the contact form: set in the administration (Portal-Einstellungen, D-116); the server does not read them. Outside `APP_ENV=local` the address of the portal uses `https://` and its host must be in `DJANGO_ALLOWED_HOSTS`.
 * `INSTANCE_PRIVACY_URL`: absolute `https://` URL of the privacy notice. Required outside `APP_ENV=local`; the administration value wins.
 * `INSTANCE_WEBSITE_URL`: absolute `https://` URL of the website (optional fallback).
-* `EMAIL_SENDER_ADDRESS`: sender of all emails (optional; default `noreply@<host of INSTANCE_BASE_URL>`, locally `noreply@localhost`). Emails never invite a reply (D-038).
 
 Email delivery (D-038):
 

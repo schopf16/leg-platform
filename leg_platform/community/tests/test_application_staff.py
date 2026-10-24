@@ -257,7 +257,7 @@ class CompleteTests(StaffCase):
         from leg_platform.community.tests.onboarding import publish_contract
 
         version = publish_contract(self.staff)
-        applications.accept_contract_step(self.person, draft, version.pk, agrees_contract=True, agrees_data_exchange=True)
+        applications.accept_contract_step(self.person, draft, version.pk, agrees_contract=True)
         applications.set_start(self.person, draft, asap=True)
         applications.submit(self.person, draft, today=TODAY)
         application_staff.mark_operator_started(draft, self.staff, STARTED, today=TODAY)

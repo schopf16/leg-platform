@@ -8,6 +8,7 @@ from django.contrib.auth.models import Group, Permission
 from django.test import TestCase, tag
 from django.urls import reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import email_texts
 from leg_platform.accounts.admin import EMAIL_TEXT_PROCESSES
 from leg_platform.accounts.models import (

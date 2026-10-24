@@ -29,10 +29,9 @@
       {% include "customer/_contract_viewer.html" %}
       <p class="muted">{% url 'customer:contract' as contract_url %}{% blocktranslate %}You can also find the contract under <a href="{{ contract_url }}">Information › Articles of association</a>.{% endblocktranslate %}</p>
       <div class="checks">
-        <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.value %} checked{% endif %}><span>{% translate "I have read the articles of association and I agree to them." %}</span></label>
-        <label class="entry-check" for="id_agrees_data_exchange"><input class="entry-check-input" type="checkbox" id="id_agrees_data_exchange" name="agrees_data_exchange"{% if form.agrees_data_exchange.value %} checked{% endif %}><span>{% blocktranslate %}I agree that the grid operator transmits my measurement data to the LEG.{% endblocktranslate %}</span></label>
+        <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.value %} checked{% endif %}><span>{% blocktranslate with date=version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
       </div>
-      {% include "customer/_step_actions.html" with gate="id_agrees_contract id_agrees_data_exchange" %}
+      {% include "customer/_step_actions.html" with gate="id_agrees_contract" %}
     </form>
   {% endif %}
 {% endblock %}

@@ -32,10 +32,8 @@ def make_env(app_env="production", **overrides):
         "APP_ENV": app_env,
         "DJANGO_SECRET_KEY": STRONG_KEY,
         "DJANGO_ALLOWED_HOSTS": "portal.example.org",
-        "INSTANCE_BASE_URL": "https://portal.example.org",
         "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
         "EMAIL_MODE": DEFAULT_EMAIL_MODE.get(app_env, "console"),
-        "EMAIL_ALLOWED_RECIPIENTS": None,
         "DB_NAME": "leg_platform",
         "DB_USER": "leg_platform",
         "DB_PASSWORD": TEST_DB_PASSWORD,
@@ -229,29 +227,21 @@ class EmailModeTests(SimpleTestCase):
                     with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
                         load_environment(make_env(app_env, EMAIL_MODE=value))
 
-    def test_local_allows_console_and_allowlist_but_not_graph(self):
-        # Local Microsoft Graph tests use allowlist with a dedicated development app
-        # registration; unrestricted delivery stays production-only (D-028).
-        for mode in ("console", "allowlist"):
-            with self.subTest(mode=mode):
-                env = make_env("local", EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=TEST_RECIPIENT)
-                self.assertEqual(load_environment(env).email_mode, mode)
-        with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=console or allowlist"):
+    def test_local_allows_only_console_and_not_graph(self):
+        # Unrestricted delivery stays production-only (D-028, D-116: the allowlist mode is gone).
+        self.assertEqual(load_environment(make_env("local", EMAIL_MODE="console")).email_mode, "console")
+        with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=console"):
             load_environment(make_env("local", EMAIL_MODE="graph"))
 
     def test_unknown_mode_refuses_start(self):
         with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
             load_environment(make_env("local", EMAIL_MODE="smtp"))
 
-    def test_console_and_allowlist_refused_in_stage_and_production(self):
+    def test_console_refused_in_stage_and_production(self):
         # Stage behaves exactly like production: unrestricted Graph delivery only (D-070).
         for app_env in ("stage", "production"):
-            for mode in ("console", "allowlist"):
-                with self.subTest(app_env=app_env, mode=mode):
-                    with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
-                        load_environment(
-                            make_env(app_env, EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=TEST_RECIPIENT)
-                        )
+            with self.subTest(app_env=app_env), self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE=graph"):
+                load_environment(make_env(app_env, EMAIL_MODE="console"))
 
     def test_graph_refused_locally(self):
         with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_MODE"):
@@ -269,17 +259,11 @@ class EmailModeTests(SimpleTestCase):
         self.assertEqual(silenced_system_checks(stage), silenced_system_checks(production))
 
     def test_allowed_combinations(self):
-        allowed = {
-            "local": ("console", "allowlist"),
-            "stage": ("graph",),
-            "production": ("graph",),
-        }
+        allowed = {"local": ("console",), "stage": ("graph",), "production": ("graph",)}
         for app_env, modes in allowed.items():
-            for mode in ("console", "allowlist", "graph"):
+            for mode in ("console", "graph"):
                 with self.subTest(app_env=app_env, mode=mode):
-                    # The list is only valid (and only needed) for the local allowlist mode.
-                    recipients = TEST_RECIPIENT if (app_env, mode) == ("local", "allowlist") else None
-                    env = make_env(app_env, EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=recipients)
+                    env = make_env(app_env, EMAIL_MODE=mode)
                     if mode in modes:
                         self.assertEqual(load_environment(env).email_mode, mode)
                     else:
@@ -307,26 +291,14 @@ class AxesProxyCountTests(SimpleTestCase):
                 ):
                     load_environment(make_env(AXES_IPWARE_PROXY_COUNT=value))
 
-    def test_allowed_recipients_are_normalised(self):
-        config = load_environment(
-            make_env(
-                "local",
-                EMAIL_MODE="allowlist",
-                EMAIL_ALLOWED_RECIPIENTS=" Tester@Example.org ,b@mail.test",
-            )
-        )
-        self.assertEqual(config.email_allowed_recipients, ("tester@example.org", "b@mail.test"))
-
     def test_backend_is_never_smtp_and_console_only_in_console_mode(self):
         self.assertEqual(
             email_backend(load_environment(make_env("local"))),
             "django.core.mail.backends.console.EmailBackend",
         )
-        for app_env, mode in (("local", "allowlist"), ("stage", "graph"), ("production", "graph")):
-            with self.subTest(app_env=app_env, mode=mode):
-                recipients = TEST_RECIPIENT if mode == "allowlist" else None
-                env = make_env(app_env, EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=recipients)
-                backend = email_backend(load_environment(env))
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                backend = email_backend(load_environment(make_env(app_env, EMAIL_MODE="graph")))
                 self.assertEqual(backend, "leg_platform.mail.GraphEmailBackend")
 
 
@@ -357,94 +329,17 @@ class SecurityLogRetentionTests(SimpleTestCase):
                     load_environment(make_env(**{name: value}))
 
 
-class AllowedRecipientsTests(SimpleTestCase):
-    def test_allowlist_without_recipients_refuses_start(self):
-        for value in (None, "", " , "):
-            with self.subTest(value=value):
-                with self.assertRaisesMessage(ImproperlyConfigured, "EMAIL_ALLOWED_RECIPIENTS"):
-                    load_environment(
-                        make_env("local", EMAIL_MODE="allowlist", EMAIL_ALLOWED_RECIPIENTS=value)
-                    )
+class MovedToAdministrationTests(SimpleTestCase):
+    """D-116: the addresses of the instance are not read from the environment any more. A value left there refuses
+    the start, so that it is never ignored silently."""
 
-    def test_console_and_graph_need_no_recipients(self):
-        self.assertEqual(load_environment(make_env("local")).email_allowed_recipients, ())
-        for app_env in ("stage", "production"):
-            self.assertEqual(load_environment(make_env(app_env)).email_allowed_recipients, ())
+    def test_each_moved_variable_refuses_the_start(self):
+        for name in ("INSTANCE_BASE_URL", "EMAIL_SENDER_ADDRESS", "CONTACT_EMAIL_ADDRESS", "EMAIL_ALLOWED_RECIPIENTS"):
+            with self.subTest(name=name), self.assertRaisesMessage(ImproperlyConfigured, name):
+                load_environment(make_env(**{name: "portal@example.org"}))
 
-    def test_recipients_are_refused_in_stage_and_production(self):
-        # Only unrestricted Graph delivery exists there: the list would suggest a restriction
-        # that does not exist (D-070). The message never contains the addresses.
-        for app_env in ("stage", "production"):
-            for value in (TEST_RECIPIENT, "not-an-address", " , "):
-                with self.subTest(app_env=app_env, value=value):
-                    with self.assertRaises(ImproperlyConfigured) as context:
-                        load_environment(
-                            make_env(app_env, EMAIL_MODE="graph", EMAIL_ALLOWED_RECIPIENTS=value)
-                        )
-                    message = str(context.exception)
-                    self.assertIn("EMAIL_ALLOWED_RECIPIENTS must not be set", message)
-                    self.assertIn(f"APP_ENV={app_env}", message)
-                    self.assertNotIn(value.strip(), message)
-
-    def test_empty_recipients_are_accepted_in_stage_and_production(self):
-        # An empty value is the same as an unset variable.
-        for app_env in ("stage", "production"):
-            for value in ("", "   "):
-                with self.subTest(app_env=app_env, value=value):
-                    config = load_environment(make_env(app_env, EMAIL_ALLOWED_RECIPIENTS=value))
-                    self.assertEqual(config.email_allowed_recipients, ())
-
-    def test_recipients_stay_valid_locally(self):
-        for mode in ("console", "allowlist"):
-            with self.subTest(mode=mode):
-                config = load_environment(
-                    make_env("local", EMAIL_MODE=mode, EMAIL_ALLOWED_RECIPIENTS=TEST_RECIPIENT)
-                )
-                self.assertEqual(config.email_allowed_recipients, (TEST_RECIPIENT,))
-
-    def test_invalid_entries_are_refused(self):
-        invalid = (
-            "example.org",
-            "@example.org",
-            "tester@",
-            "tester@@example.org",
-            "tester@other@example.org",
-            "*@example.org",
-            "tester@*.example.org",
-            "tester@example",
-            "tester@.example.org",
-            "tester@example.org.",
-            "test er@example.org",
-            "tester@exa mple.org",
-        )
-        for value in invalid:
-            with self.subTest(value=value):
-                with self.assertRaises(ImproperlyConfigured) as context:
-                    load_environment(
-                        make_env(
-                            "local",
-                            EMAIL_MODE="allowlist",
-                            EMAIL_ALLOWED_RECIPIENTS=f"valid@example.org,{value}",
-                        )
-                    )
-                message = str(context.exception)
-                self.assertIn("Entry 2", message)
-                # The addresses are personal data and never appear in the message.
-                self.assertNotIn("valid@example.org", message)
-                self.assertNotIn(value, message)
-
-    def test_valid_entries_are_normalised(self):
-        config = load_environment(
-            make_env(
-                "local",
-                EMAIL_MODE="allowlist",
-                EMAIL_ALLOWED_RECIPIENTS=" A.Tester+dev@Example.ORG , b@mail.test,c@host.invalid ",
-            )
-        )
-        self.assertEqual(
-            config.email_allowed_recipients,
-            ("a.tester+dev@example.org", "b@mail.test", "c@host.invalid"),
-        )
+    def test_without_them_the_start_is_valid(self):
+        self.assertEqual(load_environment(make_env("production")).email_mode, "graph")
 
 
 class AddressDirectoryFileTests(SimpleTestCase):

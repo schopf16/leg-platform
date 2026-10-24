@@ -28,6 +28,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils.translation import gettext, override
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts.encryption import DecryptionError, is_current
 from leg_platform.accounts.models import GRAPH_CERTIFICATE_KEY_PURPOSE, GraphConfiguration
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
@@ -168,7 +169,8 @@ class GraphConfigurationTests(TestCase):
                 GraphConfiguration.objects.get(id=1).private_key_pem()
 
 
-@override_settings(EMAIL_MODE="graph", EMAIL_ALLOWED_RECIPIENTS=[], DEFAULT_FROM_EMAIL=SENDER)
+@override_settings(EMAIL_MODE="graph")
+@portal_addresses(sender_address=SENDER)
 class GraphEmailBackendTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -209,7 +211,8 @@ class GraphEmailBackendTests(TestCase):
         return backend.send_messages(list(messages))
 
     def message(self, to=("recipient@example.com",), **kwargs):
-        return mail.EmailMessage("Subject", "Body text", None, list(to), **kwargs)
+        sender = kwargs.pop("from_email", SENDER)
+        return mail.EmailMessage("Subject", "Body text", sender, list(to), **kwargs)
 
     def sent_payload(self):
         request = self.urlopen.call_args.args[0]
@@ -244,7 +247,7 @@ class GraphEmailBackendTests(TestCase):
         self.assertEqual(payload["message"]["bccRecipients"], [])
 
     def test_html_alternative_is_sent_as_html(self):
-        message = mail.EmailMultiAlternatives("Subject", "Text part", None, ["recipient@example.com"])
+        message = mail.EmailMultiAlternatives("Subject", "Text part", SENDER, ["recipient@example.com"])
         message.attach_alternative("<p>HTML part</p>", "text/html")
         self.send(message)
         _request, payload = self.sent_payload()
@@ -308,31 +311,6 @@ class GraphEmailBackendTests(TestCase):
         self.assertNotIn("AADSTS700027", str(context.exception))
         self.urlopen.assert_not_called()
 
-    @override_settings(EMAIL_MODE="allowlist", EMAIL_ALLOWED_RECIPIENTS=["allowed@example.com"])
-    def test_allowlist_discards_message_without_allowed_to_recipient(self):
-        self.assertEqual(self.send(self.message(to=["other@example.com"])), 0)
-        self.msal.assert_not_called()
-        self.urlopen.assert_not_called()
-
-    @override_settings(EMAIL_MODE="allowlist", EMAIL_ALLOWED_RECIPIENTS=["allowed@example.com"])
-    def test_allowlist_keeps_only_allowed_recipients(self):
-        message = self.message(
-            to=["ALLOWED@example.com", "other@example.com"],
-            cc=["other@example.com"],
-            bcc=["allowed@example.com", "third@example.com"],
-        )
-        self.assertEqual(self.send(message), 1)
-        _request, payload = self.sent_payload()
-        self.assertEqual(
-            payload["message"]["toRecipients"],
-            [{"emailAddress": {"address": "ALLOWED@example.com"}}],
-        )
-        self.assertEqual(payload["message"]["ccRecipients"], [])
-        self.assertEqual(
-            payload["message"]["bccRecipients"],
-            [{"emailAddress": {"address": "allowed@example.com"}}],
-        )
-
     def test_attachments_are_refused_before_anything_is_sent(self):
         valid = self.message()
         with_attachment = self.message()
@@ -341,9 +319,24 @@ class GraphEmailBackendTests(TestCase):
             self.send(valid, with_attachment)
         self.urlopen.assert_not_called()
 
-    def test_reply_to_is_refused(self):
-        with self.assertRaisesMessage(GraphEmailError, "Reply-To"):
-            self.send(self.message(reply_to=["reply@example.com"]))
+    def test_reply_to_is_sent_as_the_replies_address(self):
+        self.send(self.message(reply_to=["reply@example.com"]))
+        _request, payload = self.sent_payload()
+        self.assertEqual(payload["message"]["replyTo"], [{"emailAddress": {"address": "reply@example.com"}}])
+
+    def test_without_reply_to_the_payload_has_none(self):
+        self.send(self.message())
+        _request, payload = self.sent_payload()
+        self.assertNotIn("replyTo", payload["message"])
+
+    def test_an_invalid_reply_to_address_is_refused(self):
+        for address in (
+            "Name <reply@example.com>",
+            "reply@example.com\r\nBcc: x@example.com",
+            "not an address",
+        ):
+            with self.subTest(address=address), self.assertRaisesMessage(GraphEmailError, "Reply-To"):
+                self.send(self.message(reply_to=[address]))
         self.urlopen.assert_not_called()
 
     def test_message_without_to_recipient_is_refused(self):
@@ -351,10 +344,9 @@ class GraphEmailBackendTests(TestCase):
             self.send(self.message(to=[], bcc=["recipient@example.com"]))
         self.urlopen.assert_not_called()
 
-    @override_settings(DEFAULT_FROM_EMAIL="other@example.com")
     def test_sender_differing_from_configuration_is_refused(self):
         with self.assertRaisesMessage(GraphEmailError, "sender address differs"):
-            self.send(self.message())
+            self.send(self.message(from_email="other@example.com"))
         self.msal.assert_not_called()
         self.urlopen.assert_not_called()
 
@@ -482,7 +474,8 @@ class TokenSessionTests(SimpleTestCase):
         self.assertEqual(requested, ["/start"])
 
 
-@override_settings(EMAIL_MODE="console", EMAIL_ALLOWED_RECIPIENTS=[], DEFAULT_FROM_EMAIL=SENDER)
+@override_settings(EMAIL_MODE="console")
+@portal_addresses(sender_address=SENDER)
 class GraphAdminTests(TestCase):
     @classmethod
     def setUpClass(cls):

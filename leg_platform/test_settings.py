@@ -7,6 +7,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django.db.models.signals import post_migrate
+
 from .addresses.storage import mark_writer
 from .settings import *  # noqa: F403
 
@@ -60,3 +62,26 @@ mark_writer()
 LOG_DIRECTORY = ""
 LOGGING = logging_config("")  # noqa: F405
 ADDRESS_IMPORT_AUTOMATIC = False
+
+# The portal settings hold the addresses of the instance (D-116). After the migrations of the test database they hold
+# the addresses of a test instance; the tests that need other values set them (leg_platform.accounts.tests.helpers,
+# portal_addresses). Django runs the TestCase classes before the TransactionTestCase classes, so the row survives
+# until the first flush.
+TEST_INSTANCE_ADDRESSES = {
+    "base_url": "https://portal.example.org",
+    "sender_address": "noreply@portal.example.org",
+    "contact_address": "",
+}
+
+
+def _store_test_instance_addresses(app_config, using="default", **_kwargs):
+    if app_config.label != "accounts" or using != "default":
+        return
+    from leg_platform.accounts.models import PortalSettings
+
+    PortalSettings.objects.using(using).update_or_create(pk=1, defaults=TEST_INSTANCE_ADDRESSES)
+
+
+post_migrate.connect(
+    _store_test_instance_addresses, dispatch_uid="leg_platform_test_instance_addresses"
+)

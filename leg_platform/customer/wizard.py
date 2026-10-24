@@ -677,7 +677,6 @@ class ContractStepView(StepView):
         try:
             applications.accept_contract_step(
                 request.user, application, data["version"], agrees_contract=data["agrees_contract"],
-                agrees_data_exchange=data["agrees_data_exchange"],
             )
         except ApplicationError as error:
             if error.code in ("not_found", "not_allowed"):

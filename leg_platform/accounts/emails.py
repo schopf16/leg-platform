@@ -16,7 +16,7 @@ from django.utils import formats, translation
 from django.utils.translation import gettext
 
 from leg_platform.accounts import email_texts, greeting
-from leg_platform.accounts.models import EmailText
+from leg_platform.accounts.models import EmailText, PortalSettings
 from leg_platform.accounts.portal_settings import portal_values
 
 Key = EmailText.Key
@@ -24,7 +24,7 @@ Key = EmailText.Key
 
 def absolute_url(path):
     """Return the link for a path of the application, built from the instance configuration."""
-    return f"{settings.INSTANCE_BASE_URL}{path}"
+    return f"{PortalSettings.instance_origin()}{path}"
 
 
 def send_sign_in_changed(address, greeting_name=""):
@@ -74,7 +74,11 @@ def _send(address, key, values, greeting_name=""):
 def _deliver(address, subject, body):
     # An automatic message that answers no email (RFC 3834, section 5.2).
     EmailMessage(
-        subject=subject, body=body, to=[address], headers={"Auto-Submitted": "auto-generated"}
+        subject=subject,
+        body=body,
+        from_email=PortalSettings.sender(),
+        to=[address],
+        headers={"Auto-Submitted": "auto-generated"},
     ).send(fail_silently=False)
 
 

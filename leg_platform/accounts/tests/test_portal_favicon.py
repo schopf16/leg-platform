@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import resolve, reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import second_factor
 from leg_platform.accounts.logo_images import (
     FAVICON_PNG_MAX_BYTES,

@@ -1,5 +1,9 @@
 """The portal settings of the administrator and the hidden task tiles of a person."""
 
+from urllib.parse import urlsplit
+
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -8,9 +12,37 @@ from leg_platform.accounts.models.common import (
     validate_hex_colour,
     validate_https_address,
     validate_instance_name,
+    validate_sender_address,
 )
 from leg_platform.accounts.models.user import User
 from leg_platform.environment import INSTANCE_NAME_MAX_LENGTH
+
+
+def validate_instance_origin(value):
+    """The address of the portal: only the origin (scheme, host, port), https outside local development (D-116).
+
+    The host must be one of ALLOWED_HOSTS, so the links cannot point elsewhere (as the environment check did)."""
+    if not value:
+        return
+    parts = urlsplit(value)
+    schemes = ("https", "http") if settings.APP_ENV == "local" else ("https",)
+    if parts.scheme not in schemes or not parts.hostname:
+        raise ValidationError(
+            _("Enter the address of the portal with https://, for example https://portal.example.org."),
+            code="origin",
+        )
+    if parts.path not in ("", "/") or parts.query or parts.fragment or parts.username or parts.password:
+        raise ValidationError(_("Enter only the address, without a path."), code="origin")
+    try:
+        parts.port
+    except ValueError:
+        raise ValidationError(_("Enter a valid port."), code="origin") from None
+    if settings.ALLOWED_HOSTS and parts.hostname.lower() not in (
+        host.lower() for host in settings.ALLOWED_HOSTS
+    ):
+        raise ValidationError(
+            _("The host of this address must be one of the allowed host names of the server."), code="origin"
+        )
 
 
 class PortalSettings(models.Model):
@@ -52,6 +84,36 @@ class PortalSettings(models.Model):
             "The website of your community with the contact information. It is linked in the "
             "footer and used as the contact address in emails. It must start with https://. "
             "Leave empty to use the server configuration."
+        ),
+    )
+    base_url = models.URLField(
+        _("address of the portal"),
+        max_length=500,
+        blank=True,
+        validators=[validate_instance_origin],
+        help_text=_(
+            "The address with which the portal is reached, for example https://portal.example.org (only the "
+            "origin, no path). Links in emails are built from it: without it no email with a link is sent. "
+            "Development: http://127.0.0.1:8000."
+        ),
+    )
+    sender_address = models.EmailField(
+        _("sender address of emails"),
+        max_length=254,
+        blank=True,
+        validators=[validate_sender_address],
+        help_text=_(
+            "The address all emails are sent from. Without it no email is sent. Use an address of the instance "
+            "that does not invite a reply, for example noreply@example.org."
+        ),
+    )
+    contact_address = models.EmailField(
+        _("address for the messages of the contact form"),
+        max_length=254,
+        blank=True,
+        validators=[validate_sender_address],
+        help_text=_(
+            "The LEG receives the messages of the contact form here. Without it the contact form is not offered."
         ),
     )
     privacy_url = models.URLField(
@@ -127,6 +189,29 @@ class PortalSettings(models.Model):
 
     def __str__(self):
         return str(self._meta.verbose_name)
+
+    @classmethod
+    def instance_origin(cls):
+        """The address of the portal for links (``base_url``); ``ImproperlyConfigured`` while it is not set."""
+        origin = cls.load().base_url
+        if not origin:
+            raise ImproperlyConfigured(
+                "The address of the portal is not set in the portal settings; no email with a link is sent."
+            )
+        return origin
+
+    @classmethod
+    def sender(cls):
+        """The sender address of every email; ``ImproperlyConfigured`` while it is not set (nothing is sent)."""
+        sender = cls.load().sender_address
+        if not sender:
+            raise ImproperlyConfigured("The sender address is not set in the portal settings; no email is sent.")
+        return sender
+
+    @classmethod
+    def contact_recipient(cls):
+        """The LEG's address for the contact form, or an empty string when it is not set."""
+        return cls.load().contact_address
 
     @classmethod
     def load(cls):

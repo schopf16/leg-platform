@@ -224,7 +224,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(T, "test_presentation", "test_instance_configuration", "test_design_assets",
                     "test_sizes", "test_request_body_limit")
-            + _labels(A, "test_entry_shell", "test_portal_settings", "test_frame", "test_workspaces",
+            + _labels(A, "test_entry_shell", "test_portal_settings", "test_instance_addresses", "test_frame", "test_workspaces",
                       "test_logo_images", "test_portal_branding", "test_portal_favicon")
         ),
     ),

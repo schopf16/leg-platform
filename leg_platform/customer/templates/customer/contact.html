@@ -1,0 +1,54 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% comment %}
+"Contact the LEG" (Information, D-115): one message to the LEG. The answer is by mail (the address shown, changed only for
+this message) or by phone (the number, checked and saved to the profile when sent). The fields of the chosen answer are
+shown with the reveal of customer.js; without a script both are shown.
+{% endcomment %}
+{% block title %}{% translate "Contact the LEG" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page contact-page">
+    <p class="page-label">{% translate "Information" %}</p>
+    <h1 class="start-title">{% translate "Contact the LEG" %}</h1>
+    {% if available %}
+      <p class="start-sub">{% translate "Have a question? Write to us." %}</p>
+      <form class="step-card contact-form" method="post" action="{% url 'customer:contact' %}" data-submit-once novalidate>
+        {% csrf_token %}
+        {% include "customer/_error_summary.html" %}
+        <div class="contact-field">
+          <label class="contact-label" for="{{ form.message.id_for_label }}">{{ form.message.label }}</label>
+          {{ form.message }}
+          <p class="muted contact-hint">{{ form.message.help_text }}</p>
+          {% for error in form.message.errors %}<p class="contact-error">{{ error }}</p>{% endfor %}
+        </div>
+        <fieldset class="contact-field contact-choice">
+          <legend class="contact-label">{{ form.reply_by.label }}</legend>
+          {% for radio in form.reply_by %}
+            <label class="entry-check contact-option" for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+          {% endfor %}
+          <div class="reveal contact-part{% if form.reply_by.value != 'phone' %} is-open{% endif %}" data-reveal-name="reply_by" data-reveal-value="email">
+            <label class="contact-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% for error in form.email.errors %}<p class="contact-error">{{ error }}</p>{% endfor %}
+          </div>
+          <div class="reveal contact-part{% if form.reply_by.value == 'phone' %} is-open{% endif %}" data-reveal-name="reply_by" data-reveal-value="phone">
+            <label class="contact-label" for="{{ form.phone.id_for_label }}">{{ form.phone.label }}</label>
+            {{ form.phone }}
+            {% for error in form.phone.errors %}<p class="contact-error">{{ error }}</p>{% endfor %}
+          </div>
+        </fieldset>
+        <label class="entry-check" for="{{ form.copy.id_for_label }}">{{ form.copy }}<span>{{ form.copy.label }}</span></label>
+        <div class="step-actions">
+          <button type="submit" class="btn btn-primary">{% translate "Send message" %}</button>
+        </div>
+      </form>
+      <p class="muted contact-note">{% translate "The LEG is run on a voluntary basis. We will answer as soon as possible. Depending on the situation, it may take a few days until we can get in touch with you. Thank you for your understanding." %}</p>
+    {% else %}
+      <div class="empty-state">
+        <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-document"/></svg></span>
+        <h2>{% translate "The contact form is not available yet." %}</h2>
+        <p>{% translate "Please try again later." %}</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

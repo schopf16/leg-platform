@@ -6,6 +6,7 @@ from django.core import mail as django_mail
 from django.core.exceptions import ValidationError
 from django.test import TestCase, tag
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.models import MailJob, SecurityEvent
 from leg_platform.community import history, own_iban, persons
 from leg_platform.community.history import HistoryEvent
@@ -99,7 +100,7 @@ class OwnIbanTests(TestCase):
         (message,) = django_mail.outbox
         for part in (GOOD_IBAN, OTHER_IBAN, "CH93", "DE89", "0076"):
             self.assertNotIn(part, message.subject + message.body)
-        self.assertIn(settings.INSTANCE_BASE_URL, message.body)
+        self.assertIn(PortalSettings.instance_origin(), message.body)
 
     def test_changes_per_hour_are_limited(self):
         ibans = [GOOD_IBAN, OTHER_IBAN, "GB82WEST12345698765432", "LI21088100002324013AA", "FR1420041010050500013M02606"]

@@ -80,11 +80,11 @@ An existing production instance: `docs/DEPLOYMENT.md`, section 12.3, with its ow
 
 Names only; never write values into a document, ticket or the repository. Stage and production are identical. Full list, defaults and values: `docs/DEPLOYMENT.md`, section 5.2 and `.env.example`.
 
-* **Required:** `APP_ENV` (`stage` or `production`), `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `INSTANCE_BASE_URL`, `INSTANCE_PRIVACY_URL`, `EMAIL_MODE` (`graph`), `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+* **Required:** `APP_ENV` (`stage` or `production`), `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `INSTANCE_PRIVACY_URL`, `EMAIL_MODE` (`graph`), `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
 * **Required once:** `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` (may stay), `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (secret; remove it after the first login and restart the services, D-076).
 * **Conditional:** `DJANGO_SECURE_PROXY_SSL_HEADER` (only if a proxy ends HTTPS in front of Django; form `HTTP_<HEADER>,<value>`); `AXES_IPWARE_PROXY_COUNT` (number of proxies; verify the topology first, `docs/INSTALLATION.md`, "Trusted Proxies"; default **NOT YET VERIFIED**).
 * **Optional:** `DJANGO_SECRET_KEY_FALLBACKS`, `DJANGO_DEBUG` (`False` or unset; `True` is refused outside `local`), `DJANGO_CSRF_TRUSTED_ORIGINS`, `DJANGO_SECURE_HSTS_SECONDS`, `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` (HSTS default one year; may be lowered for tests, not disabled; subdomains default `False`; D-028), `INSTANCE_NAME` (default `LEG Platform`, at most 100 characters), `INSTANCE_WEBSITE_URL`, `EMAIL_SENDER_ADDRESS` (default `noreply@` plus the host of `INSTANCE_BASE_URL`), `DB_HOST`, `DB_PORT` (defaults `127.0.0.1`, `3306`; encrypted transport for a remote host is open, D-028), `SECURITY_LOG_RETENTION_DAYS`, `SECURITY_LOG_LONG_RETENTION_DAYS` (defaults 30 and 365 days).
-* **Not used:** `EMAIL_ALLOWED_RECIPIENTS` (local `allowlist` only; a non-empty value stops stage and production, D-070).
+* **Not read any more (D-116):** `EMAIL_ALLOWED_RECIPIENTS`, `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS`; a value stops the start. The address of the portal and the sender are set in the administration.
 * `DJANGO_SECRET_KEY`: at least 50 characters, at least 5 different. `DJANGO_ALLOWED_HOSTS`: exact host names, no wildcards. `INSTANCE_BASE_URL`: `https://` origin without path, host in `DJANGO_ALLOWED_HOSTS`.
 * Microsoft Graph settings (sender, certificate) are entered in the Django admin, not in the environment (`README.md`, gate 1).
 

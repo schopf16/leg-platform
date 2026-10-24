@@ -9,11 +9,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.template import Context, Template
-from django.test import RequestFactory, SimpleTestCase, TestCase, tag
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
 from leg_platform.community import application_staff, applications, contracts, customer_messages, participation
@@ -324,19 +325,29 @@ class ContactLinkTests(TestCase):
     def setUp(self):
         self.mine = customer("contact.mine@example.org")
 
-    def test_the_menu_has_the_link_for_a_customer_where_the_instance_has_a_website(self):
+    @portal_addresses(contact_address="leg@example.org")
+    def test_the_menu_has_the_contact_page_where_the_address_of_the_leg_is_configured(self):
+        html = text(login(self.mine).get(HOME))
+        self.assertIn('href="/participation/contact/"', html)
+        self.assertIn(">Kontakt zur LEG</a></li>", html)
+        self.assertNotIn('target="_blank" rel="noopener noreferrer">Kontakt zur LEG', html)
+
+    @portal_addresses(contact_address="leg@example.org")
+    @portal_addresses(contact_address="leg@example.org")
+    def test_the_website_of_the_leg_is_no_longer_linked_from_the_menu(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         html = text(login(self.mine).get(HOME))
-        self.assertIn('href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">Kontakt zur LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span><svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg></a>', html)
+        self.assertNotIn('href="https://leg.example.org/" target="_blank"', html)
+        self.assertIn('href="/participation/contact/"', html)
 
-    def test_without_a_website_there_is_no_link_and_no_dead_entry(self):
-        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": ""})
+    @portal_addresses(contact_address="")
+    def test_without_the_address_of_the_leg_there_is_no_link_and_no_dead_entry(self):
         html = text(login(self.mine).get(HOME))
         self.assertNotIn("Kontakt zur LEG", html)
 
+    @portal_addresses(contact_address="leg@example.org")
     def test_a_staff_account_with_a_number_gets_the_customer_link_too(self):
         # D-113: staff accounts take part like everybody else.
-        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         self.assertIn("Kontakt zur LEG", text(login(staff_user("contact.staff@example.org")).get(HOME)))
 
 
@@ -449,7 +460,7 @@ class StepPagesTests(TestCase):
     def test_the_start_date_help_text_names_the_earliest_day_up_front(self):
         application, _building = draft_with_points(self.mine)
         applications.accept_contract_step(
-            self.mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, application, contracts.current_version().pk, agrees_contract=True
         )
         html = text(self.client.get(step_url(application, "start_date")))
         earliest = applications.earliest_start_date().strftime("%d.%m.%Y")
