@@ -173,7 +173,7 @@ class BuildingsPageTests(TestCase):
         self.assertIn(">Weiter anmelden<", html)
         # The same draft is what the start page follows.
         home = login(newcomer).get(reverse("home")).content.decode()
-        self.assertIn("Ihr Weg in die LEG", home)
+        self.assertIn("Offene Anmeldung", home)
 
     def test_a_draft_with_a_building_is_marked_as_not_completely_recorded(self):
         newcomer = customer("marked.buildings@example.org")

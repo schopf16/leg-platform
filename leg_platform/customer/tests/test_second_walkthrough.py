@@ -68,9 +68,9 @@ class ReturnedDraftWayBackTests(TestCase):
 
     def test_the_card_leads_to_the_overview_not_to_the_submit_step(self):
         html = text(self.client.get(HOME))
-        card = html[html.index('class="journey"') :]
+        card = html[html.index('class="stage-cards"') :]
         card = card[: card.index("</section>")]
-        self.assertIn("Bitte korrigieren Sie, was die LEG beschrieben hat. Danach schicken Sie die Anmeldung erneut ab.", card)
+        self.assertIn("Bitte nachbessern", card)
         self.assertIn(f'<a class="btn btn-primary" href="{START}">Angaben prüfen</a>', card)
         self.assertNotIn(">Anmeldung abschicken<", card)
 

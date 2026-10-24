@@ -225,7 +225,10 @@ class ReturnedAndPausedTests(TestCase):
                 self.assertIn("Die LEG hat Ihre Anmeldung zur Korrektur zurückgegeben:", html)
                 self.assertIn(escape(HOSTILE), html)
                 self.assertNotIn("<img src=x", html)
-                self.assertIn("Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab.", html)
+                if url == HOME:
+                    self.assertIn("Bitte nachbessern", html)
+                else:
+                    self.assertIn("Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab.", html)
 
     def test_without_a_reason_the_general_sentence_stays(self):
         self.return_it(reason="")
@@ -237,11 +240,13 @@ class ReturnedAndPausedTests(TestCase):
         html = text(self.client.get(HOME))
         self.assertNotIn("returned-note", html)
 
-    def test_a_paused_draft_has_the_label_and_the_day_it_is_deleted_everywhere(self):
+    def test_a_paused_draft_has_the_label_and_the_day_it_is_deleted_on_the_pages(self):
         Application.objects.filter(pk=self.application.pk).update(state=Application.State.PAUSED)
         day = date(2026, 12, 1)
         with patch.object(applications, "rollback_date", return_value=day):
-            for url in (HOME, BUILDINGS, START, step_url(self.application, "contract")):
+            # The start page card shows the paused draft in its group; the day is not on the card.
+            self.assertIn("Offene Anmeldung", text(self.client.get(HOME)))
+            for url in (BUILDINGS, START, step_url(self.application, "contract")):
                 with self.subTest(url=url):
                     html = flat(text(self.client.get(url)))
                     self.assertIn("sonst wird sie am 01.12.2026 gelöscht.", html)
@@ -251,7 +256,7 @@ class ReturnedAndPausedTests(TestCase):
     def test_a_paused_draft_without_a_day_says_it_without_one(self):
         Application.objects.filter(pk=self.application.pk).update(state=Application.State.PAUSED)
         with patch.object(applications, "rollback_date", return_value=None):
-            html = flat(text(self.client.get(HOME)))
+            html = flat(text(self.client.get(BUILDINGS)))
         self.assertIn("Machen Sie weiter, sonst wird sie gelöscht.", html)
 
 
@@ -293,7 +298,7 @@ class StatusLineTests(TestCase):
         self.assertNotIn("Ihr Weg in die LEG", html)
         draft_with_building(self.mine, egid=90007001, street="Seitenweg", house_number="1")
         html = text(self.client.get(HOME))
-        self.assertIn("Ihr Weg in die LEG", html)
+        self.assertIn("Offene Anmeldung", html)
         self.assertNotIn("status-line", html)
 
     def test_no_line_without_a_participation(self):

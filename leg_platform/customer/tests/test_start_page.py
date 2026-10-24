@@ -91,12 +91,11 @@ class StartPageCardTests(TestCase):
     def test_the_card_shows_progress_steps_with_dot_and_word_and_the_next_step(self):
         application, _building = draft_with_points(self.mine)
         html = text(self.client.get(HOME))
-        card = html[html.index('class="journey"') :]
+        card = html[html.index('class="stage-cards"') :]
         card = card[: card.index("</section>")]
         for marker in (
-            "Ihr Weg in die LEG", "2 von 4 erledigt", "<progress", "<span>Gebäude</span>", "<span>Messpunkte</span>",
-            "<span>Vertrag</span>", "<span>Startdatum</span>",
-            "Sie müssen dem Gesellschaftsvertrag zustimmen.", "Vertrag lesen und zustimmen",
+            "Offene Anmeldung", "<progress", "<span>Gebäude</span>", "<span>Messpunkte</span>",
+            "<span>Vertrag</span>", "<span>Startdatum</span>", "Vertrag lesen und zustimmen",
         ):
             self.assertIn(marker, card)
         # One list (W1-01): the names of the wizard, no extra final step.
@@ -104,7 +103,7 @@ class StartPageCardTests(TestCase):
             self.assertNotIn(gone, card)
         self.assertEqual(card.count("Als Nächstes"), 1)
         self.assertEqual(card.count("Erledigt"), 2)
-        self.assertEqual(card.count("Offen"), 1)
+        self.assertEqual(card.count(">Offen<"), 1)
         self.assertNotIn("Bank- oder Postverbindung", card)
         self.assertIn(f'href="{step_url(application, "contract")}"', card)
         self.assertEqual(card.count("btn-primary"), 1)
@@ -112,18 +111,16 @@ class StartPageCardTests(TestCase):
         self.assertNotIn("Ausblenden", card)
         self.assertNotIn("empty-state", html)
 
-    def test_the_start_date_is_visible_but_greyed_before_the_contract(self):
+    def test_the_start_date_is_a_step_of_the_card_before_the_contract(self):
         draft_with_points(self.mine)
         html = text(self.client.get(HOME))
-        self.assertRegex(html, r'<li class="is-muted"><span class="dot[^>]*></span><span>Startdatum</span>')
+        self.assertIn("<span>Startdatum</span>", html)
 
     def test_the_bank_step_is_in_the_card_only_with_a_feed_in(self):
         application, _building = draft_with_points(self.mine, feed_in=True)
         html = text(self.client.get(HOME))
         self.assertIn("Bank- oder Postverbindung", html)
-        self.assertIn("Sie müssen Ihre Bank- oder Postverbindung angeben.", html)
         self.assertIn(f'href="{step_url(application, "bank_connection")}"', html)
-        self.assertIn("2 von 5 erledigt", html)
 
     def test_a_complete_draft_is_ready_to_submit(self):
         application, _building = draft_with_points(self.mine)
@@ -132,7 +129,7 @@ class StartPageCardTests(TestCase):
         )
         applications.set_start(self.mine, application, asap=True)
         html = text(self.client.get(HOME))
-        self.assertIn("Ihre Angaben sind vollständig. Schicken Sie die Anmeldung jetzt ab.", html)
+        self.assertIn("Offene Anmeldung", html)
         self.assertIn(">Anmeldung abschicken<", html)
 
     def test_a_submitted_application_waits_for_the_leg(self):
@@ -143,21 +140,19 @@ class StartPageCardTests(TestCase):
         applications.set_start(self.mine, application, asap=True)
         applications.submit(self.mine, application)
         html = text(self.client.get(HOME))
-        self.assertIn("1 von 5 erledigt", html)
-        self.assertIn("Sie bestätigen die Anfrage in der E-Mail von", html)
+        self.assertIn("In Prüfung", html)
+        self.assertNotIn("Offene Anmeldung", html)
         self.assertNotIn("Bei der LEG angemeldet", html)
-        self.assertIn("Ihre Anmeldung ist eingereicht. Sie können sie ändern, bis die LEG mit der Prüfung beginnt.", html)
-        self.assertNotIn("Sie müssen nichts tun.", html)
-        application_staff.start_review(application, self.staff)
-        self.assertIn("Die LEG prüft Ihre Angaben. Sie müssen nichts tun.", text(self.client.get(HOME)))
         self.assertIn(f'href="{BUILDINGS}"', html)
+        application_staff.start_review(application, self.staff)
+        self.assertIn("In Prüfung", text(self.client.get(HOME)))
         application_staff.mark_operator_started(application, self.staff)
-        self.assertIn("Die LEG hat Sie beim Netzbetreiber angemeldet.", text(self.client.get(HOME)))
+        self.assertIn("In Prüfung", text(self.client.get(HOME)))
 
     def test_a_paused_draft_says_so_in_the_card(self):
         application, _building = draft_with_points(self.mine)
         Application.objects.filter(pk=application.pk).update(state=Application.State.PAUSED)
-        self.assertIn("Ihre Anmeldung ist pausiert", text(self.client.get(HOME)))
+        self.assertIn("Offene Anmeldung", text(self.client.get(HOME)))
 
     # --- state B and C ----------------------------------------------------------------------------------------
 
@@ -198,7 +193,7 @@ class StartPageCardTests(TestCase):
         self.assertIn("task-register_building-title", html)
         draft_with_building(self.staff, egid=90004288, street="Staffstrasse", house_number="3")
         html = text(login(self.staff).get(HOME))
-        self.assertIn("Ihr Weg in die LEG", html)
+        self.assertIn("Offene Anmeldung", html)
 
     def test_an_account_that_does_not_take_part_gets_no_card_and_no_tile_about_the_participation(self):
         with patch("leg_platform.customer.access.is_customer", return_value=False):
