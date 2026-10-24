@@ -53,6 +53,9 @@ class VerificationToken(models.Model):
         REGISTRATION = "registration", "Registration"
         PASSWORD_RESET = "password_reset", "Password reset"
         TWO_FACTOR_RESET = "two_factor_reset", "Two-factor authentication reset"
+        # The same link as TWO_FACTOR_RESET, requested by the account itself: valid only while the account has no
+        # building, metering point or IBAN entered (community.account_entries).
+        SELF_RECOVERY = "self_recovery", "Sign-in recovery requested by the account"
         METHOD_RETURN = "method_return", "Sign-in method return"
         EMAIL_CHANGE = "email_change", "Email address change"
         SECONDARY_EMAIL = "secondary_email", "Second email address"

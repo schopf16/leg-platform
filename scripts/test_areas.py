@@ -282,12 +282,13 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/invitations.py",
             "leg_platform/accounts/bot_check.py", "leg_platform/accounts/normalization.py",
             "leg_platform/accounts/views.py", "leg_platform/accounts/forms.py",
+            "leg_platform/accounts/registration_methods.py", "leg_platform/accounts/registration_views.py",
             "leg_platform/accounts/management/commands/delete_expired_registrations.py",
         ),
         tests=(
             _labels(A, "test_registration", "test_registration_hardening", "test_entry_pages",
                     "test_invalid_link_redirect", "test_token_page_forms", "test_browser_origin",
-                    "test_invitations")
+                    "test_invitations", "test_registration_methods")
             + _FLOW_REVIEWS
         ),
     ),
@@ -314,6 +315,7 @@ AREAS: dict[str, Area] = {
         "emergency access and the initial administrator.",
         paths=(
             "leg_platform/accounts/second_factor.py", "leg_platform/accounts/second_factor_reset.py",
+            "leg_platform/accounts/recovery.py",
             "leg_platform/accounts/totp.py", "leg_platform/accounts/encryption.py",
             "leg_platform/accounts/digests.py", "leg_platform/accounts/views.py",
             "leg_platform/accounts/forms.py",
@@ -325,7 +327,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/accounts/management/commands/cleanup_confirmation_failures.py",
         ),
         tests=(
-            _labels(A, "test_second_factor", "test_second_factor_reset", "test_lost_phone",
+            _labels(A, "test_second_factor", "test_second_factor_reset", "test_self_recovery", "test_lost_phone",
                     "test_one_proof", "test_one_proof_review", "test_recent_authentication",
                     "test_session_code_limit", "test_session_limit_review", "test_design_accounts",
                     "test_setup_instance", "test_proof_entry_points")

@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from leg_platform.accounts import method_views, passkey_views, profile_views, views
+from leg_platform.accounts import method_views, passkey_views, profile_views, registration_views, views
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
@@ -48,7 +48,21 @@ urlpatterns = [
         name="registration_resend",
     ),
     path("register/expired/", views.RegistrationInvalidView.as_view(), name="registration_invalid"),
+    path("register/method/", registration_views.RegistrationMethodView.as_view(), name="registration_method"),
     path("register/password/", views.RegistrationPasswordView.as_view(), name="registration_password"),
+    path("register/app/", registration_views.RegistrationAppView.as_view(), name="registration_app"),
+    path("register/app/qr.svg", registration_views.RegistrationAppQrView.as_view(), name="registration_app_qr"),
+    path("register/passkey/", registration_views.RegistrationPasskeyView.as_view(), name="registration_passkey"),
+    path(
+        "register/passkey/options/",
+        registration_views.RegistrationPasskeyOptionsView.as_view(),
+        name="registration_passkey_options",
+    ),
+    path(
+        "register/passkey/create/",
+        registration_views.RegistrationPasskeyCreateView.as_view(),
+        name="registration_passkey_create",
+    ),
     path("register/complete/", views.RegistrationCompleteView.as_view(), name="registration_complete"),
     # Only the token alphabet is matched; the view checks the length.
     path(

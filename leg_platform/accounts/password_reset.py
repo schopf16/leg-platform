@@ -34,7 +34,11 @@ def process_reset_request(address):
         if user is None:
             return None
         if user.authentication_method != User.AuthenticationMethod.PASSWORD:
-            return None
+            # No password to reset (a passkey account, or one that is in recovery): the person gets what the
+            # recovery page would give (D-106), never silence. Same lock, a savepoint inside it.
+            from leg_platform.accounts import recovery
+
+            return recovery.process_recovery_request(address)
         # Only the newest link is valid. A request above the per-address limit never reaches here,
         # so links already sent stay valid then.
         VerificationToken.objects.filter(
@@ -70,6 +74,7 @@ def delete_expired_reset_tokens(now=None):
         purpose__in=(
             VerificationToken.Purpose.PASSWORD_RESET,
             VerificationToken.Purpose.TWO_FACTOR_RESET,
+            VerificationToken.Purpose.SELF_RECOVERY,
             VerificationToken.Purpose.METHOD_RETURN,
             VerificationToken.Purpose.EMAIL_CHANGE,
             VerificationToken.Purpose.SECONDARY_EMAIL,

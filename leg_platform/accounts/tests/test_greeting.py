@@ -524,7 +524,7 @@ class NotificationGreetingTests(TestCase):
         run_mail_queue()
         self.assertEqual(mail.outbox[0].to, ["person@example.org"])
         self.assertTrue(
-            mail.outbox[0].body.startswith("Guten Tag Maria Muster\n\nDer Betreiber hat"),
+            mail.outbox[0].body.startswith("Guten Tag Maria Muster\n\nDie Wiederherstellung der Anmeldung"),
             mail.outbox[0].body,
         )
 

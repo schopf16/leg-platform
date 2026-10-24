@@ -28,6 +28,7 @@ from leg_platform.accounts.second_factor import AUTHENTICATED_AT_KEY
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,
     PASSWORD,
+    choose_method,
     completion_data,
     create_active_user,
     password_data,
@@ -259,7 +260,7 @@ class RegistrationTests(TestCase):
         self.assertNotIn(REGISTRATION_SESSION_KEY, self.client.session)
         self.assertRedirects(
             self.client.get(second_link),
-            reverse("accounts:registration_password"),
+            reverse("accounts:registration_method"),
             fetch_redirect_response=False,
         )
 
@@ -387,12 +388,18 @@ class VerificationTests(TestCase):
         self.path = verification_path(mail.outbox[0])
         self.user = User.objects.get()
         self.token = VerificationToken.objects.get()
+        self.method_url = reverse("accounts:registration_method")
         self.password_url = reverse("accounts:registration_password")
         self.complete_url = reverse("accounts:registration_complete")
         self.invalid_url = reverse("accounts:registration_invalid")
 
-    def open_link(self, client=None):
-        return (client or self.client).get(self.path)
+    def open_link(self, client=None, method="password"):
+        """Open the link and, as the person does, choose the method (the choice is its own test, D-106)."""
+        client = client or self.client
+        response = client.get(self.path)
+        if method and response.status_code == 302 and response["Location"] == self.method_url:
+            choose_method(client, method, self.token.pk)
+        return response
 
     def set_password(self, password=PASSWORD, **overrides):
         data = password_data(password, registration=self.token.pk, **overrides)
@@ -416,7 +423,7 @@ class VerificationTests(TestCase):
         first = self.open_link()
         second = self.open_link()
 
-        self.assertRedirects(first, self.password_url, fetch_redirect_response=False)
+        self.assertRedirects(first, self.method_url, fetch_redirect_response=False)
         self.assertEqual(second.status_code, 302)
         self.assertNotIn("/register/verify/", first["Location"])
         self.user.refresh_from_db()
@@ -479,8 +486,9 @@ class VerificationTests(TestCase):
         self.client.get(verification_path(mail.outbox[-1]))
 
         self.assertNotIn(REGISTRATION_PASSWORD_SESSION_KEY, self.client.session)
+        # The new link starts step 2 again, from the choice of the method.
         self.assertRedirects(
-            self.client.get(self.complete_url), self.password_url, fetch_redirect_response=False
+            self.client.get(self.complete_url), self.method_url, fetch_redirect_response=False
         )
 
     def test_a_held_password_does_not_serve_another_link(self):
@@ -655,7 +663,9 @@ class VerificationTests(TestCase):
 
         again = self.open_link()
 
-        self.assertRedirects(again, self.password_url, fetch_redirect_response=False)
+        # A new opening starts step 2 again: the method is chosen once more, the password was dropped.
+        self.assertRedirects(again, self.method_url, fetch_redirect_response=False)
+        self.assertNotIn(REGISTRATION_PASSWORD_SESSION_KEY, self.client.session)
         self.set_password()
         self.assertEqual(self.client.get(self.complete_url).status_code, 200)
 
@@ -895,6 +905,7 @@ class ConcurrentCompletionTests(TransactionTestCase):
         clients = [Client(), Client()]
         for client in clients:
             client.get(path)
+            choose_method(client, "password", token.pk)
             client.post(
                 reverse("accounts:registration_password"), password_data(registration=token.pk)
             )
@@ -933,6 +944,7 @@ class ConcurrentCompletionTests(TransactionTestCase):
         token = VerificationToken.objects.get()
         completing = Client()
         completing.get(path)
+        choose_method(completing, "password", token.pk)
         completing.post(
             reverse("accounts:registration_password"), password_data(registration=token.pk)
         )

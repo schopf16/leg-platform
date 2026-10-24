@@ -1,0 +1,18 @@
+{% extends "entry_base.html" %}
+{% load i18n %}{% comment %}
+Step 2 of the registration, first screen: the choice of the sign-in method (``registration_views.RegistrationMethodView``).
+The cards are the ones of the profile (``_login_method_choice.html``); the options are decided on the server.
+{% endcomment %}
+{% block title %}{% translate "Sign-in method" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
+{% block form %}
+  {% include "accounts/_progress.html" %}
+  <h1>{% translate "How do you want to sign in?" %}</h1>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="registration" value="{{ registration_ref }}">
+    {% include "accounts/_error_summary.html" %}
+    {% include "accounts/_login_method_choice.html" %}
+    <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+  </form>
+{% endblock %}

@@ -894,9 +894,12 @@ class NoSharpSInRenderedPagesTests(TestCase):
         client.post(reverse("accounts:registration"), registration_data("sharp.s.new@example.org"))
         run_mail_queue()
         client.get(verification_path(mail.outbox[-1]))
+        method = client.get(reverse("accounts:registration_method"))
+        self.assert_clean(method.content.decode(), "registration, method step")
+        reference = re.search(r'name="registration" value="(\d+)"', method.content.decode()).group(1)
+        client.post(reverse("accounts:registration_method"), {"method": "password", "registration": reference})
         page = client.get(reverse("accounts:registration_password"))
         self.assert_clean(page.content.decode(), "registration, password step")
-        reference = re.search(r'name="registration" value="(\d+)"', page.content.decode()).group(1)
         wrong = client.post(
             reverse("accounts:registration_password"),
             password_data("short", registration=reference),

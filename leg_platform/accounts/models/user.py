@@ -761,15 +761,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Set the retention obligation flag; it can never be unset (D-016)."""
         self._change(retention_obligation=True)
 
-    def complete_registration(self, raw_password=None, *, password_hash=None):
-        """Activate an unverified account with the password chosen after verification.
+    def complete_registration(self, raw_password=None, *, password_hash=None, passkey_binding=None):
+        """Activate an unverified account with the sign-in method chosen after verification.
 
-        Password, status and customer number are written together (D-016, D-021). The password
-        is given as text or as the hash made when it was chosen (D-058, a known algorithm).
+        Password (or passkey), status and customer number are written together (D-016, D-021). The password
+        is given as text or as the hash made when it was chosen (D-058, a known algorithm). A passkey account
+        (``passkey_binding``: the session binding under which its keys were created, ``passkeys.binding``) has
+        no password: its inactive keys of that binding are switched on in the same transaction.
         """
         if self.pk is None:
             raise AccountIntegrityError("Save the account before completing its registration.")
-        if (raw_password is None) == (password_hash is None):
+        by_passkey = passkey_binding is not None
+        if by_passkey != (raw_password is None and password_hash is None):
+            raise AccountIntegrityError("Give either the password, its hash or the binding of the passkey.")
+        if raw_password is not None and password_hash is not None:
             raise AccountIntegrityError("Give either the password or its hash.")
         if password_hash is not None and not self._has_usable_password(password_hash):
             raise AccountIntegrityError("The password hash is not usable.")
@@ -780,17 +785,27 @@ class User(AbstractBaseUser, PermissionsMixin):
                 raise AccountIntegrityError("Only unverified accounts complete a registration.")
             previous_password = self.password
             previous_status = self.status
-            if password_hash is not None:
+            previous_method = self.authentication_method
+            if by_passkey:
+                # The keys first: an active passkey account needs an active credential (``_check_state``).
+                if not self.passkeys.filter(active=False, setup_binding=passkey_binding).update(
+                    active=True, setup_binding=""
+                ):
+                    raise AccountIntegrityError("No passkey was created for this registration.")
+                self.set_unusable_password()
+                self.authentication_method = self.AuthenticationMethod.PASSKEY
+            elif password_hash is not None:
                 self.password = password_hash
             else:
                 self.set_password(raw_password)
             self.status = self.Status.ACTIVE
             try:
-                with self._account_change("status"):
-                    self.save(using=using, update_fields=["status", "password"])
+                with self._account_change("status", "authentication_method"):
+                    self.save(using=using, update_fields=["status", "password", "authentication_method"])
             except BaseException:
                 self.password = previous_password
                 self.status = previous_status
+                self.authentication_method = previous_method
                 self._apply_derived_fields()
                 raise
             self.assign_customer_number()

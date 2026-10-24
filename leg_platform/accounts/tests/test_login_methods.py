@@ -79,8 +79,9 @@ class AvailableMethodsTests(SimpleTestCase):
             ordinary = next(method for method in login_methods.available(User()) if method.key == PASSKEY)
             privileged = next(method for method in login_methods.available(administrator) if method.key == PASSKEY)
             self.assertEqual(ordinary, privileged)
-            self.assertIn("Your password and app are deleted.", str(privileged.note))
+            self.assertIn("does not work on fake websites", str(privileged.what))
             self.assertIn("recommend a second device", str(privileged.need))
+            self.assertIn("second device", str(privileged.lose))
 
 class LoginMethodFormTests(SimpleTestCase):
     def valid(self, method, user):
@@ -138,9 +139,10 @@ class LoginMethodPageTests(CeremonyFixture, TestCase):
         self.assertIn("Passwort und Code aus einer App", html)
         self.assertEqual(html.count('name="method"'), 3)
         self.assertEqual(html.count("Empfohlen"), 1)
-        self.assertIn("Unsicher? Wir empfehlen: Passwort und Code aus einer App.", html)
-        self.assertIn("Was passt zu mir?", html)
-        self.assertEqual(html.count('<li>Ich '), 2)
+        # No sentence of the recommendation, no helper list, no explainer above the cards: the tag says it.
+        for gone in ("Unsicher?", "Was passt zu mir?", "Was ist eine Authenticator-App?"):
+            self.assertNotIn(gone, html)
+        self.assertIn("Sie können Ihre Wahl jederzeit im Profil ändern.", html)
 
     def test_the_current_method_is_marked_and_preselected(self):
         html = self.page()
@@ -149,12 +151,18 @@ class LoginMethodPageTests(CeremonyFixture, TestCase):
         self.assertNotRegex(html, r'value="app" checked')
         self.assertEqual(html.count(">Aktuell</span>"), 1)
 
-    def test_the_explainer_is_a_native_details_without_brands_and_without_passkeys(self):
+    def test_each_card_opens_its_explanation_in_a_native_details_without_brands(self):
         html = self.page()
 
-        self.assertIn('<details class="help-details">', html)
-        self.assertIn("<summary>Was ist eine Authenticator-App? Was ist ein Passkey?</summary>", html)
+        self.assertEqual(html.count('<details class="choice-details">'), 3)
+        self.assertEqual(html.count("<summary>Mehr dazu</summary>"), 3)
+        self.assertEqual(html.count("Sie brauchen:"), 3)
+        self.assertEqual(html.count("Wenn Sie es verlieren:"), 3)
         self.assertIn("kostenlose App aus dem App-Store Ihres Smartphones", html)
+        self.assertIn("funktioniert nicht auf gefälschten Webseiten", html)
+        # The ten recovery codes and the way to the LEG administrator are told where they belong.
+        self.assertIn("10 Wiederherstellungscodes", html)
+        self.assertIn("LEG-Verwaltung", html)
         for brand in ("Google", "Microsoft", "Aegis"):
             self.assertNotIn(brand, html)
 
@@ -163,9 +171,12 @@ class LoginMethodPageTests(CeremonyFixture, TestCase):
 
         self.assertIn('<fieldset class="choice-group">', html)
         self.assertIn('<legend class="choice-legend">Wie möchten Sie sich anmelden?</legend>', html)
-        self.assertEqual(html.count('<label class="choice-card"'), 3)
+        self.assertEqual(html.count('<div class="choice-card">'), 3)
+        self.assertEqual(html.count('<label class="choice-pick"'), 3)
         self.assertRegex(html, r'type="radio" name="method" id="id_method_0" value="password"')
-        self.assertIn('aria-describedby="choice-app-benefit choice-app-need choice-app-lose"', html)
+        self.assertIn('aria-describedby="choice-app-summary"', html)
+        # The passkey title has no parenthesis.
+        self.assertIn('<span class="choice-title">Passkey</span>', html)
 
     def test_choice_pages_do_not_mutate_credentials(self):
         before = self.user.passkeys.filter(active=True).count()

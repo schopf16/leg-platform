@@ -22,6 +22,7 @@ from leg_platform.accounts.models import (
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
+    choose_method,
     code_for,
     complete_second_factor,
     completion_data,
@@ -76,6 +77,7 @@ class CompletionFormTests(TestCase):
         register(self.client)
         self.client.get(verification_path(mail.outbox[0]))
         self.token = VerificationToken.objects.get()
+        choose_method(self.client, "password", self.token.pk)
         self.password_url = reverse("accounts:registration_password")
         self.password_page = self.client.get(self.password_url)
         self.client.post(self.password_url, password_data(registration=self.token.pk))

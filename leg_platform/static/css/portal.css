@@ -774,8 +774,8 @@ input.account-name-input:focus {
   background: var(--warn);
 }
 
-/* Choice cards (docs/DESIGN.md, "Choice cards"; D-106): one native radio per card, the whole card is the click target.
-   Always stacked (the entry column is 400 px wide); no shadow; the selected card has a 2 px accent border and the
+/* Choice cards (docs/DESIGN.md, "Choice cards"; D-106): one native radio per card; the title and the sentence are the
+   click target, "More about this" opens the details. Always stacked (the entry column is 400 px wide); no shadow; the selected card has a 2 px accent border and the
    filled radio, never colour alone. */
 .choice-group {
   display: grid;
@@ -798,20 +798,6 @@ input.account-name-input:focus {
 
 .choice-group > * {
   min-width: 0;
-}
-
-.choice-recommendation,
-.choice-helper-title {
-  margin: 0;
-  font-weight: 600;
-}
-
-.choice-helper ul {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding-left: 20px;
-  font-size: 14px;
 }
 
 .choice-cards {
@@ -880,17 +866,7 @@ input.account-name-input:focus {
   font-weight: 600;
 }
 
-.choice-line {
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.choice-line strong {
-  color: var(--fg);
-}
-
-/* "Change sign-in" (profile chapter 3): per option "What is this?" and "What happens?", 16 px, the question in bold on its
-   own line. */
+/* The device cards of the passkey setup: one line of explanation, 16 px. */
 .choice-detail {
   display: block;
   font-size: 16px;
@@ -898,30 +874,46 @@ input.account-name-input:focus {
   color: var(--muted);
 }
 
-.choice-question {
-  display: block;
-  margin-top: 4px;
-  font-weight: 700;
+.choice-hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The card is a div: the label (title and sentence) selects the radio, "More about this" only opens its <details>. */
+.choice-pick {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.choice-summary {
   color: var(--fg);
 }
 
-/* The explainer: a native <details>, closed, no script. */
-.help-details summary {
+.choice-details {
+  margin: 0;
+}
+
+.choice-details summary {
   min-height: 44px;
   display: flex;
   align-items: center;
   cursor: pointer;
+  font-size: 14px;
   font-weight: 600;
   color: var(--accent);
 }
 
-.help-details-body {
+.choice-details-body {
   display: grid;
   gap: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
+  font-size: 14px;
 }
 
-.help-details-body p {
+.choice-details-body p {
   margin: 0;
 }
 

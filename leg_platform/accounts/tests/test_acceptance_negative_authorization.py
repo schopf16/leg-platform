@@ -47,6 +47,7 @@ from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
     age_authentication,
+    choose_method,
     code_for,
     completion_data,
     create_active_user,
@@ -1082,8 +1083,10 @@ class RegistrationNegativeTests(TestCase):
         self.assertEqual(snapshot(), before)
         self.assertEqual(User.objects.get(pk=user.pk).status, User.Status.UNVERIFIED)
         self.assertNotIn("_auth_user_id", fresh.session)
-        # The link itself still works for the person who has it.
-        self.assertRedirects(Client().get(path), PASSWORD_URL, fetch_redirect_response=False)
+        # The link itself still works for the person who has it: it leads to the choice of the method.
+        self.assertRedirects(
+            Client().get(path), reverse("accounts:registration_method"), fetch_redirect_response=False
+        )
 
     def test_the_details_step_needs_the_password_step_of_the_same_link(self):
         client = Client()
@@ -1092,6 +1095,10 @@ class RegistrationNegativeTests(TestCase):
         token = VerificationToken.objects.get()
         user = token.user
 
+        # Without a method the details step leads to the choice, with one to its setup.
+        response = client.post(COMPLETE_URL, completion_data(registration=token.pk))
+        self.assertRedirects(response, reverse("accounts:registration_method"), fetch_redirect_response=False)
+        choose_method(client, "password", token.pk)
         response = client.post(COMPLETE_URL, completion_data(registration=token.pk))
 
         self.assertRedirects(response, PASSWORD_URL, fetch_redirect_response=False)
@@ -1105,6 +1112,7 @@ class RegistrationNegativeTests(TestCase):
         path = request_link(client, "new.person@example.org", "10.85.0.3")
         client.get(path)
         token = VerificationToken.objects.get()
+        choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
         VerificationToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
 
@@ -1130,6 +1138,7 @@ class RegistrationNegativeTests(TestCase):
         path = request_link(client, "new.person@example.org", "10.85.0.4")
         client.get(path)
         token = VerificationToken.objects.get()
+        choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
         clone = Client()
         clone.cookies.update(client.cookies)
@@ -1161,6 +1170,7 @@ class RegistrationNegativeTests(TestCase):
         path = request_link(client, "new.person@example.org", "10.85.0.5")
         client.get(path)
         token = VerificationToken.objects.get()
+        choose_method(client, "password", token.pk)
 
         client.post(
             PASSWORD_URL,
@@ -1186,6 +1196,7 @@ class RegistrationNegativeTests(TestCase):
         path = request_link(client, "new.person@example.org", "10.85.0.6")
         client.get(path)
         token = VerificationToken.objects.get()
+        choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
 
         client.post(
@@ -1316,7 +1327,10 @@ class NoStoreTests(TestCase):
         self.assert_no_store(client.get(reverse("accounts:registration_sent")), "sent")
         self.assert_no_store(client.get(path), path)
         client.get(path)
+        choose_method(client, "password", token.pk)
+        self.assert_no_store(client.get(reverse("accounts:registration_method")), "method")
         self.assert_no_store(client.get(PASSWORD_URL), PASSWORD_URL)
+        choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
         self.assert_no_store(client.get(COMPLETE_URL), COMPLETE_URL)
         self.assert_no_store(client.get(LOGIN_URL), LOGIN_URL)

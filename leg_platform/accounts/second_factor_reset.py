@@ -3,6 +3,9 @@
 * any account: an active staff user or system administrator verifies identity and starts recovery,
   including for their own account or the last administrator; a 24-hour single-use link goes to the
   registered address, and the old methods are removed only after its CSRF-protected confirmation;
+* an ordinary customer account without a building, metering point or IBAN entered
+  (``community.account_entries``) starts the same recovery itself: ``may_recover_by_mail``; the link
+  is the token purpose SELF_RECOVERY and is checked again when it is sent and when it is confirmed;
 * after confirmation: a restricted session allows only complete sign-in-method setup, never normal
   account privileges;
 * the emergency command on the server (``manage.py emergency_access``), for any account.
@@ -26,12 +29,16 @@ from leg_platform.accounts.models import (
     User,
     VerificationToken,
 )
+from leg_platform.accounts.models.tokens import VERIFICATION_TOKEN_LENGTH, verification_token_digest
 from leg_platform.accounts.normalization import normalize_email_address
 
 Event = SecurityEvent.Event
 
 # As long as a password reset link (D-041).
 RESET_LIFETIME = timedelta(hours=24)
+
+# The link started by the staff and the link the account asked for itself work the same way.
+LINK_PURPOSES = (VerificationToken.Purpose.TWO_FACTOR_RESET, VerificationToken.Purpose.SELF_RECOVERY)
 
 
 class ResetRefused(Exception):
@@ -41,6 +48,22 @@ class ResetRefused(Exception):
 def _privileged(user):
     """Staff users and system administrators must use a second factor (D-004)."""
     return user.is_staff or user.is_superuser
+
+
+def may_recover_by_mail(user):
+    """Whether the account may start recovery itself: an active ordinary account with nothing entered.
+
+    Staff users and system administrators never do (D-004: their second factor is replaced only after the
+    identity check of the LEG administrator). Called with the account row locked wherever a link is issued,
+    sent or confirmed; every writer of a building, metering point or IBAN locks the same row.
+    """
+    from leg_platform.community import account_entries
+
+    return (
+        user.status == User.Status.ACTIVE
+        and not _privileged(user)
+        and not account_entries.exist(user)
+    )
 
 
 def _lock(*users):
@@ -81,9 +104,7 @@ def remove_second_factor(user, event, *, actor=None):
         *RecoveryCodeDevice.objects.filter(user=user),
     ):
         device.delete()
-    VerificationToken.objects.filter(
-        user=user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
-    ).delete()
+    VerificationToken.objects.filter(user=user, purpose__in=LINK_PURPOSES).delete()
     # Requests for a new address made before the reset must not be confirmed afterwards.
     user.discard_email_change_requests()
     user.end_all_sessions()
@@ -116,12 +137,15 @@ def reset_privileged(actor, target):
     request_link(actor, target)
 
 
-def process_reset_link(account_id, address, greeting_name=""):
+def process_reset_link(account_id, address, greeting_name="", *, self_service=False):
     """Handle the link request in the background worker; return the sending function.
 
     The account is found by the job's key, not the address (it may have passed to someone else); the
     link goes out only if the account still has the requested address (D-044). The token is created
     here and sent at once, never stored in a job (D-037). An earlier link becomes invalid.
+
+    ``self_service``: the account asked for the link itself (``recovery.process_recovery_request``);
+    nothing is issued unless ``may_recover_by_mail`` holds under the lock.
     """
     address = normalize_email_address(address)
     with transaction.atomic():
@@ -131,13 +155,17 @@ def process_reset_link(account_id, address, greeting_name=""):
         )
         if user is None or user.normalized_email != address:
             return None
-        VerificationToken.objects.filter(
-            user=user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET
-        ).delete()
+        if self_service and not may_recover_by_mail(user):
+            return None
+        VerificationToken.objects.filter(user=user, purpose__in=LINK_PURPOSES).delete()
         raw_token = VerificationToken.objects.issue(
-            user, VerificationToken.Purpose.TWO_FACTOR_RESET, RESET_LIFETIME,
+            user,
+            VerificationToken.Purpose.SELF_RECOVERY if self_service else VerificationToken.Purpose.TWO_FACTOR_RESET,
+            RESET_LIFETIME,
             target_email=address,
         )
+        if self_service:
+            security_log.record(Event.TWO_FACTOR_RESET_REQUESTED, account=user)
 
     def send():
         # Dispatch happens after issuance. Recheck under the same account-first lock so an
@@ -156,15 +184,18 @@ def process_reset_link(account_id, address, greeting_name=""):
 
 def find_link(raw_token):
     """Return the valid token of a link, or None."""
-    token = VerificationToken.objects.find_valid(
-        raw_token, VerificationToken.Purpose.TWO_FACTOR_RESET
-    )
-    return token if token is not None and _usable_for_link(token.user, token) else None
+    if len(raw_token or "") != VERIFICATION_TOKEN_LENGTH:
+        return None
+    return find_link_by_digest(verification_token_digest(raw_token))
 
 
 def find_link_by_digest(digest):
-    token = VerificationToken.objects.find_valid_by_digest(
-        digest, VerificationToken.Purpose.TWO_FACTOR_RESET
+    token = (
+        VerificationToken.objects.filter(
+            digest=digest, purpose__in=LINK_PURPOSES, expires_at__gt=timezone.now()
+        )
+        .select_related("user")
+        .first()
     )
     return token if token is not None and _usable_for_link(token.user, token) else None
 
@@ -174,6 +205,8 @@ def _usable_for_link(user, token):
         user.status == User.Status.ACTIVE
         and bool(token.target_email)
         and normalize_email_address(token.target_email) == user.normalized_email
+        # A link the account asked for itself ends as soon as something is entered for the account.
+        and (token.purpose != VerificationToken.Purpose.SELF_RECOVERY or may_recover_by_mail(user))
     )
 
 
@@ -188,7 +221,7 @@ def confirm_link(token):
             VerificationToken.objects.select_for_update()
             .filter(
                 pk=token.pk,
-                purpose=VerificationToken.Purpose.TWO_FACTOR_RESET,
+                purpose__in=LINK_PURPOSES,
                 expires_at__gt=timezone.now(),
             )
             .first()

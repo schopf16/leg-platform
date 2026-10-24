@@ -29,6 +29,7 @@ from leg_platform.accounts.models import (
     VerificationToken,
 )
 from leg_platform.accounts.tests.helpers import (
+    choose_method,
     completion_data,
     create_active_user,
     password_data,
@@ -265,7 +266,9 @@ class SessionHardeningTests(TestCase):
         self.token = VerificationToken.objects.get()
 
     def open_link(self):
-        return self.client.get(self.path)
+        response = self.client.get(self.path)
+        choose_method(self.client, "password", self.token.pk)
+        return response
 
     def set_password(self):
         return self.client.post(PASSWORD_URL, password_data(registration=self.token.pk))

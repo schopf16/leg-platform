@@ -15,7 +15,13 @@ from django.test import Client, TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import VerificationToken
-from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user, password_data
+from leg_platform.accounts.tests.helpers import (
+    PASSWORD,
+    VerifiedClient,
+    choose_method,
+    create_active_user,
+    password_data,
+)
 from leg_platform.accounts.tests.helpers import verification_path
 from leg_platform.accounts.tests.test_registration import register
 from leg_platform.community import applications
@@ -56,6 +62,7 @@ class EveryAddressFormTests(ProcessBase):
         self.assertEqual(len(paths), 1)
         client.get(paths[0])
         token = VerificationToken.objects.get()
+        choose_method(client, "password", token.pk)
         client.post(reverse("accounts:registration_password"), password_data(PASSWORD, registration=token.pk))
         return client.get(reverse("accounts:registration_complete")).content.decode()
 

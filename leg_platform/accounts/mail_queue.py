@@ -24,6 +24,7 @@ from leg_platform.accounts import (
     invitations,
     password_reset,
     rate_limits,
+    recovery,
     registration,
     second_factor_reset,
 )
@@ -52,7 +53,7 @@ def _notification(sender, greets=True):
 
 
 HANDLERS = {
-    MailJob.Kind.RECOVERY_GUIDANCE: _notification(emails.send_recovery_guidance, greets=False),
+    MailJob.Kind.RECOVERY_GUIDANCE: recovery.process_recovery_request,
     MailJob.Kind.SIGN_IN_CHANGED: _notification(emails.send_sign_in_changed),
     MailJob.Kind.REGISTRATION: registration.process_registration,
     MailJob.Kind.PASSWORD_RESET: password_reset.process_reset_request,

@@ -1,0 +1,21 @@
+{% extends "entry_base.html" %}
+{% load i18n %}{% comment %}
+Step 2 of the registration, password and app: the secret to scan and the first code (``registration_views.RegistrationAppView``).
+{% endcomment %}
+{% block title %}{% translate "Set up the app" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
+{% block form %}
+  {% include "accounts/_progress.html" %}
+  <h1>{% translate "Set up the app" %}</h1>
+  <p class="entry-hint">{% translate "Scan this code with your authenticator app." %}</p>
+  <div class="qr-tile-wrap"><div class="qr-tile"><img src="{% url 'accounts:registration_app_qr' %}" alt="{% translate 'QR code for the authenticator app' %}" width="160" height="160"></div></div>
+  <p class="entry-hint">{% translate "Cannot scan? Enter this key in the app:" %} <span class="mono-key">{{ secret }}</span></p>
+  {% include "accounts/_error_summary.html" %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="registration" value="{{ registration_ref }}">
+    {% include "accounts/_field.html" with field=form.otp_token %}
+    <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
+  </form>
+  <p class="entry-center"><a href="{% url 'accounts:registration_method' %}">{% translate "Choose another sign-in method" %}</a></p>
+{% endblock %}

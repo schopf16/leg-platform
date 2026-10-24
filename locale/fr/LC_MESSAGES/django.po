@@ -52,11 +52,8 @@ msgstr "Mentions légales"
 msgid "Create account"
 msgstr "Créer un compte"
 
-msgid "First we confirm your email address. After that you fill in the remaining details."
-msgstr "Nous confirmons d’abord votre adresse e-mail. Vous remplissez ensuite les autres informations."
-
-msgid "First we confirm your email address. After that you set your password and add your details."
-msgstr "Nous confirmons d’abord votre adresse e-mail. Vous définissez ensuite votre mot de passe et complétez vos informations."
+msgid "First we confirm your email address. After that you choose how you sign in and add your details."
+msgstr "Nous confirmons d’abord votre adresse e-mail. Vous choisissez ensuite comment vous vous connectez et complétez vos informations."
 
 msgid "One login for all sites"
 msgstr "Une seule connexion pour tous les sites"
@@ -6729,53 +6726,23 @@ msgstr "Votre méthode de connexion reste inchangée."
 msgid "Password only"
 msgstr "Mot de passe seul"
 
-msgid "The simplest way. Less protected: whoever knows your password can sign in."
-msgstr "La façon la plus simple. Moins protégée : toute personne qui connaît votre mot de passe peut se connecter."
-
 msgid "Your password."
 msgstr "Votre mot de passe."
 
 msgid "If you forget your password, we send a link to your email address."
 msgstr "Si vous oubliez votre mot de passe, nous vous envoyons un lien par e-mail."
 
-msgid "I just want to sign in as before"
-msgstr "Je veux simplement me connecter comme avant"
-
 msgid "Password and code from an app"
 msgstr "Mot de passe et code d’une application"
-
-msgid "Safer: after your password you enter a 6-digit code from an app on your phone."
-msgstr "Plus sûr : après votre mot de passe, vous saisissez un code à 6 chiffres provenant d’une application sur votre téléphone."
 
 msgid "A smartphone with a free authenticator app."
 msgstr "Un smartphone avec une application d’authentification gratuite."
 
-msgid "Use one of your 10 recovery codes. Without them, contact the LEG administrator."
-msgstr "Utilisez l’un de vos 10 codes de récupération. Sans eux, contactez l’administrateur de la LEG."
-
-msgid "I have a smartphone and can install an app"
-msgstr "J’ai un smartphone et je peux installer une application"
-
 msgid "Passkey"
 msgstr "Clé d’accès (passkey)"
 
-msgid "Quick and safe: you sign in with fingerprint, face or screen lock of your phone or computer. No password, no codes."
-msgstr "Rapide et sûr : vous vous connectez avec votre empreinte digitale, votre visage ou le verrouillage d’écran de votre téléphone ou ordinateur. Pas de mot de passe, pas de codes."
-
 msgid "A phone or computer with a screen lock. We recommend a second device."
 msgstr "Un téléphone ou un ordinateur avec verrouillage d’écran. Nous recommandons un second appareil."
-
-msgid "Sign in with your second device. Without one, you send an ID document by email to the LEG administrator, who resets your account."
-msgstr "Connectez-vous avec votre second appareil. Sans second appareil, vous envoyez une pièce d’identité par e-mail à l’administrateur de la LEG, qui réinitialise votre compte."
-
-msgid "My phone or computer unlocks with fingerprint, face or PIN"
-msgstr "Mon téléphone ou mon ordinateur se déverrouille par empreinte digitale, visage ou code PIN"
-
-msgid "Your password and app are deleted. You cannot combine a password with a passkey."
-msgstr "Votre mot de passe et votre application sont supprimés. Un mot de passe et une clé d’accès ne peuvent pas être combinés."
-
-msgid "What is an authenticator app? What is a passkey?"
-msgstr "Qu’est-ce qu’une application d’authentification ? Qu’est-ce qu’une clé d’accès ?"
 
 msgid "What is an authenticator app?"
 msgstr "Qu’est-ce qu’une application d’authentification ?"
@@ -6783,24 +6750,11 @@ msgstr "Qu’est-ce qu’une application d’authentification ?"
 msgid "An authenticator app is a free app from your phone's app store. It shows a new 6-digit code every 30 seconds. After your password you type the current code. This proves that you hold your phone."
 msgstr "Une application d’authentification est une application gratuite de la boutique d’applications de votre téléphone. Elle affiche un nouveau code à 6 chiffres toutes les 30 secondes. Après votre mot de passe, vous saisissez le code actuel. Cela prouve que vous avez votre téléphone."
 
-msgid "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, and it cannot be guessed."
-msgstr "Une clé d’accès remplace votre mot de passe. Votre téléphone ou ordinateur conserve une clé secrète. Vous confirmez par empreinte digitale, visage ou verrouillage d’écran, comme pour déverrouiller votre téléphone. Il n’y a rien à retenir ni à saisir, et elle ne peut pas être devinée."
-
 msgid "You can change your choice at any time in your profile."
 msgstr "Vous pouvez modifier votre choix à tout moment dans votre profil."
 
 msgid "How do you want to sign in?"
 msgstr "Comment souhaitez-vous vous connecter ?"
-
-msgid "Not sure? We recommend a passkey. One passkey is enough. We strongly recommend an additional passkey on another device."
-msgstr "Pas sûr ? Nous recommandons une clé d’accès. Une clé d’accès suffit. Nous recommandons vivement une clé d’accès supplémentaire sur un autre appareil."
-
-#, python-format
-msgid "Not sure? We recommend: %(title)s."
-msgstr "Pas sûr ? Nous recommandons : %(title)s."
-
-msgid "Which fits me?"
-msgstr "Lequel me convient ?"
 
 msgid "Recommended"
 msgstr "Recommandé"
@@ -7079,8 +7033,8 @@ msgstr "Envoyer les instructions de récupération"
 msgid "If you have another passkey, use it to sign in. If your authenticator app is unavailable, sign in with your password and enter a recovery code at the next step."
 msgstr "Si vous avez une autre passkey, utilisez-la pour vous connecter. Si votre application d’authentification est indisponible, connectez-vous avec votre mot de passe, puis saisissez un code de récupération à l’étape suivante."
 
-msgid "Enter your sign-in email address to request recovery instructions."
-msgstr "Saisissez votre adresse e-mail de connexion pour demander les instructions de récupération."
+msgid "Enter your sign-in email address. As long as you have entered no building, metering point or IBAN, we send you a link to choose a new sign-in method. Otherwise we send you instructions."
+msgstr "Saisissez votre adresse e-mail de connexion. Tant que vous n’avez saisi ni bâtiment, ni point de mesure, ni IBAN, nous vous envoyons un lien pour choisir une nouvelle méthode de connexion. Sinon, nous vous envoyons des instructions."
 
 msgid "Lost your sign-in method?"
 msgstr "Moyen de connexion perdu ?"
@@ -7124,8 +7078,8 @@ msgstr "Récupération de la connexion"
 msgid "We send instructions to the address you enter. With a second passkey or a recovery code you can sign in directly."
 msgstr "Nous envoyons des instructions à l’adresse saisie. Avec une deuxième clé d’accès ou un code de récupération, vous pouvez vous connecter directement."
 
-msgid "If delivery is possible, recovery instructions will arrive shortly. No sign-in method has been changed."
-msgstr "Si la livraison est possible, les instructions arriveront bientôt. Aucune méthode de connexion n’a été modifiée."
+msgid "If delivery is possible, a link or instructions will arrive shortly. No sign-in method has been changed."
+msgstr "Si la livraison est possible, un lien ou des instructions arriveront bientôt. Aucune méthode de connexion n’a été modifiée."
 
 msgid "Keep at least the required number of passkeys. Add a replacement first."
 msgstr "Conservez au moins le nombre de clés d’accès requis. Ajoutez d’abord une clé de remplacement."
@@ -7262,8 +7216,8 @@ msgstr "Paramètres du compte"
 msgid "Send a single-use recovery link valid for 24 hours. Only the account owner's confirmation removes the old password, passkeys, app and recovery codes and ends all sessions. The owner then chooses a new sign-in method."
 msgstr "Envoyer un lien de récupération à usage unique valable 24 heures. Seule la confirmation du titulaire supprime l’ancien mot de passe, les clés d’accès, l’application et les codes de récupération et termine toutes les sessions. Le titulaire choisit ensuite une nouvelle méthode."
 
-msgid "The operator started sign-in recovery for your account at %(instance_name)s.\n\nTo choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n\n%(two_factor_reset_url)s\n\nThe link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
-msgstr "L’exploitant a lancé la récupération de la connexion de votre compte à %(instance_name)s.\n\nPour choisir une nouvelle méthode, ouvrez ce lien dans les %(lifetime_hours)s heures :\n\n%(two_factor_reset_url)s\n\nCe lien est à usage unique. Son ouverture ne change rien. La confirmation sur la page suivante supprime votre ancien mot de passe, vos clés d’accès, votre application et vos codes de récupération et termine toutes les sessions. Si vous n’avez pas demandé cela, ne confirmez pas."
+msgid "Sign-in recovery was started for your account at %(instance_name)s.\n\nTo choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n\n%(two_factor_reset_url)s\n\nThe link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
+msgstr "La récupération de la connexion de votre compte à %(instance_name)s a été lancée.\n\nPour choisir une nouvelle méthode, ouvrez ce lien dans les %(lifetime_hours)s heures :\n\n%(two_factor_reset_url)s\n\nCe lien est à usage unique. Son ouverture ne change rien. La confirmation sur la page suivante supprime votre ancien mot de passe, vos clés d’accès, votre application et vos codes de récupération et termine toutes les sessions. Si vous n’avez pas demandé cela, ne confirmez pas."
 
 msgid "Sign-in recovery of your account at %(instance_name)s was confirmed. The earlier password, passkeys, app and recovery codes no longer work, and all sessions were ended. A restricted session lets you choose and set up a new sign-in method."
 msgstr "La récupération de la connexion de votre compte à %(instance_name)s a été confirmée. L’ancien mot de passe, les clés d’accès, l’application et les codes de récupération ne fonctionnent plus ; toutes les sessions ont été terminées. Une session restreinte vous permet de choisir et configurer une nouvelle méthode."
@@ -7334,10 +7288,6 @@ msgstr "Le navigateur a indiqué cet appareil au lieu d’un autre. Le portail n
 msgid "Sign-in"
 msgstr "Connexion"
 
-msgctxt "sign-in flow"
-msgid "Passkey"
-msgstr "Clé d’accès"
-
 msgid "Password and number code"
 msgstr "Mot de passe et code numérique"
 
@@ -7374,17 +7324,8 @@ msgstr "Pour votre sécurité, saisissez encore une fois votre mot de passe avan
 msgid "Number code from your phone"
 msgstr "Code numérique du téléphone"
 
-msgid "What is this?"
-msgstr "De quoi s’agit-il ?"
-
 msgid "What happens?"
 msgstr "Que se passe-t-il ?"
-
-msgid "Password and number code from your phone"
-msgstr "Mot de passe et code numérique du téléphone"
-
-msgid "A password is a secret word that only you know."
-msgstr "Un mot de passe est un mot secret que vous seul connaissez."
 
 msgid "You enter only your password each time you sign in. Anyone who knows your password can sign in. The number code is turned off."
 msgstr "À chaque connexion, vous saisissez uniquement votre mot de passe. Quiconque connaît votre mot de passe peut se connecter. Le code numérique est désactivé."
@@ -7392,14 +7333,8 @@ msgstr "À chaque connexion, vous saisissez uniquement votre mot de passe. Quico
 msgid "You enter only your password each time you sign in. Anyone who knows your password can sign in."
 msgstr "À chaque connexion, vous saisissez uniquement votre mot de passe. Quiconque connaît votre mot de passe peut se connecter."
 
-msgid "A number code is a six-digit number. It changes every 30 seconds and is shown by a program on your phone. Such programs are called authenticator apps. You find them in the app store or play store of your phone."
-msgstr "Un code numérique est un nombre à six chiffres. Il change toutes les 30 secondes et s’affiche dans un programme sur votre téléphone. Ces programmes s’appellent des applications d’authentification. Vous les trouvez dans l’App Store ou le Play Store de votre téléphone."
-
 msgid "You enter your password and then the number that the program shows right now. Without the number there is no access."
 msgstr "Vous saisissez votre mot de passe, puis le nombre que le programme affiche en ce moment. Sans ce nombre, il n’y a pas d’accès."
-
-msgid "A passkey, also called a sign-in key, is a key that your device stores. It replaces the password. It is never sent to the website. It does not work on fake websites."
-msgstr "Une clé d’accès (passkey) est une clé que votre appareil enregistre. Elle remplace le mot de passe. Elle n’est jamais envoyée au site web. Elle ne fonctionne pas sur de faux sites web."
 
 msgid "You confirm the sign-in on your device, for example with fingerprint, face recognition or device code. Your password and your number code are deleted in the process. You need neither afterwards."
 msgstr "Vous confirmez la connexion sur votre appareil, par exemple avec l’empreinte digitale, la reconnaissance faciale ou le code de l’appareil. Votre mot de passe et votre code numérique sont supprimés. Vous n’en avez ensuite plus besoin."
@@ -7651,3 +7586,37 @@ msgstr "Accueil et profil"
 
 msgid "Open staff area"
 msgstr "Ouvrir l’espace collaborateurs"
+
+msgid "Choose another sign-in method"
+msgstr "Choisir une autre méthode de connexion"
+
+msgid "My passkey"
+msgstr "Ma clé d’accès"
+
+msgid "The simplest way, but less protected."
+msgstr "La méthode la plus simple, mais moins protégée."
+
+msgid "Whoever knows your password can sign in."
+msgstr "Toute personne qui connaît votre mot de passe peut se connecter."
+
+msgid "Safer: after your password you enter a code from an app."
+msgstr "Plus sûr : après votre mot de passe, vous saisissez un code issu d’une application."
+
+msgid "You also receive 10 recovery codes: with one of them you sign in without the app. If you lose them, send an ID document by email to the LEG administrator, who starts the recovery."
+msgstr "Vous recevez en plus 10 codes de récupération : l’un d’eux vous permet de vous connecter sans l’application. Si vous les perdez, envoyez une pièce d’identité par e-mail à l’administrateur de la LEG, qui lance la récupération."
+
+msgid "Quick and safe: you sign in with fingerprint, face or screen lock, without a password."
+msgstr "Rapide et sûr : vous vous connectez avec votre empreinte, votre visage ou le verrouillage d’écran, sans mot de passe."
+
+msgid "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, face or screen lock, just like unlocking your phone. There is nothing to remember or type, it cannot be guessed and it does not work on fake websites."
+msgstr "Une clé d’accès remplace votre mot de passe. Votre téléphone ou votre ordinateur détient une clé secrète. Vous confirmez avec votre empreinte, votre visage ou le verrouillage d’écran, comme pour déverrouiller votre téléphone. Il n’y a rien à retenir ni à saisir, la clé ne peut pas être devinée et elle ne fonctionne pas sur de faux sites."
+
+msgid "Sign in with your second device. Without one, send an ID document by email to the LEG administrator, who starts the recovery."
+msgstr "Connectez-vous avec votre second appareil. Sans second appareil, envoyez une pièce d’identité par e-mail à l’administrateur de la LEG, qui lance la récupération."
+
+msgid "More about this"
+msgstr "En savoir plus"
+
+msgctxt "sign-in method"
+msgid "Passkey"
+msgstr "Clé d’accès"

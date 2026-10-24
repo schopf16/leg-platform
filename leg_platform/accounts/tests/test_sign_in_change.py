@@ -319,9 +319,9 @@ class ChoiceStepTests(TestCase):
         self.assertIn('<progress class="path-bar" max="3" value="2"', html)
         self.assertIn("Wie möchten Sie sich anmelden?", html)
         self.assertEqual(html.count('name="method"'), 3)
-        self.assertEqual(html.count("Was ist das?"), 3)
+        self.assertEqual(html.count("<summary>Mehr dazu</summary>"), 3)
         self.assertEqual(html.count("Was passiert?"), 3)
-        self.assertIn("Ein Passwort ist ein Geheimwort, das nur Sie kennen.", html)
+        self.assertIn("Wer Ihr Passwort kennt, kann sich anmelden.", html)
         self.assertIn(
             "Sie geben bei jeder Anmeldung nur Ihr Passwort ein. Wer Ihr Passwort kennt, kann sich anmelden.", html
         )
@@ -343,9 +343,9 @@ class ChoiceStepTests(TestCase):
     def test_the_titles_describe_what_the_person_has(self):
         _, html = self.choice_page(self.user)
 
-        for title in ("Passwort", "Passwort und Zahlencode vom Handy", "Passkey"):
+        # The same titles as everywhere else the choice is shown.
+        for title in ("Nur Passwort", "Passwort und Code aus einer App", "Passkey"):
             self.assertIn(f'<span class="choice-title">{title}</span>', html)
-        self.assertNotIn("Nur Passwort", html)
 
     def test_the_open_decisions_are_not_shown(self):
         _, html = self.choice_page(self.user)
@@ -354,8 +354,8 @@ class ChoiceStepTests(TestCase):
         for text in ("Google", "Microsoft", "Sicherheit:", "tief", "hoch", "verlässt das Gerät", "nie auf"):
             self.assertNotIn(text, main)
         self.assertNotIn("ß", main)
-        self.assertIn("Solche Programme heissen Authenticator-Apps.", main)
-        self.assertIn("Ein Passkey, auch Anmeldeschlüssel genannt", main)
+        self.assertIn("Eine Authenticator-App ist eine kostenlose App", main)
+        self.assertIn("Ein Passkey ersetzt Ihr Passwort.", main)
 
     def test_the_choice_shows_no_recommendation_tag(self):
         _, html = self.choice_page(self.user)

@@ -29,7 +29,7 @@ LOGIN_PANEL = (
 )
 REGISTER_PANEL = (
     "Konto erstellen",
-    "Zuerst bestätigen wir Ihre E-Mail-Adresse. Danach füllen Sie die restlichen Angaben aus.",
+    "Zuerst bestätigen wir Ihre E-Mail-Adresse. Danach wählen Sie, wie Sie sich anmelden, und ergänzen Ihre Angaben.",
     "Eine Anmeldung für alle Standorte",
     "Rechnungen und Mitteilungen jederzeit abrufbar",
 )

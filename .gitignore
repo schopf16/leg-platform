@@ -127,3 +127,6 @@ Thumbs.db
 *.sql.gz
 *.dump
 *.bak
+
+# Local template preview for design review (not part of the application)
+preview/

@@ -15,6 +15,7 @@ from leg_platform.accounts import resend
 from leg_platform.accounts.models import MailJob, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    choose_method,
     code_for,
     create_active_user,
     run_mail_queue,
@@ -170,8 +171,11 @@ class StepBarTests(TestCase):
         register(self.client)
         pages.append(self.client.get(SENT_URL))
         self.client.get(verification_path(mail.outbox[0]))
-        pages.append(self.client.get(reverse("accounts:registration_password")))
         token = VerificationToken.objects.get()
+        # Step 2 has two screens: the choice of the method and the password.
+        pages.append(self.client.get(reverse("accounts:registration_method")))
+        choose_method(self.client, "password", token.pk)
+        pages.append(self.client.get(reverse("accounts:registration_password")))
         self.client.post(
             reverse("accounts:registration_password"),
             {"username": "", "password1": PASSWORD, "password2": PASSWORD, "registration": token.pk},
@@ -184,8 +188,9 @@ class StepBarTests(TestCase):
             steps.append(self.bar(html))
             self.assertNotRegex(html, r"(?i)\sstyle\s*=")
         # The two screens of step 1 (the form and "check your email") share the first third.
-        self.assertEqual(steps, [(1, 1), (1, 1), (2, 2), (3, 3)])
-        for page, text in zip(pages, ("Schritt 1 von 3", "Schritt 1 von 3", "Schritt 2 von 3", "Schritt 3 von 3")):
+        self.assertEqual(steps, [(1, 1), (1, 1), (2, 2), (2, 2), (3, 3)])
+        texts = ("Schritt 1 von 3", "Schritt 1 von 3", "Schritt 2 von 3", "Schritt 2 von 3", "Schritt 3 von 3")
+        for page, text in zip(pages, texts):
             self.assertContains(page, text)
 
     def test_the_css_has_the_three_fills_as_classes(self):
@@ -340,6 +345,7 @@ class AccountNameOnPasswordPagesTests(TestCase):
         register(self.client)
         self.client.get(verification_path(mail.outbox[0]))
         user = User.objects.get()
+        choose_method(self.client, "password", VerificationToken.objects.get().pk)
         url = reverse("accounts:registration_password")
         page = self.client.get(url)
         html = page.content.decode()

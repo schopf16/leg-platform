@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{{ greeting }}
 
-{% blocktranslate %}The operator started sign-in recovery for your account at {{ instance_name }}.
+{% blocktranslate %}Sign-in recovery was started for your account at {{ instance_name }}.
 
 To choose a new sign-in method, open this link within {{ lifetime_hours }} hours:
 

@@ -3,7 +3,7 @@
 The flow "Change sign-in" (owner specification, profile chapters 2 to 4; ``profile_views.SignInChangeView``): the look of the
 building wizard (customer.css: the bar, "Step n of m", one screen per task, "Continue", "Back", "Cancel"), inside the
 frame of the profile. Context: ``flow`` (proof, choose, same, disable, scan, number, codes), ``has_code`` (the account has a
-number code), ``form``, and for the choice ``options``, ``selected``, ``current``; for the setup ``secret``; for ``codes`` (the
+number code), ``form``, and for the choice ``methods``, ``selected``, ``current``, ``recommended``; for the setup ``secret``; for ``codes`` (the
 recovery codes, rendered once in the answer to the confirmation of the number code, never stored: D-059) ``codes``.
 "Cancel" is a POST button (form ``flow-cancel``): it ends the grant of the proof and the unfinished setup.
 {% endcomment %}
@@ -45,23 +45,7 @@ recovery codes, rendered once in the answer to the confirmation of the number co
         {% include "accounts/_flow_progress.html" with number=2 total=3 name=name %}
         <h2 id="flow-title">{% translate "How do you want to sign in?" %}</h2>
         {% include "accounts/_error_summary.html" %}
-        <fieldset class="choice-group" aria-labelledby="flow-title">
-          <div class="choice-cards">
-            {% for option in options %}
-              <label class="choice-card" for="id_method_{{ forloop.counter0 }}">
-                <input class="form-check-input choice-radio" type="radio" name="method" id="id_method_{{ forloop.counter0 }}" value="{{ option.key }}"{% if option.key == selected %} checked{% endif %} aria-describedby="choice-{{ option.key }}-what choice-{{ option.key }}-happens">
-                <span class="choice-body">
-                  <span class="choice-head">
-                    <span class="choice-title">{{ option.title }}</span>
-                    {% if option.key == current %}<span class="choice-tag"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Current" %}</span>{% endif %}
-                  </span>
-                  <span class="choice-detail" id="choice-{{ option.key }}-what"><strong class="choice-question">{% translate "What is this?" %}</strong>{{ option.what }}</span>
-                  <span class="choice-detail" id="choice-{{ option.key }}-happens"><strong class="choice-question">{% translate "What happens?" %}</strong>{{ option.happens }}</span>
-                </span>
-              </label>
-            {% endfor %}
-          </div>
-        </fieldset>
+        {% include "accounts/_login_method_choice.html" %}
         <div class="step-actions">
           <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-two-factor">{% translate "Back" %}</a>

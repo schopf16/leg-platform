@@ -115,14 +115,26 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         )
         run_mail_queue()
         self.link = verification_path(mail.outbox[-1])
+        self.method_url = reverse("accounts:registration_method")
         self.password_url = reverse("accounts:registration_password")
         self.url = reverse("accounts:registration_complete")
+
+    def choose_password_method(self):
+        """Step 2, first screen, as a browser posts it (token and origin); the next screen is the password."""
+        reference = VerificationToken.objects.get().pk
+        chosen = submit_like_a_browser(
+            self.client, self.method_url, {"method": "password", "registration": str(reference)}
+        )
+        self.assertEqual(chosen["Location"], self.password_url)
+        return reference
 
     def test_the_link_sends_no_referrer_and_the_form_pages_do_not(self):
         opened = self.client.get(self.link)
 
         self.assertEqual(opened.status_code, 302)
         self.assertEqual(opened["Referrer-Policy"], "no-referrer")
+        self.assert_the_page_does_not_send_no_referrer(self.client, self.method_url)
+        self.choose_password_method()
         self.assert_the_page_does_not_send_no_referrer(self.client, self.password_url)
 
     def test_the_address_lookup_of_the_details_step_is_accepted_with_the_origin_of_a_browser(self):
@@ -130,7 +142,7 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         # the header and, in a browser, the origin of the page; "null" would come from a page with
         # the policy "no-referrer" (D-054, R-01) and is refused.
         self.client.get(self.link)
-        reference = VerificationToken.objects.get().pk
+        reference = self.choose_password_method()
         submit_like_a_browser(self.client, self.password_url, password_data(registration=reference))
         page = self.client.get(self.url)
         self.assertEqual(page.status_code, 200)
@@ -154,7 +166,14 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
 
     def test_the_forms_are_accepted_with_the_origin_of_a_browser(self):
         self.client.get(self.link)
-        reference = VerificationToken.objects.get().pk
+        # The choice of the method is a form like the others: refused with the origin "null", accepted with the page's.
+        with self.assertLogs("django.security.csrf", "WARNING"):
+            refused = submit_like_a_browser(
+                self.client, self.method_url,
+                {"method": "password", "registration": str(VerificationToken.objects.get().pk)}, origin="null",
+            )
+        self.assertEqual(refused.status_code, 403)
+        reference = self.choose_password_method()
 
         self.assert_the_form_works_like_in_a_browser(
             self.client, self.password_url, password_data(registration=reference), self.url

@@ -634,7 +634,7 @@ class LoginHelpPresentationTests(TestCase):
             response = self.client.get(reverse(name))
             self.assertContains(response, "sign in with your password and enter a recovery code at the next step")
         response = self.client.get(reverse("accounts:recovery"))
-        self.assertContains(response, "Enter your sign-in email address to request recovery instructions.")
+        self.assertContains(response, "we send you a link to choose a new sign-in method. Otherwise we send you instructions.")
         self.assertNotContains(response, "We send instructions to the address you enter.")
 
     @override_settings(LANGUAGE_CODE="en")

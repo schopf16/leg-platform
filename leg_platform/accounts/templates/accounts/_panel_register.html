@@ -1,9 +1,8 @@
 {% load i18n %}{% comment %}
 The texts of the warm panel of the registration (LEG-Design-Vorgaben/register/VORGABEN.md and its
-images). Context: ``password_step`` (the lead names the password and the details instead of the
-details only).
+images).
 {% endcomment %}<p class="entry-title">{% translate "Create account" %}</p>
-<p class="entry-lead">{% if password_step %}{% translate "First we confirm your email address. After that you set your password and add your details." %}{% else %}{% translate "First we confirm your email address. After that you fill in the remaining details." %}{% endif %}</p>
+<p class="entry-lead">{% translate "First we confirm your email address. After that you choose how you sign in and add your details." %}</p>
 <ul class="entry-benefits">
   <li>{% translate "One login for all sites" %}</li>
   <li>{% translate "Invoices and messages available at any time" %}</li>

@@ -71,7 +71,7 @@ The user model keeps all fields of the eCH-0010 structure (D-032); unused fields
 
 * The form asks only for the email address and links to the privacy notice (owner, 2026-10-13); until verified only the address is stored. The response is always the same generic message.
 * If the address does not belong to an active, temporarily locked or blocked account, an unverified account without a customer number is created and a time-limited (proposal: 24 hours), single-use link is sent, replacing an earlier pending registration; otherwise no account is created and an email to that address points to login and password reset.
-* Via the link the person sets the password and enters the profile data; the link stays valid after an unsuccessful submission and is consumed only by the successful last step, which activates the account and assigns the customer number (D-021). Verification never activates a password the clicking person did not choose. Completing logs the person in (D-055) and offers two-factor setup as the one recommended next step.
+* Via the link the person chooses the sign-in method (password, password and app, or passkey), sets it up and enters the profile data; the link stays valid after an unsuccessful submission and is consumed only by the successful last step, which activates the account and assigns the customer number (D-021). Verification never activates a sign-in method the clicking person did not choose. Completing logs the person in (D-055) and offers two-factor setup as the one recommended next step.
 * Unverified accounts are deleted when the link expires; registration and its emails are rate-limited.
 
 ## Changing the Email Address
@@ -86,7 +86,7 @@ Users change their address themselves (D-016); it changes only once the new addr
 
 | State | Cause | Login | Password reset | Email address | Ended by |
 | ----- | ----- | ----- | -------------- | ------------- | -------- |
-| Unverified | Registration; address not verified, no password | no | no | replaced by a new registration with the same address | Verification and password, or automatic deletion when the link expires |
+| Unverified | Registration; address not verified, no sign-in method in force | no | no | replaced by a new registration with the same address | Verification, sign-in method and details, or automatic deletion when the link expires |
 | Active | Address verified, password set | yes | yes | reserved | – |
 | Temporarily locked | Too many failed login attempts | no, until the cool-off period has expired | yes | reserved | Expiry of the cool-off period |
 | Blocked | Decision of a system administrator (misuse, suspected takeover) | no | no | reserved | A system administrator |
@@ -135,9 +135,9 @@ Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email";
 
 ## Passkeys
 
-Passkeys are an optional login method next to password with authenticator app (TOTP). One active credential suffices for every access level, including administrator activation and promotion; the last active passkey cannot be removed. An additional passkey on another device is strongly recommended for recovery protection. The active passkey profile card links directly to adding another key, with guided help and disclosure that saving ends other sessions while keeping the current session. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). Registration, username-free sign-in, management, atomic method changes and unified recovery are implemented; independent acceptance remains pending.
+Passkeys are an optional login method next to password with authenticator app (TOTP). One active credential suffices for every access level, including administrator activation and promotion; the last active passkey cannot be removed. An additional passkey on another device is strongly recommended for recovery protection. The active passkey profile card links directly to adding another key, with guided help and disclosure that saving ends other sessions while keeping the current session. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). A lost method is replaced by email while no building, metering point or IBAN is entered for the account; after that, and always for staff users and system administrators, the LEG administrator starts the recovery after an identity check. Registration, username-free sign-in, management, atomic method changes and unified recovery are implemented; independent acceptance remains pending.
 
-Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language (what you need, what happens if you lose it) and recommends "password and app" to users. It is offered after registration (start tile "Choose how you sign in"), in the profile card "Sign-in method", after a reset and at the first login of an administrator. Users choose password, password and app, or passkey; administrators choose password and app or passkey.
+Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language (what you need, what happens if you lose it) and recommends "password and app" to users. It is offered in step 2 of the registration, later in the start tile "Choose how you sign in", in the profile card "Sign-in method", after a reset and at the first login of an administrator. Users choose password, password and app, or passkey; administrators choose password and app or passkey.
 
 ## Environments
 

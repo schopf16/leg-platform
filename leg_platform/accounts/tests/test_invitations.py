@@ -15,8 +15,10 @@ from leg_platform.accounts import email_texts, emails, password_reset
 from leg_platform.accounts.models import EmailText, MailJob, SecurityEvent, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    choose_method,
     completion_data,
     password_data,
+    registration_reference,
     run_mail_queue,
     verification_path,
 )
@@ -47,6 +49,7 @@ class InvitationFlowTests(TestCase):
 
     def open(self, client, path):
         client.get(path)
+        choose_method(client, "password", registration_reference(client))
         page = client.get(reverse("accounts:registration_password"))
         self.assertEqual(page.status_code, 200)
         reference = reference_of(page)
@@ -120,7 +123,7 @@ class InvitationFlowTests(TestCase):
         second = verification_path(mail.outbox[-1])
         self.assertNotEqual(first, second)
         self.assertRedirects(Client().get(first), reverse("accounts:registration_invalid"))
-        self.assertRedirects(Client().get(second), reverse("accounts:registration_password"), fetch_redirect_response=False)
+        self.assertRedirects(Client().get(second), reverse("accounts:registration_method"), fetch_redirect_response=False)
         # No login is possible without a password, and a password reset sends nothing for the account.
         person.refresh_from_db()
         self.assertEqual((person.is_active, person.has_usable_password()), (False, False))

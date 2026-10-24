@@ -10,9 +10,11 @@ methods route into the existing flows (``profile_views.LoginMethodView``); this 
 * ``PASSKEY``: discoverable, user-verified credential without a password or app.
 """
 
+import dataclasses
 from dataclasses import dataclass
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 
 from leg_platform.accounts import second_factor
 
@@ -23,52 +25,86 @@ PASSKEY = "passkey"
 
 @dataclass(frozen=True)
 class Method:
-    """One card of the choice: texts in the reading order of the card (title, benefit, "You need", "If you lose it")."""
+    """One card of the choice. The title and one sentence (``summary``) are always shown; the rest opens under "More about
+    this": what it is, "You need", "If you lose it" and, for an account that exists, "What happens?" (``happens``, by what
+    the account has now; empty at the registration, where there is nothing to change)."""
 
     key: str
     title: object
-    benefit: object
+    summary: object
+    what: object
     need: object
     lose: object
-    # The line of the decision helper ("Which fits me?").
-    helper: object
-    # A sentence shown inside the card, for the consequence of the choice; empty for none.
-    note: object = ""
+    happens: object = ""
 
 
 _METHODS = {
     PASSWORD_ONLY: Method(
         key=PASSWORD_ONLY,
         title=_("Password only"),
-        benefit=_("The simplest way. Less protected: whoever knows your password can sign in."),
+        summary=_("The simplest way, but less protected."),
+        what=_("Whoever knows your password can sign in."),
         need=_("Your password."),
         lose=_("If you forget your password, we send a link to your email address."),
-        helper=_("I just want to sign in as before"),
     ),
     PASSWORD_AND_APP: Method(
         key=PASSWORD_AND_APP,
         title=_("Password and code from an app"),
-        benefit=_("Safer: after your password you enter a 6-digit code from an app on your phone."),
+        summary=_("Safer: after your password you enter a code from an app."),
+        what=_(
+            "An authenticator app is a free app from your phone's app store. It shows a new 6-digit code every 30 "
+            "seconds. After your password you type the current code. This proves that you hold your phone."
+        ),
         need=_("A smartphone with a free authenticator app."),
-        lose=_("Use one of your 10 recovery codes. Without them, contact the LEG administrator."),
-        helper=_("I have a smartphone and can install an app"),
+        lose=_(
+            "You also receive 10 recovery codes: with one of them you sign in without the app. If you lose them, send "
+            "an ID document by email to the LEG administrator, who starts the recovery."
+        ),
     ),
     PASSKEY: Method(
         key=PASSKEY,
-        title=_("Passkey"),
-        benefit=_(
-            "Quick and safe: you sign in with fingerprint, face or screen lock of your phone or computer. "
-            "No password, no codes."
+        title=pgettext_lazy("sign-in method", "Passkey"),
+        summary=_("Quick and safe: you sign in with fingerprint, face or screen lock, without a password."),
+        what=_(
+            "A passkey replaces your password. Your phone or computer holds a secret key. You confirm with fingerprint, "
+            "face or screen lock, just like unlocking your phone. There is nothing to remember or type, it cannot be "
+            "guessed and it does not work on fake websites."
         ),
         need=_("A phone or computer with a screen lock. We recommend a second device."),
         lose=_(
-            "Sign in with your second device. Without one, you send an ID document by email to the LEG "
-            "administrator, who resets your account."
+            "Sign in with your second device. Without one, send an ID document by email to the LEG administrator, who "
+            "starts the recovery."
         ),
-        helper=_("My phone or computer unlocks with fingerprint, face or PIN"),
-        note=_("Your password and app are deleted. You cannot combine a password with a passkey."),
     ),
 }
+
+
+def _happens(user, key):
+    """What choosing the method does to this account: depends on what the account has now (a number code is turned off
+    or deleted, a password is deleted). Security levels, brand names and the claim that the key never leaves the device are
+    not shown (D-106: no proof of device independence)."""
+    has_code = current(user) == PASSWORD_AND_APP
+    if key == PASSWORD_ONLY:
+        if has_code:
+            return _(
+                "You enter only your password each time you sign in. Anyone who knows your password can sign in. "
+                "The number code is turned off."
+            )
+        return _("You enter only your password each time you sign in. Anyone who knows your password can sign in.")
+    if key == PASSWORD_AND_APP:
+        return _(
+            "You enter your password and then the number that the program shows right now. Without the number there is "
+            "no access."
+        )
+    if has_code:
+        return _(
+            "You confirm the sign-in on your device, for example with fingerprint, face recognition or device code. "
+            "Your password and your number code are deleted in the process. You need neither afterwards."
+        )
+    return _(
+        "You confirm the sign-in on your device, for example with fingerprint, face recognition or device code. "
+        "Your password is deleted in the process. You do not need it afterwards."
+    )
 
 
 def is_privileged(user):
@@ -87,6 +123,15 @@ def available_keys(user):
 def available(user):
     """The methods this account may choose, in the order of the page: ``Method`` objects."""
     return [_METHODS[key] for key in available_keys(user)]
+
+
+def cards(user, *, registering=False):
+    """The cards of the choice, the one list of every place that shows it (registration, profile, the flow "Change sign-in",
+    recovery). ``registering``: an unverified account has nothing to change, so "What happens?" is left out."""
+    methods = available(user)
+    if registering:
+        return methods
+    return [dataclasses.replace(method, happens=_happens(user, method.key)) for method in methods]
 
 
 def has_choice(user):

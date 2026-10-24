@@ -67,6 +67,23 @@ def password_data(password=PASSWORD, registration=None, **overrides):
     return data
 
 
+def registration_reference(client, url="accounts:registration_method"):
+    """The reference of the registration that a step page of the open link shows (the hidden field ``registration``)."""
+    page = client.get(reverse(url))
+    match = re.search(r'name="registration" value="(\d+)"', page.content.decode())
+    assert match, "The step shows no registration reference."
+    return match.group(1)
+
+
+def choose_method(client, method="password", reference=None):
+    """Step 2 of the registration, first screen: choose the sign-in method of the open link."""
+    if reference is None:
+        reference = registration_reference(client)
+    return client.post(
+        reverse("accounts:registration_method"), {"method": method, "registration": str(reference)}
+    )
+
+
 def completion_data(registration=None, **overrides):
     """The details step of the registration: no password, the privacy box ticked."""
     data = {**PROFILE, "privacy": "on", **overrides}
@@ -76,15 +93,13 @@ def completion_data(registration=None, **overrides):
 
 
 def finish_registration(client, path, password=PASSWORD, details=None, **overrides):
-    """Open the link at ``path`` and go through the password and the details step.
+    """Open the link at ``path`` and go through the choice of the method, the password and the details step.
 
     Returns the response of the last step. Extra keywords replace fields of the details form.
     """
     client.get(path)
-    page = client.get(reverse("accounts:registration_password"))
-    match = re.search(r'name="registration" value="(\d+)"', page.content.decode())
-    assert match, "The password step shows no registration reference."
-    reference = match.group(1)
+    reference = registration_reference(client)
+    choose_method(client, "password", reference)
     client.post(
         reverse("accounts:registration_password"), password_data(password, registration=reference)
     )

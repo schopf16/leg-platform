@@ -21,6 +21,7 @@ from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
     age_authentication,
+    choose_method,
     code_for,
     completion_data,
     create_active_user,
@@ -291,6 +292,7 @@ class RegistrationLoginTests(TestCase):
         self.path = verification_path(mail.outbox[0])
         self.token = VerificationToken.objects.get()
         self.client.get(self.path)
+        choose_method(self.client, "password", self.token.pk)
 
     def complete(self, client=None, **overrides):
         client = client or self.client
@@ -527,6 +529,7 @@ class RegistrationInABrowserOfAnotherAccountTests(TestCase):
         mark = mark_session_of_other_account(browser)
 
         browser.get(verification_path(mail.outbox[0]))
+        choose_method(browser, "password", token.pk)
         browser.post(PASSWORD_URL, password_data(registration=token.pk))
         before = time.time()
         response = browser.post(COMPLETE_URL, completion_data(registration=token.pk))

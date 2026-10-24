@@ -11,11 +11,8 @@ is used up by the step that makes the change. It is no new way to change a metho
 """
 
 import time
-from dataclasses import dataclass
 
 from django.utils.crypto import constant_time_compare
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
 
 from leg_platform.accounts import login_methods, second_factor
 from leg_platform.accounts.models import User
@@ -70,64 +67,3 @@ def granted(request):
 
 def revoke(request):
     request.session.pop(SESSION_KEY, None)
-
-
-@dataclass(frozen=True)
-class Option:
-    """One option of the choice: the title, "What is this?" and "What happens?" (texts by the state of the account)."""
-
-    key: str
-    title: object
-    what: object
-    happens: object
-
-
-def options(user):
-    """The options of this account in the order of the page, from ``login_methods.available``: the server decides.
-
-    "What happens?" depends on what the account has now. The security levels, brand names and the sentence that the
-    key never leaves the device are not shown (owner decisions open; D-106: no proof of device independence).
-    """
-    has_code = login_methods.current(user) == login_methods.PASSWORD_AND_APP
-    texts = {
-        login_methods.PASSWORD_ONLY: Option(
-            key=login_methods.PASSWORD_ONLY,
-            title=_("Password"),
-            what=_("A password is a secret word that only you know."),
-            happens=(
-                _("You enter only your password each time you sign in. Anyone who knows your password can sign in. "
-                  "The number code is turned off.")
-                if has_code
-                else _("You enter only your password each time you sign in. Anyone who knows your password can sign in.")
-            ),
-        ),
-        login_methods.PASSWORD_AND_APP: Option(
-            key=login_methods.PASSWORD_AND_APP,
-            title=_("Password and number code from your phone"),
-            what=_(
-                "A number code is a six-digit number. It changes every 30 seconds and is shown by a program on your "
-                "phone. Such programs are called authenticator apps. You find them in the app store or play store of "
-                "your phone."
-            ),
-            happens=_(
-                "You enter your password and then the number that the program shows right now. Without the number "
-                "there is no access."
-            ),
-        ),
-        login_methods.PASSKEY: Option(
-            key=login_methods.PASSKEY,
-            title=pgettext_lazy("sign-in flow", "Passkey"),
-            what=_(
-                "A passkey, also called a sign-in key, is a key that your device stores. It replaces the password. "
-                "It is never sent to the website. It does not work on fake websites."
-            ),
-            happens=(
-                _("You confirm the sign-in on your device, for example with fingerprint, face recognition or device "
-                  "code. Your password and your number code are deleted in the process. You need neither afterwards.")
-                if has_code
-                else _("You confirm the sign-in on your device, for example with fingerprint, face recognition or "
-                       "device code. Your password is deleted in the process. You do not need it afterwards.")
-            ),
-        ),
-    }
-    return [texts[key] for key in login_methods.available_keys(user)]

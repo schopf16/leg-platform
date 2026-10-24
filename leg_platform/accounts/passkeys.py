@@ -93,22 +93,30 @@ def _client_context(response):
         raise ValueError("Cross-origin ceremonies are refused.")
 
 
-def begin(request, purpose, *, user=None, action="", mode=None):
+def _may_hold_credential(user, registering):
+    """An active account, or (``registering``) the unverified account of a registration whose link is in the session
+    (D-106): the caller has checked the link; the key stays inactive until the last step of the registration."""
+    return user.is_active or (registering and user.status == User.Status.UNVERIFIED)
+
+
+def begin(request, purpose, *, user=None, action="", mode=None, registering=False):
     """Create bounded, short-lived options. No credential ids are disclosed for public login."""
     if purpose not in {"login", "register", "proof"} or len(action) > 200:
         raise ValueError("Invalid ceremony purpose.")
+    if registering and purpose != "register":
+        raise ValueError("Only a registration ceremony can run before the account is active.")
     if purpose == "register":
         if not isinstance(mode, str) or mode not in {"this_device", "another_device"}:
             raise ValueError("Invalid registration mode.")
     elif mode is not None:
         raise ValueError("Registration mode is not valid for authentication.")
-    if purpose != "login" and (user is None or not user.is_active):
+    if purpose != "login" and (user is None or not _may_hold_credential(user, registering)):
         raise ValueError("An active account is required.")
     rp_id, _origin = relying_party()
     with transaction.atomic():
         if user is not None:
-            user = User.objects.select_for_update().get(pk=user.pk)
-            if not user.is_active:
+            user = User._base_manager.select_for_update().get(pk=user.pk)
+            if not _may_hold_credential(user, registering):
                 raise ValueError("An active account is required.")
         session_binding = binding(request)
         # Repeated clicks replace this session's options; expired rows are opportunistically removed.
@@ -178,13 +186,17 @@ def _take(request, ceremony, purpose, user, action):
     return row
 
 
-def register(request, ceremony, response, name):
-    """Return a staged verified credential, or None. Activation is a separate atomic switch."""
+def register(request, ceremony, response, name, *, user=None, registering=False):
+    """Return a staged verified credential, or None. Activation is a separate atomic switch.
+
+    ``user`` and ``registering``: the unverified account of a registration (the caller has checked the link in the
+    session); the key stays inactive until ``User.complete_registration`` switches it on in the last step.
+    """
     rp_id, origin = relying_party()
     with transaction.atomic():
-        user = User.objects.select_for_update().get(pk=request.user.pk)
+        user = User._base_manager.select_for_update().get(pk=(user or request.user).pk)
         row = _take(request, ceremony, "register", user, "")
-        if row is None or not user.is_active or user.passkeys.count() >= MAX_CREDENTIALS:
+        if row is None or not _may_hold_credential(user, registering) or user.passkeys.count() >= MAX_CREDENTIALS:
             return None
         try:
             raw_id = credential_from_response(response)

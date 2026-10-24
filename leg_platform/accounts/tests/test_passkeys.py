@@ -175,7 +175,23 @@ class PasskeyCeremonyTests(TestCase):
 
     def test_password_reset_does_not_issue_a_passkey_bypass_link(self):
         self.activate()
-        self.assertIsNone(password_reset.process_reset_request(self.user.email))
+        # No link that sets a password for a passkey account: the request gets the answer of the recovery (D-106). While
+        # nothing is entered that is the recovery link (nothing changes before its confirmation), else the instructions.
+        send = password_reset.process_reset_request(self.user.email)
+        self.assertIsNotNone(send)
+        self.assertFalse(VerificationToken.objects.filter(purpose=VerificationToken.Purpose.PASSWORD_RESET).exists())
+        self.assertEqual(
+            VerificationToken.objects.get(user=self.user).purpose, VerificationToken.Purpose.SELF_RECOVERY
+        )
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.authentication_method, User.AuthenticationMethod.PASSKEY)
+        self.assertTrue(self.user.passkeys.filter(active=True).exists())
+        VerificationToken.objects.all().delete()
+        from leg_platform.community import own_iban
+        from leg_platform.community.tests.onboarding import GOOD_IBAN
+
+        own_iban.set_own_iban(self.user, GOOD_IBAN)
+        self.assertIsNotNone(password_reset.process_reset_request(self.user.email))
         self.assertFalse(VerificationToken.objects.filter(user=self.user).exists())
 
     def test_promotion_accepts_one_active_credential_without_device_confirmation(self):

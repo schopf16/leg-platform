@@ -267,7 +267,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
             )
             context.update(
                 choose_form=choose_form,
-                methods=login_methods.available(user),
+                methods=login_methods.cards(user),
                 selected=choose_form["method"].value(),
                 current=login_methods.current(user),
                 recommended=login_methods.recommended(user),
@@ -487,7 +487,7 @@ class LoginMethodView(ProfileCardView):
         user = request.user
         form = form or LoginMethodForm(user=user, initial={"method": login_methods.current(user)})
         return render(request, "accounts/method_choice.html", {
-            "form": form, "choose_form": form, "methods": login_methods.available(user),
+            "form": form, "choose_form": form, "methods": login_methods.cards(user),
             "selected": form["method"].value(), "current": login_methods.current(user),
             "recommended": login_methods.recommended(user),
             "recommended_title": login_methods.title_of(login_methods.recommended(user)),
@@ -562,9 +562,13 @@ class SignInChangeView(ProfileCardView):
             form = form or LoginMethodForm(user=user, initial={"method": current})
             context.update(
                 form=form,
-                options=sign_in_change.options(user),
+                choose_form=form,
+                methods=login_methods.cards(user),
                 selected=form["method"].value(),
                 current=current,
+                # The flow shows no tag "Recommended" (owner specification of the flow, chapter 3).
+                recommended="",
+                hide_legend=True,
             )
         elif step in (sign_in_change.SCAN, sign_in_change.NUMBER):
             device = self.device(request)

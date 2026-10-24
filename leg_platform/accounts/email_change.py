@@ -275,7 +275,9 @@ def confirm_change(token):
             return None
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE).delete()
         # Recovery authority belongs to the current login mailbox, never its former holder.
-        VerificationToken.objects.filter(user=user, purpose=Purpose.TWO_FACTOR_RESET).delete()
+        VerificationToken.objects.filter(
+            user=user, purpose__in=(Purpose.TWO_FACTOR_RESET, Purpose.SELF_RECOVERY)
+        ).delete()
         pending.delete()
         # The stop links went to addresses no longer entitled to the account: all end, also while a second-address request is open.
         VerificationToken.objects.filter(user=user, purpose=Purpose.EMAIL_CHANGE_STOP).delete()

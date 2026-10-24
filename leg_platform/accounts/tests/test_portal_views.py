@@ -11,6 +11,7 @@ from leg_platform.accounts.models import AuthenticatorDevice, User, Verification
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     age_authentication,
+    choose_method,
     code_for,
     completion_data,
     create_active_user,
@@ -216,6 +217,7 @@ class PageSecurityAndLanguageTests(TestCase):
         reference = VerificationToken.objects.get().pk
         pending = Client()
         pending.get(path)
+        choose_method(pending, "password", reference)
         member = Client()
         member.force_login(user)
         complete_url = reverse("accounts:registration_complete")

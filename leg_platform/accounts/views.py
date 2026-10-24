@@ -19,11 +19,15 @@ from django.views import View
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, TemplateView
+from django_otp import login as otp_login
 
 from leg_platform.accounts import (
     email_change,
+    login_methods,
+    passkeys,
     password_reset,
     rate_limits,
+    registration_methods,
     resend,
     second_factor,
     second_factor_reset,
@@ -50,6 +54,7 @@ from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.portal_settings import legal_links
 from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 from leg_platform.accounts.models import (
+    AuthenticatorDevice,
     MailJob,
     SecurityEvent,
     User,
@@ -366,10 +371,12 @@ class ResendView(NeverCacheMixin, View):
 
 
 class RegistrationVerifyView(TokenPageMixin, View):
-    """Opening the link changes nothing: it remembers the token and leaves the URL (D-058).
+    """Opening the link changes no account data: it remembers the token, starts step 2 again for this session and
+    leaves the URL (D-058).
 
     Mail scanners open links; the registration completes only with the last form, and the link
-    stays valid until then.
+    stays valid until then. What step 2 staged for the account is not deleted here (a scanner must not
+    wipe it): a new choice replaces it and step 3 keeps only what belongs to the chosen method.
     """
 
     def get(self, request, token):
@@ -383,7 +390,8 @@ class RegistrationVerifyView(TokenPageMixin, View):
         # A new link starts the steps again.
         request.session.pop(REGISTRATION_PASSWORD_SESSION_KEY, None)
         request.session.pop(REGISTRATION_PRIVACY_SESSION_KEY, None)
-        return redirect("accounts:registration_password")
+        registration_methods.forget(request)
+        return redirect("accounts:registration_method")
 
 
 def clear_registration_session(request):
@@ -394,6 +402,7 @@ def clear_registration_session(request):
         REGISTRATION_PRIVACY_SESSION_KEY,
     ):
         request.session.pop(key, None)
+    registration_methods.forget(request)
     resend.forget(request, resend.REGISTRATION)
 
 
@@ -433,6 +442,17 @@ class RegistrationStepMixin(NeverCacheMixin):
             return None
         return found
 
+    def held_password_hash(self):
+        """The hash of the password of step 2 for this link, or None."""
+        held = self.request.session.get(REGISTRATION_PASSWORD_SESSION_KEY)
+        if (
+            isinstance(held, dict)
+            and isinstance(held.get("hash"), str)
+            and held.get("digest") == self.token.digest
+        ):
+            return held["hash"]
+        return None
+
     def get_context_data(self, **kwargs):
         return super().get_context_data(
             account_email=self.token.user.email, registration_ref=self.token.pk, **kwargs
@@ -440,11 +460,30 @@ class RegistrationStepMixin(NeverCacheMixin):
 
 
 class RegistrationPasswordView(RegistrationStepMixin, FormView):
-    """Step 2 of the registration: the password, kept as a hash in the session until step 3 (D-058)."""
+    """Step 2 of the registration, for the methods with a password: the password, kept as a hash in the session
+    until step 3 (D-058). The method is chosen first (``registration_views.RegistrationMethodView``)."""
 
     template_name = "accounts/registration_password.html"
     form_class = RegistrationPasswordForm
-    success_url = reverse_lazy("accounts:registration_complete")
+
+    def has_password_method(self):
+        return registration_methods.chosen(self.request, self.token) in registration_methods.PASSWORD_METHODS
+
+    def get(self, request, *args, **kwargs):
+        if not self.has_password_method():
+            return redirect("accounts:registration_method")
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        if not self.has_password_method():
+            return redirect("accounts:registration_method")
+        return super().post(request, *args, **kwargs)
+
+    def get_success_url(self):
+        # With an app the device follows; the account is only created in step 3.
+        if registration_methods.chosen(self.request, self.token) == login_methods.PASSWORD_AND_APP:
+            return reverse("accounts:registration_app")
+        return reverse("accounts:registration_complete")
 
     def get_form_kwargs(self):
         return {**super().get_form_kwargs(), "user": self.token.user}
@@ -467,9 +506,23 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
     form_class = RegistrationDetailsForm
     success_url = reverse_lazy("home")
 
-    def get(self, request, *args, **kwargs):
+    def setup_ready(self):
+        return registration_methods.setup_done(self.request, self.token, self.held_password_hash() is not None)
+
+    def setup_url(self):
+        """The screen of step 2 that still lacks something."""
+        method = registration_methods.chosen(self.request, self.token)
+        if method is None:
+            return reverse("accounts:registration_method")
+        if method == login_methods.PASSKEY:
+            return reverse("accounts:registration_passkey")
         if self.held_password_hash() is None:
-            return redirect("accounts:registration_password")
+            return reverse("accounts:registration_password")
+        return reverse("accounts:registration_app")
+
+    def get(self, request, *args, **kwargs):
+        if not self.setup_ready():
+            return redirect(self.setup_url())
         # The consent is stored with the privacy notice address shown here; keep it with the link.
         request.session[REGISTRATION_PRIVACY_SESSION_KEY] = {
             "digest": self.token.digest,
@@ -487,20 +540,9 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             return shown["url"]
         return legal_links(self.request).privacy_url
 
-    def held_password_hash(self):
-        """The hash of the password of step 2 for this link, or None."""
-        held = self.request.session.get(REGISTRATION_PASSWORD_SESSION_KEY)
-        if (
-            isinstance(held, dict)
-            and isinstance(held.get("hash"), str)
-            and held.get("digest") == self.token.digest
-        ):
-            return held["hash"]
-        return None
-
     def post(self, request, *args, **kwargs):
-        if self.held_password_hash() is None:
-            return redirect("accounts:registration_password")
+        if not self.setup_ready():
+            return redirect(self.setup_url())
         return super().post(request, *args, **kwargs)
 
     def get_form_kwargs(self):
@@ -512,8 +554,11 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
         return super().get_context_data(progress_step=3, **kwargs)
 
     def form_valid(self, form):
+        method = registration_methods.chosen(self.request, self.token)
         password_hash = self.held_password_hash()
         privacy_url = self.shown_privacy_url()
+        device = None
+        codes = []
         with transaction.atomic():
             # Lock order: account before token (as when a pending registration is replaced), so no deadlock;
             # the token is consumed only here, and the locks let only one of two concurrent submissions succeed.
@@ -529,6 +574,20 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             )
             if user is None or token is None:
                 return self.invalid(self.request)
+            # What step 2 staged is checked again under the lock of the account (a second tab may have changed it).
+            if method == login_methods.PASSKEY and not registration_methods.passkey_staged(self.request, user):
+                return redirect(self.setup_url())
+            if method == login_methods.PASSWORD_AND_APP:
+                device = AuthenticatorDevice.objects.select_for_update().filter(user=user, confirmed=True).first()
+                if device is None:
+                    return redirect(self.setup_url())
+            # What another tab or an earlier choice staged for another method does not go with the account.
+            if method != login_methods.PASSWORD_AND_APP:
+                AuthenticatorDevice.objects.filter(user=user).delete()
+            if method == login_methods.PASSKEY:
+                user.passkeys.filter(active=False).exclude(setup_binding=passkeys.binding(self.request)).delete()
+            else:
+                user.passkeys.filter(active=False).delete()
             # Write only the form's fields (plus consent) onto the account read under the lock: the
             # form's instance is stale and must not write back a column changed in the meantime.
             form.instance.privacy_accepted_at = timezone.now()
@@ -540,12 +599,26 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
             for name in written:
                 setattr(user, name, getattr(form.instance, name))
             user.save(update_fields=list(written))
-            user.complete_registration(password_hash=password_hash)
+            if method == login_methods.PASSKEY:
+                user.complete_registration(passkey_binding=passkeys.binding(self.request))
+            else:
+                user.complete_registration(password_hash=password_hash)
+            if device is not None:
+                # Made now and shown once below: nothing about them is stored in the session (D-059).
+                codes = totp._replace_recovery_codes(user)
             token.delete()
             security_log.record(SecurityEvent.Event.REGISTRATION_COMPLETED, account=user)
         clear_registration_session(self.request)
         # Logged in as after a login (D-055): the session ID is renewed; the link is consumed, so it cannot log in again.
         login(self.request, user, backend=second_factor.LOGIN_BACKEND)
+        if method == login_methods.PASSKEY:
+            second_factor.mark_passkey_session(self.request, user)
+        if device is not None:
+            # Imported here: the profile views import this module.
+            from leg_platform.accounts.profile_views import render_profile
+
+            otp_login(self.request, device)
+            return render_profile(self.request, codes=codes, enrolled=True)
         return redirect(self.get_success_url())
 
 

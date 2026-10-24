@@ -1,0 +1,60 @@
+{% extends "entry_base.html" %}
+{% load i18n static %}{% comment %}
+Step 2 of the registration, passkey: where it is stored, the window of the browser, and the failure
+(``registration_views.RegistrationPasskeyView``). The ceremony is ``passkeys.js`` and the display around it
+``passkey-setup.js``, as in the profile (``passkey_setup.html``); here the requests go to the registration entry points and
+the key stays inactive until step 3 activates the account.
+{% endcomment %}
+{% block title %}{% translate "Set up a passkey" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
+{% block extra_head %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endblock %}
+{% block form %}
+  <form id="passkey-create" method="post" action="{% url 'accounts:registration_passkey_create' %}" data-passkey-register data-options="{% url 'accounts:registration_passkey_options' %}" data-pending="{% translate 'Waiting for your confirmation …' %}" data-error="{% translate 'Did not work. Nothing was changed.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
+    {% csrf_token %}
+    <input type="hidden" name="name" value="{% translate 'My passkey' %}">
+    <section data-passkey-panel="device" aria-labelledby="flow-title">
+      {% include "accounts/_progress.html" %}
+      <h1 id="flow-title" tabindex="-1">{% translate "Set up a passkey" %}</h1>
+      <fieldset class="choice-group">
+        <legend class="choice-legend">{% translate "Where should the passkey be stored?" %}</legend>
+        <div class="choice-cards">
+          <label class="choice-card" for="id_device_this">
+            <input class="form-check-input choice-radio" type="radio" name="device_choice" id="id_device_this" value="this_device" checked aria-describedby="device-this-detail">
+            <span class="choice-body">
+              <span class="choice-title">{% translate "On this device" %}</span>
+              <span class="choice-detail" id="device-this-detail">{% translate "This computer or this device." %}</span>
+            </span>
+          </label>
+          <label class="choice-card" for="id_device_other">
+            <input class="form-check-input choice-radio" type="radio" name="device_choice" id="id_device_other" value="another_device" aria-describedby="device-other-detail">
+            <span class="choice-body">
+              <span class="choice-title">{% translate "On another device" %}</span>
+              <span class="choice-detail" id="device-other-detail">{% translate "A QR code is shown to you. Photograph it with your phone." %}</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+      <button type="submit" class="btn btn-primary" name="mode" value="this_device">{% translate "Continue" %}</button>
+      <p class="entry-center"><a href="{% url 'accounts:registration_method' %}">{% translate "Choose another sign-in method" %}</a></p>
+    </section>
+
+    <section data-passkey-panel="waiting" aria-labelledby="waiting-title" hidden>
+      {% include "accounts/_progress.html" %}
+      <h1 id="waiting-title" tabindex="-1">{% translate "Confirm in the window" %}</h1>
+      <p>{% translate "Your browser or password manager opens a window. Follow the instructions there." %}</p>
+      <p class="entry-hint" role="status" data-passkey-status></p>
+    </section>
+
+    <section data-passkey-panel="failed" aria-labelledby="failed-title" hidden>
+      <h1 id="failed-title" tabindex="-1">{% translate "Did not work. Nothing was changed." %}</h1>
+      <p data-passkey-error-text hidden></p>
+      <p>{% translate "If this device already has a passkey for this portal, choose “On another device”." %}</p>
+      <a class="btn btn-primary" href="{% url 'accounts:registration_passkey' %}">{% translate "Try again" context "passkey setup" %}</a>
+      <p class="entry-center"><a href="{% url 'accounts:registration_method' %}">{% translate "Choose another sign-in method" %}</a></p>
+    </section>
+  </form>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/passkey-setup.js' %}"></script>
+{% endblock %}
