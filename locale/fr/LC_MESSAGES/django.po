@@ -7671,6 +7671,7 @@ msgid "%(days)s day"
 msgid_plural "%(days)s days"
 msgstr[0] "%(days)s jour"
 msgstr[1] "%(days)s jours"
+msgstr[2] "%(days)s jours"
 
 msgid "Please correct"
 msgstr "Correction demandée"
