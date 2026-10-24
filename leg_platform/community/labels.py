@@ -24,6 +24,9 @@ _KIND_TEXTS = {
     ApplicationNotice.Kind.OPERATOR_DATA_CHANGED: grid_operator.text(
         _("Data changed after the registration at the %(operator)s: check the registration again")
     ),
+    ApplicationNotice.Kind.ACCOUNT_DELETED: grid_operator.text(
+        _("Account deleted: withdraw the registration at the %(operator)s")
+    ),
 }
 
 

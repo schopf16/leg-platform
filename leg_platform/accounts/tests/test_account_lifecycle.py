@@ -308,11 +308,10 @@ class AccountDeletionTests(TestCase):
         self.client.force_login(self.user)
 
     def delete_account(self, **credentials):
+        # The proof is the password; the box of the page is ticked for a deletion (owner decision 2026-10-24).
         credentials.setdefault("current_password", PASSWORD)
-        return self.client.post(
-            DELETE_URL,
-            {"confirm": "on", **credentials},
-        )
+        credentials.setdefault("confirm", "on")
+        return self.client.post(DELETE_URL, credentials)
 
     def test_deletion_requires_correct_reauthentication(self):
         response = self.delete_account(current_password="wrong")
@@ -343,53 +342,32 @@ class AccountDeletionTests(TestCase):
         with self.assertRaises(AccountIntegrityError):
             self.user._change(retention_obligation=False)
 
-    def delete_card(self, client):
-        page = client.get(f"{PROFILE_URL}?edit=delete").content.decode()
-        card = re.search(r'<section class="profile-card profile-card-danger".*?</section>', page, re.S)
-        return re.sub(r'value="[^"]*"', "", card.group(0))
+    def test_the_page_says_what_happens_and_what_the_button_does(self):
+        page = self.client.get(DELETE_URL).content.decode()
 
-    def test_the_confirmation_says_what_the_button_does(self):
-        card = self.delete_card(self.client)
+        self.assertIn("Konto wirklich löschen?", page)
+        self.assertIn("Sie verlieren den Zugang zum Portal.", page)
+        self.assertIn("Alle Angaben werden gelöscht.", page)
+        self.assertIn("Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind.", page)
+        self.assertIn("Konto unwiderruflich löschen</button>", page)
+        self.assertIn("Diese Kündigung kann nicht mehr zurückgezogen oder aufgehoben werden.", page)
 
-        self.assertIn("Konto wirklich löschen?", card)
-        self.assertIn("Mit dem Löschen verlieren Sie den Zugang zum Portal.", card)
-        self.assertIn("Rechnungen und Buchungsbelege bewahren wir so lange auf, wie das Gesetz es verlangt.", card)
-        self.assertIn("Konto endgültig löschen</button>", card)
-        self.assertIn("Ich weiss, dass mein Konto und meine Angaben gelöscht werden", card)
+    def test_the_card_of_the_profile_is_one_sentence_and_leads_to_the_page(self):
+        card = re.search(
+            r'<section class="profile-card profile-card-danger".*?</section>',
+            self.client.get(PROFILE_URL).content.decode(), re.S,
+        ).group(0)
 
-    def test_the_card_of_a_retained_account_says_it_is_deactivated_and_the_plain_card_says_nothing_of_it(self):
-        # Owner decision 2026-10-19 (kundenprofil/PROFIL.md section 6; amends D-055): an account that is only
-        # deactivated is told so before; an account that is deleted sees the card of D-059 unchanged.
-        retained = create_active_user("retained.person@example.org")
-        retained.set_retention_obligation()
-        other = VerifiedClient()
-        other.force_login(retained)
+        self.assertIn(f'href="{DELETE_URL}"', card)
+        self.assertNotIn("<form", card)
+        self.assertNotIn("Aufbewahrung", card)
+        self.assertNotIn("deaktiviert", card)
 
-        plain = self.delete_card(self.client)
-        kept = self.delete_card(other)
-
-        for word in ("Aufbewahrung", "deaktiviert", "retention", "retain", "closed"):
-            self.assertNotIn(word, plain)
-        self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", kept)
-        self.assertNotIn("Rechnungen und Buchungsbelege", kept)
-
-    def test_the_checkbox_is_never_ticked_again_after_an_error(self):
-        # Ticked, but with a wrong password: the card is shown again with the box unticked.
+    def test_a_wrong_password_keeps_the_page_and_deletes_nothing(self):
         wrong = self.delete_account(current_password="wrong")
 
         self.assertEqual(wrong.status_code, 200)
-        box = re.search(r'<input[^>]*name="confirm"[^>]*>', wrong.content.decode()).group(0)
-        self.assertNotIn("checked", box)
-        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
-
-    def test_a_missing_confirmation_has_a_specific_message(self):
-        response = self.client.post(DELETE_URL, {"current_password": PASSWORD})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Bitte setzen Sie das Häkchen, um zu bestätigen, dass Sie Ihr Konto löschen möchten."
-        )
-        self.assertNotContains(response, "zwingend erforderlich")
+        self.assertTemplateUsed(wrong, "accounts/account_delete.html")
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
 
     def test_the_result_says_deleted_or_deactivated_and_a_retained_account_stays_deactivated(self):

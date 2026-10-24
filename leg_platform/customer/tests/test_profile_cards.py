@@ -240,20 +240,23 @@ class PersonalCardTests(TestCase):
 
         html = card(self.get(), "personal")
 
-        self.assertIn("EGID 90001234", html)
+        # The EGID has its own row; the note about the confirmed address is shown only in the edit state.
+        self.assertIn("EGID", html)
+        self.assertIn("90001234", html)
         self.assertNotIn("Die Adresse ist bestätigt", html)
         self.assertNotRegex(card(self.get("?edit=personal"), "personal"), r'<input[^>]*name="street"[^>]*disabled')
         self.assertEqual(self.post(street="Neuweg").status_code, 302)
         self.mine.refresh_from_db()
         self.assertEqual(self.mine.street, "Neuweg")
 
-    def test_after_the_confirmation_the_note_stands_under_the_address_and_the_address_is_locked(self):
+    def test_after_the_confirmation_the_address_is_locked_and_the_note_is_in_the_edit_state(self):
         self.building()
 
         html = card(self.get(), "personal")
-        self.assertIn("EGID 90001234", html)
-        self.assertIn("Die Adresse ist bestätigt und kann nicht geändert werden. Wenden Sie sich bei einer Änderung an die LEG.", html)
+        self.assertIn("90001234", html)
+        self.assertNotIn("Die Adresse ist bestätigt", html)
         edit = card(self.get("?edit=personal"), "personal")
+        self.assertIn("Die Adresse ist bestätigt und kann nicht geändert werden. Wenden Sie sich bei einer Änderung an die LEG.", edit)
         for name in ("street", "house_number", "postal_code", "town"):
             self.assertRegex(edit, rf'<input[^>]*name="{name}"[^>]*disabled')
         # Whatever the browser posts, the address stays; the name can still be changed.
@@ -346,149 +349,51 @@ class EmailAndTwoFactorCardTests(TestCase):
 
 @tag("mariadb")
 class DeleteCardTests(TestCase):
-    databases = {"default", "addresses"}
+    """The deletion is always possible (owner decision 2026-10-24): the card is one sentence that leads to the page
+    "Delete account"; the page offers "Messpunkte abmelden" for a customer with running points; the deletion deregisters
+    the running points by itself and deactivates the account while an assignment is in force."""
 
     @classmethod
     def setUpTestData(cls):
-        cls.location = make_location("Musterstrasse", "1", "3063", "Ittigen", egid=90001234)
+        cls.location = make_location()
 
     def setUp(self):
         self.mine = customer("mine.delete@example.org")
         self.client = login(self.mine)
 
-    def delete_card(self, query="?edit=delete"):
-        return card(self.client.get(PROFILE + query).content.decode(), "delete")
+    def test_the_card_is_one_sentence_and_leads_to_the_page(self):
+        html = card(self.client.get(PROFILE).content.decode(), "delete")
 
-    def start_deregistration(self):
-        return deregistrations.request_deregistration(
-            self.mine, metering_point_ids=[p.pk for p in deregistrations.eligible_points(self.mine)]
-        )
+        self.assertIn(f'href="{DELETE}"', html)
+        self.assertNotIn('name="current_password"', html)
+        self.assertIn("Sie können Ihr Konto jederzeit löschen.", html)
 
-    def test_with_a_running_point_the_button_starts_the_deregistration_and_no_form_is_shown(self):
+    def test_the_page_offers_the_deregistration_next_to_the_button_for_a_customer_with_points(self):
         active_point(1, self.mine, self.location)
 
-        for query in ("", "?edit=delete"):
-            with self.subTest(query=query):
-                html = self.delete_card(query)
-                self.assertIn("Sie haben noch Messpunkte. Melden Sie diese zuerst ab. Danach können Sie Ihr Konto löschen.", html)
-                self.assertIn(f'href="{reverse("customer:deregistration_start")}?for=account_deletion"', html)
-                self.assertNotIn('name="confirm"', html)
-                self.assertNotIn("?edit=delete", html)
+        html = self.client.get(DELETE).content.decode()
 
-    def test_the_deletion_is_refused_before_any_proof_is_used_up(self):
-        active_point(1, self.mine, self.location)
-        self.mine.set_secondary_email("second.delete@example.org")
+        self.assertIn("Konto unwiderruflich löschen", html)
+        self.assertIn(f'href="{reverse("customer:deregistration_start")}"', html)
+        self.assertIn("Messpunkte abmelden", html)
 
-        for password in (PASSWORD, "wrong wrong wrong"):
-            response = self.client.post(DELETE, {"confirm": "on", "current_password": password})
-            self.assertRedirects(response, f"{PROFILE}#card-delete", fetch_redirect_response=False)
+    def test_a_running_point_is_deregistered_by_the_deletion_and_the_account_is_deactivated(self):
+        point = active_point(1, self.mine, self.location)
 
-        self.assertIn("Sie können Ihr Konto noch nicht löschen", self.delete_card(""))
-        self.mine.refresh_from_db()
-        self.assertEqual((self.mine.status, self.mine.secondary_email), (User.Status.ACTIVE, "second.delete@example.org"))
-        self.assertFalse(SessionCodeFailure.objects.filter(account=self.mine).exists())
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DEACTIVATED).exists())
-
-    def test_a_point_that_is_not_active_yet_blocks_without_a_way_to_deregister_it(self):
-        active_point(1, self.mine, self.location, start=date.today() + timedelta(days=40))
-
-        html = self.delete_card("")
-
-        self.assertIn("Sie können Ihr Konto noch nicht löschen: Eine Anmeldung läuft noch oder ein Messpunkt ist noch nicht aktiv.", html)
-        self.assertIn("Zu den Gebäuden", html)
-        self.assertNotIn("for=account_deletion", html)
-        self.assertEqual(
-            self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD}).status_code, 302
-        )
-        self.assertEqual(User.objects.get(pk=self.mine.pk).status, User.Status.ACTIVE)
-
-    def test_a_registration_in_flight_blocks_the_deletion(self):
-        publish_contract()
-        configure_numbers()
-        application, _building = draft_with_points(self.mine, number=50)
-        applications.accept_contract_step(
-            self.mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
-        )
-        applications.set_start(self.mine, application, asap=True)
-        applications.submit(self.mine, application)
-
-        self.assertIn("Sie können Ihr Konto noch nicht löschen", self.delete_card(""))
-        self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
-        self.assertEqual(User.objects.get(pk=self.mine.pk).status, User.Status.ACTIVE)
-
-    def test_once_the_deregistration_is_started_the_deletion_is_released_and_the_account_is_deactivated(self):
-        active_point(1, self.mine, self.location)
-        active_point(2, self.mine, self.location, Direction.FEED_IN)
-        own_iban.set_own_iban(self.mine, GOOD_IBAN)
-        self.mine.set_secondary_email("second.delete@example.org")
-        self.start_deregistration()
-
-        html = self.delete_card()
-
-        self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", html)
-        self.assertIn("Mit dem Löschen verlieren Sie den Zugang zum Portal.", html)
-        self.assertIn("Ich weiss, dass mein Konto deaktiviert wird und dass das nicht rückgängig gemacht werden kann.", html)
-        self.assertNotIn("werden gelöscht", html)
-        self.assertRegex(html, r'<input[^>]*name="current_password"')
-        wrong = self.client.post(DELETE, {"confirm": "on", "current_password": "wrong wrong wrong"})
-        self.assertEqual(wrong.status_code, 200)
-        self.assertEqual(User.objects.get(pk=self.mine.pk).status, User.Status.ACTIVE)
-        unticked = self.client.post(DELETE, {"current_password": PASSWORD})
-        self.assertEqual(unticked.status_code, 200)
-        self.assertEqual(User.objects.get(pk=self.mine.pk).status, User.Status.ACTIVE)
-
-        response = self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
+        response = self.client.post(DELETE, {"current_password": PASSWORD, "confirm": "on"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ihr Konto wurde deaktiviert")
-        self.assertContains(response, "Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.")
-        self.assertNotContains(response, "Ihr Konto wurde gelöscht")
-        stored = User.objects.get(pk=self.mine.pk)
-        self.assertEqual((stored.status, stored.secondary_email), (User.Status.DEACTIVATED, ""))
-        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DEACTIVATED).count(), 1)
-        # Every address was told, and the session ended.
-        self.assertEqual(
-            sorted(MailJob.objects.filter(kind=MailJob.Kind.ACCOUNT_DELETED).values_list("address", flat=True)),
-            ["mine.delete@example.org", "second.delete@example.org"],
+        self.assertTemplateUsed(response, "accounts/account_deleted.html")
+        self.mine.refresh_from_db()
+        # The assignment is in force until the earliest date: the account is only deactivated, its sign-in is gone.
+        self.assertEqual(self.mine.status, User.Status.DEACTIVATED)
+        self.assertFalse(self.mine.has_usable_password())
+        self.assertTrue(
+            deregistrations.Deregistration.objects.filter(person=self.mine, items__metering_point=point).exists()
         )
-        self.assertEqual(self.client.get(PROFILE).status_code, 302)
 
-    def test_a_terminated_account_without_a_running_point_is_released_at_once(self):
-        point = active_point(1, self.mine, self.location)
-        type(point).objects.filter(pk=point.pk).update(terminated_on=date.today() - timedelta(days=2))
+    def test_an_account_without_points_is_deleted_at_once(self):
+        response = self.client.post(DELETE, {"current_password": PASSWORD, "confirm": "on"})
 
-        self.assertIn("Ihr Konto wird deaktiviert.", self.delete_card())
-
-    def test_an_account_that_is_really_deleted_keeps_the_old_wording_and_the_old_result(self):
-        html = self.delete_card()
-
-        self.assertIn("Ihre Angaben werden gelöscht.", html)
-        self.assertNotIn("deaktiviert", html)
-        response = self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
-        self.assertContains(response, "Ihr Konto wurde gelöscht")
+        self.assertTemplateUsed(response, "accounts/account_deleted.html")
         self.assertFalse(User.objects.filter(pk=self.mine.pk).exists())
-
-    def test_a_retention_obligation_without_a_metering_point_is_told_too(self):
-        self.mine.set_retention_obligation()
-
-        self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", self.delete_card())
-        response = self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
-        self.assertContains(response, "Ihr Konto wurde deaktiviert")
-
-    def test_the_release_is_checked_again_under_the_lock_of_the_account(self):
-        # The first check passes, a parallel request withdraws the release before the lock: nothing happens.
-        with patch.object(deregistrations, "deletion_released", side_effect=[True, False]):
-            response = self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
-
-        self.assertRedirects(response, f"{PROFILE}#card-delete", fetch_redirect_response=False)
-        self.assertEqual(User.objects.get(pk=self.mine.pk).status, User.Status.ACTIVE)
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DELETED).exists())
-
-    def test_the_account_of_another_customer_is_never_touched(self):
-        other = customer("other.delete@example.org")
-        active_point(1, self.mine, self.location)
-        self.start_deregistration()
-
-        self.client.post(DELETE, {"confirm": "on", "current_password": PASSWORD})
-
-        self.assertEqual(User.objects.get(pk=other.pk).status, User.Status.ACTIVE)

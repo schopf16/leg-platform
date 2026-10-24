@@ -111,7 +111,6 @@ class CardPageTests(TestCase):
             ("personal", 'name="street"'),
             ("email", 'name="secondary_email"'),
             ("password", 'name="new_password1"'),
-            ("delete", 'name="confirm"'),
         ):
             with self.subTest(edit=edit):
                 page = self.client.get(f"{PROFILE_URL}?edit={edit}")
@@ -119,7 +118,7 @@ class CardPageTests(TestCase):
                 # No other card has its form open.
                 opened = [
                     name
-                    for name in ('name="street"', 'name="secondary_email"', 'name="new_password1"', 'name="confirm"')
+                    for name in ('name="street"', 'name="secondary_email"', 'name="new_password1"')
                     if name in page.content.decode()
                 ]
                 self.assertEqual(opened, [field])
@@ -149,7 +148,7 @@ class CardPageTests(TestCase):
             ("profile_edit", 'name="street"'),
             ("email_change_request", 'name="secondary_email"'),
             ("password_change", 'name="new_password1"'),
-            ("account_delete", 'name="confirm"'),
+            ("account_delete", 'name="current_password"'),
         ):
             with self.subTest(name=name):
                 self.assertContains(self.client.get(reverse(f"accounts:{name}")), expected)
@@ -873,21 +872,18 @@ class DeleteCardTests(TestCase):
         self.assertContains(page, "Konto löschen")
         self.assertNotContains(page, 'name="confirm"')
 
-    @override_settings(INSTANCE_PRIVACY_URL="https://www.example.org/privacy")
-    def test_the_confirmation_has_the_notice_with_the_privacy_link_and_an_empty_box(self):
-        page = self.client.get(f"{PROFILE_URL}?edit=delete")
+    def test_the_page_has_the_proof_the_box_and_the_button_that_waits_for_the_box(self):
+        page = self.client.get(self.url)
 
-        self.assertContains(page, 'href="https://www.example.org/privacy"')
+        self.assertContains(page, 'name="current_password"')
+        self.assertContains(page, "Konto unwiderruflich löschen")
         self.assertContains(page, 'name="confirm"')
-        self.assertNotContains(page, "checked")
+        self.assertContains(page, 'data-gate="id_confirm"')
 
-    def test_a_wrong_password_or_a_missing_tick_deletes_nothing(self):
-        wrong = self.client.post(self.url, {"current_password": OTHER_PASSWORD, "confirm": "on"})
-        unticked = self.client.post(self.url, {"current_password": PASSWORD})
+    def test_a_wrong_password_deletes_nothing(self):
+        wrong = self.client.post(self.url, {"current_password": OTHER_PASSWORD})
 
         self.assertEqual(wrong.status_code, 200)
-        self.assertEqual(unticked.status_code, 200)
-        self.assertContains(unticked, "Bitte setzen Sie das Häkchen")
         self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
 
     def test_the_deletion_shows_the_result_page_at_once_and_tells_both_addresses(self):

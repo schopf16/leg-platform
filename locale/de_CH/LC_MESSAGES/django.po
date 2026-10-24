@@ -33,7 +33,8 @@ msgstr "Darstellung: hell. Zu dunkel wechseln."
 msgid "Display: dark. Switch to light."
 msgstr "Darstellung: dunkel. Zu hell wechseln."
 
-# Entry shell: panel texts of the login and of the registration (LEG-Design-Vorgaben)
+# Entry shell: panel texts of the login and of the registration (LEG-Design-
+# Vorgaben)
 msgid "Welcome to the LEG portal"
 msgstr "Willkommen im Portal der LEG"
 
@@ -293,8 +294,14 @@ msgstr "Neue E-Mail-Adresse bestätigen"
 msgid "Confirm your new email address at %(instance_name)s"
 msgstr "Neue E-Mail-Adresse bei %(instance_name)s bestätigen"
 
-msgid "Contact information for the operator:\n\n%(contact_url)s"
-msgstr "Kontaktinformationen des Betreibers:\n\n%(contact_url)s"
+msgid ""
+"Contact information for the operator:\n"
+"\n"
+"%(contact_url)s"
+msgstr ""
+"Kontaktinformationen des Betreibers:\n"
+"\n"
+"%(contact_url)s"
 
 msgid "Delete account"
 msgstr "Konto löschen"
@@ -314,11 +321,31 @@ msgstr "Änderung der E-Mail-Adresse: Die neue Adresse hat bereits ein Konto"
 msgid "Email address changed"
 msgstr "E-Mail-Adresse geändert"
 
-msgid "Hello\n\nSomeone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n\n%(email_change_url)s\n\nThe link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
-msgstr "Guten Tag\n\nBei %(instance_name)s wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Öffnen Sie diesen Link, um die neue Adresse zu bestätigen:\n\n%(email_change_url)s\n\nDer Link ist %(lifetime_hours)s Stunden gültig. Die neue Adresse wird erst nach Ihrer Bestätigung verwendet."
+msgid ""
+"Hello\n"
+"\n"
+"Someone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n"
+"\n"
+"%(email_change_url)s\n"
+"\n"
+"The link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Bei %(instance_name)s wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Öffnen Sie diesen Link, um die neue Adresse zu bestätigen:\n"
+"\n"
+"%(email_change_url)s\n"
+"\n"
+"Der Link ist %(lifetime_hours)s Stunden gültig. Die neue Adresse wird erst nach Ihrer Bestätigung verwendet."
 
-msgid "Hello\n\nSomeone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
-msgstr "Guten Tag\n\nBei %(instance_name)s wurde versucht, die E-Mail-Adresse eines Kontos in diese Adresse zu ändern. Es wurde keine Änderung vorgenommen. Falls Sie dies veranlasst haben, melden Sie sich mit der bereits registrierten E-Mail-Adresse an oder kontaktieren Sie den Betreiber."
+msgid ""
+"Hello\n"
+"\n"
+"Someone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
+msgstr ""
+"Guten Tag\n"
+"\n"
+"Bei %(instance_name)s wurde versucht, die E-Mail-Adresse eines Kontos in diese Adresse zu ändern. Es wurde keine Änderung vorgenommen. Falls Sie dies veranlasst haben, melden Sie sich mit der bereits registrierten E-Mail-Adresse an oder kontaktieren Sie den Betreiber."
 
 msgid "Home"
 msgstr "Startseite"
@@ -395,7 +422,8 @@ msgstr "Diese Adresse wurde nicht gefunden. Bitte prüfen Sie Strasse, Hausnumme
 msgid "Too many import requests. Please try again later."
 msgstr "Zu viele Importanfragen. Bitte versuchen Sie es später erneut."
 
-# D-090: the import of the address directory in the portal itself, its status page and its failure reasons.
+# D-090: the import of the address directory in the portal itself, its status
+# page and its failure reasons.
 msgid "Interrupted"
 msgstr "Unterbrochen"
 
@@ -701,23 +729,12 @@ msgstr "Ein Systemadministrator braucht auch Zugang zur Verwaltung."
 msgid "Only active accounts can receive access to the administration."
 msgstr "Nur aktive Konten können Zugang zur Verwaltung erhalten."
 
-msgid ""
-"Only accounts that have set up two-factor authentication can receive these "
-"rights. The person must first set up two-factor authentication in their "
-"profile."
-msgstr ""
-"Nur Konten mit eingerichteter Zwei-Faktor-Anmeldung (2FA) können diese "
-"Rechte erhalten. Die Person muss die Zwei-Faktor-Anmeldung zuerst in "
-"ihrem Profil einrichten."
+msgid "Only accounts that have set up two-factor authentication can receive these rights. The person must first set up two-factor authentication in their profile."
+msgstr "Nur Konten mit eingerichteter Zwei-Faktor-Anmeldung (2FA) können diese Rechte erhalten. Die Person muss die Zwei-Faktor-Anmeldung zuerst in ihrem Profil einrichten."
 
 #, python-format
-msgid ""
-"Customer numbers are running out: %(issued)d of %(total)d have been issued "
-"(%(percent)d%%). Once all are issued, no registration can be completed."
-msgstr ""
-"Die Kundennummern gehen aus: %(issued)d von %(total)d sind vergeben "
-"(%(percent)d%%). Sobald alle vergeben sind, kann keine Registrierung mehr "
-"abgeschlossen werden."
+msgid "Customer numbers are running out: %(issued)d of %(total)d have been issued (%(percent)d%%). Once all are issued, no registration can be completed."
+msgstr "Die Kundennummern gehen aus: %(issued)d von %(total)d sind vergeben (%(percent)d%%). Sobald alle vergeben sind, kann keine Registrierung mehr abgeschlossen werden."
 
 #: leg_platform/accounts/models.py
 msgid "This email address is already in use."
@@ -750,7 +767,8 @@ msgstr "Familie"
 msgid "email address"
 msgstr "E-Mail-Adresse"
 
-#. Overrides Django's generic unique message with plain wording that fits every field.
+#. Overrides Django's generic unique message with plain wording that fits
+#. every field.
 #, python-format
 msgid "%(model_name)s with this %(field_label)s already exists."
 msgstr "%(model_name)s: Dieser Wert für «%(field_label)s» wird bereits verwendet."
@@ -767,7 +785,8 @@ msgstr "Zugang zur Verwaltung"
 msgid "retention obligation"
 msgstr "Aufbewahrungspflicht"
 
-#. Verbose names that Django derives from the field names (privacy_accepted_at/url); the
+#. Verbose names that Django derives from the field names
+#. (privacy_accepted_at/url); the
 #. catalogue test requires a translation for every field of the account.
 msgid "privacy accepted at"
 msgstr "Datenschutzerklärung akzeptiert am"
@@ -850,6 +869,7 @@ msgstr "Land"
 
 msgid "phone number"
 msgstr "Telefonnummer"
+
 #: leg_platform/accounts/models.py
 msgid "Registration: link to confirm the address"
 msgstr "Registrierung: Link zur Bestätigung der Adresse"
@@ -897,13 +917,8 @@ msgstr "ja"
 msgid "Write a placeholder in curly brackets. It is replaced when the email is sent."
 msgstr "Schreiben Sie einen Platzhalter in geschweiften Klammern. Er wird beim Versand der E-Mail ersetzt."
 
-msgid ""
-"Web and email addresses cannot be typed; use the placeholders for addresses. "
-"The subject can only use the name of the portal."
-msgstr ""
-"Web- und E-Mail-Adressen können nicht eingetippt werden; verwenden Sie die "
-"Platzhalter für Adressen. Im Betreff kann nur der Name des Portals verwendet "
-"werden."
+msgid "Web and email addresses cannot be typed; use the placeholders for addresses. The subject can only use the name of the portal."
+msgstr "Web- und E-Mail-Adressen können nicht eingetippt werden; verwenden Sie die Platzhalter für Adressen. Im Betreff kann nur der Name des Portals verwendet werden."
 
 msgid "Placeholder"
 msgstr "Platzhalter"
@@ -1035,6 +1050,7 @@ msgstr "Es wurde noch keine frühere Fassung gespeichert."
 
 msgid "Default text"
 msgstr "Standardtext"
+
 msgid "Enter a first name or a company name."
 msgstr "Geben Sie einen Vornamen oder einen Firmennamen ein."
 
@@ -1050,14 +1066,17 @@ msgstr "Bitte füllen Sie dieses Feld aus."
 msgid "Enter a postal code with 4 digits from 1000 to 9999."
 msgstr "Geben Sie eine Postleitzahl mit 4 Ziffern von 1000 bis 9999 ein."
 
-#. Overrides Django's German text (django/conf/locale/de), which contains a sharp s; shown
+#. Overrides Django's German text (django/conf/locale/de), which contains a
+#. sharp s; shown
 #. e.g. for negative values in positive integer fields.
 #, python-format
 msgid "Ensure this value is greater than or equal to %(limit_value)s."
 msgstr "Dieser Wert muss grösser oder gleich %(limit_value)s sein."
 
-#. Field labels as Django stores them in admin change messages (capitalised English form
-#. labels, translated only when the history is shown: LogEntry.get_change_message()).
+#. Field labels as Django stores them in admin change messages (capitalised
+#. English form
+#. labels, translated only when the history is shown:
+#. LogEntry.get_change_message()).
 msgid "Salutation"
 msgstr "Anrede"
 
@@ -1100,7 +1119,8 @@ msgstr "Berechtigungen"
 msgid "Name"
 msgstr "Name"
 
-#. Overrides Django's German texts for the fields of PermissionsMixin, so that the user form
+#. Overrides Django's German texts for the fields of PermissionsMixin, so that
+#. the user form
 #. uses the project's terms ("system administrator", "account"; D-012, D-036).
 msgid "superuser status"
 msgstr "Systemadministrator"
@@ -1129,7 +1149,8 @@ msgstr "%(name)s durchsuchen"
 msgid "Pagination %(name)s"
 msgstr "Seitennavigation %(name)s"
 
-#. Overrides the German country name of django-countries, which contains a sharp s.
+#. Overrides the German country name of django-countries, which contains a
+#. sharp s.
 msgid "United Kingdom of Great Britain and Northern Ireland"
 msgstr "Vereinigtes Königreich Grossbritannien und Nordirland"
 
@@ -1187,6 +1208,7 @@ msgstr ""
 
 msgid "If you did not request this change, contact the operator of this portal immediately."
 msgstr "Wenn Sie diese Änderung nicht veranlasst haben, wenden Sie sich sofort an die Betreiber dieses Portals."
+
 #: leg_platform/accounts/emails.py
 #, python-format
 msgid "Choose a new password for %(instance_name)s"
@@ -1213,6 +1235,7 @@ msgstr "Passwort speichern"
 #: leg_platform/accounts/views.py
 msgid "Your password was changed. You can now log in."
 msgstr "Ihr Passwort wurde geändert. Sie können sich jetzt anmelden."
+
 #: leg_platform/accounts/forms.py
 msgid "The email address or the password is incorrect."
 msgstr "Die E-Mail-Adresse oder das Passwort ist falsch."
@@ -2127,9 +2150,6 @@ msgstr "Die zweite Adresse muss sich von der Adresse für die Anmeldung untersch
 msgid "Nothing was changed."
 msgstr "Es wurde nichts geändert."
 
-msgid "I know that my account and my details will be deleted and that this cannot be undone."
-msgstr "Ich weiss, dass mein Konto und meine Angaben gelöscht werden und das nicht rückgängig gemacht werden kann."
-
 msgid "second email address"
 msgstr "zweite E-Mail-Adresse"
 
@@ -2251,7 +2271,7 @@ msgid "Your details are deleted. We keep invoices and booking records for as lon
 msgstr "Ihre Angaben werden gelöscht. Rechnungen und Buchungsbelege bewahren wir so lange auf, wie das Gesetz es verlangt. Mehr dazu in der Datenschutzerklärung."
 
 msgid "Delete account permanently"
-msgstr "Konto endgültig löschen"
+msgstr "Konto unwiderruflich löschen"
 
 msgid "Your account and your personal details are deleted. This cannot be undone."
 msgstr "Ihr Konto und Ihre persönlichen Angaben werden gelöscht. Das lässt sich nicht rückgängig machen."
@@ -2430,7 +2450,8 @@ msgstr "fehlgeschlagene Anmeldung im Protokoll"
 msgid "log of failed logins"
 msgstr "Protokoll der fehlgeschlagenen Anmeldungen"
 
-# Administration, final acceptance (blocks 5c): email text list, start page, rights, portal settings.
+# Administration, final acceptance (blocks 5c): email text list, start page,
+# rights, portal settings.
 msgid "Registration"
 msgstr "Registrierung"
 
@@ -2653,7 +2674,8 @@ msgstr "Frühere Fassungen zeigen den Wortlaut früherer Texte."
 msgid "The change history shows who changed what and when."
 msgstr "Der Änderungsverlauf zeigt, wer wann was geändert hat."
 
-# Portal settings: name, website, logos, colours and the server configuration (D-073)
+# Portal settings: name, website, logos, colours and the server configuration
+# (D-073)
 msgid "Name, logo and colours"
 msgstr "Name, Logo und Farben"
 
@@ -2663,7 +2685,8 @@ msgstr "eigene Einstellungen"
 msgid "server configuration"
 msgstr "Serverkonfiguration"
 
-# Terms of Django's administration that are replaced by the words of the portal (P2-7, P2-4, P2-8).
+# Terms of Django's administration that are replaced by the words of the
+# portal (P2-7, P2-4, P2-8).
 msgid "View site"
 msgstr "Zum Portal"
 
@@ -2931,10 +2954,11 @@ msgstr "Die Einstellungen des Portals ansehen"
 msgid "Change name, logo, colours and addresses of the portal"
 msgstr "Name, Logo, Farben und Adressen des Portals ändern"
 
-# The management area (D-077). The texts of the pages are the final texts of the owner's design
-# specification (LEG-Design-Vorgaben/verwaltung); a text that the specification does not contain is
+# The management area (D-077). The texts of the pages are the final texts of
+# the owner's design
+# specification (LEG-Design-Vorgaben/verwaltung); a text that the
+# specification does not contain is
 # the smallest neutral wording and is listed as an open point in D-077.
-
 msgid "Community"
 msgstr "Gemeinschaft"
 
@@ -2947,7 +2971,8 @@ msgstr "Übersicht"
 msgid "Settings"
 msgstr "Einstellungen"
 
-# The Django administration, named differently from the group "Management" (both would read
+# The Django administration, named differently from the group "Management"
+# (both would read
 # "Verwaltung").
 msgid "System administration"
 msgstr "Systemverwaltung"
@@ -3005,7 +3030,8 @@ msgstr "Geben Sie die %(operator)s-Nummer ein: TRA und Ziffern."
 msgid "This address already exists."
 msgstr "Diese Adresse gibt es schon."
 
-# Field names and names of the models (they appear in forms and in the lists of rights)
+# Field names and names of the models (they appear in forms and in the lists
+# of rights)
 msgid "created"
 msgstr "angelegt"
 
@@ -3266,7 +3292,8 @@ msgstr "Land geändert"
 msgid "Identifier changed"
 msgstr "Identifikator geändert"
 
-# Management area, block 2: locations (verwaltung/standorte; texts 1:1 from the owner specification)
+# Management area, block 2: locations (verwaltung/standorte; texts 1:1 from
+# the owner specification)
 msgid "Address changed"
 msgstr "Adresse geändert"
 
@@ -3607,7 +3634,8 @@ msgstr "Korrektur der Absender-Adresse übernommen"
 msgid "Sender address correction not accepted"
 msgstr "Korrektur der Absender-Adresse nicht übernommen"
 
-# Phase 2, block 3: metering points (D-079). The texts of the specification are taken 1:1; texts that the
+# Phase 2, block 3: metering points (D-079). The texts of the specification
+# are taken 1:1; texts that the
 # specification does not give are marked "invented" in D-079.
 msgid "Marked as notified"
 msgstr "Als angemeldet gesetzt"
@@ -3914,7 +3942,8 @@ msgstr "Messpunkt wiederherstellen"
 msgid "These metering points belong to the same person at the same location. They only change along if you select them here."
 msgstr "Diese Messpunkte gehören zur gleichen Person am gleichen Standort. Sie werden nur mitgewechselt, wenn Sie sie hier auswählen."
 
-# Block 4: the LEGs (D-080). The texts are the owner's (verwaltung/legs/referenz); the ones the specification does
+# Block 4: the LEGs (D-080). The texts are the owner's
+# (verwaltung/legs/referenz); the ones the specification does
 # not give are listed in D-080.
 msgid "Participants"
 msgstr "Teilnehmer"
@@ -4082,7 +4111,8 @@ msgstr "Produktionsquote geändert"
 msgid "Master data changed"
 msgstr "Stammdaten geändert"
 
-# Persons (D-081): the texts of personen/referenz and personen/detail/referenz 1:1; the others are neutral
+# Persons (D-081): the texts of personen/referenz and personen/detail/referenz
+# 1:1; the others are neutral
 # wording of the developer (listed in D-081).
 msgid "Persons"
 msgstr "Personen"
@@ -4413,8 +4443,10 @@ msgstr "Standort geändert"
 msgid "This location is archived."
 msgstr "Dieser Standort ist archiviert."
 
-# D-087: creating a person, the invitation and the changes of the customer's data by the staff. The texts of the
-# specification stay as they are ("Person anlegen", "Einladung erneut senden", "Bearbeiten", the names of the cards
+# D-087: creating a person, the invitation and the changes of the customer's
+# data by the staff. The texts of the
+# specification stay as they are ("Person anlegen", "Einladung erneut senden",
+# "Bearbeiten", the names of the cards
 # and fields); the others are listed in D-087 as invented.
 msgid "Invited"
 msgstr "Eingeladen"
@@ -4509,7 +4541,8 @@ msgstr ""
 "\n"
 "Wenn Sie diese E-Mail nicht erwarten, können Sie sie ignorieren."
 
-# Management area, work package B (D-093 to D-096): forms, assignments, navigation.
+# Management area, work package B (D-093 to D-096): forms, assignments,
+# navigation.
 msgid "Enter the last characters of the number."
 msgstr "Geben Sie die letzten Zeichen der Nummer ein."
 
@@ -5063,7 +5096,8 @@ msgstr "Wenn Sie das nicht veranlasst haben, loggen Sie sich ein, prüfen Sie di
 msgid "At %(instance_name)s an application was rolled back because the confirmation by the grid operator did not arrive in time. Please withdraw the registration at the grid operator. The details are in the management area after you log in:"
 msgstr "Bei %(instance_name)s wurde eine Anmeldung rückabgewickelt, weil die Bestätigung des Netzbetreibers nicht rechtzeitig eingetroffen ist. Bitte ziehen Sie die Anmeldung beim Netzbetreiber zurück. Die Einzelheiten finden Sie nach dem Einloggen im Verwaltungsbereich:"
 
-# ---- Management pages of the onboarding: processes, contracts, deadlines (D-103; owner design verwaltung/vorgaenge, vertraege) ----
+# ---- Management pages of the onboarding: processes, contracts, deadlines
+# (D-103; owner design verwaltung/vorgaenge, vertraege) ----
 msgid "Processes"
 msgstr "Vorgänge"
 
@@ -5800,7 +5834,8 @@ msgstr[1] "%(count)d Anmeldungen, die schon bei %(operator)s sind, werden rücka
 msgid "Time of the daily address directory run changed"
 msgstr "Uhrzeit des täglichen Laufs des Adressverzeichnisses geändert"
 
-# ---- The customer's participation: buildings, the registration wizard, the menu (D-103; LEG-Design-Vorgaben/anmeldungprozess) ----
+# ---- The customer's participation: buildings, the registration wizard, the
+# menu (D-103; LEG-Design-Vorgaben/anmeldungprozess) ----
 msgid "Customer area"
 msgstr "Kundenbereich"
 
@@ -6415,7 +6450,8 @@ msgstr "Rechnung"
 msgid "Message"
 msgstr "Mitteilung"
 
-# The rows of "Start registration" (the owner's words from the mockup anmeldung-starten).
+# The rows of "Start registration" (the owner's words from the mockup
+# anmeldung-starten).
 msgid "The address where the metering point is located."
 msgstr "Die Adresse, an der sich der Messpunkt befindet."
 
@@ -6549,8 +6585,8 @@ msgstr "Mit dem Löschen verlieren Sie den Zugang zum Portal."
 msgid "Your account will be deactivated. Your details are kept for retention reasons."
 msgstr "Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten."
 
-msgid "I know that my account will be deactivated and that this cannot be undone."
-msgstr "Ich weiss, dass mein Konto deaktiviert wird und dass das nicht rückgängig gemacht werden kann."
+msgid "I know that my account will be deleted or deactivated and that this cannot be undone."
+msgstr "Ich weiss, dass mein Konto gelöscht bzw. deaktiviert wird und dass das nicht rückgängig gemacht werden kann."
 
 msgid "You still have metering points. Deregister them first. Then you can delete your account."
 msgstr "Sie haben noch Messpunkte. Melden Sie diese zuerst ab. Danach können Sie Ihr Konto löschen."
@@ -7180,8 +7216,22 @@ msgstr "Kontoeinstellungen"
 msgid "Send a single-use recovery link valid for 24 hours. Only the account owner's confirmation removes the old password, passkeys, app and recovery codes and ends all sessions. The owner then chooses a new sign-in method."
 msgstr "Einen einmal verwendbaren Wiederherstellungslink mit 24 Stunden Gültigkeit senden. Erst die Bestätigung durch den Kontoinhaber entfernt das bisherige Passwort, Passkeys, App und Wiederherstellungscodes und beendet alle Sitzungen. Danach wählt er eine neue Anmeldemethode."
 
-msgid "Sign-in recovery was started for your account at %(instance_name)s.\n\nTo choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n\n%(two_factor_reset_url)s\n\nThe link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
-msgstr "Die Wiederherstellung der Anmeldung für Ihr Konto bei %(instance_name)s wurde gestartet.\n\nÖffnen Sie diesen Link innerhalb von %(lifetime_hours)s Stunden, um eine neue Anmeldemethode zu wählen:\n\n%(two_factor_reset_url)s\n\nDer Link kann einmal verwendet werden. Beim Öffnen ändert sich nichts. Erst die Bestätigung auf der folgenden Seite entfernt Ihr bisheriges Passwort, Passkeys, App und Wiederherstellungscodes und beendet alle Sitzungen. Wenn Sie dies nicht angefordert haben, bestätigen Sie es nicht."
+msgid ""
+"Sign-in recovery was started for your account at %(instance_name)s.\n"
+"\n"
+"To choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"The link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
+msgstr ""
+"Die Wiederherstellung der Anmeldung für Ihr Konto bei %(instance_name)s wurde gestartet.\n"
+"\n"
+"Öffnen Sie diesen Link innerhalb von %(lifetime_hours)s Stunden, um eine neue Anmeldemethode zu wählen:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"Der Link kann einmal verwendet werden. Beim Öffnen ändert sich nichts. Erst die Bestätigung auf der folgenden Seite entfernt Ihr bisheriges Passwort, Passkeys, App und Wiederherstellungscodes und beendet alle Sitzungen. Wenn Sie dies nicht angefordert haben, bestätigen Sie es nicht."
 
 msgid "Sign-in recovery of your account at %(instance_name)s was confirmed. The earlier password, passkeys, app and recovery codes no longer work, and all sessions were ended. A restricted session lets you choose and set up a new sign-in method."
 msgstr "Die Wiederherstellung der Anmeldung für Ihr Konto bei %(instance_name)s wurde bestätigt. Das bisherige Passwort, Passkeys, App und Wiederherstellungscodes funktionieren nicht mehr; alle Sitzungen wurden beendet. In einer eingeschränkten Sitzung können Sie eine neue Anmeldemethode wählen und einrichten."
@@ -7584,3 +7634,80 @@ msgstr "Mehr dazu"
 msgctxt "sign-in method"
 msgid "Passkey"
 msgstr "Passkey"
+
+msgid "Open application"
+msgstr "Offene Anmeldung"
+
+msgid "Building not chosen yet"
+msgstr "Gebäude noch nicht gewählt"
+
+msgid "Confirmed, waits for the start"
+msgstr "Bestätigt, wartet auf den Start"
+
+msgid "Go to the building"
+msgstr "Zum Gebäude"
+
+msgid "Stage"
+msgstr "Stand"
+
+msgid "Start in"
+msgstr "Startet in"
+
+msgid "EGID: %(egid)s"
+msgstr "EGID-Nummer: %(egid)s"
+
+msgid "Page through the buildings"
+msgstr "Gebäude durchblättern"
+
+msgid "Show the previous building"
+msgstr "Vorheriges Gebäude"
+
+msgid "Show the next building"
+msgstr "Nächstes Gebäude"
+
+msgid "%(days)s day"
+msgid_plural "%(days)s days"
+msgstr[0] "%(days)s Tag"
+msgstr[1] "%(days)s Tage"
+
+msgid "Please correct"
+msgstr "Bitte nachbessern"
+
+msgid "You can delete your account at any time. Running applications are withdrawn, any metering points are deregistered. Open claims remain until they are settled. This cannot be undone."
+msgstr "Sie können Ihr Konto jederzeit löschen. Laufende Anmeldungen werden zurückgezogen, etwaige Messpunkte werden abgemeldet. Offene Forderungen bleiben bis zu deren Begleichung bestehen. Dieser Vorgang kann nicht rückgängig gemacht werden."
+
+msgid "When you delete your account, the following happens automatically:"
+msgstr "Wenn Sie Ihr Konto löschen, passiert automatisch Folgendes:"
+
+msgid "An application that is not submitted yet is deleted."
+msgstr "Eine Anmeldung, die noch nicht abgeschickt ist, wird gelöscht."
+
+msgid "A submitted application is withdrawn."
+msgstr "Eine abgeschickte Anmeldung wird zurückgezogen."
+
+msgid "Your metering points are deregistered. The deregistration takes effect on the earliest possible date."
+msgstr "Ihre Messpunkte werden abgemeldet. Die Abmeldung wirkt zum frühesten möglichen Datum."
+
+msgid "You lose access to the portal."
+msgstr "Sie verlieren den Zugang zum Portal."
+
+msgid "This cancellation cannot be withdrawn or revoked."
+msgstr "Diese Kündigung kann nicht mehr zurückgezogen oder aufgehoben werden."
+
+msgid "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email."
+msgstr "Haben Sie Strom von der LEG bezogen, werden Ihnen die Kosten bis zur endgültigen Abmeldung beim Strombetreiber weiterhin am Quartalsende in Rechnung gestellt. Ihre Rechnungen erhalten Sie danach nur noch per E-Mail."
+
+msgid "All details are deleted."
+msgstr "Alle Angaben werden gelöscht."
+
+msgid "Exempt are the details that we are legally obliged to keep."
+msgstr "Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind."
+
+msgid "Authenticate yourself once more to complete the deletion."
+msgstr "Authentifizieren Sie sich noch einmal, um die Löschung abzuschliessen."
+
+msgid "Account deleted: withdraw the registration at the grid operator"
+msgstr "Konto gelöscht: Anmeldung beim Netzbetreiber zurückziehen"
+
+msgid "Account deleted: withdraw the registration at the %(operator)s"
+msgstr "Konto gelöscht: Anmeldung bei %(operator)s zurückziehen"

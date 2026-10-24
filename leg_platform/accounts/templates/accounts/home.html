@@ -2,6 +2,7 @@
 {% load i18n static management_ui %}
 {% block title %}{% translate "Start" %}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
+{% block scripts %}{{ block.super }}<script defer src="{% static 'customer/js/stage-cards.js' %}"></script>{% endblock %}
 {% block inner_class %}{% endblock %}
 {% block content %}
   <h1 class="start-title">{% blocktranslate with name=account.display_name %}Hello, {{ name }}{% endblocktranslate %}</h1>
@@ -15,7 +16,7 @@
   {% endif %}
   {% include "customer/_banners.html" %}
   {% include "customer/_status_lines.html" %}
-  {% if journey %}{% include "customer/_journey.html" %}{% endif %}
+  {% if stage and not stage.empty %}{% include "customer/_stage_cards.html" %}{% endif %}
   {% if tasks %}
     <div class="task-grid">
       {% for task in tasks %}
@@ -46,7 +47,7 @@
         </article>
       {% endfor %}
     </div>
-  {% elif not journey %}
+  {% elif not stage or stage.empty %}
     <div class="empty-state">
       <span class="empty-state-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-check"/></svg></span>
       <h2>{% translate "No open tasks" %}</h2>

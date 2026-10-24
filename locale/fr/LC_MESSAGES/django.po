@@ -297,7 +297,10 @@ msgstr "Confirmer la nouvelle adresse e-mail"
 msgid "Confirm your new email address at %(instance_name)s"
 msgstr "Confirmez votre nouvelle adresse e-mail chez %(instance_name)s"
 
-msgid "Contact information for the operator:\n\n%(contact_url)s"
+msgid ""
+"Contact information for the operator:\n"
+"\n"
+"%(contact_url)s"
 msgstr ""
 "Coordonnées de l’exploitant :\n"
 "\n"
@@ -321,7 +324,14 @@ msgstr "Modification de l’adresse e-mail : la nouvelle adresse a déjà un com
 msgid "Email address changed"
 msgstr "Adresse e-mail modifiée"
 
-msgid "Hello\n\nSomeone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n\n%(email_change_url)s\n\nThe link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
+msgid ""
+"Hello\n"
+"\n"
+"Someone requested a change to your email address at %(instance_name)s. To confirm the new address, open this link:\n"
+"\n"
+"%(email_change_url)s\n"
+"\n"
+"The link expires in %(lifetime_hours)s hours. The new address is not used until you confirm it."
 msgstr ""
 "Bonjour\n"
 "\n"
@@ -331,7 +341,10 @@ msgstr ""
 "\n"
 "Le lien est valable %(lifetime_hours)s heures. La nouvelle adresse n’est utilisée qu’après votre confirmation."
 
-msgid "Hello\n\nSomeone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
+msgid ""
+"Hello\n"
+"\n"
+"Someone tried to change an account's email address to this address at %(instance_name)s. No change was made. If this was you, use the email address already registered to log in or contact the operator."
 msgstr ""
 "Bonjour\n"
 "\n"
@@ -718,16 +731,11 @@ msgstr "Un administrateur système a aussi besoin d’un accès à l’administr
 msgid "Only active accounts can receive access to the administration."
 msgstr "Seuls les comptes actifs peuvent recevoir un accès à l’administration."
 
-msgid ""
-"Only accounts that have set up two-factor authentication can receive these "
-"rights. The person must first set up two-factor authentication in their "
-"profile."
+msgid "Only accounts that have set up two-factor authentication can receive these rights. The person must first set up two-factor authentication in their profile."
 msgstr "Seuls les comptes ayant configuré l’authentification à deux facteurs peuvent recevoir ces droits. La personne doit d’abord configurer l’authentification à deux facteurs dans son profil."
 
 #, python-format
-msgid ""
-"Customer numbers are running out: %(issued)d of %(total)d have been issued "
-"(%(percent)d%%). Once all are issued, no registration can be completed."
+msgid "Customer numbers are running out: %(issued)d of %(total)d have been issued (%(percent)d%%). Once all are issued, no registration can be completed."
 msgstr "Les numéros de client s’épuisent : %(issued)d sur %(total)d ont été attribués (%(percent)d%%). Une fois tous les numéros attribués, plus aucune inscription ne pourra être finalisée."
 
 #: leg_platform/accounts/models.py
@@ -909,9 +917,7 @@ msgstr "oui"
 msgid "Write a placeholder in curly brackets. It is replaced when the email is sent."
 msgstr "Écrivez une variable entre accolades. Elle est remplacée lors de l’envoi de l’e-mail."
 
-msgid ""
-"Web and email addresses cannot be typed; use the placeholders for addresses. "
-"The subject can only use the name of the portal."
+msgid "Web and email addresses cannot be typed; use the placeholders for addresses. The subject can only use the name of the portal."
 msgstr "Les adresses web et e-mail ne peuvent pas être saisies ; utilisez les variables pour les adresses. L’objet ne peut utiliser que le nom du portail."
 
 msgid "Placeholder"
@@ -2143,9 +2149,6 @@ msgstr "La seconde adresse doit être différente de l’adresse de connexion."
 msgid "Nothing was changed."
 msgstr "Rien n’a été modifié."
 
-msgid "I know that my account and my details will be deleted and that this cannot be undone."
-msgstr "Je sais que mon compte et mes informations seront supprimés et que cela ne peut pas être annulé."
-
 msgid "second email address"
 msgstr "seconde adresse e-mail"
 
@@ -2267,7 +2270,7 @@ msgid "Your details are deleted. We keep invoices and booking records for as lon
 msgstr "Vos informations sont supprimées. Nous conservons les factures et les justificatifs comptables aussi longtemps que la loi l’exige. Plus d’informations dans la déclaration de protection des données."
 
 msgid "Delete account permanently"
-msgstr "Supprimer définitivement le compte"
+msgstr "Supprimer le compte de façon irrévocable"
 
 msgid "Your account and your personal details are deleted. This cannot be undone."
 msgstr "Votre compte et vos données personnelles sont supprimés. Cette action est irréversible."
@@ -2950,7 +2953,6 @@ msgstr "Modifier le nom, le logo, les couleurs et les adresses du portail"
 # The management area (D-077). The texts of the pages are the final texts of the owner's design
 # specification (LEG-Design-Vorgaben/verwaltung); a text that the specification does not contain is
 # the smallest neutral wording and is listed as an open point in D-077.
-
 msgid "Community"
 msgstr "Communauté"
 
@@ -6585,8 +6587,8 @@ msgstr "En supprimant le compte, vous perdez l’accès au portail."
 msgid "Your account will be deactivated. Your details are kept for retention reasons."
 msgstr "Votre compte sera désactivé. Vos informations sont conservées afin de respecter les obligations de conservation."
 
-msgid "I know that my account will be deactivated and that this cannot be undone."
-msgstr "Je sais que mon compte sera désactivé et que cela ne peut pas être annulé."
+msgid "I know that my account will be deleted or deactivated and that this cannot be undone."
+msgstr "Je sais que mon compte sera supprimé ou désactivé et que cela ne peut pas être annulé."
 
 msgid "You still have metering points. Deregister them first. Then you can delete your account."
 msgstr "Vous avez encore des points de mesure. Désinscrivez-les d’abord. Vous pourrez ensuite supprimer votre compte."
@@ -7216,8 +7218,22 @@ msgstr "Paramètres du compte"
 msgid "Send a single-use recovery link valid for 24 hours. Only the account owner's confirmation removes the old password, passkeys, app and recovery codes and ends all sessions. The owner then chooses a new sign-in method."
 msgstr "Envoyer un lien de récupération à usage unique valable 24 heures. Seule la confirmation du titulaire supprime l’ancien mot de passe, les clés d’accès, l’application et les codes de récupération et termine toutes les sessions. Le titulaire choisit ensuite une nouvelle méthode."
 
-msgid "Sign-in recovery was started for your account at %(instance_name)s.\n\nTo choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n\n%(two_factor_reset_url)s\n\nThe link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
-msgstr "La récupération de la connexion de votre compte à %(instance_name)s a été lancée.\n\nPour choisir une nouvelle méthode, ouvrez ce lien dans les %(lifetime_hours)s heures :\n\n%(two_factor_reset_url)s\n\nCe lien est à usage unique. Son ouverture ne change rien. La confirmation sur la page suivante supprime votre ancien mot de passe, vos clés d’accès, votre application et vos codes de récupération et termine toutes les sessions. Si vous n’avez pas demandé cela, ne confirmez pas."
+msgid ""
+"Sign-in recovery was started for your account at %(instance_name)s.\n"
+"\n"
+"To choose a new sign-in method, open this link within %(lifetime_hours)s hours:\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"The link can be used once. Opening it changes nothing. Confirming on the following page removes your old password, passkeys, app and recovery codes and ends all sessions. If you did not ask for this, do not confirm it."
+msgstr ""
+"La récupération de la connexion de votre compte à %(instance_name)s a été lancée.\n"
+"\n"
+"Pour choisir une nouvelle méthode, ouvrez ce lien dans les %(lifetime_hours)s heures :\n"
+"\n"
+"%(two_factor_reset_url)s\n"
+"\n"
+"Ce lien est à usage unique. Son ouverture ne change rien. La confirmation sur la page suivante supprime votre ancien mot de passe, vos clés d’accès, votre application et vos codes de récupération et termine toutes les sessions. Si vous n’avez pas demandé cela, ne confirmez pas."
 
 msgid "Sign-in recovery of your account at %(instance_name)s was confirmed. The earlier password, passkeys, app and recovery codes no longer work, and all sessions were ended. A restricted session lets you choose and set up a new sign-in method."
 msgstr "La récupération de la connexion de votre compte à %(instance_name)s a été confirmée. L’ancien mot de passe, les clés d’accès, l’application et les codes de récupération ne fonctionnent plus ; toutes les sessions ont été terminées. Une session restreinte vous permet de choisir et configurer une nouvelle méthode."
@@ -7620,3 +7636,80 @@ msgstr "En savoir plus"
 msgctxt "sign-in method"
 msgid "Passkey"
 msgstr "Clé d’accès"
+
+msgid "Open application"
+msgstr "Demande ouverte"
+
+msgid "Building not chosen yet"
+msgstr "Bâtiment pas encore choisi"
+
+msgid "Confirmed, waits for the start"
+msgstr "Confirmé, en attente du début"
+
+msgid "Go to the building"
+msgstr "Vers le bâtiment"
+
+msgid "Stage"
+msgstr "État"
+
+msgid "Start in"
+msgstr "Début dans"
+
+msgid "EGID: %(egid)s"
+msgstr "EGID : %(egid)s"
+
+msgid "Page through the buildings"
+msgstr "Parcourir les bâtiments"
+
+msgid "Show the previous building"
+msgstr "Bâtiment précédent"
+
+msgid "Show the next building"
+msgstr "Bâtiment suivant"
+
+msgid "%(days)s day"
+msgid_plural "%(days)s days"
+msgstr[0] "%(days)s jour"
+msgstr[1] "%(days)s jours"
+
+msgid "Please correct"
+msgstr "Correction demandée"
+
+msgid "You can delete your account at any time. Running applications are withdrawn, any metering points are deregistered. Open claims remain until they are settled. This cannot be undone."
+msgstr "Vous pouvez supprimer votre compte à tout moment. Les demandes en cours sont retirées, les éventuels points de mesure sont désinscrits. Les créances ouvertes restent dues jusqu’à leur règlement. Cette opération ne peut pas être annulée."
+
+msgid "When you delete your account, the following happens automatically:"
+msgstr "Si vous supprimez votre compte, les opérations suivantes ont lieu automatiquement :"
+
+msgid "An application that is not submitted yet is deleted."
+msgstr "Une demande non encore envoyée est supprimée."
+
+msgid "A submitted application is withdrawn."
+msgstr "Une demande envoyée est retirée."
+
+msgid "Your metering points are deregistered. The deregistration takes effect on the earliest possible date."
+msgstr "Vos points de mesure sont désinscrits. La désinscription prend effet à la date possible la plus proche."
+
+msgid "You lose access to the portal."
+msgstr "Vous perdez l’accès au portail."
+
+msgid "This cancellation cannot be withdrawn or revoked."
+msgstr "Cette résiliation ne peut plus être retirée ni annulée."
+
+msgid "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email."
+msgstr "Si vous avez consommé de l’électricité de la LEG, les frais jusqu’à la désinscription définitive auprès du gestionnaire de réseau vous seront encore facturés à la fin du trimestre. Ensuite, vous ne recevrez vos factures que par e-mail."
+
+msgid "All details are deleted."
+msgstr "Toutes les données sont supprimées."
+
+msgid "Exempt are the details that we are legally obliged to keep."
+msgstr "Font exception les données dont nous sommes légalement tenus de garantir la conservation."
+
+msgid "Authenticate yourself once more to complete the deletion."
+msgstr "Authentifiez-vous une nouvelle fois pour finaliser la suppression."
+
+msgid "Account deleted: withdraw the registration at the grid operator"
+msgstr "Compte supprimé : retirer l’inscription auprès du gestionnaire de réseau"
+
+msgid "Account deleted: withdraw the registration at the %(operator)s"
+msgstr "Compte supprimé : retirer l’inscription auprès de %(operator)s"

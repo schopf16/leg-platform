@@ -86,7 +86,8 @@ class StaffCustomerFlowTests(TestCase):
         for name in ("application_building", "application_metering_points"):
             with self.subTest(name=name):
                 self.assertEqual(client.get(reverse(f"customer:{name}", args=[application.pk])).status_code, 200)
-        self.assertContains(client.get(HOME), "Ihr Weg in die LEG")
+        # The start page shows the open application as a card (customer/stage_cards.py, owner decision 2026-10-24).
+        self.assertContains(client.get(HOME), "Offene Anmeldung")
 
     def test_the_mail_of_the_application_goes_to_the_account_like_for_everybody(self):
         application, _building = draft_with_points(self.staff, number=33)
@@ -155,14 +156,16 @@ class StaffAccountDeletionTests(TestCase):
         self.assertFalse(User.objects.filter(pk=staff.pk).exists())
         self.assertTrue(User.objects.filter(pk=spare.pk).exists())
 
-    def test_a_staff_account_with_a_running_point_is_blocked_before_the_proof(self):
+    def test_a_staff_account_with_a_running_point_deregisters_it_by_the_deletion(self):
+        # Owner decision 2026-10-24: the deletion is always possible; the running point is deregistered by itself.
         staff = staff_user("blocked.staff@example.org")
-        active_point(1, staff, self.location)
+        point = active_point(1, staff, self.location)
 
         response = delete_account(login(staff), staff)
 
-        self.assertRedirects(response, f"{PROFILE}#card-delete", fetch_redirect_response=False)
-        self.assertEqual(User.objects.get(pk=staff.pk).status, User.Status.ACTIVE)
+        self.assertContains(response, "Ihr Konto wurde deaktiviert")
+        self.assertEqual(User.objects.get(pk=staff.pk).status, User.Status.DEACTIVATED)
+        self.assertTrue(deregistrations.Deregistration.objects.filter(person=staff, items__metering_point=point).exists())
 
     def test_once_the_deregistration_is_started_a_staff_account_is_deactivated_and_keeps_its_data(self):
         staff = staff_user("deactivated.staff@example.org")
@@ -186,7 +189,8 @@ class StaffAccountDeletionTests(TestCase):
 
         response = delete_account(login(administrator), administrator)
 
-        self.assertRedirects(response, f"{PROFILE}#card-delete", fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Das Konto konnte nicht gelöscht werden.")
         stored = User.objects.get(pk=administrator.pk)
         self.assertEqual((stored.status, stored.is_superuser, stored.is_staff), (User.Status.ACTIVE, True, True))
 
@@ -196,7 +200,8 @@ class StaffAccountDeletionTests(TestCase):
 
         response = delete_account(login(administrator), administrator)
 
-        self.assertRedirects(response, f"{PROFILE}#card-delete", fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Das Konto konnte nicht gelöscht werden.")
         self.assertEqual(User.objects.get(pk=administrator.pk).status, User.Status.ACTIVE)
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.ACCOUNT_DEACTIVATED).exists())
 
@@ -213,7 +218,7 @@ class StaffAccountDeletionTests(TestCase):
         staff = staff_user("card.staff@example.org")
         active_point(1, staff, self.location)
 
-        html = login(staff).get(f"{PROFILE}?edit=delete").content.decode()
+        html = login(staff).get(reverse("accounts:account_delete")).content.decode()
 
-        self.assertIn(f'href="{reverse("customer:deregistration_start")}?for=account_deletion"', html)
-        self.assertNotIn('name="confirm"', html)
+        self.assertIn(f'href="{reverse("customer:deregistration_start")}"', html)
+        self.assertIn('name="confirm"', html)

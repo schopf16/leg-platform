@@ -1,0 +1,60 @@
+{% load i18n %}{% comment %}
+The start page of a customer (customer/stage_cards.py): one card per stage of the open applications, and the confirmed buildings
+as a table. A card with more than one building pages through them (arrows, "1/2"); the script is customer/js/stage-cards.js and
+only pages, without a script every building of a card is shown one under the other. Context: ``stage`` (StageView).
+{% endcomment %}{% if stage.groups %}
+  <div class="stage-cards">
+    {% for group in stage.groups %}
+      <section class="stage-card{% if group.slides|length > 1 %} has-pager{% endif %}" data-stage-card aria-labelledby="stage-{{ group.key }}">
+        {% for slide in group.slides %}
+          <article class="stage-slide" data-slide>
+            {% if slide.returned %}
+              <div class="alert alert-warning stage-returned" role="status">
+                <p class="stage-returned-title"><strong>{% translate "Please correct" %}</strong></p>
+                <p>{% translate "The LEG returned your application for correction:" %}</p>
+                {% if slide.reason %}<p class="stage-returned-reason">{{ slide.reason }}</p>{% endif %}
+              </div>
+            {% endif %}
+            <div class="stage-head">
+              <div>
+                <p class="stage-eyebrow" id="stage-{{ group.key }}">{{ group.eyebrow }}</p>
+                <h2 class="stage-address">{{ slide.address }}</h2>
+                {% if slide.egid %}<p class="stage-sub">{% blocktranslate with egid=slide.egid %}EGID: {{ egid }}{% endblocktranslate %}{% if slide.name %} – {{ slide.name }}{% endif %}</p>{% endif %}
+              </div>
+              <div class="stage-pager" role="group" aria-label="{% translate 'Page through the buildings' %}">
+                <button type="button" class="stage-pager-btn" data-prev aria-label="{% translate 'Show the previous building' %}">‹</button>
+                <span class="stage-pager-count" data-count aria-live="polite">1/{{ group.slides|length }}</span>
+                <button type="button" class="stage-pager-btn" data-next aria-label="{% translate 'Show the next building' %}">›</button>
+              </div>
+            </div>
+            <progress class="path-bar" max="{{ slide.total }}" value="{{ slide.done }}" aria-label="{% blocktranslate with done=slide.done total=slide.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ slide.done }}/{{ slide.total }}</progress>
+            <ol class="step-list">
+              {% for step in slide.steps %}
+                <li><span>{{ step.label }}</span><span class="step-status"><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'now' %}warn{% else %}muted{% endif %}" aria-hidden="true"></span><span class="step-word step-word-{% if step.state == 'done' %}done{% elif step.state == 'now' %}next{% else %}open{% endif %}">{{ step.word }}</span></span></li>
+              {% endfor %}
+            </ol>
+            <div class="stage-action"><a class="btn btn-primary" href="{{ slide.url }}">{{ slide.button }}</a></div>
+          </article>
+        {% endfor %}
+      </section>
+    {% endfor %}
+  </div>
+{% endif %}
+{% if stage.confirmed %}
+  <section class="stage-table" aria-labelledby="stage-confirmed">
+    <h2 class="stage-eyebrow" id="stage-confirmed">{% translate "Confirmed" %}</h2>
+    <table>
+      <thead><tr><th scope="col">{% translate "Building" %}</th><th scope="col">{% translate "Stage" %}</th><th scope="col">{% translate "Start in" %}</th><th scope="col"><span class="visually-hidden">{% translate "Building" %}</span></th></tr></thead>
+      <tbody>
+        {% for row in stage.confirmed %}
+          <tr>
+            <td>{{ row.address }}{% if row.egid %}<span class="stage-sub">{% blocktranslate with egid=row.egid %}EGID: {{ egid }}{% endblocktranslate %}{% if row.name %} – {{ row.name }}{% endif %}</span>{% endif %}</td>
+            <td>{% translate "Confirmed, waits for the start" %}</td>
+            <td class="stage-days">{% if row.days is None %}{% translate "As soon as possible" %}{% else %}{% blocktranslate count days=row.days %}{{ days }} day{% plural %}{{ days }} days{% endblocktranslate %}{% endif %}</td>
+            <td class="stage-link"><a href="{{ row.url }}">{% translate "Go to the building" %}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}

@@ -1161,3 +1161,208 @@ span.note-warn {
     display: none !important;
   }
 }
+
+/* ---- Start page: stage cards (owner decision 2026-10-24) ---- */
+.stage-cards {
+  display: grid;
+  gap: 24px;
+  margin: 24px 0;
+}
+
+.stage-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.stage-slide {
+  display: grid;
+  gap: 12px;
+}
+
+.stage-slide[hidden] {
+  display: none;
+}
+
+.stage-card.has-pager .stage-slide + .stage-slide {
+  padding-top: 0;
+}
+
+.stage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stage-eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stage-address {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stage-sub {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.stage-pager {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.stage-card.has-pager .stage-pager {
+  display: inline-flex;
+}
+
+.stage-pager-count {
+  min-width: 3ch;
+  font-size: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.stage-pager-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stage-pager-btn:hover {
+  border-color: var(--accent);
+}
+
+.stage-pager-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stage-slide .step-list li {
+  grid-template-columns: minmax(0, 1fr) minmax(9.5rem, 15rem);
+}
+
+.stage-slide .step-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.stage-slide .step-status .dot {
+  margin-top: 4px;
+}
+
+.stage-slide .step-word {
+  white-space: normal;
+}
+
+.stage-slide .step-word-next {
+  color: var(--fg);
+}
+
+.stage-action {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.stage-table {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  margin: 24px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.stage-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.stage-table th,
+.stage-table td {
+  padding: 12px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--line);
+}
+
+.stage-table th {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.stage-table a {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.stage-days {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.stage-link {
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .stage-table table,
+  .stage-table tbody,
+  .stage-table tr,
+  .stage-table td {
+    display: block;
+  }
+  .stage-table thead {
+    display: none;
+  }
+  .stage-table td {
+    padding: 4px 0;
+    border-top: 0;
+  }
+  .stage-table tr {
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  .stage-link {
+    text-align: left;
+  }
+}
+
+.stage-returned {
+  margin: 0;
+}
+
+.stage-returned-title,
+.stage-returned p {
+  margin: 0 0 4px;
+}
+
+.stage-returned-reason {
+  white-space: pre-line;
+}

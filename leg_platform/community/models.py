@@ -831,6 +831,11 @@ class ApplicationNotice(models.Model):
         OPERATOR_DATA_CHANGED = "operator_changed", _(
             "Data changed after the registration at the grid operator: check the registration again"
         )
+        # The customer deleted the account while the registration was at the grid operator: withdraw it there, as if the
+        # customer had deregistered the buildings and points himself (owner decision 2026-10-24).
+        ACCOUNT_DELETED = "account_deleted", _(
+            "Account deleted: withdraw the registration at the grid operator"
+        )
 
     person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     kind = models.CharField(max_length=20, choices=Kind)

@@ -48,7 +48,8 @@ under the address fields (W4-01) and names the LEG as a link where the instance 
   {% else %}
     <dl class="profile-rows">
       <div class="profile-row"><dt>{% translate "Name" %}</dt><dd>{{ account.display_name }}</dd></div>
-      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}{% if address_building.egid %} · {% translate "EGID" %} {{ address_building.egid }}{% endif %}{% if address_building.locked %}<span class="profile-note d-block" id="address-locked-note">{% blocktranslate %}The address is confirmed and cannot be changed. Please contact the {{ leg }} for a change.{% endblocktranslate %}</span>{% endif %}</dd></div>
+      <div class="profile-row"><dt>{% translate "Address" %}</dt><dd>{% if account.street_address_display %}{{ account.street_address_display }}<br>{% endif %}{{ account.postal_code_display }} {{ account.town }}</dd></div>
+      {% if address_building.egid %}<div class="profile-row"><dt>{% translate "EGID" %}</dt><dd>{{ address_building.egid }}</dd></div>{% endif %}
       {% if account.organisation_name and account.first_name %}<div class="profile-row"><dt>{% translate "Company" %}</dt><dd>{{ account.organisation_name }}</dd></div>{% endif %}
       {% if account.phone_number %}<div class="profile-row"><dt>{% translate "Phone" %}</dt><dd>{{ account.phone_number_display }}</dd></div>{% endif %}
     </dl>

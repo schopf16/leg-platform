@@ -69,18 +69,20 @@ class CardLayoutTests(TestCase):
         client = Client()
         client.force_login(user)
         disable = client.get(f"{PROFILE_URL}?edit=two_factor&step=disable").content.decode()
-        delete = self.page("?edit=delete")
+        delete = client.get(reverse("accounts:account_delete")).content.decode()
 
         self.assertIn('class="btn btn-danger-outline">2FA deaktivieren</button>', disable)
-        self.assertIn('class="btn btn-danger-outline" data-gate="id_confirm">Konto endgültig löschen</button>', delete)
-        self.assertNotIn("btn btn-danger\"", disable + delete)
+        # The page "Delete account" has the filled red button that waits for the box (owner decision 2026-10-24).
+        self.assertIn('class="btn btn-danger" data-gate="id_confirm">Konto unwiderruflich löschen</button>', delete)
+        self.assertIn('name="confirm"', delete)
+        self.assertNotIn("btn btn-danger\"", disable)
 
     def test_the_code_field_says_2fa_authentication_code_and_has_a_placeholder(self):
         user, _device = create_user_with_totp("coded.person@example.org")
         client = Client()
         client.force_login(user)
 
-        for query in ("?edit=email", "?edit=password", "?edit=delete", "?edit=two_factor&step=disable"):
+        for query in ("?edit=email", "?edit=password", "?edit=two_factor&step=disable"):
             html = client.get(f"{PROFILE_URL}{query}").content.decode()
             with self.subTest(query=query):
                 self.assertRegex(html, r'<label[^>]*for="id_otp_token"[^>]*>2FA-Authentifizierungscode</label>')
@@ -95,11 +97,12 @@ class CardLayoutTests(TestCase):
         field = html[html.index('id="id_current_password"'):]
         self.assertLess(field.index("invalid-feedback"), field.index("form-hint"))
 
-    def test_the_summary_names_the_box_of_the_deletion_by_a_short_word(self):
-        response = self.client.post(reverse("accounts:account_delete"), {"current_password": PASSWORD})
+    def test_the_deletion_page_has_the_proof_and_a_box_that_is_never_ticked_after_an_error(self):
+        response = self.client.post(reverse("accounts:account_delete"), {"current_password": "wrong", "confirm": "on"})
 
-        self.assertContains(response, "Bestätigung: Bitte setzen Sie das Häkchen")
-        self.assertNotContains(response, "Ich weiss, dass mein Konto und meine Angaben gelöscht werden und das nicht rückgängig gemacht werden kann.:")
+        self.assertContains(response, 'name="current_password"')
+        box = re.search(r'<input[^>]*name="confirm"[^>]*>', response.content.decode()).group(0)
+        self.assertNotIn("checked", box)
 
     def test_the_password_card_says_aendern_and_the_second_address_says_what_it_is_for(self):
         html = self.page()

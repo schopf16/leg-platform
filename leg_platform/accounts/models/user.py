@@ -657,6 +657,16 @@ class User(AbstractBaseUser, PermissionsMixin):
                 account.save(using=using, update_fields=["secondary_email"])
             if account.retention_obligation or account._has_person_assignment(using):
                 account._change(status=self.Status.DEACTIVATED)
+                # Sign-in is gone for good: the password, the passkeys, the app and the recovery codes are deleted; the
+                # details kept under the retention duty stay (owner decision 2026-10-24).
+                from leg_platform.accounts.models.passkeys import Passkey
+                from leg_platform.accounts.models.second_factor import AuthenticatorDevice, RecoveryCodeDevice
+
+                Passkey.objects.filter(user=account).delete()
+                AuthenticatorDevice.objects.filter(user=account).delete()
+                RecoveryCodeDevice.objects.filter(user=account).delete()
+                account.set_unusable_password()
+                account.save(using=using, update_fields=["password"])
                 account.end_all_sessions()
                 self.refresh_from_db(using=using)
                 return "deactivated"
@@ -688,7 +698,14 @@ class User(AbstractBaseUser, PermissionsMixin):
                 raise AccountIntegrityError("The email address is already in use.")
             try:
                 with transaction.atomic(using=using):
-                    account._change(status=self.Status.ACTIVE)
+                    # Its sign-in was deleted with the deactivation (owner decision 2026-10-24): an account without a
+                    # password starts with the recovery, where a new sign-in method is set up (no password is invented).
+                    if account.authentication_method == self.AuthenticationMethod.PASSWORD and not account.has_usable_password():
+                        account._change(
+                            status=self.Status.ACTIVE, authentication_method=self.AuthenticationMethod.RECOVERY
+                        )
+                    else:
+                        account._change(status=self.Status.ACTIVE)
             except IntegrityError:
                 raise AccountIntegrityError(
                     "The email address is already in use."

@@ -832,10 +832,10 @@ class EmailChangeForm(ReauthenticationForm):
 
 
 class AccountDeleteForm(ReauthenticationForm):
-    """The confirmation of the deletion: the proof and the box (D-059)."""
+    """The confirmation of the deletion: the proof (D-062) and the box that says the deletion cannot be undone (owner, 2026-10-24)."""
 
     confirm = forms.BooleanField(
-        label=_("I know that my account and my details will be deleted and that this cannot be undone."),
+        label=_("I know that my account will be deleted or deactivated and that this cannot be undone."),
         error_messages={
             "required": _("Please tick the box to confirm that you want to delete your account.")
         },
@@ -844,7 +844,6 @@ class AccountDeleteForm(ReauthenticationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # The box is never shown as ticked after an error: no confirmation by habit.
-        self.fields["confirm"].summary_label = _("Confirmation")
         self.fields["confirm"].widget = forms.CheckboxInput(
             attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
         )

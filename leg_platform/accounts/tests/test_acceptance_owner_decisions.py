@@ -229,7 +229,12 @@ class WithoutASecondFactorTheConfirmationsAskForThePasswordTests(TestCase):
         for name in FORMS_B:
             with self.subTest(form=name):
                 _user, client = self.prepare(name)
-                url = f"{PROFILE}?edit=two_factor&step=setup" if name == "setup" else f"{PROFILE}?edit={name}"
+                if name == "setup":
+                    url = f"{PROFILE}?edit=two_factor&step=setup"
+                elif name == "delete":
+                    url = DELETE_URL  # its own page since 2026-10-24
+                else:
+                    url = f"{PROFILE}?edit={name}"
                 html = client.get(url).content.decode()
                 self.assertTrue(has_input(html, "current_password"))
                 self.assertFalse(has_input(html, "otp_token"))
@@ -273,7 +278,7 @@ class WithASecondFactorOnlyTheAppCodeCountsTests(TestCase):
         pages = {
             "email": f"{PROFILE}?edit=email",
             "password": f"{PROFILE}?edit=password",
-            "delete": f"{PROFILE}?edit=delete",
+            "delete": reverse("accounts:account_delete"),
             "codes": f"{PROFILE}?edit=two_factor&step=codes_new",
             "disable": f"{PROFILE}?edit=two_factor&step=disable",
         }
@@ -760,7 +765,7 @@ class FieldAttributesTests(TestCase):
         for url in (
             f"{PROFILE}?edit=email",
             f"{PROFILE}?edit=password",
-            f"{PROFILE}?edit=delete",
+            reverse("accounts:account_delete"),
             f"{PROFILE}?edit=two_factor&step=codes_new",
             f"{PROFILE}?edit=two_factor&step=disable",
             f"{PROFILE}?edit=two_factor&step=lost_phone",
@@ -781,7 +786,7 @@ class FieldAttributesTests(TestCase):
         pages = (
             (client_b, f"{PROFILE}?edit=email"),
             (client_b, f"{PROFILE}?edit=password"),
-            (client_b, f"{PROFILE}?edit=delete"),
+            (client_b, reverse("accounts:account_delete")),
             (client_b, f"{PROFILE}?edit=two_factor&step=setup"),
             (client_a, f"{PROFILE}?edit=password"),
             (client_a, f"{PROFILE}?edit=two_factor&step=lost_phone"),

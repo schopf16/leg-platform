@@ -603,10 +603,12 @@ class ProfileWalkthroughTests(TestCase):
         from leg_platform.community import deregistrations
 
         deregistrations.request_deregistration(self.mine, metering_point_ids=[active.pk], desired_date=None)
+        # The card is one sentence for every account; the page says what happens (owner decision 2026-10-24).
         html = flat(text(self.client.get(self.profile)))
-        self.assertIn("Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen erhalten.", html)
-        self.assertIn("Ihre Abmeldung läuft weiter. Die Messpunkte enden zum Termin, den die LEG bestätigt.", html)
-        self.assertNotIn("Ihr Konto und Ihre persönlichen Angaben werden gelöscht", html)
+        self.assertIn("Sie können Ihr Konto jederzeit löschen.", html)
+        self.assertNotIn("Ihr Konto wird deaktiviert", html)
+        page = flat(text(self.client.get(reverse("accounts:account_delete"))))
+        self.assertIn("Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind.", page)
 
 
 class LogOutWordTests(SimpleTestCase):

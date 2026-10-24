@@ -124,24 +124,25 @@ class HomeView(NeverCacheMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         user = self.request.user
-        journey = None
+        stage = None
         banners = []
         status_lines = []
         requested_note = ""
         from leg_platform.customer.access import is_customer
 
         if is_customer(user):
-            # The card "Your way into the LEG" (D-103): only while an application of the account is open. Staff accounts
+            # The cards of the open applications and the table of the confirmed buildings (D-103): only while an application
+            # of the account is open. Staff accounts
             # with a customer number take part and see the same page (D-113); an account without a number sees the greeting
             # and its tasks only.
             from leg_platform.community import participation
             from leg_platform.customer import banners as customer_banners
-            from leg_platform.customer import journey as customer_journey
+            from leg_platform.customer import stage_cards
 
             self.pending_messages = customer_banners.pending(user)
             banners = self.pending_messages.banners
-            journey = customer_journey.for_account(user)
-            if journey is None:
+            stage = stage_cards.for_account(user)
+            if stage.empty:
                 # A status line under the greeting where no card is shown (W1-18): the participation or a deregistration.
                 status_lines = [line for line in participation.status_lines(user) if line.kind in self.STATUS_KINDS]
                 if any(line.kind == "deregistration_requested" for line in status_lines):
@@ -157,7 +158,7 @@ class HomeView(NeverCacheMixin, TemplateView):
             account=user,
             tasks=tasks.open_tasks(user),
             address_line=user.street_address_display,
-            journey=journey,
+            stage=stage,
             banners=banners,
             status_lines=status_lines,
             requested_note=requested_note,

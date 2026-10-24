@@ -136,11 +136,8 @@ def deletion_state(user):
 
 
 def delete_form(request, data=None, retained=False):
-    """The confirmation of the deletion; for an account that is only deactivated the box says so."""
-    form = AccountDeleteForm(data, request=request) if data is not None else AccountDeleteForm(request=request)
-    if retained:
-        form.fields["confirm"].label = _("I know that my account will be deactivated and that this cannot be undone.")
-    return form
+    """The confirmation of the deletion: the one proof (D-062)."""
+    return AccountDeleteForm(data, request=request) if data is not None else AccountDeleteForm(request=request)
 
 
 def bank_context(request, editing, form):
@@ -894,48 +891,49 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
 
 
 class AccountDeleteView(ProfileCardView):
-    """Delete the account, or keep it deactivated under the retention rule (D-016).
+    """"Delete account" (owner decision 2026-10-24): a page of its own with the consequences and the one proof (D-062).
 
-    The deletion is released only when no metering point is running without a started deregistration and no registration
-    is in flight (``community.deregistrations.deletion_released``; the customer starts the deregistration from this card,
-    PROFIL.md section 6). The hook is here and not in ``User.delete_or_deactivate``: the guards of the account model stay
-    as they are. The release is checked before the proof is asked (nothing is used up) and once more under the lock of the
-    account. An account that is only deactivated is told so before (owner decision 2026-10-19, amends D-055); the answer
-    renders the result itself because the session ends.
+    The deletion is always possible. It withdraws the running applications and starts the deregistration of the running
+    metering points by itself (``community.account_deletion.prepare``). The one refusal: an application that the LEG
+    already registered at the grid operator. An account that keeps details under the retention duty is only deactivated
+    (``User.delete_or_deactivate``); its sign-in is removed in every case. The answer of a deleted account is rendered here,
+    because the session ends.
     """
 
-    def get(self, request):
-        return render_profile(request, edit="delete")
+    template_name = "accounts/account_delete.html"
 
-    @staticmethod
-    def blocked(request):
-        messages.error(
-            request,
-            _(
-                "You cannot delete your account yet: a registration is still running or a metering point is not "
-                "active yet. Withdraw the registration on the page Buildings, or wait until the metering point is "
-                "active and deregister it."
-            ),
-            extra_tags="card-delete",
-        )
-        return back_to("delete")
+    def page(self, request, form=None, blocked=False):
+        from leg_platform.customer import access as customer_access
+
+        info = deletion_state(request.user)
+        return render(request, self.template_name, {
+            "form": form or delete_form(request, retained=info["retained"]),
+            "customer": customer_access.is_customer(request.user),
+            "blocked": blocked,
+            "privacy_url": legal_links(request).privacy_url,
+        })
+
+    def get(self, request):
+        return self.page(request)
 
     def post(self, request):
+        from leg_platform.community import account_deletion
+
         info = deletion_state(request.user)
-        if not info["released"]:
-            return self.blocked(request)
         form = delete_form(request, request.POST, retained=info["retained"])
         if not form.is_valid():
-            return render_profile(request, edit="delete", forms={"delete": form})
+            if getattr(request, second_factor.SESSION_ENDED_ATTRIBUTE, False):
+                second_factor.end_session_for_wrong_codes(request)
+                return redirect("accounts:login")
+            return self.page(request, form)
         user = request.user
         addresses = user.notification_addresses()
         try:
             with transaction.atomic():
-                from leg_platform.community import customer_messages, deregistrations
+                from leg_platform.community import customer_messages
 
                 User._base_manager.select_for_update().get(pk=user.pk)
-                if not deregistrations.deletion_released(user):
-                    raise DeletionBlocked
+                account_deletion.prepare(user, actor=user)
                 # Also blanks the name in the account's queued notifications (D-068).
                 outcome = user.delete_or_deactivate()
                 if outcome == "deactivated":
@@ -949,17 +947,12 @@ class AccountDeleteView(ProfileCardView):
                 security_log.record(event, account=user, actor=user)
                 # Every address is told (D-059); the jobs hold no account key.
                 enqueue_for_account(MailJob.Kind.ACCOUNT_DELETED, user, addresses=addresses)
-        except DeletionBlocked:
-            return self.blocked(request)
+        except account_deletion.DeletionBlocked:
+            return self.page(request, blocked=True)
         except AccountIntegrityError:
-            messages.error(request, _("The account could not be deleted."), extra_tags="card-delete")
-            return back_to("delete")
+            return self.page(request, blocked=True)
         logout(request)
         return render(request, "accounts/account_deleted.html", {"deactivated": outcome == "deactivated"})
-
-
-class DeletionBlocked(Exception):
-    """The release of the deletion was withdrawn between the first check and the lock (a parallel request)."""
 
 
 def refused_change(request):

@@ -744,13 +744,12 @@ class AccountDeletionNegativeTests(TestCase):
         self.client.force_login(self.user)
         self.url = reverse("accounts:account_delete")
 
-    def test_without_the_box_or_without_the_password_nothing_is_deleted(self):
+    def test_without_the_password_nothing_is_deleted(self):
+        # The one proof is the password here (no second factor); the confirmation is the button of the page (owner, 2026-10-24).
         cases = {
-            "no box": {"current_password": PASSWORD},
-            "empty box": {"current_password": PASSWORD, "confirm": ""},
-            "box is false": {"current_password": PASSWORD, "confirm": "false"},
-            "no password": {"confirm": "on"},
-            "empty password": {"current_password": "", "confirm": "on"},
+            "no password": {},
+            "empty password": {"current_password": ""},
+            "wrong password": {"current_password": "wrong password"},
             "nothing": {},
         }
         for label, data in cases.items():

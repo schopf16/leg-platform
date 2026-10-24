@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+"Delete account" (owner decision 2026-10-24): the page after the card "Delete account" of the profile. It says what happens,
+asks for the one proof (D-062: password, number code from the app or passkey, whichever the account uses) and leads to the
+deletion. "Deregister metering points" is the way to keep the account; "Cancel" returns to the profile. Context: ``form``
+(AccountDeleteForm), ``customer`` (the account takes part: the cost note and the deregistration are shown), ``blocked`` (the LEG
+has to act first), ``privacy_url``.
+{% endcomment %}
+{% block title %}{% translate "Delete account" %}{% endblock %}
+{% block inner_class %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
+{% block scripts %}{{ block.super }}<script defer src="{% static 'js/confirm-gate.js' %}"></script>{% endblock %}
+{% block content %}
+  <div class="wizard">
+    <div>
+      <p class="page-label">{% translate "My account · Profile" %}</p>
+      <h1 class="start-title">{% translate "Delete account" %}</h1>
+    </div>
+    <section class="step-card" aria-labelledby="flow-title">
+      <h2 id="flow-title">{% translate "Really delete the account?" %}</h2>
+      {% if blocked %}
+        <div class="alert alert-danger" role="alert">{% translate "The account could not be deleted." %}</div>
+      {% else %}
+        <p>{% translate "When you delete your account, the following happens automatically:" %}</p>
+        <ul>
+          <li>{% translate "An application that is not submitted yet is deleted." %}</li>
+          <li>{% translate "A submitted application is withdrawn." %}</li>
+          <li>{% translate "Your metering points are deregistered. The deregistration takes effect on the earliest possible date." %}</li>
+          <li>{% translate "You lose access to the portal." %}</li>
+        </ul>
+        <div class="step-warning">
+          <strong>{% translate "This cancellation cannot be withdrawn or revoked." %}</strong>
+          {% if customer %}<p>{% translate "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email." %}</p>{% endif %}
+        </div>
+        <div class="step-warning">
+          <strong>{% translate "All details are deleted." %}</strong>
+          <p>{% translate "Exempt are the details that we are legally obliged to keep." %}</p>
+        </div>
+      {% endif %}
+      {% if not blocked %}
+      <form method="post" action="{% url 'accounts:account_delete' %}" novalidate>
+        {% csrf_token %}
+        <h3>{% translate "Authenticate yourself once more to complete the deletion." %}</h3>
+        {% include "accounts/_error_summary.html" %}
+        {% include "accounts/profile/_proof_fields.html" %}
+        {% include "accounts/_field.html" with field=form.confirm %}
+        <div class="step-actions">
+          <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
+          {% if customer %}<a class="btn btn-primary" href="{% url 'customer:deregistration_start' %}">{% translate "Deregister metering points" %}</a>{% endif %}
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+      {% else %}
+        <div class="step-actions">
+          <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Back to profile" %}</a>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

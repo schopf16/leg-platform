@@ -226,23 +226,24 @@ class DeregistrationDateTests(TestCase):
 class ProfileDeletionTests(TestCase):
     databases = {"default", "addresses"}
 
-    def test_the_button_says_deregister_while_points_run_and_the_confirmation_repeats_the_running_deregistration(self):
+    def test_the_page_offers_deregistration_while_points_run_and_a_running_one_does_not_block(self):
         from leg_platform.community.tests.helpers import make_location
 
         mine = customer("n11.mine@example.org")
         active_point(91, mine, make_location("Musterstrasse", "1", "3063", "Ittigen", egid=90001234))
         client = login(mine)
-        profile = reverse("accounts:profile")
-        card = text(client.get(profile))
+        # The card is one sentence and leads to the page; the page offers "Messpunkte abmelden" while points run.
+        card = text(client.get(reverse("accounts:profile")))
         card = card[card.index('id="card-delete"') :]
-        self.assertIn(">Messpunkte abmelden<", card)
-        self.assertIn("?for=account_deletion", card)
+        self.assertIn(f'href="{reverse("accounts:account_delete")}"', card)
+        page = text(client.get(reverse("accounts:account_delete")))
+        self.assertIn(">Messpunkte abmelden<", page)
+        self.assertIn(reverse("customer:deregistration_start"), page)
 
         deregistrations.request_deregistration(mine, metering_point_ids=[mine.metering_point_assignments.get().metering_point_id])
-        confirm = text(client.get(profile, {"edit": "delete"}))
-        confirm = confirm[confirm.index('id="card-delete"') :]
-        self.assertIn("Ihre Abmeldung läuft weiter. Die Messpunkte enden zum Termin, den die LEG bestätigt.", confirm)
-        self.assertIn("Ihr Konto wird deaktiviert.", confirm)
+        # A running deregistration is no longer a reason to refuse anything: the page still asks for the proof.
+        page = text(client.get(reverse("accounts:account_delete")))
+        self.assertIn("Konto unwiderruflich löschen", page)
 
 
 @tag("mariadb")
