@@ -337,7 +337,7 @@ class LostPhonePageTests(TestCase):
         for url in (
             f"{PROFILE}?edit=email",
             f"{PROFILE}?edit=password",
-            f"{PROFILE}?edit=delete",
+            reverse("accounts:account_delete"),
             f"{PROFILE}?edit=two_factor&step=codes_new",
             DISABLE_PAGE,
         ):
@@ -378,7 +378,7 @@ class LostPhonePageTests(TestCase):
         user = create_active_user("eyes@example.org")
         client = Client()
         client.force_login(user)
-        pages = [f"{PROFILE}?edit=email", f"{PROFILE}?edit=password", f"{PROFILE}?edit=delete"]
+        pages = [f"{PROFILE}?edit=email", f"{PROFILE}?edit=password", reverse("accounts:account_delete")]
         for client_, url in [(client, page) for page in pages] + [(self.client, LOST_PAGE)]:
             with self.subTest(url=url):
                 html = client_.get(url).content.decode()

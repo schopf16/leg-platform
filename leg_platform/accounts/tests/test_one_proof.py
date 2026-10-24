@@ -50,7 +50,7 @@ PAUSED = "pausiert"
 PAGES = {
     "email": f"{PROFILE}?edit=email",
     "password": f"{PROFILE}?edit=password",
-    "delete": f"{PROFILE}?edit=delete",
+    "delete": DELETE_URL,
     "codes": f"{PROFILE}?edit=two_factor&step=codes_new",
     "disable": f"{PROFILE}?edit=two_factor&step=disable",
 }
