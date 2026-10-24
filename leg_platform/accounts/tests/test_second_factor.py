@@ -1077,8 +1077,8 @@ class PasswordChangeTests(TestCase):
 
         # The cards open in place: the links lead to the state of the card (D-059).
         self.assertContains(response, "?edit=password#card-password")
-        self.assertContains(response, 'href="/profile/sign-in-method/">Anmeldung ändern</a>')
-        self.assertContains(response, ">Anmeldung</h2>")
+        self.assertContains(response, 'href="/profile/sign-in-method/">Ändern</a>')
+        self.assertContains(response, ">Anmeldemethode</h2>")
 
 
 @tag("mariadb")

@@ -7694,9 +7694,6 @@ msgstr "Vos points de mesure sont désinscrits. La désinscription prend effet �
 msgid "You lose access to the portal."
 msgstr "Vous perdez l’accès au portail."
 
-msgid "This cancellation cannot be withdrawn or revoked."
-msgstr "Cette résiliation ne peut plus être retirée ni annulée."
-
 msgid "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email."
 msgstr "Si vous avez consommé de l’électricité de la LEG, les frais jusqu’à la désinscription définitive auprès du gestionnaire de réseau vous seront encore facturés à la fin du trimestre. Ensuite, vous ne recevrez vos factures que par e-mail."
 
@@ -7714,3 +7711,9 @@ msgstr "Compte supprimé : retirer l’inscription auprès du gestionnaire de r�
 
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Compte supprimé : retirer l’inscription auprès de %(operator)s"
+
+msgid "This deletion cannot be withdrawn or revoked."
+msgstr "Cette suppression ne peut plus être retirée ni annulée."
+
+msgid "Tick the box to enable the deletion."
+msgstr "Cochez la case pour activer la suppression."

@@ -7665,9 +7665,6 @@ msgstr "I Suoi punti di misura vengono disdetti. La disdetta ha effetto alla dat
 msgid "You lose access to the portal."
 msgstr "Perde l’accesso al portale."
 
-msgid "This cancellation cannot be withdrawn or revoked."
-msgstr "Questa disdetta non può più essere ritirata né annullata."
-
 msgid "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email."
 msgstr "Se ha prelevato energia dalla LEG, i costi fino alla disdetta definitiva presso il gestore di rete continueranno a essere fatturati alla fine del trimestre. Successivamente riceverà le fatture solo via e-mail."
 
@@ -7685,3 +7682,9 @@ msgstr "Conto eliminato: ritirare la registrazione presso il gestore di rete"
 
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Conto eliminato: ritirare la registrazione presso %(operator)s"
+
+msgid "This deletion cannot be withdrawn or revoked."
+msgstr "Questa eliminazione non può più essere ritirata né annullata."
+
+msgid "Tick the box to enable the deletion."
+msgstr "Spuntate la casella per attivare l’eliminazione."

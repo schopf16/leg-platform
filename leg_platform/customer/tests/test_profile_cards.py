@@ -327,11 +327,11 @@ class EmailAndTwoFactorCardTests(TestCase):
         user = customer("tf.cards@example.org")
         html = card(self.get(user), "two-factor")
         self.assertIn("Nur Passwort", html)
-        self.assertIn("Anmeldung ändern", html)
+        self.assertIn('href="/profile/sign-in-method/">Ändern</a>', html)
         AuthenticatorDevice.objects.create_device(user, confirmed=True)
         html = card(self.get(user), "two-factor")
         self.assertIn("Passwort und Zahlencode", html)
-        self.assertIn("Anmeldung ändern", html)
+        self.assertIn('href="/profile/sign-in-method/">Ändern</a>', html)
         self.assertIn("Neue Codes erzeugen", html)
         # Turning the number code off is a step of the flow, not a button of the card.
         self.assertNotIn("2FA deaktivieren", html)

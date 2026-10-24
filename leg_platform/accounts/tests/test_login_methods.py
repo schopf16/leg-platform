@@ -203,7 +203,7 @@ class LoginMethodPageTests(CeremonyFixture, TestCase):
         html = self.client.get(PROFILE_URL).content.decode()
 
         self.assertNotIn("Zwei-Faktor-Anmeldung (2FA)", html)
-        self.assertRegex(html, r'href="/profile/sign-in-method/">Anmeldung ändern</a>')
+        self.assertRegex(html, r'href="/profile/sign-in-method/">Ändern</a>')
 
     def test_anonymous_visitors_are_sent_to_the_login(self):
         anonymous = Client()
@@ -308,7 +308,7 @@ class AdministratorLoginMethodTests(TestCase):
     def test_the_card_shows_a_change_button_for_privileged_accounts(self):
         html = self.verified().get(PROFILE_URL).content.decode()
 
-        self.assertIn(">Anmeldung ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
+        self.assertIn(">Ändern</a>", html.split('id="card-two-factor"')[1].split("</section>")[0])
 
     def test_a_restricted_session_cannot_reach_the_choice_and_is_sent_to_the_setup(self):
         newcomer = create_active_user("new.staff@example.org")

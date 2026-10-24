@@ -72,14 +72,14 @@ class CardStateTests(TestCase):
     def test_a_password_account_shows_the_status_the_sentence_and_one_button(self):
         card = self.card(self.password_user)
 
-        self.assertIn(">Anmeldung</h2>", card)
+        self.assertIn(">Anmeldemethode</h2>", card)
         self.assertIn("Nur Passwort", card)
         self.assertIn(
             "Schützen Sie Ihr Konto zusätzlich mit einem Zahlencode vom Handy. "
             "Oder ersetzen Sie das Passwort durch einen Passkey.",
             card,
         )
-        self.assertRegex(card, rf'<a class="btn btn-primary" href="{FLOW}">Anmeldung ändern</a>')
+        self.assertRegex(card, rf'<a class="btn btn-secondary-action" href="{FLOW}">Ändern</a>')
         self.assertEqual(card.count("<a "), 1)
 
     def test_a_number_code_account_shows_its_own_status_and_text(self):
@@ -87,7 +87,7 @@ class CardStateTests(TestCase):
 
         self.assertIn("Passwort und Zahlencode", card)
         self.assertIn("Sie melden sich mit Ihrem Passwort und einem Zahlencode vom Handy an.", card)
-        self.assertRegex(card, rf'href="{FLOW}">Anmeldung ändern</a>')
+        self.assertRegex(card, rf'href="{FLOW}">Ändern</a>')
         self.assertNotIn("Nur Passwort", card)
         # The turn-off is a step of the flow now: no extra button on the card.
         self.assertNotIn("2FA deaktivieren", card)
@@ -112,22 +112,22 @@ class PasskeyCardTests(CeremonyFixture, TestCase):
         html = page(self.client.get(PROFILE))
         card = html.split('id="card-two-factor"')[1].split("</section>")[0]
 
-        self.assertIn(">Anmeldung</h2>", card)
+        self.assertIn(">Anmeldemethode</h2>", card)
         self.assertRegex(
             card, r'profile-status"><span class="status-dot status-active" aria-hidden="true"></span>Passkey</span>'
         )
         self.assertNotIn("Nur Passwort", card)
         self.assertIn(reverse("accounts:passkeys"), card)
-        # One sentence, one primary button, one small link named like the one of the password card.
+        # One sentence and no filled button: the change button is in the head, like the other cards.
         self.assertIn("Sie melden sich mit einem Passkey an.", card)
-        self.assertEqual(card.count("btn-primary"), 1)
+        self.assertEqual(card.count("btn-primary"), 0)
         self.assertIn(">Passkeys verwalten</a>", card)
-        self.assertRegex(card, r'class="profile-link" href="[^"]*sign-in-method/">Anmeldung ändern</a>')
+        self.assertRegex(card, r'<a class="btn btn-secondary-action" href="[^"]*sign-in-method/">Ändern</a>')
         for text in ("App", "Wiederherstellungscodes", "Weitere Hilfe", "Synchron"):
             self.assertNotIn(text, card)
-        # The secondary button: further passkeys directly from the card (one primary, one secondary, one small link).
+        # The buttons: "Change" in the head, "Manage passkeys" and "Set up another passkey" in the body; none filled.
         self.assertIn(">Weiteren Passkey einrichten</a>", card)
-        self.assertEqual(card.count("btn-secondary-action"), 1)
+        self.assertEqual(card.count("btn-secondary-action"), 3)
         # An account without a password has no button "Anmeldung ändern" in its password card.
         self.assertNotIn("Anmeldung ändern", html.split('id="card-password"')[1].split("</section>")[0])
         self.assertFalse(sign_in_change.uses_flow(self.user))

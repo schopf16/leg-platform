@@ -29,24 +29,25 @@ has to act first), ``privacy_url``.
           <li>{% translate "You lose access to the portal." %}</li>
         </ul>
         <div class="step-warning">
-          <strong>{% translate "This cancellation cannot be withdrawn or revoked." %}</strong>
+          <strong>{% translate "This deletion cannot be withdrawn or revoked." %}</strong>
           {% if customer %}<p>{% translate "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email." %}</p>{% endif %}
         </div>
-        <div class="step-warning">
+        <div class="step-info">
           <strong>{% translate "All details are deleted." %}</strong>
           <p>{% translate "Exempt are the details that we are legally obliged to keep." %}</p>
         </div>
       {% endif %}
       {% if not blocked %}
-      <form method="post" action="{% url 'accounts:account_delete' %}" novalidate>
+      <form method="post" action="{% url 'accounts:account_delete' %}" class="wizard-form" novalidate>
         {% csrf_token %}
         <h3>{% translate "Authenticate yourself once more to complete the deletion." %}</h3>
         {% include "accounts/_error_summary.html" %}
         {% include "accounts/profile/_proof_fields.html" %}
         {% include "accounts/_field.html" with field=form.confirm %}
+        <p class="form-hint" id="confirm-gate-hint">{% translate "Tick the box to enable the deletion." %}</p>
         <div class="step-actions">
           <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
-          {% if customer %}<a class="btn btn-primary" href="{% url 'customer:deregistration_start' %}">{% translate "Deregister metering points" %}</a>{% endif %}
+          {% if customer %}<a class="btn btn-secondary-action" href="{% url 'customer:deregistration_start' %}">{% translate "Deregister metering points" %}</a>{% endif %}
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
         </div>
       </form>

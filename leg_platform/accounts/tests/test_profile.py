@@ -697,10 +697,10 @@ class TwoFactorCardTests(TestCase):
     def test_the_card_offers_the_flow_when_nothing_is_set_up(self):
         page = self.client.get(PROFILE_URL)
 
-        self.assertContains(page, ">Anmeldung</h2>")
+        self.assertContains(page, ">Anmeldemethode</h2>")
         self.assertContains(page, "Nur Passwort")
         self.assertContains(page, "Schützen Sie Ihr Konto zusätzlich mit einem Zahlencode vom Handy.")
-        self.assertRegex(page.content.decode(), r'href="/profile/sign-in-method/">Anmeldung ändern</a>')
+        self.assertRegex(page.content.decode(), r'href="/profile/sign-in-method/">Ändern</a>')
 
     def test_the_setup_has_two_steps_with_the_key_and_the_qr_code(self):
         self.assertEqual(self.start("wrong password for this account").status_code, 200)

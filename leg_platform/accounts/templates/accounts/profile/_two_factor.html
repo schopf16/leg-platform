@@ -7,9 +7,14 @@ one sentence and the button "Change sign-in" (``sign_in_flow``: a password accou
 flow is ``accounts:login_method``, ``sign_in_change.py``). The recovery codes are shown only in the answer to the
 form that made them; nothing about them is stored (D-059).
 {% endcomment %}<section class="profile-card" id="card-two-factor" aria-labelledby="card-two-factor-title"{% if tf_state != "view" %} data-state="edit"{% endif %}>
-  {% if tf_state == "view" or tf_state == "setup" %}
+  {% if tf_state == "view" and passkey_account or tf_state == "view" and second_factor_active or tf_state == "view" and sign_in_flow %}
+    <div class="profile-card-head has-action">
+      <h2 id="card-two-factor-title">{% translate "Sign-in method" %}</h2>
+      <a class="btn btn-secondary-action" href="{% url 'accounts:login_method' %}">{% translate "Change" %}</a>
+    </div>
+  {% elif tf_state == "view" or tf_state == "setup" %}
     <div class="profile-card-head">
-      <h2 id="card-two-factor-title">{% translate "Sign-in" %}</h2>
+      <h2 id="card-two-factor-title">{% translate "Sign-in method" %}</h2>
       {% if passkey_account %}
         <span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Passkey" context "sign-in flow" %}</span>
       {% elif second_factor_active %}
@@ -27,23 +32,38 @@ form that made them; nothing about them is stored (D-059).
 
   {% if tf_state == "view" %}
     {% if passkey_account %}
+      <dl class="profile-rows">
+        <div class="profile-row profile-row-status">
+          <dt>{% translate "Status" %}</dt>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Passkey" context "sign-in flow" %}</span></dd>
+        </div>
+      </dl>
       <p class="profile-text">{% translate "You sign in with a passkey." %}</p>
       <div class="profile-actions">
-        <a class="btn btn-primary" href="{% url 'accounts:passkeys' %}">{% translate "Manage passkeys" %}</a>
+        <a class="btn btn-secondary-action" href="{% url 'accounts:passkeys' %}">{% translate "Manage passkeys" %}</a>
         <a class="btn btn-secondary-action" href="{% url 'accounts:passkey_setup' %}">{% translate "Set up another passkey" %}</a>
       </div>
-      <p class="profile-note"><a class="profile-link" href="{% url 'accounts:login_method' %}">{% translate "Change sign-in" %}</a></p>
     {% elif second_factor_active %}
+      <dl class="profile-rows">
+        <div class="profile-row profile-row-status">
+          <dt>{% translate "Status" %}</dt>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot status-active" aria-hidden="true"></span>{% translate "Password and number code" %}</span></dd>
+        </div>
+      </dl>
       <p class="profile-text">{% translate "You sign in with your password and a number code from your phone." %}</p>
       <div class="profile-actions">
-        <a class="btn {% if edit %}btn-secondary-action{% else %}btn-primary{% endif %}" href="{% url 'accounts:login_method' %}">{% translate "Change sign-in" %}</a>
         <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=codes_new#card-two-factor">{% translate "Create new codes" %}</a>
       </div>
       <p class="profile-note">{% if remaining_codes %}{% blocktranslate count counter=remaining_codes %}You have {{ counter }} unused recovery code.{% plural %}You have {{ counter }} unused recovery codes.{% endblocktranslate %}{% else %}{% translate "You have no unused recovery codes left. Create new ones." %}{% endif %}</p>
       {% if second_factor_required %}<p class="profile-note">{% translate "Your account must use a number code. It cannot be turned off." %}</p>{% endif %}
     {% elif sign_in_flow %}
+      <dl class="profile-rows">
+        <div class="profile-row profile-row-status">
+          <dt>{% translate "Status" %}</dt>
+          <dd class="profile-row-end"><span class="profile-status"><span class="status-dot" aria-hidden="true"></span>{% translate "Password only" %}</span></dd>
+        </div>
+      </dl>
       <p class="profile-text">{% translate "Protect your account additionally with a number code from your phone. Or replace the password with a passkey." %}</p>
-      <div class="profile-actions"><a class="btn {% if edit %}btn-secondary-action{% else %}btn-primary{% endif %}" href="{% url 'accounts:login_method' %}">{% translate "Change sign-in" %}</a></div>
     {% else %}
       <p class="profile-text">{% translate "You sign in with your password only. With a code from an app you protect your account additionally. This is voluntary." %}</p>
       <div class="profile-actions"><a class="btn {% if edit %}btn-secondary-action{% else %}btn-primary{% endif %}" href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=choose#card-two-factor">{% translate "Change" %}</a></div>

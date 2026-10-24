@@ -660,9 +660,9 @@ class ManagePasskeysTests(WizardFixture, TestCase):
         card = self.get(PROFILE).content.decode().split('id="card-two-factor"')[1].split("</section>")[0]
         self.assertIn(">Passkey<", card.replace("\n", "").replace("  ", ""))
         self.assertIn("You sign in with a passkey.", card)
-        self.assertEqual(card.count("btn-primary"), 1)
-        self.assertIn(f'<a class="btn btn-primary" href="{MANAGE}">Manage passkeys</a>', card)
-        self.assertIn(">Change sign-in</a>", card)
+        self.assertEqual(card.count("btn-primary"), 0)
+        self.assertIn(f'<a class="btn btn-secondary-action" href="{MANAGE}">Manage passkeys</a>', card)
+        self.assertIn('href="/profile/sign-in-method/">Change</a>', card)
         self.assertIn(f'href="{SETUP}"', card)
         self.assertIn(">Set up another passkey</a>", card)
         for text in ("More help", "<details", "strongly recommend", "localhost", "App", "app ", "recovery codes"):

@@ -449,14 +449,14 @@ class TwoFactorPageTests(TestCase):
 
         response = self.client.get(PROFILE_URL)
 
-        self.assertContains(response, ">Anmeldung</h2>")
+        self.assertContains(response, ">Anmeldemethode</h2>")
         self.assertContains(response, "Nur Passwort")
         self.assertContains(
             response,
             "Schützen Sie Ihr Konto zusätzlich mit einem Zahlencode vom Handy. "
             "Oder ersetzen Sie das Passwort durch einen Passkey.",
         )
-        self.assertContains(response, "Anmeldung ändern</a>")
+        self.assertContains(response, "Ändern</a>")
 
     def test_the_card_with_a_second_factor_counts_the_recovery_codes_and_changes_in_the_flow(self):
         user, _device = create_user_with_totp()

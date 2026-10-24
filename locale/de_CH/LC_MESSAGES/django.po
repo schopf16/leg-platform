@@ -7691,9 +7691,6 @@ msgstr "Ihre Messpunkte werden abgemeldet. Die Abmeldung wirkt zum frühesten m�
 msgid "You lose access to the portal."
 msgstr "Sie verlieren den Zugang zum Portal."
 
-msgid "This cancellation cannot be withdrawn or revoked."
-msgstr "Diese Kündigung kann nicht mehr zurückgezogen oder aufgehoben werden."
-
 msgid "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email."
 msgstr "Haben Sie Strom von der LEG bezogen, werden Ihnen die Kosten bis zur endgültigen Abmeldung beim Strombetreiber weiterhin am Quartalsende in Rechnung gestellt. Ihre Rechnungen erhalten Sie danach nur noch per E-Mail."
 
@@ -7711,3 +7708,9 @@ msgstr "Konto gelöscht: Anmeldung beim Netzbetreiber zurückziehen"
 
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Konto gelöscht: Anmeldung bei %(operator)s zurückziehen"
+
+msgid "This deletion cannot be withdrawn or revoked."
+msgstr "Diese Löschung kann nicht mehr zurückgezogen oder aufgehoben werden."
+
+msgid "Tick the box to enable the deletion."
+msgstr "Kästchen anklicken, um die Löschung freizugeben."
