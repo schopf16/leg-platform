@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core import mail
+from django.core.mail import EmailMessage
 from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 
@@ -117,8 +118,7 @@ class ContactTests(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_a_failed_delivery_is_shown_and_the_number_is_not_saved(self):
-        with patch("leg_platform.customer.contact.get_connection") as connection:
-            connection.return_value.send_messages.side_effect = GraphEmailError("refused")
+        with patch.object(EmailMessage, "send", side_effect=GraphEmailError("refused")):
             response = self.post(reply_by="phone", phone="079 123 45 67")
         self.assertIn("Die Nachricht konnte nicht gesendet werden.", response.content.decode())
         self.mine.refresh_from_db()

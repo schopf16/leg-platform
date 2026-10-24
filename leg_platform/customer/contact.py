@@ -8,7 +8,7 @@ delivery raises and the view shows a refusal.
 
 import phonenumbers
 from django.conf import settings
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import EmailMessage
 from django.utils import translation
 from django.utils.translation import gettext as _
 
@@ -81,5 +81,8 @@ def send(person, data):
                 body=_("This is a copy of the message you sent to the LEG:") + "\n\n" + data["message"],
                 to=[person.email],
             ))
-    get_connection().send_messages(messages)
+    # One message after the other: the message to the LEG goes first, the copy second (Django 6.1 deprecates
+    # get_connection(); the project sends every email with EmailMessage.send).
+    for message in messages:
+        message.send(fail_silently=False)
     return phone
