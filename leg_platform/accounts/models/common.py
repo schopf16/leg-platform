@@ -83,6 +83,17 @@ def validate_account_email(email):
         raise ValueError(f"The email address is longer than {EMAIL_MAX_LENGTH} characters.")
 
 
+def validate_sender_address(value):
+    """One address in the strict sender pattern of the environment module (D-116); no display name, no list."""
+    from leg_platform.environment import is_valid_sender_address
+
+    if value and not is_valid_sender_address(value):
+        raise ValidationError(
+            _("Enter one complete email address, for example noreply@example.org."),
+            code="sender_address",
+        )
+
+
 def validate_https_address(value):
     """Accept only a complete https:// address without credentials (D-056)."""
     # Any parsing error (unclosed bracket, port out of range) is a refusal, never an exception.

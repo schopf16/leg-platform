@@ -34,7 +34,7 @@ from webauthn.helpers.structs import (
 )
 
 from leg_platform.accounts.digests import keyed_digest
-from leg_platform.accounts.models import Passkey, PasskeyChallenge, PasskeyIdentity, User
+from leg_platform.accounts.models import Passkey, PasskeyChallenge, PasskeyIdentity, PortalSettings, User
 
 LIFETIME = timedelta(minutes=5)
 SESSION_KEY = "passkey_binding"
@@ -44,7 +44,7 @@ MAX_CREDENTIAL_BYTES = 1024
 
 def relying_party():
     """Canonical configuration only, never Host, Origin or any other request header."""
-    parsed = urlsplit(settings.INSTANCE_BASE_URL)
+    parsed = urlsplit(PortalSettings.instance_origin())
     if (
         not parsed.hostname
         or parsed.username or parsed.password
@@ -52,7 +52,8 @@ def relying_party():
         or (parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname == "localhost"))
     ):
         raise ImproperlyConfigured(
-            "Passkeys require an HTTPS INSTANCE_BASE_URL (http://localhost is allowed locally)."
+            "Passkeys require an HTTPS address of the portal in the portal settings "
+            "(http://localhost is allowed locally)."
         )
     return parsed.hostname, f"{parsed.scheme}://{parsed.netloc}"
 

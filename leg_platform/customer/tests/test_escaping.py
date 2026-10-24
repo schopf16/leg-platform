@@ -142,7 +142,7 @@ class WizardPagesEscapeTests(TestCase):
         ApplicationMeteringPoint.objects.filter(building=building).update(name=HOSTILE)
         applications.save_bank_connection(self.mine, application, GOOD_IBAN)
         applications.accept_contract_step(
-            self.mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, application, contracts.current_version().pk, agrees_contract=True
         )
         pages = [START, BUILDINGS, reverse("customer:application_cancel", args=[application.pk])]
         pages += [step_url(application, name) for name in ("building", "metering_points", "bank_connection", "contract", "start_date")]

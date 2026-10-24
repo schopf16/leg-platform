@@ -22,6 +22,7 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import mail_queue, registration
 from leg_platform.accounts.models import MailJob, PortalSettings, User, VerificationToken
 from leg_platform.accounts.second_factor import AUTHENTICATED_AT_KEY
@@ -96,8 +97,7 @@ class RegistrationTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["taken.person@example.org"])
 
     def test_the_link_is_built_from_the_configuration_not_from_the_request(self):
-        with override_settings(INSTANCE_BASE_URL="https://portal.example.org"):
-            register(self.client)
+        register(self.client)
 
         self.assertEqual(
             mail.outbox[0].body.count("https://portal.example.org/register/verify/"), 1

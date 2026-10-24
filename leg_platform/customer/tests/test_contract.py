@@ -8,7 +8,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.community import contracts
-from leg_platform.community.models import ContractVersion
+from leg_platform.community.models import ContractAcceptance, ContractVersion
 from leg_platform.community.tests.helpers import staff_user
 from leg_platform.community.tests.onboarding import pdf
 from leg_platform.customer.tests.helpers import customer, login, publish_contract
@@ -55,7 +55,7 @@ class ContractDownloadTests(TestCase):
         self.assertEqual(self.client.get(DOWNLOAD).status_code, 404)
 
     def test_an_accepted_version_stays_available_to_that_account_only(self):
-        contracts.accept_contract(self.mine, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.mine, self.version.pk, agrees_contract=True)
         newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
         contracts.make_current(self.staff, newer)
         old = reverse("customer:contract_version_download", args=[self.version.pk])
@@ -181,17 +181,15 @@ class ContractPageTests(TestCase):
 
     def test_the_page_lists_the_current_version_and_the_versions_the_account_accepted(self):
         version = publish_contract(self.staff)
-        contracts.accept_contract(self.mine, version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.mine, version.pk, agrees_contract=True)
         newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
         contracts.make_current(self.staff, newer)
         spare = contracts.upload_version(self.staff, pdf(b"spare"), date(2026, 12, 1))
         html = login(self.mine).get(PAGE).content.decode()
         self.assertIn("Fassung vom 01.11.2026", html)
         self.assertIn("Aktuelle Fassung", html)
-        self.assertIn("Noch nicht zugestimmt", html)
+        self.assertIn('name="agrees_contract"', html)
         self.assertIn("Fassung vom 07.10.2026", html)
-        self.assertIn("Ersetzte Fassung", html)
-        self.assertIn("Sie haben am", html)
         self.assertNotIn("01.12.2026", html)
         self.assertIn(reverse("customer:contract_version_download", args=[version.pk]), html)
         self.assertNotIn(reverse("customer:contract_version_download", args=[spare.pk]), html)
@@ -199,3 +197,43 @@ class ContractPageTests(TestCase):
         other = login(customer("other.contractpage@example.org")).get(PAGE).content.decode()
         self.assertNotIn("07.10.2026", other)
         self.assertIn("01.11.2026", other)
+
+
+@tag("customer")
+class ContractAcceptPageTests(TestCase):
+    """The tick and the button under the frame on the Information page (D-114)."""
+
+    databases = {"default", "addresses"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.mine = customer("mine.contractaccept@example.org")
+        cls.staff = staff_user("staff.contractaccept@example.org")
+
+    def setUp(self):
+        self.version = publish_contract(self.staff)
+        self.url = reverse("customer:contract_accept")
+
+    def test_the_tick_stores_the_acceptance_and_shows_it_as_done(self):
+        client = login(self.mine)
+        response = client.post(self.url, {"version": self.version.pk, "agrees_contract": "on"})
+        self.assertRedirects(response, PAGE, fetch_redirect_response=False)
+        acceptance = ContractAcceptance.objects.get(person=self.mine, version=self.version)
+        self.assertTrue(acceptance.data_exchange_accepted)
+        html = client.get(PAGE).content.decode()
+        self.assertIn("Sie haben dieser Fassung bereits zugestimmt.", html)
+
+    def test_without_the_tick_nothing_is_stored(self):
+        response = login(self.mine).post(self.url, {"version": self.version.pk})
+        self.assertRedirects(response, PAGE, fetch_redirect_response=False)
+        self.assertFalse(ContractAcceptance.objects.exists())
+
+    def test_a_replaced_version_is_refused(self):
+        newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
+        contracts.make_current(self.staff, newer)
+        login(self.mine).post(self.url, {"version": self.version.pk, "agrees_contract": "on"})
+        self.assertFalse(ContractAcceptance.objects.exists())
+
+    def test_a_get_leads_back_and_stores_nothing(self):
+        self.assertRedirects(login(self.mine).get(self.url), PAGE, fetch_redirect_response=False)
+        self.assertFalse(ContractAcceptance.objects.exists())

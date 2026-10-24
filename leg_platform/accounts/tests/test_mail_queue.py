@@ -15,6 +15,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import mail_queue, rate_limits
 from leg_platform.accounts.models import (
     MailJob,
@@ -351,7 +352,7 @@ class MailRequestTests(TestCase):
         post_registration("new.person@example.org")
         run_mail_queue()
 
-        self.assertEqual(mail.outbox[0].from_email, settings.DEFAULT_FROM_EMAIL)
+        self.assertEqual(mail.outbox[0].from_email, PortalSettings.sender())
 
 
 @tag("mariadb")

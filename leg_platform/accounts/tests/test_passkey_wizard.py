@@ -20,6 +20,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import translation
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import passkey_methods, passkey_views, second_factor
 from leg_platform.accounts.models import MailJob, Passkey, SecurityEvent, User
 from leg_platform.accounts.tests import test_passkeys
@@ -82,7 +83,7 @@ class WizardFixture(CeremonyFixture):
         return list(self.user.passkeys.order_by("pk"))
 
 
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 class SetupWizardTests(WizardFixture, TestCase):
     def test_every_step_needs_the_login(self):
         anonymous = Client()
@@ -500,7 +501,7 @@ class SetupWizardTests(WizardFixture, TestCase):
                 self.assertEqual(self.get(PROFILE).status_code, 302)
 
 
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 class ManagePasskeysTests(WizardFixture, TestCase):
     def test_overview_shows_cards_with_name_creation_and_last_use_only(self):
         keys = self.passkey_user(count=2)
@@ -669,7 +670,7 @@ class ManagePasskeysTests(WizardFixture, TestCase):
             self.assertNotIn(text, card)
 
 
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 class WizardLanguageTests(WizardFixture, TestCase):
     """The texts of the new screens exist in the four languages, and none contains the letter that Swiss German does not use."""
 

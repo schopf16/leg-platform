@@ -25,9 +25,8 @@ APP_ENV_PRODUCTION = "production"
 APP_ENVS = (APP_ENV_LOCAL, APP_ENV_STAGE, APP_ENV_PRODUCTION)
 
 EMAIL_MODE_CONSOLE = "console"
-EMAIL_MODE_ALLOWLIST = "allowlist"
 EMAIL_MODE_GRAPH = "graph"
-EMAIL_MODES = (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST, EMAIL_MODE_GRAPH)
+EMAIL_MODES = (EMAIL_MODE_CONSOLE, EMAIL_MODE_GRAPH)
 
 # One year, the value Django's documentation calls common for SECURE_HSTS_SECONDS.
 DEFAULT_HSTS_SECONDS = 31536000
@@ -63,18 +62,15 @@ SECURITY_LOG_LONG_RETENTION_DAYS = 365
 # Neutral platform default; instance values belong to the configuration (D-013, D-014).
 DEFAULT_INSTANCE_NAME = "LEG Platform"
 INSTANCE_NAME_MAX_LENGTH = 100
-# Used only with APP_ENV=local, where the development server listens on this origin.
-LOCAL_INSTANCE_BASE_URL = "http://127.0.0.1:8000"
 
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
 
-# Delivery modes per APP_ENV (D-028, D-070): local allows console output (the default) and
-# delivery restricted to allowed recipients; stage and production allow only unrestricted
-# Microsoft Graph delivery, so security links never reach console or server logs and stage
+# Delivery modes per APP_ENV (D-028, D-070, D-116): local allows console output (the default); stage and
+# production allow only Microsoft Graph delivery, so security links never reach console or server logs and stage
 # behaves exactly like production.
 ALLOWED_EMAIL_MODES = {
-    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE, EMAIL_MODE_ALLOWLIST),
+    APP_ENV_LOCAL: (EMAIL_MODE_CONSOLE,),
     APP_ENV_STAGE: (EMAIL_MODE_GRAPH,),
     APP_ENV_PRODUCTION: (EMAIL_MODE_GRAPH,),
 }
@@ -95,12 +91,9 @@ class EnvironmentConfig:
     hsts_seconds: int
     hsts_include_subdomains: bool
     email_mode: str
-    email_allowed_recipients: tuple[str, ...]
     instance_name: str
-    instance_base_url: str
     instance_privacy_url: str
     instance_website_url: str
-    email_sender_address: str
     db_name: str
     db_user: str
     db_password: str
@@ -284,7 +277,7 @@ def parse_hsts_include_subdomains(env: Mapping[str, str]) -> bool:
     return _parse_bool(env, "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
 
 
-def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, ...]]:
+def parse_email(env: Mapping[str, str], app_env: str) -> str:
     mode = _get(env, "EMAIL_MODE")
     if not mode:
         # Only local development has a default; elsewhere the mode must be chosen explicitly.
@@ -300,38 +293,31 @@ def parse_email(env: Mapping[str, str], app_env: str) -> tuple[str, tuple[str, .
         raise ImproperlyConfigured(
             f"APP_ENV={app_env} allows only EMAIL_MODE={' or '.join(allowed)}; got {mode!r}."
         )
-    if app_env != APP_ENV_LOCAL and _get(env, "EMAIL_ALLOWED_RECIPIENTS"):
-        # Outside local the list would suggest a restriction that does not exist (D-070).
-        raise ImproperlyConfigured(
-            f"EMAIL_ALLOWED_RECIPIENTS must not be set with APP_ENV={app_env}: delivery is "
-            f"unrestricted there and the list would have no effect. Remove the variable."
-        )
-    recipients = parse_email_allowed_recipients(env)
-    if mode == EMAIL_MODE_ALLOWLIST and not recipients:
-        # An allowlist without entries would deliver to nobody without notice (D-028).
-        raise ImproperlyConfigured("EMAIL_MODE=allowlist requires EMAIL_ALLOWED_RECIPIENTS.")
-    return mode, recipients
+    return mode
 
 
-# One complete address: exactly one "@", a non-empty local part and a domain with at least two
-# labels; no white space, wildcards or list separators. Deliberately simple.
-_ALLOWED_RECIPIENT = re.compile(
-    r"[^@\s,*]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+"
+def is_valid_sender_address(value: str) -> bool:
+    """Whether a value is one address in the strict sender pattern (D-116: the portal settings check it too)."""
+    return bool(_SENDER_ADDRESS.fullmatch(value))
+
+
+# Settings that moved into the portal settings of the administration (D-116). A value still in the environment is
+# refused at start, so that it is never ignored silently.
+MOVED_TO_ADMINISTRATION = (
+    "INSTANCE_BASE_URL",
+    "EMAIL_SENDER_ADDRESS",
+    "CONTACT_EMAIL_ADDRESS",
+    "EMAIL_ALLOWED_RECIPIENTS",
 )
 
 
-def parse_email_allowed_recipients(env: Mapping[str, str]) -> tuple[str, ...]:
-    """Return the lower-case allowed recipients; errors name only the position of an entry
-    (addresses are personal data)."""
-    recipients = []
-    for position, entry in enumerate(_split_list(_get(env, "EMAIL_ALLOWED_RECIPIENTS")), 1):
-        if not _ALLOWED_RECIPIENT.fullmatch(entry):
+def refuse_moved_variables(env: Mapping[str, str]) -> None:
+    for name in MOVED_TO_ADMINISTRATION:
+        if _get(env, name):
             raise ImproperlyConfigured(
-                f"Entry {position} of EMAIL_ALLOWED_RECIPIENTS is not a single complete email "
-                f"address (exactly one '@', no wildcards, no domain-only entries)."
+                f"{name} is no longer read from the environment (D-116): set it in the portal settings of the "
+                f"administration and remove the variable."
             )
-        recipients.append(entry.lower())
-    return tuple(recipients)
 
 
 def is_valid_instance_name(value: str) -> bool:
@@ -389,28 +375,6 @@ def _parse_url(name: str, value: str, allowed_schemes: tuple[str, ...]) -> Split
     return parts
 
 
-def parse_instance_base_url(
-    env: Mapping[str, str], app_env: str, allowed_hosts: tuple[str, ...]
-) -> str:
-    """Return the canonical origin of the instance, used to build links in emails (D-013).
-
-    The host must be one of ALLOWED_HOSTS, so the configuration cannot point links elsewhere.
-    """
-    value = _get(env, "INSTANCE_BASE_URL")
-    if not value:
-        if app_env != APP_ENV_LOCAL:
-            raise ImproperlyConfigured("INSTANCE_BASE_URL must be set outside APP_ENV=local.")
-        return LOCAL_INSTANCE_BASE_URL
-    schemes = ("https",) if app_env != APP_ENV_LOCAL else ("https", "http")
-    parts = _parse_url("INSTANCE_BASE_URL", value, schemes)
-    if parts.path not in ("", "/") or parts.query:
-        # The application runs on its own host name, never under a path (D-025).
-        raise ImproperlyConfigured("INSTANCE_BASE_URL must be an origin without a path.")
-    if allowed_hosts and parts.hostname.lower() not in (host.lower() for host in allowed_hosts):
-        raise ImproperlyConfigured("The host of INSTANCE_BASE_URL must be in DJANGO_ALLOWED_HOSTS.")
-    return f"{parts.scheme}://{parts.netloc}"
-
-
 def parse_instance_link(env: Mapping[str, str], name: str, required: bool) -> str:
     """Return an absolute https:// URL of the instance configuration, or an empty string."""
     value = _get(env, name)
@@ -427,25 +391,6 @@ def parse_instance_link(env: Mapping[str, str], name: str, required: bool) -> st
 _SENDER_ADDRESS = re.compile(
     r"[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+"
 )
-
-
-def parse_email_sender_address(env: Mapping[str, str], base_url: str) -> str:
-    """Return the sender address of outgoing email: ``EMAIL_SENDER_ADDRESS`` or
-    ``noreply@<host of the base URL>`` (the administrator sets it later, D-006)."""
-    value = _get(env, "EMAIL_SENDER_ADDRESS")
-    if value:
-        if not _SENDER_ADDRESS.fullmatch(value):
-            raise ImproperlyConfigured(
-                "EMAIL_SENDER_ADDRESS must be one complete email address."
-            )
-        return value.lower()
-    host = urlsplit(base_url).hostname or "localhost"
-    try:
-        ip_address(host)
-    except ValueError:
-        if "." in host:
-            return f"noreply@{host.lower()}"
-    return "noreply@localhost"
 
 
 def parse_security_log_retention(env: Mapping[str, str]) -> tuple[int, int]:
@@ -579,14 +524,14 @@ def parse_log_directory(env: Mapping[str, str], app_env: str) -> str:
 
 def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     """Validate the environment and return the configuration; raise ImproperlyConfigured."""
+    refuse_moved_variables(env)
     app_env = parse_app_env(env)
     debug = parse_debug(env, app_env)
     secret_key, secret_key_fallbacks = parse_secret_keys(env, app_env)
-    email_mode, email_allowed_recipients = parse_email(env, app_env)
+    email_mode = parse_email(env, app_env)
     database = parse_database(env)
     security_log_retention = parse_security_log_retention(env)
     allowed_hosts = parse_allowed_hosts(env, app_env)
-    base_url = parse_instance_base_url(env, app_env, allowed_hosts)
     return EnvironmentConfig(
         app_env=app_env,
         debug=debug,
@@ -599,16 +544,13 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         hsts_seconds=parse_hsts_seconds(env),
         hsts_include_subdomains=parse_hsts_include_subdomains(env),
         email_mode=email_mode,
-        email_allowed_recipients=email_allowed_recipients,
         instance_name=parse_instance_name(env),
-        instance_base_url=base_url,
         # The privacy notice must be linked at registration (D-022), so it is required
         # wherever real persons register.
         instance_privacy_url=parse_instance_link(
             env, "INSTANCE_PRIVACY_URL", required=app_env != APP_ENV_LOCAL
         ),
         instance_website_url=parse_instance_link(env, "INSTANCE_WEBSITE_URL", required=False),
-        email_sender_address=parse_email_sender_address(env, base_url),
         db_name=database["DB_NAME"],
         db_user=database["DB_USER"],
         db_password=database["DB_PASSWORD"],

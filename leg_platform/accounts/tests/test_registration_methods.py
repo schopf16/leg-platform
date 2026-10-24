@@ -8,6 +8,7 @@ from django.core import mail
 from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import login_methods, passkeys, registration_methods, totp
 from leg_platform.accounts.models import (
     AccountIntegrityError,
@@ -42,7 +43,7 @@ EMAIL = "new.person@example.org"
 
 
 @tag("mariadb")
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 class RegistrationMethodTests(CeremonyFixture, TestCase):
     # Completing the registration reads the address directory (advisory check, D-033).
     databases = {"default", "addresses"}

@@ -114,8 +114,10 @@ PASSED_THROUGH = ("PATH", "SYSTEMROOT", "TEMP", "TMP", "PYTHONWARNINGS")
 # The refusals of the base child process (name -> changed variables); see CHILD_SCRIPT.
 REFUSALS = {
     "missing_email_mode": {"EMAIL_MODE": ""},
-    "console": {"EMAIL_MODE": "console", "EMAIL_ALLOWED_RECIPIENTS": "tester@example.org"},
-    "allowlist": {"EMAIL_MODE": "allowlist", "EMAIL_ALLOWED_RECIPIENTS": "tester@example.org"},
+    "console": {"EMAIL_MODE": "console"},
+    "base_url": {"INSTANCE_BASE_URL": "https://portal.example.org"},
+    "sender": {"EMAIL_SENDER_ADDRESS": "noreply@example.org"},
+    "contact": {"CONTACT_EMAIL_ADDRESS": "leg@example.org"},
     "allowed_recipients": {"EMAIL_ALLOWED_RECIPIENTS": "tester@example.org"},
 }
 
@@ -129,7 +131,6 @@ def child_environment(**overrides):
             "APP_ENV": "production",
             "DJANGO_SECRET_KEY": STRONG_KEY,
             "DJANGO_ALLOWED_HOSTS": "portal.example.org",
-            "INSTANCE_BASE_URL": "https://portal.example.org",
             "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
             "EMAIL_MODE": "graph",
             "DB_NAME": "leg_platform",
@@ -255,19 +256,22 @@ class ProductionSettingsModuleTests(SimpleTestCase):
             with self.subTest(app_env=app_env):
                 self.assert_refused(app_env, "missing_email_mode", "EMAIL_MODE")
 
-    def test_console_and_allowlist_refuse_start(self):
-        for app_env in PRODUCTION_GRADE_APP_ENVS:
-            for mode in ("console", "allowlist"):
-                with self.subTest(app_env=app_env, mode=mode):
-                    self.assert_refused(app_env, mode, "EMAIL_MODE=graph")
-
-    def test_allowed_recipients_refuse_start(self):
-        # The list would suggest a restriction that does not exist with Graph delivery (D-070).
+    def test_console_refuses_start(self):
         for app_env in PRODUCTION_GRADE_APP_ENVS:
             with self.subTest(app_env=app_env):
-                self.assert_refused(
-                    app_env, "allowed_recipients", "EMAIL_ALLOWED_RECIPIENTS must not be set"
-                )
+                self.assert_refused(app_env, "console", "EMAIL_MODE=graph")
+
+    def test_the_moved_addresses_refuse_start(self):
+        # D-116: the addresses of the instance live in the portal settings; a value left in the environment is refused.
+        for app_env in PRODUCTION_GRADE_APP_ENVS:
+            for key, message in (
+                ("base_url", "INSTANCE_BASE_URL"),
+                ("sender", "EMAIL_SENDER_ADDRESS"),
+                ("contact", "CONTACT_EMAIL_ADDRESS"),
+                ("allowed_recipients", "EMAIL_ALLOWED_RECIPIENTS"),
+            ):
+                with self.subTest(app_env=app_env, key=key):
+                    self.assert_refused(app_env, key, message)
 
 
 class PasswordHasherTests(SimpleTestCase):

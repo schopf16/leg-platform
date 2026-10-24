@@ -143,7 +143,7 @@ class VersionTests(TestCase):
 
     def test_a_version_with_an_acceptance_is_kept(self):
         version = publish_contract(self.staff)
-        contracts.accept_contract(self.customer, version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, version.pk, agrees_contract=True)
         newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
         contracts.make_current(self.staff, newer)
         with self.assertRaises(ApplicationError):
@@ -187,7 +187,7 @@ class AcceptanceTests(TestCase):
 
     def test_the_acceptance_stores_time_version_digest_and_the_second_tick(self):
         acceptance = contracts.accept_contract(
-            self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True
+            self.customer, self.version.pk, agrees_contract=True
         )
 
         self.assertEqual(acceptance.person, self.customer)
@@ -203,7 +203,7 @@ class AcceptanceTests(TestCase):
         from leg_platform.accounts.models import SecurityEvent
 
         self.assertFalse(type(self.customer).objects.get(pk=self.customer.pk).retention_obligation)
-        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
 
         self.customer.refresh_from_db()
         self.assertTrue(self.customer.retention_obligation)
@@ -212,41 +212,43 @@ class AcceptanceTests(TestCase):
 
     def test_a_refused_acceptance_leaves_the_flag_alone(self):
         with self.assertRaises(ApplicationError):
-            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=False)
+            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=False)
         self.assertFalse(type(self.customer).objects.get(pk=self.customer.pk).retention_obligation)
 
     def test_the_acceptance_survives_the_deletion_of_the_account(self):
-        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         self.assertEqual(type(self.customer).objects.get(pk=self.customer.pk).delete_or_deactivate(), "deactivated")
         self.assertEqual(ContractAcceptance.objects.filter(person=self.customer).count(), 1)
 
-    def test_both_ticks_are_required(self):
-        for contract, exchange in ((True, False), (False, True), (False, False), (None, True), ("on", "on")):
-            with self.subTest(contract=contract, exchange=exchange), self.assertRaises(ApplicationError) as caught:
-                contracts.accept_contract(
-                    self.customer, self.version.pk, agrees_contract=contract, agrees_data_exchange=exchange
-                )
-            self.assertEqual(caught.exception.code, "both_ticks_required")
+    def test_the_tick_is_required(self):
+        for contract in (False, None, "on"):
+            with self.subTest(contract=contract), self.assertRaises(ApplicationError) as caught:
+                contracts.accept_contract(self.customer, self.version.pk, agrees_contract=contract)
+            self.assertEqual(caught.exception.code, "agreement_required")
         self.assertEqual(ContractAcceptance.objects.count(), 0)
 
+    def test_the_acceptance_stores_the_data_exchange_as_part_of_the_contract(self):
+        acceptance = contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
+        self.assertTrue(acceptance.data_exchange_accepted)
+
     def test_once_per_person_and_version(self):
-        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         with self.assertRaises(ApplicationError) as caught:
-            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         self.assertEqual(caught.exception.code, "already_accepted")
 
     def test_a_version_that_is_not_current_any_more_is_refused(self):
         newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
         contracts.make_current(self.staff, newer)
         with self.assertRaises(ApplicationError) as caught:
-            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         self.assertEqual(caught.exception.code, "version_changed")
         self.assertFalse(contracts.has_accepted_current(self.customer))
 
     def test_without_a_current_version_nothing_can_be_accepted(self):
         ContractVersion.objects.update(current_marker=None)
         with self.assertRaises(ApplicationError) as caught:
-            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+            contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         self.assertEqual(caught.exception.code, "no_contract")
 
     def test_an_account_without_a_customer_number_or_blocked_cannot_accept(self):
@@ -254,11 +256,11 @@ class AcceptanceTests(TestCase):
         blocked.set_status(type(blocked).Status.BLOCKED)
         for person in (blocked, None):
             with self.subTest(person=person), self.assertRaises(ApplicationError) as caught:
-                contracts.accept_contract(person, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+                contracts.accept_contract(person, self.version.pk, agrees_contract=True)
             self.assertEqual(caught.exception.code, "not_allowed")
 
     def test_a_customer_downloads_the_current_version_and_the_versions_the_account_accepted(self):
-        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         name, data = contracts.customer_download(self.customer)
         self.assertEqual((name, data), ("contract-2026-10-07.pdf", bytes(self.version.pdf)))
         self.assertEqual(contracts.customer_download(self.customer, self.version.pk)[0], name)
@@ -281,7 +283,7 @@ class AcceptanceTests(TestCase):
 
     def test_the_versions_a_customer_sees_are_the_current_one_and_the_accepted_ones(self):
         other = customer("other.versions@example.org")
-        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.customer, self.version.pk, agrees_contract=True)
         newer = contracts.upload_version(self.staff, pdf(b"newer"), date(2026, 11, 1))
         spare = contracts.upload_version(self.staff, pdf(b"spare"), date(2026, 12, 1))
         contracts.make_current(self.staff, newer)

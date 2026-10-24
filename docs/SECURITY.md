@@ -348,9 +348,7 @@ Sources: Django 6.0 docs (`SECURE_REFERRER_POLICY`, CSRF "Limitations", CSP refe
   * Stage and production allow only unrestricted Graph delivery. Security links never reach console or server logs, and stage does not differ from production.
   * A stage instance is production-grade: same security configuration, separate database and secrets, no copy of production data, no real personal data of third parties without need. A mistyped test address receives real email.
 * Local Graph delivery uses a dedicated development app registration and sender mailbox, separate from stage and production (section 7; D-020).
-  * Allowed local recipients live only in `EMAIL_ALLOWED_RECIPIENTS` on the developer machine, never in the repository.
-  * `allowlist` without recipients refuses to start. Each entry is one complete address. Debug pages and error reports mask them.
-  * A non-empty `EMAIL_ALLOWED_RECIPIENTS` is refused in stage and production (D-070).
+  * The addresses of the instance (address of the portal, sender, contact address) are stored in the portal settings; only system administrators change them (D-116).
 * Automated tests never send real email (in-memory backend) and use only reserved domains (RFC 2606: `example.com`, `example.net`, `example.org`, `.test`, `.invalid`).
 * Automatic emails do not invite a reply (noreply sender by default). A mailbox that receives replies anyway can contain personal data.
 

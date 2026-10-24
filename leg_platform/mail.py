@@ -2,7 +2,7 @@
 
 ``GraphEmailBackend`` sends through Microsoft Graph (``POST /v1.0/users/{sender}/sendMail``). The
 application authenticates with a certificate (client credentials, MSAL). It is used for the
-EMAIL_MODE values ``allowlist`` and ``graph``. It fails closed: when it is not configured or a
+EMAIL_MODE value ``graph``. It fails closed: when it is not configured or a
 message cannot be sent, ``GraphEmailError`` is raised, and email is never sent by another route
 (not Django's SMTP backend, not the console, where security links could end up in logs).
 
@@ -26,7 +26,6 @@ from requests.adapters import HTTPAdapter
 
 from leg_platform.accounts.encryption import DecryptionError
 from leg_platform.accounts.models import GraphConfiguration
-from leg_platform.environment import EMAIL_MODE_ALLOWLIST
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +84,7 @@ class GraphEmailBackend(BaseEmailBackend):
                     "The sender address differs from the configured Microsoft Graph sender; "
                     "no email was sent."
                 )
-            payload = _payload(message)
-            if payload is None:
-                logger.info("Email discarded: no To recipient is on the allowlist.")
-            else:
-                payloads.append(payload)
+            payloads.append(_payload(message))
         if not payloads:
             return 0
         token = _access_token(configuration)
@@ -155,33 +150,21 @@ def _access_token(configuration):
     return token
 
 
-def _allowed(addresses):
-    """Keep the addresses that may receive email in the current EMAIL_MODE."""
-    if settings.EMAIL_MODE != EMAIL_MODE_ALLOWLIST:
-        return list(addresses)
-    allowed = set(settings.EMAIL_ALLOWED_RECIPIENTS)
-    return [address for address in addresses if address.lower() in allowed]
-
-
 def _recipients(addresses):
     return [{"emailAddress": {"address": address}} for address in addresses]
 
 
 def _payload(message):
-    """Return the sendMail JSON body for a message, or None when no To recipient is allowed."""
+    """Return the sendMail JSON body for a message."""
     if message.attachments:
         raise GraphEmailError(
             "Attachments are not supported by the Microsoft Graph backend; no email was sent."
         )
-    if message.reply_to:
-        raise GraphEmailError(
-            "Reply-To is not supported by the Microsoft Graph backend; no email was sent."
-        )
+    for address in message.reply_to:
+        if not _plain_address(address):
+            raise GraphEmailError("A Reply-To address is not valid; no email was sent.")
     if not message.to:
         raise GraphEmailError("A message needs a To recipient; no email was sent.")
-    to = _allowed(message.to)
-    if not to:
-        return None
     if any(name.lower() == "auto-submitted" for name in message.extra_headers):
         logger.warning("Header Auto-Submitted is not sent by the Microsoft Graph backend.")
     html = next(
@@ -198,17 +181,27 @@ def _payload(message):
         body = {"contentType": "HTML", "content": message.body}
     else:
         body = {"contentType": "Text", "content": message.body}
+    graph_message = {
+        "subject": message.subject,
+        "body": body,
+        "toRecipients": _recipients(message.to),
+        "ccRecipients": _recipients(message.cc),
+        "bccRecipients": _recipients(message.bcc),
+    }
+    if message.reply_to:
+        # The replies go to these addresses (the message resource, property replyTo; D-115).
+        graph_message["replyTo"] = _recipients(message.reply_to)
     return {
-        "message": {
-            "subject": message.subject,
-            "body": body,
-            "toRecipients": _recipients(to),
-            "ccRecipients": _recipients(_allowed(message.cc)),
-            "bccRecipients": _recipients(_allowed(message.bcc)),
-        },
+        "message": graph_message,
         # Not kept in the Sent Items of the sender mailbox (sendMail, saveToSentItems).
         "saveToSentItems": False,
     }
+
+
+def _plain_address(address):
+    """True for one plain address: no display name, no line break (no header can be injected)."""
+    _, parsed = parseaddr(address)
+    return bool(parsed) and parsed == address and "\n" not in address and "\r" not in address
 
 
 def _error_code(error):

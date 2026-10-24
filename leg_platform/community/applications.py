@@ -725,14 +725,12 @@ def save_bank_connection(person, application, value):
     return changed
 
 
-def accept_contract_step(person, application, version_id, *, agrees_contract, agrees_data_exchange):
-    """The contract step: both ticks for the current version (``contracts.accept_contract``); returns the acceptance."""
+def accept_contract_step(person, application, version_id, *, agrees_contract):
+    """The contract step: the tick for the current version (``contracts.accept_contract``); returns the acceptance."""
     with transaction.atomic():
         fresh = locked_customer(person)
         draft = _lock_draft(fresh, application)
-        acceptance = contracts.accept_contract(
-            fresh, version_id, agrees_contract=agrees_contract, agrees_data_exchange=agrees_data_exchange
-        )
+        acceptance = contracts.accept_contract(fresh, version_id, agrees_contract=agrees_contract)
         _changed(draft)
     return acceptance
 

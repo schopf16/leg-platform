@@ -190,7 +190,7 @@ class BuildingsPageTests(TestCase):
         from leg_platform.community import application_staff, contracts
 
         applications.accept_contract_step(
-            newcomer, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            newcomer, application, contracts.current_version().pk, agrees_contract=True
         )
         applications.set_start(newcomer, application, asap=True)
         applications.submit(newcomer, application)
@@ -215,7 +215,7 @@ class BuildingsPageTests(TestCase):
         from leg_platform.community import contracts
 
         applications.accept_contract_step(
-            newcomer, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            newcomer, application, contracts.current_version().pk, agrees_contract=True
         )
         applications.set_start(newcomer, application, asap=True)
         applications.submit(newcomer, application)

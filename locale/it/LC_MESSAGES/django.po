@@ -2844,9 +2844,6 @@ msgstr "Colori"
 msgid "Server configuration (read only)"
 msgstr "Configurazione del server (sola lettura)"
 
-msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the base address decide where the links in emails and the security settings point, so they are not stored where the portal settings can change them."
-msgstr "Questi valori sono impostati dal gestore nella configurazione del server e non possono essere modificati qui: il nome host, gli host consentiti e l'indirizzo di base determinano dove puntano i collegamenti nelle e-mail e le impostazioni di sicurezza, perciò non sono memorizzati dove le impostazioni del portale possono modificarli."
-
 msgid "uploaded logos"
 msgstr "loghi caricati"
 
@@ -2888,9 +2885,6 @@ msgstr "Ambiente"
 msgid "Debug mode"
 msgstr "Modalità di debug"
 
-msgid "Base address of the portal (links in emails)"
-msgstr "Indirizzo di base del portale (collegamenti nelle e-mail)"
-
 msgid "Allowed host names"
 msgstr "Nomi host consentiti"
 
@@ -2902,9 +2896,6 @@ msgstr "Invio delle e-mail"
 
 msgid "Sender address of emails"
 msgstr "Indirizzo mittente delle e-mail"
-
-msgid "Number of allowed recipients (development only)"
-msgstr "Numero di destinatari consentiti (solo sviluppo)"
 
 msgid "Security log: days kept (usual, long)"
 msgstr "Log di sicurezza: giorni di conservazione (normale, lungo)"
@@ -6021,9 +6012,6 @@ msgstr "Nel frattempo il contratto è stato sostituito. Legga la nuova versione.
 msgid "The contract is not available yet. Please try again later."
 msgstr "Il contratto non è ancora disponibile. Riprovi più tardi."
 
-msgid "Please tick both boxes."
-msgstr "Spunti entrambe le caselle."
-
 msgid "Please agree to the contract first."
 msgstr "Accetti prima il contratto."
 
@@ -6186,25 +6174,12 @@ msgstr "Statuto"
 msgid "Information"
 msgstr "Informazioni"
 
-msgid "The current version and every version you agreed to."
-msgstr "La versione attuale e ogni versione che ha accettato."
-
 #, python-format
 msgid "Version of %(date)s"
 msgstr "Versione del %(date)s"
 
 msgid "Current version"
 msgstr "Versione attuale"
-
-msgid "Replaced version"
-msgstr "Versione sostituita"
-
-#, python-format
-msgid "You agreed on %(date)s"
-msgstr "Ha accettato il %(date)s"
-
-msgid "Not agreed yet"
-msgstr "Non ancora accettato"
 
 msgid "Download contract"
 msgstr "Scarica il contratto"
@@ -6281,12 +6256,6 @@ msgstr "Versione del contratto del %(date)s"
 #, python-format
 msgid "You can also find the contract under <a href=\"%(contract_url)s\">Information › Articles of association</a>."
 msgstr "Può trovare il contratto anche alla voce <a href=\"%(contract_url)s\">Informazioni › Statuto</a>."
-
-msgid "I have read the articles of association and I agree to them."
-msgstr "Ho letto lo statuto e lo accetto."
-
-msgid "I agree that the grid operator transmits my measurement data to the LEG."
-msgstr "Acconsento che il gestore di rete trasmetta i miei dati di misura alla CEL."
 
 msgid "Which metering points belong to your building?"
 msgstr "Quali punti di misura appartengono al Suo edificio?"
@@ -7688,3 +7657,154 @@ msgstr "Questa eliminazione non può più essere ritirata né annullata."
 
 msgid "Tick the box to enable the deletion."
 msgstr "Spuntate la casella per attivare l’eliminazione."
+
+msgid "Here you find the current contract and all earlier versions."
+msgstr "Qui trovate il contratto attuale e tutte le versioni precedenti."
+
+msgid "If the contract is not shown here, download the current version below."
+msgstr "Se il contratto non viene visualizzato qui, scaricate qui sotto la versione attuale."
+
+msgid "Please download the current version below to read it."
+msgstr "Per leggerlo, scaricate qui sotto la versione attuale."
+
+#, python-format
+msgid "I have read the current version of %(date)s and agree to it."
+msgstr "Ho letto la versione attuale del %(date)s e vi acconsento."
+
+msgid "Accept this version"
+msgstr "Accettare"
+
+msgid "You have already agreed to this version."
+msgstr "Avete già accettato questa versione."
+
+msgid "Versions of the contract"
+msgstr "Versioni del contratto"
+
+msgid "Please tick the box to agree."
+msgstr "Spuntate la casella per accettare."
+
+msgid "Have a question? Write to us."
+msgstr "Avete una domanda? Scriveteci."
+
+msgid "Send message"
+msgstr "Invia messaggio"
+
+msgid "The LEG is run on a voluntary basis. We will answer as soon as possible. Depending on the situation, it may take a few days until we can get in touch with you. Thank you for your understanding."
+msgstr "La LEG è gestita su base volontaria. Risponderemo il più rapidamente possibile. A seconda della situazione, potrebbero passare alcuni giorni prima che possiamo metterci in contatto con voi. Grazie per la vostra comprensione."
+
+msgid "The contact form is not available yet."
+msgstr "Il modulo di contatto non è ancora disponibile."
+
+msgid "Your message"
+msgstr "Il vostro messaggio"
+
+msgid "Please do not enter passwords or access data."
+msgstr "Non inserite password né dati di accesso."
+
+msgid "How should we answer you?"
+msgstr "Come dobbiamo rispondervi?"
+
+msgid "By email"
+msgstr "Per e-mail"
+
+msgid "By phone"
+msgstr "Per telefono"
+
+msgid "Telephone number"
+msgstr "Numero di telefono"
+
+msgid "I would like a copy of this message by email."
+msgstr "Desidero ricevere una copia di questo messaggio per e-mail."
+
+msgid "Please enter an email address."
+msgstr "Inserite un indirizzo e-mail."
+
+msgid "Please enter a valid telephone number, for example +41 79 123 45 67 or 079 123 45 67."
+msgstr "Inserite un numero di telefono valido, ad esempio +41 79 123 45 67 o 079 123 45 67."
+
+msgid "The message could not be sent. Please try again later."
+msgstr "Il messaggio non ha potuto essere inviato. Riprovate più tardi."
+
+msgid "Your message was sent to the LEG."
+msgstr "Il vostro messaggio è stato inviato alla LEG."
+
+msgid "Answer by phone: {number}"
+msgstr "Risposta per telefono: {number}"
+
+msgid "Answer by email to: {address}"
+msgstr "Risposta per e-mail a: {address}"
+
+msgid "Customer number: {number}"
+msgstr "Numero cliente: {number}"
+
+msgid "Name: {name}"
+msgstr "Nome: {name}"
+
+msgid "Copy wanted: {answer}"
+msgstr "Copia richiesta: {answer}"
+
+msgid "no"
+msgstr "no"
+
+msgid "Message:"
+msgstr "Messaggio:"
+
+msgid "Contact form: message from customer {number}"
+msgstr "Modulo di contatto: messaggio del cliente {number}"
+
+msgid "Copy of your message to the LEG"
+msgstr "Copia del vostro messaggio alla LEG"
+
+msgid "This is a copy of the message you sent to the LEG:"
+msgstr "Questa è una copia del messaggio che avete inviato alla LEG:"
+
+msgid "Please try again later."
+msgstr "Riprovate più tardi."
+
+msgid "Enter the address of the portal with https://, for example https://portal.example.org."
+msgstr "Inserite l'indirizzo del portale con https://, ad esempio https://portal.example.org."
+
+msgid "Enter only the address, without a path."
+msgstr "Inserite solo l'indirizzo, senza percorso."
+
+msgid "Enter a valid port."
+msgstr "Inserite una porta valida."
+
+msgid "The host of this address must be one of the allowed host names of the server."
+msgstr "L'host di questo indirizzo deve essere uno dei nomi host consentiti del server."
+
+msgid "Enter one complete email address, for example noreply@example.org."
+msgstr "Inserite un indirizzo e-mail completo, ad esempio noreply@example.org."
+
+msgid "address of the portal"
+msgstr "indirizzo del portale"
+
+msgid "sender address of emails"
+msgstr "indirizzo del mittente delle e-mail"
+
+msgid "address for the messages of the contact form"
+msgstr "indirizzo per i messaggi del modulo di contatto"
+
+msgid "The address with which the portal is reached, for example https://portal.example.org (only the origin, no path). Links in emails are built from it: without it no email with a link is sent. Development: http://127.0.0.1:8000."
+msgstr "L'indirizzo con cui si raggiunge il portale, ad esempio https://portal.example.org (solo l'origine, senza percorso). I link nelle e-mail ne derivano: senza questo indirizzo non viene inviata alcuna e-mail con link. Sviluppo: http://127.0.0.1:8000."
+
+msgid "The address all emails are sent from. Without it no email is sent. Use an address of the instance that does not invite a reply, for example noreply@example.org."
+msgstr "L'indirizzo da cui vengono inviate tutte le e-mail. Senza di esso non viene inviata alcuna e-mail. Usate un indirizzo dell'istanza che non invita a rispondere, ad esempio noreply@example.org."
+
+msgid "The LEG receives the messages of the contact form here. Without it the contact form is not offered."
+msgstr "La LEG riceve qui i messaggi del modulo di contatto. Senza questo indirizzo il modulo di contatto non viene offerto."
+
+msgid "Addresses of the instance"
+msgstr "Indirizzi dell'istanza"
+
+msgid "The address of the portal and the addresses of the emails. Without the address of the portal no email with a link is sent; without the sender no email is sent."
+msgstr "L'indirizzo del portale e gli indirizzi delle e-mail. Senza l'indirizzo del portale non viene inviata alcuna e-mail con link; senza mittente non viene inviata alcuna e-mail."
+
+msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the security settings decide how the portal is reached."
+msgstr "Questi valori sono impostati dall'operatore nella configurazione del server e non possono essere modificati qui: il nome host, gli host consentiti e le impostazioni di sicurezza determinano come si raggiunge il portale."
+
+msgid "https://portal.example.org"
+msgstr "https://portal.example.org"
+
+msgid "noreply@example.org"
+msgstr "noreply@example.org"

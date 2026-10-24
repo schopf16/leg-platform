@@ -221,14 +221,15 @@ def has_accepted_current(person):
     return version is not None and ContractAcceptance.objects.filter(person=person, version=version).exists()
 
 
-def accept_contract(person, version_id, *, agrees_contract, agrees_data_exchange):
-    """The account accepts the CURRENT version with both ticks; returns the acceptance.
+def accept_contract(person, version_id, *, agrees_contract):
+    """The account accepts the CURRENT version with its one tick; returns the acceptance.
 
-    ``version_id`` is the version the page showed: if another version became current meanwhile it is
-    ``ApplicationError("version_changed")`` and nothing is stored. ``both_ticks_required``, ``no_contract``,
-    ``already_accepted``. Stores no IP address, device data or password."""
-    if agrees_contract is not True or agrees_data_exchange is not True:
-        raise ApplicationError("both_ticks_required")
+    The data exchange with the grid operator is part of the contract text (owner decision 2026-10-24), so every
+    acceptance stores ``data_exchange_accepted=True``. ``version_id`` is the version the page showed: if another version
+    became current meanwhile it is ``ApplicationError("version_changed")`` and nothing is stored. ``agreement_required``,
+    ``no_contract``, ``already_accepted``. Stores no IP address, device data or password."""
+    if agrees_contract is not True:
+        raise ApplicationError("agreement_required")
     with transaction.atomic():
         fresh = locked_customer(person)
         version = ContractVersion.objects.select_for_update().defer("pdf").filter(current_marker=True).first()

@@ -33,10 +33,10 @@ SECRET_KEY_FALLBACKS = list(ENVIRONMENT.secret_key_fallbacks)
 ALLOWED_HOSTS = list(ENVIRONMENT.allowed_hosts)
 CSRF_TRUSTED_ORIGINS = list(ENVIRONMENT.csrf_trusted_origins)
 
-# Instance configuration (D-013); INSTANCE_BASE_URL is the canonical origin for links in emails.
+# Instance configuration (D-013). The addresses of the instance (origin for links, sender, contact address) are in the
+# portal settings of the administration (D-116).
 
 INSTANCE_NAME = ENVIRONMENT.instance_name
-INSTANCE_BASE_URL = ENVIRONMENT.instance_base_url
 INSTANCE_PRIVACY_URL = ENVIRONMENT.instance_privacy_url
 INSTANCE_WEBSITE_URL = ENVIRONMENT.instance_website_url
 INSTANCE_BRANDING = load_branding(os.environ)
@@ -311,9 +311,7 @@ if _instance_static_directory is not None:
 # backend, so tests never send email.
 
 EMAIL_MODE = ENVIRONMENT.email_mode
-EMAIL_ALLOWED_RECIPIENTS = list(ENVIRONMENT.email_allowed_recipients)
-DEFAULT_FROM_EMAIL = ENVIRONMENT.email_sender_address
-# Masks EMAIL_ALLOWED_RECIPIENTS (personal addresses) on debug pages and in error reports (D-028).
+# Every message names its sender explicitly (the portal settings, D-116); Django's default is never used.
 DEFAULT_EXCEPTION_REPORTER_FILTER = "leg_platform.debug.ExceptionReporterFilter"
 
 if django.VERSION >= (6, 1):

@@ -38,7 +38,7 @@ def complete_application(person, staff, *, feed_in=False, egid=90004269, number=
         applications.save_bank_connection(person, application, GOOD_IBAN)
     if not contracts.has_accepted_current(person):
         applications.accept_contract_step(
-            person, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            person, application, contracts.current_version().pk, agrees_contract=True
         )
     applications.set_start(person, application, asap=True)
     applications.submit(person, application)
@@ -125,7 +125,7 @@ class StartPageCardTests(TestCase):
     def test_a_complete_draft_is_ready_to_submit(self):
         application, _building = draft_with_points(self.mine)
         applications.accept_contract_step(
-            self.mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, application, contracts.current_version().pk, agrees_contract=True
         )
         applications.set_start(self.mine, application, asap=True)
         html = text(self.client.get(HOME))
@@ -135,7 +135,7 @@ class StartPageCardTests(TestCase):
     def test_a_submitted_application_waits_for_the_leg(self):
         application, _building = draft_with_points(self.mine)
         applications.accept_contract_step(
-            self.mine, application, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True
+            self.mine, application, contracts.current_version().pk, agrees_contract=True
         )
         applications.set_start(self.mine, application, asap=True)
         applications.submit(self.mine, application)

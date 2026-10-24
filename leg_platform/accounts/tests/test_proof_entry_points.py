@@ -12,6 +12,7 @@ from unittest.mock import patch
 from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
+from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import login_methods, passkey_methods, second_factor, sign_in_change
 from leg_platform.accounts.models import AuthenticatorDevice, MailJob, Passkey, RecoveryCode, SecurityEvent, User
 from leg_platform.accounts.tests import test_passkey_wizard as wizard
@@ -316,7 +317,7 @@ class WrongProofLimitTests(TestCase):
         self.assertTrue(AuthenticatorDevice.objects.filter(user=user, confirmed=True).exists())
 
 
-@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
+@portal_addresses(base_url="https://portal.example.org")
 @tag("mariadb")
 class PasskeyEntryPointTests(wizard.WizardFixture, TestCase):
     # Anonymous visitors

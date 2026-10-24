@@ -24,6 +24,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, tag
 from django.urls import reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import second_factor_reset
 from leg_platform.accounts.models import (
     EmailText,

@@ -1,5 +1,6 @@
 """Helpers of the portal tests. Test addresses use reserved domains only (RFC 2606)."""
 
+import functools
 import re
 import time
 from unittest.mock import patch
@@ -11,8 +12,38 @@ from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import bot_check, rate_limits
-from leg_platform.accounts.models import AuthenticatorDevice, User
+from leg_platform.accounts.models import AuthenticatorDevice, PortalSettings, User
+
+def portal_addresses(**values):
+    """Decorator for a test class or a test method: the portal settings hold these addresses (``base_url``,
+    ``sender_address``, ``contact_address``) during the test. The row is written before each test; the transaction
+    of the test rolls it back (D-116)."""
+
+    def store():
+        PortalSettings.objects.update_or_create(pk=1, defaults=values)
+
+    def decorate(target):
+        if isinstance(target, type):
+            original_setup = target.setUp
+
+            def setUp(self):
+                store()
+                original_setup(self)
+
+            target.setUp = setUp
+            return target
+
+        @functools.wraps(target)
+        def wrapper(self, *args, **kwargs):
+            store()
+            return target(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorate
+
 
 PASSWORD = "copper kettle hums beside quiet orchard"
 OTHER_PASSWORD = "paper lantern rests under silver rain"
@@ -130,7 +161,7 @@ def verification_path(message):
     match = re.search(r"^(https?://\S+/register/verify/\S+)$", message.body, re.MULTILINE)
     assert match, "The email contains no verification link."
     link = match.group(1)
-    assert link.startswith(settings.INSTANCE_BASE_URL + "/"), "The link is not built from the base URL."
+    assert link.startswith(PortalSettings.instance_origin() + "/"), "The link is not built from the base URL."
     return urlsplit(link).path
 
 

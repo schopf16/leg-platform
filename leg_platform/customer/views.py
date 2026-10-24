@@ -19,8 +19,9 @@ from leg_platform.accounts import profile_views
 from leg_platform.community import archived, buildings, contracts, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.persons import PersonError
-from leg_platform.customer import banners, forms, limits, overview, returns, texts
+from leg_platform.customer import banners, contact, forms, limits, overview, returns, texts
 from leg_platform.customer.access import CustomerAccessMixin
+from leg_platform.mail import GraphEmailError
 from leg_platform.customer.wizard import too_many_requests
 from leg_platform.downloads import pdf_attachment, pdf_inline
 
@@ -113,11 +114,82 @@ class MeteringPointNameView(CustomerAccessMixin, View):
 
 
 class ContractView(CustomerAccessMixin, View):
-    """"Articles of association" (Information): the current version and every version the account accepted."""
+    """"Articles of association" (Information): the current version and every version the account accepted, and the
+    tick for the current version (the form posts to ``ContractAcceptView``)."""
 
     def get(self, request):
-        versions = contracts.customer_versions(request.user)
-        return render(request, "customer/contract.html", {"versions": versions, "current": contracts.current_version()})
+        version = contracts.current_version()
+        return render(request, "customer/contract.html", {
+            "versions": contracts.customer_versions(request.user),
+            "current": version,
+            "acceptance": contracts.acceptance_of(request.user, version) if version else None,
+            "form": forms.ContractForm(initial={"version": version.pk if version else None}),
+        })
+
+
+class ContractAcceptView(CustomerAccessMixin, View):
+    """Saves the tick for the current version on the Information page: the same rule as the contract step of the
+    application (``contracts.accept_contract``; the version shown and the tick are checked there). A GET leads back to
+    the page."""
+
+    http_method_names = ["get", "head", "post"]
+
+    def get(self, request):
+        return redirect("customer:contract")
+
+    def post(self, request):
+        if not limits.allow_wizard(request.user):
+            return too_many_requests(request)
+        form = forms.ContractForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, texts.message("agreement_required"))
+            return redirect("customer:contract")
+        try:
+            contracts.accept_contract(
+                request.user, form.cleaned_data["version"], agrees_contract=form.cleaned_data["agrees_contract"],
+            )
+        except ApplicationError as error:
+            if error.code != "already_accepted":
+                messages.error(request, texts.message(error.code))
+        else:
+            messages.success(request, _("Saved."))
+        return redirect("customer:contract")
+
+
+class ContactView(CustomerAccessMixin, View):
+    """"Contact the LEG" (Information, D-115): one message to the LEG; the answer by mail or by phone. A phone number
+    that is sent is saved to the profile, like the card "Personal details" saves it (no confirmation). Without the
+    configured address of the LEG the page is not offered (a POST is a 404)."""
+
+    def get(self, request):
+        return self.show(request)
+
+    def post(self, request):
+        if not contact.available():
+            raise Http404
+        if not limits.allow_wizard(request.user):
+            return too_many_requests(request)
+        form = forms.ContactForm(request.POST)
+        if not form.is_valid():
+            return self.show(request, form)
+        try:
+            phone = contact.send(request.user, form.cleaned_data)
+        except (GraphEmailError, OSError):
+            messages.error(request, texts.message("contact_failed"))
+            return self.show(request, form)
+        if phone and phone != str(request.user.phone_number or ""):
+            request.user.phone_number = phone
+            request.user.save(update_fields=["phone_number"])
+        messages.success(request, _("Your message was sent to the LEG."))
+        return redirect("customer:contact")
+
+    def show(self, request, form=None):
+        user = request.user
+        form = form or forms.ContactForm(initial={
+            "email": user.email,
+            "phone": user.phone_number_display if user.phone_number else "",
+        })
+        return render(request, "customer/contact.html", {"form": form, "available": contact.available()})
 
 
 class ContractDownloadView(CustomerAccessMixin, View):

@@ -32,6 +32,8 @@ urlpatterns = [
     path("application/<int:pk>/withdraw/", wizard.ApplicationWithdrawView.as_view(), name="application_withdraw"),
     path("application/<int:pk>/change/", wizard.ApplicationChangeView.as_view(), name="application_change"),
     path("contract/", views.ContractView.as_view(), name="contract"),
+    path("contact/", views.ContactView.as_view(), name="contact"),
+    path("contract/accept/", views.ContractAcceptView.as_view(), name="contract_accept"),
     path("contract/download/", views.ContractDownloadView.as_view(), name="contract_download"),
     path("contract/read/", views.ContractReadingView.as_view(), name="contract_read"),
     path(

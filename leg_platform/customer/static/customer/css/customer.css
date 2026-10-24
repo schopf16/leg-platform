@@ -838,18 +838,143 @@ span.note-warn {
   gap: 8px;
 }
 
-/* ---- Contract page ---- */
-.contract-list {
-  list-style: none;
+/* ---- Contact page (D-115) ---- */
+.contact-page {
+  max-width: 720px;
+}
+
+.contact-form {
+  display: grid;
+  gap: 24px;
+}
+
+.contact-field {
+  display: grid;
+  gap: 8px;
   margin: 0;
   padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.contact-label {
+  font-weight: 600;
+}
+
+.contact-hint,
+.contact-note {
+  font-size: 14px;
+  margin: 0;
+}
+
+.contact-error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bad);
+}
+
+.contact-form textarea,
+.contact-form input[type="email"],
+.contact-form input[type="tel"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.contact-form textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.contact-choice {
+  gap: 12px;
+}
+
+.contact-option {
+  align-items: flex-start;
+}
+
+.contact-part {
+  display: grid;
+  gap: 8px;
+  margin-left: 32px;
+}
+
+/* ---- Contract page ---- */
+.contract-page {
+  max-width: 1100px;
+}
+
+/* The tick and the button for the current version, under the frame. */
+.contract-consent {
   display: grid;
   gap: 16px;
 }
 
-.contract-version {
-  grid-template-columns: minmax(0, 1fr) auto;
+.contract-consent.is-accepted .entry-check span {
+  color: var(--muted);
+}
+
+.contract-consent .step-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* The versions: one row each, the download as an icon. */
+.contract-list-card {
+  padding: 8px 16px;
+}
+
+.contract-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contract-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.contract-row:first-child {
+  border-top: 0;
+}
+
+.contract-row-title {
+  font-weight: 600;
+}
+
+.contract-row-tag {
+  font-weight: 400;
+}
+
+.contract-row.is-replaced .contract-row-title {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.contract-download {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: inherit;
+}
+
+.contract-download-icon {
+  width: 22px;
+  height: 22px;
 }
 
 /* The contract in the page (D-108): a bordered frame that scrolls inside; on a phone the frame is hidden (embedded PDFs
@@ -1135,11 +1260,6 @@ span.note-warn {
     justify-content: flex-start;
   }
 
-  .contract-version {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .contract-version .btn,
   .mp-progress-actions .btn {
     width: 100%;
   }

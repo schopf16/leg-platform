@@ -9,6 +9,7 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.test import RequestFactory, TestCase, override_settings, tag
 from django.urls import reverse
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.admin import PortalSettingsAdmin
 from leg_platform.accounts.models import PortalSettings, SecurityEvent, validate_https_address
 from leg_platform.accounts.portal_settings import legal_links
@@ -61,6 +62,7 @@ class AddressValidationTests(TestCase):
                 validate_https_address(value)
 
     def test_the_model_refuses_an_address_with_the_wrong_scheme_and_allows_empty(self):
+        PortalSettings.objects.all().delete()
         row = PortalSettings(privacy_url="http://www.example.org/", imprint_url="")
         with self.assertRaises(ValidationError) as caught:
             row.full_clean()
@@ -72,6 +74,7 @@ class AddressValidationTests(TestCase):
         PortalSettings.load()
         self.assertEqual(PortalSettings.load().pk, 1)
         with self.assertRaises(IntegrityError), transaction.atomic():
+            PortalSettings.objects.all().delete()
             PortalSettings.objects.create(id=2)
 
 
@@ -85,6 +88,7 @@ class LegalLinksTests(TestCase):
 
     @override_settings(INSTANCE_PRIVACY_URL="https://env.example.org/privacy")
     def test_the_setting_wins_over_the_instance_configuration(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(id=1, privacy_url=PRIVACY, imprint_url=IMPRINT)
         links = legal_links()
         self.assertEqual((links.privacy_url, links.imprint_url), (PRIVACY, IMPRINT))
@@ -112,6 +116,7 @@ class LegalLinksTests(TestCase):
             self.assertEqual(tuple(legal_links()), ("", ""))
 
     def test_the_database_is_read_once_per_request(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(id=1, privacy_url=PRIVACY)
         request = RequestFactory().get("/")
         with self.assertNumQueries(1):
@@ -121,6 +126,7 @@ class LegalLinksTests(TestCase):
 
     @override_settings(INSTANCE_PRIVACY_URL="https://env.example.org/privacy")
     def test_a_database_error_fails_safe_without_an_exception(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(id=1, privacy_url=PRIVACY, imprint_url=IMPRINT)
         with mock.patch.object(
             PortalSettings.objects, "filter", side_effect=OperationalError("down")
@@ -131,6 +137,7 @@ class LegalLinksTests(TestCase):
 
     @override_settings(INSTANCE_WEBSITE_URL=WEBSITE)
     def test_the_login_footer_has_three_items_and_the_links_open_in_a_new_tab(self):
+        PortalSettings.objects.all().delete()
         PortalSettings.objects.create(id=1, privacy_url=PRIVACY, imprint_url=IMPRINT)
         html = self.client.get(LOGIN_URL).content.decode()
         footer = html[html.index('<div class="legal-links">') :]
@@ -230,7 +237,10 @@ class PortalSettingsAdminTests(TestCase):
     def test_saving_without_a_change_records_no_event(self):
         self.client.force_login(self.administrator)
         self.client.get(self.url)
-        self.client.post(self.url, {"privacy_url": "", "imprint_url": "", "_save": "Sichern"})
+        self.client.post(self.url, {
+            "privacy_url": "", "imprint_url": "", "base_url": "https://portal.example.org",
+            "sender_address": "noreply@portal.example.org", "contact_address": "", "_save": "Sichern",
+        })
         self.assertFalse(
             SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists()
         )
@@ -245,6 +255,7 @@ class PortalSettingsAdminTests(TestCase):
         self.assertFalse(PortalSettings.objects.exists() and PortalSettings.objects.get(pk=1).privacy_url)
 
     def test_a_staff_user_has_no_access_and_nothing_is_changed(self):
+        PortalSettings.objects.all().delete()
         self.client.force_login(self.staff)
         self.assertEqual(self.client.get(self.url).status_code, 403)
         response = self.client.post(self.url, {"privacy_url": PRIVACY, "imprint_url": IMPRINT})

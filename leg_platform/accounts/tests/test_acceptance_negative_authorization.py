@@ -29,6 +29,7 @@ from django.test import Client, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
+from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import second_factor
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.models import (

@@ -115,7 +115,7 @@ class StartAndStepsTests(TestCase):
 
     def test_a_contract_accepted_before_the_application_is_already_on_file(self):
         version = publish_contract(self.staff)
-        contracts.accept_contract(self.person, version.pk, agrees_contract=True, agrees_data_exchange=True)
+        contracts.accept_contract(self.person, version.pk, agrees_contract=True)
         application = applications.start_draft(self.person)
 
         self.assertEqual(applications.progress(application).step(applications.CONTRACT).state, applications.KNOWN)
@@ -528,7 +528,7 @@ class AuthorizationTests(TestCase):
             "remove_point": lambda: applications.remove_metering_point(intruder, app, point.pk),
             "bank": lambda: applications.save_bank_connection(intruder, app, GOOD_IBAN),
             "contract": lambda: applications.accept_contract_step(
-                intruder, app, contracts.current_version().pk, agrees_contract=True, agrees_data_exchange=True),
+                intruder, app, contracts.current_version().pk, agrees_contract=True),
             "start": lambda: applications.set_start(intruder, app, asap=True),
             "submit": lambda: applications.submit(intruder, app),
             "withdraw": lambda: applications.withdraw(intruder, app),
@@ -955,6 +955,6 @@ class IdleClockTests(TestCase):
         applications.save_bank_connection(self.person, application, GOOD_IBAN)
         self.assertIsNotNone(Application.objects.get(pk=application.pk).contract_pending_since)
         applications.accept_contract_step(
-            self.person, application, version.pk, agrees_contract=True, agrees_data_exchange=True
+            self.person, application, version.pk, agrees_contract=True
         )
         self.assertIsNone(Application.objects.get(pk=application.pk).contract_pending_since)
