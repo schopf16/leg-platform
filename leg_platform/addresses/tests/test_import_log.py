@@ -272,3 +272,18 @@ class CountProgressTests(TestCase):
             self.assertEqual(count_rows(archive, "data.csv", 10), 3)
             self.assertIsNone(count_rows(archive, "data.csv", 2))
             self.assertIsNone(count_rows(archive, "missing.csv", 10))
+
+
+class NumberFormatTests(TestCase):
+    """Design review 6: one number format everywhere (DESIGN section 8): the Swiss thousands separator and one decimal
+    for megabytes."""
+
+    def test_counts_use_the_typographic_apostrophe(self):
+        self.assertEqual(status.count_text(341981), "341’981")
+        self.assertEqual(status.count_text(1203456), "1’203’456")
+
+    def test_megabytes_have_one_decimal_and_the_separator(self):
+        self.assertEqual(status.megabytes_text(int(1269.9 * 1024 * 1024)), "1’269.9")
+        self.assertEqual(status.megabytes_text(100 * 1024 * 1024), "100.0")
+        self.assertEqual(status.megabytes_text(None), "")
+

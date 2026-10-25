@@ -272,7 +272,7 @@ class RunnerTests(TransactionTestCase):
             self.assertTrue(runner.wait_for_end(30))
         self.assertEqual((job.phase, job.bytes_done, job.bytes_total), ("downloading", 25 * 1024 * 1024, 100 * 1024 * 1024))
         self.assertEqual((page["state"], page["percent"]), ("running", 25))
-        self.assertIn("25 of 100 MB downloaded", page["detail"])
+        self.assertIn("25.0 of 100.0 MB downloaded", page["detail"])
 
     def test_only_the_import_thread_may_write_the_directory_file(self):
         seen = {}

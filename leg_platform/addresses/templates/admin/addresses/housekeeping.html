@@ -52,7 +52,7 @@
     <thead><tr><th>{% translate "Table" %}</th><th>{% translate "Before" %}</th><th>{% translate "After" %}</th></tr></thead>
     <tbody>
     {% for row in sizes %}
-      <tr><td>{{ row.name }}</td><td>{% if row.before is not None %}{{ row.before|filesizeformat }}{% else %}–{% endif %}</td><td>{% if row.after is not None %}{{ row.after|filesizeformat }}{% else %}–{% endif %}</td></tr>
+      <tr><td>{{ row.name }}</td><td>{% if row.before is not None %}{{ row.before_text }} MB{% else %}–{% endif %}</td><td>{% if row.after is not None %}{{ row.after_text }} MB{% else %}–{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table>

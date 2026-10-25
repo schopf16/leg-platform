@@ -543,8 +543,13 @@ def page_context(now=None, lines=ERROR_LINES_DEFAULT):
     now = now or timezone.now()
     status = HousekeepingStatus.objects.get_or_create(pk=1)[0]
     backup, backup_code = read_backup_status()
+    from leg_platform.addresses.status import megabytes_text
+
     sizes = [
-        {"name": name, "before": values["before"], "after": values["after"]}
+        {
+            "name": name, "before": values["before"], "after": values["after"],
+            "before_text": megabytes_text(values["before"]), "after_text": megabytes_text(values["after"]),
+        }
         for name, values in (status.mariadb_sizes or {}).items()
     ]
     return {

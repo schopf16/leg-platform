@@ -22,6 +22,7 @@ from django.utils.translation import gettext as _
 from leg_platform import logfiles
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
+from leg_platform.addresses.status import megabytes_text
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,8 @@ def describe(files):
                 "name": item["name"],
                 "title": log_titles()[base],
                 "backup": number,
-                "size_kb": f"{item['size'] / 1024:.1f}",
+                # The same size format as the other pages (DESIGN section 8): megabytes, one decimal.
+                "size_text": megabytes_text(item["size"]),
                 "modified": datetime.fromtimestamp(item["modified"], tz=timezone.get_current_timezone()),
                 "view_url": reverse("admin:logs_view", kwargs={"log": base}) + query,
                 "download_url": reverse("admin:logs_download", kwargs={"log": base}) + query,

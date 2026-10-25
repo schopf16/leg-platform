@@ -18,7 +18,7 @@
       {% for row in rows %}
         <tr>
           <th scope="row">{{ row.title }}{% if row.backup %} ({% translate "older file" %} {{ row.backup }}){% endif %}<br><code>{{ row.name }}</code></th>
-          <td data-label="{% translate 'Size' %}">{{ row.size_kb }} KB</td>
+          <td data-label="{% translate 'Size' %}">{{ row.size_text }} MB</td>
           <td data-label="{% translate 'Last change' %}">{{ row.modified|date:"d.m.Y H:i" }}</td>
           <td><a href="{{ row.view_url }}">{% if row.backup %}{% translate "Show" %}{% else %}{% translate "Watch live" %}{% endif %}</a></td>
           <td><a href="{{ row.download_url }}">{% translate "Download" %}</a></td>
