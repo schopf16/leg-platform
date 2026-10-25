@@ -4,6 +4,7 @@ from axes.models import AccessAttempt, AccessFailureLog
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.utils import label_for_field, lookup_field
+from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseNotAllowed, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -153,7 +154,25 @@ class SecurityEventAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         # The page is named "Security events" (review item 4); the lead line is in its template.
-        return super().changelist_view(request, {"title": _("Security events"), **(extra_context or {})})
+        response = super().changelist_view(request, {"title": _("Security events"), **(extra_context or {})})
+        context = getattr(response, "context_data", None) or {}
+        cl = context.get("cl")
+        if cl is not None:
+            # One block per entry on a phone (third review, item 1): the labels and values of the columns, as text.
+            names = self.get_list_display(request)
+            context["entry_headers"] = [str(label_for_field(name, SecurityEvent, self)) for name in names]
+            context["entry_rows"] = [
+                [(label, self.cell_text(name, entry)) for label, name in zip(context["entry_headers"], names)]
+                for entry in cl.result_list
+            ]
+        return response
+
+    def cell_text(self, name, entry):
+        if name == "occurred_at":
+            return timezone.localtime(entry.occurred_at).strftime("%d.%m.%Y %H:%M")
+        if name == "event":
+            return entry.get_event_display()
+        return lookup_field(name, entry, self)[2]
 
     def has_module_permission(self, request):
         return request.user.is_superuser

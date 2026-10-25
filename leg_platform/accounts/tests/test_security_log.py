@@ -349,3 +349,11 @@ class SecurityLogLayoutTests(TestCase):
         self.assertIn(".model-securityevent #changelist-filter {", css)
         self.assertIn("order: 2;", css)
 
+    def test_each_entry_is_one_block_with_a_label_for_each_cell(self):
+        # Third review item 1: the table reflows on a phone; every column is in the block, labelled.
+        html = self.page().content.decode()
+        self.assertIn('<table id="result_list" class="phone-table">', html)
+        self.assertIn('<td data-label="Konto">', html)
+        self.assertIn('<td data-label="Von">', html)
+        self.assertEqual(html.count('<tr><td data-label='), 2)
+
