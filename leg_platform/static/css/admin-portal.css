@@ -430,6 +430,30 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The sources of the log page: one row of chips (checkboxes that read as toggles, never colour alone). */
+.log-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.log-chips legend {
+  margin-inline-end: 8px;
+}
+
+.log-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 999px;
+}
+
 .import-spinner {
   display: inline-block;
   width: 14px;

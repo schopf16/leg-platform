@@ -8238,7 +8238,7 @@ msgid "Minimum severity"
 msgstr "Mindestschweregrad"
 
 msgid "Send an email"
-msgstr "E-Mail senden"
+msgstr "E-Mails senden"
 
 msgid "Logs"
 msgstr "Protokolle"
@@ -8270,14 +8270,8 @@ msgstr "Als Text herunterladen"
 msgid "No entry in this time range."
 msgstr "Kein Eintrag in diesem Zeitraum."
 
-msgid "The log files open on their own pages: live view, download and the rotated copies."
-msgstr "Die Protokolldateien öffnen auf eigenen Seiten: Live-Ansicht, Download und die rotierten Kopien."
-
 msgid "Security log file"
 msgstr "Sicherheitsprotokoll"
-
-msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
-msgstr "Die Meldung enthält nur Zeitpunkt, Schweregrad und Quelle: keine Protokollzeile, keinen Text eines Eintrags und keinen Dateinamen. Pro Quelle und Stunde höchstens eine Meldung; weitere Einträge werden nur gezählt."
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr "Die E-Mail bei Fehler und die Protokollmeldungen werden auf der Protokollseite eingestellt."
@@ -8291,6 +8285,24 @@ msgstr "Details im Importprotokoll"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "Sources"
+msgstr "Quellen"
+
+msgid "Excluded texts:"
+msgstr "Ausgeschlossene Texte:"
+
+msgid "Confirmation required"
+msgstr "Bestätigung erforderlich"
+
+msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
+msgstr "Wer die Sicherheitsmeldungen erhält, ändert sich mit dem Schalter oder der Adresse; deshalb ist ein Nachweis der Identität nötig."
+
+msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
+msgstr "Die Meldung enthält keine Protokollzeile, keinen Eintragstext und keinen Dateinamen; höchstens eine Meldung pro Quelle und Stunde."
+
+msgid "Email notification"
+msgstr "E-Mail-Benachrichtigung"
+
 msgid "Send errors from the logs"
 msgstr "Fehler im Protokoll senden"
 
@@ -8301,7 +8313,7 @@ msgid "Send when the address directory is old"
 msgstr "Adressverzeichnis veraltet senden"
 
 msgid "Choose single errors"
-msgstr "Einzelne Fehler wählen"
+msgstr "Einzelne Importfehler wählen"
 
 msgid "When to send"
 msgstr "Wann senden"
@@ -8446,9 +8458,6 @@ msgstr "Unerwarteter HTTP-Inhaltstyp."
 
 msgid "Unsafe ZIP member."
 msgstr "Unsicherer ZIP-Eintrag."
-
-msgid "Send"
-msgstr "Senden"
 
 msgid "Import errors"
 msgstr "Importfehler"

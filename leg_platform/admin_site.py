@@ -51,6 +51,12 @@ INDEX_HINT = _(
 )
 
 
+def is_current_page(entry_url, path):
+    """True when the request path is the entry's URL or lies below it (exact segments, never a substring)."""
+    base = entry_url.rstrip("/")
+    return path == base or path == base + "/" or path.startswith(base + "/")
+
+
 class PortalAdminSite(AdminSite):
     def group_of(self, object_name):
         """The group of the start page that a model belongs to: (key, name)."""
@@ -237,9 +243,12 @@ class PortalAdminSite(AdminSite):
                         "app_label": key,
                         "app_url": index_url,
                         "has_module_perms": True,
-                        "models": members,
+                        "models": [dict(m, current=is_current_page(m["admin_url"], request.path)) for m in members],
                     }
                 )
+        for group in grouped:
+            # A group is open only when it holds the current page (design review; the sidebar and the start page).
+            group["current"] = any(model["current"] for model in group["models"])
         return grouped
 
     def get_urls(self):

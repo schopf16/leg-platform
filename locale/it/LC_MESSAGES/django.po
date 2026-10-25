@@ -8244,14 +8244,8 @@ msgstr "Scarica come testo"
 msgid "No entry in this time range."
 msgstr "Nessuna voce in questo periodo."
 
-msgid "The log files open on their own pages: live view, download and the rotated copies."
-msgstr "I file di registro si aprono nelle proprie pagine: vista in diretta, download e copie ruotate."
-
 msgid "Security log file"
 msgstr "Registro di sicurezza"
-
-msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
-msgstr "L'avviso contiene solo l'ora, la gravità e la fonte: nessuna riga di registro, nessun testo di una voce e nessun nome di file. Al massimo un avviso per fonte e ora; le altre voci vengono solo contate."
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr "L'e-mail in caso di errore e gli avvisi del registro si impostano nella pagina dei registri."
@@ -8264,6 +8258,24 @@ msgstr "Dettagli nel registro delle importazioni"
 
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
+
+msgid "Sources"
+msgstr "Fonti"
+
+msgid "Excluded texts:"
+msgstr "Testi esclusi:"
+
+msgid "Confirmation required"
+msgstr "Conferma richiesta"
+
+msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
+msgstr "Cambiando l'interruttore o l'indirizzo cambia chi riceve gli avvisi di sicurezza; per questo è richiesta una prova d'identità."
+
+msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
+msgstr "L'avviso non contiene righe di registro, testi di voci né nomi di file; al massimo un avviso per fonte e ora."
+
+msgid "Email notification"
+msgstr "Notifica via e-mail"
 
 msgid "Send errors from the logs"
 msgstr "Inviare gli errori dei registri"
@@ -8420,9 +8432,6 @@ msgstr "Tipo di contenuto HTTP inatteso."
 
 msgid "Unsafe ZIP member."
 msgstr "Voce ZIP non sicura."
-
-msgid "Send"
-msgstr "Inviare"
 
 msgid "Import errors"
 msgstr "Errori di importazione"

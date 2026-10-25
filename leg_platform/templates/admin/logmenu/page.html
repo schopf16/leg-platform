@@ -13,61 +13,53 @@
         {% for value, label in ranges %}<option value="{{ value }}"{% if value == range %} selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </p>
-    <p>
-      <label><input type="checkbox" name="show" value="security"{% if "security" in shown %} checked{% endif %}> {% translate "Security events" %}</label>
-      <label><input type="checkbox" name="show" value="housekeeping"{% if "housekeeping" in shown %} checked{% endif %}> {% translate "Housekeeping errors" %}</label>
-      <label><input type="checkbox" name="show" value="import"{% if "import" in shown %} checked{% endif %}> {% translate "Import errors" %}</label>
-    </p>
+    <fieldset class="log-chips">
+      <legend>{% translate "Sources" %}</legend>
+      <label class="log-chip"><input type="checkbox" name="show" value="security"{% if "security" in shown %} checked{% endif %}> {% translate "Security events" %}</label>
+      <label class="log-chip"><input type="checkbox" name="show" value="housekeeping"{% if "housekeeping" in shown %} checked{% endif %}> {% translate "Housekeeping errors" %}</label>
+      <label class="log-chip"><input type="checkbox" name="show" value="import"{% if "import" in shown %} checked{% endif %}> {% translate "Import errors" %}</label>
+    </fieldset>
     <p><label for="logmenu-lines">{% translate "Lines" %}</label>
       <select id="logmenu-lines" name="lines">
         {% for value in line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
       </select>
     </p>
-    <button type="submit" class="button">{% translate "Show" %}</button>
+    <button type="submit" class="default">{% translate "Show" %}</button>
   </form>
-</section>
-
-<section class="data-import-block" id="logmenu-files" aria-labelledby="logmenu-files-heading">
-  <h2 id="logmenu-files-heading">{% translate "Log files" %}</h2>
-  <p class="help">{% translate "The log files open on their own pages: live view, download and the rotated copies." %}</p>
-  <ul>
-    <li><a href="{{ log_list_url }}">{% translate "All log files" %}</a></li>
-    {% for key, url in file_links %}<li><a href="{{ url }}">{% if key == "application" %}{% translate "Application log" %}{% else %}{% translate "Security log file" %}{% endif %}</a></li>{% endfor %}
-  </ul>
 </section>
 
 {% if security_lines is not None %}
 <section class="data-import-block" id="logmenu-security" aria-labelledby="logmenu-security-heading">
   <h2 id="logmenu-security-heading">{% translate "Security events" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'security' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
   {% include "admin/logs/_text_box.html" with lines=security_lines box_id="logmenu-security-box" %}
+  <p><a href="{% url 'admin:logmenu_download' 'security' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
 </section>
 {% endif %}
 {% if housekeeping_lines is not None %}
 <section class="data-import-block" id="logmenu-housekeeping" aria-labelledby="logmenu-housekeeping-heading">
   <h2 id="logmenu-housekeeping-heading">{% translate "Housekeeping errors" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'housekeeping' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
   {% include "admin/logs/_text_box.html" with lines=housekeeping_lines box_id="logmenu-housekeeping-box" %}
+  <p><a href="{% url 'admin:logmenu_download' 'housekeeping' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
 </section>
 {% endif %}
 {% if import_lines is not None %}
 <section class="data-import-block" id="logmenu-import" aria-labelledby="logmenu-import-heading">
   <h2 id="logmenu-import-heading">{% translate "Import errors" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'import' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
   {% include "admin/logs/_text_box.html" with lines=import_lines box_id="logmenu-import-box" %}
+  <p><a href="{% url 'admin:logmenu_download' 'import' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
 </section>
 {% endif %}
 
 <section class="data-import-block" id="logmenu-notify" aria-labelledby="logmenu-notify-heading">
   <h2 id="logmenu-notify-heading">{% translate "Email notice" %}</h2>
-  <p class="help">{% translate "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted." %}</p>
+  <p class="help">{% translate "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour." %}</p>
   {% if suppressed %}
   <ul>{% for source, count in suppressed.items %}<li>{{ source }}: {{ count }}</li>{% endfor %}</ul>
   {% endif %}
   <form method="post" action="{% url 'admin:logmenu_settings' %}" class="import-form">{% csrf_token %}
     {{ settings_form.non_field_errors }}
     <fieldset>
-      <legend>{% translate "Send" %}</legend>
+      <legend>{% translate "Email notification" %}</legend>
       <p>{{ settings_form.enabled.errors }}<label for="{{ settings_form.enabled.id_for_label }}">{{ settings_form.enabled }} {% translate "Send an email" %}</label></p>
       <p>{{ settings_form.email.errors }}<label for="{{ settings_form.email.id_for_label }}">{% translate "Email address" %}</label><br>{{ settings_form.email }}</p>
     </fieldset>
@@ -75,7 +67,7 @@
       <legend>{% translate "When to send" %}</legend>
       <p>{{ settings_form.notify_error.errors }}<label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}" id="{{ settings_form.notify_error.auto_id }}"{% if settings_form.notify_error.value %} checked{% endif %}> {{ settings_form.notify_error.label }}</label></p>
       <details id="logmenu-failures" class="import-form">
-        <summary>{% translate "Choose single errors" %}</summary>
+        <summary>{% translate "Choose single errors" %} <span class="help">({% translate "Excluded texts:" %} {{ settings_form.excluded_count }})</span></summary>
         {% for heading, boxes in settings_form.grouped_failures %}
           <h4>{{ heading }}</h4>
           {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}
@@ -85,8 +77,8 @@
       <p>{{ settings_form.notify_stale.errors }}<label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}" id="{{ settings_form.notify_stale.auto_id }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {{ settings_form.notify_stale.label }}</label></p>
     </fieldset>
     <fieldset>
-      <legend>{% translate "Proof of identity" %}</legend>
-      <p class="help">{% translate "A change of the switch or the address needs one proof: the code from the app, or your password." %}</p>
+      <legend>{% translate "Confirmation required" %}</legend>
+      <p class="help">{% translate "Changing the switch or the address changes who receives the security notices, so one proof of identity is required." %}</p>
       {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
       {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
     </fieldset>

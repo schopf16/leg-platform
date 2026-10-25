@@ -242,6 +242,11 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
         if self.user is not None:
             self.use_one_proof(self.user, autofocus=False)
 
+    @property
+    def excluded_count(self):
+        """The number of failure texts that are not ticked (stored as the exclusions)."""
+        return len(self.instance.muted_failures or [])
+
     def grouped_failures(self):
         """The per-text ticks by source heading, as the bound checkboxes (the closed block of the form)."""
         position = {value: index for index, (value, _label) in enumerate(self.fields["failures"].choices)}

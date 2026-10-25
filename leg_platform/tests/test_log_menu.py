@@ -71,7 +71,8 @@ class AccessTests(LogMenuBase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="logmenu-security"')
         self.assertContains(response, 'id="logmenu-housekeeping"')
-        self.assertContains(response, reverse("admin:logs_view", kwargs={"log": "security"}))
+        # The log files are not listed on this page any more (design review); they keep their sidebar entry.
+        self.assertNotContains(response, reverse("admin:logs_view", kwargs={"log": "security"}))
 
     def test_staff_with_the_housekeeping_right_is_refused_everywhere(self):
         client = self.client_for(self.staff)
@@ -364,7 +365,7 @@ class NotificationFormLayoutTests(LogMenuBase):
         html = self.page()
         block = html[html.index('<details id="logmenu-failures"'):html.index("</details>", html.index('<details id="logmenu-failures"'))]
         self.assertNotIn(" open", html[html.index('<details id="logmenu-failures"'):html.index('<details id="logmenu-failures"') + 40])
-        self.assertIn("Einzelne Fehler wählen", block)
+        self.assertIn("Einzelne Importfehler wählen", block)
         self.assertEqual(block.count('name="failures"'), len(log_menu.failure_texts()))
         self.assertLess(html.index('name="notify_error"'), html.index('<details id="logmenu-failures"'))
         self.assertLess(html.index('<details id="logmenu-failures"'), html.index('name="notify_warning"'))
@@ -382,3 +383,44 @@ class NotificationFormLayoutTests(LogMenuBase):
         self.assertIn('class="default">Benachrichtigung speichern</button>', html)
         self.assertNotIn("By severity", html)
         self.assertNotIn("By event", html)
+
+
+class PageLayoutTests(LogMenuBase):
+    """Design review: the sidebar opens only the group of the current page and marks the page by its exact URL;
+    the log page has one sources block, one box and one download under each box, and a visible confirmation block."""
+
+    def test_the_path_test_is_exact_and_never_a_substring(self):
+        from leg_platform.admin_site import is_current_page
+
+        self.assertTrue(is_current_page("/admin/logs/", "/admin/logs/"))
+        self.assertTrue(is_current_page("/admin/logs/", "/admin/logs/security/"))
+        self.assertFalse(is_current_page("/admin/log", "/admin/logs/"))
+        self.assertFalse(is_current_page("/admin/accounts/user/", "/admin/accounts/users/"))
+
+    def test_only_the_group_of_the_current_page_is_open(self):
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        self.assertIn('class="admin-group app-system" open', html)
+        self.assertNotIn('class="admin-group app-users" open', html)
+        self.assertNotIn('class="admin-group app-content" open', html)
+        self.assertIn('href="/admin/logmenu/" aria-current="page"', html)
+        self.assertNotIn('href="/admin/logs/" aria-current="page"', html)
+
+    def test_each_box_has_its_download_under_it(self):
+        self.housekeeping_error()
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        box = html.index('id="logmenu-housekeeping-box"')
+        download = html.index(reverse("admin:logmenu_download", kwargs={"source": "housekeeping"}))
+        self.assertLess(box, download)
+        self.assertLess(download, html.index('id="logmenu-notify"'))
+
+    def test_the_excluded_count_is_shown_in_the_summary(self):
+        self.set_notification(muted_failures=log_menu.failure_texts()[:2])
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        self.assertIn("Einzelne Importfehler wählen", html)
+        self.assertIn("(Ausgeschlossene Texte: 2)", html)
+
+    def test_the_proof_block_has_a_plain_title_and_one_sentence(self):
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        self.assertIn("Bestätigung erforderlich", html)
+        self.assertIn("deshalb ist ein Nachweis der Identität nötig", html)
+        self.assertNotIn("Proof of identity", html)

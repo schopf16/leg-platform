@@ -8273,14 +8273,8 @@ msgstr "Télécharger en texte"
 msgid "No entry in this time range."
 msgstr "Aucune entrée dans cette période."
 
-msgid "The log files open on their own pages: live view, download and the rotated copies."
-msgstr "Les fichiers journaux s'ouvrent sur leurs propres pages : affichage en direct, téléchargement et copies tournées."
-
 msgid "Security log file"
 msgstr "Journal de sécurité"
-
-msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
-msgstr "L'avis ne contient que l'heure, la gravité et la source : aucune ligne de journal, aucun texte d'entrée et aucun nom de fichier. Au plus un avis par source et par heure ; les autres entrées sont seulement comptées."
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr "L'e-mail en cas d'erreur et les avis du journal se règlent sur la page des journaux."
@@ -8293,6 +8287,24 @@ msgstr "Détails dans le journal des imports"
 
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
+
+msgid "Sources"
+msgstr "Sources"
+
+msgid "Excluded texts:"
+msgstr "Textes exclus :"
+
+msgid "Confirmation required"
+msgstr "Confirmation requise"
+
+msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
+msgstr "Le changement de l'interrupteur ou de l'adresse modifie le destinataire des alertes de sécurité ; un justificatif d'identité est donc requis."
+
+msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
+msgstr "L'avis ne contient aucune ligne de journal, aucun texte d'entrée et aucun nom de fichier ; au plus un avis par source et par heure."
+
+msgid "Email notification"
+msgstr "Notification par e-mail"
 
 msgid "Send errors from the logs"
 msgstr "Envoyer les erreurs des journaux"
@@ -8449,9 +8461,6 @@ msgstr "Type de contenu HTTP inattendu."
 
 msgid "Unsafe ZIP member."
 msgstr "Entrée ZIP dangereuse."
-
-msgid "Send"
-msgstr "Envoyer"
 
 msgid "Import errors"
 msgstr "Erreurs d'import"
