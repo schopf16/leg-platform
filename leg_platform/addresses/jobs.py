@@ -38,7 +38,8 @@ INTERRUPTED = "The import was interrupted because the application stopped or res
 # (a test compares them with the importer). Any other text counts as unexpected, so that no upstream data
 # can reach the page, the log or the security log through a message.
 SAFE_FAILURES = frozenset({
-    "Unapproved download URL.", "Official download failed.", "Unexpected HTTP content encoding.",
+    "Unapproved download URL.", "Official download failed.", "Official file not found.",
+    "Unexpected HTTP content encoding.",
     "Download exceeds the size limit.", "Download exceeds its resource limit.", "Incomplete download.",
     "Invalid official catalogue metadata.", "CSV exceeds its resource limit.",
     "Invalid address field length.", "Invalid address field.", "Expected exactly one CSV member.",

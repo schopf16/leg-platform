@@ -386,6 +386,12 @@ class DownloadRuleTests(SimpleTestCase):
             list(importer._chunks(session, importer.PLANT_URL, 100, content_types=plants.PLANT_CONTENT_TYPES))
         self.assertEqual(str(raised.exception), "Download exceeds the size limit.")
 
+    def test_a_missing_file_is_refused_with_its_own_text(self):
+        session = self.session_answering({"Content-Type": "application/zip"}, status_code=404)
+        with self.assertRaises(importer.ImportFailure) as raised:
+            list(importer._chunks(session, importer.PLANT_URL, 100, content_types=plants.PLANT_CONTENT_TYPES))
+        self.assertEqual(str(raised.exception), "Official file not found.")
+
     def test_the_error_texts_of_the_plant_import_are_allowed_and_have_words_for_the_page(self):
         texts = {
             plants.FORMAT_FAILURE, plants.SIZE_FAILURE, plants.CHANGE_FAILURE,
@@ -737,6 +743,14 @@ class PlantSecurityEventTests(TestCase):
             SecurityEvent.Event.PV_IMPORT_FAILED, detail=f"automatic, {plants.FORMAT_FAILURE}",
         )
         self.assertEqual(ImportRequest.objects.get(pk=1).last_error, plants.FORMAT_FAILURE)
+
+    def test_a_missing_file_is_logged_with_its_step(self):
+        claimed = jobs.claim(scheduled=True, web=True, source=ImportRequest.Source.PLANT)
+        with patch.object(jobs.security_log, "record") as record:
+            jobs.record_failure(claimed, importer.ImportFailure("Official file not found."))
+        record.assert_called_once_with(
+            SecurityEvent.Event.PV_IMPORT_FAILED, detail="automatic, Official file not found.",
+        )
 
     def test_an_unknown_failure_text_is_not_stored(self):
         claimed = jobs.claim(scheduled=True, web=True, source=ImportRequest.Source.PLANT)

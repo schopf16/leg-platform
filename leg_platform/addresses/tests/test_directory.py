@@ -2207,7 +2207,8 @@ class PlantBlockAdminTests(TestCase):
         ImportRequest.objects.create(
             pk=1, state=ImportRequest.State.SUCCEEDED if state == "succeeded" else ImportRequest.State.FAILED,
             source=ImportRequest.Source.PLANT, finished_at=timezone.now(), last_plant_state=state,
-            last_plant_finished_at=timezone.now(), last_plant_error=error,
+            last_plant_finished_at=timezone.now() if today else timezone.now() - timedelta(days=1),
+            last_plant_error=error,
             last_plant_scheduled_run_on=timezone.localdate() if today else timezone.localdate() - timedelta(days=1),
         )
 
@@ -2263,10 +2264,13 @@ class PlantBlockAdminTests(TestCase):
         self._last_run("failed", error=plants.UNREADABLE_FAILURE)
         response = self._client().get(self.page)
         self.assertContains(
+            response, '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed</dd>',
+        )
+        self.assertContains(
             response,
-            '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed<br>'
-            'The plant register could not be downloaded or read. '
-            'Check the network connection and try again.</dd>',
+            '<p class="import-error" id="plant-error" role="alert"><strong>Reason:</strong> '
+            '<span id="plant-error-text">The plant register could not be downloaded or read. '
+            'Check the network connection and try again.</span></p>',
         )
         self.assertContains(response, "341’981")
         self.assertContains(response, "1’203’456")
@@ -2281,6 +2285,47 @@ class PlantBlockAdminTests(TestCase):
             response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
         )
         self.assertNotContains(response, '<span class="status-dot status-ok" aria-hidden="true"></span>Completed')
+
+    def test_a_failure_of_yesterday_is_still_shown_today_with_its_time_and_the_alert(self):
+        self._plant_register()
+        self._last_run("failed", error=plants.UNREADABLE_FAILURE, today=False)
+        finished = timezone.localtime(ImportRequest.objects.get(pk=1).last_plant_finished_at)
+        response = self._client().get(self.page)
+        self.assertContains(response, f'<dd id="plant-run-at">{finished.strftime("%d.%m.%Y %H:%M")}</dd>')
+        self.assertContains(
+            response, '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed</dd>',
+        )
+        self.assertContains(response, '<p class="import-error" id="plant-error" role="alert">')
+        self.assertNotContains(response, "Not run today")
+
+    def test_a_later_success_replaces_the_failure(self):
+        self._plant_register()
+        self._last_run("failed", error=plants.UNREADABLE_FAILURE, today=False)
+        ImportRequest.objects.filter(pk=1).update(
+            last_plant_state="succeeded", last_plant_error="", last_plant_finished_at=timezone.now(),
+            last_plant_scheduled_run_on=timezone.localdate(),
+        )
+        response = self._client().get(self.page)
+        self.assertContains(response, '<span class="status-dot status-ok" aria-hidden="true"></span>Completed</dd>')
+        self.assertNotContains(response, 'id="plant-error"')
+        self.assertNotContains(response, "could not be downloaded or read")
+
+    def test_a_success_of_an_earlier_day_says_not_updated_today_and_raises_no_alert(self):
+        self._plant_register()
+        self._last_run("succeeded", today=False)
+        response = self._client(language="de-ch").get(self.page)
+        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertNotContains(response, 'id="plant-error"')
+
+    def test_a_failure_shows_only_its_fixed_reason_and_no_path_url_or_trace(self):
+        self._plant_register()
+        self._last_run("failed", error="/srv/data/ElectricityProductionPlant.csv https://data.geo.admin.ch/x.zip Traceback")
+        response = self._client().get(self.page)
+        self.assertContains(response, "The import failed unexpectedly. The application log has the details.")
+        body = response.content.decode()
+        for text in ("https://data", "http://data", "Traceback", "/srv/", "ElectricityProductionPlant", ".zip", "File \""):
+            with self.subTest(text=text):
+                self.assertNotIn(text, body)
 
     def test_the_page_and_the_block_need_the_permission(self):
         self._plant_register()

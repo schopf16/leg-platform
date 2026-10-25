@@ -107,6 +107,8 @@ def _download_body(session, url, limit, content_types, put):
         url, stream=True, allow_redirects=False, timeout=(10, 60), verify=True,
         headers={"Accept-Encoding": "identity"},
     ) as response:
+        if response.status_code == 404:
+            raise ImportFailure("Official file not found.")
         if response.status_code != 200:
             raise ImportFailure("Official download failed.")
         if response.headers.get("Content-Encoding", "identity").lower() != "identity":
