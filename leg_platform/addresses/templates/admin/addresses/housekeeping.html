@@ -11,14 +11,16 @@
     <dt>{% translate "Finished at" %}</dt><dd>{{ status.finished_at|default:"–" }}</dd>
     <dt>{% translate "Started by" %}</dt><dd>{% if status.trigger == "manual" %}{% translate "Manually" %}{% elif status.trigger == "scheduled" %}{% translate "Weekly" %}{% else %}–{% endif %}</dd>
   </dl>
-  <table>
-    <thead><tr><th>{% translate "Step" %}</th><th>{% translate "Result" %}</th><th>{% translate "Finished at" %}</th><th>{% translate "Reason" %}</th></tr></thead>
-    <tbody>
-    {% for step in steps %}
-      <tr><td>{{ step.label }}</td><td>{{ step.state_label|default:"–" }}</td><td>{{ step.finished_at|default:"–" }}</td><td>{{ step.text|default:"–" }}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  {# One card per step: a dot plus the word, the time, at most one error line with a link to the error log below. #}
+  {% for step in steps %}
+  <div class="import-box" id="housekeeping-step-{{ forloop.counter }}">
+    <p class="import-headline"><span class="status-dot status-{{ step.tone }}" aria-hidden="true"></span> <strong>{{ step.label }}</strong>: {{ step.state_label|default:"–" }}</p>
+    <dl class="import-facts">
+      <dt>{% translate "Finished at" %}</dt><dd>{{ step.finished_at|default:"–" }}</dd>
+    </dl>
+    {% if step.state == "failed" and step.text %}<p class="import-error" role="alert"><strong>{% translate "Reason" %}:</strong> {{ step.text }} <a href="#housekeeping-errors">{% translate "Details in the error log" %}</a></p>{% endif %}
+  </div>
+  {% endfor %}
 </section>
 
 <section class="data-import-block" id="housekeeping-errors" aria-labelledby="housekeeping-errors-heading">

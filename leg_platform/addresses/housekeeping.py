@@ -508,6 +508,11 @@ def refusal_text(result):
     return texts.get(result, _("The housekeeping did not start."))
 
 
+def _tone(state):
+    """The colour word of a step (a dot plus the word, never colour alone): the tokens of the admin stylesheet."""
+    return {"succeeded": "ok", "failed": "bad", "skipped": "warn"}.get(state, "muted")
+
+
 def _state_label(state):
     return HousekeepingStatus.State(state).label if state else ""
 
@@ -515,11 +520,11 @@ def _state_label(state):
 def _step_rows(status):
     return [
         {
-            "label": _("Address directory"), "state": status.sqlite_state, "state_label": _state_label(status.sqlite_state),
+            "label": _("Address directory"), "state": status.sqlite_state, "state_label": _state_label(status.sqlite_state), "tone": _tone(status.sqlite_state),
             "finished_at": status.sqlite_finished_at, "text": message_text(status.sqlite_message),
         },
         {
-            "label": _("Application database"), "state": status.mariadb_state,
+            "label": _("Application database"), "state": status.mariadb_state, "tone": _tone(status.mariadb_state),
             "state_label": _state_label(status.mariadb_state),
             "finished_at": status.mariadb_finished_at, "text": message_text(status.mariadb_message),
         },

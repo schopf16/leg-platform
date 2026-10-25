@@ -411,6 +411,25 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The status card of the import page: its dot follows the state of the box (a dot plus the word, never colour alone). */
+.import-box .status-dot.status-live {
+  background: var(--status-muted);
+}
+
+.import-box.import-running .status-dot.status-live,
+.import-box.import-queued .status-dot.status-live {
+  background: var(--status-warn);
+}
+
+.import-box.import-succeeded .status-dot.status-live {
+  background: var(--status-ok);
+}
+
+.import-box.import-failed .status-dot.status-live,
+.import-box.import-interrupted .status-dot.status-live {
+  background: var(--status-bad);
+}
+
 .import-spinner {
   display: inline-block;
   width: 14px;

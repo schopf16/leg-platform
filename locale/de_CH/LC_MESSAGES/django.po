@@ -7874,12 +7874,6 @@ msgstr "Letzte Aktualisierung der Anlagen"
 msgid "Result"
 msgstr "Ergebnis"
 
-msgid "Addresses in the directory"
-msgstr "Adressen im Verzeichnis"
-
-msgid "Rows of the plant file"
-msgstr "Einträge der Datei"
-
 msgid "Plants taken over"
 msgstr "Übernommene Anlagen"
 
@@ -7972,9 +7966,6 @@ msgstr "Letzte Auswertung"
 
 msgid "Statistic of the last successful scan"
 msgstr "Statistik der letzten erfolgreichen Auswertung"
-
-msgid "Postal codes scanned"
-msgstr "Ausgewertete Postleitzahlen"
 
 msgid "With a transformer station"
 msgstr "Mit Trafostation"
@@ -8297,6 +8288,9 @@ msgstr "E-Mail-Meldung"
 msgid "Details in the import log"
 msgstr "Details im Importprotokoll"
 
+msgid "Details in the error log"
+msgstr "Details im Fehlerprotokoll"
+
 msgid "Import log"
 msgstr "Importprotokoll"
 
@@ -8323,12 +8317,6 @@ msgstr "Keine Bewegung seit %(minutes)s Minuten."
 
 msgid "Statistic"
 msgstr "Statistik"
-
-msgid "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)."
-msgstr "Wird täglich durch den täglichen Lauf geladen. Keine Aktion hier. Quelle: Bundesamt für Energie (BFE), freie Nutzung (Open Use)."
-
-msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
-msgstr "Die Abfrage läuft einmal pro Woche, am Samstag, nach dem Anlagenregister. Keine Aktion hier. Quelle: BKW Netz, öffentliche Karte mit hohem Rabatt."
 
 msgid "A repair was tried recently and did not succeed."
 msgstr "Eine Reparatur wurde kürzlich versucht und war nicht erfolgreich."

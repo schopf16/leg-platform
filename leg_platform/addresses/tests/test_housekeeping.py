@@ -518,3 +518,36 @@ class ErrorTextBoxTests(HousekeepingBase):
         self.assertIn(housekeeping.message_text(housekeeping.SQLITE_VACUUM_FAILED), line)
         self.assertIn("housekeeping-0000.sql.gz", line)
         self.assertIn(gettext("Open"), line)
+
+
+class StepCardTests(HousekeepingBase):
+    """The result of each step is a card (admin spec step 6): a dot plus the word, one error line only when it failed."""
+
+    def setUp(self):
+        super().setUp()
+        self.person = create_active_user("housekeeping.cards@example.org")
+        self.person.set_privileges(is_staff=True, is_superuser=False)
+        self.person.user_permissions.add(Permission.objects.get(codename="run_housekeeping"))
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.person)
+        self.url = reverse("admin:addresses_housekeepingstatus_changelist")
+
+    def test_each_step_is_a_card_with_its_dot_and_word(self):
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED,
+                            "mariadb_message": housekeeping.SQLITE_VACUUM_FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertIn('id="housekeeping-step-1"', content)
+        self.assertIn('id="housekeeping-step-2"', content)
+        self.assertIn('class="status-dot status-ok"', content)
+        self.assertIn('class="status-dot status-bad"', content)
+
+    def test_only_a_failed_step_shows_its_error_line_with_a_link_to_the_log(self):
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED,
+                            "mariadb_message": housekeeping.SQLITE_VACUUM_FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertEqual(content.count('role="alert"'), 1)
+        self.assertIn('href="#housekeeping-errors"', content)
