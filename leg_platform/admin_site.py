@@ -221,14 +221,6 @@ class PortalAdminSite(AdminSite):
                             "add_url": None,
                             "view_only": True,
                         },
-                        {
-                            "name": _("Import log"),
-                            "object_name": "ImportLog",
-                            "perms": {"view": True},
-                            "admin_url": reverse("admin:addresses_importrequest_log", current_app=self.name),
-                            "add_url": None,
-                            "view_only": True,
-                        },
                         ]
                     )
             if members:

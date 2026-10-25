@@ -65,12 +65,22 @@ class ImportLogBase(TestCase):
 
 
 class ImportLogAccessTests(ImportLogBase):
-    def test_superuser_sees_the_import_log(self):
+    def test_superuser_sees_the_import_log_section_as_text(self):
         self.failed_run()
-        response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_log"))
+        response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="importlog-table"')
+        self.assertContains(response, 'id="import-log-box"')
+        self.assertContains(response, 'class="log-line"')
+
+        section = response.content.decode("utf-8")
+        section = section[section.index('id="import-log"'):]
+        self.assertNotIn("<table", section)
         self.assertEqual(ImportLogEntry.objects.count(), 1)
+
+    def test_the_old_log_url_redirects_to_the_section_for_superusers(self):
+        response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_log"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].endswith("#import-log"))
 
     def test_staff_with_the_directory_right_is_refused_on_the_log_and_its_download(self):
         self.failed_run()
@@ -91,11 +101,10 @@ class ImportLogAccessTests(ImportLogBase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(len(lines[0].split("	")), 4)
 
-    def test_the_directory_page_links_the_log_to_the_superuser_only(self):
+    def test_the_import_log_section_is_for_the_superuser_only(self):
         self.failed_run()
-        log_url = reverse("admin:addresses_importrequest_log")
-        self.assertContains(self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist")), log_url)
-        self.assertNotContains(self.client_for(self.staff).get(reverse("admin:addresses_importrequest_changelist")), log_url)
+        self.assertContains(self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist")), 'id="import-log"')
+        self.assertNotContains(self.client_for(self.staff).get(reverse("admin:addresses_importrequest_changelist")), 'id="import-log"')
 
 
 class ImportErrorStateTests(ImportLogBase):

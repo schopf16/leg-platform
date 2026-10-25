@@ -288,7 +288,7 @@ class MenuEntryTests(LogMenuBase):
         response = self.client_for(self.superuser).get(reverse("admin:index"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("admin:logmenu"))
-        self.assertContains(response, reverse("admin:addresses_importrequest_log"))
+        self.assertNotContains(response, reverse("admin:addresses_importrequest_log"))
 
     def test_staff_with_the_housekeeping_right_does_not_see_them(self):
         response = self.client_for(self.staff).get(reverse("admin:index"))

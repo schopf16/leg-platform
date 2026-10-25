@@ -99,5 +99,21 @@
   <p class="help">{% translate "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)." %}</p>
 </section>
 
+{% if import_log %}
+<section class="data-import-block" id="import-log" aria-labelledby="import-log-heading">
+  <h2 id="import-log-heading">{% translate "Import log" %}</h2>
+  <p class="help">{% translate "Failed imports and scans. An error stays open until a later successful run of the same source. The log holds the source, the step, a fixed reason and the time only." %}</p>
+  <form method="get" class="import-form">
+    <p><label for="import-log-source">{% translate "Source" %}</label>
+      <select id="import-log-source" name="log_source">{% for key, label in import_log.sources %}<option value="{{ key }}"{% if key == import_log.source %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <label for="import-log-lines">{% translate "Lines" %}</label>
+      <select id="import-log-lines" name="lines">{% for value in import_log.line_counts %}<option value="{{ value }}"{% if value == import_log.lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+    </p>
+    <button type="submit" class="button">{% translate "Show" %}</button>
+  </form>
+  <p><a href="{{ import_log.download_url }}">{% translate "Download as text" %}</a></p>
+  {% include "admin/logs/_text_box.html" with lines=import_log.lines box_id="import-log-box" %}
+</section>
+{% endif %}
 </div>
 {% endblock %}
