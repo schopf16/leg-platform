@@ -470,6 +470,10 @@ class LogBoxHeightTests(LogMenuBase):
         self.assertIn("Kein Eintrag in diesem Zeitraum.", html)
         css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
         box = css[css.index(".log-box {"):css.index("}", css.index(".log-box {"))]
-        self.assertIn("height: 29.4rem;", box)  # 24 lines at 0.875rem and line height 1.4
+        # One height for all log boxes: the custom property of the stylesheet, 24 lines (fifth review item 2).
+        self.assertIn("--log-lines: 24;", css)
+        self.assertIn("height: calc(var(--log-lines) * 1lh);", box)
         self.assertIn("overflow: auto;", box)
+        self.assertNotIn("29.4rem", css)
+        self.assertEqual(css.count("height: calc(var(--log-lines) * 1lh);"), 2)
 
