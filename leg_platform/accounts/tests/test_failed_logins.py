@@ -114,12 +114,18 @@ class LockoutListTests(TestCase):
     def test_the_filters_and_the_line_count_have_plain_labels(self):
         html = self.client_.get(reverse("admin:failed_logins")).content.decode()
         self.assertIn("Nach Zeitpunkt", html)
-        self.assertIn("Nach Adresse", html)
         self.assertNotIn("Nach Nach", html)
         self.assertNotIn("Nach Pfad", html)
         self.assertIn("Kennung, gekürzt", html)
         self.assertIn("Anzahl anzeigen", html)
         self.assertIn(">Alle</a>", html)
+
+    def test_the_address_filter_is_shown_only_when_there_are_rows_of_that_kind(self):
+        html = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        self.assertNotIn("Nach Adresse", html)
+        self.attempt(BLOCKED, 1)
+        html = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        self.assertIn("Nach Adresse", html)
 
     def test_the_identifier_is_shortened_in_both_sections(self):
         self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)

@@ -275,7 +275,11 @@ def failed_logins_view(request):
                 [(label, lookup_field(name, obj, model_admin)[2]) for label, name in zip(headers, columns)]
                 for obj in cl.result_list
             ],
-            "filters": [(spec.title, list(spec.choices(cl))) for spec in cl.filter_specs],
+            # A filter without any value (for example "Nach Adresse" with no rows of that kind) is not shown (review item 8).
+            "filters": [
+                (spec.title, choices) for spec, choices in
+                ((spec, list(spec.choices(cl))) for spec in cl.filter_specs) if len(choices) > 1
+            ],
             "query": cl.query,
             "note": minutes if section_id == "locked" else None,
             # The "Log" section is a text box (owner decision): the newest lines at the bottom, redacted.
