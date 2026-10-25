@@ -306,7 +306,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_portal_views", "test_login_protection", "test_session_timeout",
                     "test_stay_signed_in", "test_password_reset", "test_security_log",
-                    "test_browser_origin")
+                    "test_browser_origin", "test_failed_logins")
             + _FLOW_REVIEWS
         ),
     ),
@@ -368,7 +368,7 @@ AREAS: dict[str, Area] = {
                "leg_platform/accounts/forms.py", "leg_platform/templates/admin/",
                "leg_platform/*/templates/admin/"),
         tests=(
-            _labels(A, "test_admin", "test_admin_acceptance", "test_admin_exposure",
+            _labels(A, "test_admin", "test_admin_acceptance", "test_admin_exposure", "test_admin_groups",
                     "test_admin_spotcheck", "test_portal_settings", "test_graph_test_email_limits",
                     "test_email_texts", "test_translations", "test_acceptance_negative_authorization",
                     "test_portal_branding", "test_portal_favicon", "test_workspaces")
