@@ -29,7 +29,7 @@
     <p class="import-error" role="alert">{% translate "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds." %}</p>
     <form method="post" class="import-form">{% csrf_token %}
       <input type="hidden" name="action" value="acknowledge">
-      <button type="submit" class="default">{% translate "Acknowledge the errors" %}</button>
+      <button type="submit" class="button default">{% translate "Acknowledge the errors" %}</button>
     </form>
   {% endif %}
   <form method="get" class="log-controls" id="housekeeping-error-form">
@@ -37,7 +37,7 @@
       <select id="housekeeping-error-lines" name="lines">
         {% for value in error_line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
       </select>
-      <button type="submit" class="default">{% translate "Show" %}</button></p>
+      <button type="submit" class="button default">{% translate "Show" %}</button></p>
   </form>
   {% include "admin/logs/_text_box.html" with lines=error_lines box_id="housekeeping-error-box" %}
   <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server." %}</p>
@@ -77,7 +77,7 @@
   <h2 id="housekeeping-run-heading">{% translate "Run now" %}</h2>
   <p class="help">{% translate "The address directory is compacted only when no import runs and enough disk space is free. The application tables are optimised only after a current successful dump. Nothing is rebuilt or deleted. The weekly run is on Sunday from 04:30." %}</p>
   <form method="post" class="import-form">{% csrf_token %}
-    <button type="submit" class="default"{% if running %} disabled{% endif %}>{% translate "Run the housekeeping now" %}</button>
+    <button type="submit" class="button default"{% if running %} disabled{% endif %}>{% translate "Run the housekeeping now" %}</button>
   </form>
 </section>
 </div>

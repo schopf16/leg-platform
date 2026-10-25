@@ -571,7 +571,7 @@ class LogPageTests(TestCase):
             self.assertIn('<ol class="breadcrumbs">', html)
             self.assertNotIn('<div class="breadcrumbs">', html)
         self.assertIn('<li aria-current="page">', viewer)
-        self.assertIn('class="default" id="log-pause"', viewer)  # the admin button (UX-003)
+        self.assertIn('class="button default" id="log-pause"', viewer)  # the admin button (UX-003)
         self.assertNotIn("aria-pressed", viewer)  # the label changes, not a state as well
         self.assertIn('role="region"', viewer)
         self.assertIn("Automatisch zum Ende scrollen", viewer)

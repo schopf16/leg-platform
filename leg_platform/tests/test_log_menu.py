@@ -380,7 +380,7 @@ class NotificationFormLayoutTests(LogMenuBase):
 
     def test_one_primary_button_saves_the_notification(self):
         html = self.page()
-        self.assertIn('class="default">Benachrichtigung speichern</button>', html)
+        self.assertIn('class="button default">Benachrichtigung speichern</button>', html)
         self.assertNotIn("By severity", html)
         self.assertNotIn("By event", html)
 
@@ -424,6 +424,8 @@ class PageLayoutTests(LogMenuBase):
         html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
         self.assertIn("Bestätigung erforderlich", html)
         self.assertIn("Zum Ändern ist ein Code aus der App nötig", html)
+        self.assertIn('for="id_otp_token">Code aus der App</label>', html)
+        self.assertNotIn("2FA", html)
         self.assertNotIn("Proof of identity", html)
 
 

@@ -24,7 +24,7 @@
         {% for value in line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
       </select>
     </p>
-    <button type="submit" class="default">{% translate "Show" %}</button>
+    <button type="submit" class="button default">{% translate "Show" %}</button>
   </form>
 </section>
 
@@ -83,7 +83,7 @@
       {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
       {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
     </fieldset>
-    <button type="submit" class="default">{% translate "Save notification" %}</button>
+    <button type="submit" class="button default">{% translate "Save notification" %}</button>
   </form>
 </section>
 
