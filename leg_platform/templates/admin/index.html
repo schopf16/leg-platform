@@ -10,7 +10,7 @@
       <ul class="portal-steps">
         {% for step in first_steps %}
           <li>
-            <span class="portal-state"><span class="status-dot {% if step.ok is True %}status-ok{% else %}status-muted{% endif %}" aria-hidden="true"></span>{{ step.status }}</span>
+            <span class="portal-state"><span class="status-dot {% if step.ok is True %}status-ok{% elif step.ok is False %}status-warn{% else %}status-muted{% endif %}" aria-hidden="true"></span>{{ step.status }}</span>
             <a href="{{ step.url }}">{{ step.label }}</a>
           </li>
         {% endfor %}

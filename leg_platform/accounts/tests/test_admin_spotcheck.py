@@ -52,7 +52,7 @@ class GraphStepTests(TestCase):
 
         page = self.client.get(INDEX_URL).content.decode()
 
-        self.assertRegex(page, r"status-dot status-muted\" aria-hidden=\"true\"></span>Zertifikat abgelaufen<")
+        self.assertRegex(page, r"status-dot status-warn\" aria-hidden=\"true\"></span>Zertifikat abgelaufen<")
         self.assertNotRegex(page, r">bereit<")
 
 

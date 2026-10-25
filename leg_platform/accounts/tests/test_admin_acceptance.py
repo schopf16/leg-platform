@@ -74,7 +74,7 @@ class FirstStepsTests(TestCase):
         self.assertNotIn("recent-actions-module", page)
         self.assertNotIn("Neueste Aktionen", page)
         self.assertNotIn("portal-state-todo", page)
-        self.assertIn('class="status-dot status-muted"', page)
+        self.assertIn('class="status-dot status-warn"', page)
 
     def test_the_status_follows_the_settings(self):
         client, _administrator = administrator_client()
@@ -317,7 +317,7 @@ class WordsOfTheAdministrationTests(TestCase):
             reverse("admin:accounts_user_change", args=(self.other.pk,))
         ).content.decode()
 
-        self.assertIn('<li><a href="/admin/">Benutzer</a></li>', page)
+        self.assertIn('<li>Benutzer</li>', page)
         self.assertNotIn('<a href="/admin/accounts/">', page)
         self.assertIn("Änderungsverlauf", page)
         self.assertNotIn("Geschichte", page)
