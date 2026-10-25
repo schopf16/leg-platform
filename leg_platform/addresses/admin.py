@@ -11,11 +11,57 @@ from leg_platform.accounts.models import SecurityEvent
 
 from . import runner, status
 from .limits import allow_request
-from .models import ImportRequest
+from .models import ImportRequest, ServicePostalCode
 
 PERMISSION = "addresses.request_directory_import"
+# The postal codes of the service area of the transformer station scan (D-118); its own right, like the one above.
+SERVICE_AREA_PERMISSION = "addresses.manage_service_areas"
 # How often the page asks for the status while an import is queued or running (seconds).
 POLL_SECONDS = 2
+
+
+@admin.register(ServicePostalCode)
+class ServicePostalCodeAdmin(admin.ModelAdmin):
+    # Only the right ``addresses.manage_service_areas`` (D-118): view, add, change and delete of the postal codes.
+    list_display = ("postal_code",)
+    search_fields = ("postal_code",)
+
+    def has_module_permission(self, request):
+        return request.user.has_perm(SERVICE_AREA_PERMISSION)
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm(SERVICE_AREA_PERMISSION)
+
+    def has_add_permission(self, request):
+        return request.user.has_perm(SERVICE_AREA_PERMISSION)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.has_perm(SERVICE_AREA_PERMISSION)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.has_perm(SERVICE_AREA_PERMISSION)
+
+    # Every change is a security event (D-118) with the postal codes of the service area after the change, nothing else.
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            self._record_change(request)
+
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            super().delete_model(request, obj)
+            self._record_change(request)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            super().delete_queryset(request, queryset)
+            self._record_change(request)
+
+    @staticmethod
+    def _record_change(request):
+        codes = ServicePostalCode.objects.order_by("postal_code").values_list("postal_code", flat=True)
+        detail = "postal codes: " + (", ".join(codes) or "none")
+        security_log.record(SecurityEvent.Event.SERVICE_AREA_CHANGED, actor=request.user, detail=detail)
 
 
 @admin.register(ImportRequest)
@@ -69,6 +115,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
             "opts": self.model._meta,
             "import_status": status.build(),
             "plant_status": status.plant_status(),
+            "transformer_status": status.transformer_status(),
             "status_url": reverse("admin:addresses_importrequest_status"),
             "poll_seconds": POLL_SECONDS,
         }

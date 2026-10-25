@@ -3,6 +3,7 @@
 import uuid
 from datetime import time, timedelta
 
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -65,6 +66,10 @@ class Address(models.Model):
     # Entrance of the building (column ADR_EDID, "Eingangsidentifikator"; D-049): with the EGID it tells the
     # entrances of one building (or the buildings of one address) apart. Null: the file gives none.
     entrance_id = models.PositiveSmallIntegerField(null=True, editable=False)
+    # LV95 (EPSG:2056) position of the address point (columns ADR_EASTING and ADR_NORTHING; D-049 amendment of
+    # 2026-10-25). Null: the file gives none. Used for the transformer station match (D-118).
+    easting = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
+    northing = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
 
     objects = AddressQuerySet.as_manager()
 
@@ -110,12 +115,13 @@ class ImportRequest(models.Model):
     class Source(models.TextChoices):
         ADDRESS = "address", _("Address directory")
         PLANT = "plant", _("Plant register")
+        TRANSFORMER = "transformer", _("Transformer stations")
 
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     state = models.CharField(max_length=12, choices=State, default=State.IDLE, verbose_name=_("Status"))
     # The import that holds this one claim (D-117): the address directory or the plant register. Both share the claim
     # (D-090): no import starts while the other one runs.
-    source = models.CharField(max_length=8, choices=Source, default=Source.ADDRESS, editable=False)
+    source = models.CharField(max_length=12, choices=Source, default=Source.ADDRESS, editable=False)
     requested_at = models.DateTimeField(null=True, verbose_name=_("Requested at"))
     started_at = models.DateTimeField(null=True, verbose_name=_("Started at"))
     finished_at = models.DateTimeField(null=True, verbose_name=_("Finished at"))
@@ -158,6 +164,15 @@ class ImportRequest(models.Model):
     last_plant_state = models.CharField(max_length=12, blank=True, default="", editable=False)
     last_plant_finished_at = models.DateTimeField(null=True, editable=False)
     last_plant_error = models.CharField(max_length=255, blank=True, default="", editable=False)
+    # The weekly transformer station scan (D-118, ``schedule.run_transformer_weekly``): the day of its last run, the
+    # result of the last run (``last_transformer_state``, time, fixed failure text) and the statistic of the last success.
+    last_transformer_scheduled_run_on = models.DateField(null=True, editable=False)
+    last_transformer_state = models.CharField(max_length=12, blank=True, default="", editable=False)
+    last_transformer_finished_at = models.DateTimeField(null=True, editable=False)
+    last_transformer_error = models.CharField(max_length=255, blank=True, default="", editable=False)
+    last_transformer_postal_codes = models.CharField(max_length=255, blank=True, default="", editable=False)
+    last_transformer_buildings = models.PositiveIntegerField(null=True, editable=False)
+    last_transformer_with_name = models.PositiveIntegerField(null=True, editable=False)
 
     class Meta:
         default_permissions = ()
@@ -167,6 +182,52 @@ class ImportRequest(models.Model):
 
     def __str__(self):
         return str(_("Data import"))
+
+
+class ServicePostalCode(models.Model):
+    """A postal code of the area the LEG serves; the transformer station scan covers these postal codes (D-118).
+
+    Instance data: entered by staff in the administration (right ``addresses.manage_service_areas``), never in code.
+    """
+
+    postal_code = models.CharField(
+        max_length=4, unique=True, verbose_name=_("Postal code"),
+        validators=[RegexValidator(r"^[1-9][0-9]{3}$", message=_("Enter a Swiss postal code with four digits."))],
+    )
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["postal_code"]
+        permissions = [("manage_service_areas", _("Can manage the postal codes of the service area"))]
+        verbose_name = _("Postal code of the service area")
+        verbose_name_plural = _("Postal codes of the service area")
+
+    def __str__(self):
+        return self.postal_code
+
+
+class TransformerStation(models.Model):
+    """The transformer station of one building, from the public BKW high-discount map (D-118). In the address directory
+    file (alias ``addresses``): one row per building (EGID), with no foreign key to the address generation. A weekly scan
+    replaces the rows of the postal codes it scanned; a lookup joins them to the current generation by EGID.
+    """
+
+    class Match(models.TextChoices):
+        EXACT = "exact", _("Exact")
+        FALLBACK = "fallback", _("Nearest dot")
+        NONE = "none", _("No dot")
+
+    egid = models.PositiveIntegerField(unique=True, editable=False)
+    postal_code = models.CharField(max_length=4, db_index=True, editable=False)
+    # The cleaned name only (``transformers.CLEAN_NAME``), never the raw text of the map; "" when the map shows none.
+    name = models.CharField(max_length=64, blank=True, default="", editable=False)
+    match = models.CharField(max_length=8, choices=Match, editable=False)
+    scanned_at = models.DateTimeField(editable=False)
+
+    class Meta:
+        default_permissions = ()
+        verbose_name = _("Transformer station")
+        verbose_name_plural = _("Transformer stations")
 
 
 class BuildingLookup(models.Model):

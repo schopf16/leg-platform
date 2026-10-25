@@ -499,7 +499,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
             call_command("setup_instance", stdout=out, stderr=err)
         return out.getvalue(), err.getvalue()
 
-    def test_a_first_start_creates_the_file_and_only_the_two_directory_tables(self):
+    def test_a_first_start_creates_the_file_and_only_the_directory_tables(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "state" / "address-directory.sqlite3"
             with directory_file(path) as alias:
@@ -511,7 +511,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                 self.assertEqual(
                     set(alias.introspection.table_names()),
                     {"django_migrations", "addresses_address", "addresses_directory", "addresses_plant",
-                     "addresses_plantregister"},
+                     "addresses_plantregister", "addresses_transformerstation"},
                 )
                 job = ImportRequest.objects.get(pk=1)
                 self.assertEqual(job.state, ImportRequest.State.QUEUED)

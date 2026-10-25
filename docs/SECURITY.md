@@ -315,6 +315,11 @@
 
 Sources: Django 6.0 docs (`SECURE_REFERRER_POLICY`, CSRF "Limitations", CSP reference and howto), W3C CSP3, draft-ietf-httpbis-rfc6265bis, W3C SVG integration.
 
+* **Transformer station scan (D-118).** The weekly run (`schedule.run_transformer_weekly`, Saturdays) and the command `scan_transformer_stations` read the public map server of BKW Netz, host `qgisserver-extern.bkw.ch` (one fixed address, `transformers.WMS_URL`, which must be in `importer.APPROVED_WMS_URLS`). No other address, no redirect, certificate verified, no proxy variables, no `.netrc`, no credentials. Only the tiles of the service area are requested, one at a time, at least one second apart. The owner states verbal permission to use the server (recorded 2026-10-25; source: owner statement).
+  * **Deadline:** each tile request runs in a helper thread with a hard total limit of 60 seconds (`transformers.REQUEST_SECONDS`, also cut at the rest of the run's 3,600 seconds) for connection, headers and body together. At the deadline every socket of the request is shut down (`http_budget.Budget`), as for the downloads.
+  * **Content:** the answer must be a PNG of the requested size and at most 16 MiB; any other answer is a fixed failure. Nothing of the answer is stored or logged.
+  * Only the scheduled run and the command start the scan. No web view and no administration action does (test `NoWebStartTests`).
+
 ## 7. Secrets
 
 * No secrets in Git, source code, documentation, logs or error messages. Local secrets live in ignored files or environment variables; server secrets in protected environment variables or a suitable secret store. Never display secrets in plain text again.
@@ -385,6 +390,8 @@ Sources: Django 6.0 docs (`SECURE_REFERRER_POLICY`, CSRF "Limitations", CSP refe
   * rejected portal-settings uploads (reason code only);
   * the outcome of every address directory import (completed, or failed with the fixed reason; D-090);
   * the outcome of every plant register import (D-117): `pv_import_succeeded` with the kind (manual or automatic) and the number of stored plants; `pv_import_failed` with the kind and one fixed reason (a sentence of `jobs.PLANT_FAILURES`, of `jobs.SAFE_FAILURES`, or the generic text for an unexpected failure). Never a row, a value, a file name or upstream text. Default retention (30 days), like the address events.
+  * the outcome of every transformer station scan (D-118): `transformer_scan_succeeded` with the kind and the number of buildings; `transformer_scan_failed` with the kind and one fixed reason (`jobs.TRANSFORMER_FAILURES`). Never a row, a name, a label, a tile or upstream text. Default retention (30 days).
+  * every change of the postal codes of the service area (`service_area_changed`, D-118): the actor only in the entry; the postal codes after the change in the log line, nothing else. Default retention.
   * every opening of a log page and every log download (D-099).
 * Logs never contain passwords, tokens, secrets or complete security links, and only as much personal data as necessary (basis: OWASP Logging Cheat Sheet).
   * The logging filter (`log_filters.TokenRedactionFilter`) removes tokens of links, email addresses, IBANs and the values that MariaDB names in duplicate-entry and invalid-value errors from every message and exception text before it is written.

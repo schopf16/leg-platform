@@ -682,6 +682,9 @@ class DailyChainTests(TestCase):
             jobs.record_success(claimed, 3)
 
         self.enterContext(patch.object(schedule, "_execute_with_heartbeat", side_effect=execute))
+        # 2026-10-24 is a Saturday: the transformer station scan (D-118) follows the plant register; these tests
+        # do not scan (see test_transformers for the order of the three steps).
+        self.enterContext(patch.object(schedule, "run_transformer_weekly", return_value=schedule.NOT_SATURDAY))
         self.morning = timezone.make_aware(datetime(2026, 10, 24, 4, 0))
         # The address import is due by the update flag.
         ImportRequest.objects.create(pk=1, update_flag_set_at=timezone.now())

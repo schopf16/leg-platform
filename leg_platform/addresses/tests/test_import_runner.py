@@ -62,7 +62,8 @@ class FailureTextTests(SimpleTestCase):
         self.assertEqual(messages, set(jobs.SAFE_FAILURES))
         self.assertEqual(
             set(status.REASONS),
-            set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED},
+            set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
+            | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED},
         )
 
     def test_every_reason_has_a_swiss_german_text_without_the_sharp_s(self):

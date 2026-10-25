@@ -347,6 +347,16 @@ sudo /opt/leg-platform/venv/bin/python -m pip freeze | grep -iE '^(django|mysqlc
 
 Expected: `No broken requirements found.`; Python 3.12 or newer; Django 6.1.x (allowed `>=6.0.9,<6.2`). Record the last output in the hand-over. No hash pinning of PyPI packages: supply-chain risk, owner accepts or rejects (F-3).
 
+Transformer station scan (D-118), server only: the image and OCR packages of the weekly scan are installed on the server, not in the application's dependencies:
+
+```bash
+sudo /opt/leg-platform/venv/bin/python -m pip install -r /opt/leg-platform/app/requirements/transformers.txt
+sudo /opt/leg-platform/venv/bin/python -m pip install --no-deps rapidocr-onnxruntime==1.2.3
+sudo /opt/leg-platform/venv/bin/python -m pip check
+```
+
+The reader package is installed with `--no-deps` on purpose: it declares `opencv-python`, which conflicts with `opencv-python-headless` (both provide `cv2`). Its other requirements are in `requirements/transformers.txt`. The one remaining `pip check` message, "rapidocr-onnxruntime 1.2.3 requires opencv-python, which is not installed.", is expected. The pins are those of `requirements/transformers.txt` (the versions of `bkw_leg_scanner.py`, the others resolved on 2026-10-25). Without them the weekly scan records the fixed text "The map reader is not installed on this server."; nothing else stops. The postal codes of the service area are entered in the administration (right `addresses.manage_service_areas`), never in a file. The scan reads the public BKW map server over HTTPS (`qgisserver-extern.bkw.ch`, outbound port 443, D-118); the server must reach it.
+
 ### 4.3 Directory layout
 
 | Path | Content | Rights |
@@ -823,7 +833,7 @@ Outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com` is neede
 
 ### 8.3 Scheduled tasks (every 15 minutes)
 
-`run_scheduled_tasks` runs every cleanup task once and then the daily address directory run (`scheduled_address_import`, D-090; KONZEPT 3a). A failing task fails the unit.
+`run_scheduled_tasks` runs every cleanup task once and then the daily address directory run (`scheduled_address_import`, D-090; KONZEPT 3a). The daily run also runs the plant register (D-117) and, on Saturdays, the transformer station scan (D-118; outbound HTTPS to `qgisserver-extern.bkw.ch`). A failing task fails the unit.
 
 **Queued imports take priority:** the address task consumes an already queued request (including setup after a missing/changed schema) before daily time, once-per-day, missing-column backoff and `ADDRESS_IMPORT_AUTOMATIC` checks. This is the default installation's asynchronous fallback without the optional importer. Setup queues immediately; the download waits until this task tick (up to 15 minutes plus timer delay and any earlier cleanup runtime), or the optional worker's next poll. No running consumer means the job stays queued. Normal automatic refresh still uses the daily policy below; normal CSV imports never delete the database.
 

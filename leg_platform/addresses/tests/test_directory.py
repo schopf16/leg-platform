@@ -12,6 +12,7 @@ import tempfile
 import types
 import uuid
 import zipfile
+from decimal import Decimal
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -42,13 +43,13 @@ from leg_platform.addresses.router import AddressRouter
 from leg_platform.addresses.services import approximate_matches, clean_input, directory_status, lookup
 
 HEADER = "STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_NAME;COM_NAME\n"
-EGID_HEADER = HEADER.rstrip("\n") + ";BDG_EGID;ADR_EDID\n"
+EGID_HEADER = HEADER.rstrip("\n") + ";BDG_EGID;ADR_EDID;ADR_EASTING;ADR_NORTHING\n"
 SYNTHETIC_CSV = HEADER + "Example Street;12a;9999 Example Town;Discarded synthetic building;Discarded municipality\n"
 
 
 def with_egid(text):
-    """A test table written with ``HEADER`` gets the columns BDG_EGID and ADR_EDID last: every row its own EGID
-    (1001, 1002, ...) and entrance 0.
+    """A test table written with ``HEADER`` gets the columns BDG_EGID, ADR_EDID, ADR_EASTING and ADR_NORTHING last: every
+    row its own EGID (1001, 1002, ...), entrance 0 and one fixed LV95 position.
 
     A text that does not start with ``HEADER`` (a broken header, an empty file) stays as it is.
     """
@@ -56,7 +57,7 @@ def with_egid(text):
         return text
     rows = text[len(HEADER):].split("\n")
     lines = [EGID_HEADER.rstrip("\n")]
-    lines.extend(f"{row};{1000 + number};0" if row else row for number, row in enumerate(rows, start=1))
+    lines.extend(f"{row};{1000 + number};0;2600001.5;1200001.25" if row else row for number, row in enumerate(rows, start=1))
     return "\n".join(lines)
 
 
@@ -109,6 +110,7 @@ class ParserTests(SimpleTestCase):
         self.assertEqual(list(importer.address_rows(io.BytesIO(archive_bytes()))), [{
             "street": "Example Street", "house_number": "12a",
             "postal_code": "9999", "locality": "Example Town", "egid": 1001, "entrance_id": 0,
+            "easting": Decimal("2600001.500"), "northing": Decimal("1200001.250"),
         }])
 
     def test_the_official_names_of_the_building_and_entrance_columns(self):
@@ -117,25 +119,66 @@ class ParserTests(SimpleTestCase):
 
     def test_the_egid_and_the_entrance_are_read_from_their_columns_wherever_the_columns_are(self):
         text = (
-            "ADR_EGAID;BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
-            "1;123456789;3;Example Street;1;9999 Example Town\n"
-            "2;7;32767;Example Street;2;9999 Example Town\n"
+            "ADR_EGAID;BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+            "1;123456789;3;Example Street;1;9999 Example Town;2600001;1200001\n"
+            "2;7;32767;Example Street;2;9999 Example Town;2600002;1200002\n"
         )
         rows = list(importer.address_rows(io.BytesIO(archive_bytes(text))))
         self.assertEqual([(row["egid"], row["entrance_id"]) for row in rows], [(123456789, 3), (7, 32767)])
 
     def test_several_addresses_may_share_an_egid_and_one_address_may_have_several(self):
         text = (
-            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
-            "500;0;Example Street;1;9999 Example Town\n"
-            "500;1;Example Street;1a;9999 Example Town\n"
-            "501;0;Example Street;1;9999 Example Town\n"
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+            "500;0;Example Street;1;9999 Example Town;2600001;1200001\n"
+            "500;1;Example Street;1a;9999 Example Town;2600001;1200001\n"
+            "501;0;Example Street;1;9999 Example Town;2600002;1200002\n"
         )
         rows = list(importer.address_rows(io.BytesIO(archive_bytes(text))))
         self.assertEqual(
             [(row["house_number"], row["egid"], row["entrance_id"]) for row in rows],
             [("1", 500, 0), ("1a", 500, 1), ("1", 501, 0)],
         )
+
+    def test_the_coordinates_are_stored_as_lv95_decimals_with_three_places_and_may_be_empty(self):
+        text = (
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+            "500;0;Example Street;1;9999 Example Town;2600001.5;1200001.25\n"
+            "501;0;Example Street;2;9999 Example Town;2600002.123;1200002\n"
+            "502;0;Example Street;3;9999 Example Town;;\n"
+        )
+        rows = list(importer.address_rows(io.BytesIO(archive_bytes(text))))
+        self.assertEqual(
+            [(row["easting"], row["northing"]) for row in rows],
+            [
+                (Decimal("2600001.500"), Decimal("1200001.250")),
+                (Decimal("2600002.123"), Decimal("1200002.000")),
+                (None, None),
+            ],
+        )
+
+    def test_a_coordinate_outside_lv95_or_with_more_decimals_refuses_the_file(self):
+        head = "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+        for easting, northing in (
+            ("2479999", "1200000"), ("2840001", "1200000"), ("2600000", "1069999"), ("2600000", "1300001"),
+            ("-2600000", "1200000"), ("2600000.1234", "1200000"), ("2.6e6", "1200000"), ("2600000,5", "1200000"),
+        ):
+            with self.subTest(easting=easting, northing=northing), self.assertRaisesMessage(
+                importer.ImportFailure, "Invalid address field.",
+            ):
+                list(importer.address_rows(io.BytesIO(
+                    archive_bytes(head + f"5;0;Example;1;9999 Town;{easting};{northing}\n"),
+                )))
+
+    def test_a_file_without_the_coordinate_columns_is_refused_with_a_fixed_sentence(self):
+        for csv_text in (
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_NORTHING\n5;0;Example;1;9999 Town;1200000\n",
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING\n5;0;Example;1;9999 Town;2600000\n",
+        ):
+            with self.subTest(csv_text=csv_text[:40]):
+                with self.assertRaisesMessage(importer.ImportFailure, "Missing coordinate column.") as raised:
+                    list(importer.address_rows(io.BytesIO(archive_bytes(csv_text))))
+                self.assertIn(str(raised.exception), jobs.SAFE_FAILURES)
+                self.assertIn(str(raised.exception), jobs.COLUMN_FAILURES)
 
     def test_a_file_without_the_egid_or_the_entrance_column_is_refused_with_a_fixed_sentence(self):
         for csv_text, message in (
@@ -150,15 +193,15 @@ class ParserTests(SimpleTestCase):
                 self.assertIn(str(raised.exception), jobs.SAFE_FAILURES)
 
     def test_an_empty_egid_or_entrance_is_stored_as_none_and_an_invalid_one_refuses_the_file(self):
-        head = "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
-        rows = list(importer.address_rows(io.BytesIO(archive_bytes(head + ";;Example;1;9999 Town\n"))))
+        head = "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+        rows = list(importer.address_rows(io.BytesIO(archive_bytes(head + ";;Example;1;9999 Town;;\n"))))
         self.assertEqual((rows[0]["egid"], rows[0]["entrance_id"]), (None, None))
         for value in ("0", "012", "1000000000", "-5", "12.0", "1e3", "abc", " 5", "5 ", "\u0663"):
             with self.subTest(egid=value), self.assertRaisesMessage(importer.ImportFailure, "Invalid address field."):
-                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"{value};0;Example;1;9999 Town\n"))))
+                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"{value};0;Example;1;9999 Town;2600001;1200001\n"))))
         for value in ("00", "01", "32768", "100000", "-1", "1.0", "x", " 1", "\u0663"):
             with self.subTest(entrance=value), self.assertRaisesMessage(importer.ImportFailure, "Invalid address field."):
-                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"5;{value};Example;1;9999 Town\n"))))
+                list(importer.address_rows(io.BytesIO(archive_bytes(head + f"5;{value};Example;1;9999 Town;2600001;1200001\n"))))
 
     def test_dangerous_or_unexpected_zip_members_rejected(self):
         for name in ("../escape.csv", "/escape.csv", "other.csv", "sub/" + importer.CSV_NAME):
@@ -366,14 +409,15 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         # ``plants.py`` (D-117) is the second downloader: the daily run of the plant register, reached only through
         # ``jobs.execute``. The read helper ``plant_lookup.py`` has no network access.
         # ``http_budget.py`` (the socket budget of a download, D-117) imports the transport adapter of ``requests`` but
-        # makes no request itself; only the two downloaders use it.
+        # makes no request itself; only the downloaders use it. ``transformers.py`` (D-118) is the third one: the map
+        # server, reached only through ``jobs.execute`` and the two commands, never by a web request.
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*(import|from) requests\b", text, re.M)),
-            ["http_budget.py", "importer.py", "plants.py", "swisstopo.py"],
+            ["http_budget.py", "importer.py", "plants.py", "swisstopo.py", "transformers.py"],
         )
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*from \.http_budget import", text, re.M)),
-            ["importer.py", "swisstopo.py"],
+            ["importer.py", "swisstopo.py", "transformers.py"],
         )
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*(from \. import .*\bswisstopo\b|from \.swisstopo)", text, re.M)),
@@ -649,10 +693,10 @@ class DirectoryDatabaseTests(TestCase):
 
     def test_an_import_stores_the_egid_and_the_entrance_per_address_and_marks_the_generation(self):
         text = (
-            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL\n"
-            "500;0;Example Street;1;9999 Example Town\n"
-            "501;1;Example Street;1;9999 Example Town\n"
-            "500;2;Example Street;1a;9999 Example Town\n"
+            "BDG_EGID;ADR_EDID;STN_LABEL;ADR_NUMBER;ZIP_LABEL;ADR_EASTING;ADR_NORTHING\n"
+            "500;0;Example Street;1;9999 Example Town;2600001;1200001\n"
+            "501;1;Example Street;1;9999 Example Town;2600001;1200001\n"
+            "500;2;Example Street;1a;9999 Example Town;2600001;1200001\n"
         )
         self.assertEqual(importer._publish(io.BytesIO(archive_bytes(text)), "1" * 64, timezone.localdate()), 3)
         directory = Directory.objects.get(pk=1)
@@ -2544,6 +2588,7 @@ class ReadOnlyDefaultTests(TransactionTestCase):
         "addresses/management/commands/import_address_directory.py",
         "addresses/management/commands/scheduled_address_import.py",
         "addresses/management/commands/seed_local_address_directory.py",
+        "addresses/management/commands/scan_transformer_stations.py",
         "addresses/management/commands/migrate.py",
         "accounts/management/commands/setup_instance.py",
     }
@@ -2826,10 +2871,10 @@ class MigrateTests(SimpleTestCase):
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory",
-                              "addresses_plant", "addresses_plantregister"})
+                              "addresses_plant", "addresses_plantregister", "addresses_transformerstation"})
             self.assertEqual(address_columns, {
                 "id", "generation", "street", "house_number", "postal_code", "locality",
-                "street_key", "house_number_key", "locality_key", "egid", "entrance_id",
+                "street_key", "house_number_key", "locality_key", "egid", "entrance_id", "easting", "northing",
             })
             self.assertEqual(directory_columns, {
                 "id", "generation", "data_date", "imported_at", "checksum", "row_count",
@@ -2853,6 +2898,8 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0007_locality_index"),
                 ("addresses", "0008_plant_register_and_pv_import"),
                 ("addresses", "0009_data_import_labels_and_plant_run"),
+                ("addresses", "0010_address_coordinates"),
+                ("addresses", "0011_transformer_scan"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.
@@ -2903,3 +2950,14 @@ class MigrateTests(SimpleTestCase):
             self.assertEqual(shell.returncode, 0, shell.stderr[-500:])
             # `shell` prints a line about its automatic imports first.
             self.assertEqual(shell.stdout.split()[-3:], ["rows", "1", "True"])
+
+
+class CoordinateMigrationTests(SimpleTestCase):
+    def test_the_coordinate_migration_makes_the_setup_rebuild_the_directory_file(self):
+        # setup.prepare_directory rebuilds the disposable file when a migration changes the address tables (D-075, D-117).
+        from leg_platform.addresses import setup
+
+        migration = MigrationLoader(None, ignore_no_migrations=True).get_migration(
+            "addresses", "0010_address_coordinates",
+        )
+        self.assertTrue(setup._changes_directory(migration))

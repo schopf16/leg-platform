@@ -11,7 +11,7 @@ from django.db.migrations.operations.models import AlterModelManagers, AlterMode
 from django.db.migrations.operations.special import RunPython, RunSQL, SeparateDatabaseAndState
 
 from . import jobs
-from .models import Address, Directory, ImportRequest, Plant, PlantRegister
+from .models import Address, Directory, ImportRequest, Plant, PlantRegister, TransformerStation
 from .sqlite.base import DatabaseWrapper
 from .storage import DIRECTORY_ALIAS, directory_open_guard, rebuilding_directory, reset_marker
 
@@ -27,7 +27,7 @@ def _changes_directory(migration):
             return router.allow_migrate(DIRECTORY_ALIAS, migration.app_label, **operation.hints)
         return migration.app_label == "addresses" and any(
             operation.references_model(model._meta.model_name, "addresses")
-            for model in (Address, Directory, Plant, PlantRegister)
+            for model in (Address, Directory, Plant, PlantRegister, TransformerStation)
         )
 
     return any(relevant(operation) for operation in migration.operations)
@@ -37,7 +37,7 @@ def _schema_matches(connection):
     """Also detect missing tables, columns or declared indexes despite recorded migrations."""
     with connection.cursor() as cursor:
         tables = connection.introspection.table_names(cursor)
-        for model in (Address, Directory, Plant, PlantRegister):
+        for model in (Address, Directory, Plant, PlantRegister, TransformerStation):
             table = model._meta.db_table
             if table not in tables:
                 return False
