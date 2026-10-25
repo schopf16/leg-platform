@@ -136,13 +136,9 @@ def page(request):
         "security_lines": text_box_lines("security", since, count) if "security" in shown else None,
         "housekeeping_lines": text_box_lines("housekeeping", since, count) if "housekeeping" in shown else None,
         "import_lines": text_box_lines("import", since, count) if "import" in shown else None,
-        "file_links": [
-            ("application", reverse("admin:logs_view", kwargs={"log": "application"})),
-            ("security", reverse("admin:logs_view", kwargs={"log": "security"})),
-        ],
         "settings_form": NotificationForm(instance=settings_row(), request=request),
         "suppressed": suppressed_counts(),
-        "log_list_url": reverse("admin:logs"),
+        "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
     }
     return TemplateResponse(request, "admin/logmenu/page.html", context)
 
@@ -318,11 +314,10 @@ def settings_view(request):
         "security_lines": None,
         "housekeeping_lines": None,
         "import_lines": None,
-        "file_links": [],
         "line_counts": LINE_COUNTS,
         "lines_selected": DEFAULT_LINES,
         "suppressed": suppressed_counts(),
-        "log_list_url": reverse("admin:logs"),
+        "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
     }
     return TemplateResponse(request, "admin/logmenu/page.html", context, status=400)
 

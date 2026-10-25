@@ -52,7 +52,7 @@
 
 <section class="data-import-block" id="logmenu-notify" aria-labelledby="logmenu-notify-heading">
   <h2 id="logmenu-notify-heading">{% translate "Email notice" %}</h2>
-  <p class="help">{% translate "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour." %}</p>
+  <p class="help">{% translate "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour." %} <a href="{{ mail_settings_url }}">{% translate "Mail settings" %}</a></p>
   {% if suppressed %}
   <ul>{% for source, count in suppressed.items %}<li>{{ source }}: {{ count }}</li>{% endfor %}</ul>
   {% endif %}

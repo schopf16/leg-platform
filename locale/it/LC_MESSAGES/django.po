@@ -8256,6 +8256,9 @@ msgstr "Avviso via e-mail"
 msgid "Details in the import log"
 msgstr "Dettagli nel registro delle importazioni"
 
+msgid "Mail settings"
+msgstr "Impostazioni e-mail"
+
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 

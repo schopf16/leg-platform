@@ -424,3 +424,34 @@ class PageLayoutTests(LogMenuBase):
         self.assertIn("Bestätigung erforderlich", html)
         self.assertIn("deshalb ist ein Nachweis der Identität nötig", html)
         self.assertNotIn("Proof of identity", html)
+
+
+class SidebarEntryTests(LogMenuBase):
+    """Design review B: the mail settings are reached from Protokolle, the postal codes are under Verwaltungsdaten,
+    the sidebar has no quick filter field."""
+
+    def sidebar(self):
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        return html[html.index('id="nav-sidebar"'):html.index("</nav>", html.index('id="nav-sidebar"'))]
+
+    def group(self, html, key):
+        start = html.index(f'class="admin-group app-{key}"')
+        return html[start:html.index("</details>", start)]
+
+    def test_the_mail_settings_are_not_a_sidebar_entry_but_a_link_on_the_log_page(self):
+        sidebar = self.sidebar()
+        mail = reverse("admin:accounts_graphconfiguration_changelist")
+        self.assertNotIn(f'href="{mail}"', sidebar)
+        page = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        self.assertIn(f'href="{mail}"', page)
+        self.assertIn("E-Mail-Einstellungen", page)
+
+    def test_the_postal_codes_are_under_management_data(self):
+        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
+        postal = reverse("admin:addresses_servicepostalcode_changelist")
+        self.assertIn(f'href="{postal}"', self.group(html, "data"))
+        self.assertNotIn(f'href="{postal}"', self.group(html, "system"))
+
+    def test_the_sidebar_has_no_quick_filter_field(self):
+        self.assertNotIn('id="nav-filter"', self.sidebar())
+

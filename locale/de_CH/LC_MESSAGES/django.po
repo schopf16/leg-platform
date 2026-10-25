@@ -8282,6 +8282,9 @@ msgstr "E-Mail-Meldung"
 msgid "Details in the import log"
 msgstr "Details im Importprotokoll"
 
+msgid "Mail settings"
+msgstr "E-Mail-Einstellungen"
+
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 

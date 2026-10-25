@@ -25,14 +25,13 @@ ADMIN_GROUPS = (
         _("Management data"),
         (
             "Location", "MeteringPoint", "Leg", "TransformerCircuit", "PersonRecord", "PersonAssignment",
-            "LegAssignment", "ShareChange", "HistoryEntry", "ManagementSettings",
+            "LegAssignment", "ShareChange", "HistoryEntry", "ManagementSettings", "ServicePostalCode",
         ),
     ),
     (
         "system",
         _("System"),
         (
-            "GraphConfiguration",
             "SecurityEvent",
             "AccessAttempt",
             "AccessFailureLog",
@@ -43,8 +42,10 @@ ADMIN_GROUPS = (
     ),
 )
 SYSTEM_ORDER = (
-    "ImportRequest", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent", "GraphConfiguration",
+    "ImportRequest", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent",
 )
+# Entries that are not in the sidebar (design review B): the mail settings are reached from the log menu.
+SIDEBAR_HIDDEN = ("AccessAttempt", "AccessFailureLog", "GraphConfiguration")
 INDEX_HINT = _(
     "You maintain the name, the logo, the colours and the addresses of the portal and the "
     "texts of the emails under Content."
@@ -191,7 +192,7 @@ class PortalAdminSite(AdminSite):
             return app_list
         entries = [model for app in app_list for model in app["models"]]
         # The two lockout lists are one entry, "Failed logins" (owner decision; see the link below).
-        entries = [model for model in entries if model["object_name"] not in ("AccessAttempt", "AccessFailureLog")]
+        entries = [model for model in entries if model["object_name"] not in SIDEBAR_HIDDEN]
         index_url = reverse("admin:index", current_app=self.name)
         grouped = []
         for key, name, object_names in ADMIN_GROUPS:

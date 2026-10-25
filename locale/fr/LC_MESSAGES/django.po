@@ -8285,6 +8285,9 @@ msgstr "Avis par e-mail"
 msgid "Details in the import log"
 msgstr "Détails dans le journal des imports"
 
+msgid "Mail settings"
+msgstr "Paramètres de messagerie"
+
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 

@@ -1,0 +1,6 @@
+{% load i18n %}{# The side navigation of the portal (design review B): Django's version without the quick filter field; the groups #}
+{# are the admin groups of admin_site.py (open only with the current page). #}
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  {% include 'admin/app_list.html' with app_list=available_apps show_changelinks=False %}
+</nav>
