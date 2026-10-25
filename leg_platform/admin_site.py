@@ -25,14 +25,13 @@ ADMIN_GROUPS = (
         _("Management data"),
         (
             "Location", "MeteringPoint", "Leg", "TransformerCircuit", "PersonRecord", "PersonAssignment",
-            "LegAssignment", "ShareChange", "HistoryEntry", "ManagementSettings",
+            "LegAssignment", "ShareChange", "HistoryEntry", "ManagementSettings", "ServicePostalCode",
         ),
     ),
     (
         "system",
         _("System"),
         (
-            "GraphConfiguration",
             "SecurityEvent",
             "AccessAttempt",
             "AccessFailureLog",
@@ -42,10 +41,21 @@ ADMIN_GROUPS = (
         ),
     ),
 )
+SYSTEM_ORDER = (
+    "ImportRequest", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent",
+)
+# Entries that are not in the sidebar (design review B): the mail settings are reached from the log menu.
+SIDEBAR_HIDDEN = ("AccessAttempt", "AccessFailureLog", "GraphConfiguration")
 INDEX_HINT = _(
     "You maintain the name, the logo, the colours and the addresses of the portal and the "
     "texts of the emails under Content."
 )
+
+
+def is_current_page(entry_url, path):
+    """True when the request path is the entry's URL or lies below it (exact segments, never a substring)."""
+    base = entry_url.rstrip("/")
+    return path == base or path == base + "/" or path.startswith(base + "/")
 
 
 class PortalAdminSite(AdminSite):
@@ -181,6 +191,8 @@ class PortalAdminSite(AdminSite):
         if app_label is not None:
             return app_list
         entries = [model for app in app_list for model in app["models"]]
+        # The two lockout lists are one entry, "Failed logins" (owner decision; see the link below).
+        entries = [model for model in entries if model["object_name"] not in SIDEBAR_HIDDEN]
         index_url = reverse("admin:index", current_app=self.name)
         grouped = []
         for key, name, object_names in ADMIN_GROUPS:
@@ -204,6 +216,14 @@ class PortalAdminSite(AdminSite):
                             "view_only": True,
                         },
                         {
+                            "name": _("Failed logins"),
+                            "object_name": "FailedLogins",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:failed_logins", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        {
                             "name": _("Log menu"),
                             "object_name": "LogMenu",
                             "perms": {"view": True},
@@ -211,16 +231,12 @@ class PortalAdminSite(AdminSite):
                             "add_url": None,
                             "view_only": True,
                         },
-                        {
-                            "name": _("Import log"),
-                            "object_name": "ImportLog",
-                            "perms": {"view": True},
-                            "admin_url": reverse("admin:addresses_importrequest_log", current_app=self.name),
-                            "add_url": None,
-                            "view_only": True,
-                        },
                         ]
                     )
+            if key == "system":
+                # The order of the System group (spec section 2): imports, maintenance, logs, log files, failed logins,
+                # security log, Graph configuration; anything else last.
+                members.sort(key=lambda m: SYSTEM_ORDER.index(m["object_name"]) if m["object_name"] in SYSTEM_ORDER else len(SYSTEM_ORDER))
             if members:
                 grouped.append(
                     {
@@ -228,9 +244,12 @@ class PortalAdminSite(AdminSite):
                         "app_label": key,
                         "app_url": index_url,
                         "has_module_perms": True,
-                        "models": members,
+                        "models": [dict(m, current=is_current_page(m["admin_url"], request.path)) for m in members],
                     }
                 )
+        for group in grouped:
+            # A group is open only when it holds the current page (design review; the sidebar and the start page).
+            group["current"] = any(model["current"] for model in group["models"])
         return grouped
 
     def get_urls(self):
@@ -239,12 +258,14 @@ class PortalAdminSite(AdminSite):
         from django.urls import path
 
         from leg_platform import log_menu, log_views
+        from leg_platform.accounts.admin.security import failed_logins_view
 
         return [
             path("logs/", self.admin_view(log_views.log_list), name="logs"),
             path("logs/<logkey:log>/", self.admin_view(log_views.log_view), name="logs_view"),
             path("logs/<logkey:log>/tail/", self.admin_view(log_views.log_tail), name="logs_tail"),
             path("logs/<logkey:log>/download/", self.admin_view(log_views.log_download), name="logs_download"),
+            path("failed-logins/", self.admin_view(failed_logins_view), name="failed_logins"),
             path("logmenu/", self.admin_view(log_menu.page), name="logmenu"),
             path("logmenu/settings/", self.admin_view(log_menu.settings_view), name="logmenu_settings"),
             path("logmenu/download/<str:source>/", self.admin_view(log_menu.download), name="logmenu_download"),

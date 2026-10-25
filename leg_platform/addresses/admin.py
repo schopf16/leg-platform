@@ -99,27 +99,12 @@ class ImportRequestAdmin(admin.ModelAdmin):
         ]
 
     def log_view(self, request):
-        """The import error log (D-121): system administrators only; every view is a security event."""
+        """The old address of the import log: it redirects to its section on the import page (owner decision, D-121).
+        Only system administrators; the download and its redaction are unchanged."""
         from leg_platform.log_menu import require_superuser
 
         require_superuser(request)
-        if request.method != "GET":
-            return HttpResponseNotAllowed(["GET"])
-        log_views.record_view(request, "importlog")
-        source = request.GET.get("source", "")
-        if source not in ("", *IMPORT_LOG_SOURCES):
-            source = ""
-        context = {
-            **self.admin_site.each_context(request),
-            "title": _("Import log"),
-            "opts": self.model._meta,
-            "rows": import_log_rows(source),
-            "source": source,
-            "sources": [("", _("All sources")), *[(key, label) for key, label in IMPORT_LOG_SOURCES.items()]],
-            "download_url": reverse("admin:addresses_importrequest_log_download", kwargs={"source": source or "all"}),
-            "back_url": reverse("admin:addresses_importrequest_changelist"),
-        }
-        return TemplateResponse(request, "admin/addresses/importlog.html", context)
+        return HttpResponseRedirect(reverse("admin:addresses_importrequest_changelist") + "#import-log")
 
     def log_download(self, request, source):
         """The rows of the import error log as text, redacted like the log files (D-121, D-099)."""
@@ -173,10 +158,30 @@ class ImportRequestAdmin(admin.ModelAdmin):
             "plant_status": status.plant_status(),
             "transformer_status": status.transformer_status(),
             "status_url": reverse("admin:addresses_importrequest_status"),
-            "import_log_url": reverse("admin:addresses_importrequest_log"),
+            "import_log_url": reverse("admin:addresses_importrequest_changelist") + "#import-log",
             "poll_seconds": POLL_SECONDS,
+            "import_log": self.import_log_section(request) if request.user.is_superuser else None,
         }
         return TemplateResponse(request, "admin/addresses/directory.html", context)
+
+    def import_log_section(self, request):
+        """The import error log as text, at the bottom of the import page (superusers only; D-121, owner decision)."""
+        from leg_platform import log_views
+        from leg_platform.log_menu import LINE_COUNTS, line_count
+
+        log_views.record_view(request, "importlog")
+        source = request.GET.get("log_source", "")
+        if source not in ("", *IMPORT_LOG_SOURCES):
+            source = ""
+        count = line_count(request)
+        return {
+            "lines": import_log_text(source, count),
+            "source": source,
+            "sources": [("", _("All sources")), *[(key, label) for key, label in IMPORT_LOG_SOURCES.items()]],
+            "line_counts": LINE_COUNTS,
+            "lines_selected": str(count),
+            "download_url": reverse("admin:addresses_importrequest_log_download", kwargs={"source": source or "all"}),
+        }
 
     def status_view(self, request):
         """The status as JSON for the script of the page: signed in, same right as the page, GET only, never cached."""
@@ -206,6 +211,19 @@ def import_log_queryset(source=""):
     return rows.order_by("-occurred_at", "-pk")[:IMPORT_LOG_LIMIT]
 
 
+def import_log_text(source, count):
+    """The newest ``count`` lines of the import error log as text, oldest first, redacted like the download (D-099)."""
+    rows = list(import_log_queryset(source))[:count]
+    rows.reverse()
+    return [
+        redact_personal_data(redact_tokens(
+            f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}  {IMPORT_LOG_SOURCES[row.source]}  "
+            f"{row.step or '-'}  {_(row.reason)}"
+        ))
+        for row in rows
+    ]
+
+
 def import_log_rows(source=""):
     """The rows for the page: the source label, the time, the step and the fixed reason text (translated)."""
     return [
@@ -219,6 +237,15 @@ def import_log_rows(source=""):
 
 # The housekeeping of both databases (D-119): its own right, checked on the page, the POST and the status endpoint.
 HOUSEKEEPING_PERMISSION = "addresses.run_housekeeping"
+
+
+def _error_line_count(request):
+    """The number of lines of the error box from the query (50, 200 or 500; the default 200)."""
+    try:
+        value = int(request.GET.get("lines", housekeeping.ERROR_LINES_DEFAULT))
+    except ValueError:
+        return housekeeping.ERROR_LINES_DEFAULT
+    return value if value in housekeeping.ERROR_LINE_COUNTS else housekeeping.ERROR_LINES_DEFAULT
 
 
 @admin.register(HousekeepingStatus)
@@ -268,7 +295,7 @@ class HousekeepingStatusAdmin(admin.ModelAdmin):
             return HttpResponseNotAllowed(["GET", "POST"])
         context = {
             **self.admin_site.each_context(request),
-            **housekeeping.page_context(),
+            **housekeeping.page_context(lines=_error_line_count(request)),
             "title": _("Housekeeping"),
             "opts": self.model._meta,
         }

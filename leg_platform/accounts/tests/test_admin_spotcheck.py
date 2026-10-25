@@ -43,7 +43,7 @@ class GraphStepTests(TestCase):
     def test_a_valid_certificate_is_ready(self):
         page = self.client.get(INDEX_URL).content.decode()
 
-        self.assertRegex(page, r"portal-state portal-state-ok\">bereit<")
+        self.assertRegex(page, r"status-dot status-ok\" aria-hidden=\"true\"></span>bereit<")
         self.assertNotIn("Zertifikat abgelaufen", page)
 
     def test_an_expired_certificate_is_not_ready(self):
@@ -52,7 +52,7 @@ class GraphStepTests(TestCase):
 
         page = self.client.get(INDEX_URL).content.decode()
 
-        self.assertRegex(page, r"portal-state portal-state-todo\">Zertifikat abgelaufen<")
+        self.assertRegex(page, r"status-dot status-warn\" aria-hidden=\"true\"></span>Zertifikat abgelaufen<")
         self.assertNotRegex(page, r">bereit<")
 
 
@@ -97,7 +97,7 @@ class GroupRightsTests(TestCase):
                     "Portal-Einstellungen: ansehen",
                     "Portal-Einstellungen: ändern",
                     # The plain tables of the management data: view only (D-091).
-                    "Einstellungen der Verwaltung: ansehen",
+                    "Verwaltungseinstellungen: ansehen",
                     "LEG-Zuordnung: ansehen",
                     "LEG: ansehen",
                     "Messpunkt: ansehen",

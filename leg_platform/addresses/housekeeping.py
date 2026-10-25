@@ -47,6 +47,8 @@ FREE_SPACE_MARGIN = 1024 ** 3
 # The lease of a run: a run that is killed is taken over after this time.
 RUN_LEASE = timedelta(hours=3)
 # The scheduled run: Sunday from this time of day (instance time). The daily address import runs at 03:00 by default.
+ERROR_LINE_COUNTS = (50, 200, 500)
+ERROR_LINES_DEFAULT = 200
 SUNDAY = 6
 SCHEDULED_TIME = time(4, 30)
 
@@ -388,6 +390,20 @@ def error_rows(limit=None, open_only=False):
     ]
 
 
+def error_lines(count):
+    """The newest ``count`` housekeeping errors as text lines, oldest first (the newest at the bottom).
+
+    Each line: time, step, fixed reason text, dump file name (never content or SQL), open or acknowledged.
+    """
+    rows = error_rows(limit=count)
+    rows.reverse()
+    return [
+        f"{timezone.localtime(row['occurred_at']):%Y-%m-%d %H:%M:%S}  {row['step']}  {row['reason']}  "
+        f"{row['dump'] or '-'}  {_('Open') if row['open'] else _('Acknowledged')}"
+        for row in rows
+    ]
+
+
 def _execute(now):
     """Both steps, then the results and the release of the lease in one write.
 
@@ -492,31 +508,48 @@ def refusal_text(result):
     return texts.get(result, _("The housekeeping did not start."))
 
 
+def _tone(state):
+    """The colour word of a step (a dot plus the word, never colour alone): the tokens of the admin stylesheet."""
+    return {"succeeded": "ok", "failed": "bad", "skipped": "warn"}.get(state, "muted")
+
+
 def _state_label(state):
-    return HousekeepingStatus.State(state).label if state else ""
+    """The word of a step: a dot and the word, never colour alone (design review 5)."""
+    words = {
+        "": _("Not run yet"),
+        HousekeepingStatus.State.SUCCEEDED: _("Successful"),
+        HousekeepingStatus.State.FAILED: _("Failed"),
+        HousekeepingStatus.State.SKIPPED: _("Skipped"),
+    }
+    return str(words.get(state or "", words[""]))
 
 
 def _step_rows(status):
     return [
         {
-            "label": _("Address directory"), "state": status.sqlite_state, "state_label": _state_label(status.sqlite_state),
+            "label": _("Address directory"), "state": status.sqlite_state, "state_label": _state_label(status.sqlite_state), "tone": _tone(status.sqlite_state),
             "finished_at": status.sqlite_finished_at, "text": message_text(status.sqlite_message),
         },
         {
-            "label": _("Application database"), "state": status.mariadb_state,
+            "label": _("Application database"), "state": status.mariadb_state, "tone": _tone(status.mariadb_state),
             "state_label": _state_label(status.mariadb_state),
             "finished_at": status.mariadb_finished_at, "text": message_text(status.mariadb_message),
         },
     ]
 
 
-def page_context(now=None):
+def page_context(now=None, lines=ERROR_LINES_DEFAULT):
     """The data of the administration page (read only)."""
     now = now or timezone.now()
     status = HousekeepingStatus.objects.get_or_create(pk=1)[0]
     backup, backup_code = read_backup_status()
+    from leg_platform.addresses.status import megabytes_text
+
     sizes = [
-        {"name": name, "before": values["before"], "after": values["after"]}
+        {
+            "name": name, "before": values["before"], "after": values["after"],
+            "before_text": megabytes_text(values["before"]), "after_text": megabytes_text(values["after"]),
+        }
         for name, values in (status.mariadb_sizes or {}).items()
     ]
     return {
@@ -527,7 +560,9 @@ def page_context(now=None):
         "backup": backup,
         "backup_text": message_text(backup_code) if backup_code else "",
         "backup_fresh": backup_verdict(now) is None,
-        "errors": error_rows(limit=20),
+        "error_lines": error_lines(lines),
+        "error_line_counts": ERROR_LINE_COUNTS,
+        "lines_selected": lines,
         "open_error": open_error_exists(),
     }
 

@@ -19,6 +19,7 @@ from django.db import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
@@ -460,3 +461,105 @@ class ErrorAdminTests(HousekeepingBase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(HousekeepingError.objects.filter(cleared_at__isnull=True).count(), 1)
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED).exists())
+
+
+class ErrorTextBoxTests(HousekeepingBase):
+    """The error list is a text box (owner decision, D-120/D-122 log style): lines limited, newest at the bottom."""
+
+    def setUp(self):
+        super().setUp()
+        self.person = create_active_user("housekeeping.textbox@example.org")
+        self.person.set_privileges(is_staff=True, is_superuser=False)
+        self.person.user_permissions.add(Permission.objects.get(codename="run_housekeeping"))
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.person)
+        self.url = reverse("admin:addresses_housekeepingstatus_changelist")
+
+    def make_errors(self, count):
+        for index in range(count):
+            HousekeepingError.objects.create(
+                step=HousekeepingError.Step.SQLITE, reason=housekeeping.SQLITE_VACUUM_FAILED,
+                dump_file_name=f"housekeeping-{index:04d}.sql.gz")
+
+    def error_section(self, response):
+        content = response.content.decode()
+        start = content.index('id="housekeeping-error-box"') if 'id="housekeeping-error-box"' in content else -1
+        self.assertGreaterEqual(start, 0)
+        return content[content.rfind("<form", 0, start):content.index("</pre>", start) + len("</pre>")]
+
+    def test_the_errors_are_a_text_box_without_a_table(self):
+        self.make_errors(2)
+        response = self.client_.get(self.url)
+        section = self.error_section(response)
+        self.assertIn('<pre class="log-box" id="housekeeping-error-box"', section)
+        self.assertNotIn("<table", section)
+        self.assertNotIn('id="housekeeping-error-log"', response.content.decode())
+        self.assertEqual(section.count('class="log-line"'), 2)
+
+    def test_the_line_count_limits_the_lines_and_the_newest_is_at_the_bottom(self):
+        self.make_errors(60)
+        response = self.client_.get(self.url, {"lines": "50"})
+        section = self.error_section(response)
+        self.assertEqual(section.count('class="log-line"'), 50)
+        self.assertIn("housekeeping-0059.sql.gz", section)
+        self.assertNotIn("housekeeping-0009.sql.gz", section)
+        self.assertLess(section.index("housekeeping-0058"), section.index("housekeeping-0059"))
+
+    def test_an_unknown_line_count_falls_back_to_the_default(self):
+        self.make_errors(60)
+        for value in ("7", "abc"):
+            section = self.error_section(self.client_.get(self.url, {"lines": value}))
+            self.assertEqual(section.count('class="log-line"'), 60)
+
+    def test_each_line_names_the_step_reason_dump_and_state(self):
+        self.make_errors(1)
+        section = self.error_section(self.client_.get(self.url))
+        line = section.split('<span class="log-line">')[1].split("</span>")[0]
+        self.assertIn(housekeeping.message_text(housekeeping.SQLITE_VACUUM_FAILED), line)
+        self.assertIn("housekeeping-0000.sql.gz", line)
+        self.assertIn(gettext("Open"), line)
+
+
+class StepCardTests(HousekeepingBase):
+    """The result of each step is a card (admin spec step 6): a dot plus the word, one error line only when it failed."""
+
+    def setUp(self):
+        super().setUp()
+        self.person = create_active_user("housekeeping.cards@example.org")
+        self.person.set_privileges(is_staff=True, is_superuser=False)
+        self.person.user_permissions.add(Permission.objects.get(codename="run_housekeeping"))
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.person)
+        self.url = reverse("admin:addresses_housekeepingstatus_changelist")
+
+    def test_each_step_is_a_card_with_its_dot_and_word(self):
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED,
+                            "mariadb_message": housekeeping.SQLITE_VACUUM_FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertIn('id="housekeeping-step-1"', content)
+        self.assertIn('id="housekeeping-step-2"', content)
+        self.assertIn('class="status-dot status-ok"', content)
+        self.assertIn('class="status-dot status-bad"', content)
+
+    def test_only_a_failed_step_shows_its_error_line_with_a_link_to_the_log(self):
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED,
+                            "mariadb_message": housekeeping.SQLITE_VACUUM_FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertEqual(content.count('role="alert"'), 1)
+        self.assertIn('href="#housekeeping-errors"', content)
+
+    def test_each_step_shows_a_dot_and_one_of_three_words(self):
+        content = self.client_.get(self.url).content.decode()
+        self.assertEqual(content.count("Noch nicht ausgeführt"), 2)
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertIn("Erfolgreich", content)
+        self.assertIn("Fehlgeschlagen", content)
+        self.assertNotIn("Noch nicht ausgeführt", content)
+

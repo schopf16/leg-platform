@@ -1,0 +1,4 @@
+{% load i18n %}{# A log as text in a scrollable box (owner decision): monospace, fixed height, newest at the bottom. No table. #}
+<pre class="log-box" id="{{ box_id }}" tabindex="0">{% for line in lines %}<span class="log-line">{{ line }}</span>
+{% empty %}<span class="log-line">{% translate "No entry in this time range." %}</span>
+{% endfor %}</pre>

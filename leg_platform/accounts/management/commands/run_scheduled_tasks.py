@@ -24,6 +24,8 @@ TASKS = (
     "notify_log_events",
     # Address app: expired stored building searches, then the daily address directory run (the import itself runs
     # last: it can take minutes and the cleanups must not wait for it).
+    # The import error log: rows older than 180 days (D-122, security review).
+    "cleanup_import_log",
     "cleanup_address_lookups",
     "scheduled_address_import",
 )

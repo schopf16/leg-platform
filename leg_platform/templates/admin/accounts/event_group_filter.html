@@ -1,0 +1,16 @@
+{% load i18n %}{# The event types as one select with a group per area (design review E); the other filters stay as their own lists. #}
+<form method="get" class="import-form log-event-filter">
+  {% for name, value in spec.select.hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <p>
+    <label for="event-type-filter">{{ spec.title }}</label>
+    <select id="event-type-filter" name="{{ spec.select.name }}">
+      <option value="">{% translate "All" %}</option>
+      {% for group in spec.select.groups %}
+        <optgroup label="{{ group.title }}">
+          {% for value, label in group.options %}<option value="{{ value }}"{% if value == spec.select.selected %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </optgroup>
+      {% endfor %}
+    </select>
+  </p>
+  <button type="submit" class="button default">{% translate "Show" %}</button>
+</form>

@@ -425,9 +425,6 @@ msgstr "Motivo"
 msgid "Directory in use"
 msgstr "Elenco in uso"
 
-msgid "File size"
-msgstr "Dimensione del file"
-
 msgid "Download progress"
 msgstr "Avanzamento del download"
 
@@ -486,9 +483,6 @@ msgstr "%(count)s indirizzi letti"
 
 msgid "The automatic refresh is turned off on this server. The directory is only updated when you request it here or when the operator starts the import on the server."
 msgstr "L'aggiornamento automatico è disattivato su questo server. L'elenco viene aggiornato solo quando lo richiede qui oppure quando il gestore avvia l'importazione sul server."
-
-msgid "Once a day from %(time)s the scheduled tasks of the server check whether the directory must be updated: when an address could not be found, or when the regular refresh is due. A request on this page starts at once."
-msgstr "Una volta al giorno a partire dalle %(time)s le attività pianificate del server verificano se l'elenco deve essere aggiornato: quando non è stato possibile trovare un indirizzo oppure quando è in scadenza l'aggiornamento regolare. Una richiesta su questa pagina si avvia subito."
 
 msgid "An address could not be found: the directory is updated at the next daily run."
 msgstr "Non è stato possibile trovare un indirizzo: l'elenco viene aggiornato alla prossima esecuzione giornaliera."
@@ -7848,12 +7842,6 @@ msgstr "Ultimo aggiornamento degli impianti"
 msgid "Result"
 msgstr "Risultato"
 
-msgid "Addresses in the directory"
-msgstr "Indirizzi nel registro"
-
-msgid "Rows of the plant file"
-msgstr "Voci del file"
-
 msgid "Plants taken over"
 msgstr "Impianti acquisiti"
 
@@ -7946,9 +7934,6 @@ msgstr "Ultima analisi"
 
 msgid "Statistic of the last successful scan"
 msgstr "Statistica dell’ultima analisi riuscita"
-
-msgid "Postal codes scanned"
-msgstr "Codici postali analizzati"
 
 msgid "With a transformer station"
 msgstr "Con cabina di trasformazione"
@@ -8142,14 +8127,14 @@ msgstr "Errori della manutenzione"
 msgid "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds."
 msgstr "È aperto un errore. La manutenzione settimanale non viene ripetuta finché l'errore non è confermato o una manutenzione manuale non riesce."
 
+msgid "Acknowledged"
+msgstr "Confermato"
+
 msgid "Acknowledge the errors"
 msgstr "Confermare gli errori"
 
 msgid "No error has been recorded."
 msgstr "Nessun errore registrato."
-
-msgid "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)."
-msgstr "Un file di backup non viene ripristinato da questa pagina. Il ripristino è una procedura manuale sul server (istruzioni: documento di installazione, capitolo 12.2)."
 
 msgid "Email on error"
 msgstr "E-mail in caso di errore"
@@ -8250,14 +8235,8 @@ msgstr "Scarica come testo"
 msgid "No entry in this time range."
 msgstr "Nessuna voce in questo periodo."
 
-msgid "The log files open on their own pages: live view, download and the rotated copies."
-msgstr "I file di registro si aprono nelle proprie pagine: vista in diretta, download e copie ruotate."
-
 msgid "Security log file"
 msgstr "Registro di sicurezza"
-
-msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
-msgstr "L'avviso contiene solo l'ora, la gravità e la fonte: nessuna riga di registro, nessun testo di una voce e nessun nome di file. Al massimo un avviso per fonte e ora; le altre voci vengono solo contate."
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr "L'e-mail in caso di errore e gli avvisi del registro si impostano nella pagina dei registri."
@@ -8267,6 +8246,87 @@ msgstr "Avviso via e-mail"
 
 msgid "Details in the import log"
 msgstr "Dettagli nel registro delle importazioni"
+
+msgid "Mail settings"
+msgstr "Impostazioni e-mail"
+
+msgid "Details in the error log"
+msgstr "Dettagli nel registro degli errori"
+
+msgid "The entries are technical log lines of the application."
+msgstr "Le voci sono righe tecniche del registro dell'applicazione."
+
+msgid "security event"
+msgstr "evento di sicurezza"
+
+msgid "Choose an entry to view it."
+msgstr "Scegliere una voce da consultare."
+
+msgid "texts excluded"
+msgstr "testi esclusi"
+
+msgid "Applies to all errors, including import errors."
+msgstr "Vale per tutti gli errori, compresi quelli di importazione."
+
+msgid "code (shortened)"
+msgstr "codice (abbreviato)"
+
+msgid "address"
+msgstr "indirizzo"
+
+msgid "A dump file is not restored from this page. A restore is a manual procedure on the server."
+msgstr "Un file di salvataggio non viene ripristinato da questa pagina. Il ripristino è una procedura manuale sul server."
+
+msgid "Not run yet"
+msgstr "Non ancora eseguito"
+
+msgid "Changing needs a code from the app."
+msgstr "Per la modifica serve un codice dell'app."
+
+msgid "Event type"
+msgstr "Tipo di evento"
+
+msgid "Accounts and access"
+msgstr "Conti e accesso"
+
+msgid "Sign-in and codes"
+msgstr "Accesso e codici"
+
+msgid "Imports and maintenance"
+msgstr "Importazioni e manutenzione"
+
+msgid "Other"
+msgstr "Altri"
+
+msgid "Sources"
+msgstr "Fonti"
+
+msgid "Confirmation required"
+msgstr "Conferma richiesta"
+
+msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
+msgstr "L'avviso non contiene righe di registro, testi di voci né nomi di file; al massimo un avviso per fonte e ora."
+
+msgid "Email notification"
+msgstr "Notifica via e-mail"
+
+msgid "Send errors from the logs"
+msgstr "Inviare gli errori dei registri"
+
+msgid "Send warnings from the logs"
+msgstr "Inviare gli avvertimenti dei registri"
+
+msgid "Send when the address directory is old"
+msgstr "Inviare se il registro degli indirizzi è datato"
+
+msgid "Choose single errors"
+msgstr "Scegliere singoli errori"
+
+msgid "When to send"
+msgstr "Quando inviare"
+
+msgid "Save notification"
+msgstr "Salvare la notifica"
 
 msgid "Import log"
 msgstr "Registro delle importazioni"
@@ -8294,12 +8354,6 @@ msgstr "Nessun movimento da %(minutes)s minuti."
 
 msgid "Statistic"
 msgstr "Statistica"
-
-msgid "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)."
-msgstr "Caricato ogni giorno dall'esecuzione quotidiana. Nessuna azione qui. Fonte: Ufficio federale dell'energia (UFE), uso libero (Open Use)."
-
-msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
-msgstr "La scansione avviene una volta alla settimana, il sabato, dopo il registro degli impianti. Nessuna azione qui. Fonte: BKW Rete, mappa pubblica con forte sconto."
 
 msgid "A repair was tried recently and did not succeed."
 msgstr "Una riparazione è stata tentata di recente senza successo."
@@ -8412,15 +8466,6 @@ msgstr "Tipo di contenuto HTTP inatteso."
 msgid "Unsafe ZIP member."
 msgstr "Voce ZIP non sicura."
 
-msgid "Send"
-msgstr "Inviare"
-
-msgid "By severity"
-msgstr "Per gravità"
-
-msgid "By event"
-msgstr "Per evento"
-
 msgid "Import errors"
 msgstr "Errori di importazione"
 
@@ -8468,3 +8513,15 @@ msgstr "Generale"
 
 msgid "Log menu"
 msgstr "Menu dei registri"
+
+msgid "Locked"
+msgstr "Bloccato"
+
+msgid "Log"
+msgstr "Registro"
+
+msgid "Failed logins"
+msgstr "Accessi non riusciti"
+
+msgid "Lines"
+msgstr "Righe"

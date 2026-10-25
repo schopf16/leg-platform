@@ -125,8 +125,15 @@ def count_text(value):
     return f"{value:,}".replace(",", "’")
 
 
+def megabytes_text(size):
+    """A size in megabytes, one decimal, the Swiss thousands separator: 1’269.9 (DESIGN section 8)."""
+    if size is None:
+        return ""
+    return f"{size / (1024 * 1024):,.1f}".replace(",", "’")
+
+
 def _megabytes(size):
-    return f"{size / (1024 * 1024):.1f}".rstrip("0").rstrip(".") if size is not None else ""
+    return megabytes_text(size)
 
 
 def file_size():
@@ -148,27 +155,22 @@ def effective_state(job, now=None):
 
 
 def next_automatic_text(job):
-    """A sentence about the automatic refresh (the daily run of the scheduled tasks); honest about what triggers it."""
+    """One sentence about the automatic refresh (design review 4): when the next one is due."""
     if not settings.ADDRESS_IMPORT_AUTOMATIC:
         return gettext(
             "The automatic refresh is turned off on this server. The directory is only updated when you "
             "request it here or when the operator starts the import on the server."
         )
-    base = gettext(
-        "Once a day from %(time)s the scheduled tasks of the server check whether the directory must be "
-        "updated: when an address could not be found, or when the regular refresh is due. A request on this "
-        "page starts at once."
-    ) % {"time": schedule.import_run_time().strftime("%H:%M")}
     if job is not None and job.update_flag_set_at is not None:
-        return base + " " + gettext("An address could not be found: the directory is updated at the next daily run.")
+        return gettext("An address could not be found: the directory is updated at the next daily run.")
     interval = jobs.EMPTY_DIRECTORY_INTERVAL if jobs.directory_is_empty() else jobs.AUTOMATIC_INTERVAL
     last = job.last_automatic_attempt_at if job else None
     if last is None:
-        return base + " " + gettext("The first refresh is due now.")
+        return gettext("The first refresh is due now.")
     due = last + interval
     if due <= timezone.now():
-        return base + " " + gettext("The next refresh is due now.")
-    return base + " " + gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
+        return gettext("The next refresh is due now.")
+    return gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
 
 
 def _transformer_status_base(now=None):
@@ -306,13 +308,13 @@ def _buildings_lines(units):
     for code in sorted(set(done) | set(total)):
         if code in total:
             lines.append(gettext("Postal code %(code)s: %(done)s of %(total)s buildings") % {
-                "code": code, "done": done.get(code, 0), "total": total[code],
+                "code": code, "done": count_text(done.get(code, 0)), "total": count_text(total[code]),
             })
         else:
             lines.append(gettext("Postal code %(code)s: %(done)s buildings") % {"code": code, "done": done[code]})
     if total:
         lines.append(gettext("All postal codes: %(done)s of %(total)s buildings") % {
-            "done": sum(done.get(code, 0) for code in total), "total": sum(total.values()),
+            "done": count_text(sum(done.get(code, 0) for code in total)), "total": count_text(sum(total.values())),
         })
     return lines
 
@@ -336,9 +338,11 @@ def progress_lines(job, source, now):
     rows_total = getattr(job, "rows_total", None)
     if source in (ImportRequest.Source.ADDRESS, ImportRequest.Source.PLANT) and getattr(job, "rows_done", None) is not None:
         if rows_total:
-            result["rows_text"] = gettext("%(done)s of %(total)s rows") % {"done": job.rows_done, "total": rows_total}
+            result["rows_text"] = gettext("%(done)s of %(total)s rows") % {
+                "done": count_text(job.rows_done), "total": count_text(rows_total),
+            }
         else:
-            result["rows_text"] = gettext("%(done)s rows") % {"done": job.rows_done}
+            result["rows_text"] = gettext("%(done)s rows") % {"done": count_text(job.rows_done)}
     if source == ImportRequest.Source.TRANSFORMER:
         result["buildings_lines"] = _buildings_lines(getattr(job, "progress_units", None))
     return result

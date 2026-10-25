@@ -571,7 +571,7 @@ class LogPageTests(TestCase):
             self.assertIn('<ol class="breadcrumbs">', html)
             self.assertNotIn('<div class="breadcrumbs">', html)
         self.assertIn('<li aria-current="page">', viewer)
-        self.assertIn('class="button" id="log-pause"', viewer)  # the admin button (UX-003)
+        self.assertIn('class="button default" id="log-pause"', viewer)  # the admin button (UX-003)
         self.assertNotIn("aria-pressed", viewer)  # the label changes, not a state as well
         self.assertIn('role="region"', viewer)
         self.assertIn("Automatisch zum Ende scrollen", viewer)
@@ -581,6 +581,19 @@ class LogPageTests(TestCase):
         self.assertRegex(index, r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")  # numeric dates (DESIGN section 8)
         for log, title in (("application", "Anwendungsprotokoll"), ("security", "Sicherheitsprotokoll (Datei)")):
             self.assertIn(title, self.client_admin.get(self.url("logs_view", log)).content.decode())
+
+    def test_the_security_file_has_the_german_line_and_the_page_colours(self):
+        # Design review 7 and 9: a German line above the box; the box takes the page colours, not a fixed black.
+        html = self.client_admin.get(self.url("logs_view", "security")).content.decode()
+        self.assertIn("Die Einträge sind technische Protokollzeilen der Anwendung.", html)
+        self.assertLess(html.index("Die Einträge sind technische"), html.index('id="log-output"'))
+        css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
+        self.assertIn("--log-lines: 24;", css)  # 24 lines, the same rule as the boxes of the log page
+        self.assertIn(".log-box,\n.log-output {", css)
+        self.assertIn("height: calc(var(--log-lines) * 1.4em + 1rem + 2px);", css)
+        self.assertNotIn("27.3rem", css)
+        self.assertIn("background: var(--body-bg, #fff);", css)
+        self.assertNotIn("background: #111;", css)
 
     def test_the_script_shows_a_windows_line_break_once_and_keeps_one_pause_state(self):
         script = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "js" / "log-viewer.js").read_text(encoding="utf-8")

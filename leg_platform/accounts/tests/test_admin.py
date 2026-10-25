@@ -390,13 +390,13 @@ class AdminPresentationTests(TestCase):
         with translation.override("de-ch"):
             content = self.client.get(reverse("admin:index")).content.decode()
 
-        groups = re.findall(r'<a href="[^"]*" class="section"[^>]*>([^<]+)</a>', content)
+        groups = re.findall(r'<summary class="admin-group-title">([^<]+)</summary>', content)
         self.assertEqual(groups, ["Benutzer", "Inhalte", "Verwaltungsdaten", "System"])
         self.assertIn(
             "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
             content,
         )
-        for name in ("Mailtexte", "Portal-Einstellungen", "Gesperrte und fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
+        for name in ("Mailtexte", "Portal-Einstellungen", "Fehlgeschlagene Anmeldungen", "Sicherheitsereignisse"):
             self.assertIn(name, content)
         # No product name of a package as a heading.
         self.assertNotIn(">Axes<", content)
@@ -410,7 +410,7 @@ class AdminPresentationTests(TestCase):
             content = self.client.get(reverse("admin:index")).content.decode()
 
         # A staff user without rights sees no group at all, and never the system group.
-        self.assertNotIn("Sicherheitsprotokoll", content)
+        self.assertNotIn("Sicherheitsereignisse", content)
         self.assertNotIn("Gesperrte und fehlgeschlagene Anmeldungen", content)
         self.assertNotIn(">System<", content)
 
@@ -816,7 +816,8 @@ class AdminLogEntryTests(TestCase):
             history = self.client.get(
                 reverse("admin:accounts_user_history", args=(self.member.pk,))
             ).content.decode()
-        self.assertIn(f"Konto mit interner Nummer {self.member.pk}", index)
+        # The box of recent actions is removed from the start page (design review C): nothing of it is shown there.
+        self.assertNotIn("recent-actions-module", index)
         self.assertNotIn(self.member.customer_number_display, index)
         # The history page names the actor, read from the account at display time.
         self.assertIn(self.administrator.email, history)

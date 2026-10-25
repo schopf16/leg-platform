@@ -66,6 +66,16 @@ class FirstStepsTests(TestCase):
         self.assertIn(reverse("admin:accounts_portalsettings_change", args=(1,)), page)
         self.assertIn(reverse("admin:accounts_emailtext_changelist"), page)
 
+    def test_the_start_page_has_no_recent_actions_box_and_no_exclamation_mark(self):
+        client, _administrator = administrator_client()
+
+        page = client.get(INDEX_URL).content.decode()
+
+        self.assertNotIn("recent-actions-module", page)
+        self.assertNotIn("Neueste Aktionen", page)
+        self.assertNotIn("portal-state-todo", page)
+        self.assertIn('class="status-dot status-warn"', page)
+
     def test_the_status_follows_the_settings(self):
         client, _administrator = administrator_client()
         PortalSettings.objects.update_or_create(
@@ -279,7 +289,7 @@ class BlockedLoginListTests(TestCase):
     def test_the_list_explains_itself_and_says_how_to_unblock(self):
         client, _administrator = administrator_client()
 
-        page = client.get(reverse("admin:axes_accessattempt_changelist")).content.decode()
+        page = client.get(reverse("admin:failed_logins")).content.decode()
 
         self.assertIn("Diese Listen zeigen fehlgeschlagene und gesperrte Anmeldungen.", page)
         self.assertIn("ist ein Code und keine Adresse", page)
@@ -307,7 +317,7 @@ class WordsOfTheAdministrationTests(TestCase):
             reverse("admin:accounts_user_change", args=(self.other.pk,))
         ).content.decode()
 
-        self.assertIn('<li><a href="/admin/">Benutzer</a></li>', page)
+        self.assertIn('<li>Benutzer</li>', page)
         self.assertNotIn('<a href="/admin/accounts/">', page)
         self.assertIn("Änderungsverlauf", page)
         self.assertNotIn("Geschichte", page)

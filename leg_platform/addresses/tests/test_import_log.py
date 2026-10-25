@@ -65,12 +65,27 @@ class ImportLogBase(TestCase):
 
 
 class ImportLogAccessTests(ImportLogBase):
-    def test_superuser_sees_the_import_log(self):
+    def test_superuser_sees_the_import_log_section_as_text(self):
+        self.failed_run()
+        response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="import-log-box"')
+        self.assertContains(response, 'class="log-line"')
+
+        section = response.content.decode("utf-8")
+        section = section[section.index('id="import-log"'):]
+        self.assertNotIn("<table", section)
+        self.assertEqual(ImportLogEntry.objects.count(), 1)
+
+    def test_the_old_log_url_redirects_to_the_section_for_superusers(self):
+        # Review item 10: the Location is the import page and its section, and the section is there.
         self.failed_run()
         response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_log"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="importlog-table"')
-        self.assertEqual(ImportLogEntry.objects.count(), 1)
+        target = reverse("admin:addresses_importrequest_changelist") + "#import-log"
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], target)
+        page = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist"))
+        self.assertIn('id="import-log"', page.content.decode())
 
     def test_staff_with_the_directory_right_is_refused_on_the_log_and_its_download(self):
         self.failed_run()
@@ -91,11 +106,10 @@ class ImportLogAccessTests(ImportLogBase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(len(lines[0].split("	")), 4)
 
-    def test_the_directory_page_links_the_log_to_the_superuser_only(self):
+    def test_the_import_log_section_is_for_the_superuser_only(self):
         self.failed_run()
-        log_url = reverse("admin:addresses_importrequest_log")
-        self.assertContains(self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist")), log_url)
-        self.assertNotContains(self.client_for(self.staff).get(reverse("admin:addresses_importrequest_changelist")), log_url)
+        self.assertContains(self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist")), 'id="import-log"')
+        self.assertNotContains(self.client_for(self.staff).get(reverse("admin:addresses_importrequest_changelist")), 'id="import-log"')
 
 
 class ImportErrorStateTests(ImportLogBase):
@@ -134,7 +148,7 @@ class ImportNoticeTests(ImportLogBase):
         self.assertNotIn("Missing", body)
         self.assertNotIn("EGID", body)
 
-    def test_no_mail_when_disabled_or_below_the_severity(self):
+    def test_no_mail_when_disabled_or_when_the_error_tick_is_off(self):
         self.failed_run()
         LogNotificationSettings.objects.filter(pk=1).update(enabled=False)
         self.assertEqual(log_menu.notify_log_events(NOW), 0)
@@ -263,3 +277,18 @@ class CountProgressTests(TestCase):
             self.assertEqual(count_rows(archive, "data.csv", 10), 3)
             self.assertIsNone(count_rows(archive, "data.csv", 2))
             self.assertIsNone(count_rows(archive, "missing.csv", 10))
+
+
+class NumberFormatTests(TestCase):
+    """Design review 6: one number format everywhere (DESIGN section 8): the Swiss thousands separator and one decimal
+    for megabytes."""
+
+    def test_counts_use_the_typographic_apostrophe(self):
+        self.assertEqual(status.count_text(341981), "341’981")
+        self.assertEqual(status.count_text(1203456), "1’203’456")
+
+    def test_megabytes_have_one_decimal_and_the_separator(self):
+        self.assertEqual(status.megabytes_text(int(1269.9 * 1024 * 1024)), "1’269.9")
+        self.assertEqual(status.megabytes_text(100 * 1024 * 1024), "100.0")
+        self.assertEqual(status.megabytes_text(None), "")
+

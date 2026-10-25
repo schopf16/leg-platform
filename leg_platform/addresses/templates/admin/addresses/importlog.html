@@ -13,7 +13,7 @@
         {% for key, label in sources %}<option value="{{ key }}"{% if key == source %} selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </p>
-    <button type="submit" class="button">{% translate "Show" %}</button>
+    <button type="submit" class="button default">{% translate "Show" %}</button>
   </form>
   <p><a href="{{ download_url }}">{% translate "Download as text" %}</a> · <a href="{{ back_url }}">{% translate "Back to the imports" %}</a></p>
   <table id="importlog-table">

@@ -13,9 +13,10 @@
 {% block content %}
 <section aria-label="{{ title }}" id="log-viewer" data-tail-url="{{ tail_url }}" data-poll-seconds="{{ poll_seconds }}" data-live="{% if live %}1{% else %}0{% endif %}" data-text-ended="{% translate 'The log can no longer be updated. Reload the page; you may have to sign in again.' %}" data-text-retry="{% translate 'The log could not be loaded. Trying again.' %}" data-text-paused="{% translate 'Paused. New lines are not shown until you continue.' %}" data-text-live="{% translate 'Live: new lines appear by themselves.' %}" data-text-static="{% translate 'This older file does not change.' %}" data-text-missing="{% translate 'Nothing was logged to this file yet.' %}">
   <p class="log-file"><code>{{ file_name }}</code></p>
+  <p class="help">{% translate "The entries are technical log lines of the application." %}</p>
   <p class="log-controls">
     {# One state only: the label changes between "Pause" and "Continue", no aria-pressed (UX-014). #}
-    {% if live %}<button type="button" class="button" id="log-pause" data-label-pause="{% translate 'Pause' %}" data-label-continue="{% translate 'Continue' %}">{% translate "Pause" %}</button>
+    {% if live %}<button type="button" class="button default" id="log-pause" data-label-pause="{% translate 'Pause' %}" data-label-continue="{% translate 'Continue' %}">{% translate "Pause" %}</button>
     <label><input type="checkbox" id="log-follow" checked> {% translate "Scroll to the end automatically" %}</label>{% endif %}
     <a href="{{ download_url }}">{% translate "Download" %}</a><a href="{{ list_url }}">{% translate "All log files" %}</a>
   </p>

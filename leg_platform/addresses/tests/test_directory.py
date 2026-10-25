@@ -2262,7 +2262,7 @@ class PlantBlockAdminTests(TestCase):
         response = self._client().get(self.page)
         self.assertEqual(response.status_code, 200)
         for text in (
-            "Data imports", "PV plants (BFE)", "341’981", "350’292", "8’299", "1’203’456",
+            "Data imports", "PV plants (BFE)", "341’981", "8’299",
             "Source: Federal Office of Energy (BFE), open use (Open Use)",
         ):
             self.assertContains(response, text)
@@ -2275,12 +2275,12 @@ class PlantBlockAdminTests(TestCase):
         self._plant_register()
         self._last_run("succeeded")
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), freie Nutzung (Open Use)")
+        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)")
         self.assertContains(response, "PV-Anlagen (BFE)")
         self.assertContains(response, "Datenimporte")
         self.assertContains(response, "341’981")
         for text in (
-            "Letzte Aktualisierung der Anlagen", "Einträge der Datei", "Nicht übernommene Einträge: Prüfung nicht bestanden",
+            "Letzte Aktualisierung der Anlagen", "Nicht übernommene Einträge: Prüfung nicht bestanden",
             "Übersprungene Anlagen: ohne Gebäudenummer (EGID)", "Statistik",
         ):
             self.assertContains(response, text)
@@ -2346,7 +2346,7 @@ class PlantBlockAdminTests(TestCase):
     def test_the_empty_state_and_the_run_of_today_have_the_german_texts(self):
         response = self._client(language="de-ch").get(self.page)
         self.assertContains(response, "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie.")
-        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertContains(response, "Noch nicht aktualisiert")
         self.assertNotContains(response, "Noch nicht importiert")
         self.assertNotContains(response, "Heute nicht ausgeführt")
 
@@ -2364,8 +2364,8 @@ class PlantBlockAdminTests(TestCase):
             'Check the network connection and try again.</span></p>',
         )
         self.assertContains(response, "341’981")
-        self.assertContains(response, "1’203’456")
-        older = (timezone.localdate() - timedelta(days=3)).strftime("%d.%m.%Y")
+        self.assertContains(response, 'id="plant-data-date"')
+        older =(timezone.localdate() - timedelta(days=3)).strftime("%d.%m.%Y")
         self.assertContains(response, f"The data from {older} stays valid.")
 
     def test_a_run_of_another_day_is_not_shown_as_the_result_of_today(self):
@@ -2405,7 +2405,7 @@ class PlantBlockAdminTests(TestCase):
         self._plant_register()
         self._last_run("succeeded", today=False)
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertContains(response, "Noch nicht aktualisiert")
         self.assertNotContains(response, 'id="plant-error"')
 
     def test_a_failure_shows_only_its_fixed_reason_and_no_path_url_or_trace(self):

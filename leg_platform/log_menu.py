@@ -7,11 +7,13 @@ per scheduled run (``notify_log_events``), applies the ticks of the setting and 
 hour. The mail holds no log line, no reason text and no file name.
 """
 
+import itertools
 from datetime import datetime, timedelta
 
 from django import forms
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Max
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, StreamingHttpResponse
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -20,12 +22,16 @@ from django.utils.translation import gettext as _
 
 from leg_platform import log_views
 from leg_platform.accounts import security_log
+from leg_platform.accounts.forms import OneProofMixin
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
 from leg_platform.log_filters import redact_personal_data, redact_tokens
 
 DATABASE_SOURCES = ("security", "housekeeping", "import")
 TIME_RANGES = {"1": timedelta(hours=1), "24": timedelta(hours=24), "168": timedelta(days=7), "720": timedelta(days=30)}
 DEFAULT_RANGE = "24"
+# The number of lines a log box shows (owner decision): the newest at the bottom; the default 200.
+LINE_COUNTS = ("50", "200", "500")
+DEFAULT_LINES = "200"
 ROW_LIMIT = 200
 # One mail per source and this long at most; further events in that time are only counted (owner decision, D-120).
 MAIL_INTERVAL = timedelta(hours=1)
@@ -67,6 +73,20 @@ def _since(request):
     return key, timezone.now() - TIME_RANGES[key]
 
 
+def line_count(request):
+    """The number of lines of a log box from the query (50, 200 or 500; the default 200)."""
+    value = request.GET.get("lines", DEFAULT_LINES)
+    return int(value) if value in LINE_COUNTS else int(DEFAULT_LINES)
+
+
+def text_box_lines(source, since, count):
+    """The newest ``count`` lines of a source as text, oldest first (the newest at the bottom), redacted like the
+    download (D-099): the same lines as the download, only fewer."""
+    chosen = list(itertools.islice(_text_lines(source, since), count))
+    chosen.reverse()
+    return [redact_personal_data(redact_tokens(line)) for line in chosen]
+
+
 def _shown(request):
     chosen = set(request.GET.getlist("show")) & set(DATABASE_SOURCES)
     return chosen or set(DATABASE_SOURCES)
@@ -102,6 +122,7 @@ def page(request):
     log_views.record_view(request, "logmenu")
     key, since = _since(request)
     shown = _shown(request)
+    count = line_count(request)
     context = {
         **log_views.admin.site.each_context(request),
         "title": _("Logs"),
@@ -110,16 +131,14 @@ def page(request):
             ("1", _("Last hour")), ("24", _("Last 24 hours")), ("168", _("Last 7 days")), ("720", _("Last 30 days")),
         )],
         "shown": shown,
-        "security_rows": _security_rows(since) if "security" in shown else None,
-        "housekeeping_rows": _housekeeping_rows(since) if "housekeeping" in shown else None,
-        "import_rows": _import_rows(since) if "import" in shown else None,
-        "file_links": [
-            ("application", reverse("admin:logs_view", kwargs={"log": "application"})),
-            ("security", reverse("admin:logs_view", kwargs={"log": "security"})),
-        ],
-        "settings_form": NotificationForm(instance=settings_row()),
+        "line_counts": LINE_COUNTS,
+        "lines_selected": str(count),
+        "security_lines": text_box_lines("security", since, count) if "security" in shown else None,
+        "housekeeping_lines": text_box_lines("housekeeping", since, count) if "housekeeping" in shown else None,
+        "import_lines": text_box_lines("import", since, count) if "import" in shown else None,
+        "settings_form": NotificationForm(instance=settings_row(), request=request),
         "suppressed": suppressed_counts(),
-        "log_list_url": reverse("admin:logs"),
+        "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
     }
     return TemplateResponse(request, "admin/logmenu/page.html", context)
 
@@ -188,36 +207,81 @@ def failure_groups():
     ]
 
 
-class NotificationForm(forms.ModelForm):
-    """The notice setting (D-122): the switch, the one address, the ticks by severity and by event kind, and one tick
-    per fixed failure text of the import. A ticked text is mailed; an unticked one is not."""
+class NotificationForm(OneProofMixin, forms.ModelForm):
+    """The notice setting (D-122, security review): the switch, the one address, the ticks by severity and event, and one
+    tick per fixed failure text. Changing the switch or the address needs one proof of identity (D-062, D-100)."""
 
     failures = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple, label=_("Import errors"))
+    # The proof (one of the two; the mixin removes the other): as in the portal settings (D-062).
+    current_password = forms.CharField(
+        label=_("Current password"), strip=False, required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+    otp_token = forms.CharField(label=_("Code from the app"), max_length=256, required=False)
 
     class Meta:
         model = LogNotificationSettings
-        fields = [
-            "enabled", "email", "notify_error", "notify_warning", "notify_notice", "notify_stale", "notify_unchanged",
-        ]
+        fields = ["enabled", "email", "notify_error", "notify_warning", "notify_stale"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.request = request
+        self.user = getattr(request, "user", None)
         muted = set(self.instance.muted_failures or [])
         self.fields["failures"].choices = [(text, _(text)) for text in failure_texts()]
         self.fields["failures"].initial = [text for text in failure_texts() if text not in muted]
+        # The four rules of the form (spec section 4, option 1 of the coordinator): one tick per rule, the import
+        # failures as one closed block of per-text ticks under the error tick.
+        self.fields["notify_error"].label = _("Send errors from the logs")
+        self.fields["notify_warning"].label = _("Send warnings from the logs")
+        self.fields["notify_stale"].label = _("Send when the address directory is old")
+        if self.user is not None:
+            self.use_one_proof(self.user, autofocus=False)
+        # The code of the app is named as the app shows it (review item 2), not the mixin's "2FA" wording.
+        if "otp_token" in self.fields:
+            self.fields["otp_token"].label = _("Code from the app")
+
+    @property
+    def excluded_count(self):
+        """The number of failure texts that are not ticked (stored as the exclusions)."""
+        return len(self.instance.muted_failures or [])
+
+    def grouped_failures(self):
+        """The per-text ticks by source heading, as the bound checkboxes (the closed block of the form)."""
+        position = {value: index for index, (value, _label) in enumerate(self.fields["failures"].choices)}
+        field = self["failures"]
+        return [(heading, [field[position[text]] for text in texts]) for heading, texts in failure_groups()]
 
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("enabled") and not cleaned.get("email"):
             self.add_error("email", _("Enter an email address, or switch the email off."))
+        changed = (
+            cleaned.get("enabled") != self.instance.enabled or cleaned.get("email") != self.instance.email
+        )
+        if changed:
+            self.check_proof(cleaned)
         return cleaned
 
-    def grouped_failures(self):
-        """The tick boxes of the failure texts under their source headings (the layout only)."""
-        widgets = {widget.data["value"]: widget for widget in self["failures"].subwidgets}
-        return [
-            (heading, [widgets[text] for text in texts if text in widgets]) for heading, texts in failure_groups()
-        ]
+    def check_proof(self, cleaned):
+        """One proof for a change of the switch or the address; without a request nothing is accepted (fails closed)."""
+        if self.user is None:
+            self.add_error(None, _("Enter your current password."))
+            return
+        if self.proof == "password":
+            password = cleaned.get("current_password")
+            if password is None:
+                self.add_error("current_password", _("Enter your current password."))
+                return
+            from leg_platform.accounts import second_factor
+
+            if not second_factor.verify_password(self.request, self.user, password):
+                self.add_error("current_password", _("The password is not correct. Please try again."))
+            return
+        if self.proof == "code":
+            self.check_code(cleaned)
+            return
+        self.add_error(None, _("Enter the 2FA authentication code."))
 
     def save_settings(self):
         """Save the setting fields only: the bookkeeping of the notifier (``state``) stays as it is."""
@@ -229,14 +293,18 @@ class NotificationForm(forms.ModelForm):
 
 
 def settings_view(request):
-    """POST only: change the notification setting. One security event per change, no address in it."""
+    """POST only: change the notification setting. One proof for a change of the switch or the address; one security
+    event per change, no address in it. Switching on starts from the current rows: only later events are mailed."""
     require_superuser(request)
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    form = NotificationForm(request.POST, instance=settings_row())
+    form = NotificationForm(request.POST, instance=settings_row(), request=request)
     if form.is_valid():
         with transaction.atomic():
+            was_enabled = settings_row().enabled
             form.save_settings()
+            if form.cleaned_data.get("enabled") and not was_enabled:
+                _start_from_now(settings_row())
             security_log.record(SecurityEvent.Event.LOG_NOTIFICATION_CHANGED, actor=request.user)
         return HttpResponseRedirect(reverse("admin:logmenu"))
     context = {
@@ -246,21 +314,27 @@ def settings_view(request):
         "range": DEFAULT_RANGE,
         "ranges": [],
         "shown": set(DATABASE_SOURCES),
-        "security_rows": None,
-        "housekeeping_rows": None,
-        "import_rows": None,
-        "file_links": [],
+        "security_lines": None,
+        "housekeeping_lines": None,
+        "import_lines": None,
+        "line_counts": LINE_COUNTS,
+        "lines_selected": DEFAULT_LINES,
         "suppressed": suppressed_counts(),
-        "log_list_url": reverse("admin:logs"),
+        "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
     }
     return TemplateResponse(request, "admin/logmenu/page.html", context, status=400)
 
 
 # --- notification (D-120, D-122) --------------------------------------------------------------------------------
 
+# Rows below the highest checked id that are still looked at: rows can commit after a higher id (security review).
+WINDOW = 500
+
+
 def _state(row):
     state = row.state if isinstance(row.state, dict) else {}
     state.setdefault("checked", {})
+    state.setdefault("seen", {})
     state.setdefault("last_mail", {})
     state.setdefault("suppressed", {})
     state.setdefault("pending", [])
@@ -269,6 +343,52 @@ def _state(row):
 
 def suppressed_counts():
     return dict(_state(settings_row())["suppressed"])
+
+
+def _highest_ids():
+    from leg_platform.addresses.models import HousekeepingError, ImportLogEntry
+
+    return {
+        "security": SecurityEvent.objects.aggregate(m=Max("pk"))["m"] or 0,
+        "housekeeping": HousekeepingError.objects.aggregate(m=Max("pk"))["m"] or 0,
+        "import": ImportLogEntry.objects.aggregate(m=Max("pk"))["m"] or 0,
+    }
+
+
+def _source_querysets():
+    from leg_platform.addresses.models import HousekeepingError, ImportLogEntry
+
+    return {
+        "security": SecurityEvent.objects.filter(event__in=list(NOTIFYING_EVENTS)),
+        "housekeeping": HousekeepingError.objects.all(),
+        "import": ImportLogEntry.objects.all(),
+    }
+
+
+def _start_from_now(row):
+    """Switch on: the marks are the current highest ids of every source, and every row that exists now is marked as
+    handled, so older rows are never mailed; rows that commit later get new ids and are still handled (D-122)."""
+    state = _state(row)
+    top = _highest_ids()
+    state["checked"] = top
+    state["seen"] = {
+        key: list(queryset.filter(pk__gt=max(top[key] - WINDOW, 0)).values_list("pk", flat=True))
+        for key, queryset in _source_querysets().items()
+    }
+    state["pending"] = []
+    row.state = state
+    row.save(update_fields=["state"])
+
+
+def _fresh_rows(queryset, state, key):
+    """The rows of one source not handled yet. A row is handled once; the window covers late commits (WINDOW)."""
+    checked = state["checked"].get(key, 0)
+    seen = set(state["seen"].get(key, []))
+    rows = list(queryset.filter(pk__gt=max(checked - WINDOW, 0)).order_by("pk"))
+    top = max([checked] + [row.pk for row in rows])
+    state["checked"][key] = top
+    state["seen"][key] = sorted(pk for pk in seen | {row.pk for row in rows} if pk > top - WINDOW)
+    return [row for row in rows if row.pk not in seen]
 
 
 def directory_changed_on():
@@ -281,7 +401,8 @@ def directory_changed_on():
 def check_stale(now):
     """The data is old (no change for more than ``STALE_CONTENT_DAYS``): one error event when it opens (D-122).
 
-    The event is cleared by the next successful import of the source that changes the file (``jobs``)."""
+    Called under the lock of the notifier's state, so two runs create one row. Cleared by the next import of the
+    source that changes the file (``jobs``)."""
     from leg_platform.addresses import status
     from leg_platform.addresses.models import ImportLogEntry, ImportRequest
 
@@ -297,22 +418,19 @@ def check_stale(now):
 
 
 def _new_items(state):
-    """Items after the last checked row: (key, row pk, source, severity, time, kind, reason), in row order.
+    """Items not handled yet: (key, row pk, source, severity, time, kind, reason), in row order.
 
     ``reason`` is the fixed failure text of an import error (its tick decides); None for the other sources."""
-    checked = state["checked"]
-    items = []
-    for event in SecurityEvent.objects.filter(
-        pk__gt=checked.get("security", 0), event__in=list(NOTIFYING_EVENTS),
-    ).order_by("pk"):
-        source, severity = NOTIFYING_EVENTS[event.event]
-        items.append(("security", event.pk, source, severity, event.occurred_at, "security", None))
     from leg_platform.addresses.models import HousekeepingError, ImportLogEntry
 
-    for error in HousekeepingError.objects.filter(pk__gt=checked.get("housekeeping", 0)).order_by("pk"):
+    items = []
+    for event in _fresh_rows(SecurityEvent.objects.filter(event__in=list(NOTIFYING_EVENTS)), state, "security"):
+        source, severity = NOTIFYING_EVENTS[event.event]
+        items.append(("security", event.pk, source, severity, event.occurred_at, "security", None))
+    for error in _fresh_rows(HousekeepingError.objects.all(), state, "housekeeping"):
         items.append(("housekeeping", error.pk, "housekeeping", HOUSEKEEPING_SEVERITY, error.occurred_at,
                       KIND_ERROR, None))
-    for entry in ImportLogEntry.objects.filter(pk__gt=checked.get("import", 0)).order_by("pk"):
+    for entry in _fresh_rows(ImportLogEntry.objects.all(), state, "import"):
         if entry.kind == KIND_UNCHANGED:
             items.append(("import", entry.pk, "import", UNCHANGED_SEVERITY, entry.occurred_at, KIND_UNCHANGED, None))
         elif entry.kind == KIND_STALE:
@@ -324,14 +442,12 @@ def _new_items(state):
 
 
 def wanted(row, severity, kind, reason):
-    """The rule of the ticks (D-122): every kind is sent only by its own tick(s), nothing else."""
+    """The rule of the ticks (D-122, security review): the unchanged-file event is never mailed."""
     level = LogNotificationSettings.Severity
     if kind == "security":
         return severity == level.WARNING and row.notify_warning
     if kind == KIND_STALE:
         return row.notify_stale
-    if kind == KIND_UNCHANGED:
-        return row.notify_unchanged and row.notify_notice
     if kind == KIND_ERROR:
         if severity != level.ERROR or not row.notify_error:
             return False
@@ -341,22 +457,18 @@ def wanted(row, severity, kind, reason):
 
 
 def notify_log_events(now=None):
-    """Check the database sources once; queue at most one mail per source and hour (D-120, D-122).
-
-    The high-water marks always advance, so a switch turned on later does not mail old events. Returns the number of
-    notices queued in this run.
-    """
+    """Check the database sources once, under the lock of the notifier's state; queue at most one mail per source and
+    hour (D-120, D-122). Returns the number of notices queued in this run."""
     from leg_platform.accounts import mail_queue
 
     now = now or timezone.now()
-    check_stale(now)
     with transaction.atomic():
         LogNotificationSettings.objects.get_or_create(pk=1)
         row = LogNotificationSettings.objects.select_for_update().get(pk=1)
+        check_stale(now)
         state = _state(row)
         queued = 0
         for source_key, pk, source, severity, occurred, kind, reason in _new_items(state):
-            state["checked"][source_key] = max(pk, state["checked"].get(source_key, 0))
             if not row.enabled or not row.email or not wanted(row, severity, kind, reason):
                 continue
             last = state["last_mail"].get(source)
@@ -373,13 +485,17 @@ def notify_log_events(now=None):
     return queued
 
 
-def take_pending():
-    """The notices waiting for the mail, and clears them (called by the mail queue handler when the mail is made)."""
+def peek_pending():
+    """The notices waiting for the mail. Nothing is cleared here: a failed send keeps them (security review)."""
+    row = LogNotificationSettings.objects.filter(pk=1).first()
+    return [dict(notice) for notice in _state(row)["pending"]] if row else []
+
+
+def clear_pending(sent):
+    """Remove the notices that the mail has carried; called only after the mail was sent successfully."""
     with transaction.atomic():
-        LogNotificationSettings.objects.get_or_create(pk=1)
         row = LogNotificationSettings.objects.select_for_update().get(pk=1)
         state = _state(row)
-        pending, state["pending"] = state["pending"], []
+        state["pending"] = [notice for notice in state["pending"] if notice not in sent]
         row.state = state
         row.save(update_fields=["state"])
-    return pending

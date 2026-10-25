@@ -126,16 +126,17 @@ fieldset .description,
   font-weight: 600;
 }
 
-.portal-state-ok::before {
-  content: "\2713\00a0";
-}
+/* A first step is a dot plus the word (the status-dot classes); a step that is not set yet is neither red nor marked "!". */
+@media (max-width: 767px) {
+  .portal-box,
+  .portal-help {
+    overflow-wrap: anywhere;
+  }
 
-.portal-state-todo::before {
-  content: "!\00a0";
-}
-
-.portal-state-todo {
-  color: var(--error-fg, #ba2121);
+  .portal-steps li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
 }
 
 .portal-help table {
@@ -411,6 +412,110 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The status card of the import page: its dot follows the state of the box (a dot plus the word, never colour alone). */
+.import-box .status-dot.status-live {
+  background: var(--status-muted);
+}
+
+.import-box.import-running .status-dot.status-live,
+.import-box.import-queued .status-dot.status-live {
+  background: var(--status-warn);
+}
+
+.import-box.import-succeeded .status-dot.status-live {
+  background: var(--status-ok);
+}
+
+.import-box.import-failed .status-dot.status-live,
+.import-box.import-interrupted .status-dot.status-live {
+  background: var(--status-bad);
+}
+
+/* The failed-login tables (design review H): on a phone each entry is one block, the label of each cell in front of it. */
+@media (max-width: 767px) {
+  .phone-table,
+  .phone-table tbody,
+  .phone-table tr,
+  .phone-table th,
+  .phone-table td {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .phone-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .phone-table tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--hairline-color, #ccc);
+  }
+
+  .phone-table th,
+  .phone-table td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .phone-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+  }
+}
+
+/* The table of the security log: the column headers are not cut off, the account and the actor columns are wide enough
+   for the short headers "Konto" and "Von" (design review E). */
+#result_list thead th {
+  min-width: 6.5em;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+
+#result_list .column-account_number,
+#result_list .column-actor_number {
+  min-width: 7em;
+}
+
+/* The breadcrumbs (DESIGN section 1): one ordered list, no separator glyph; the items are spaced apart. */
+ol.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em 1.25em;
+  margin: 0;
+  padding: 0.5em 1em;
+  list-style: none;
+}
+
+/* The sources of the log page: one row of chips (checkboxes that read as toggles, never colour alone). */
+.log-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.log-chips legend {
+  margin-inline-end: 8px;
+}
+
+.log-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline-color, #ccc);
+  border-radius: 999px;
+}
+
 .import-spinner {
   display: inline-block;
   width: 14px;
@@ -558,22 +663,33 @@ input.portal-colour {
   margin: 0 0 8px;
 }
 
+/* Every log box (the boxes of the log page, the file view and the failed-login log) has the same height and scrolls,
+   also when it is empty: 24 lines of 1.4em, padding 0.5rem top and bottom, a 1px border on each side, border-box.
+   One rule for all of them (sixth review: the boxes differed by font size and box sizing). */
+:root {
+  --log-lines: 24;
+}
+
+.log-box,
 .log-output {
   box-sizing: border-box;
-  width: 100%;
-  height: 60vh;
-  margin: 0;
-  padding: 8px 12px;
-  overflow: auto;
+  height: calc(var(--log-lines) * 1.4em + 1rem + 2px);
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--hairline-color, #ccc);
-  border-radius: 4px;
-  background: #111;
-  color: #e6e6e6;
+  overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.4;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  background: var(--body-bg, #fff);
+  color: var(--body-fg, #333);
+}
+
+.log-output {
+  width: 100%;
+  margin: 0;
+  border-radius: 4px;
 }
 
 /* Raw tables of the management data for system administrators (D-091): the list is a row of inputs per row, the new
@@ -626,4 +742,55 @@ input.portal-colour {
 #changelist #result_list tr.raw-new-row button {
   min-height: 24px;
   margin-top: 4px;
+}
+
+/* A log as text (owner decision): a fixed-height monospace box, the newest line at the bottom, long lines wrap. */
+.log-box {
+  margin: 0.5rem 0;
+}
+.log-line { display: block; }
+
+/* The security events (review item 3): the filters go below the table, so that the table has the full width. */
+.model-securityevent #changelist .changelist-form-container {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.model-securityevent #changelist .changelist-form-container:has(#changelist-filter) > div {
+  max-width: 100%;
+}
+
+.model-securityevent #changelist-filter {
+  order: 2;
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0 0;
+}
+
+.model-securityevent #changelist .changelist-form-container > div:not(#changelist-filter) {
+  order: 1;
+}
+
+/* The filter panel of the security events stays inside the content width (third review item 2). */
+.model-securityevent #changelist-filter,
+.model-securityevent #changelist-filter * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* The filter rows of the failed logins (fourth review item 5): a title and the choices as chips. */
+.log-filter-title {
+  font-weight: 600;
+  margin-inline-end: 4px;
+}
+
+.log-chip.is-selected {
+  font-weight: 600;
+  border-color: currentColor;
+}
+
+.log-chip:hover,
+.log-chip:focus {
+  text-decoration: underline;
 }

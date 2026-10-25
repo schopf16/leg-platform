@@ -2,9 +2,11 @@
 (docs/SECURITY.md, sections 10 and 11; D-018, D-041)."""
 
 from datetime import timedelta
+from pathlib import Path
 from io import StringIO
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
 from django.db import transaction
@@ -291,3 +293,72 @@ class RecordedEventsTests(TestCase):
             self.assertEqual((entry.account_id, entry.actor_id), (account.pk, admin_user.pk))
             self.assertTrue(entry.long_retention)
         self.assertTrue(User.objects.get(pk=account.pk).is_staff)
+
+
+@tag("mariadb")
+class SecurityLogLayoutTests(TestCase):
+    """Design review E: the event types as one grouped select (not a list of links), plain column names, the table named
+    "Security events" in the sidebar. Nothing here changes or deletes an entry."""
+
+    client_class = VerifiedClient
+
+    def setUp(self):
+        self.administrator = administrator()
+        self.client.force_login(self.administrator)
+        security_log.record(Event.PASSWORD_CHANGED, account=self.administrator)
+        security_log.record(Event.LOG_NOTIFICATION_CHANGED, account=self.administrator)
+
+    def page(self, query=None):
+        return self.client.get(reverse("admin:accounts_securityevent_changelist"), query or {})
+
+    def test_the_event_types_are_one_grouped_select_and_no_list_of_links(self):
+        response = self.page()
+        html = response.content.decode()
+        self.assertIn('<select id="event-type-filter" name="event__exact">', html)
+        self.assertGreaterEqual(html.count("<optgroup"), 2)
+        self.assertNotIn("?event__exact=", html)
+
+    def test_the_select_filters_one_event_type(self):
+        response = self.page({"event__exact": "password_changed"})
+        self.assertEqual(response.status_code, 200)
+        rows = [entry.event for entry in response.context["cl"].result_list]
+        self.assertEqual(rows, ["password_changed"])
+        self.assertIn('value="password_changed" selected', response.content.decode())
+
+    def test_the_columns_have_short_plain_headers(self):
+        html = self.page().content.decode()
+        self.assertIn(">Konto<", html)
+        self.assertIn(">Von<", html)
+        self.assertNotIn("interne Nummer", html)
+
+    def test_the_sidebar_names_the_table_security_events(self):
+        html = self.page().content.decode()
+        self.assertIn(">Sicherheitsereignisse</a>", html)
+
+    def test_the_page_is_named_security_events_with_plain_filters(self):
+        html = self.page().content.decode()
+        self.assertIn("<h1>Sicherheitsereignisse</h1>", html)
+        self.assertIn("Einen Eintrag zum Ansehen wählen.", html)
+        self.assertNotIn("Lange aufbewahrt", html)
+        self.assertIn("Nach Zeitpunkt", html)
+        self.assertNotIn("Anzahl anzeigen", html)
+
+    def test_the_filters_are_stacked_below_the_table_by_the_stylesheet(self):
+        # The filter column is placed by the stylesheet (order 2, full width); no layout is checked in a browser here.
+        css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
+        self.assertIn(".model-securityevent #changelist-filter {", css)
+        self.assertIn("order: 2;", css)
+        # The panel keeps its width inside the content: no left margin of the desktop layout (Django: 30px) on this page.
+        block = css[css.index(".model-securityevent #changelist-filter {"):]
+        block = block[:block.index("}")]
+        self.assertIn("margin: 16px 0 0;", block)
+        self.assertIn("box-sizing: border-box;", block)
+
+    def test_each_entry_is_one_block_with_a_label_for_each_cell(self):
+        # Third review item 1: the table reflows on a phone; every column is in the block, labelled.
+        html = self.page().content.decode()
+        self.assertIn('<table id="result_list" class="phone-table">', html)
+        self.assertIn('<td data-label="Konto">', html)
+        self.assertIn('<td data-label="Von">', html)
+        self.assertEqual(html.count('<tr><td data-label='), 2)
+

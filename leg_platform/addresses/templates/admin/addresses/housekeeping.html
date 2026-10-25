@@ -11,14 +11,16 @@
     <dt>{% translate "Finished at" %}</dt><dd>{{ status.finished_at|default:"–" }}</dd>
     <dt>{% translate "Started by" %}</dt><dd>{% if status.trigger == "manual" %}{% translate "Manually" %}{% elif status.trigger == "scheduled" %}{% translate "Weekly" %}{% else %}–{% endif %}</dd>
   </dl>
-  <table>
-    <thead><tr><th>{% translate "Step" %}</th><th>{% translate "Result" %}</th><th>{% translate "Finished at" %}</th><th>{% translate "Reason" %}</th></tr></thead>
-    <tbody>
-    {% for step in steps %}
-      <tr><td>{{ step.label }}</td><td>{{ step.state_label|default:"–" }}</td><td>{{ step.finished_at|default:"–" }}</td><td>{{ step.text|default:"–" }}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  {# One card per step: a dot plus the word, the time, at most one error line with a link to the error log below. #}
+  {% for step in steps %}
+  <div class="import-box" id="housekeeping-step-{{ forloop.counter }}">
+    <p class="import-headline"><span class="status-dot status-{{ step.tone }}" aria-hidden="true"></span> <strong>{{ step.label }}</strong>: {{ step.state_label|default:"–" }}</p>
+    <dl class="import-facts">
+      <dt>{% translate "Finished at" %}</dt><dd>{{ step.finished_at|default:"–" }}</dd>
+    </dl>
+    {% if step.state == "failed" and step.text %}<p class="import-error" role="alert"><strong>{% translate "Reason" %}:</strong> {{ step.text }} <a href="#housekeeping-errors">{% translate "Details in the error log" %}</a></p>{% endif %}
+  </div>
+  {% endfor %}
 </section>
 
 <section class="data-import-block" id="housekeeping-errors" aria-labelledby="housekeeping-errors-heading">
@@ -27,22 +29,18 @@
     <p class="import-error" role="alert">{% translate "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds." %}</p>
     <form method="post" class="import-form">{% csrf_token %}
       <input type="hidden" name="action" value="acknowledge">
-      <button type="submit" class="button">{% translate "Acknowledge the errors" %}</button>
+      <button type="submit" class="button default">{% translate "Acknowledge the errors" %}</button>
     </form>
   {% endif %}
-  {% if errors %}
-  <table id="housekeeping-error-log">
-    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Dump file" %}</th><th>{% translate "Open" %}</th></tr></thead>
-    <tbody>
-    {% for error in errors %}
-      <tr><td>{{ error.occurred_at }}</td><td>{{ error.step }}</td><td>{{ error.reason }}</td><td>{{ error.dump|default:"–" }}</td><td>{% if error.open %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="help">{% translate "No error has been recorded." %}</p>
-  {% endif %}
-  <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)." %}</p>
+  <form method="get" class="log-controls" id="housekeeping-error-form">
+    <p><label for="housekeeping-error-lines">{% translate "Lines" %}</label>
+      <select id="housekeeping-error-lines" name="lines">
+        {% for value in error_line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="button default">{% translate "Show" %}</button></p>
+  </form>
+  {% include "admin/logs/_text_box.html" with lines=error_lines box_id="housekeeping-error-box" %}
+  <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server." %}</p>
 </section>
 
 <p class="help">{% translate "The e-mail on error and the log notices are set on the logs page." %} <a href="{% url 'admin:logmenu' %}">{% translate "Logs" %}</a></p>
@@ -54,7 +52,7 @@
     <thead><tr><th>{% translate "Table" %}</th><th>{% translate "Before" %}</th><th>{% translate "After" %}</th></tr></thead>
     <tbody>
     {% for row in sizes %}
-      <tr><td>{{ row.name }}</td><td>{% if row.before is not None %}{{ row.before|filesizeformat }}{% else %}–{% endif %}</td><td>{% if row.after is not None %}{{ row.after|filesizeformat }}{% else %}–{% endif %}</td></tr>
+      <tr><td>{{ row.name }}</td><td>{% if row.before is not None %}{{ row.before_text }} MB{% else %}–{% endif %}</td><td>{% if row.after is not None %}{{ row.after_text }} MB{% else %}–{% endif %}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -79,7 +77,7 @@
   <h2 id="housekeeping-run-heading">{% translate "Run now" %}</h2>
   <p class="help">{% translate "The address directory is compacted only when no import runs and enough disk space is free. The application tables are optimised only after a current successful dump. Nothing is rebuilt or deleted. The weekly run is on Sunday from 04:30." %}</p>
   <form method="post" class="import-form">{% csrf_token %}
-    <button type="submit" class="button"{% if running %} disabled{% endif %}>{% translate "Run the housekeeping now" %}</button>
+    <button type="submit" class="button default"{% if running %} disabled{% endif %}>{% translate "Run the housekeeping now" %}</button>
   </form>
 </section>
 </div>
