@@ -431,6 +431,16 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The breadcrumbs (DESIGN section 1): one ordered list, no separator glyph; the items are spaced apart. */
+ol.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em 1.25em;
+  margin: 0;
+  padding: 0.5em 1em;
+  list-style: none;
+}
+
 /* The sources of the log page: one row of chips (checkboxes that read as toggles, never colour alone). */
 .log-chips {
   display: flex;

@@ -110,3 +110,28 @@ class LockoutListTests(TestCase):
         for section in (locked, log):
             self.assertIn(BLOCKED[:8] + "…" + BLOCKED[-4:], section)
             self.assertNotIn(BLOCKED, section)
+
+
+class BreadcrumbPatternTests(TestCase):
+    """Design review D: one breadcrumb pattern (an ordered list) on the administration pages, no separator glyph."""
+
+    def setUp(self):
+        self.superuser = create_active_user("failed.crumbs.superuser@example.org")
+        self.superuser.set_privileges(is_staff=True, is_superuser=True)
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.superuser)
+
+    def test_the_failed_logins_page_has_the_list_and_no_arrow_bar(self):
+        page = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        self.assertIn('<ol class="breadcrumbs">', page)
+        self.assertNotIn("&rsaquo;", page)
+        self.assertNotIn("›", page)
+        self.assertNotIn('<div class="breadcrumbs">', page)
+
+    def test_the_other_pages_use_the_same_list(self):
+        for name in ("admin:logmenu", "admin:addresses_housekeepingstatus_changelist", "admin:logs"):
+            with self.subTest(name=name):
+                page = self.client_.get(reverse(name)).content.decode()
+                self.assertIn('<ol class="breadcrumbs">', page)
+                self.assertNotIn("&rsaquo;", page)
+
