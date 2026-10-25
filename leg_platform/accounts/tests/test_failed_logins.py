@@ -1,11 +1,19 @@
 """The one entry "Failed logins" (owner decision): superusers see it with both sections, the old lists redirect there,
 nobody can add or delete a row, staff with any right see nothing of it."""
 
+from datetime import timedelta
+
+from axes.models import AccessAttempt, AccessFailureLog
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
+from leg_platform.accounts.login_protection import LOGIN_COOLOFF, LOGIN_FAILURE_LIMIT
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+
+BLOCKED = "a" * 60 + "1234"
+SINGLE = "b" * 60 + "5678"
 
 
 class FailedLoginsTests(TestCase):
@@ -52,3 +60,53 @@ class FailedLoginsTests(TestCase):
         page = client.get(reverse("admin:failed_logins"))
         self.assertNotContains(page, reverse("admin:axes_accessattempt_add"))
         self.assertNotContains(page, 'name="action"')
+
+
+class LockoutListTests(TestCase):
+    """Design review A: "Locked" shows only current blocks; the identifier is shortened in both sections."""
+
+    def setUp(self):
+        self.superuser = create_active_user("failed.lockout.superuser@example.org")
+        self.superuser.set_privileges(is_staff=True, is_superuser=True)
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.superuser)
+
+    def attempt(self, username, failures, when=None):
+        when = when or timezone.now()
+        attempt = AccessAttempt.objects.create(
+            username=username, ip_address="203.0.113.7", user_agent="test", path_info="/accounts/login/",
+            http_accept="text/html", failures_since_start=failures,
+        )
+        # The time is set by axes on create (auto_now_add): it is moved afterwards for the test.
+        AccessAttempt.objects.filter(pk=attempt.pk).update(attempt_time=when)
+        log = AccessFailureLog.objects.create(
+            username=username, ip_address="203.0.113.7", user_agent="test", path_info="/accounts/login/",
+            http_accept="text/html", locked_out=failures >= LOGIN_FAILURE_LIMIT,
+        )
+        AccessFailureLog.objects.filter(pk=log.pk).update(attempt_time=when)
+
+    def sections(self):
+        html = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        locked = html[html.index('id="failed-logins-locked"'):html.index('id="failed-logins-log"')]
+        log = html[html.index('id="failed-logins-log"'):]
+        return locked, log
+
+    def test_the_locked_list_holds_only_the_current_blocks(self):
+        self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
+        self.attempt(SINGLE, 1)
+        locked, log = self.sections()
+        self.assertIn(BLOCKED[:8], locked)
+        self.assertNotIn(SINGLE[:8], locked)
+        self.assertIn(SINGLE[:8], log)
+
+    def test_an_old_block_is_no_longer_locked(self):
+        self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT, when=timezone.now() - LOGIN_COOLOFF - timedelta(minutes=1))
+        locked, _log = self.sections()
+        self.assertNotIn(BLOCKED[:8], locked)
+
+    def test_the_identifier_is_shortened_in_both_sections(self):
+        self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
+        locked, log = self.sections()
+        for section in (locked, log):
+            self.assertIn(BLOCKED[:8] + "…" + BLOCKED[-4:], section)
+            self.assertNotIn(BLOCKED, section)

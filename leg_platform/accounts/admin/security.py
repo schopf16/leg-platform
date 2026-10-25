@@ -14,6 +14,16 @@ from django.utils.translation import gettext_lazy as _
 # The one entry "Failed logins" shows both models (owner decision): "Locked" (current state) and "Log" (history).
 FAILED_LOGIN_MODELS = (AccessAttempt, AccessFailureLog)
 
+def short_identifier(value):
+    """The identifier shortened for the screen: the first 8 and the last 4 characters; never the whole digest."""
+    if not value:
+        return "–"
+    value = str(value)
+    if len(value) <= 12:
+        return value
+    return f"{value[:8]}…{value[-4:]}"
+
+
 # Plain words instead of the product name; the models are those of django-axes.
 AccessAttempt._meta.verbose_name = _("blocked or failed login")
 AccessAttempt._meta.verbose_name_plural = _("blocked and failed logins")
@@ -72,7 +82,7 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
     """Pseudonymous lockout records, system administrators only."""
 
     actions = None
-    list_display = ("attempt_time", "username", "path_info", "failures_since_start")
+    list_display = ("attempt_time", "short_username", "path_info", "failures_since_start")
     list_filter = ("attempt_time", "path_info")
     ordering = ("-attempt_time",)
     list_per_page = 100
@@ -81,6 +91,10 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
     fields = readonly_fields = ("username", "path_info", "failures_since_start", "attempt_time")
     search_fields = ("username", "path_info")
     change_list_template = "admin/axes_change_list.html"
+
+    @admin.display(description=_("code (shortened)"), ordering="username")
+    def short_username(self, obj):
+        return short_identifier(obj.username)
 
     def changelist_view(self, request, extra_context=None):
         # The one page "Failed logins" shows both lists (owner decision); the old list redirects there for superusers.
@@ -107,8 +121,23 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
         return False
 
 
+class ReadOnlyLockedAdmin(ReadOnlyAxesAdmin):
+    """The "Locked" section of the failed-logins page: only the current blocks, an account or an IP address at the limit
+    within the cool-off. The single failed attempts stay in the "Log" section. The change view is not filtered."""
+
+    def get_queryset(self, request):
+        from django.utils import timezone
+
+        from leg_platform.accounts.login_protection import LOGIN_COOLOFF, LOGIN_FAILURE_LIMIT
+
+        return super().get_queryset(request).filter(
+            failures_since_start__gte=LOGIN_FAILURE_LIMIT,
+            attempt_time__gte=timezone.now() - LOGIN_COOLOFF,
+        )
+
+
 class ReadOnlyAxesFailureAdmin(ReadOnlyAxesAdmin):
-    list_display = ("attempt_time", "username", "path_info", "locked_out")
+    list_display = ("attempt_time", "short_username", "path_info", "locked_out")
     fields = readonly_fields = ("username", "path_info", "locked_out", "attempt_time")
 
 
@@ -133,7 +162,7 @@ def failed_logins_view(request):
     request.GET.pop("lines", None)
     sections = []
     for model, title, section_id in ((AccessAttempt, _("Locked"), "locked"), (AccessFailureLog, _("Log"), "log")):
-        model_admin = ReadOnlyAxesAdmin(model, admin.site) if model is AccessAttempt else ReadOnlyAxesFailureAdmin(
+        model_admin = ReadOnlyLockedAdmin(model, admin.site) if model is AccessAttempt else ReadOnlyAxesFailureAdmin(
             model, admin.site,
         )
         cl = model_admin.get_changelist_instance(request)
@@ -150,7 +179,7 @@ def failed_logins_view(request):
             "lines": (
                 [
                     redact_personal_data(redact_tokens(
-                        f"{timezone.localtime(obj.attempt_time):%Y-%m-%d %H:%M:%S}  {obj.username}  "
+                        f"{timezone.localtime(obj.attempt_time):%Y-%m-%d %H:%M:%S}  {short_identifier(obj.username)}  "
                         f"{obj.path_info}  locked_out={obj.locked_out}"
                     ))
                     for obj in reversed(list(cl.queryset[:count]))
