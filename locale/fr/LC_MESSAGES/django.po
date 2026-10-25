@@ -8171,6 +8171,9 @@ msgstr "Erreurs de la maintenance"
 msgid "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds."
 msgstr "Une erreur est ouverte. La maintenance hebdomadaire ne reprend pas tant que l'erreur n'est pas acquittée ou qu'une maintenance manuelle n'a pas réussi."
 
+msgid "Acknowledged"
+msgstr "Acquitté"
+
 msgid "Acknowledge the errors"
 msgstr "Acquitter les erreurs"
 

@@ -30,18 +30,14 @@
       <button type="submit" class="button">{% translate "Acknowledge the errors" %}</button>
     </form>
   {% endif %}
-  {% if errors %}
-  <table id="housekeeping-error-log">
-    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Dump file" %}</th><th>{% translate "Open" %}</th></tr></thead>
-    <tbody>
-    {% for error in errors %}
-      <tr><td>{{ error.occurred_at }}</td><td>{{ error.step }}</td><td>{{ error.reason }}</td><td>{{ error.dump|default:"–" }}</td><td>{% if error.open %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p class="help">{% translate "No error has been recorded." %}</p>
-  {% endif %}
+  <form method="get" class="log-controls" id="housekeeping-error-form">
+    <p><label for="housekeeping-error-lines">{% translate "Lines" %}</label>
+      <select id="housekeeping-error-lines" name="lines">
+        {% for value in error_line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="button">{% translate "Show" %}</button></p>
+  </form>
+  {% include "admin/logs/_text_box.html" with lines=error_lines box_id="housekeeping-error-box" %}
   <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)." %}</p>
 </section>
 

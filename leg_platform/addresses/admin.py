@@ -239,6 +239,15 @@ def import_log_rows(source=""):
 HOUSEKEEPING_PERMISSION = "addresses.run_housekeeping"
 
 
+def _error_line_count(request):
+    """The number of lines of the error box from the query (50, 200 or 500; the default 200)."""
+    try:
+        value = int(request.GET.get("lines", housekeeping.ERROR_LINES_DEFAULT))
+    except ValueError:
+        return housekeeping.ERROR_LINES_DEFAULT
+    return value if value in housekeeping.ERROR_LINE_COUNTS else housekeeping.ERROR_LINES_DEFAULT
+
+
 @admin.register(HousekeepingStatus)
 class HousekeepingStatusAdmin(admin.ModelAdmin):
     """The last results of the housekeeping, the dump status and the button to run now. No generic model editing."""
@@ -286,7 +295,7 @@ class HousekeepingStatusAdmin(admin.ModelAdmin):
             return HttpResponseNotAllowed(["GET", "POST"])
         context = {
             **self.admin_site.each_context(request),
-            **housekeeping.page_context(),
+            **housekeeping.page_context(lines=_error_line_count(request)),
             "title": _("Housekeeping"),
             "opts": self.model._meta,
         }

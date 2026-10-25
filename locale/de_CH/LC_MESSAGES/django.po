@@ -8168,6 +8168,9 @@ msgstr "Fehler der Wartung"
 msgid "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds."
 msgstr "Ein Fehler ist offen. Die wöchentliche Wartung läuft nicht erneut, bis der Fehler quittiert ist oder eine manuelle Wartung erfolgreich war."
 
+msgid "Acknowledged"
+msgstr "Quittiert"
+
 msgid "Acknowledge the errors"
 msgstr "Fehler quittieren"
 
