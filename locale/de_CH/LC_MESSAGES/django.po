@@ -8271,7 +8271,7 @@ msgid "No entry in this time range."
 msgstr "Kein Eintrag in diesem Zeitraum."
 
 msgid "Security log file"
-msgstr "Sicherheitsprotokoll"
+msgstr "Sicherheitsprotokoll-Datei"
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr "Die E-Mail bei Fehler und die Protokollmeldungen werden auf der Protokollseite eingestellt."
@@ -8287,6 +8287,21 @@ msgstr "E-Mail-Einstellungen"
 
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
+
+msgid "Event type"
+msgstr "Ereignisart"
+
+msgid "Accounts and access"
+msgstr "Konten und Zugriff"
+
+msgid "Sign-in and codes"
+msgstr "Anmeldung und Codes"
+
+msgid "Imports and maintenance"
+msgstr "Importe und Wartung"
+
+msgid "Other"
+msgstr "Andere"
 
 msgid "Sources"
 msgstr "Quellen"

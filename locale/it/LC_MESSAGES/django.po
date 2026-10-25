@@ -8262,6 +8262,21 @@ msgstr "Impostazioni e-mail"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "Event type"
+msgstr "Tipo di evento"
+
+msgid "Accounts and access"
+msgstr "Conti e accesso"
+
+msgid "Sign-in and codes"
+msgstr "Accesso e codici"
+
+msgid "Imports and maintenance"
+msgstr "Importazioni e manutenzione"
+
+msgid "Other"
+msgstr "Altri"
+
 msgid "Sources"
 msgstr "Fonti"
 

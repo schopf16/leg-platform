@@ -291,3 +291,45 @@ class RecordedEventsTests(TestCase):
             self.assertEqual((entry.account_id, entry.actor_id), (account.pk, admin_user.pk))
             self.assertTrue(entry.long_retention)
         self.assertTrue(User.objects.get(pk=account.pk).is_staff)
+
+
+@tag("mariadb")
+class SecurityLogLayoutTests(TestCase):
+    """Design review E: the event types as one grouped select (not a list of links), plain column names, the table named
+    "Security events" in the sidebar. Nothing here changes or deletes an entry."""
+
+    client_class = VerifiedClient
+
+    def setUp(self):
+        self.administrator = administrator()
+        self.client.force_login(self.administrator)
+        security_log.record(Event.PASSWORD_CHANGED, account=self.administrator)
+        security_log.record(Event.LOG_NOTIFICATION_CHANGED, account=self.administrator)
+
+    def page(self, query=None):
+        return self.client.get(reverse("admin:accounts_securityevent_changelist"), query or {})
+
+    def test_the_event_types_are_one_grouped_select_and_no_list_of_links(self):
+        response = self.page()
+        html = response.content.decode()
+        self.assertIn('<select id="event-type-filter" name="event__exact">', html)
+        self.assertGreaterEqual(html.count("<optgroup"), 2)
+        self.assertNotIn("?event__exact=", html)
+
+    def test_the_select_filters_one_event_type(self):
+        response = self.page({"event__exact": "password_changed"})
+        self.assertEqual(response.status_code, 200)
+        rows = [entry.event for entry in response.context["cl"].result_list]
+        self.assertEqual(rows, ["password_changed"])
+        self.assertIn('value="password_changed" selected', response.content.decode())
+
+    def test_the_columns_have_short_plain_headers(self):
+        html = self.page().content.decode()
+        self.assertIn(">Konto<", html)
+        self.assertIn(">Von<", html)
+        self.assertNotIn("interne Nummer", html)
+
+    def test_the_sidebar_names_the_table_security_events(self):
+        html = self.page().content.decode()
+        self.assertIn(">Sicherheitsereignisse</a>", html)
+

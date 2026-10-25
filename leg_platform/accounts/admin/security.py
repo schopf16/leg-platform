@@ -11,6 +11,8 @@ from django.urls import reverse
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
+from leg_platform.accounts.models import SecurityEvent
+
 # The one entry "Failed logins" shows both models (owner decision): "Locked" (current state) and "Log" (history).
 FAILED_LOGIN_MODELS = (AccessAttempt, AccessFailureLog)
 
@@ -31,6 +33,59 @@ AccessFailureLog._meta.verbose_name = _("failed login in the log")
 AccessFailureLog._meta.verbose_name_plural = _("log of failed logins")
 
 
+# The security log is named "Security events" in the sidebar (design review E); the model keeps its name.
+SecurityEvent._meta.verbose_name_plural = _("Security events")
+
+# The event types by area, for the grouped select of the filter (design review E). A type not named here is "Other".
+EVENT_GROUPS = (
+    (_("Accounts and access"), (
+        "PASSWORD_CHANGED", "PASSWORD_RESET", "PASSKEYS_CHANGED", "SIGN_IN_METHOD_CHANGED", "EMAIL_CHANGE_REQUESTED",
+        "EMAIL_CHANGED", "SECONDARY_EMAIL_CHANGED", "TWO_FACTOR_ENABLED", "RECOVERY_CODES_RENEWED", "RECOVERY_CODE_USED",
+        "REGISTRATION_COMPLETED", "ACCOUNT_BLOCKED", "ACCOUNT_UNBLOCKED", "ACCOUNT_DEACTIVATED", "ACCOUNT_REACTIVATED",
+        "ACCOUNT_DELETED", "ACCOUNT_DATA_CHANGED_BY_STAFF", "PERSON_INVITED", "INVITATION_RESENT",
+        "RETENTION_OBLIGATION_SET",
+    )),
+    (_("Sign-in and codes"), (
+        "LOGIN_LOCKOUT", "CODE_ATTEMPTS_WARNING", "CODE_ATTEMPTS_PAUSED", "ALL_SESSIONS_ENDED",
+    )),
+    (_("Administration"), (
+        "PRIVILEGES_CHANGED", "ACCESS_RELATIONS_CHANGED", "PORTAL_SETTINGS_CHANGED", "PORTAL_UPLOAD_REJECTED",
+        "LOG_NOTIFICATION_CHANGED", "GRID_OPERATOR_CHANGED", "LIST_PRINTED",
+    )),
+    (_("Imports and maintenance"), (
+        "HOUSEKEEPING_RUN", "HOUSEKEEPING_ERRORS_ACKNOWLEDGED", "ADDRESS_IMPORT_SUCCEEDED", "ADDRESS_IMPORT_FAILED",
+        "PV_IMPORT_SUCCEEDED", "PV_IMPORT_FAILED",
+    )),
+)
+
+
+class EventGroupFilter(admin.ChoicesFieldListFilter):
+    """The event types as one select with a group per area (design review E), not a list of links."""
+
+    title = _("Event type")
+    template = "admin/accounts/event_group_filter.html"
+
+    def choices(self, changelist):
+        labels = dict(SecurityEvent.Event.choices)
+        members = SecurityEvent.Event.__members__
+        assigned = set()
+        groups = []
+        for title, names in EVENT_GROUPS:
+            values = [members[name].value for name in names if name in members and members[name].value in labels]
+            assigned.update(values)
+            if values:
+                groups.append({"title": title, "options": [(v, labels[v]) for v in values]})
+        rest = [value for value in labels if value not in assigned]
+        if rest:
+            groups.append({"title": _("Other"), "options": [(v, labels[v]) for v in rest]})
+        selected = changelist.params.get(self.lookup_kwarg, "")
+        hidden = [(key, value) for key, value in changelist.get_filters_params().items() if key != self.lookup_kwarg]
+        if changelist.query:
+            hidden.append(("q", changelist.query))
+        self.select = {"name": self.lookup_kwarg, "selected": selected, "groups": groups, "hidden": hidden}
+        return [self.select]
+
+
 class SecurityEventAdmin(admin.ModelAdmin):
     """The security log: read only, system administrators only (D-018, D-041).
 
@@ -39,17 +94,17 @@ class SecurityEventAdmin(admin.ModelAdmin):
 
     actions = None  # not even the site-wide "delete selected"
     list_display = ("occurred_at", "event", "account_number", "actor_number", "retention")
-    list_filter = ("event", "long_retention")
+    list_filter = (("event", EventGroupFilter), "long_retention")
     ordering = ("-occurred_at", "-id")
     list_per_page = 100
     show_full_result_count = False
     fields = readonly_fields = ("occurred_at", "event", "account_id", "actor_id", "long_retention")
 
-    @admin.display(description=_("account (internal number)"), ordering="account_id")
+    @admin.display(description=_("Account"), ordering="account_id")
     def account_number(self, obj):
         return obj.account_id if obj.account_id is not None else "-"
 
-    @admin.display(description=_("performed by (internal number)"), ordering="actor_id")
+    @admin.display(description=_("From"), ordering="actor_id")
     def actor_number(self, obj):
         return obj.actor_id if obj.actor_id is not None else "-"
 

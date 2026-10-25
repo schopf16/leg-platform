@@ -8291,6 +8291,21 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "Event type"
+msgstr "Type d'événement"
+
+msgid "Accounts and access"
+msgstr "Comptes et accès"
+
+msgid "Sign-in and codes"
+msgstr "Connexion et codes"
+
+msgid "Imports and maintenance"
+msgstr "Importations et maintenance"
+
+msgid "Other"
+msgstr "Autres"
+
 msgid "Sources"
 msgstr "Sources"
 

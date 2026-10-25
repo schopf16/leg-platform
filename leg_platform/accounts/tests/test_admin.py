@@ -396,7 +396,7 @@ class AdminPresentationTests(TestCase):
             "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
             content,
         )
-        for name in ("Mailtexte", "Portal-Einstellungen", "Fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
+        for name in ("Mailtexte", "Portal-Einstellungen", "Fehlgeschlagene Anmeldungen", "Sicherheitsereignisse"):
             self.assertIn(name, content)
         # No product name of a package as a heading.
         self.assertNotIn(">Axes<", content)
@@ -410,7 +410,7 @@ class AdminPresentationTests(TestCase):
             content = self.client.get(reverse("admin:index")).content.decode()
 
         # A staff user without rights sees no group at all, and never the system group.
-        self.assertNotIn("Sicherheitsprotokoll", content)
+        self.assertNotIn("Sicherheitsereignisse", content)
         self.assertNotIn("Gesperrte und fehlgeschlagene Anmeldungen", content)
         self.assertNotIn(">System<", content)
 

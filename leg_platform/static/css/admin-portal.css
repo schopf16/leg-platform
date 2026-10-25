@@ -431,6 +431,19 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The table of the security log: the column headers are not cut off, the account and the actor columns are wide enough
+   for the short headers "Konto" and "Von" (design review E). */
+#result_list thead th {
+  min-width: 6.5em;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+
+#result_list .column-account_number,
+#result_list .column-actor_number {
+  min-width: 7em;
+}
+
 /* The breadcrumbs (DESIGN section 1): one ordered list, no separator glyph; the items are spaced apart. */
 ol.breadcrumbs {
   display: flex;
