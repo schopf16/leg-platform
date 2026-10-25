@@ -8282,6 +8282,9 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "The entries are technical log lines of the application."
+msgstr "Les entrées sont des lignes techniques du journal de l'application."
+
 msgid "security event"
 msgstr "événement de sécurité"
 

@@ -8279,6 +8279,9 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "The entries are technical log lines of the application."
+msgstr "Die Einträge sind technische Protokollzeilen der Anwendung."
+
 msgid "security event"
 msgstr "Sicherheitsereignis"
 

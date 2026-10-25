@@ -582,6 +582,16 @@ class LogPageTests(TestCase):
         for log, title in (("application", "Anwendungsprotokoll"), ("security", "Sicherheitsprotokoll (Datei)")):
             self.assertIn(title, self.client_admin.get(self.url("logs_view", log)).content.decode())
 
+    def test_the_security_file_has_the_german_line_and_the_page_colours(self):
+        # Design review 7 and 9: a German line above the box; the box takes the page colours, not a fixed black.
+        html = self.client_admin.get(self.url("logs_view", "security")).content.decode()
+        self.assertIn("Die Einträge sind technische Protokollzeilen der Anwendung.", html)
+        self.assertLess(html.index("Die Einträge sind technische"), html.index('id="log-output"'))
+        css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
+        self.assertIn("height: 27.3rem;", css)  # 24 lines of the file viewer
+        self.assertIn("background: var(--body-bg, #fff);", css)
+        self.assertNotIn("background: #111;", css)
+
     def test_the_script_shows_a_windows_line_break_once_and_keeps_one_pause_state(self):
         script = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "js" / "log-viewer.js").read_text(encoding="utf-8")
         self.assertIn(r'replace(/\r\n?/g, "\n")', script)
