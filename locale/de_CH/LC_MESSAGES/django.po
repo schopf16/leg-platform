@@ -8494,3 +8494,15 @@ msgstr "Allgemein"
 
 msgid "Log menu"
 msgstr "Protokoll-Menü"
+
+msgid "Locked"
+msgstr "Gesperrt"
+
+msgid "Log"
+msgstr "Protokoll"
+
+msgid "Failed logins"
+msgstr "Fehlgeschlagene Anmeldungen"
+
+msgid "Lines"
+msgstr "Zeilen"

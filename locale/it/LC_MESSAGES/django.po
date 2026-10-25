@@ -8468,3 +8468,15 @@ msgstr "Generale"
 
 msgid "Log menu"
 msgstr "Menu dei registri"
+
+msgid "Locked"
+msgstr "Bloccato"
+
+msgid "Log"
+msgstr "Registro"
+
+msgid "Failed logins"
+msgstr "Accessi non riusciti"
+
+msgid "Lines"
+msgstr "Righe"

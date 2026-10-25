@@ -8497,3 +8497,15 @@ msgstr "Général"
 
 msgid "Log menu"
 msgstr "Menu des journaux"
+
+msgid "Locked"
+msgstr "Bloqué"
+
+msgid "Log"
+msgstr "Journal"
+
+msgid "Failed logins"
+msgstr "Connexions échouées"
+
+msgid "Lines"
+msgstr "Lignes"
