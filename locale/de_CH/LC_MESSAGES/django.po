@@ -8288,6 +8288,9 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "Changing needs a code from the app."
+msgstr "Zum Ändern ist ein Code aus der App nötig."
+
 msgid "By time"
 msgstr "Nach Zeitpunkt"
 
@@ -8314,9 +8317,6 @@ msgstr "Ausgeschlossene Texte:"
 
 msgid "Confirmation required"
 msgstr "Bestätigung erforderlich"
-
-msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
-msgstr "Wer die Sicherheitsmeldungen erhält, ändert sich mit dem Schalter oder der Adresse; deshalb ist ein Nachweis der Identität nötig."
 
 msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
 msgstr "Die Meldung enthält keine Protokollzeile, keinen Eintragstext und keinen Dateinamen; höchstens eine Meldung pro Quelle und Stunde."

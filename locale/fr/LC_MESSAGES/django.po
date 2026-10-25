@@ -8291,6 +8291,9 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "Changing needs a code from the app."
+msgstr "Une modification nécessite un code de l'application."
+
 msgid "By time"
 msgstr "Par moment"
 
@@ -8317,9 +8320,6 @@ msgstr "Textes exclus :"
 
 msgid "Confirmation required"
 msgstr "Confirmation requise"
-
-msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
-msgstr "Le changement de l'interrupteur ou de l'adresse modifie le destinataire des alertes de sécurité ; un justificatif d'identité est donc requis."
 
 msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
 msgstr "L'avis ne contient aucune ligne de journal, aucun texte d'entrée et aucun nom de fichier ; au plus un avis par source et par heure."

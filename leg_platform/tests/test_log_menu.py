@@ -422,7 +422,7 @@ class PageLayoutTests(LogMenuBase):
     def test_the_proof_block_has_a_plain_title_and_one_sentence(self):
         html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
         self.assertIn("Bestätigung erforderlich", html)
-        self.assertIn("deshalb ist ein Nachweis der Identität nötig", html)
+        self.assertIn("Zum Ändern ist ein Code aus der App nötig", html)
         self.assertNotIn("Proof of identity", html)
 
 

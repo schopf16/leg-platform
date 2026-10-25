@@ -8262,6 +8262,9 @@ msgstr "Impostazioni e-mail"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "Changing needs a code from the app."
+msgstr "Per la modifica serve un codice dell'app."
+
 msgid "By time"
 msgstr "Per orario"
 
@@ -8288,9 +8291,6 @@ msgstr "Testi esclusi:"
 
 msgid "Confirmation required"
 msgstr "Conferma richiesta"
-
-msgid "Changing the switch or the address changes who receives the security notices, so one proof of identity is required."
-msgstr "Cambiando l'interruttore o l'indirizzo cambia chi riceve gli avvisi di sicurezza; per questo è richiesta una prova d'identità."
 
 msgid "The notice holds no log line, no text of an entry and no file name; at most one notice per source and hour."
 msgstr "L'avviso non contiene righe di registro, testi di voci né nomi di file; al massimo un avviso per fonte e ora."

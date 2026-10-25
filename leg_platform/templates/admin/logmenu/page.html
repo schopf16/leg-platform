@@ -78,7 +78,7 @@
     </fieldset>
     <fieldset>
       <legend>{% translate "Confirmation required" %}</legend>
-      <p class="help">{% translate "Changing the switch or the address changes who receives the security notices, so one proof of identity is required." %}</p>
+      <p class="help">{% translate "Changing needs a code from the app." %}</p>
       {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
       {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
     </fieldset>
