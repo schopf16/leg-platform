@@ -279,3 +279,18 @@ class TickTests(LogMenuBase):
         self.assertIn(self.MISSING, texts)
         self.assertIn(self.UNREACHABLE, texts)
         self.assertEqual(len(texts), len(set(texts)))
+
+
+class MenuEntryTests(LogMenuBase):
+    """The sidebar entries of the log pages: superusers only, in the group System (D-120, D-121)."""
+
+    def test_a_superuser_sees_both_entries_with_their_urls(self):
+        response = self.client_for(self.superuser).get(reverse("admin:index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("admin:logmenu"))
+        self.assertContains(response, reverse("admin:addresses_importrequest_log"))
+
+    def test_staff_with_the_housekeeping_right_does_not_see_them(self):
+        response = self.client_for(self.staff).get(reverse("admin:index"))
+        self.assertNotContains(response, reverse("admin:logmenu"))
+        self.assertNotContains(response, reverse("admin:addresses_importrequest_log"))

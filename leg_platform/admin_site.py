@@ -193,7 +193,8 @@ class PortalAdminSite(AdminSite):
                 members += [m for m in entries if m["object_name"] not in known]
                 if request.user.is_superuser:
                     # The log pages are not a model: a plain link, for system administrators only (D-092).
-                    members.append(
+                    members.extend(
+                        [
                         {
                             "name": _("Log files"),
                             "object_name": "LogFiles",
@@ -201,7 +202,24 @@ class PortalAdminSite(AdminSite):
                             "admin_url": reverse("admin:logs", current_app=self.name),
                             "add_url": None,
                             "view_only": True,
-                        }
+                        },
+                        {
+                            "name": _("Log menu"),
+                            "object_name": "LogMenu",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:logmenu", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        {
+                            "name": _("Import log"),
+                            "object_name": "ImportLog",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:addresses_importrequest_log", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        ]
                     )
             if members:
                 grouped.append(

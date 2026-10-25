@@ -8465,3 +8465,6 @@ msgstr "Tutti i NPA: %(done)s di %(total)s edifici"
 
 msgid "General"
 msgstr "Generale"
+
+msgid "Log menu"
+msgstr "Menu dei registri"

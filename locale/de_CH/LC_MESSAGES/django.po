@@ -8491,3 +8491,6 @@ msgstr "Alle PLZ: %(done)s von %(total)s Gebäuden"
 
 msgid "General"
 msgstr "Allgemein"
+
+msgid "Log menu"
+msgstr "Protokoll-Menü"

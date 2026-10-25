@@ -8494,3 +8494,6 @@ msgstr "Tous les NPA : %(done)s sur %(total)s bâtiments"
 
 msgid "General"
 msgstr "Général"
+
+msgid "Log menu"
+msgstr "Menu des journaux"
