@@ -586,8 +586,8 @@ msgstr "Die heruntergeladene Datei stimmt nicht mit ihrer Prüfsumme überein un
 msgid "The official directory could not be downloaded or read. Check the network connection and try again."
 msgstr "Das offizielle Verzeichnis konnte nicht heruntergeladen oder gelesen werden. Prüfen Sie die Netzwerkverbindung und versuchen Sie es erneut."
 
-msgid "The import failed unexpectedly. The application log has the details."
-msgstr "Der Import ist unerwartet fehlgeschlagen. Das Anwendungsprotokoll enthält die Einzelheiten."
+msgid "The import failed unexpectedly. Details in the import log."
+msgstr "Der Import ist unerwartet fehlgeschlagen. Details im Importprotokoll."
 
 msgid "The import was interrupted because the application stopped or restarted. Request it again."
 msgstr "Der Import wurde unterbrochen, weil die Anwendung angehalten oder neu gestartet wurde. Fordern Sie ihn erneut an."
@@ -8203,3 +8203,294 @@ msgstr "Fehler-E-Mail der Wartung geändert"
 
 msgid "Housekeeping errors acknowledged"
 msgstr "Wartungsfehler quittiert"
+
+msgid "application"
+msgstr "Anwendung"
+
+msgid "security"
+msgstr "Sicherheit"
+
+msgid "housekeeping"
+msgstr "Wartung"
+
+msgid "import"
+msgstr "Import"
+
+msgid "mail"
+msgstr "Mail"
+
+msgid "A high-severity entry was recorded. Please sign in to the server and check the log."
+msgstr "Ein Eintrag mit hohem Schweregrad ist aufgetreten. Bitte melden Sie sich am Server an und prüfen Sie das Protokoll."
+
+msgid "A notice was recorded."
+msgstr "Ein Hinweis ist aufgetreten."
+
+msgid "Enter an email address, or switch the email off."
+msgstr "Geben Sie eine E-Mail-Adresse ein oder schalten Sie die E-Mail aus."
+
+msgid "Log notice"
+msgstr "Protokoll-Hinweis"
+
+msgid "Log notification"
+msgstr "Protokollmeldung"
+
+msgid "Log notification changed"
+msgstr "Protokollmeldung geändert"
+
+msgid "Critical"
+msgstr "Kritisch"
+
+msgid "Minimum severity"
+msgstr "Mindestschweregrad"
+
+msgid "Send an email"
+msgstr "E-Mail senden"
+
+msgid "Logs"
+msgstr "Protokolle"
+
+msgid "Choose the entries"
+msgstr "Einträge auswählen"
+
+msgid "Time range"
+msgstr "Zeitraum"
+
+msgid "Last hour"
+msgstr "Letzte Stunde"
+
+msgid "Last 24 hours"
+msgstr "Letzte 24 Stunden"
+
+msgid "Last 7 days"
+msgstr "Letzte 7 Tage"
+
+msgid "Last 30 days"
+msgstr "Letzte 30 Tage"
+
+msgid "Security events"
+msgstr "Sicherheitsereignisse"
+
+msgid "Download as text"
+msgstr "Als Text herunterladen"
+
+msgid "No entry in this time range."
+msgstr "Kein Eintrag in diesem Zeitraum."
+
+msgid "The log files open on their own pages: live view, download and the rotated copies."
+msgstr "Die Protokolldateien öffnen auf eigenen Seiten: Live-Ansicht, Download und die rotierten Kopien."
+
+msgid "Security log file"
+msgstr "Sicherheitsprotokoll"
+
+msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
+msgstr "Die Meldung enthält nur Zeitpunkt, Schweregrad und Quelle: keine Protokollzeile, keinen Text eines Eintrags und keinen Dateinamen. Pro Quelle und Stunde höchstens eine Meldung; weitere Einträge werden nur gezählt."
+
+msgid "The e-mail on error and the log notices are set on the logs page."
+msgstr "Die E-Mail bei Fehler und die Protokollmeldungen werden auf der Protokollseite eingestellt."
+
+msgid "Email notice"
+msgstr "E-Mail-Meldung"
+
+msgid "Details in the import log"
+msgstr "Details im Importprotokoll"
+
+msgid "Import log"
+msgstr "Importprotokoll"
+
+msgid "Source"
+msgstr "Quelle"
+
+msgid "All sources"
+msgstr "Alle Quellen"
+
+msgid "No entry."
+msgstr "Kein Eintrag."
+
+msgid "Back to the imports"
+msgstr "Zurück zu den Importen"
+
+msgid "Failed imports and scans. An error stays open until a later successful run of the same source. The log holds the source, the step, a fixed reason and the time only."
+msgstr "Fehlgeschlagene Importe und Scans. Ein Fehler bleibt offen, bis ein späterer erfolgreicher Lauf derselben Quelle ihn ablöst. Das Protokoll enthält nur Quelle, Schritt, einen festen Grund und die Zeit."
+
+msgid "Last progress %(minutes)s minutes ago."
+msgstr "Letzter Fortschritt vor %(minutes)s Minuten."
+
+msgid "No movement for %(minutes)s minutes."
+msgstr "Keine Bewegung seit %(minutes)s Minuten."
+
+msgid "Statistic"
+msgstr "Statistik"
+
+msgid "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)."
+msgstr "Wird täglich durch den täglichen Lauf geladen. Keine Aktion hier. Quelle: Bundesamt für Energie (BFE), freie Nutzung (Open Use)."
+
+msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
+msgstr "Die Abfrage läuft einmal pro Woche, am Samstag, nach dem Anlagenregister. Keine Aktion hier. Quelle: BKW Netz, öffentliche Karte mit hohem Rabatt."
+
+msgid "A repair was tried recently and did not succeed."
+msgstr "Eine Reparatur wurde kürzlich versucht und war nicht erfolgreich."
+
+msgid "CSV exceeds its resource limit."
+msgstr "Die CSV-Datei überschreitet das Ressourcenlimit."
+
+msgid "Catalogue data date predates the published directory."
+msgstr "Das Datum der Katalogdaten liegt vor dem veröffentlichten Verzeichnis."
+
+msgid "Download exceeds its resource limit."
+msgstr "Der Download überschreitet das Ressourcenlimit."
+
+msgid "Download exceeds the size limit."
+msgstr "Der Download überschreitet die Grössenbegrenzung."
+
+msgid "Empty directory."
+msgstr "Leeres Verzeichnis."
+
+msgid "Expected exactly one CSV member."
+msgstr "Erwartet genau eine CSV-Datei im Archiv."
+
+msgid "Incomplete download."
+msgstr "Der Download ist unvollständig."
+
+msgid "Invalid CSV header."
+msgstr "Ungültige Kopfzeile der CSV-Datei."
+
+msgid "Invalid CSV row count or width."
+msgstr "Ungültige Zeilenzahl oder Spaltenzahl der CSV-Datei."
+
+msgid "Invalid address field length."
+msgstr "Ungültige Länge eines Adressfeldes."
+
+msgid "Invalid address field."
+msgstr "Ungültiges Adressfeld."
+
+msgid "Invalid official archive format."
+msgstr "Ungültiges Format des amtlichen Archivs."
+
+msgid "Invalid official catalogue metadata."
+msgstr "Ungültige Metadaten des amtlichen Katalogs."
+
+msgid "Invalid postal label."
+msgstr "Ungültige Postleitzahl-Bezeichnung."
+
+msgid "Missing EGID column."
+msgstr "Spalte EGID fehlt."
+
+msgid "Missing approved CSV columns."
+msgstr "Freigegebene CSV-Spalten fehlen."
+
+msgid "Missing coordinate column."
+msgstr "Koordinatenspalte fehlt."
+
+msgid "Missing entrance column."
+msgstr "Spalte Eingang fehlt."
+
+msgid "No buildings with coordinates for the postal codes."
+msgstr "Keine Gebäude mit Koordinaten für die Postleitzahlen."
+
+msgid "No postal code is set for the transformer scan."
+msgstr "Für die Abfrage der Trafostationen ist keine Postleitzahl gesetzt."
+
+msgid "Not enough free disk space for an import."
+msgstr "Zu wenig freier Speicherplatz für einen Import."
+
+msgid "Official archive checksum mismatch."
+msgstr "Prüfsumme des amtlichen Archivs stimmt nicht."
+
+msgid "Official download failed."
+msgstr "Der amtliche Download ist fehlgeschlagen."
+
+msgid "Official file not found."
+msgstr "Amtliche Datei nicht gefunden."
+
+msgid "The import failed unexpectedly."
+msgstr "Der Import ist unerwartet fehlgeschlagen."
+
+msgid "The import lease was lost."
+msgstr "Der Importauftrag wurde verloren."
+
+msgid "The import was interrupted because the application stopped or restarted."
+msgstr "Der Import wurde unterbrochen, weil die Anwendung angehalten oder neu gestartet wurde."
+
+msgid "The map server could not be reached."
+msgstr "Der Kartenserver konnte nicht erreicht werden."
+
+msgid "The official directory could not be imported."
+msgstr "Das amtliche Verzeichnis konnte nicht importiert werden."
+
+msgid "The plant register could not be downloaded or read."
+msgstr "Das Anlagenregister konnte nicht heruntergeladen oder gelesen werden."
+
+msgid "The transformer scan takes too long."
+msgstr "Die Abfrage der Trafostationen dauert zu lange."
+
+msgid "Too many map tiles for one run."
+msgstr "Zu viele Kartenkacheln für einen Lauf."
+
+msgid "Unapproved download URL."
+msgstr "Nicht freigegebene Download-Adresse."
+
+msgid "Unexpected HTTP content encoding."
+msgstr "Unerwartete HTTP-Inhaltskodierung."
+
+msgid "Unexpected HTTP content type."
+msgstr "Unerwarteter HTTP-Inhaltstyp."
+
+msgid "Unsafe ZIP member."
+msgstr "Unsicherer ZIP-Eintrag."
+
+msgid "Send"
+msgstr "Senden"
+
+msgid "By severity"
+msgstr "Nach Schweregrad"
+
+msgid "By event"
+msgstr "Nach Ereignis"
+
+msgid "Import errors"
+msgstr "Importfehler"
+
+msgid "Errors"
+msgstr "Fehler"
+
+msgid "Warnings"
+msgstr "Warnungen"
+
+msgid "Notice"
+msgstr "Hinweis"
+
+msgid "Warning"
+msgstr "Warnung"
+
+msgid "Address directory not changed for a long time"
+msgstr "Adressverzeichnis seit längerer Zeit unverändert"
+
+msgid "Downloaded file unchanged"
+msgstr "Heruntergeladene Datei unverändert"
+
+msgid "The address directory has not changed for a long time."
+msgstr "Das Adressverzeichnis ist seit längerer Zeit unverändert."
+
+msgid "The downloaded file is unchanged since the last run."
+msgstr "Die heruntergeladene Datei ist seit der letzten Ausführung unverändert."
+
+msgid "%(done)s of %(total)s rows"
+msgstr "%(done)s von %(total)s Zeilen"
+
+msgid "%(done)s rows"
+msgstr "%(done)s Zeilen"
+
+msgid "Postal code %(code)s: %(done)s of %(total)s buildings"
+msgstr "PLZ %(code)s: %(done)s von %(total)s Gebäuden"
+
+msgid "Postal code %(code)s: %(done)s buildings"
+msgstr "PLZ %(code)s: %(done)s Gebäude"
+
+msgid "All postal codes: %(done)s of %(total)s buildings"
+msgstr "Alle PLZ: %(done)s von %(total)s Gebäuden"
+
+msgid "General"
+msgstr "Allgemein"
+
+msgid "Log menu"
+msgstr "Protokoll-Menü"

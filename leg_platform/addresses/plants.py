@@ -38,6 +38,7 @@ from .importer import (
     declared_entry_count,
 )
 from .models import Directory, ImportRequest, Plant, PlantRegister
+from .progress import count_rows
 from .storage import DIRECTORY_ALIAS
 
 logger = logging.getLogger(__name__)
@@ -237,6 +238,8 @@ def _load_generation(archive, generation, progress):
     """Insert the plants as the (still invisible) generation; return (stored, counts) with the counts of ``plant_rows``."""
     counts = {"rejected": 0, "skipped": 0}
     stored = 0
+    if progress is not None:
+        progress.set_rows_total(count_rows(archive, PLANT_CSV_NAME, MAX_PLANT_ROWS))
     chunk = []
     for plant in plant_rows(archive, counts):
         chunk.append(Plant(

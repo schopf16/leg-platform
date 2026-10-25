@@ -48,7 +48,8 @@ class Heartbeat(threading.Thread):
         ).update(
             heartbeat_at=timezone.now(), phase=self.progress.current_phase[:16],
             bytes_done=self.progress.bytes_done, bytes_total=self.progress.bytes_total,
-            rows_done=self.progress.rows_done,
+            rows_done=self.progress.rows_done, progress_at=self.progress.changed_at,
+            rows_total=self.progress.rows_total, progress_units=self.progress.units(),
         )
 
     def run(self):

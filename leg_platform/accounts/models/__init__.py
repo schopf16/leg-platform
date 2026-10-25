@@ -28,6 +28,7 @@ from leg_platform.accounts.models.customer_numbers import (
     format_customer_number,
 )
 from leg_platform.accounts.models.user import User
+from leg_platform.accounts.models.log_notice import LogNotificationSettings
 from leg_platform.accounts.models.passkeys import Passkey, PasskeyChallenge, PasskeyIdentity, PendingSignInChange
 from leg_platform.accounts.models.user_manager import (
     SUPERUSER_LOCK_TIMEOUT,

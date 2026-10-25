@@ -144,6 +144,13 @@ class ImportRequest(models.Model):
     bytes_done = models.PositiveBigIntegerField(null=True, editable=False)
     bytes_total = models.PositiveBigIntegerField(null=True, editable=False)
     rows_done = models.PositiveIntegerField(null=True, editable=False)
+    # The time of the last progress of the running job (D-121): the status page shows how long ago it was.
+    progress_at = models.DateTimeField(null=True, editable=False)
+    # Consecutive runs of the address directory that found the file unchanged (D-122).
+    unchanged_runs = models.PositiveIntegerField(default=0, editable=False)
+    # The rows of the CSV of the running job (None: unknown) and the building counts per postal code (D-122).
+    rows_total = models.PositiveIntegerField(null=True, editable=False)
+    progress_units = models.JSONField(null=True, editable=False)
     # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
     last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
     # The update flag (KONZEPT 3a, D-066): set once when a building could not be found in the directory nor at
@@ -341,9 +348,6 @@ class HousekeepingStatus(models.Model):
     mariadb_message = models.CharField(max_length=40, blank=True, verbose_name=_("Application database result"))
     # {"table name": {"before": bytes, "after": bytes}} for the tables of the optimisation.
     mariadb_sizes = models.JSONField(default=dict, blank=True, verbose_name=_("Table sizes"))
-    # The error mail (D-119): off by default; the recipient is checked as an email address.
-    notify_enabled = models.BooleanField(default=False, verbose_name=_("Send an email on error"))
-    notify_email = models.EmailField(blank=True, verbose_name=_("Email address for errors"))
 
     class Meta:
         default_permissions = ()
@@ -383,3 +387,26 @@ class HousekeepingError(models.Model):
         ordering = ["-occurred_at", "-id"]
         verbose_name = _("Housekeeping error")
         verbose_name_plural = _("Housekeeping errors")
+
+
+class ImportLogEntry(models.Model):
+    """A failed import run of the address directory, the plant register or the transformer scan (D-121).
+
+    Holds the source, the step, the fixed reason text of the importer and the time: never SQL, file content or personal
+    data. Open until a later successful run of the same source clears it.
+    """
+
+    occurred_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Occurred at"))
+    source = models.CharField(max_length=12, choices=ImportRequest.Source, editable=False, verbose_name=_("Source"))
+    step = models.CharField(max_length=20, blank=True, editable=False, verbose_name=_("Step"))
+    reason = models.CharField(max_length=255, editable=False, verbose_name=_("Reason"))
+    cleared_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cleared at"))
+    # The kind of the event: an error, the data is old (stale), or the downloaded file is unchanged (D-122).
+    kind = models.CharField(max_length=10, default="error", editable=False, verbose_name=_("Kind"))
+    count = models.PositiveIntegerField(null=True, blank=True, editable=False, verbose_name=_("Unchanged runs"))
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["-occurred_at", "-id"]
+        verbose_name = _("Import error")
+        verbose_name_plural = _("Import errors")

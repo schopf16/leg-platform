@@ -71,7 +71,7 @@ class MailJob(models.Model):
         APPLICATION_REJECTED = "application_rejected", "Application not accepted"
         APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", "Application not accepted by the grid operator"
         # The error mail of the housekeeping of the databases (D-119): no payload, the lines are read when it is made.
-        HOUSEKEEPING_ERROR = "housekeeping_error", "Housekeeping error"
+        LOG_NOTIFICATION = "log_notification", "Log notification"
 
     # Notifications about a change of the account, as opposed to the requests of a person who
     # may have no account (D-038, D-040).

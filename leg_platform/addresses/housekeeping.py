@@ -23,7 +23,6 @@ import threading
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
-from django import forms
 from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -349,21 +348,13 @@ def _dump_name():
 
 def _record_outcome(errors):
     """Open the errors of a failed run, or clear the open ones after a successful run; the error mail on opening."""
-    # Imported here: the mail queue imports the accounts app, which imports the admin of this app.
-    from leg_platform.accounts import mail_queue
-    from leg_platform.accounts.models import MailJob
-
     with transaction.atomic():
         if not errors:
             HousekeepingError.objects.filter(cleared_at__isnull=True).update(cleared_at=timezone.now())
             return
-        was_open = HousekeepingError.objects.filter(cleared_at__isnull=True).exists()
         dump_name = _dump_name()
         for step, reason in errors:
             HousekeepingError.objects.create(step=step, reason=reason, dump_file_name=dump_name)
-        status = HousekeepingStatus.objects.get(pk=1)
-        if not was_open and status.notify_enabled and status.notify_email:
-            mail_queue.enqueue(MailJob.Kind.HOUSEKEEPING_ERROR, status.notify_email)
 
 
 def open_error_exists():
@@ -426,27 +417,6 @@ def _execute(now):
             "Housekeeping finished: address directory %s, application database %s.",
             fields["sqlite_state"], fields["mariadb_state"],
         )
-
-
-class NotificationForm(forms.ModelForm):
-    """The error mail of the administration page (D-119): an enable switch and the address, checked as an email."""
-
-    class Meta:
-        model = HousekeepingStatus
-        fields = ["notify_enabled", "notify_email"]
-
-    def clean(self):
-        cleaned = super().clean()
-        if cleaned.get("notify_enabled") and not cleaned.get("notify_email"):
-            self.add_error("notify_email", _("Enter an email address for the errors, or switch the email off."))
-        return cleaned
-
-    def save_settings(self):
-        """Save the two fields only: the row also holds the lease and the results of a run that may be going on."""
-        status = self.save(commit=False)
-        status.save(update_fields=["notify_enabled", "notify_email"])
-        return status
-
 
 
 def _release_lease():

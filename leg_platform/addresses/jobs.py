@@ -18,7 +18,7 @@ from django.utils import timezone
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
-from .models import Directory, HousekeepingStatus, ImportRequest
+from .models import Directory, HousekeepingStatus, ImportLogEntry, ImportRequest
 from .storage import DIRECTORY_ALIAS, reset_marker
 
 logger = logging.getLogger(__name__)
@@ -204,6 +204,8 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
                     setattr(job, name, value)
                 fields += ["last_transformer_state", "last_transformer_finished_at", "last_transformer_error"]
             job.save(update_fields=fields)
+            # The interrupted run is a failure of its source too (D-121).
+            _log_failure(job.source, INTERRUPTED, "", now)
         plant = source == ImportRequest.Source.PLANT
         # The plant register and the transformer scan both run only as the scheduled run, never while an address request
         # is queued, and neither touches the address schedule (D-117, D-118).
@@ -251,6 +253,26 @@ def _kind(claimed):
     return "manual" if claimed.manual else "automatic"
 
 
+def _log_failure(source, reason, step, now):
+    """One row of the import error log (D-121): the source, the step and the fixed reason text only."""
+    ImportLogEntry.objects.create(
+        source=source, step=step if step.isidentifier() and len(step) <= 20 else "",
+        reason=reason[:255], occurred_at=now,
+    )
+
+
+def _clear_failures(source, now, keep_kinds=()):
+    """A successful run of the source clears the open rows of that source only (D-121). ``keep_kinds``: rows that
+    stay open (the stale event stays until the file changes, D-122)."""
+    ImportLogEntry.objects.filter(source=source, cleared_at__isnull=True).exclude(kind__in=keep_kinds).update(
+        cleared_at=now,
+    )
+
+
+# The information event of an unchanged file (D-122): level notice, not an error.
+UNCHANGED_TEXT = "The downloaded file is unchanged since the last run."
+
+
 def record_success(claimed, count, *, downloaded=None, transformer=None):
     """Store and log a completed import (the claim must still be ours). ``transformer``: the result of a scan (D-118)."""
     count = count if isinstance(count, int) else None
@@ -271,10 +293,22 @@ def record_success(claimed, count, *, downloaded=None, transformer=None):
         })
     else:
         fields["columns_missing_at"] = None
+    unchanged = downloaded is False and claimed.source == ImportRequest.Source.ADDRESS
+    if claimed.source == ImportRequest.Source.ADDRESS:
+        # Consecutive runs that found the file unchanged (D-122); a changed download starts again at zero.
+        previous = ImportRequest.objects.filter(pk=1).values_list("unchanged_runs", flat=True).first() or 0
+        fields["unchanged_runs"] = previous + 1 if unchanged else 0
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(**fields)
     if not finished:
         logger.warning("An import finished, but its job was taken over meanwhile.")
         return
+    # The stale event stays open until the file changes again (D-122): an unchanged run does not clear it.
+    _clear_failures(claimed.source, fields["finished_at"], keep_kinds=("stale",) if unchanged else ())
+    if unchanged:
+        ImportLogEntry.objects.create(
+            source=claimed.source, kind="unchanged", step="", reason=UNCHANGED_TEXT, count=fields["unchanged_runs"],
+            occurred_at=fields["finished_at"],
+        )
     if scan:
         logger.info("Transformer station scan completed (%s): %s buildings.", _kind(claimed), transformer.buildings)
         with transaction.atomic():
@@ -316,6 +350,7 @@ def record_failure(claimed, exc):
         known = SAFE_FAILURES | TRANSFORMER_FAILURES
     reason = str(exc) if isinstance(exc, ImportFailure) and str(exc) in known else UNEXPECTED_FAILURE
     now = timezone.now()
+    step = ImportRequest.objects.filter(pk=1).values_list("phase", flat=True).first() or ""
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
         state=ImportRequest.State.FAILED, finished_at=now, heartbeat_at=None,
         phase="", last_error=reason[:255],
@@ -329,6 +364,7 @@ def record_failure(claimed, exc):
         # Taken over meanwhile: the new holder owns the row.
         logger.warning("An import failed, but its job was taken over meanwhile.")
         return
+    _log_failure(claimed.source, reason, step, now)
     what = "Plant register import" if plant else "Transformer station scan" if scan else "Address directory import"
     logger.error(
         "%s failed (%s): %s%s", what, _kind(claimed), reason,

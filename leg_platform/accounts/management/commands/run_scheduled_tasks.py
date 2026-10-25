@@ -20,6 +20,8 @@ TASKS = (
     "clearsessions",
     # Weekly housekeeping of both databases (D-119): Sunday from 04:30, once per ISO week.
     "housekeeping",
+    # The log menu: one check of the database sources; at most one mail per source and hour (D-120).
+    "notify_log_events",
     # Address app: expired stored building searches, then the daily address directory run (the import itself runs
     # last: it can take minutes and the cleanups must not wait for it).
     "cleanup_address_lookups",

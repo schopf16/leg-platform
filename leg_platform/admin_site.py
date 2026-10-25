@@ -193,7 +193,8 @@ class PortalAdminSite(AdminSite):
                 members += [m for m in entries if m["object_name"] not in known]
                 if request.user.is_superuser:
                     # The log pages are not a model: a plain link, for system administrators only (D-092).
-                    members.append(
+                    members.extend(
+                        [
                         {
                             "name": _("Log files"),
                             "object_name": "LogFiles",
@@ -201,7 +202,24 @@ class PortalAdminSite(AdminSite):
                             "admin_url": reverse("admin:logs", current_app=self.name),
                             "add_url": None,
                             "view_only": True,
-                        }
+                        },
+                        {
+                            "name": _("Log menu"),
+                            "object_name": "LogMenu",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:logmenu", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        {
+                            "name": _("Import log"),
+                            "object_name": "ImportLog",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:addresses_importrequest_log", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        ]
                     )
             if members:
                 grouped.append(
@@ -220,13 +238,16 @@ class PortalAdminSite(AdminSite):
         # each view checks "system administrator" itself.
         from django.urls import path
 
-        from leg_platform import log_views
+        from leg_platform import log_menu, log_views
 
         return [
             path("logs/", self.admin_view(log_views.log_list), name="logs"),
             path("logs/<logkey:log>/", self.admin_view(log_views.log_view), name="logs_view"),
             path("logs/<logkey:log>/tail/", self.admin_view(log_views.log_tail), name="logs_tail"),
             path("logs/<logkey:log>/download/", self.admin_view(log_views.log_download), name="logs_download"),
+            path("logmenu/", self.admin_view(log_menu.page), name="logmenu"),
+            path("logmenu/settings/", self.admin_view(log_menu.settings_view), name="logmenu_settings"),
+            path("logmenu/download/<str:source>/", self.admin_view(log_menu.download), name="logmenu_download"),
             *super().get_urls(),
         ]
 

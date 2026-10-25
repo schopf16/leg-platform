@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# The import error log (D-121): system administrators only; the views refuse everyone else. No script, no inline style. #}
+{% block content %}
+<div class="data-import-blocks">
+<section class="data-import-block" id="importlog" aria-labelledby="importlog-heading">
+  <h2 id="importlog-heading">{% translate "Import log" %}</h2>
+  <p class="help">{% translate "Failed imports and scans. An error stays open until a later successful run of the same source. The log holds the source, the step, a fixed reason and the time only." %}</p>
+  <form method="get" class="import-form">
+    <p>
+      <label for="importlog-source">{% translate "Source" %}</label>
+      <select id="importlog-source" name="source">
+        {% for key, label in sources %}<option value="{{ key }}"{% if key == source %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </p>
+    <button type="submit" class="button">{% translate "Show" %}</button>
+  </form>
+  <p><a href="{{ download_url }}">{% translate "Download as text" %}</a> · <a href="{{ back_url }}">{% translate "Back to the imports" %}</a></p>
+  <table id="importlog-table">
+    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Source" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Open" %}</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr><td>{{ row.occurred_at }}</td><td>{{ row.source }}</td><td>{{ row.step }}</td><td>{{ row.reason }}</td><td>{% if row.open %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td></tr>
+    {% empty %}
+      <tr><td colspan="5">{% translate "No entry." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+</div>
+{% endblock %}

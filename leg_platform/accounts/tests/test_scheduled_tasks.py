@@ -18,6 +18,8 @@ COMMANDS = Path(run_scheduled_tasks.__file__).parent
 
 @tag("mariadb")
 class ScheduledTasksTests(TestCase):
+    databases = {"default", "addresses"}
+
     def test_every_cleanup_command_is_part_of_the_scheduled_tasks(self):
         cleanup_commands = {
             path.stem

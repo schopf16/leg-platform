@@ -616,6 +616,8 @@ class CoveredSubqueryTests(TestCase):
 
 @tag("mariadb")
 class CommandTests(DeadlineCase):
+    databases = {"default", "addresses"}
+
     def test_the_command_runs_the_rules_prints_numbers_and_logs_no_data(self):
         self.idle_draft(3)
         out = StringIO()
