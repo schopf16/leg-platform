@@ -106,7 +106,7 @@
       <label for="import-log-lines">{% translate "Lines" %}</label>
       <select id="import-log-lines" name="lines">{% for value in import_log.line_counts %}<option value="{{ value }}"{% if value == import_log.lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}</select>
     </p>
-    <button type="submit" class="button">{% translate "Show" %}</button>
+    <button type="submit" class="default">{% translate "Show" %}</button>
   </form>
   <p><a href="{{ import_log.download_url }}">{% translate "Download as text" %}</a></p>
   {% include "admin/logs/_text_box.html" with lines=import_log.lines box_id="import-log-box" %}

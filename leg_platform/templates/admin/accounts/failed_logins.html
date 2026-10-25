@@ -9,7 +9,7 @@
   <p><label for="failed-logins-lines">{% translate "Lines" %}</label>
     <select id="failed-logins-lines" name="lines">{% for value in line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}</select>
   </p>
-  <button type="submit" class="button">{% translate "Search" %}</button>
+  <button type="submit" class="default">{% translate "Search" %}</button>
 </form>
 {% for section in sections %}
 <section class="data-import-block" id="failed-logins-{{ section.id }}" aria-labelledby="failed-logins-{{ section.id }}-heading">
