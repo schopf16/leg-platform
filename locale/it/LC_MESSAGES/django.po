@@ -512,6 +512,9 @@ msgstr "Non è stato possibile caricare lo stato. Nuovo tentativo in corso."
 msgid "The download address is not an approved one."
 msgstr "L'indirizzo di download non è tra quelli approvati."
 
+msgid "The official file was not found on the server."
+msgstr "Il file ufficiale non è stato trovato sul server."
+
 msgid "The official server did not deliver the file. Check that this server can reach data.geo.admin.ch."
 msgstr "Il server ufficiale non ha fornito il file. Verifichi che questo server possa raggiungere data.geo.admin.ch."
 

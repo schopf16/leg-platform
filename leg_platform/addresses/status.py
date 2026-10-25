@@ -22,6 +22,7 @@ from .services import directory_status
 REASONS = {
     "Unapproved download URL.": _("The download address is not an approved one."),
     "Official download failed.": _("The official server did not deliver the file. Check that this server can reach data.geo.admin.ch."),
+    "Official file not found.": _("The official file was not found on the server."),
     "Unexpected HTTP content encoding.": _("The official server answered in an unexpected format."),
     "Download exceeds the size limit.": _("The official file is larger than allowed."),
     "Download exceeds its resource limit.": _("The download was larger or slower than allowed."),
@@ -143,10 +144,12 @@ def next_automatic_text(job):
 
 def plant_status(now=None):
     """The block "PV-Anlagen (BFE)" of the address page (D-117): the statistic of the last successful plant import and
-    the result of the last plant run. Read only: the plant import runs only in the daily run, never from this page.
+    the last result of the plant run with its date and time. Read only: the plant import runs only in the daily run.
 
-    The result of a run is shown only for a run of today (``last_plant_scheduled_run_on``); otherwise the result is
-    "not run today". The statistic keeps the values of the last success (``PlantRegister``).
+    A failure is shown whatever day it happened on, until a later run replaces it (owner decision 2026-10-25). A success
+    is the result only on the day of its run (``last_plant_scheduled_run_on``); an earlier success, or no run at all,
+    gives "not run today" (the time of the success stays visible). The statistic keeps the values of the last success
+    (``PlantRegister``).
     """
     now = now or timezone.now()
     today = timezone.localdate(now)
@@ -168,10 +171,11 @@ def plant_status(now=None):
             result_state, result_reason = "failed", reason_text(jobs.INTERRUPTED)
     elif job is not None and job.last_plant_finished_at is not None:
         run_at = _when(job.last_plant_finished_at)
-        if job.last_plant_scheduled_run_on == today and job.last_plant_state in ("succeeded", "failed"):
-            result_state = job.last_plant_state
-            if result_state == "failed":
-                result_reason = reason_text(job.last_plant_error)
+        if job.last_plant_state == "failed":
+            result_state = "failed"
+            result_reason = reason_text(job.last_plant_error) or reason_text(jobs.UNEXPECTED_FAILURE)
+        elif job.last_plant_state == "succeeded" and job.last_plant_scheduled_run_on == today:
+            result_state = "succeeded"
     labels = {
         "running": ImportRequest.State.RUNNING.label,
         "succeeded": ImportRequest.State.SUCCEEDED.label,

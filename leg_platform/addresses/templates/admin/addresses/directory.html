@@ -56,8 +56,10 @@
   <dl class="import-facts">
     <dt>{% translate "Last plant run" %}</dt><dd id="plant-run-at">{{ plant_status.run_at|default:"–" }}</dd>
     <dt>{% translate "Result" %}</dt>
-    <dd id="plant-result"><span class="status-dot status-{{ plant_status.result_tone }}" aria-hidden="true"></span>{{ plant_status.result_label }}{% if plant_status.result_reason %}<br>{{ plant_status.result_reason }}{% endif %}</dd>
+    <dd id="plant-result"><span class="status-dot status-{{ plant_status.result_tone }}" aria-hidden="true"></span>{{ plant_status.result_label }}</dd>
   </dl>
+  {# role="alert": a failure stays visible until a later run replaces it (D-117); the reason is a fixed text #}
+  {% if plant_status.result_reason %}<p class="import-error" id="plant-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="plant-error-text">{{ plant_status.result_reason }}</span></p>{% endif %}
   {% if plant_status.older_data_date %}<p class="help" id="plant-older-data">{% blocktranslate with date=plant_status.older_data_date %}The data from {{ date }} stays valid.{% endblocktranslate %}</p>{% endif %}
 
   <h3>{% translate "Statistic of the last successful import" %}</h3>
