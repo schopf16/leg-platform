@@ -596,6 +596,9 @@ msgstr "Importazione dell'elenco degli indirizzi completata"
 msgid "Address directory import failed"
 msgstr "Importazione dell'elenco degli indirizzi non riuscita"
 
+msgid "Postal codes of the service area changed"
+msgstr "Codici postali dell'area di servizio modificati"
+
 # D-092: the log files and the log pages of the administration.
 msgid "Log file viewed"
 msgstr "File di log visualizzato"

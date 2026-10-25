@@ -41,6 +41,28 @@ class ServicePostalCodeAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.has_perm(SERVICE_AREA_PERMISSION)
 
+    # Every change is a security event (D-118) with the postal codes of the service area after the change, nothing else.
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            self._record_change(request)
+
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            super().delete_model(request, obj)
+            self._record_change(request)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            super().delete_queryset(request, queryset)
+            self._record_change(request)
+
+    @staticmethod
+    def _record_change(request):
+        codes = ServicePostalCode.objects.order_by("postal_code").values_list("postal_code", flat=True)
+        detail = "postal codes: " + (", ".join(codes) or "none")
+        security_log.record(SecurityEvent.Event.SERVICE_AREA_CHANGED, actor=request.user, detail=detail)
+
 
 @admin.register(ImportRequest)
 class ImportRequestAdmin(admin.ModelAdmin):

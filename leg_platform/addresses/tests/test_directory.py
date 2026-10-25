@@ -417,7 +417,7 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         )
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*from \.http_budget import", text, re.M)),
-            ["importer.py", "swisstopo.py"],
+            ["importer.py", "swisstopo.py", "transformers.py"],
         )
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*(from \. import .*\bswisstopo\b|from \.swisstopo)", text, re.M)),

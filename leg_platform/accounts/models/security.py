@@ -229,6 +229,8 @@ class SecurityEvent(models.Model):
         # The transformer station scan (D-118): one event per outcome, the count or the fixed reason in the detail.
         TRANSFORMER_SCAN_SUCCEEDED = "transformer_scan_succeeded", _("Transformer station scan completed")
         TRANSFORMER_SCAN_FAILED = "transformer_scan_failed", _("Transformer station scan failed")
+        # The postal codes of the service area (D-118): the codes only, in the log line; no other text of the input.
+        SERVICE_AREA_CHANGED = "service_area_changed", _("Postal codes of the service area changed")
         LOG_VIEWED = "log_viewed", _("Log file viewed")
         LOG_DOWNLOADED = "log_downloaded", _("Log file downloaded")
         PERSISTENT_SESSION_STARTED = "persistent_session_started", _(

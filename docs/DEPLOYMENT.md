@@ -351,10 +351,11 @@ Transformer station scan (D-118), server only: the image and OCR packages of the
 
 ```bash
 sudo /opt/leg-platform/venv/bin/python -m pip install -r /opt/leg-platform/app/requirements/transformers.txt
+sudo /opt/leg-platform/venv/bin/python -m pip install --no-deps rapidocr-onnxruntime==1.2.3
 sudo /opt/leg-platform/venv/bin/python -m pip check
 ```
 
-The pins are those of `requirements/transformers.txt` (the versions of `bkw_leg_scanner.py`). Without them the weekly scan records the fixed text "The map reader is not installed on this server."; nothing else stops. The postal codes of the service area are entered in the administration (right `addresses.manage_service_areas`), never in a file. The scan reads the public BKW map server over HTTPS (`qgisserver-extern.bkw.ch`, outbound port 443, D-118); the server must reach it.
+The reader package is installed with `--no-deps` on purpose: it declares `opencv-python`, which conflicts with `opencv-python-headless` (both provide `cv2`). Its other requirements are in `requirements/transformers.txt`. The one remaining `pip check` message, "rapidocr-onnxruntime 1.2.3 requires opencv-python, which is not installed.", is expected. The pins are those of `requirements/transformers.txt` (the versions of `bkw_leg_scanner.py`, the others resolved on 2026-10-25). Without them the weekly scan records the fixed text "The map reader is not installed on this server."; nothing else stops. The postal codes of the service area are entered in the administration (right `addresses.manage_service_areas`), never in a file. The scan reads the public BKW map server over HTTPS (`qgisserver-extern.bkw.ch`, outbound port 443, D-118); the server must reach it.
 
 ### 4.3 Directory layout
 

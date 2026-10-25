@@ -6,9 +6,14 @@ that read pixels need numpy, scipy and Pillow (``requirements/transformers.txt``
 
 import importlib.util
 import io
+import re
+import socketserver
+import threading
+import time
 import unittest
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -17,10 +22,12 @@ from django.contrib import admin
 from django.contrib.auth.models import Permission
 from django.db.migrations.loader import MigrationLoader
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts.tests.helpers import create_active_user
-from leg_platform.addresses import importer, jobs, schedule, setup, status, transformers
+from leg_platform.accounts.models import SecurityEvent
+from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.addresses import importer, jobs, runner, schedule, setup, status, transformers
 from leg_platform.addresses.admin import SERVICE_AREA_PERMISSION, ServicePostalCodeAdmin
 from leg_platform.addresses.models import Address, Directory, ImportRequest, ServicePostalCode, TransformerStation
 from leg_platform.addresses.router import AddressRouter
@@ -92,6 +99,10 @@ class FakeSession:
         self.responses = list(responses)
         self.error = error
         self.calls = []
+        self.mounted = []
+
+    def mount(self, prefix, adapter):
+        self.mounted.append(prefix)
 
     def get(self, url, **kwargs):
         self.calls.append({"url": url, **kwargs})
@@ -208,6 +219,128 @@ class TileLimitTests(SimpleTestCase):
         self.assertEqual(transformers.MAX_SCAN_SECONDS, 3600)
         self.assertEqual(transformers.TILE_PAUSE_SECONDS, 1.0)
         self.assertEqual(transformers.REQUEST_TIMEOUT, (10, 60))
+        self.assertEqual(transformers.REQUEST_SECONDS, 60)
+        self.assertEqual(transformers.MAX_TILE_BYTES, 16 * 1024 * 1024)
+
+
+class TileBodyTests(SimpleTestCase):
+    """What the answer of one tile may be (D-118): a PNG of the requested size, at most ``MAX_TILE_BYTES``."""
+
+    def fetch(self, session):
+        return transformers.fetch_tile(session, (0, 0, 1, 1), transformers.TILE_PX + 102, (10, 60))
+
+    def test_a_tile_larger_than_the_limit_is_refused(self):
+        session = FakeSession(responses=[FakeResponse(b"\x89PNG" + bytes(2048))])
+        with patch.object(transformers, "MAX_TILE_BYTES", 1024), self.assertRaises(transformers.ScanFailure) as raised:
+            self.fetch(session)
+        self.assertEqual(str(raised.exception), jobs.MAP_ANSWER)
+
+    @needs_packages
+    def test_a_200_answer_typed_as_png_with_another_body_is_refused(self):
+        for body in (b"<html>not a picture</html>", b"\x89PNG\r\n\x1a\n" + b"truncated", b""):
+            with self.subTest(body=body[:12]), self.assertRaises(transformers.ScanFailure) as raised:
+                self.fetch(FakeSession(responses=[FakeResponse(body, content_type="image/png")]))
+            self.assertEqual(str(raised.exception), jobs.MAP_ANSWER)
+
+    @needs_packages
+    def test_a_png_of_another_size_is_refused(self):
+        png, _canvas = tile_png(64)
+        with self.assertRaises(transformers.ScanFailure) as raised:
+            self.fetch(FakeSession(responses=[FakeResponse(png, content_type="image/png")]))
+        self.assertEqual(str(raised.exception), jobs.MAP_ANSWER)
+
+
+class _TrickleServer(socketserver.ThreadingTCPServer):
+    """A test-only server on 127.0.0.1 whose tile trickles: one byte every 0.3 s, as a faulty map server may do."""
+
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self):
+        self.closed = threading.Event()  # the client side went away
+        self.connected = threading.Event()
+        super().__init__(("127.0.0.1", 0), _TrickleHandler)
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.server_address[1]}/ogc/"
+
+
+class _TrickleHandler(socketserver.BaseRequestHandler):
+    DRIP = 0.3
+    LIFETIME = 20  # never longer than this, whatever the client does
+
+    def handle(self):
+        server = self.server
+        server.connected.set()
+        request = b""
+        while b"\r\n\r\n" not in request:
+            chunk = self.request.recv(4096)
+            if not chunk:
+                server.closed.set()
+                return
+            request += chunk
+        ended = time.monotonic() + self.LIFETIME
+        try:
+            self.request.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: image/png\r\n\r\n")
+            while time.monotonic() < ended:
+                self.request.sendall(b"\x89")
+                time.sleep(self.DRIP)
+        except OSError:
+            pass
+        server.closed.set()
+
+
+class TileDeadlineTests(SimpleTestCase):
+    """The hard total deadline of one tile request (review finding 1 of D-118, the rule of D-117 for downloads).
+
+    A socket timeout limits one wait only; a server that trickles bytes must not hold the scan. The test replaces only
+    the approved map address (a seam: the local server speaks plain HTTP); the logic under test is the real one.
+    """
+
+    def test_a_tile_that_trickles_is_cut_off_at_the_request_deadline(self):
+        server = _TrickleServer()
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(lambda: (server.shutdown(), server.server_close()))
+        with patch.object(transformers, "WMS_URL", server.url), \
+                patch.object(importer, "APPROVED_WMS_URLS", frozenset({server.url})):
+            started = time.monotonic()
+            with self.assertRaises(transformers.ScanFailure) as raised:
+                transformers.fetch_tile(
+                    transformers.make_session(), (0, 0, 1, 1), transformers.TILE_PX + 102, (10, 60), seconds=1.0,
+                )
+            elapsed = time.monotonic() - started
+        self.assertEqual(str(raised.exception), jobs.MAP_TOO_LONG)
+        self.assertTrue(server.connected.is_set())
+        self.assertGreaterEqual(elapsed, 0.9)
+        self.assertLess(elapsed, 4.0, f"the tile request was held for {elapsed:.1f} s")
+        # The socket was shut down (the server sees the client leave) and no helper thread is left behind.
+        self.assertTrue(server.closed.wait(5), "the connection was not closed")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and any(t.name == "transformer-tile" for t in threading.enumerate()):
+            time.sleep(0.05)
+        self.assertFalse(any(t.name == "transformer-tile" for t in threading.enumerate()))
+
+    def test_each_request_gets_its_own_limit_and_never_more_than_the_rest_of_the_run(self):
+        buildings = [
+            transformers.Building(1, "3063", 2600000.0, 1200000.0),
+            transformers.Building(2, "3063", 2600000.0 + transformers.TILE_SIZE, 1200000.0),
+        ]
+        clock_value = [0.0]
+        limits = []
+
+        def fetch(session, bbox, px, timeout, seconds=None):
+            limits.append(seconds)
+            if len(limits) == 1:
+                clock_value[0] += transformers.MAX_SCAN_SECONDS - 30.0  # the first request leaves 30 s of the run
+            return None
+
+        with patch.object(transformers, "fetch_tile", side_effect=fetch),                 patch.object(transformers, "find_dots", return_value=[]):
+            transformers.scan_tiles(
+                buildings, session=None, reader=None, sleep=lambda seconds: None, clock=lambda: clock_value[0],
+            )
+        self.assertEqual(limits, [transformers.REQUEST_SECONDS, 30.0])
 
 
 @needs_packages
@@ -509,3 +642,119 @@ class MigrationAndRoutingTests(SimpleTestCase):
     def test_the_station_table_lives_in_the_directory_file_and_the_right_list_in_the_application_database(self):
         self.assertEqual(AddressRouter().db_for_write(TransformerStation), "addresses")
         self.assertIsNone(AddressRouter().db_for_write(ServicePostalCode))
+
+
+class NoWebStartTests(TestCase):
+    """No web view and no administration action starts a scan (D-118): only the weekly run and the command do."""
+
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        person = create_active_user(f"scan-{uuid.uuid4().hex[:8]}@example.org")
+        person.set_privileges(is_staff=True, is_superuser=False)
+        for codename in ("request_directory_import", "manage_service_areas"):
+            person.user_permissions.add(Permission.objects.get(codename=codename))
+        self.client = VerifiedClient()
+        self.client.force_login(person)
+        publish([])
+        ServicePostalCode.objects.create(postal_code="3063")
+
+    def test_the_pages_and_actions_of_the_administration_never_start_a_scan(self):
+        directory = reverse("admin:addresses_importrequest_changelist")
+        postal = reverse("admin:addresses_servicepostalcode_changelist")
+        code = ServicePostalCode.objects.get(postal_code="3063")
+        with patch.object(transformers, "run_scan") as scan, \
+                patch.object(schedule, "run_transformer_weekly") as weekly, \
+                patch.object(schedule, "run_transformer_now") as now, \
+                patch.object(jobs, "claim", wraps=jobs.claim) as claim, \
+                patch.object(runner, "start_manual", return_value=True) as start, \
+                patch("leg_platform.addresses.admin.allow_request", return_value=True):
+            self.assertEqual(self.client.get(directory).status_code, 200)
+            self.assertEqual(self.client.get(reverse("admin:addresses_importrequest_status")).status_code, 200)
+            self.assertEqual(self.client.post(directory).status_code, 302)
+            self.assertEqual(self.client.get(postal).status_code, 200)
+            self.client.post(reverse("admin:addresses_servicepostalcode_add"), {"postal_code": "3048"})
+            self.client.post(
+                reverse("admin:addresses_servicepostalcode_change", args=[code.pk]), {"postal_code": "3049"},
+            )
+            self.client.post(postal, {"action": "delete_selected", "_selected_action": [code.pk], "post": "yes"})
+        scan.assert_not_called()
+        weekly.assert_not_called()
+        now.assert_not_called()
+        start.assert_called_once_with()  # the address import button starts its own job only
+        for call in claim.call_args_list:
+            self.assertNotEqual(call.kwargs.get("source"), ImportRequest.Source.TRANSFORMER)
+
+    def test_only_the_weekly_run_the_command_and_their_job_code_name_the_scan(self):
+        # Every module of the project (tests and migrations aside) that names the scan or its module. A web view, a form
+        # or an administration class is not on this list; a new one must be added here on purpose (D-118).
+        project = Path(transformers.__file__).resolve().parents[1]  # the package leg_platform
+        pattern = re.compile(
+            r"\b(run_transformer_weekly|run_transformer_now|run_scan|scan_tiles|fetch_tile)\b"
+            r"|\bSource\.TRANSFORMER\b|\bimport transformers\b|\bfrom \.transformers\b"
+        )
+        named = set()
+        for path in project.rglob("*.py"):
+            relative = path.relative_to(project).as_posix()
+            if "tests" in path.parts or "migrations" in path.parts:
+                continue
+            if pattern.search(path.read_text(encoding="utf-8")):
+                named.add(relative)
+        self.assertEqual(sorted(named), [
+            "addresses/jobs.py",
+            "addresses/management/commands/scan_transformer_stations.py",
+            "addresses/models.py",
+            "addresses/schedule.py",
+            "addresses/status.py",
+            "addresses/transformers.py",
+        ])
+
+
+class ServiceAreaEventTests(TestCase):
+    """Every change of the postal codes of the service area is a security event; the log line names the codes only."""
+
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        person = create_active_user(f"area-{uuid.uuid4().hex[:8]}@example.org")
+        person.set_privileges(is_staff=True, is_superuser=False)
+        person.user_permissions.add(Permission.objects.get(codename="manage_service_areas"))
+        self.person = person
+        self.client = VerifiedClient()
+        self.client.force_login(person)
+
+    def events(self):
+        return SecurityEvent.objects.filter(event=SecurityEvent.Event.SERVICE_AREA_CHANGED).count()
+
+    def logged(self, action):
+        with self.assertLogs("leg_platform.security", "WARNING") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                action()
+        return logs.output
+
+    def test_add_change_and_delete_are_each_one_event_and_the_log_names_the_codes_only(self):
+        add = reverse("admin:addresses_servicepostalcode_add")
+        output = self.logged(lambda: self.client.post(add, {"postal_code": "3063"}))
+        self.assertEqual(self.events(), 1)
+        self.assertEqual(output, [
+            "WARNING:leg_platform.security:The postal codes of the service area were changed "
+            f"(actor {self.person.pk}, postal codes: 3063)."
+        ])
+        code = ServicePostalCode.objects.get(postal_code="3063")
+        change = reverse("admin:addresses_servicepostalcode_change", args=[code.pk])
+        output = self.logged(lambda: self.client.post(change, {"postal_code": "3048"}))
+        self.assertEqual(self.events(), 2)
+        self.assertIn("postal codes: 3048)", output[0])
+        output = self.logged(
+            lambda: self.client.post(
+                reverse("admin:addresses_servicepostalcode_changelist"),
+                {"action": "delete_selected", "_selected_action": [code.pk], "post": "yes"},
+            )
+        )
+        self.assertEqual(self.events(), 3)
+        self.assertIn("postal codes: none)", output[0])
+
+    def test_a_refused_input_changes_nothing_and_records_nothing(self):
+        self.client.post(reverse("admin:addresses_servicepostalcode_add"), {"postal_code": "0000"})
+        self.assertFalse(ServicePostalCode.objects.exists())
+        self.assertEqual(self.events(), 0)

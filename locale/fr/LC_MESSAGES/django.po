@@ -600,6 +600,9 @@ msgstr "Importation du répertoire d’adresses terminée"
 msgid "Address directory import failed"
 msgstr "Échec de l’importation du répertoire d’adresses"
 
+msgid "Postal codes of the service area changed"
+msgstr "Codes postaux de la zone desservie modifiés"
+
 # D-092: the log files and the log pages of the administration.
 msgid "Log file viewed"
 msgstr "Fichier journal consulté"

@@ -173,6 +173,7 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "axes.AccessAttempt",
                 "axes.AccessFailureLog",
                 "addresses.ImportRequest",
+                "addresses.ServicePostalCode",
                 "auth.Group",
                 "community.GridOperator",
                 # Plain read-only tables of the management data (D-091).

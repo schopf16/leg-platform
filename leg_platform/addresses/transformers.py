@@ -8,7 +8,8 @@ name is read from the label next to the dot with OCR. Only the cleaned name is s
 ``TransformerStation`` (no raw label, no image, no URL). The method follows ``bkw_leg_scanner.py`` of the project owner.
 
 Politeness and limits (D-118): one request at a time; at least ``TILE_PAUSE_SECONDS`` between two requests; a total time
-limit ``MAX_SCAN_SECONDS`` per run; at most ``MAX_TILES_PER_RUN`` tiles per run (a larger area is refused, never cut); a
+limit ``MAX_SCAN_SECONDS`` per run; a hard total time limit ``REQUEST_SECONDS`` per tile request (``http_budget``, as in
+the downloads of ``importer``); at most ``MAX_TILES_PER_RUN`` tiles per run (a larger area is refused, never cut); a
 user agent that names LEG-Platform and the purpose; HTTPS only; no redirects; certificate verification on; no proxy
 variables and no ``.netrc``; no credentials.
 
@@ -19,6 +20,7 @@ only) are imported where they are used, so the rest of the application and its t
 import io
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 
@@ -27,6 +29,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from . import importer, jobs
+from .http_budget import Adapter, Budget
 from .importer import ImportFailure
 from .models import DIRECTORY_ALIAS, Address, Directory, ImportRequest, ServicePostalCode, TransformerStation
 
@@ -51,6 +54,9 @@ MAX_TILES_PER_RUN = 300
 MAX_SCAN_SECONDS = 3600
 # Per request: connect and read (seconds); each one is also cut at the rest of the run's time.
 REQUEST_TIMEOUT = (10, 60)
+# Per request, hard: connect, headers and body together (a socket timeout alone lets a trickling server hold the run).
+# The request is also cut at the rest of the run's time (D-118, docs/SECURITY.md section 6).
+REQUEST_SECONDS = 60
 MAX_TILE_BYTES = 16 * 1024 * 1024
 # Matching and labels (the values of bkw_leg_scanner.py).
 EXACT_RADIUS = 3.0  # metres: a dot this close to an address point is an exact match
@@ -171,19 +177,8 @@ def _png(data, px):
         raise ScanFailure(jobs.MAP_ANSWER) from None
 
 
-def fetch_tile(session, bbox, px, timeout):
-    """Render one WMS tile (GetMap, PNG) and return it as an RGBA array.
-
-    One GET, no redirect, the answer must be a PNG of at most ``MAX_TILE_BYTES``. Every failure is a fixed ``ScanFailure``.
-    """
-    if WMS_URL not in importer.APPROVED_WMS_URLS:
-        raise ScanFailure(jobs.MAP_ANSWER)
-    params = {
-        "MAP": WMS_MAP, "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap",
-        "LAYERS": WMS_LAYER, "STYLES": "", "CRS": CRS,
-        "BBOX": ",".join(f"{value:.3f}" for value in bbox),
-        "WIDTH": px, "HEIGHT": px, "FORMAT": "image/png", "TRANSPARENT": "TRUE",
-    }
+def _render(session, params, px, timeout):
+    """One GET of a tile and its checks; returns the RGBA array. Runs in the helper thread of ``fetch_tile``."""
     try:
         response = session.get(
             WMS_URL, params=params, timeout=timeout, allow_redirects=False, stream=True, verify=True,
@@ -207,11 +202,62 @@ def fetch_tile(session, bbox, px, timeout):
     return _png(data, px)
 
 
+def fetch_tile(session, bbox, px, timeout, seconds=REQUEST_SECONDS):
+    """Render one WMS tile (GetMap, PNG) and return it as an RGBA array.
+
+    One GET, no redirect, the answer must be a PNG of at most ``MAX_TILE_BYTES``. Every failure is a fixed ``ScanFailure``.
+
+    Hard total deadline (D-118, ``docs/SECURITY.md`` section 6): the request runs in a helper thread and the caller waits
+    at most ``seconds`` (connect, headers and body together). At the deadline every socket of the request is shut down
+    (``http_budget.Budget``), so that a read which trickles bytes ends at once, and ``ScanFailure`` is raised. The helper
+    thread does not touch the database.
+    """
+    if WMS_URL not in importer.APPROVED_WMS_URLS:
+        raise ScanFailure(jobs.MAP_ANSWER)
+    params = {
+        "MAP": WMS_MAP, "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap",
+        "LAYERS": WMS_LAYER, "STYLES": "", "CRS": CRS,
+        "BBOX": ",".join(f"{value:.3f}" for value in bbox),
+        "WIDTH": px, "HEIGHT": px, "FORMAT": "image/png", "TRANSPARENT": "TRUE",
+    }
+    budget = Budget()
+    adapter = Adapter(budget)
+    # The approved address is HTTPS; the plain HTTP prefix is mounted too, so that the budget covers any scheme.
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    outcome = {}
+
+    def work():
+        try:
+            outcome["png"] = _render(session, params, px, timeout)
+        except ScanFailure as failure:
+            outcome["failure"] = failure
+        except Exception:  # noqa: BLE001 - nothing of the answer may reach the caller or a log
+            outcome["failure"] = ScanFailure(jobs.MAP_ANSWER)
+
+    thread = threading.Thread(target=work, name="transformer-tile", daemon=True)
+    thread.start()
+    try:
+        thread.join(seconds)
+        if thread.is_alive():
+            budget.expire()
+            thread.join(1)
+            raise ScanFailure(jobs.MAP_TOO_LONG)
+    finally:
+        adapter.close()
+    if "failure" in outcome:
+        raise outcome["failure"]
+    return outcome["png"]
+
+
 def find_dots(img):
     """Return (col, row) of every coloured dot of the tile (saturated, of a size between the two limits)."""
     from scipy import ndimage
 
-    rgb = img[..., :3].astype(int)
+    import numpy as np
+
+    # int16 holds every channel value (0 to 255) and every difference of two of them exactly; int64 would copy 4x the bytes.
+    rgb = img[..., :3].astype(np.int16)
     alpha = img[..., 3]
     saturation = rgb.max(axis=-1) - rgb.min(axis=-1)
     mask = (alpha >= 128) & (saturation >= SATURATION_MIN)
@@ -328,7 +374,7 @@ def scan_tiles(buildings, *, session, reader, sleep, clock):
         x1, y1 = x0 + TILE_SIZE, y0 + TILE_SIZE
         box = (x0 - TILE_OVERLAP, y0 - TILE_OVERLAP, x1 + TILE_OVERLAP, y1 + TILE_OVERLAP)
         timeout = (min(REQUEST_TIMEOUT[0], remaining), min(REQUEST_TIMEOUT[1], remaining))
-        img = fetch_tile(session, box, fetch_px, timeout)
+        img = fetch_tile(session, box, fetch_px, timeout, seconds=min(REQUEST_SECONDS, remaining))
         last_end = clock()
         found = []
         for col, row in find_dots(img):
