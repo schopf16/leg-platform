@@ -348,6 +348,11 @@ class SecurityLogLayoutTests(TestCase):
         css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
         self.assertIn(".model-securityevent #changelist-filter {", css)
         self.assertIn("order: 2;", css)
+        # The panel keeps its width inside the content: no left margin of the desktop layout (Django: 30px) on this page.
+        block = css[css.index(".model-securityevent #changelist-filter {"):]
+        block = block[:block.index("}")]
+        self.assertIn("margin: 16px 0 0;", block)
+        self.assertIn("box-sizing: border-box;", block)
 
     def test_each_entry_is_one_block_with_a_label_for_each_cell(self):
         # Third review item 1: the table reflows on a phone; every column is in the block, labelled.

@@ -753,6 +753,8 @@ ol.breadcrumbs {
   order: 2;
   flex: none;
   width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0 0;
 }
 
 .model-securityevent #changelist .changelist-form-container > div:not(#changelist-filter) {
@@ -761,7 +763,7 @@ ol.breadcrumbs {
 
 /* The filter panel of the security events stays inside the content width (third review item 2). */
 .model-securityevent #changelist-filter,
-.model-securityevent #changelist-filter select {
+.model-securityevent #changelist-filter * {
   max-width: 100%;
   box-sizing: border-box;
 }
