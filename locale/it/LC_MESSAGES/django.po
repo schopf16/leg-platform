@@ -548,6 +548,9 @@ msgstr "Il file ufficiale non contiene alcuna colonna con il numero dell'edifici
 msgid "The official file has no entrance number (ADR_EDID) column. Nothing was changed."
 msgstr "Il file ufficiale non contiene alcuna colonna con il numero dell'ingresso (ADR_EDID). Non è stato modificato nulla."
 
+msgid "The official file has no coordinate (ADR_EASTING, ADR_NORTHING) columns. Nothing was changed."
+msgstr "Il file ufficiale non contiene le colonne delle coordinate (ADR_EASTING, ADR_NORTHING). Non è stato modificato nulla."
+
 msgid "The official file contains an invalid postal code."
 msgstr "Il file ufficiale contiene un NPA non valido."
 

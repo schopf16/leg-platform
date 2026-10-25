@@ -288,8 +288,11 @@ class DailyRunTests(TestCase):
                 schedule.run_daily(at(3, 0))
         self.assertIsNone(self.job().columns_missing_at)
 
-    def test_the_two_column_failures_are_the_ones_that_back_off(self):
-        self.assertEqual(jobs.COLUMN_FAILURES, {"Missing EGID column.", "Missing entrance column."})
+    def test_the_column_failures_are_the_ones_that_back_off(self):
+        self.assertEqual(
+            jobs.COLUMN_FAILURES,
+            {"Missing EGID column.", "Missing entrance column.", "Missing coordinate column."},
+        )
         self.assertLessEqual(jobs.COLUMN_FAILURES, jobs.SAFE_FAILURES)
         self.assertEqual(schedule.COLUMNS_RETRY_INTERVAL, timedelta(days=7))
 

@@ -37,6 +37,7 @@ REASONS = {
     "Missing approved CSV columns.": _("The official file does not have the expected content."),
     "Missing EGID column.": _("The official file has no building number (EGID) column. Nothing was changed."),
     "Missing entrance column.": _("The official file has no entrance number (ADR_EDID) column. Nothing was changed."),
+    "Missing coordinate column.": _("The official file has no coordinate (ADR_EASTING, ADR_NORTHING) columns. Nothing was changed."),
     "Invalid CSV row count or width.": _("The official file does not have the expected content."),
     "Invalid postal label.": _("The official file contains an invalid postal code."),
     "Empty directory.": _("The official file contains no addresses."),

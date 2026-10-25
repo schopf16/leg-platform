@@ -65,6 +65,10 @@ class Address(models.Model):
     # Entrance of the building (column ADR_EDID, "Eingangsidentifikator"; D-049): with the EGID it tells the
     # entrances of one building (or the buildings of one address) apart. Null: the file gives none.
     entrance_id = models.PositiveSmallIntegerField(null=True, editable=False)
+    # LV95 (EPSG:2056) position of the address point (columns ADR_EASTING and ADR_NORTHING; D-049 amendment of
+    # 2026-10-25). Null: the file gives none. Used for the transformer station match (D-118).
+    easting = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
+    northing = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
 
     objects = AddressQuerySet.as_manager()
 

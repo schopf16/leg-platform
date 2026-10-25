@@ -44,7 +44,7 @@ SAFE_FAILURES = frozenset({
     "Invalid official catalogue metadata.", "CSV exceeds its resource limit.",
     "Invalid address field length.", "Invalid address field.", "Expected exactly one CSV member.",
     "Unsafe ZIP member.", "Invalid CSV header.", "Missing approved CSV columns.", "Missing EGID column.",
-    "Missing entrance column.",
+    "Missing entrance column.", "Missing coordinate column.",
     "Invalid CSV row count or width.", "Invalid postal label.", "Empty directory.",
     "Invalid official archive format.", "Another import is running.", "The import lease was lost.",
     "The free disk space could not be checked.", "Not enough free disk space for an import.",
@@ -53,7 +53,7 @@ SAFE_FAILURES = frozenset({
     "The official directory could not be imported.", "Unexpected HTTP content type.",
 })
 # The official file lacks a required column: the same file fails again, so the daily run waits a week (``schedule``).
-COLUMN_FAILURES = frozenset({"Missing EGID column.", "Missing entrance column."})
+COLUMN_FAILURES = frozenset({"Missing EGID column.", "Missing entrance column.", "Missing coordinate column."})
 # The fixed texts of the plant register import (``plants``, D-117): stored, logged and shown like SAFE_FAILURES.
 PLANT_FAILURES = frozenset({
     "The plant register file has an unexpected format.", "The plant register file is larger than allowed.",

@@ -550,6 +550,9 @@ msgstr "Die offizielle Datei enthält keine Spalte mit der Gebäudenummer (EGID)
 msgid "The official file has no entrance number (ADR_EDID) column. Nothing was changed."
 msgstr "Die offizielle Datei enthält keine Spalte mit der Eingangsnummer (ADR_EDID). Es wurde nichts verändert."
 
+msgid "The official file has no coordinate (ADR_EASTING, ADR_NORTHING) columns. Nothing was changed."
+msgstr "Die offizielle Datei enthält keine Koordinatenspalten (ADR_EASTING, ADR_NORTHING). Es wurde nichts verändert."
+
 msgid "The official file contains an invalid postal code."
 msgstr "Die offizielle Datei enthält eine ungültige Postleitzahl."
 

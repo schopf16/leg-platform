@@ -23,6 +23,7 @@ import time
 import uuid
 import zipfile
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import requests
@@ -54,6 +55,12 @@ CSV_NAME = ASSET_NAME.removesuffix(".zip")
 EGID_COLUMN = "BDG_EGID"
 # Column of the entrance identifier (product information table 1: ADR_EDID, SHORT, in the CSV; same header).
 ENTRANCE_COLUMN = "ADR_EDID"
+# Coordinates of every row (LV95, EPSG:2056; D-049 amendment of 2026-10-25), stored as easting and northing.
+EASTING_COLUMN = "ADR_EASTING"
+NORTHING_COLUMN = "ADR_NORTHING"
+# LV95 bounds of Switzerland, the same as the plant register (D-117).
+EASTING_RANGE = (Decimal(2480000), Decimal(2840000))
+NORTHING_RANGE = (Decimal(1070000), Decimal(1300000))
 MAX_METADATA_BYTES = 128 * 1024
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_CSV_BYTES = 1024 * 1024 * 1024
@@ -261,6 +268,18 @@ def _egid(value):
     return int(value)
 
 
+def _coordinate(value, bounds):
+    """An LV95 coordinate with at most three decimals inside ``bounds``, or None if the file gives none."""
+    if not value:
+        return None
+    if not re.fullmatch(r"[0-9]{1,8}(\.[0-9]{1,3})?", value):
+        raise ImportFailure("Invalid address field.")
+    number = Decimal(value)
+    if not bounds[0] <= number <= bounds[1]:
+        raise ImportFailure("Invalid address field.")
+    return number.quantize(Decimal("0.001"))
+
+
 def _entrance(value):
     """The entrance identifier of a row: 0 to 32767 (a SHORT of the official model), or None if the file gives none."""
     if not value:
@@ -315,7 +334,7 @@ def declared_entry_count(archive):
 
 
 def _address_rows(archive):
-    """Yield only the five approved source columns, split into six values."""
+    """Yield only the approved source columns: the locality, the building and entrance identifiers and the coordinates."""
     entries = declared_entry_count(archive)
     if entries is None:
         raise ImportFailure("Invalid official archive format.")
@@ -350,13 +369,20 @@ def _address_rows(archive):
                 raise ImportFailure("Missing EGID column.")
             if ENTRANCE_COLUMN not in header:
                 raise ImportFailure("Missing entrance column.")
-            indexes = [header.index(column) for column in (*required, EGID_COLUMN, ENTRANCE_COLUMN)]
+            if EASTING_COLUMN not in header or NORTHING_COLUMN not in header:
+                raise ImportFailure("Missing coordinate column.")
+            indexes = [
+                header.index(column)
+                for column in (*required, EGID_COLUMN, ENTRANCE_COLUMN, EASTING_COLUMN, NORTHING_COLUMN)
+            ]
             count = 0
             for row in reader:
                 count += 1
                 if count > MAX_ROWS or len(row) != len(header):
                     raise ImportFailure("Invalid CSV row count or width.")
-                street, house_number, zip_label, egid, entrance = (row[index] for index in indexes)
+                street, house_number, zip_label, egid, entrance, easting, northing = (
+                    row[index] for index in indexes
+                )
                 postal_code, separator, locality = zip_label.partition(" ")
                 if not separator or not re.fullmatch(r"[1-9][0-9]{3}", postal_code):
                     raise ImportFailure("Invalid postal label.")
@@ -367,6 +393,8 @@ def _address_rows(archive):
                     "locality": _text(locality, 255),
                     "egid": _egid(egid),
                     "entrance_id": _entrance(entrance),
+                    "easting": _coordinate(easting, EASTING_RANGE),
+                    "northing": _coordinate(northing, NORTHING_RANGE),
                 }
             if count == 0:
                 raise ImportFailure("Empty directory.")
