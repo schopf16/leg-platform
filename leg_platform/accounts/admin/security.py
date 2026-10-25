@@ -133,13 +133,22 @@ class SecurityEventAdmin(admin.ModelAdmin):
         return False
 
 
-class TimeFilter(admin.DateFieldListFilter):
-    """The time filter of the lockout lists (design review I): titled "By time"; its first choice reads "All"."""
+class NamedFilter:
+    """A list filter with a plain title. Django prints "By <title>" (German "Nach <title>"), so the title is the
+    noun only (design review G). Django sets the title from the field in the base class; this one is set after it."""
+
+    filter_title = ""
 
     def __init__(self, field, request, params, model, model_admin, field_path):
         super().__init__(field, request, params, model, model_admin, field_path)
-        # Django sets the title from the field name in the base class; the plain title is set after it.
-        self.title = _("By time")
+        self.title = self.filter_title
+
+
+class TimeFilter(NamedFilter, admin.DateFieldListFilter):
+    """The time filter of the lockout lists (design review I): "By time" (German "Nach Zeitpunkt"); its first choice reads
+    "All"."""
+
+    filter_title = _("time")
 
     def choices(self, changelist):
         for index, choice in enumerate(super().choices(changelist)):
@@ -148,12 +157,18 @@ class TimeFilter(admin.DateFieldListFilter):
             yield choice
 
 
+class PathFilter(NamedFilter, admin.AllValuesFieldListFilter):
+    """The address (path) of the attempt: "By address" (German "Nach Adresse")."""
+
+    filter_title = _("address")
+
+
 class ReadOnlyAxesAdmin(admin.ModelAdmin):
     """Pseudonymous lockout records, system administrators only."""
 
     actions = None
     list_display = ("attempt_time", "short_username", "path_info", "failures_since_start")
-    list_filter = (("attempt_time", TimeFilter), "path_info")
+    list_filter = (("attempt_time", TimeFilter), ("path_info", PathFilter))
     ordering = ("-attempt_time",)
     list_per_page = 100
     show_full_result_count = False

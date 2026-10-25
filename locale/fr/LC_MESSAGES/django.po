@@ -8282,6 +8282,12 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "code (shortened)"
+msgstr "code (abrégé)"
+
+msgid "address"
+msgstr "adresse"
+
 msgid "A dump file is not restored from this page. A restore is a manual procedure on the server."
 msgstr "Un fichier de sauvegarde n'est pas restauré depuis cette page. La restauration est une procédure manuelle sur le serveur."
 
@@ -8290,9 +8296,6 @@ msgstr "Pas encore exécuté"
 
 msgid "Changing needs a code from the app."
 msgstr "Une modification nécessite un code de l'application."
-
-msgid "By time"
-msgstr "Par moment"
 
 msgid "Event type"
 msgstr "Type d'événement"

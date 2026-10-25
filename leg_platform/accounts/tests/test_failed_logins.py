@@ -108,12 +108,16 @@ class LockoutListTests(TestCase):
         self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
         locked, log = self.sections()
         self.assertIn('class="phone-table"', locked)
-        self.assertIn('<td data-label="Code (shortened)">', locked)
+        self.assertIn('<td data-label="Kennung, gekürzt">', locked)
         self.assertNotIn("<table", log)
 
     def test_the_filters_and_the_line_count_have_plain_labels(self):
         html = self.client_.get(reverse("admin:failed_logins")).content.decode()
         self.assertIn("Nach Zeitpunkt", html)
+        self.assertIn("Nach Adresse", html)
+        self.assertNotIn("Nach Nach", html)
+        self.assertNotIn("Nach Pfad", html)
+        self.assertIn("Kennung, gekürzt", html)
         self.assertIn("Anzahl anzeigen", html)
         self.assertIn(">Alle</a>", html)
 

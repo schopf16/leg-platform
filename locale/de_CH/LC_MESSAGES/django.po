@@ -8279,6 +8279,12 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "code (shortened)"
+msgstr "Kennung, gekürzt"
+
+msgid "address"
+msgstr "Adresse"
+
 msgid "A dump file is not restored from this page. A restore is a manual procedure on the server."
 msgstr "Eine Sicherungsdatei wird von dieser Seite nicht zurückgespielt. Das Zurückspielen ist ein manuelles Verfahren auf dem Server."
 
@@ -8287,9 +8293,6 @@ msgstr "Noch nicht ausgeführt"
 
 msgid "Changing needs a code from the app."
 msgstr "Zum Ändern ist ein Code aus der App nötig."
-
-msgid "By time"
-msgstr "Nach Zeitpunkt"
 
 msgid "Event type"
 msgstr "Ereignisart"
