@@ -7964,3 +7964,147 @@ msgstr "Fonte: BKW Netz, mappa dello sconto elevato (pubblica)"
 
 msgid "The file has not changed since %(date)s. Check whether the source is still updated."
 msgstr "Il file non è cambiato dal %(date)s. Verificate se la fonte viene ancora aggiornata."
+
+msgid "Free pages were returned to the file system."
+msgstr "Le pagine libere sono state restituite al file system."
+
+msgid "The address directory file is missing. Nothing was done."
+msgstr "Il file della directory degli indirizzi manca. Non è stato eseguito nulla."
+
+msgid "Not enough free disk space. The file was not compacted."
+msgstr "Spazio libero sul disco insufficiente. Il file non è stato compattato."
+
+msgid "The integrity check failed. The file was not compacted."
+msgstr "Il controllo di integrità non è riuscito. Il file non è stato compattato."
+
+msgid "The integrity check failed after the compaction."
+msgstr "Il controllo di integrità non è riuscito dopo la compattazione."
+
+msgid "The compaction failed."
+msgstr "La compattazione non è riuscita."
+
+msgid "The application database is not MariaDB. Nothing was done."
+msgstr "La banca dati dell'applicazione non è MariaDB. Non è stato eseguito nulla."
+
+msgid "The tables were optimised."
+msgstr "Le tabelle sono state ottimizzate."
+
+msgid "The optimisation failed."
+msgstr "L'ottimizzazione non è riuscita."
+
+msgid "No dump status of the housekeeping is available. Nothing was optimised."
+msgstr "Nessuno stato del backup della manutenzione disponibile. Nessuna ottimizzazione eseguita."
+
+msgid "The dump status of the housekeeping cannot be read. Nothing was optimised."
+msgstr "Lo stato del backup della manutenzione non può essere letto. Nessuna ottimizzazione eseguita."
+
+msgid "The dump status of the housekeeping is invalid. Nothing was optimised."
+msgstr "Lo stato del backup della manutenzione non è valido. Nessuna ottimizzazione eseguita."
+
+msgid "The last dump of the housekeeping failed. Nothing was optimised."
+msgstr "L'ultimo backup della manutenzione non è riuscito. Nessuna ottimizzazione eseguita."
+
+msgid "The last dump of the housekeeping is too old. Nothing was optimised."
+msgstr "L'ultimo backup della manutenzione è troppo vecchio. Nessuna ottimizzazione eseguita."
+
+msgid "The step failed unexpectedly."
+msgstr "La fase è fallita in modo imprevisto."
+
+msgid "Another housekeeping run is active."
+msgstr "È già in corso un'altra manutenzione."
+
+msgid "An import is running. Try again when it has finished."
+msgstr "È in corso un import. Riprovi al termine."
+
+msgid "The housekeeping did not start."
+msgstr "La manutenzione non è stata avviata."
+
+msgid "Application database"
+msgstr "Banca dati dell'applicazione"
+
+msgid "Housekeeping"
+msgstr "Manutenzione"
+
+msgid "Started by"
+msgstr "Avviato da"
+
+msgid "Manually"
+msgstr "Manualmente"
+
+msgid "Weekly"
+msgstr "Settimanale"
+
+msgid "Address directory finished at"
+msgstr "Directory degli indirizzi terminata il"
+
+msgid "Address directory result"
+msgstr "Risultato della directory degli indirizzi"
+
+msgid "File size before (bytes)"
+msgstr "Dimensione del file prima (byte)"
+
+msgid "File size after (bytes)"
+msgstr "Dimensione del file dopo (byte)"
+
+msgid "Application database finished at"
+msgstr "Banca dati dell'applicazione terminata il"
+
+msgid "Application database result"
+msgstr "Risultato della banca dati dell'applicazione"
+
+msgid "Table sizes"
+msgstr "Dimensioni delle tabelle"
+
+msgid "Can run the housekeeping of the databases"
+msgstr "Può avviare la manutenzione delle banche dati"
+
+msgid "Housekeeping of the databases"
+msgstr "Manutenzione delle banche dati"
+
+msgid "The housekeeping has started. This page shows the result."
+msgstr "La manutenzione è stata avviata. Questa pagina mostra il risultato."
+
+msgid "Last results"
+msgstr "Ultimi risultati"
+
+msgid "A run is active. This page shows its result when it has finished."
+msgstr "È in corso una manutenzione. Questa pagina mostra il risultato al termine."
+
+msgid "Table sizes of the application database"
+msgstr "Dimensioni delle tabelle della banca dati dell'applicazione"
+
+msgid "Table"
+msgstr "Tabella"
+
+msgid "Before"
+msgstr "Prima"
+
+msgid "After"
+msgstr "Dopo"
+
+msgid "Dump before the optimisation"
+msgstr "Backup prima dell'ottimizzazione"
+
+msgid "Successful"
+msgstr "Riuscito"
+
+msgid "Usable for the optimisation"
+msgstr "Utilizzabile per l'ottimizzazione"
+
+msgid "Run now"
+msgstr "Avvia ora"
+
+msgid "The address directory is compacted only when no import runs and enough disk space is free. The application tables are optimised only after a current successful dump. Nothing is rebuilt or deleted. The weekly run is on Sunday from 04:30."
+msgstr "La directory degli indirizzi viene compattata solo se non è in corso alcun import e c'è spazio libero sufficiente. Le tabelle dell'applicazione vengono ottimizzate solo dopo un backup recente e riuscito. Non viene ricostruito né cancellato nulla. La manutenzione settimanale è la domenica a partire dalle 04:30."
+
+msgid "Run the housekeeping now"
+msgstr "Avvia la manutenzione ora"
+
+msgid "Skipped"
+msgstr "Saltata"
+
+msgid "Step"
+msgstr "Fase"
+
+msgid "The address directory is being set up. Try again later."
+msgstr "La directory degli indirizzi è in fase di configurazione. Riprovi più tardi."

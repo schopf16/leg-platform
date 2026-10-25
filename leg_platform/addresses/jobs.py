@@ -18,7 +18,7 @@ from django.utils import timezone
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
-from .models import Directory, ImportRequest
+from .models import Directory, HousekeepingStatus, ImportRequest
 from .storage import DIRECTORY_ALIAS, reset_marker
 
 logger = logging.getLogger(__name__)
@@ -181,6 +181,9 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
         # consume that request (or start an automatic run) until its marker is removed.
         # Checking under this row lock also closes the race with setup taking the same lock.
         if reset_marker(connections[DIRECTORY_ALIAS].settings_dict["NAME"]).exists():
+            return None
+        # A housekeeping run holds its lease under the same row lock (D-119): no import starts until it ends.
+        if HousekeepingStatus.lease_active(now):
             return None
         if job.state == ImportRequest.State.RUNNING:
             if _is_running(job, now):

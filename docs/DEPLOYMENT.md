@@ -1269,6 +1269,62 @@ sudo leg-manage web shell -c "from leg_platform.addresses.models import ImportRe
 * **Journald:** `journalctl --disk-usage`. A persistent journal needs `/var/log/journal` (**UNVERIFIED** default). Access logs contain IP addresses; rotation and deletion follow O-15.
 * **Lock behaviour of the counter statements (D-072; UNVERIFIED):** once per instance and after a MariaDB major upgrade run `EXPLAIN DELETE` (`sudo mariadb leg_platform -e`) for the cleanup deletes of `accounts_confirmationfailure` (`account_id`, `occurred_at`), `accounts_sessioncodefailure` (`account_id`, `updated_at`) and `accounts_loginipattempt` (`bucket_id`, `attempted_at`) on real data. Expected: key `accounts_cf_account_time`, an index starting with `account_id`, and `accounts_lia_bucket_time`. `type` `ALL`: tell the owner. Never widen the application account for deadlock diagnosis (D-046, D-072).
 
+### 12.5 Housekeeping of the databases (D-119)
+
+The application runs the housekeeping (`addresses/housekeeping.py`): weekly from `run_scheduled_tasks` (Sunday from 04:30 instance time, once per ISO week) and by the button "Housekeeping" in the administration (right `addresses.run_housekeeping`). It never creates, deletes or changes a dump. The steps of the root units below are not run by the application. The daily dump (12.2) and its retention are not touched.
+
+* **Dump before the optimisation.** `/usr/local/sbin/leg-housekeeping-backup` (root, mode 0750), run by `leg-housekeeping-backup.service` (Type=oneshot), started by `leg-housekeeping-backup.timer` with `OnCalendar=Sun *-*-* 04:20:00`. It writes `housekeeping-<UTC>.sql.gz` to `/var/backups/leg-platform` and checks it with `gzip -t`.
+
+```bash
+#!/bin/bash
+set -euo pipefail
+umask 077
+dir=/var/backups/leg-platform
+status_dir=/var/lib/leg-platform
+status_file="$status_dir/housekeeping-backup.json"
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+name="housekeeping-$stamp.sql.gz"
+write_status() {  # $1 = true or false, $2 = file name ("" when failed)
+  local tmp
+  tmp=$(mktemp "$status_dir/.housekeeping-backup.XXXXXX")
+  printf '{"finished_at":"%s","ok":%s,"file_name":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" > "$tmp"
+  chmod 0644 "$tmp"
+  mv -f "$tmp" "$status_file"
+}
+if mariadb-dump --single-transaction --routines --triggers --events --default-character-set=utf8mb4 leg_platform \
+    | gzip -9 > "$dir/$name.tmp" && gzip -t "$dir/$name.tmp"; then
+  mv "$dir/$name.tmp" "$dir/$name"
+  write_status true "$name"
+else
+  rm -f "$dir/$name.tmp"
+  write_status false ""
+  exit 1
+fi
+```
+
+* **Deletion after an error-free run.** `/usr/local/sbin/leg-housekeeping-cleanup` (root, mode 0750), run by `leg-housekeeping-cleanup.service` (Type=oneshot), started by `leg-housekeeping-cleanup.timer` with `OnCalendar=Sun *-*-* 05:30:00`. It reads the result of the last run from the application database and deletes only `housekeeping-*.sql.gz` files that are older than the newest one, and only when the MariaDB step succeeded and no run is active. Daily `leg_platform-*.sql.gz` files are never matched.
+
+```bash
+#!/bin/bash
+set -euo pipefail
+umask 077
+dir=/var/backups/leg-platform
+rm -f -- "$dir"/housekeeping-*.sql.gz.tmp  # leftovers of killed runs, always
+answer=$(mariadb --batch --skip-column-names leg_platform -e "SELECT mariadb_state, running_until IS NULL FROM addresses_housekeepingstatus WHERE id=1")
+if [ "$answer" != $'succeeded\t1' ]; then
+  echo "The housekeeping did not succeed or still runs; no dump deleted." >&2
+  exit 0
+fi
+newest=$(ls -1 "$dir"/housekeeping-*.sql.gz 2>/dev/null | sort | tail -n 1 || true)
+[ -n "$newest" ] || exit 0
+ls -1 "$dir"/housekeeping-*.sql.gz | sort | { grep -v -x -F "$newest" || true; } | xargs -r rm -f --
+```
+
+* **Retention of the housekeeping dumps (not decided).** The cleanup above removes only `housekeeping-*.sql.gz.tmp` leftovers in every case. Finished dumps are deleted only after an error-free run, as shown. Dumps of runs whose MariaDB step did not succeed stay in `/var/backups/leg-platform` until the owner decides how long to keep them. Check their disk use before go-live.
+* **Status file.** `/var/lib/leg-platform` (root, 0755) holds `housekeeping-backup.json` (0644, root). The application only reads it. A file that is missing, unreadable, reports a failure or is older than two hours skips the optimisation of the application tables; the reason is shown on the page.
+* **Owner steps on the server (not done; not verified).** (1) Create the two scripts, mode 0750, owner root. (2) Create the four units and enable the timers: `systemctl enable --now leg-housekeeping-backup.timer leg-housekeeping-cleanup.timer`. (3) Run `systemctl start leg-housekeeping-backup.service`, then check `/var/lib/leg-platform/housekeeping-backup.json` and run `gzip -t` on the new dump. (4) Keep `run_scheduled_tasks` on its 15-minute schedule. (5) Check that the free disk space in the folder of the address directory is at least twice its size (file plus `-wal`) plus 1 GiB; `VACUUM` needs the temporary copy there.
+* **Lock time.** `OPTIMIZE TABLE` locks each table while it runs. The default time is Sunday 04:30; the daily address import runs at 03:00 and must have finished by then.
+
 ## 13. Hand-over report, known open points and findings
 
 ### 13.1 Report template for the executing AI

@@ -9,9 +9,9 @@ from django.utils.translation import gettext as _
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
-from . import runner, status
+from . import housekeeping, runner, status
 from .limits import allow_request
-from .models import ImportRequest, ServicePostalCode
+from .models import HousekeepingStatus, ImportRequest, ServicePostalCode
 
 PERMISSION = "addresses.request_directory_import"
 # The postal codes of the service area of the transformer station scan (D-118); its own right, like the one above.
@@ -128,5 +128,67 @@ class ImportRequestAdmin(admin.ModelAdmin):
         if request.method != "GET":
             return HttpResponseNotAllowed(["GET"])
         response = JsonResponse(status.build())
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+# The housekeeping of both databases (D-119): its own right, checked on the page, the POST and the status endpoint.
+HOUSEKEEPING_PERMISSION = "addresses.run_housekeeping"
+
+
+@admin.register(HousekeepingStatus)
+class HousekeepingStatusAdmin(admin.ModelAdmin):
+    """The last results of the housekeeping, the dump status and the button to run now. No generic model editing."""
+
+    def has_module_permission(self, request):
+        return request.user.has_perm(HOUSEKEEPING_PERMISSION)
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm(HOUSEKEEPING_PERMISSION)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        return [
+            path("", self.admin_site.admin_view(self.housekeeping_view),
+                 name="addresses_housekeepingstatus_changelist"),
+            path("status/", self.admin_site.admin_view(self.status_view),
+                 name="addresses_housekeepingstatus_status"),
+        ]
+
+    def housekeeping_view(self, request):
+        if not request.user.has_perm(HOUSEKEEPING_PERMISSION):
+            raise PermissionDenied
+        if request.method == "POST":
+            result = housekeeping.start_manual(request.user)
+            if result == housekeeping.STARTED:
+                self.message_user(request, _("The housekeeping has started. This page shows the result."), messages.SUCCESS)
+            else:
+                self.message_user(request, housekeeping.refusal_text(result), messages.WARNING)
+            return HttpResponseRedirect(reverse("admin:addresses_housekeepingstatus_changelist"))
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET", "POST"])
+        context = {
+            **self.admin_site.each_context(request),
+            **housekeeping.page_context(),
+            "title": _("Housekeeping"),
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(request, "admin/addresses/housekeeping.html", context)
+
+    def status_view(self, request):
+        """The step results as JSON for the page: signed in, same right, GET only, never cached."""
+        if not request.user.has_perm(HOUSEKEEPING_PERMISSION):
+            raise PermissionDenied
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
+        response = JsonResponse(housekeeping.status_payload())
         response["Cache-Control"] = "no-store"
         return response

@@ -172,6 +172,7 @@ class UserModelConfigurationTests(SimpleTestCase):
                 "accounts.PortalSettings",
                 "axes.AccessAttempt",
                 "axes.AccessFailureLog",
+                "addresses.HousekeepingStatus",
                 "addresses.ImportRequest",
                 "addresses.ServicePostalCode",
                 "auth.Group",

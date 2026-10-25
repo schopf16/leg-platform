@@ -7990,3 +7990,147 @@ msgstr "Quelle: BKW Netz, Hochrabatt-Karte (öffentlich)"
 
 msgid "The file has not changed since %(date)s. Check whether the source is still updated."
 msgstr "Die Datei ist seit dem %(date)s unverändert. Prüfen Sie, ob die Quelle noch aktualisiert wird."
+
+msgid "Free pages were returned to the file system."
+msgstr "Freie Seiten wurden dem Dateisystem zurückgegeben."
+
+msgid "The address directory file is missing. Nothing was done."
+msgstr "Die Datei des Adressverzeichnisses fehlt. Es wurde nichts getan."
+
+msgid "Not enough free disk space. The file was not compacted."
+msgstr "Zu wenig freier Speicherplatz. Die Datei wurde nicht verdichtet."
+
+msgid "The integrity check failed. The file was not compacted."
+msgstr "Die Integritätsprüfung ist fehlgeschlagen. Die Datei wurde nicht verdichtet."
+
+msgid "The integrity check failed after the compaction."
+msgstr "Die Integritätsprüfung ist nach der Verdichtung fehlgeschlagen."
+
+msgid "The compaction failed."
+msgstr "Die Verdichtung ist fehlgeschlagen."
+
+msgid "The application database is not MariaDB. Nothing was done."
+msgstr "Die Anwendungsdatenbank ist nicht MariaDB. Es wurde nichts getan."
+
+msgid "The tables were optimised."
+msgstr "Die Tabellen wurden optimiert."
+
+msgid "The optimisation failed."
+msgstr "Die Optimierung ist fehlgeschlagen."
+
+msgid "No dump status of the housekeeping is available. Nothing was optimised."
+msgstr "Kein Sicherungsstatus der Wartung vorhanden. Es wurde nichts optimiert."
+
+msgid "The dump status of the housekeeping cannot be read. Nothing was optimised."
+msgstr "Der Sicherungsstatus der Wartung kann nicht gelesen werden. Es wurde nichts optimiert."
+
+msgid "The dump status of the housekeeping is invalid. Nothing was optimised."
+msgstr "Der Sicherungsstatus der Wartung ist ungültig. Es wurde nichts optimiert."
+
+msgid "The last dump of the housekeeping failed. Nothing was optimised."
+msgstr "Die letzte Sicherung der Wartung ist fehlgeschlagen. Es wurde nichts optimiert."
+
+msgid "The last dump of the housekeeping is too old. Nothing was optimised."
+msgstr "Die letzte Sicherung der Wartung ist zu alt. Es wurde nichts optimiert."
+
+msgid "The step failed unexpectedly."
+msgstr "Der Schritt ist unerwartet fehlgeschlagen."
+
+msgid "Another housekeeping run is active."
+msgstr "Eine andere Wartung läuft bereits."
+
+msgid "An import is running. Try again when it has finished."
+msgstr "Ein Import läuft. Versuchen Sie es nach dessen Ende erneut."
+
+msgid "The housekeeping did not start."
+msgstr "Die Wartung wurde nicht gestartet."
+
+msgid "Application database"
+msgstr "Anwendungsdatenbank"
+
+msgid "Housekeeping"
+msgstr "Wartung"
+
+msgid "Started by"
+msgstr "Gestartet durch"
+
+msgid "Manually"
+msgstr "Manuell"
+
+msgid "Weekly"
+msgstr "Wöchentlich"
+
+msgid "Address directory finished at"
+msgstr "Adressverzeichnis beendet am"
+
+msgid "Address directory result"
+msgstr "Ergebnis Adressverzeichnis"
+
+msgid "File size before (bytes)"
+msgstr "Dateigrösse vorher (Bytes)"
+
+msgid "File size after (bytes)"
+msgstr "Dateigrösse nachher (Bytes)"
+
+msgid "Application database finished at"
+msgstr "Anwendungsdatenbank beendet am"
+
+msgid "Application database result"
+msgstr "Ergebnis Anwendungsdatenbank"
+
+msgid "Table sizes"
+msgstr "Tabellengrössen"
+
+msgid "Can run the housekeeping of the databases"
+msgstr "Darf die Wartung der Datenbanken ausführen"
+
+msgid "Housekeeping of the databases"
+msgstr "Wartung der Datenbanken"
+
+msgid "The housekeeping has started. This page shows the result."
+msgstr "Die Wartung wurde gestartet. Diese Seite zeigt das Ergebnis."
+
+msgid "Last results"
+msgstr "Letzte Ergebnisse"
+
+msgid "A run is active. This page shows its result when it has finished."
+msgstr "Eine Wartung läuft. Diese Seite zeigt das Ergebnis nach dem Ende."
+
+msgid "Table sizes of the application database"
+msgstr "Tabellengrössen der Anwendungsdatenbank"
+
+msgid "Table"
+msgstr "Tabelle"
+
+msgid "Before"
+msgstr "Vorher"
+
+msgid "After"
+msgstr "Nachher"
+
+msgid "Dump before the optimisation"
+msgstr "Sicherung vor der Optimierung"
+
+msgid "Successful"
+msgstr "Erfolgreich"
+
+msgid "Usable for the optimisation"
+msgstr "Für die Optimierung verwendbar"
+
+msgid "Run now"
+msgstr "Jetzt ausführen"
+
+msgid "The address directory is compacted only when no import runs and enough disk space is free. The application tables are optimised only after a current successful dump. Nothing is rebuilt or deleted. The weekly run is on Sunday from 04:30."
+msgstr "Das Adressverzeichnis wird nur verdichtet, wenn kein Import läuft und genug Speicherplatz frei ist. Die Tabellen der Anwendung werden nur nach einer aktuellen, erfolgreichen Sicherung optimiert. Es wird nichts neu aufgebaut oder gelöscht. Die wöchentliche Wartung läuft am Sonntag ab 04:30."
+
+msgid "Run the housekeeping now"
+msgstr "Wartung jetzt ausführen"
+
+msgid "Skipped"
+msgstr "Übersprungen"
+
+msgid "Step"
+msgstr "Schritt"
+
+msgid "The address directory is being set up. Try again later."
+msgstr "Das Adressverzeichnis wird eingerichtet. Versuchen Sie es später erneut."

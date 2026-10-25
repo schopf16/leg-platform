@@ -391,6 +391,7 @@ Sources: Django 6.0 docs (`SECURE_REFERRER_POLICY`, CSRF "Limitations", CSP refe
   * the outcome of every address directory import (completed, or failed with the fixed reason; D-090);
   * the outcome of every plant register import (D-117): `pv_import_succeeded` with the kind (manual or automatic) and the number of stored plants; `pv_import_failed` with the kind and one fixed reason (a sentence of `jobs.PLANT_FAILURES`, of `jobs.SAFE_FAILURES`, or the generic text for an unexpected failure). Never a row, a value, a file name or upstream text. Default retention (30 days), like the address events.
   * the outcome of every transformer station scan (D-118): `transformer_scan_succeeded` with the kind and the number of buildings; `transformer_scan_failed` with the kind and one fixed reason (`jobs.TRANSFORMER_FAILURES`). Never a row, a name, a label, a tile or upstream text. Default retention (30 days).
+  * every run of the housekeeping of the databases (D-119): `housekeeping_run`, once per run, with the account of a manual start; fixed text, no SQL, no table content, no file name. Default retention (30 days).
   * every change of the postal codes of the service area (`service_area_changed`, D-118): the actor only in the entry; the postal codes after the change in the log line, nothing else. Default retention.
   * every opening of a log page and every log download (D-099).
 * Logs never contain passwords, tokens, secrets or complete security links, and only as much personal data as necessary (basis: OWASP Logging Cheat Sheet).

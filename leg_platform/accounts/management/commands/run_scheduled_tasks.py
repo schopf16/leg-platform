@@ -18,6 +18,8 @@ TASKS = (
     "cleanup_confirmation_failures",
     # Django's own command: removes the expired sessions of the database session store.
     "clearsessions",
+    # Weekly housekeeping of both databases (D-119): Sunday from 04:30, once per ISO week.
+    "housekeeping",
     # Address app: expired stored building searches, then the daily address directory run (the import itself runs
     # last: it can take minutes and the cleanups must not wait for it).
     "cleanup_address_lookups",

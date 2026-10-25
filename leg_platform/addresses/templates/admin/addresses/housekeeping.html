@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# The housekeeping of both databases (D-119). The server renders the results; no script, no inline style. #}
+{% block content %}
+<div class="data-import-blocks">
+<section class="data-import-block" id="housekeeping-status" aria-labelledby="housekeeping-steps-heading">
+  <h2 id="housekeeping-steps-heading">{% translate "Last results" %}</h2>
+  {% if running %}<p class="help" role="status">{% translate "A run is active. This page shows its result when it has finished." %}</p>{% endif %}
+  <dl class="import-facts">
+    <dt>{% translate "Started at" %}</dt><dd>{{ status.started_at|default:"–" }}</dd>
+    <dt>{% translate "Finished at" %}</dt><dd>{{ status.finished_at|default:"–" }}</dd>
+    <dt>{% translate "Started by" %}</dt><dd>{% if status.trigger == "manual" %}{% translate "Manually" %}{% elif status.trigger == "scheduled" %}{% translate "Weekly" %}{% else %}–{% endif %}</dd>
+  </dl>
+  <table>
+    <thead><tr><th>{% translate "Step" %}</th><th>{% translate "Result" %}</th><th>{% translate "Finished at" %}</th><th>{% translate "Reason" %}</th></tr></thead>
+    <tbody>
+    {% for step in steps %}
+      <tr><td>{{ step.label }}</td><td>{{ step.state_label|default:"–" }}</td><td>{{ step.finished_at|default:"–" }}</td><td>{{ step.text|default:"–" }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if sizes %}
+<section class="data-import-block" id="housekeeping-sizes" aria-labelledby="housekeeping-sizes-heading">
+  <h2 id="housekeeping-sizes-heading">{% translate "Table sizes of the application database" %}</h2>
+  <table>
+    <thead><tr><th>{% translate "Table" %}</th><th>{% translate "Before" %}</th><th>{% translate "After" %}</th></tr></thead>
+    <tbody>
+    {% for row in sizes %}
+      <tr><td>{{ row.name }}</td><td>{% if row.before is not None %}{{ row.before|filesizeformat }}{% else %}–{% endif %}</td><td>{% if row.after is not None %}{{ row.after|filesizeformat }}{% else %}–{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="data-import-block" id="housekeeping-dump" aria-labelledby="housekeeping-dump-heading">
+  <h2 id="housekeeping-dump-heading">{% translate "Dump before the optimisation" %}</h2>
+  {% if backup %}
+    <dl class="import-facts">
+      <dt>{% translate "Finished at" %}</dt><dd>{{ backup.finished_at }}</dd>
+      <dt>{% translate "Result" %}</dt><dd>{% if backup.ok %}{% translate "Successful" %}{% else %}{% translate "Failed" %}{% endif %}</dd>
+      <dt>{% translate "File" %}</dt><dd>{{ backup.file_name }}</dd>
+      <dt>{% translate "Usable for the optimisation" %}</dt><dd>{% if backup_fresh %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
+    </dl>
+  {% else %}
+    <p class="help">{{ backup_text }}</p>
+  {% endif %}
+</section>
+
+<section class="data-import-block" id="housekeeping-run" aria-labelledby="housekeeping-run-heading">
+  <h2 id="housekeeping-run-heading">{% translate "Run now" %}</h2>
+  <p class="help">{% translate "The address directory is compacted only when no import runs and enough disk space is free. The application tables are optimised only after a current successful dump. Nothing is rebuilt or deleted. The weekly run is on Sunday from 04:30." %}</p>
+  <form method="post" class="import-form">{% csrf_token %}
+    <button type="submit" class="button"{% if running %} disabled{% endif %}>{% translate "Run the housekeeping now" %}</button>
+  </form>
+</section>
+</div>
+{% endblock %}

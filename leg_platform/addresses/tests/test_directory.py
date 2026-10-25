@@ -2684,6 +2684,7 @@ class ReadOnlyDefaultTests(TransactionTestCase):
         "addresses/management/commands/scheduled_address_import.py",
         "addresses/management/commands/seed_local_address_directory.py",
         "addresses/management/commands/scan_transformer_stations.py",
+        "addresses/management/commands/housekeeping.py",
         "addresses/management/commands/migrate.py",
         "accounts/management/commands/setup_instance.py",
     }
@@ -2996,6 +2997,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0010_address_coordinates"),
                 ("addresses", "0011_transformer_scan"),
                 ("addresses", "0012_content_changed_at"),
+                ("addresses", "0013_housekeepingstatus"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.
