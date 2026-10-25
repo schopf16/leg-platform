@@ -237,6 +237,9 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
         self.fields["notify_stale"].label = _("Send when the address directory is old")
         if self.user is not None:
             self.use_one_proof(self.user, autofocus=False)
+        # The code of the app is named as the app shows it (review item 2), not the mixin's "2FA" wording.
+        if "otp_token" in self.fields:
+            self.fields["otp_token"].label = _("Code from the app")
 
     @property
     def excluded_count(self):
