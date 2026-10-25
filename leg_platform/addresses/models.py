@@ -107,8 +107,15 @@ class ImportRequest(models.Model):
         SUCCEEDED = "succeeded", _("Completed")
         FAILED = "failed", _("Failed")
 
+    class Source(models.TextChoices):
+        ADDRESS = "address", _("Address directory")
+        PLANT = "plant", _("Plant register")
+
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     state = models.CharField(max_length=12, choices=State, default=State.IDLE, verbose_name=_("Status"))
+    # The import that holds this one claim (D-117): the address directory or the plant register. Both share the claim
+    # (D-090): no import starts while the other one runs.
+    source = models.CharField(max_length=8, choices=Source, default=Source.ADDRESS, editable=False)
     requested_at = models.DateTimeField(null=True, verbose_name=_("Requested at"))
     started_at = models.DateTimeField(null=True, verbose_name=_("Started at"))
     finished_at = models.DateTimeField(null=True, verbose_name=_("Finished at"))
@@ -142,15 +149,24 @@ class ImportRequest(models.Model):
     # day of the last run (at most one download per day). Read through ``schedule.import_run_time``.
     run_time = models.TimeField(default=DEFAULT_RUN_TIME, editable=False)
     last_scheduled_run_on = models.DateField(null=True, editable=False)
+    # The day of the last daily run of the plant register (``schedule.run_plant_daily``, D-117); its own day, so that
+    # the address run and the plant run do not use up each other's day.
+    last_plant_scheduled_run_on = models.DateField(null=True, editable=False)
+    # The result of the last plant run (D-117, administration block "PV-Anlagen (BFE)"): kept apart from the fields above,
+    # which the address import overwrites. Set by ``jobs`` when a plant run ends: ``State.SUCCEEDED`` or ``State.FAILED``,
+    # the time, and the fixed failure text ("" after a success).
+    last_plant_state = models.CharField(max_length=12, blank=True, default="", editable=False)
+    last_plant_finished_at = models.DateTimeField(null=True, editable=False)
+    last_plant_error = models.CharField(max_length=255, blank=True, default="", editable=False)
 
     class Meta:
         default_permissions = ()
         permissions = [("request_directory_import", _("Can request an address directory import"))]
-        verbose_name = _("Address directory import")
-        verbose_name_plural = _("Address directory imports")
+        verbose_name = _("Data import")
+        verbose_name_plural = _("Data imports")
 
     def __str__(self):
-        return str(_("Address directory import"))
+        return str(_("Data import"))
 
 
 class BuildingLookup(models.Model):
@@ -171,3 +187,59 @@ class BuildingLookup(models.Model):
 
     class Meta:
         default_permissions = ()
+
+
+class PlantRegister(models.Model):
+    """The published generation of the plant register (BFE, D-117): one row, in the addresses file (alias ``addresses``)."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    generation = models.UUIDField(default=uuid.uuid4, editable=False)
+    data_date = models.DateField(null=True, editable=False)
+    imported_at = models.DateTimeField(null=True, editable=False)
+    # SHA-256 of the downloaded ZIP. Not compared with an official value (none is published; D-117).
+    checksum = models.CharField(max_length=64, blank=True, editable=False)
+    row_count = models.PositiveIntegerField(default=0, editable=False)
+    rejected_count = models.PositiveIntegerField(default=0, editable=False)
+    # Plants without an EGID: skipped, not stored (D-117).
+    skipped_count = models.PositiveIntegerField(default=0, editable=False)
+    # Statistic of the last successful import (D-117), not used for any decision and not shown yet. The address count
+    # of the published directory when the plants were published, and the rows of the plant file (row_count plus
+    # rejected_count plus skipped_count). A failed or refused import leaves all of these values as they were.
+    address_count = models.PositiveIntegerField(default=0, editable=False)
+    file_row_count = models.PositiveIntegerField(default=0, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        verbose_name = _("Plant register")
+        verbose_name_plural = _("Plant register")
+
+
+class Plant(models.Model):
+    """One plant of the plant register (BFE, D-117): the fields the portal uses only, public register data.
+
+    One building (EGID) can have several plants: the relation is one to many.
+    """
+
+    generation = models.UUIDField(editable=False)
+    # Identifier of the source (column xtf_id), unique within a generation.
+    xtf_id = models.CharField(max_length=64, editable=False)
+    egid = models.PositiveIntegerField(editable=False)
+    # Technology code of the source (column SubCategory, e.g. subcat_2 for photovoltaics).
+    subcategory = models.CharField(max_length=16, editable=False)
+    # Total power in kW (column TotalPower: first commissioning plus all extensions).
+    total_power_kw = models.DecimalField(max_digits=11, decimal_places=3, editable=False)
+    # LV95 (EPSG:2056) coordinates of the plant; null when the source gives none.
+    x = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
+    y = models.DecimalField(max_digits=10, decimal_places=3, null=True, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        verbose_name = _("Plant of the register")
+        verbose_name_plural = _("Plants of the register")
+        constraints = [
+            models.UniqueConstraint(fields=["generation", "xtf_id"], name="plant_generation_xtf_id"),
+        ]
+        indexes = [
+            # Plants of one building.
+            models.Index(fields=["generation", "egid"], name="plant_generation_egid"),
+        ]

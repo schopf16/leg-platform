@@ -10,7 +10,6 @@ import re
 from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
-from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import login_methods, passkey_methods, sign_in_change
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
@@ -103,7 +102,7 @@ class CardStateTests(TestCase):
         self.assertRedirects(response, FLOW, fetch_redirect_response=False)
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 @tag("mariadb")
 class PasskeyCardTests(CeremonyFixture, TestCase):
     def test_a_passkey_account_shows_the_status_passkey_and_keeps_its_buttons(self):

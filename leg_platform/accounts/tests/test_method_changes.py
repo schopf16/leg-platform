@@ -11,7 +11,6 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone, translation
 
-from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import method_changes, passkey_methods, passkeys, second_factor, second_factor_reset
 from leg_platform.accounts.mail_queue import enqueue_for_account
 from leg_platform.accounts.models import (
@@ -23,7 +22,7 @@ from leg_platform.accounts.tests.helpers import (
 )
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class MethodTransitionTests(TestCase):
     setUp = test_passkeys.PasskeyCeremonyTests.setUp
     client_data = test_passkeys.PasskeyCeremonyTests.client_data
@@ -417,7 +416,7 @@ class MethodTransitionTests(TestCase):
         self.assertEqual(self.user.authentication_method, "passkey")
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class UnifiedRecoveryTests(TestCase):
     def setUp(self):
         self.staff = create_active_user("staff@example.org")

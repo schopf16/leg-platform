@@ -32,6 +32,7 @@ def make_env(app_env="production", **overrides):
         "APP_ENV": app_env,
         "DJANGO_SECRET_KEY": STRONG_KEY,
         "DJANGO_ALLOWED_HOSTS": "portal.example.org",
+        "INSTANCE_BASE_URL": "https://portal.example.org",
         "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
         "EMAIL_MODE": DEFAULT_EMAIL_MODE.get(app_env, "console"),
         "DB_NAME": "leg_platform",
@@ -330,11 +331,11 @@ class SecurityLogRetentionTests(SimpleTestCase):
 
 
 class MovedToAdministrationTests(SimpleTestCase):
-    """D-116: the addresses of the instance are not read from the environment any more. A value left there refuses
-    the start, so that it is never ignored silently."""
+    """D-116: the sender and the contact address are not read from the environment any more; they are in the E-Mail
+    chapter of the administration. A value left there refuses the start, so that it is never ignored silently."""
 
     def test_each_moved_variable_refuses_the_start(self):
-        for name in ("INSTANCE_BASE_URL", "EMAIL_SENDER_ADDRESS", "CONTACT_EMAIL_ADDRESS", "EMAIL_ALLOWED_RECIPIENTS"):
+        for name in ("EMAIL_SENDER_ADDRESS", "CONTACT_EMAIL_ADDRESS", "EMAIL_ALLOWED_RECIPIENTS"):
             with self.subTest(name=name), self.assertRaisesMessage(ImproperlyConfigured, name):
                 load_environment(make_env(**{name: "portal@example.org"}))
 

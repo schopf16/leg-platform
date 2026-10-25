@@ -118,7 +118,8 @@ Email: locally emails go to the console (`EMAIL_MODE=console`). Graph delivery i
 Each instance sets its values in the environment (`.env.example`, D-013, D-037). They are validated at startup; invalid values prevent the start:
 
 * `INSTANCE_NAME`: shown in pages and email subjects (optional, default "LEG Platform"; the administration value wins, D-073).
-* Address of the portal (links in emails and WebAuthn), sender of emails and address for the messages of the contact form: set in the administration (Portal-Einstellungen, D-116); the server does not read them. Outside `APP_ENV=local` the address of the portal uses `https://` and its host must be in `DJANGO_ALLOWED_HOSTS`.
+* `INSTANCE_BASE_URL`: the address of the portal (links in emails and WebAuthn), an `https://` origin without path, e.g. `https://portal.example.org`. Its host must be in `DJANGO_ALLOWED_HOSTS`. Required outside `APP_ENV=local`; locally it defaults to `http://127.0.0.1:8000`.
+* Sender of emails and address for the messages of the contact form: the chapter "Email" of the administration (`GraphConfiguration`, D-116); the server does not read them. Without a sender no email is sent.
 * `INSTANCE_PRIVACY_URL`: absolute `https://` URL of the privacy notice. Required outside `APP_ENV=local`; the administration value wins.
 * `INSTANCE_WEBSITE_URL`: absolute `https://` URL of the website (optional fallback).
 
@@ -130,7 +131,7 @@ Email delivery (D-038):
 
 ### Microsoft Graph sender
 
-D-006. The operator does these steps in Microsoft Entra ID and Exchange Online. Configuration and test send: section "Microsoft Graph configuration" of the Django administration (system administrators only): tenant ID, client ID, sender address, certificate and private key together (the key is never shown again). Source: Microsoft Learn, RBAC for Applications (https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac).
+D-006. The operator does these steps in Microsoft Entra ID and Exchange Online. Configuration and test send: the chapter "Email" of the Django administration (system administrators only): tenant ID, client ID, sender address, contact address, certificate and private key together (the key is never shown again). Source: Microsoft Learn, RBAC for Applications (https://learn.microsoft.com/en-us/exchange/permissions-exo/application-rbac).
 
 1. In Microsoft Entra ID, register one application for the instance, upload its certificate (public part only), add the application permission `Mail.Send` with admin consent (removed again in step 5).
 2. Note the application (client) ID and the object ID of the enterprise application (service principal); not the IDs of the app registration page.

@@ -274,6 +274,10 @@ class DeregistrationForm(ReauthenticationForm):
             self.add_error(None, texts.IBAN_NEEDED)
 
 
+# LastPass, 1Password and Bitwarden leave a field alone that carries their ignore attribute (D-115).
+PASSWORD_MANAGER_IGNORE = {"data-lpignore": "true", "data-1p-ignore": "true", "data-bwignore": "true"}
+
+
 class ContactForm(CustomerForm):
     """The contact form "Contact the LEG" (D-115): the message, the answer by mail or by phone, a copy. The mail address
     is prefilled from the account and changed only for this message; the phone number is checked and saved to the profile
@@ -288,10 +292,14 @@ class ContactForm(CustomerForm):
         choices=((contact.REPLY_EMAIL, _("By email")), (contact.REPLY_PHONE, _("By phone"))),
         widget=forms.RadioSelect, initial=contact.REPLY_EMAIL,
     )
-    email = forms.EmailField(label=_("Email address"), max_length=254, required=False)
+    # Password managers would fill a saved login into these fields over the offered address: they are told to ignore them.
+    email = forms.EmailField(
+        label=_("Email address"), max_length=254, required=False,
+        widget=forms.EmailInput(attrs={"autocomplete": "off", **PASSWORD_MANAGER_IGNORE}),
+    )
     phone = forms.CharField(
         label=_("Telephone number"), max_length=30, required=False,
-        widget=forms.TextInput(attrs={"type": "tel", "placeholder": "+41 79 123 45 67", "autocomplete": "tel"}),
+        widget=forms.TextInput(attrs={"type": "tel", "placeholder": "+41 79 123 45 67", "autocomplete": "off", **PASSWORD_MANAGER_IGNORE}),
     )
     copy = forms.BooleanField(label=_("I would like a copy of this message by email."), required=False)
 

@@ -60,7 +60,10 @@ class FailureTextTests(SimpleTestCase):
         messages = self.importer_messages()
         self.assertGreater(len(messages), 20)
         self.assertEqual(messages, set(jobs.SAFE_FAILURES))
-        self.assertEqual(set(status.REASONS), set(jobs.SAFE_FAILURES) | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED})
+        self.assertEqual(
+            set(status.REASONS),
+            set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED},
+        )
 
     def test_every_reason_has_a_swiss_german_text_without_the_sharp_s(self):
         with translation.override("de-ch"):
@@ -401,10 +404,11 @@ class StatusEndpointTests(TestCase):
     def test_the_answer_shows_the_counts_and_the_file_of_the_directory(self):
         client, _person = make_staff("status.three@example.org")
         Directory.objects.create(
-            pk=1, data_date=timezone.localdate(), imported_at=timezone.now(), row_count=3300000, checksum="a" * 64
+            pk=1, data_date=timezone.localdate(), imported_at=timezone.now(), row_count=2400000, checksum="a" * 64
         )
         body = client.get(STATUS_URL).json()
-        self.assertEqual(body["directory"]["row_count"], 3300000)
+        # The count is the Swiss text of count_text (DESIGN section 8), the same as in the page.
+        self.assertEqual(body["directory"]["row_count"], "2’400’000")
         self.assertTrue(body["directory"]["available"])
 
     def test_a_running_job_without_a_heartbeat_is_reported_as_interrupted_with_a_reason(self):

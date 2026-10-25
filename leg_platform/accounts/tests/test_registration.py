@@ -97,11 +97,12 @@ class RegistrationTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ["taken.person@example.org"])
 
     def test_the_link_is_built_from_the_configuration_not_from_the_request(self):
-        register(self.client)
+        with override_settings(INSTANCE_BASE_URL="https://portal.example.org"):
+            register(self.client)
 
-        self.assertEqual(
-            mail.outbox[0].body.count("https://portal.example.org/register/verify/"), 1
-        )
+            self.assertEqual(
+                mail.outbox[0].body.count("https://portal.example.org/register/verify/"), 1
+            )
         self.assertNotIn("testserver", mail.outbox[0].body)
 
     def test_the_response_is_the_same_for_every_state_of_the_address(self):

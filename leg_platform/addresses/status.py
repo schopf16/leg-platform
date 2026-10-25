@@ -7,13 +7,14 @@ by the server and the JSON that the script polls say the same. Nothing here writ
 import os
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.utils import timezone
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from . import jobs, schedule
-from .models import ImportRequest
+from .models import ImportRequest, PlantRegister
 from .services import directory_status
 
 # The fixed texts of ``importer.ImportFailure`` and of the jobs, in words for the page. A text that is
@@ -46,6 +47,17 @@ REASONS = {
     "Catalogue data date predates the published directory.": _("The official file is older than the directory in use. Nothing was changed."),
     "A repair was tried recently and did not succeed.": _("A repair was tried a short time ago and did not succeed. Try again in a few hours."),
     "Official archive checksum mismatch.": _("The downloaded file does not match its checksum and was discarded."),
+    "Unexpected HTTP content type.": _("The official server answered in an unexpected format."),
+    # The plant register (D-117); the texts are the constants of ``plants``.
+    "The plant register file has an unexpected format.": _("The plant register file has an unexpected format."),
+    "The plant register file is larger than allowed.": _("The plant register file is larger than allowed."),
+    "The number of plants changed too much. Nothing was changed.": _(
+        "The number of plants changed too much. Nothing was changed."
+    ),
+    "The plant register contains no plants.": _("The plant register contains no plants."),
+    "The plant register could not be downloaded or read.": _(
+        "The plant register could not be downloaded or read. Check the network connection and try again."
+    ),
     "The official directory could not be imported.": _("The official directory could not be downloaded or read. Check the network connection and try again."),
     jobs.UNEXPECTED_FAILURE: _("The import failed unexpectedly. The application log has the details."),
     jobs.INTERRUPTED: _("The import was interrupted because the application stopped or restarted. Request it again."),
@@ -71,6 +83,16 @@ def reason_text(message):
 def _when(value):
     """A date and time in the numeric form of the design language (DESIGN section 8): 17.10.2026 02:44."""
     return date_format(timezone.localtime(value), "d.m.Y H:i") if value else ""
+
+
+def _day(value):
+    """A date in the numeric form of the design language (DESIGN section 8): 17.10.2026."""
+    return date_format(value, "d.m.Y") if value else ""
+
+
+def count_text(value):
+    """A count with the Swiss thousands separator, a typographic apostrophe: 341’981 (DESIGN section 8)."""
+    return f"{value:,}".replace(",", "’")
 
 
 def _megabytes(size):
@@ -119,6 +141,68 @@ def next_automatic_text(job):
     return base + " " + gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
 
 
+def plant_status(now=None):
+    """The block "PV-Anlagen (BFE)" of the address page (D-117): the statistic of the last successful plant import and
+    the result of the last plant run. Read only: the plant import runs only in the daily run, never from this page.
+
+    The result of a run is shown only for a run of today (``last_plant_scheduled_run_on``); otherwise the result is
+    "not run today". The statistic keeps the values of the last success (``PlantRegister``).
+    """
+    now = now or timezone.now()
+    today = timezone.localdate(now)
+    try:
+        register = PlantRegister.objects.filter(pk=1).first()
+    except DatabaseError:
+        register = None
+    job = ImportRequest.objects.filter(pk=1).first()
+    imported = register is not None and register.imported_at is not None
+    result_state = ""
+    result_reason = ""
+    run_at = ""
+    if job is not None and job.source == ImportRequest.Source.PLANT and effective_state(job, now) in ("running", "interrupted"):
+        # A plant run that is running, or whose process is gone (it is taken over by the next claim).
+        run_at = _when(job.started_at)
+        if effective_state(job, now) == "running":
+            result_state = "running"
+        else:
+            result_state, result_reason = "failed", reason_text(jobs.INTERRUPTED)
+    elif job is not None and job.last_plant_finished_at is not None:
+        run_at = _when(job.last_plant_finished_at)
+        if job.last_plant_scheduled_run_on == today and job.last_plant_state in ("succeeded", "failed"):
+            result_state = job.last_plant_state
+            if result_state == "failed":
+                result_reason = reason_text(job.last_plant_error)
+    labels = {
+        "running": ImportRequest.State.RUNNING.label,
+        "succeeded": ImportRequest.State.SUCCEEDED.label,
+        "failed": ImportRequest.State.FAILED.label,
+        "": _("Not run today"),
+    }
+    # The dot of the result (DESIGN section 3.5): a status is a dot plus a word.
+    tones = {"running": "warn", "succeeded": "ok", "failed": "bad", "": "muted"}
+    older = ""
+    if imported:
+        older_date = register.data_date or timezone.localtime(register.imported_at).date()
+        older = _day(older_date)
+    return {
+        "imported": imported,
+        "imported_at": _when(register.imported_at) if imported else "",
+        "data_date": _day(register.data_date) if imported else "",
+        "address_count": count_text(register.address_count) if imported else "",
+        "file_row_count": count_text(register.file_row_count) if imported else "",
+        "row_count": count_text(register.row_count) if imported else "",
+        "rejected_count": count_text(register.rejected_count) if imported else "",
+        "skipped_count": count_text(register.skipped_count) if imported else "",
+        "run_at": run_at,
+        "result_state": result_state,
+        "result_label": str(labels[result_state]),
+        "result_tone": tones[result_state],
+        "result_reason": result_reason,
+        # After a failed run the values of the last success stay valid; the date names their data.
+        "older_data_date": older if result_state == "failed" and imported else "",
+    }
+
+
 def build():
     """Everything the page and the polling endpoint show, as plain values (texts translated)."""
     job = ImportRequest.objects.filter(pk=1).first()
@@ -160,7 +244,7 @@ def build():
                 % {"done": _megabytes(job.bytes_done), "total": _megabytes(job.bytes_total) or "?"}
             )
         if job.rows_done is not None:
-            parts.append(gettext("%(count)s addresses read") % {"count": job.rows_done})
+            parts.append(gettext("%(count)s addresses read") % {"count": count_text(job.rows_done)})
         detail = ", ".join(parts)
     error = reason_text(job.last_error) if job is not None and state in ("failed", "interrupted") else ""
     if state == "interrupted" and not error:
@@ -191,7 +275,7 @@ def build():
             "available": directory is not None,
             "data_date": date_format(directory.data_date, "d.m.Y") if directory and directory.data_date else "",
             "imported_at": _when(directory.imported_at) if directory else "",
-            "row_count": directory.row_count if directory else 0,
+            "row_count": count_text(directory.row_count) if directory else "",
             "file_megabytes": _megabytes(size),
             "warning": str(status["warning"]) if status["warning"] else "",
         },

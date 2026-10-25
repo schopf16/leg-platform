@@ -15,7 +15,6 @@ from django.test import Client, RequestFactory, TestCase, TransactionTestCase, o
 from django.utils import timezone
 from webauthn.helpers import bytes_to_base64url
 
-from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import passkey_methods, passkey_views, passkeys, password_reset, second_factor
 from leg_platform.accounts.forms import EmailChangeForm, ReauthenticationForm
 from leg_platform.accounts.models import (
@@ -25,7 +24,7 @@ from leg_platform.accounts.models import (
 from leg_platform.accounts.tests.helpers import create_active_user
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class PasskeyCeremonyTests(TestCase):
     def setUp(self):
         self.user = create_active_user()
@@ -511,7 +510,7 @@ class PasskeyCeremonyTests(TestCase):
         ))
         self.assertEqual(Passkey.objects.get(user=self.user).public_key, first.public_key)
 
-    @portal_addresses(base_url="http://localhost:8001")
+    @override_settings(INSTANCE_BASE_URL="http://localhost:8001")
     def test_canonical_localhost_origin_is_allowed(self):
         self.assertEqual(passkeys.relying_party(), ("localhost", "http://localhost:8001"))
 
@@ -554,7 +553,7 @@ class CeremonyFixture:
         self.request.user = self.user
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
     """D-106: real signature verification through HTTP, not a mocked verifier."""
 
@@ -1040,7 +1039,7 @@ class PasskeyEndpointAcceptanceTests(CeremonyFixture, TestCase):
         self.assertEqual(passkey["action"], reverse("accounts:passkey_login"))
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class MethodReturnAcceptanceTests(CeremonyFixture, TestCase):
     """Pending switch boundaries, competing links and notification recipients."""
 
@@ -1237,7 +1236,7 @@ class MethodReturnAcceptanceTests(CeremonyFixture, TestCase):
                 )
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
     """Owner amendment: same recovery for app/passkey and every access level."""
 
@@ -1575,7 +1574,7 @@ class RecoveryAcceptanceMatrixTests(CeremonyFixture, TestCase):
         self.assertFalse(self.user.passkeys.exists())
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
     """One active passkey satisfies promotion; existing authorization remains mandatory."""
 
@@ -1765,7 +1764,7 @@ class PasskeyPromotionHttpAcceptanceTests(CeremonyFixture, TestCase):
 
 
 @tag("mariadb")
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 class MethodReturnRaceAcceptanceTests(CeremonyFixture, TransactionTestCase):
     """Two valid address links must never complete the same transition twice."""
 

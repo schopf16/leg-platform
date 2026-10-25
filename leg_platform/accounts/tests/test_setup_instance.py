@@ -510,7 +510,8 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                 self.assertTrue(path.is_file())
                 self.assertEqual(
                     set(alias.introspection.table_names()),
-                    {"django_migrations", "addresses_address", "addresses_directory"},
+                    {"django_migrations", "addresses_address", "addresses_directory", "addresses_plant",
+                     "addresses_plantregister"},
                 )
                 job = ImportRequest.objects.get(pk=1)
                 self.assertEqual(job.state, ImportRequest.State.QUEUED)

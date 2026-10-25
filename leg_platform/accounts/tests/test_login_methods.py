@@ -11,7 +11,6 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts.tests.helpers import portal_addresses
 from leg_platform.accounts import login_methods, second_factor
 from leg_platform.accounts.forms import LoginMethodForm
 from leg_platform.accounts.models import AuthenticatorDevice, HiddenTask, SessionCodeFailure, User
@@ -115,7 +114,7 @@ class LoginMethodFormTests(SimpleTestCase):
         self.assertEqual(form.errors["method"], [str(LoginMethodForm.choose_message)])
 
 
-@portal_addresses(base_url="https://portal.example.org")
+@override_settings(INSTANCE_BASE_URL="https://portal.example.org")
 @tag("mariadb")
 class LoginMethodPageTests(CeremonyFixture, TestCase):
     """The shared choice component (``_login_method_choice.html``), served now to the accounts that are not served by the

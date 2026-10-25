@@ -80,7 +80,7 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 ## Email
 
 * Sending is encapsulated behind one application interface: `leg_platform.mail.GraphEmailBackend` (D-006). It fails closed while no configuration exists (D-028).
-* The Graph configuration lives in the database, maintained in a dedicated admin section (D-006): tenant ID, client ID, sender address, certificate authentication (signed client assertion, no client secret), public certificate with expiry warning, private key, test send. Key handling: `docs/SECURITY.md`, sections 7 and 8.
+* The Graph configuration lives in the database, maintained in the chapter "Email" of the administration (D-006, D-116): tenant ID, client ID, sender address, contact address, certificate authentication (signed client assertion, no client secret), public certificate with expiry warning, private key, test send. Key handling: `docs/SECURITY.md`, sections 7 and 8.
 * `EMAIL_MODE` controls delivery; the allowed values depend on `APP_ENV`. Stage behaves exactly like production (D-070): `APP_ENV=stage` is only a label, the columns `stage` and `production` are identical.
 
 | Value | `local` | `stage` | `production` | Behaviour |

@@ -32,13 +32,16 @@ class GraphTestEmailLimitTests(TestCase):
         self.administrator = create_active_user("admin@example.org")
         self.administrator.set_privileges(is_staff=True, is_superuser=True)
         self.client.force_login(self.administrator)
-        self.configuration = GraphConfiguration.objects.create(
-            id=1,
-            tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
-            client_id=UUID("00000000-0000-0000-0000-000000000002"),
-            sender_address="sender@example.org",
-            certificate_pem="public certificate",
-            encrypted_private_key="encrypted private key",
+        # The row exists from the post-migrate step of the test database; its values are replaced here.
+        self.configuration, _created = GraphConfiguration.objects.update_or_create(
+            pk=1,
+            defaults={
+                "tenant_id": UUID("00000000-0000-0000-0000-000000000001"),
+                "client_id": UUID("00000000-0000-0000-0000-000000000002"),
+                "sender_address": "sender@example.org",
+                "certificate_pem": "public certificate",
+                "encrypted_private_key": "encrypted private key",
+            },
         )
         self.send_url = reverse("admin:accounts_graphconfiguration_send_test")
 

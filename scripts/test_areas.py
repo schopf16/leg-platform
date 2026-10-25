@@ -224,7 +224,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(T, "test_presentation", "test_instance_configuration", "test_design_assets",
                     "test_sizes", "test_request_body_limit")
-            + _labels(A, "test_entry_shell", "test_portal_settings", "test_instance_addresses", "test_frame", "test_workspaces",
+            + _labels(A, "test_entry_shell", "test_portal_settings", "test_frame", "test_workspaces",
                       "test_logo_images", "test_portal_branding", "test_portal_favicon")
         ),
     ),
@@ -247,7 +247,7 @@ AREAS: dict[str, Area] = {
         paths=("leg_platform/addresses/", "leg_platform/static/css/admin-portal.css",
                "leg_platform/templates/admin/base_site.html"),
         exclude=("leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py"),
-        tests=("leg_platform.addresses.tests", A + "test_address_notice", C + "test_address_check"),
+        tests=("leg_platform.addresses.tests", D + "test_plants", A + "test_address_notice", C + "test_address_check"),
     ),
     "community": Area(
         "The domain of the community (D-077): models, rules, services, the address check, the rights "
@@ -374,6 +374,7 @@ AREAS: dict[str, Area] = {
         "scheduled cleanup tasks.",
         paths=(
             "leg_platform/mail.py", "leg_platform/accounts/mail_queue.py",
+            "leg_platform/accounts/mail_addresses.py",
             "leg_platform/accounts/emails.py", "leg_platform/accounts/email_texts.py",
             "leg_platform/accounts/greeting.py", "leg_platform/accounts/rate_limits.py",
             "leg_platform/accounts/invitations.py",
@@ -385,7 +386,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/community/management/commands/process_application_deadlines.py",
         ),
         tests=(
-            _labels(A, "test_mail_queue", "test_email_texts", "test_greeting", "test_scheduled_tasks",
+            _labels(A, "test_mail_queue", "test_mail_addresses", "test_email_texts", "test_greeting", "test_scheduled_tasks",
                     "test_graph_test_email_limits", "test_invalid_link_redirect", "test_invitations")
             + _labels(T, "test_mail_graph", "test_instance_configuration")
             + _labels(C, "test_application_mail", "test_application_deadlines", "test_own_iban")
@@ -396,7 +397,8 @@ AREAS: dict[str, Area] = {
         "and checks that no migration is missing.",
         paths=("leg_platform/*/migrations/",),
         tests=(
-            _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue")
+            _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue",
+                    "test_mail_address_migration")
             + _labels(T, "test_database")
             + _labels(C, "test_models", "test_migration_0004", "test_iban", "test_onboarding_models")
             + ("leg_platform.addresses.tests",)

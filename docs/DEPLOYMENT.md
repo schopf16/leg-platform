@@ -307,6 +307,7 @@ Nothing to create by hand; no separate database or account.
 * Own SQLite file `/var/lib/leg-platform/address-directory.sqlite3` (`ADDRESS_DIRECTORY_FILE` can name another absolute path outside the repository).
 * systemd creates `/var/lib/leg-platform` (`StateDirectory=leg-platform`, section 8 and the wrapper of 6.1). Do **not** `mkdir` or `chown` it.
 * `leg-setup.service` (8.0) creates the file (mode 0600) and its tables at the first start.
+* The plant register (D-117) uses the same folder. Its ZIP (at most 64 MiB) and the extracted plant file (at most 128 MiB) are temporary files next to the directory file (`/var/lib/leg-platform`, not `/tmp`), removed when the import ends. The plant tables add about 30 to 40 MB per generation (estimate, not measured). The daily run needs the free-space check to pass before it downloads either source: at least 4 GiB free on this disk (section 10.2); below that the plant import is refused.
 * Public data, **not part of any backup** (12.1). After a restore the daily run of the scheduled tasks (8.3) imports it at the next run after the configured time (default 03:00; an empty directory is due again every 24 hours), or an administrator presses the button. Until then: no address suggestions.
 
 ## 4. Application installation
@@ -373,8 +374,8 @@ Expected: `No broken requirements found.`; Python 3.12 or newer; Django 6.1.x (a
 `leg_platform/environment.py` validates at start and refuses unsafe values. Defaults: `.env.example`. Outside `local` required: `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `INSTANCE_BASE_URL`, `INSTANCE_PRIVACY_URL`, `EMAIL_MODE`.
 
 * **Secret** (never printed): `DJANGO_SECRET_KEY` (3.1; at least 50 characters, 5 distinct, no `django-insecure-` prefix, never reused across instances); `DJANGO_SECRET_KEY_FALLBACKS` (empty; during a rotation the previous key, 12.3); `DB_PASSWORD` (3.1).
-* Stay unset: `DJANGO_DEBUG`, `DJANGO_CSRF_TRUSTED_ORIGINS`. `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` and `EMAIL_ALLOWED_RECIPIENTS` are not read any more: a value refuses the start (D-116).
-* `DJANGO_ALLOWED_HOSTS=<HOST>` exactly, no wildcard. `INSTANCE_PRIVACY_URL`: absolute `https://` URL. The address of the portal (`https://<HOST>`, origin without path) and the sender of emails are set in the administration after the first start (D-116).
+* Stay unset: `DJANGO_DEBUG`, `DJANGO_CSRF_TRUSTED_ORIGINS`. `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` and `EMAIL_ALLOWED_RECIPIENTS` are not read any more: a value refuses the start (D-116).
+* `DJANGO_ALLOWED_HOSTS=<HOST>` exactly, no wildcard. `INSTANCE_BASE_URL=https://<HOST>` (origin without path; passkeys and email links are built from it). `INSTANCE_PRIVACY_URL`: absolute `https://` URL. The sender of emails and the contact address are set in the administration, chapter "Email", after the first start (D-116).
 * `APP_ENV`: `production` or `stage` (O-2). `EMAIL_MODE=graph` (the only mode on stage and production, D-070).
 * `DB_NAME`=`DB_USER`=`leg_platform`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`.
 * `DJANGO_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https`: only because nginx sets `X-Forwarded-Proto https` on every forwarded request (section 7).
@@ -412,7 +413,7 @@ sudo stat -c '%a %U:%G %n' /etc/leg-platform/app.env
 
 * Expected `600 root:root`.
 * Stage: `APP_ENV=stage`, every other line identical (D-070). Own database, `DJANGO_SECRET_KEY` and Graph configuration. Never reuse production values.
-* **Existing stage instance with `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` or `EMAIL_ALLOWED_RECIPIENTS` in its environment (D-116)** refuses to start with the current release. Before the update: set the address of the portal and the sender in the administration (Portal-Einstellungen), then remove those lines from `/etc/leg-platform/app.env` (keep a copy outside the checkout). An instance still on `EMAIL_MODE=allowlist` (D-070) sets `EMAIL_MODE=graph`.
+* **Existing stage instance with `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS` or `EMAIL_ALLOWED_RECIPIENTS` in its environment (D-116)** refuses to start with the current release. Before the update: set the sender and the contact address in the administration (chapter "Email"), then remove those lines from `/etc/leg-platform/app.env` (keep a copy outside the checkout). An instance still on `EMAIL_MODE=allowlist` (D-070) sets `EMAIL_MODE=graph`. `INSTANCE_BASE_URL` stays in the environment.
   1. Remove the moved lines from the environment file as described above.
   2. Before step 8 of 12.3, with web and mail stopped, count queued mail: `sudo leg-manage web shell -c "from leg_platform.accounts.models import MailJob; print(MailJob.objects.count())"`. It is sent at the first restart with `graph`.
   3. If not `0`, purge on stage (`MailJob.objects.all().delete()` the same way) unless the owner wants it sent. Record count and decision.
@@ -838,6 +839,7 @@ Outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com` is neede
 * delete the whole `[Install]` section (the timer starts the unit)
 
 * **The daily address run** (`scheduled_address_import`) does nothing before the configured time of day (default 03:00, instance time zone; `schedule.import_run_time()`), once the day's check is done, or when nothing is due. It downloads the directory when the update flag is set (an address was found neither locally nor at swisstopo), when the published directory has no building numbers yet (once, after the upgrade that added them), or when the regular refresh is due (every 90 days; 24 hours while the directory is missing). At most one download per day; the button of the administration starts at once and does not wait for it. `ADDRESS_IMPORT_AUTOMATIC=False` in `app.env` turns the run off.
+* **Two imports in sequence (D-117).** The daily run imports the address directory first and then the plant register (BFE), in the same process and under the same claim. The plant register runs every day from the configured time (default 03:00), also when the address import failed (owner decision 2026-10-25). The plant register is downloaded once a day (about 20 MB; an unchanged file is downloaded again). The unit's `TimeoutStartSec=2h` must cover both imports: the plant download has a deadline of 30 minutes. Neither duration is measured on a server (**UNVERIFIED**).
 * The unit runs for the whole import (about 12 minutes); the timer does not start it again meanwhile. The run writes heartbeats like the web thread, so a killed run counts as dead after about 90 seconds (the button is not blocked for the six hours of a lease). The import is the last task, so the cleanups never wait for it. A failed import fails the unit once per day (`Result=exit-code`, reason on the page "Adressverzeichnis" and in `application.log`); it is not repeated the same day. A file that lacks a required column (`BDG_EGID`, `ADR_EDID`) is not downloaded again by the run for 7 days (the unit then ends successfully with the word "waiting"); the button still works.
 * Outbound HTTPS to `data.geo.admin.ch` (the import) must work directly from this unit (proxy variables and `.netrc` are ignored). **UNVERIFIED:** that the hardening of block H allows the import and the SQLite file in this unit as it does in the web unit (V50 and V54).
 
@@ -985,7 +987,7 @@ With this alternative do **not** put the email variable into `app.env` while no 
 
 Steps: `docs/INSTALLATION.md`, "Microsoft Graph sender" (Entra ID app registration with certificate, `Mail.Send`, RBAC for Applications scoped to exactly the sender mailbox, unscoped permission removed, `Test-ServicePrincipalAuthorization` showing `InScope True`, automatic replies off). The person named in O-11 performs them; the executing AI cannot and must not.
 
-* A system administrator enters tenant ID, client ID, sender address, certificate and private key (files of at most 16 KiB each) in the administration, "Microsoft Graph configuration". The private key is written only there (never into this server's shell history or files), stored encrypted with a key derived from `DJANGO_SECRET_KEY`, never shown again.
+* A system administrator enters tenant ID, client ID, sender address, certificate and private key (files of at most 16 KiB each) in the administration, chapter "Email". The private key is written only there (never into this server's shell history or files), stored encrypted with a key derived from `DJANGO_SECRET_KEY`, never shown again.
 * The gate is passed only by a **real test send** ("test send" goes to the logged-in administrator; limit 12 per hour and 24 per 24 hours). The administrator confirms receipt in words (not by forwarding the email). The AI checks that the queue is empty and the worker logged no error (V52).
 * Exchange changes take 30 minutes to 2 hours to take effect.
 
@@ -993,11 +995,14 @@ Steps: `docs/INSTALLATION.md`, "Microsoft Graph sender" (Entra ID app registrati
 
 The importer (`leg_platform/addresses/importer.py`; started by the administrator's button in a thread of the web service, or by the daily run of the scheduled tasks in their own process, D-090) fetches the swisstopo address directory from `https://data.geo.admin.ch/` over HTTPS only, verifies the official SHA-256 multihash before parsing and publishes a new generation in one short transaction (D-075). It also reads the building number and the entrance number (columns `BDG_EGID`, `ADR_EDID`); a file without one of them is refused and the directory in use stays. Limits: archive 256 MiB, CSV 1 GiB, 5,000,000 rows, 30 minutes download.
 
+**Update to the plant register (D-117).** The first start after the update changes the schema of the address file (the plant tables). `setup.prepare_directory` then rebuilds the disposable file and queues an address import of about 143 MB, as described in item 1 below. The plant register is loaded by the first daily run after that. Check both imports as described below.
+
 **Disk and time are not measured on a server** (**UNVERIFIED**; extrapolated about 12 minutes and 0.9 GB per generation).
 
 * Reserve **three generations** (about 2.7 GB) plus the download (about 143 MB) in `/var/lib/leg-platform` only; nothing large goes to `/tmp`. The file does not shrink.
 * Measure `du -sh /var/lib/leg-platform` after the first and second import and report (F-4).
 * Less than 4 GB free on the disk of `/var/lib/leg-platform`: the import is refused (job `failed`, reason on the page, nothing written). The database must never run out of space because of the directory (12.4).
+* The plant tables add about 30 to 40 MB per generation (estimate, not measured). The plant download is temporary, as described in section 3.5.
 
 **Observe the first import** (no extra service needed if the scheduled-task timer runs):
 

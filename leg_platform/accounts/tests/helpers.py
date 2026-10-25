@@ -12,17 +12,16 @@ from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 
-from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import bot_check, rate_limits
-from leg_platform.accounts.models import AuthenticatorDevice, PortalSettings, User
+from leg_platform.accounts.models import AuthenticatorDevice, GraphConfiguration, User
 
-def portal_addresses(**values):
-    """Decorator for a test class or a test method: the portal settings hold these addresses (``base_url``,
-    ``sender_address``, ``contact_address``) during the test. The row is written before each test; the transaction
-    of the test rolls it back (D-116)."""
+def instance_mail_addresses(**values):
+    """Decorator for a test class or a test method: the E-Mail chapter holds these values (``sender_address``,
+    ``contact_address``) during the test. The row is written before each test; the transaction of the test rolls it
+    back (D-116). The base address of the portal is set with ``override_settings(INSTANCE_BASE_URL=...)``."""
 
     def store():
-        PortalSettings.objects.update_or_create(pk=1, defaults=values)
+        GraphConfiguration.objects.update_or_create(pk=1, defaults=values)
 
     def decorate(target):
         if isinstance(target, type):
@@ -161,7 +160,7 @@ def verification_path(message):
     match = re.search(r"^(https?://\S+/register/verify/\S+)$", message.body, re.MULTILINE)
     assert match, "The email contains no verification link."
     link = match.group(1)
-    assert link.startswith(PortalSettings.instance_origin() + "/"), "The link is not built from the base URL."
+    assert link.startswith(settings.INSTANCE_BASE_URL + "/"), "The link is not built from the base URL."
     return urlsplit(link).path
 
 

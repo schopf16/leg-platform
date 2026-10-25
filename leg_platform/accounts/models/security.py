@@ -223,6 +223,9 @@ class SecurityEvent(models.Model):
         GRID_OPERATOR_CHANGED = "grid_operator_changed", _("Grid operator changed")
         ADDRESS_IMPORT_SUCCEEDED = "address_import_succeeded", _("Address directory import completed")
         ADDRESS_IMPORT_FAILED = "address_import_failed", _("Address directory import failed")
+        # The plant register import (D-117): one event per outcome, the reason in the detail (fixed words).
+        PV_IMPORT_SUCCEEDED = "pv_import_succeeded", _("Plant register import completed")
+        PV_IMPORT_FAILED = "pv_import_failed", _("Plant register import failed")
         LOG_VIEWED = "log_viewed", _("Log file viewed")
         LOG_DOWNLOADED = "log_downloaded", _("Log file downloaded")
         PERSISTENT_SESSION_STARTED = "persistent_session_started", _(

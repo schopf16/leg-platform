@@ -87,7 +87,7 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
   <li><a class="frame-sub-item{% if customer_state.contract %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.contract %} aria-current="page"{% endif %}>{% translate "Articles of association" %}</a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Questions and answers" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
   <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Event" context "customer menu" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
-  {% contact_available as contact_open %}{% if contact_open %}<li><a class="frame-sub-item{% if customer_state.contact %} is-active{% endif %}" href="{% url 'customer:contact' %}"{% if customer_state.contact %} aria-current="page"{% endif %}>{% translate "Contact the LEG" %}</a></li>{% endif %}
+  <li><a class="frame-sub-item{% if customer_state.contact %} is-active{% endif %}" href="{% url 'customer:contact' %}"{% if customer_state.contact %} aria-current="page"{% endif %}>{% translate "Contact the LEG" %}</a></li>
 </ul>
 {% endif %}
 <p class="frame-group">{% translate "Coming next" %}</p>

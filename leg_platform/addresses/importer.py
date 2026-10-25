@@ -10,11 +10,15 @@ generation serving.
 import csv
 import hashlib
 import hmac
+import io
 import json
 import logging
+import queue
 import re
 import shutil
+import struct
 import tempfile
+import threading
 import time
 import uuid
 import zipfile
@@ -26,12 +30,18 @@ from django.db import DatabaseError, connections, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from .http_budget import Adapter, Budget
 from .models import DIRECTORY_ALIAS, Address, Directory, ImportRequest
 
 ITEM_URL = (
     "https://data.geo.admin.ch/api/stac/v0.9/collections/"
     "ch.swisstopo.amtliches-gebaeudeadressverzeichnis/items/"
     "amtliches-gebaeudeadressverzeichnis_ch"
+)
+# The plant register of the Federal Office of Energy (BFE, D-117): one fixed URL, the only one besides the above.
+PLANT_URL = (
+    "https://data.geo.admin.ch/ch.bfe.elektrizitaetsproduktionsanlagen/csv/2056/"
+    "ch.bfe.elektrizitaetsproduktionsanlagen.zip"
 )
 ASSET_NAME = "amtliches-gebaeudeadressverzeichnis_ch_2056.csv.zip"
 ASSET_URL = (
@@ -49,8 +59,13 @@ MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_CSV_BYTES = 1024 * 1024 * 1024
 MAX_LINE_BYTES = 16 * 1024
 MAX_ROWS = 5_000_000
+# Total time of one official download, from the request to the last byte (D-117; the header phase counts too).
 MAX_DOWNLOAD_SECONDS = 1800
 CHUNK_SIZE = 64 * 1024
+# Messages of the download thread that wait for the caller (bounded: a fast server waits, the memory does not grow).
+DOWNLOAD_QUEUE_SIZE = 8
+# How often a waiting caller looks at the clock while the download thread is silent (seconds).
+DOWNLOAD_POLL_SECONDS = 1.0
 BATCH_SIZE = 2000
 # One transaction per chunk: the write lock is held briefly.
 CHUNK_ROWS = 20_000
@@ -61,6 +76,14 @@ PRUNE_BATCH_SIZE = 900
 # (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1 GB
 # per generation, up to three on disk; the disk is shared with the instance database.
 MIN_FREE_DISK_BYTES = 4 * 1024**3
+# ZIP end records (PKWARE APPNOTE 4.3.16, 4.3.15, 4.3.6), read before ``zipfile`` parses the central directory.
+EOCD_SIGNATURE = b"PK\x05\x06"
+ZIP64_LOCATOR_SIGNATURE = b"PK\x06\x07"
+ZIP64_RECORD_SIGNATURE = b"PK\x06\x06"
+MAX_ZIP_COMMENT = 65535
+END_RECORD = struct.Struct("<4sHHHHIIH")  # 22 bytes; index 4 entries, index 7 comment length
+ZIP64_LOCATOR = struct.Struct("<4sIQI")  # 20 bytes; index 2 offset of the ZIP64 end record
+ZIP64_RECORD = struct.Struct("<4sQHHIIQQQQ")  # 56 bytes; index 7 entries
 # Lease on the ``Directory`` row against concurrent imports; expires so a killed importer does not
 # block forever, renewed with every chunk.
 IMPORT_LEASE = timedelta(hours=6)
@@ -74,32 +97,119 @@ class ImportFailure(Exception):
     """Safe generic failure; do not include upstream responses or CSV data."""
 
 
-def _chunks(session, url, limit, on_chunk=None):
-    """Yield the body of an approved URL in chunks; ``on_chunk(size so far, announced length or None)`` reports progress."""
-    if url not in {ITEM_URL, ASSET_URL}:
-        raise ImportFailure("Unapproved download URL.")
-    started = time.monotonic()
+class _Stopped(Exception):
+    """The caller gave up (deadline or abandoned download): the download thread stops."""
+
+
+def _download_body(session, url, limit, content_types, put):
+    """The request, the checks of the answer and the body, as messages (``put``) for the caller of ``_chunks``."""
     with session.get(
-        url, stream=True, allow_redirects=False, timeout=(10, 60),
+        url, stream=True, allow_redirects=False, timeout=(10, 60), verify=True,
         headers={"Accept-Encoding": "identity"},
     ) as response:
         if response.status_code != 200:
             raise ImportFailure("Official download failed.")
         if response.headers.get("Content-Encoding", "identity").lower() != "identity":
             raise ImportFailure("Unexpected HTTP content encoding.")
+        if content_types is not None:
+            media_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+            if media_type not in content_types:
+                raise ImportFailure("Unexpected HTTP content type.")
         length = response.headers.get("Content-Length")
+        put("headers", response.headers, length)
         if length is not None and (not length.isdecimal() or not 0 < int(length) <= limit):
             raise ImportFailure("Download exceeds the size limit.")
         size = 0
         for chunk in response.iter_content(CHUNK_SIZE):
             size += len(chunk)
-            if size > limit or time.monotonic() - started > MAX_DOWNLOAD_SECONDS:
+            if size > limit:
                 raise ImportFailure("Download exceeds its resource limit.")
-            if on_chunk is not None:
-                on_chunk(size, int(length) if length is not None else None)
-            yield chunk
+            put("chunk", chunk, None)
         if not size or (length is not None and size != int(length)):
             raise ImportFailure("Incomplete download.")
+
+
+def _download_thread(session, url, limit, content_types, budget, messages):
+    """The body of the download thread: every outcome is handed to the caller as one message; nothing is raised here."""
+
+    def put(kind, payload, extra):
+        # Waits for room in the queue, but gives up as soon as the caller has expired the budget.
+        while not budget.expired:
+            try:
+                messages.put((kind, payload, extra), timeout=DOWNLOAD_POLL_SECONDS)
+                return
+            except queue.Full:
+                continue
+        raise _Stopped
+
+    try:
+        _download_body(session, url, limit, content_types, put)
+        put("end", None, None)
+    except _Stopped:
+        pass
+    except BaseException as exc:  # noqa: BLE001 - re-raised by the caller; the thread must not fail silently
+        try:
+            put("error", exc, None)
+        except _Stopped:
+            pass
+
+
+def _chunks(
+    session, url, limit, on_chunk=None, content_types=None, on_headers=None,
+    *, seconds=MAX_DOWNLOAD_SECONDS, clock=time.monotonic,
+):
+    """Yield the body of an approved URL in chunks; ``on_chunk(size so far, announced length or None)`` reports progress.
+
+    ``content_types`` (media types without parameters) must match the response when given; ``on_headers`` receives the
+    response headers before the body is read.
+
+    Hard total deadline (D-117, ``docs/SECURITY.md`` section 6): the request runs in a helper thread and the caller
+    waits for its messages until ``seconds`` after the start, connect, headers and body together. The clock is checked
+    after every message and at every poll. When the deadline has passed, every socket of the request is shut down
+    (``http_budget.Budget``), so that a read which trickles bytes ends at once, and ``ImportFailure`` is raised.
+    ``clock`` is injected by the tests.
+    """
+    if url not in {ITEM_URL, ASSET_URL, PLANT_URL}:
+        raise ImportFailure("Unapproved download URL.")
+    deadline = clock() + seconds
+    budget = Budget()
+    session.mount("https://", Adapter(budget))
+    messages = queue.Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
+    thread = threading.Thread(
+        target=_download_thread, args=(session, url, limit, content_types, budget, messages),
+        name="official-download", daemon=True,
+    )
+    thread.start()
+    size = 0
+    announced = None
+    finished = False
+    try:
+        while True:
+            try:
+                kind, payload, extra = messages.get(timeout=DOWNLOAD_POLL_SECONDS)
+            except queue.Empty:
+                if clock() >= deadline:
+                    raise ImportFailure("Download exceeds its resource limit.") from None
+                continue
+            if kind == "error":
+                raise payload
+            if clock() >= deadline:
+                raise ImportFailure("Download exceeds its resource limit.")
+            if kind == "headers":
+                if on_headers is not None:
+                    on_headers(payload)
+                announced = int(extra) if extra is not None and extra.isdecimal() else None
+            elif kind == "chunk":
+                size += len(payload)
+                if on_chunk is not None:
+                    on_chunk(size, announced)
+                yield payload
+            else:
+                finished = True
+                return
+    finally:
+        if not finished:
+            budget.expire()
 
 
 def _metadata(session):
@@ -158,8 +268,58 @@ def _entrance(value):
     return int(value)
 
 
+def declared_entry_count(archive):
+    """The number of entries the end record of a ZIP file declares, read before ``zipfile`` parses the archive (M1).
+
+    Only the end record, and the ZIP64 locator and record when the count is 0xFFFF, are read from the tail of the file,
+    so that an archive with an absurd central directory is refused without parsing it. None if no consistent end record
+    is found. The position of ``archive`` is restored.
+    """
+    start = archive.tell()
+    try:
+        archive.seek(0, io.SEEK_END)
+        size = archive.tell()
+        tail_start = max(0, size - (END_RECORD.size + MAX_ZIP_COMMENT))
+        archive.seek(tail_start)
+        tail = archive.read(size - tail_start)
+        position = tail.rfind(EOCD_SIGNATURE)
+        # The record must end at the end of the file (its comment length is right); a signature inside a comment does not.
+        while position != -1:
+            if (
+                position + END_RECORD.size <= len(tail)
+                and position + END_RECORD.size + END_RECORD.unpack_from(tail, position)[7] == len(tail)
+            ):
+                break
+            position = tail.rfind(EOCD_SIGNATURE, 0, position)
+        else:
+            return None
+        entries = END_RECORD.unpack_from(tail, position)[4]
+        if entries != 0xFFFF:
+            return entries
+        locator_at = tail_start + position - ZIP64_LOCATOR.size
+        if locator_at < 0:
+            return None
+        archive.seek(locator_at)
+        locator = archive.read(ZIP64_LOCATOR.size)
+        if len(locator) != ZIP64_LOCATOR.size or locator[:4] != ZIP64_LOCATOR_SIGNATURE:
+            return None
+        archive.seek(ZIP64_LOCATOR.unpack(locator)[2])
+        record = archive.read(ZIP64_RECORD.size)
+        if len(record) != ZIP64_RECORD.size or record[:4] != ZIP64_RECORD_SIGNATURE:
+            return None
+        return ZIP64_RECORD.unpack(record)[7]
+    finally:
+        archive.seek(start)
+
+
 def _address_rows(archive):
     """Yield only the five approved source columns, split into six values."""
+    entries = declared_entry_count(archive)
+    if entries is None:
+        raise ImportFailure("Invalid official archive format.")
+    if entries != 1:
+        # Refused before the central directory is parsed (M1); the text is the one of the member check below.
+        raise ImportFailure("Expected exactly one CSV member.")
     with zipfile.ZipFile(archive) as zipped:
         members = zipped.infolist()
         if len(members) != 1:

@@ -33,11 +33,11 @@ from django.utils import timezone
 from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.models import RateLimitBucket, RateLimitEvent, SecurityEvent
 from leg_platform.accounts.rate_limits import RATE_LIMIT_PURPOSE
-from leg_platform.addresses import importer, jobs, storage
+from leg_platform.addresses import importer, jobs, plants, storage
 from leg_platform.addresses.jobs import process_one, request_import
 from leg_platform.addresses.keys import fold, key, prefix_range
 from leg_platform.addresses.limits import allow_request
-from leg_platform.addresses.models import Address, Directory, ImportRequest
+from leg_platform.addresses.models import Address, Directory, ImportRequest, PlantRegister
 from leg_platform.addresses.router import AddressRouter
 from leg_platform.addresses.services import approximate_matches, clean_input, directory_status, lookup
 
@@ -254,9 +254,9 @@ class ParserTests(SimpleTestCase):
         with self.assertRaises(importer.ImportFailure):
             list(importer._chunks(session, importer.ASSET_URL, 1_000_000))
         response.headers = {}
-        with patch.object(importer.time, "monotonic", side_effect=[0, 2000]):
-            with self.assertRaises(importer.ImportFailure):
-                list(importer._chunks(session, importer.ASSET_URL, 1_000_000))
+        # The total deadline has passed before the download starts (the clock is injected, D-117).
+        with self.assertRaises(importer.ImportFailure):
+            list(importer._chunks(session, importer.ASSET_URL, 1_000_000, seconds=0, clock=lambda: 0))
 
     def test_no_arbitrary_download_url(self):
         session = session_for()
@@ -363,8 +363,16 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         # The one outbound door of a request (KONZEPT 3a, D-066): only ``swisstopo.py`` talks to a third party
         # about an address, and only ``buildings.py`` (signed-in accounts, rate limits) calls it.
         sources = {path.name: path.read_text(encoding="utf-8") for path in directory.glob("*.py")}
+        # ``plants.py`` (D-117) is the second downloader: the daily run of the plant register, reached only through
+        # ``jobs.execute``. The read helper ``plant_lookup.py`` has no network access.
+        # ``http_budget.py`` (the socket budget of a download, D-117) imports the transport adapter of ``requests`` but
+        # makes no request itself; only the two downloaders use it.
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*(import|from) requests\b", text, re.M)),
+            ["http_budget.py", "importer.py", "plants.py", "swisstopo.py"],
+        )
+        self.assertEqual(
+            sorted(name for name, text in sources.items() if re.search(r"^\s*from \.http_budget import", text, re.M)),
             ["importer.py", "swisstopo.py"],
         )
         self.assertEqual(
@@ -2153,6 +2161,187 @@ class DirectoryDatabaseTests(TestCase):
         self.assertFalse(ImportRequest.objects.exists())
 
 
+@override_settings(LANGUAGE_CODE="en", ROOT_URLCONF="leg_platform.addresses.tests.urls")
+class PlantBlockAdminTests(TestCase):
+    # The block "PV-Anlagen (BFE)" of the data imports page (D-117): read only; the statistic of the last successful import
+    # and the result of the last plant run. The directory is in its own file (alias "addresses"), as in DirectoryDatabaseTests.
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        self.disk = patch.object(
+            importer.shutil, "disk_usage",
+            return_value=types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES * 10),
+        )
+        self.disk.start()
+        self.addCleanup(self.disk.stop)
+        Directory.objects.create(
+            pk=1, generation=uuid.uuid4(), data_date=timezone.localdate(), imported_at=timezone.now(),
+            checksum="0" * 64, row_count=1, has_egid=True,
+        )
+        self.page = reverse("admin:addresses_importrequest_changelist")
+        from leg_platform.accounts.tests.helpers import create_active_user
+
+        self.user = create_active_user("plant-block-staff@example.org")
+        self.user.set_privileges(is_staff=True, is_superuser=False)
+
+    def _client(self, with_permission=True, language=None):
+        from leg_platform.accounts.tests.helpers import VerifiedClient
+
+        self.user.user_permissions.set(
+            [Permission.objects.get(codename="request_directory_import")] if with_permission else []
+        )
+        client = VerifiedClient()
+        client.force_login(self.user)
+        if language is not None:
+            client.cookies[settings.LANGUAGE_COOKIE_NAME] = language
+        return client
+
+    def _plant_register(self):
+        return PlantRegister.objects.create(
+            pk=1, generation=uuid.uuid4(), data_date=timezone.localdate() - timedelta(days=3),
+            imported_at=timezone.now() - timedelta(days=3), checksum="1" * 64, row_count=341981,
+            rejected_count=12, skipped_count=8299, file_row_count=350292, address_count=1203456,
+        )
+
+    def _last_run(self, state, error="", today=True):
+        ImportRequest.objects.create(
+            pk=1, state=ImportRequest.State.SUCCEEDED if state == "succeeded" else ImportRequest.State.FAILED,
+            source=ImportRequest.Source.PLANT, finished_at=timezone.now(), last_plant_state=state,
+            last_plant_finished_at=timezone.now(), last_plant_error=error,
+            last_plant_scheduled_run_on=timezone.localdate() if today else timezone.localdate() - timedelta(days=1),
+        )
+
+    def test_the_block_shows_the_statistic_of_the_last_import_and_the_source_line(self):
+        self._plant_register()
+        self._last_run("succeeded")
+        response = self._client().get(self.page)
+        self.assertEqual(response.status_code, 200)
+        for text in (
+            "Data imports", "PV plants (BFE)", "341’981", "350’292", "8’299", "1’203’456",
+            "Source: Federal Office of Energy (BFE), open use (Open Use)",
+        ):
+            self.assertContains(response, text)
+        self.assertContains(
+            response, '<dd id="plant-result"><span class="status-dot status-ok" aria-hidden="true"></span>Completed</dd>',
+        )
+        self.assertContains(response, '<dd id="plant-rejected-count">12</dd>')
+
+    def test_the_block_has_the_german_texts_and_the_exact_german_source_line(self):
+        self._plant_register()
+        self._last_run("succeeded")
+        response = self._client(language="de-ch").get(self.page)
+        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)")
+        self.assertContains(response, "PV-Anlagen (BFE)")
+        self.assertContains(response, "Datenimporte")
+        self.assertContains(response, "341’981")
+        for text in (
+            "Letzte Aktualisierung der Anlagen", "Einträge der Datei", "Nicht übernommene Einträge: Prüfung nicht bestanden",
+            "Übersprungene Anlagen: ohne Gebäudenummer (EGID)", "Zahlen der letzten erfolgreichen Aktualisierung",
+        ):
+            self.assertContains(response, text)
+        self.assertNotContains(response, "Letzter Lauf")
+        self.assertNotContains(response, "Ignorierte Zeilen")
+        self.assertNotContains(response, "ß")
+
+    def test_a_never_imported_plant_register_shows_the_empty_state(self):
+        response = self._client().get(self.page)
+        self.assertContains(response, '<p id="plant-not-imported">Not imported yet</p>')
+        self.assertNotContains(response, 'id="plant-imported-at"')
+        self.assertContains(
+            response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
+        )
+
+    def test_the_empty_state_and_the_run_of_today_have_the_german_texts(self):
+        response = self._client(language="de-ch").get(self.page)
+        self.assertContains(response, "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie.")
+        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertNotContains(response, "Noch nicht importiert")
+        self.assertNotContains(response, "Heute nicht ausgeführt")
+
+    def test_a_failed_run_names_its_reason_and_keeps_the_values_of_the_last_success(self):
+        self._plant_register()
+        self._last_run("failed", error=plants.UNREADABLE_FAILURE)
+        response = self._client().get(self.page)
+        self.assertContains(
+            response,
+            '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed<br>'
+            'The plant register could not be downloaded or read. '
+            'Check the network connection and try again.</dd>',
+        )
+        self.assertContains(response, "341’981")
+        self.assertContains(response, "1’203’456")
+        older = (timezone.localdate() - timedelta(days=3)).strftime("%d.%m.%Y")
+        self.assertContains(response, f"The data from {older} stays valid.")
+
+    def test_a_run_of_another_day_is_not_shown_as_the_result_of_today(self):
+        self._plant_register()
+        self._last_run("succeeded", today=False)
+        response = self._client().get(self.page)
+        self.assertContains(
+            response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
+        )
+        self.assertNotContains(response, '<span class="status-dot status-ok" aria-hidden="true"></span>Completed')
+
+    def test_the_page_and_the_block_need_the_permission(self):
+        self._plant_register()
+        self._last_run("succeeded")
+        response = self._client(with_permission=False).get(self.page)
+        self.assertEqual(response.status_code, 403)
+        self.assertNotContains(response, "341’981", status_code=403)
+        self.assertNotContains(response, "PV plants (BFE)", status_code=403)
+
+    def test_no_notice_about_coverage_or_completeness_appears_on_the_page(self):
+        self._plant_register()
+        self._last_run("succeeded")
+        notices = ("coverage", "incomplete", "not all plants", "Abdeckung", "unvollständig", "vollständig", "Lücke")
+        for language in ("en", "de-ch"):
+            body = self._client(language=language).get(self.page).content.decode().lower()
+            for notice in notices:
+                with self.subTest(language=language, notice=notice):
+                    self.assertNotIn(notice.lower(), body)
+
+    def test_counts_use_the_swiss_thousands_separator(self):
+        from leg_platform.addresses.status import count_text
+
+        self.assertEqual(
+            [count_text(value) for value in (0, 999, 1000, 341981, 1234567)],
+            ["0", "999", "1’000", "341’981", "1’234’567"],
+        )
+
+    def test_a_plant_run_records_its_result_apart_from_the_address_fields(self):
+        token = uuid.uuid4()
+        ImportRequest.objects.create(
+            pk=1, state=ImportRequest.State.RUNNING, source=ImportRequest.Source.PLANT, claim_token=token,
+            started_at=timezone.now(),
+        )
+        jobs.record_failure(
+            jobs.Claim(token, False, False, ImportRequest.Source.PLANT),
+            importer.ImportFailure(plants.UNREADABLE_FAILURE),
+        )
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.last_plant_state, job.last_plant_error), ("failed", plants.UNREADABLE_FAILURE))
+        self.assertIsNotNone(job.last_plant_finished_at)
+        # An address import overwrites the shared fields only; the result of the plant run stays.
+        address_token = uuid.uuid4()
+        ImportRequest.objects.filter(pk=1).update(
+            state=ImportRequest.State.RUNNING, source=ImportRequest.Source.ADDRESS, claim_token=address_token,
+            started_at=timezone.now(),
+        )
+        jobs.record_success(jobs.Claim(address_token, True, False, ImportRequest.Source.ADDRESS), 5)
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual(job.state, ImportRequest.State.SUCCEEDED)
+        self.assertEqual((job.last_plant_state, job.last_plant_error), ("failed", plants.UNREADABLE_FAILURE))
+        # A successful plant run stores its success and clears the failure text.
+        plant_token = uuid.uuid4()
+        ImportRequest.objects.filter(pk=1).update(
+            state=ImportRequest.State.RUNNING, source=ImportRequest.Source.PLANT, claim_token=plant_token,
+            started_at=timezone.now(),
+        )
+        jobs.record_success(jobs.Claim(plant_token, False, False, ImportRequest.Source.PLANT), 341981)
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.last_plant_state, job.last_plant_error), ("succeeded", ""))
+
+
 @tag("mariadb")
 class PrefixSearchTests(TestCase):
     """Prefix searches ignore case and accents and read through the indexes (D-075)."""
@@ -2570,6 +2759,8 @@ class MigrateTests(SimpleTestCase):
             self.assertIn("Applying addresses.0006_columns_missing_backoff... OK", first.stdout)
             # 0007 adds the index of the towns (the suggestions of the postal code and the town, D-111).
             self.assertIn("Applying addresses.0007_locality_index... OK", first.stdout)
+            # 0008 creates the plant register tables in the file and the claim fields in the application database (D-117).
+            self.assertIn("Applying addresses.0008_plant_register_and_pv_import... OK", first.stdout)
             second = subprocess.run(
                 [*command, "--plan"], env=environment, capture_output=True, text=True, timeout=120, check=False,
             )
@@ -2589,7 +2780,8 @@ class MigrateTests(SimpleTestCase):
             finally:
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
-                             {"django_migrations", "addresses_address", "addresses_directory"})
+                             {"django_migrations", "addresses_address", "addresses_directory",
+                              "addresses_plant", "addresses_plantregister"})
             self.assertEqual(address_columns, {
                 "id", "generation", "street", "house_number", "postal_code", "locality",
                 "street_key", "house_number_key", "locality_key", "egid", "entrance_id",
@@ -2614,6 +2806,8 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0005_entrance_identifier"),
                 ("addresses", "0006_columns_missing_backoff"),
                 ("addresses", "0007_locality_index"),
+                ("addresses", "0008_plant_register_and_pv_import"),
+                ("addresses", "0009_data_import_labels_and_plant_run"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.

@@ -13,7 +13,6 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
-from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import SplitResult, urlsplit
 
@@ -62,6 +61,8 @@ SECURITY_LOG_LONG_RETENTION_DAYS = 365
 # Neutral platform default; instance values belong to the configuration (D-013, D-014).
 DEFAULT_INSTANCE_NAME = "LEG Platform"
 INSTANCE_NAME_MAX_LENGTH = 100
+# Used only with APP_ENV=local, where the development server listens on this origin.
+LOCAL_INSTANCE_BASE_URL = "http://127.0.0.1:8000"
 
 _TRUE_VALUES = ("true",)
 _FALSE_VALUES = ("false",)
@@ -91,6 +92,7 @@ class EnvironmentConfig:
     hsts_seconds: int
     hsts_include_subdomains: bool
     email_mode: str
+    instance_base_url: str
     instance_name: str
     instance_privacy_url: str
     instance_website_url: str
@@ -301,10 +303,9 @@ def is_valid_sender_address(value: str) -> bool:
     return bool(_SENDER_ADDRESS.fullmatch(value))
 
 
-# Settings that moved into the portal settings of the administration (D-116). A value still in the environment is
-# refused at start, so that it is never ignored silently.
+# Settings that moved into the portal settings or the E-Mail chapter of the administration (D-116). A value still
+# in the environment is refused at start, so that it is never ignored silently.
 MOVED_TO_ADMINISTRATION = (
-    "INSTANCE_BASE_URL",
     "EMAIL_SENDER_ADDRESS",
     "CONTACT_EMAIL_ADDRESS",
     "EMAIL_ALLOWED_RECIPIENTS",
@@ -373,6 +374,28 @@ def _parse_url(name: str, value: str, allowed_schemes: tuple[str, ...]) -> Split
             "without credentials or fragment."
         )
     return parts
+
+
+def parse_instance_base_url(
+    env: Mapping[str, str], app_env: str, allowed_hosts: tuple[str, ...]
+) -> str:
+    """Return the canonical origin of the instance, used to build links in emails and the passkey origin (D-013).
+
+    The host must be one of ALLOWED_HOSTS, so the configuration cannot point links elsewhere.
+    """
+    value = _get(env, "INSTANCE_BASE_URL")
+    if not value:
+        if app_env != APP_ENV_LOCAL:
+            raise ImproperlyConfigured("INSTANCE_BASE_URL must be set outside APP_ENV=local.")
+        return LOCAL_INSTANCE_BASE_URL
+    schemes = ("https",) if app_env != APP_ENV_LOCAL else ("https", "http")
+    parts = _parse_url("INSTANCE_BASE_URL", value, schemes)
+    if parts.path not in ("", "/") or parts.query:
+        # The application runs on its own host name, never under a path (D-025).
+        raise ImproperlyConfigured("INSTANCE_BASE_URL must be an origin without a path.")
+    if allowed_hosts and parts.hostname.lower() not in (host.lower() for host in allowed_hosts):
+        raise ImproperlyConfigured("The host of INSTANCE_BASE_URL must be in DJANGO_ALLOWED_HOSTS.")
+    return f"{parts.scheme}://{parts.netloc}"
 
 
 def parse_instance_link(env: Mapping[str, str], name: str, required: bool) -> str:
@@ -532,6 +555,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     database = parse_database(env)
     security_log_retention = parse_security_log_retention(env)
     allowed_hosts = parse_allowed_hosts(env, app_env)
+    base_url = parse_instance_base_url(env, app_env, allowed_hosts)
     return EnvironmentConfig(
         app_env=app_env,
         debug=debug,
@@ -544,6 +568,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         hsts_seconds=parse_hsts_seconds(env),
         hsts_include_subdomains=parse_hsts_include_subdomains(env),
         email_mode=email_mode,
+        instance_base_url=base_url,
         instance_name=parse_instance_name(env),
         # The privacy notice must be linked at registration (D-022), so it is required
         # wherever real persons register.
@@ -601,9 +626,9 @@ def security_settings(config: EnvironmentConfig) -> dict[str, object]:
 def email_backend(config: EnvironmentConfig) -> str:
     """Return the email backend for EMAIL_MODE.
 
-    The modes allowlist and graph send through Microsoft Graph (``leg_platform.mail``). That
-    backend fails closed when it is not configured; these modes never fall back to Django's
-    default SMTP backend or to the console.
+    The mode graph sends through Microsoft Graph (``leg_platform.mail``). That backend fails
+    closed when it is not configured; it never falls back to Django's default SMTP backend or to
+    the console.
     """
     if config.email_mode == EMAIL_MODE_CONSOLE:
         return "django.core.mail.backends.console.EmailBackend"

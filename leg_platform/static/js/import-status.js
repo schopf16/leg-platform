@@ -64,7 +64,7 @@
     var directory = status.directory;
     setText("directory-data-date", dash(directory.data_date));
     setText("directory-imported-at", dash(directory.imported_at));
-    setText("directory-row-count", directory.available ? String(directory.row_count) : "\u2013");
+    setText("directory-row-count", directory.available ? directory.row_count : "\u2013");
     setText("directory-file-size", directory.file_megabytes ? directory.file_megabytes + " MB" : "\u2013");
     setText("directory-warning", directory.warning);
     setHidden("directory-warning", !directory.warning);

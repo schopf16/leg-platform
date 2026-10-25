@@ -191,6 +191,7 @@ jobs:
           APP_ENV: production
           EMAIL_MODE: graph
           DJANGO_ALLOWED_HOSTS: portal.example.org
+          INSTANCE_BASE_URL: https://portal.example.org
           INSTANCE_PRIVACY_URL: https://www.example.org/privacy
         run: python manage.py check --deploy --database default --fail-level WARNING
 
@@ -199,6 +200,7 @@ jobs:
           APP_ENV: stage
           EMAIL_MODE: graph
           DJANGO_ALLOWED_HOSTS: portal.example.org
+          INSTANCE_BASE_URL: https://portal.example.org
           INSTANCE_PRIVACY_URL: https://www.example.org/privacy
         run: python manage.py check --deploy --database default --fail-level WARNING
 

@@ -48,6 +48,8 @@ class DailyRunTests(TestCase):
     databases = {"default", "addresses"}
 
     def setUp(self):
+        # The plant register follows the address run (D-117); these tests never download it (see test_plants).
+        self.enterContext(patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED))
         publish_directory()
         # A recent regular refresh: only the flag (or a missing identifier column) makes the run due.
         ImportRequest.objects.create(pk=1, last_automatic_attempt_at=timezone.now() - timedelta(days=1))
@@ -405,6 +407,10 @@ class HeartbeatThreadTests(TransactionTestCase):
 
     databases = {"default", "addresses"}
 
+    def setUp(self):
+        # The plant register follows the address run (D-117); these tests never download it (see test_plants).
+        self.enterContext(patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED))
+
     def test_the_heartbeat_moves_while_the_scheduled_import_runs(self):
         publish_directory()
         ImportRequest.objects.create(pk=1, update_flag_set_at=timezone.now())
@@ -429,6 +435,10 @@ class ScheduledCommandTests(TestCase):
     databases = {"default", "addresses"}
 
     def setUp(self):
+        # run_daily runs the plant register after the addresses (D-117): these tests never download it.
+        plant_run = patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED)
+        plant_run.start()
+        self.addCleanup(plant_run.stop)
         publish_directory()
         ImportRequest.objects.create(pk=1, last_automatic_attempt_at=timezone.now() - timedelta(days=1))
 

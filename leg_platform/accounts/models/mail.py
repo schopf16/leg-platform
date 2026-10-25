@@ -1,4 +1,5 @@
-"""Email delivery: the mail outbox, the editable email texts and the Microsoft Graph settings."""
+"""Email delivery: the mail outbox, the editable email texts and the E-Mail chapter (Microsoft Graph settings,
+sender and contact address; D-006, D-116)."""
 
 from datetime import timedelta
 
@@ -13,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.debug import sensitive_variables
 
 from leg_platform.accounts.encryption import decrypt, encrypt, is_current, reencrypt
-from leg_platform.accounts.models.common import EMAIL_MAX_LENGTH
+from leg_platform.accounts.models.common import EMAIL_MAX_LENGTH, validate_sender_address
 from leg_platform.accounts.models.user import User
 
 # The longest cleaned greeting name a job may hold: first name (30) and last name (30) with one
@@ -276,12 +277,33 @@ CERTIFICATE_EXPIRED = "expired"
 
 
 class GraphConfiguration(models.Model):
-    """The Microsoft Graph settings of the email delivery. The table holds exactly one row (id 1)."""
+    """The E-Mail chapter of the administration: the Microsoft Graph settings, the sender and the contact address
+    (D-116). The table holds exactly one row (id 1). The sender is the Graph mailbox: the Graph backend refuses any
+    other sender, so the one value serves both (``leg_platform.accounts.mail_addresses``)."""
 
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     tenant_id = models.UUIDField(_("tenant ID"), null=True, blank=True)
     client_id = models.UUIDField(_("client ID"), null=True, blank=True)
-    sender_address = models.EmailField(_("sender mailbox"), max_length=254, blank=True)
+    sender_address = models.EmailField(
+        _("sender address"),
+        max_length=254,
+        blank=True,
+        validators=[validate_sender_address],
+        help_text=_(
+            "The address all emails are sent from. It is the mailbox of the Microsoft Graph application. Without it "
+            "no email is sent. Use an address of the instance that does not invite a reply, for example "
+            "noreply@example.org."
+        ),
+    )
+    contact_address = models.EmailField(
+        _("address for the messages of the contact form"),
+        max_length=254,
+        blank=True,
+        validators=[validate_sender_address],
+        help_text=_(
+            "The LEG receives the messages of the contact form here. Without it the contact form is not offered."
+        ),
+    )
     certificate_pem = models.TextField(blank=True, editable=False)
     encrypted_private_key = models.TextField(blank=True, editable=False)
     certificate_expires_on = models.DateTimeField(null=True, editable=False)
@@ -289,8 +311,8 @@ class GraphConfiguration(models.Model):
 
     class Meta:
         default_permissions = ()
-        verbose_name = _("Microsoft Graph configuration")
-        verbose_name_plural = _("Microsoft Graph configuration")
+        verbose_name = _("Email")
+        verbose_name_plural = _("Email")
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(id=1), name="accounts_graph_configuration_singleton"

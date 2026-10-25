@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
 
-from leg_platform.accounts.tests.helpers import portal_addresses
+from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
 from leg_platform.community import application_staff, applications, contracts, customer_messages, participation
@@ -325,27 +325,28 @@ class ContactLinkTests(TestCase):
     def setUp(self):
         self.mine = customer("contact.mine@example.org")
 
-    @portal_addresses(contact_address="leg@example.org")
+    @instance_mail_addresses(contact_address="leg@example.org")
     def test_the_menu_has_the_contact_page_where_the_address_of_the_leg_is_configured(self):
         html = text(login(self.mine).get(HOME))
         self.assertIn('href="/participation/contact/"', html)
         self.assertIn(">Kontakt zur LEG</a></li>", html)
         self.assertNotIn('target="_blank" rel="noopener noreferrer">Kontakt zur LEG', html)
 
-    @portal_addresses(contact_address="leg@example.org")
-    @portal_addresses(contact_address="leg@example.org")
+    @instance_mail_addresses(contact_address="leg@example.org")
     def test_the_website_of_the_leg_is_no_longer_linked_from_the_menu(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         html = text(login(self.mine).get(HOME))
         self.assertNotIn('href="https://leg.example.org/" target="_blank"', html)
         self.assertIn('href="/participation/contact/"', html)
 
-    @portal_addresses(contact_address="")
-    def test_without_the_address_of_the_leg_there_is_no_link_and_no_dead_entry(self):
+    @instance_mail_addresses(contact_address="")
+    def test_without_the_address_of_the_leg_the_entry_stays_and_the_page_says_so(self):
         html = text(login(self.mine).get(HOME))
-        self.assertNotIn("Kontakt zur LEG", html)
+        self.assertIn('href="/participation/contact/"', html)
+        self.assertIn("Kontakt zur LEG", html)
+        self.assertIn("noch nicht verfügbar", text(login(self.mine).get("/participation/contact/")))
 
-    @portal_addresses(contact_address="leg@example.org")
+    @instance_mail_addresses(contact_address="leg@example.org")
     def test_a_staff_account_with_a_number_gets_the_customer_link_too(self):
         # D-113: staff accounts take part like everybody else.
         self.assertIn("Kontakt zur LEG", text(login(staff_user("contact.staff@example.org")).get(HOME)))
