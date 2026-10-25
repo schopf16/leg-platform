@@ -78,9 +78,14 @@ class ImportLogAccessTests(ImportLogBase):
         self.assertEqual(ImportLogEntry.objects.count(), 1)
 
     def test_the_old_log_url_redirects_to_the_section_for_superusers(self):
+        # Review item 10: the Location is the import page and its section, and the section is there.
+        self.failed_run()
         response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_log"))
+        target = reverse("admin:addresses_importrequest_changelist") + "#import-log"
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response["Location"].endswith("#import-log"))
+        self.assertEqual(response["Location"], target)
+        page = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist"))
+        self.assertIn('id="import-log"', page.content.decode())
 
     def test_staff_with_the_directory_right_is_refused_on_the_log_and_its_download(self):
         self.failed_run()
