@@ -158,3 +158,23 @@ class BreadcrumbPatternTests(TestCase):
                 self.assertIn('<ol class="breadcrumbs">', page)
                 self.assertNotIn("&rsaquo;", page)
 
+class FilterRowTests(TestCase):
+    """Fourth review item 5 and 6: the filters are chips in one row, and the breadcrumb names the group as text."""
+
+    def setUp(self):
+        self.superuser = create_active_user("failed.rows.superuser@example.org")
+        self.superuser.set_privileges(is_staff=True, is_superuser=True)
+        self.client_ = VerifiedClient()
+        self.client_.force_login(self.superuser)
+
+    def test_the_filters_are_chips_not_lists_of_links(self):
+        html = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        self.assertIn('class="log-chips" role="group"', html)
+        self.assertIn("Nach Zeitpunkt", html)
+        self.assertNotIn("<details data-filter-title", html)
+
+    def test_a_breadcrumb_group_is_plain_text_not_a_link(self):
+        html = self.client_.get(reverse("admin:accounts_securityevent_changelist")).content.decode()
+        self.assertIn("<li>System</li>", html)
+        self.assertNotRegex(html, r'<a [^>]*>System</a>')
+

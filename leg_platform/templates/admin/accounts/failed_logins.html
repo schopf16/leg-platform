@@ -14,8 +14,12 @@
 {% for section in sections %}
 <section class="data-import-block" id="failed-logins-{{ section.id }}" aria-labelledby="failed-logins-{{ section.id }}-heading">
   <h2 id="failed-logins-{{ section.id }}-heading">{{ section.title }}</h2>
+  {# One compact row per filter: the choices as chips, no list of links (fourth review item 5). #}
   {% for title, choices in section.filters %}
-    {% include "admin/filter.html" with title=title choices=choices %}
+  <div class="log-chips" role="group" aria-label="{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}">
+    <span class="log-filter-title">{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}</span>
+    {% for choice in choices %}<a class="log-chip{% if choice.selected %} is-selected{% endif %}" href="{{ choice.query_string }}"{% if choice.selected %} aria-current="true"{% endif %}>{{ choice.display }}</a>{% endfor %}
+  </div>
   {% endfor %}
   {% if section.lines is not None %}
     {% include "admin/logs/_text_box.html" with lines=section.lines box_id="failed-logins-log-box" %}

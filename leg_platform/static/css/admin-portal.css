@@ -765,3 +765,19 @@ ol.breadcrumbs {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* The filter rows of the failed logins (fourth review item 5): a title and the choices as chips. */
+.log-filter-title {
+  font-weight: 600;
+  margin-inline-end: 4px;
+}
+
+.log-chip.is-selected {
+  font-weight: 600;
+  border-color: currentColor;
+}
+
+.log-chip:hover,
+.log-chip:focus {
+  text-decoration: underline;
+}
