@@ -20,6 +20,7 @@
     </p>
     <p class="import-detail" id="import-detail"{% if not import_status.detail %} hidden{% endif %}>{{ import_status.detail }}</p>
     <p class="help" id="import-progress-text">{{ import_status.progress_text }}</p>
+    <p class="help" id="import-rows-text">{{ import_status.rows_text }}</p>
     <p role="alert" class="import-error" id="import-stall"{% if not import_status.stall_text %} hidden{% endif %}>{{ import_status.stall_text }}</p>
     <p class="import-leave" id="import-leave"{% if not import_status.active %} hidden{% endif %}>{% translate "You can leave this page; the import goes on. A restart of the portal interrupts it." %}</p>
     {# role="alert": a failure is announced when it appears (DESIGN section 3.5, UX-006) #}
@@ -51,6 +52,7 @@
 <section class="data-import-block" id="plant-status" aria-labelledby="plant-status-heading">
   <h2 id="plant-status-heading">{% translate "PV plants (BFE)" %}</h2>
   <p class="help" id="plant-progress-text">{{ plant_status.progress_text }}</p>
+  <p class="help" id="plant-rows-text">{{ plant_status.rows_text }}</p>
   {% if plant_status.stall_text %}<p role="alert" class="import-error" id="plant-stall">{{ plant_status.stall_text }}</p>{% endif %}
   <p class="import-headline"><span class="status-dot status-{{ plant_status.result_tone }}" aria-hidden="true"></span> <strong id="plant-result">{{ plant_status.result_label }}</strong></p>
   {# role="alert": a failure stays visible until a later run replaces it (D-117); the reason is a fixed text #}
@@ -77,6 +79,7 @@
 <section class="data-import-block" id="transformer-status" aria-labelledby="transformer-status-heading">
   <h2 id="transformer-status-heading">{% translate "Transformer stations" %}</h2>
   <p class="help" id="transformer-progress-text">{{ transformer_status.progress_text }}</p>
+  {% for line in transformer_status.buildings_lines %}<p class="help">{{ line }}</p>{% endfor %}
   {% if transformer_status.stall_text %}<p role="alert" class="import-error" id="transformer-stall">{{ transformer_status.stall_text }}</p>{% endif %}
   <p class="import-headline"><span class="status-dot status-{{ transformer_status.result_tone }}" aria-hidden="true"></span> <strong id="transformer-result">{{ transformer_status.result_label }}</strong></p>
   {# role="alert": a failure stays visible until a later scan replaces it (D-118); the reason is a fixed text #}

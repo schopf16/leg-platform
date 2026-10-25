@@ -108,8 +108,9 @@
     </fieldset>
     <fieldset>
       <legend>{% translate "Import errors" %}</legend>
-      {% for checkbox in settings_form.failures %}
-        <p>{{ checkbox }}</p>
+      {% for heading, boxes in settings_form.grouped_failures %}
+        <h4>{{ heading }}</h4>
+        {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}
       {% endfor %}
     </fieldset>
     <button type="submit" class="button">{% translate "Save" %}</button>

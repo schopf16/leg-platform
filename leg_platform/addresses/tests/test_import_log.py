@@ -2,7 +2,10 @@
 until a later success of the same source, the notice of import errors (no reason text in the mail), and the progress of
 a running import (last progress, stall warning after ten minutes, no percentage without a known total)."""
 
+import tempfile
+import zipfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -17,6 +20,7 @@ from leg_platform.accounts import mail_queue
 from leg_platform.accounts.models import LogNotificationSettings, MailJob
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.addresses import importer, jobs, status
+from leg_platform.addresses.progress import Progress, count_rows
 from leg_platform.addresses.models import ImportLogEntry, ImportRequest
 
 ZURICH = ZoneInfo("Europe/Zurich")
@@ -200,3 +204,62 @@ class ImportProgressTests(ImportLogBase):
         self.assertEqual(payload["progress_bytes_done"], 500)
         self.assertEqual(payload["progress_bytes_total"], 1000)
         self.assertIn(":", payload["progress_at"])
+
+
+class CountProgressTests(TestCase):
+    """The counts of the running import (D-122): x of y with known totals, x alone without a total, never a percentage."""
+
+    def job(self, source, **fields):
+        values = {"state": ImportRequest.State.RUNNING, "source": source, "progress_at": None, "rows_done": None,
+                  "rows_total": None, "progress_units": None}
+        values.update(fields)
+        return SimpleNamespace(**values)
+
+    def test_rows_with_a_known_total_show_both_numbers_and_no_percentage(self):
+        job = self.job(ImportRequest.Source.ADDRESS, rows_done=5, rows_total=20)
+        text = status.progress_lines(job, ImportRequest.Source.ADDRESS, NOW)["rows_text"]
+        self.assertIn("5", text)
+        self.assertIn("20", text)
+        self.assertNotIn("%", text)
+
+    def test_rows_without_a_total_show_the_count_only(self):
+        job = self.job(ImportRequest.Source.PLANT, rows_done=7, rows_total=None)
+        text = status.progress_lines(job, ImportRequest.Source.PLANT, NOW)["rows_text"]
+        self.assertIn("7", text)
+        self.assertNotIn("%", text)
+        self.assertNotIn("20", text)
+
+    def test_the_buildings_show_x_of_y_per_postal_code_and_in_total(self):
+        units = {"done": {"8000": 3, "3000": 1}, "total": {"8000": 10, "3000": 4}}
+        job = self.job(ImportRequest.Source.TRANSFORMER, progress_units=units)
+        lines = status.progress_lines(job, ImportRequest.Source.TRANSFORMER, NOW)["buildings_lines"]
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(any("8000" in line and "3" in line and "10" in line for line in lines))
+        self.assertTrue(any("3000" in line and "1" in line and "4" in line for line in lines))
+        self.assertTrue(any("14" in line and "4" in line for line in lines))
+
+    def test_a_postal_code_without_a_total_shows_its_count_only(self):
+        units = {"done": {"8000": 3, "9000": 2}, "total": {"8000": 10}}
+        job = self.job(ImportRequest.Source.TRANSFORMER, progress_units=units)
+        lines = status.progress_lines(job, ImportRequest.Source.TRANSFORMER, NOW)["buildings_lines"]
+        without_total = [line for line in lines if "9000" in line]
+        self.assertEqual(len(without_total), 1)
+        self.assertNotIn("%", "".join(lines))
+        self.assertNotIn("10", without_total[0])
+
+    def test_the_progress_object_counts_buildings_and_builds_the_units(self):
+        progress = Progress()
+        self.assertIsNone(progress.units())
+        progress.set_buildings_total({"8000": 10})
+        progress.add_buildings({"8000": 3})
+        progress.add_buildings({"8000": 2})
+        self.assertEqual(progress.units(), {"done": {"8000": 5}, "total": {"8000": 10}})
+
+    def test_the_rows_of_a_csv_member_are_counted_once_and_not_beyond_the_limit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            archive = Path(folder) / "archive.zip"
+            with zipfile.ZipFile(archive, "w") as zipped:
+                zipped.writestr("data.csv", "EGID;ADR\n1;a\n2;b\n3;c")
+            self.assertEqual(count_rows(archive, "data.csv", 10), 3)
+            self.assertIsNone(count_rows(archive, "data.csv", 2))
+            self.assertIsNone(count_rows(archive, "missing.csv", 10))

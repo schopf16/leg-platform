@@ -19,6 +19,7 @@ only) are imported where they are used, so the rest of the application and its t
 
 import io
 import logging
+from collections import Counter
 import re
 import threading
 import time
@@ -347,7 +348,7 @@ def settle_names(dots):
         dot.name = candidate if CLEAN_NAME.fullmatch(candidate) and len(candidate) <= 64 else ""
 
 
-def scan_tiles(buildings, *, session, reader, sleep, clock):
+def scan_tiles(buildings, *, session, reader, sleep, clock, progress=None):
     """Request the tiles that contain the buildings, one at a time, and return (dots, tile count).
 
     Refused before the first request when the buildings need more than ``MAX_TILES_PER_RUN`` tiles. The pause and the
@@ -359,6 +360,11 @@ def scan_tiles(buildings, *, session, reader, sleep, clock):
         raise ScanFailure(jobs.MAP_TOO_MANY_TILES)
     deadline = clock() + MAX_SCAN_SECONDS
     fetch_px = TILE_PX + int(round(2 * TILE_OVERLAP / (TILE_SIZE / TILE_PX)))
+    # The buildings of each tile core, per postal code: the progress counts them when their tile is done (D-122).
+    per_cell = {}
+    for building in buildings:
+        cell = (int((building.east - origin[0]) // TILE_SIZE), int((building.north - origin[1]) // TILE_SIZE))
+        per_cell.setdefault(cell, Counter())[building.postal_code] += 1
     dots = []
     last_end = None
     for i, j in cells:
@@ -384,6 +390,8 @@ def scan_tiles(buildings, *, session, reader, sleep, clock):
             assign_labels(found, reader.read_tile(img))
         # The dots of this tile's core only: the overlap of the tiles must not count a dot twice.
         dots.extend(d for d in found if x0 <= d.east < x1 and y0 <= d.north < y1)
+        if progress is not None:
+            progress.add_buildings(per_cell.get((i, j), {}))
     if clock() > deadline:
         raise ScanFailure(jobs.MAP_TOO_LONG)
     settle_names(dots)
@@ -448,8 +456,9 @@ def run_scan(claim_token, *, progress=None, session=None, reader=None, sleep=tim
             raise ScanFailure(jobs.SCAN_READER_MISSING) from None
     if progress is not None:
         progress.phase("downloading")
+        progress.set_buildings_total(Counter(building.postal_code for building in buildings))
     dots, tiles = scan_tiles(
-        buildings, session=session or make_session(), reader=reader, sleep=sleep, clock=clock,
+        buildings, session=session or make_session(), reader=reader, sleep=sleep, clock=clock, progress=progress,
     )
     stations = match_stations(buildings, dots)
     if progress is not None:

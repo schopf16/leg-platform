@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from .http_budget import Adapter, Budget
 from .models import DIRECTORY_ALIAS, Address, Directory, ImportRequest
+from .progress import count_rows
 
 ITEM_URL = (
     "https://data.geo.admin.ch/api/stac/v0.9/collections/"
@@ -473,6 +474,8 @@ def _load_generation(archive, generation, token, progress=None):
     """Insert every row of the archive as the (still invisible) generation; return the count."""
     chunk = []
     count = 0
+    if progress is not None:
+        progress.set_rows_total(count_rows(archive, CSV_NAME, MAX_ROWS))
     for values in address_rows(archive):
         chunk.append(Address(generation=generation, **values))
         count += 1

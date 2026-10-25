@@ -148,6 +148,9 @@ class ImportRequest(models.Model):
     progress_at = models.DateTimeField(null=True, editable=False)
     # Consecutive runs of the address directory that found the file unchanged (D-122).
     unchanged_runs = models.PositiveIntegerField(default=0, editable=False)
+    # The rows of the CSV of the running job (None: unknown) and the building counts per postal code (D-122).
+    rows_total = models.PositiveIntegerField(null=True, editable=False)
+    progress_units = models.JSONField(null=True, editable=False)
     # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
     last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
     # The update flag (KONZEPT 3a, D-066): set once when a building could not be found in the directory nor at

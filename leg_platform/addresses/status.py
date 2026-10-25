@@ -297,22 +297,51 @@ def _plant_status_base(now=None):
 STALL_AFTER = timedelta(minutes=10)
 
 
-def progress_lines(job, source, now):
-    """The last progress of a running job of ``source`` and, after ``STALL_AFTER``, the stall warning (D-121).
+def _buildings_lines(units):
+    """One line per postal code and one for all, "x of y buildings"; a code without a known total shows x only."""
+    units = units or {}
+    done = {str(code): int(count) for code, count in (units.get("done") or {}).items()}
+    total = {str(code): int(count) for code, count in (units.get("total") or {}).items()}
+    lines = []
+    for code in sorted(set(done) | set(total)):
+        if code in total:
+            lines.append(gettext("Postal code %(code)s: %(done)s of %(total)s buildings") % {
+                "code": code, "done": done.get(code, 0), "total": total[code],
+            })
+        else:
+            lines.append(gettext("Postal code %(code)s: %(done)s buildings") % {"code": code, "done": done[code]})
+    if total:
+        lines.append(gettext("All postal codes: %(done)s of %(total)s buildings") % {
+            "done": sum(done.get(code, 0) for code in total), "total": sum(total.values()),
+        })
+    return lines
 
-    A number of minutes only: no percentage is computed here (a percentage needs a known total, see ``build``)."""
-    empty = {"progress_text": "", "stall_text": "", "progress_stalled": False}
-    if job is None or job.state != ImportRequest.State.RUNNING or job.source != source or job.progress_at is None:
-        return empty
-    silent = now - job.progress_at
-    minutes = int(silent.total_seconds() // 60)
-    return {
-        "progress_text": gettext("Last progress %(minutes)s minutes ago.") % {"minutes": minutes},
-        "stall_text": (
-            gettext("No movement for %(minutes)s minutes.") % {"minutes": minutes} if silent > STALL_AFTER else ""
-        ),
-        "progress_stalled": silent > STALL_AFTER,
+
+def progress_lines(job, source, now):
+    """The progress of a running job of ``source`` (D-121, D-122): the last progress and, after ``STALL_AFTER``, the stall
+    warning; the rows read (x of y, or x alone when the total is unknown); the buildings per postal code of the transformer
+    scan. A percentage is never computed here."""
+    result = {
+        "progress_text": "", "stall_text": "", "progress_stalled": False, "rows_text": "", "buildings_lines": [],
     }
+    if job is None or job.state != ImportRequest.State.RUNNING or job.source != source:
+        return result
+    if job.progress_at is not None:
+        silent = now - job.progress_at
+        minutes = int(silent.total_seconds() // 60)
+        result["progress_text"] = gettext("Last progress %(minutes)s minutes ago.") % {"minutes": minutes}
+        if silent > STALL_AFTER:
+            result["stall_text"] = gettext("No movement for %(minutes)s minutes.") % {"minutes": minutes}
+            result["progress_stalled"] = True
+    rows_total = getattr(job, "rows_total", None)
+    if source in (ImportRequest.Source.ADDRESS, ImportRequest.Source.PLANT) and getattr(job, "rows_done", None) is not None:
+        if rows_total:
+            result["rows_text"] = gettext("%(done)s of %(total)s rows") % {"done": job.rows_done, "total": rows_total}
+        else:
+            result["rows_text"] = gettext("%(done)s rows") % {"done": job.rows_done}
+    if source == ImportRequest.Source.TRANSFORMER:
+        result["buildings_lines"] = _buildings_lines(getattr(job, "progress_units", None))
+    return result
 
 
 def _current_job():

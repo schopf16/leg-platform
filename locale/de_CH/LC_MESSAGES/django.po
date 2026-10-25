@@ -8473,3 +8473,21 @@ msgstr "Das Adressverzeichnis ist seit längerer Zeit unverändert."
 
 msgid "The downloaded file is unchanged since the last run."
 msgstr "Die heruntergeladene Datei ist seit der letzten Ausführung unverändert."
+
+msgid "%(done)s of %(total)s rows"
+msgstr "%(done)s von %(total)s Zeilen"
+
+msgid "%(done)s rows"
+msgstr "%(done)s Zeilen"
+
+msgid "Postal code %(code)s: %(done)s of %(total)s buildings"
+msgstr "PLZ %(code)s: %(done)s von %(total)s Gebäuden"
+
+msgid "Postal code %(code)s: %(done)s buildings"
+msgstr "PLZ %(code)s: %(done)s Gebäude"
+
+msgid "All postal codes: %(done)s of %(total)s buildings"
+msgstr "Alle PLZ: %(done)s von %(total)s Gebäuden"
+
+msgid "General"
+msgstr "Allgemein"

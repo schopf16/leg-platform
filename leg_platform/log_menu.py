@@ -165,6 +165,29 @@ def settings_row():
     return LogNotificationSettings.objects.get_or_create(pk=1)[0]
 
 
+def failure_groups():
+    """The failure texts by source heading, for the layout only (the ticks are per text; D-122)."""
+    from leg_platform.addresses import jobs
+
+    plant, transformer, address = set(jobs.PLANT_FAILURES), set(jobs.TRANSFORMER_FAILURES), set(jobs.SAFE_FAILURES)
+    groups = {"address": [], "plant": [], "transformer": [], "general": []}
+    for text in failure_texts():
+        if text in plant:
+            groups["plant"].append(text)
+        elif text in transformer:
+            groups["transformer"].append(text)
+        elif text in address:
+            groups["address"].append(text)
+        else:
+            groups["general"].append(text)
+    return [
+        (_("Address directory"), groups["address"]),
+        (_("PV plants (BFE)"), groups["plant"]),
+        (_("Transformer stations"), groups["transformer"]),
+        (_("General"), groups["general"]),
+    ]
+
+
 class NotificationForm(forms.ModelForm):
     """The notice setting (D-122): the switch, the one address, the ticks by severity and by event kind, and one tick
     per fixed failure text of the import. A ticked text is mailed; an unticked one is not."""
@@ -188,6 +211,13 @@ class NotificationForm(forms.ModelForm):
         if cleaned.get("enabled") and not cleaned.get("email"):
             self.add_error("email", _("Enter an email address, or switch the email off."))
         return cleaned
+
+    def grouped_failures(self):
+        """The tick boxes of the failure texts under their source headings (the layout only)."""
+        widgets = {widget.data["value"]: widget for widget in self["failures"].subwidgets}
+        return [
+            (heading, [widgets[text] for text in texts if text in widgets]) for heading, texts in failure_groups()
+        ]
 
     def save_settings(self):
         """Save the setting fields only: the bookkeeping of the notifier (``state``) stays as it is."""

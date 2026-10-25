@@ -8447,3 +8447,21 @@ msgstr "La directory degli indirizzi non è cambiata da molto tempo."
 
 msgid "The downloaded file is unchanged since the last run."
 msgstr "Il file scaricato è invariato dall'ultima esecuzione."
+
+msgid "%(done)s of %(total)s rows"
+msgstr "%(done)s di %(total)s righe"
+
+msgid "%(done)s rows"
+msgstr "%(done)s righe"
+
+msgid "Postal code %(code)s: %(done)s of %(total)s buildings"
+msgstr "NPA %(code)s: %(done)s di %(total)s edifici"
+
+msgid "Postal code %(code)s: %(done)s buildings"
+msgstr "NPA %(code)s: %(done)s edifici"
+
+msgid "All postal codes: %(done)s of %(total)s buildings"
+msgstr "Tutti i NPA: %(done)s di %(total)s edifici"
+
+msgid "General"
+msgstr "Generale"

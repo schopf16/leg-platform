@@ -3002,6 +3002,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0016_importlogentry"),
                 ("addresses", "0017_importrequest_progress_at"),
                 ("addresses", "0018_importlogentry_count_importlogentry_kind_and_more"),
+                ("addresses", "0019_importrequest_progress_units_and_more"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })
