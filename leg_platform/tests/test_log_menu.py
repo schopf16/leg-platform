@@ -3,6 +3,7 @@ and at or above the severity, no log line and no secret in the mail, one mail pe
 one security event per change of the setting.
 """
 
+import re
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -339,3 +340,45 @@ class LogTextBoxTests(LogMenuBase):
         box = self.section(html, 'id="failed-logins-log-box"', "</pre>")
         self.assertEqual(box.count('class="log-line"'), 50)
         self.assertNotIn("<table", self.section(html, 'id="failed-logins-log"'))
+
+
+class NotificationFormLayoutTests(LogMenuBase):
+    """The four rules of the form (spec section 4, option 1): one tick per rule, the import failures in a closed block
+    of per-text ticks under the error tick, one primary button."""
+
+    def page(self):
+        response = self.client_for(self.superuser).get(reverse("admin:logmenu"))
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    def test_the_rules_are_one_line_each_with_their_labels(self):
+        html = self.page()
+        self.assertIn('name="notify_error"', html)
+        self.assertIn("Fehler im Protokoll senden", html)
+        self.assertIn('name="notify_warning"', html)
+        self.assertIn("Warnungen im Protokoll senden", html)
+        self.assertIn('name="notify_stale"', html)
+        self.assertIn("Adressverzeichnis veraltet senden", html)
+
+    def test_the_failure_ticks_sit_in_a_closed_details_block_under_the_error_tick(self):
+        html = self.page()
+        block = html[html.index('<details id="logmenu-failures"'):html.index("</details>", html.index('<details id="logmenu-failures"'))]
+        self.assertNotIn(" open", html[html.index('<details id="logmenu-failures"'):html.index('<details id="logmenu-failures"') + 40])
+        self.assertIn("Einzelne Fehler wählen", block)
+        self.assertEqual(block.count('name="failures"'), len(log_menu.failure_texts()))
+        self.assertLess(html.index('name="notify_error"'), html.index('<details id="logmenu-failures"'))
+        self.assertLess(html.index('<details id="logmenu-failures"'), html.index('name="notify_warning"'))
+
+    def test_the_failure_ticks_are_checked_unless_muted(self):
+        muted = log_menu.failure_texts()[:1]
+        self.set_notification(muted_failures=muted)
+        html = self.page()
+        block = html[html.index('<details id="logmenu-failures"'):html.index("</details>", html.index('<details id="logmenu-failures"'))]
+        checked = re.findall(r"<input[^>]*\schecked", block)
+        self.assertEqual(len(checked), len(log_menu.failure_texts()) - 1)
+
+    def test_one_primary_button_saves_the_notification(self):
+        html = self.page()
+        self.assertIn('class="default">Benachrichtigung speichern</button>', html)
+        self.assertNotIn("By severity", html)
+        self.assertNotIn("By event", html)

@@ -8291,6 +8291,24 @@ msgstr "Details im Importprotokoll"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "Send errors from the logs"
+msgstr "Fehler im Protokoll senden"
+
+msgid "Send warnings from the logs"
+msgstr "Warnungen im Protokoll senden"
+
+msgid "Send when the address directory is old"
+msgstr "Adressverzeichnis veraltet senden"
+
+msgid "Choose single errors"
+msgstr "Einzelne Fehler wählen"
+
+msgid "When to send"
+msgstr "Wann senden"
+
+msgid "Save notification"
+msgstr "Benachrichtigung speichern"
+
 msgid "Import log"
 msgstr "Importprotokoll"
 
@@ -8431,12 +8449,6 @@ msgstr "Unsicherer ZIP-Eintrag."
 
 msgid "Send"
 msgstr "Senden"
-
-msgid "By severity"
-msgstr "Nach Schweregrad"
-
-msgid "By event"
-msgstr "Nach Ereignis"
 
 msgid "Import errors"
 msgstr "Importfehler"

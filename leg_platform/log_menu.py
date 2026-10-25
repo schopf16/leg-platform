@@ -234,8 +234,19 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
         muted = set(self.instance.muted_failures or [])
         self.fields["failures"].choices = [(text, _(text)) for text in failure_texts()]
         self.fields["failures"].initial = [text for text in failure_texts() if text not in muted]
+        # The four rules of the form (spec section 4, option 1 of the coordinator): one tick per rule, the import
+        # failures as one closed block of per-text ticks under the error tick.
+        self.fields["notify_error"].label = _("Send errors from the logs")
+        self.fields["notify_warning"].label = _("Send warnings from the logs")
+        self.fields["notify_stale"].label = _("Send when the address directory is old")
         if self.user is not None:
             self.use_one_proof(self.user, autofocus=False)
+
+    def grouped_failures(self):
+        """The per-text ticks by source heading, as the bound checkboxes (the closed block of the form)."""
+        position = {value: index for index, (value, _label) in enumerate(self.fields["failures"].choices)}
+        field = self["failures"]
+        return [(heading, [field[position[text]] for text in texts]) for heading, texts in failure_groups()]
 
     def clean(self):
         cleaned = super().clean()

@@ -8265,6 +8265,24 @@ msgstr "Dettagli nel registro delle importazioni"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "Send errors from the logs"
+msgstr "Inviare gli errori dei registri"
+
+msgid "Send warnings from the logs"
+msgstr "Inviare gli avvertimenti dei registri"
+
+msgid "Send when the address directory is old"
+msgstr "Inviare se il registro degli indirizzi è datato"
+
+msgid "Choose single errors"
+msgstr "Scegliere singoli errori"
+
+msgid "When to send"
+msgstr "Quando inviare"
+
+msgid "Save notification"
+msgstr "Salvare la notifica"
+
 msgid "Import log"
 msgstr "Registro delle importazioni"
 
@@ -8405,12 +8423,6 @@ msgstr "Voce ZIP non sicura."
 
 msgid "Send"
 msgstr "Inviare"
-
-msgid "By severity"
-msgstr "Per gravità"
-
-msgid "By event"
-msgstr "Per evento"
 
 msgid "Import errors"
 msgstr "Errori di importazione"

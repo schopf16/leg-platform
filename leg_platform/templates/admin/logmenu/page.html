@@ -72,20 +72,17 @@
       <p>{{ settings_form.email.errors }}<label for="{{ settings_form.email.id_for_label }}">{% translate "Email address" %}</label><br>{{ settings_form.email }}</p>
     </fieldset>
     <fieldset>
-      <legend>{% translate "By severity" %}</legend>
-      <p><label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}"{% if settings_form.notify_error.value %} checked{% endif %}> {% translate "Errors" %}</label></p>
-      <p><label><input type="checkbox" name="{{ settings_form.notify_warning.html_name }}"{% if settings_form.notify_warning.value %} checked{% endif %}> {% translate "Warnings" %}</label></p>
-    </fieldset>
-    <fieldset>
-      <legend>{% translate "By event" %}</legend>
-      <p><label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {% translate "Address directory not changed for a long time" %}</label></p>
-    </fieldset>
-    <fieldset>
-      <legend>{% translate "Import errors" %}</legend>
-      {% for heading, boxes in settings_form.grouped_failures %}
-        <h4>{{ heading }}</h4>
-        {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}
-      {% endfor %}
+      <legend>{% translate "When to send" %}</legend>
+      <p>{{ settings_form.notify_error.errors }}<label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}" id="{{ settings_form.notify_error.auto_id }}"{% if settings_form.notify_error.value %} checked{% endif %}> {{ settings_form.notify_error.label }}</label></p>
+      <details id="logmenu-failures" class="import-form">
+        <summary>{% translate "Choose single errors" %}</summary>
+        {% for heading, boxes in settings_form.grouped_failures %}
+          <h4>{{ heading }}</h4>
+          {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}
+        {% endfor %}
+      </details>
+      <p>{{ settings_form.notify_warning.errors }}<label><input type="checkbox" name="{{ settings_form.notify_warning.html_name }}" id="{{ settings_form.notify_warning.auto_id }}"{% if settings_form.notify_warning.value %} checked{% endif %}> {{ settings_form.notify_warning.label }}</label></p>
+      <p>{{ settings_form.notify_stale.errors }}<label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}" id="{{ settings_form.notify_stale.auto_id }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {{ settings_form.notify_stale.label }}</label></p>
     </fieldset>
     <fieldset>
       <legend>{% translate "Proof of identity" %}</legend>
@@ -93,7 +90,7 @@
       {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
       {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
     </fieldset>
-    <button type="submit" class="button">{% translate "Save" %}</button>
+    <button type="submit" class="default">{% translate "Save notification" %}</button>
   </form>
 </section>
 

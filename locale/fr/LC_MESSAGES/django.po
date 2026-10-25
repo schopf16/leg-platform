@@ -8294,6 +8294,24 @@ msgstr "Détails dans le journal des imports"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "Send errors from the logs"
+msgstr "Envoyer les erreurs des journaux"
+
+msgid "Send warnings from the logs"
+msgstr "Envoyer les avertissements des journaux"
+
+msgid "Send when the address directory is old"
+msgstr "Envoyer si le répertoire des adresses est ancien"
+
+msgid "Choose single errors"
+msgstr "Choisir des erreurs individuelles"
+
+msgid "When to send"
+msgstr "Quand envoyer"
+
+msgid "Save notification"
+msgstr "Enregistrer la notification"
+
 msgid "Import log"
 msgstr "Journal des imports"
 
@@ -8434,12 +8452,6 @@ msgstr "Entrée ZIP dangereuse."
 
 msgid "Send"
 msgstr "Envoyer"
-
-msgid "By severity"
-msgstr "Par gravité"
-
-msgid "By event"
-msgstr "Par événement"
 
 msgid "Import errors"
 msgstr "Erreurs d'import"
