@@ -18,6 +18,11 @@
       <label><input type="checkbox" name="show" value="housekeeping"{% if "housekeeping" in shown %} checked{% endif %}> {% translate "Housekeeping errors" %}</label>
       <label><input type="checkbox" name="show" value="import"{% if "import" in shown %} checked{% endif %}> {% translate "Import errors" %}</label>
     </p>
+    <p><label for="logmenu-lines">{% translate "Lines" %}</label>
+      <select id="logmenu-lines" name="lines">
+        {% for value in line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select>
+    </p>
     <button type="submit" class="button">{% translate "Show" %}</button>
   </form>
 </section>
@@ -31,54 +36,25 @@
   </ul>
 </section>
 
-{% if security_rows is not None %}
+{% if security_lines is not None %}
 <section class="data-import-block" id="logmenu-security" aria-labelledby="logmenu-security-heading">
   <h2 id="logmenu-security-heading">{% translate "Security events" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'security' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
-  <table>
-    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Event" %}</th></tr></thead>
-    <tbody>
-    {% for row in security_rows %}
-      <tr><td>{{ row.occurred_at }}</td><td>{{ row.get_event_display }}</td></tr>
-    {% empty %}
-      <tr><td colspan="2">{% translate "No entry in this time range." %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <p><a href="{% url 'admin:logmenu_download' 'security' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
+  {% include "admin/logs/_text_box.html" with lines=security_lines box_id="logmenu-security-box" %}
 </section>
 {% endif %}
-
-{% if housekeeping_rows is not None %}
+{% if housekeeping_lines is not None %}
 <section class="data-import-block" id="logmenu-housekeeping" aria-labelledby="logmenu-housekeeping-heading">
   <h2 id="logmenu-housekeeping-heading">{% translate "Housekeeping errors" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'housekeeping' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
-  <table>
-    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Dump file" %}</th></tr></thead>
-    <tbody>
-    {% for row in housekeeping_rows %}
-      <tr><td>{{ row.occurred_at }}</td><td>{{ row.step }}</td><td>{{ row.reason }}</td><td>{{ row.dump|default:"–" }}</td></tr>
-    {% empty %}
-      <tr><td colspan="4">{% translate "No entry in this time range." %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <p><a href="{% url 'admin:logmenu_download' 'housekeeping' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
+  {% include "admin/logs/_text_box.html" with lines=housekeeping_lines box_id="logmenu-housekeeping-box" %}
 </section>
 {% endif %}
-
-{% if import_rows is not None %}
+{% if import_lines is not None %}
 <section class="data-import-block" id="logmenu-import" aria-labelledby="logmenu-import-heading">
   <h2 id="logmenu-import-heading">{% translate "Import errors" %}</h2>
-  <p><a href="{% url 'admin:logmenu_download' 'import' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
-  <table>
-    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th></tr></thead>
-    <tbody>
-    {% for row in import_rows %}
-      <tr><td>{{ row.occurred_at }}</td><td>{{ row.step|default:"–" }}</td><td>{{ row.reason }}</td></tr>
-    {% empty %}
-      <tr><td colspan="3">{% translate "No entry in this time range." %}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <p><a href="{% url 'admin:logmenu_download' 'import' %}?since={{ range }}&amp;lines={{ lines_selected }}">{% translate "Download as text" %}</a></p>
+  {% include "admin/logs/_text_box.html" with lines=import_lines box_id="logmenu-import-box" %}
 </section>
 {% endif %}
 

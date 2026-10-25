@@ -294,3 +294,40 @@ class MenuEntryTests(LogMenuBase):
         response = self.client_for(self.staff).get(reverse("admin:index"))
         self.assertNotContains(response, reverse("admin:logmenu"))
         self.assertNotContains(response, reverse("admin:addresses_importrequest_log"))
+
+
+class LogTextBoxTests(LogMenuBase):
+    """The logs are text in a box, not a table (owner decision): the chosen number of lines limits the output."""
+
+    @staticmethod
+    def section(html, start, end="</section>"):
+        begin = html.index(start)
+        return html[begin:html.index(end, begin)]
+
+    def test_the_security_box_shows_the_chosen_number_of_lines_and_no_table(self):
+        for _ in range(60):
+            SecurityEvent.objects.create(event=SecurityEvent.Event.LOG_VIEWED)
+        response = self.client_for(self.superuser).get(reverse("admin:logmenu"), {"show": "security", "lines": "50"})
+        html = response.content.decode("utf-8")
+        box = self.section(html, 'id="logmenu-security-box"', "</pre>")
+        self.assertEqual(box.count('class="log-line"'), 50)
+        self.assertNotIn("<table", self.section(html, 'id="logmenu-security"'))
+
+    def test_the_default_is_200_lines_and_the_box_holds_the_text_of_the_events(self):
+        SecurityEvent.objects.create(event=SecurityEvent.Event.LOG_VIEWED)
+        response = self.client_for(self.superuser).get(reverse("admin:logmenu"), {"show": "security"})
+        html = response.content.decode("utf-8")
+        box = self.section(html, 'id="logmenu-security-box"', "</pre>")
+        self.assertGreaterEqual(box.count('class="log-line"'), 1)
+        self.assertIn('value="200" selected', html)
+
+    def test_the_failed_login_log_is_a_text_box_with_the_chosen_lines(self):
+        from axes.models import AccessFailureLog
+
+        for index in range(60):
+            AccessFailureLog.objects.create(username=f"code{index}", path_info="/accounts/login/", locked_out=False)
+        response = self.client_for(self.superuser).get(reverse("admin:failed_logins"), {"lines": "50"})
+        html = response.content.decode("utf-8")
+        box = self.section(html, 'id="failed-logins-log-box"', "</pre>")
+        self.assertEqual(box.count('class="log-line"'), 50)
+        self.assertNotIn("<table", self.section(html, 'id="failed-logins-log"'))

@@ -627,3 +627,7 @@ input.portal-colour {
   min-height: 24px;
   margin-top: 4px;
 }
+
+/* A log as text (owner decision): a fixed-height monospace box, the newest line at the bottom, long lines wrap. */
+.log-box { font-family: monospace; font-size: 0.875rem; line-height: 1.4; max-height: 28rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 1px solid; }
+.log-line { display: block; }

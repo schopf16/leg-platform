@@ -7,6 +7,7 @@ per scheduled run (``notify_log_events``), applies the ticks of the setting and 
 hour. The mail holds no log line, no reason text and no file name.
 """
 
+import itertools
 from datetime import datetime, timedelta
 
 from django import forms
@@ -26,6 +27,9 @@ from leg_platform.log_filters import redact_personal_data, redact_tokens
 DATABASE_SOURCES = ("security", "housekeeping", "import")
 TIME_RANGES = {"1": timedelta(hours=1), "24": timedelta(hours=24), "168": timedelta(days=7), "720": timedelta(days=30)}
 DEFAULT_RANGE = "24"
+# The number of lines a log box shows (owner decision): the newest at the bottom; the default 200.
+LINE_COUNTS = ("50", "200", "500")
+DEFAULT_LINES = "200"
 ROW_LIMIT = 200
 # One mail per source and this long at most; further events in that time are only counted (owner decision, D-120).
 MAIL_INTERVAL = timedelta(hours=1)
@@ -67,6 +71,20 @@ def _since(request):
     return key, timezone.now() - TIME_RANGES[key]
 
 
+def line_count(request):
+    """The number of lines of a log box from the query (50, 200 or 500; the default 200)."""
+    value = request.GET.get("lines", DEFAULT_LINES)
+    return int(value) if value in LINE_COUNTS else int(DEFAULT_LINES)
+
+
+def text_box_lines(source, since, count):
+    """The newest ``count`` lines of a source as text, oldest first (the newest at the bottom), redacted like the
+    download (D-099): the same lines as the download, only fewer."""
+    chosen = list(itertools.islice(_text_lines(source, since), count))
+    chosen.reverse()
+    return [redact_personal_data(redact_tokens(line)) for line in chosen]
+
+
 def _shown(request):
     chosen = set(request.GET.getlist("show")) & set(DATABASE_SOURCES)
     return chosen or set(DATABASE_SOURCES)
@@ -102,6 +120,7 @@ def page(request):
     log_views.record_view(request, "logmenu")
     key, since = _since(request)
     shown = _shown(request)
+    count = line_count(request)
     context = {
         **log_views.admin.site.each_context(request),
         "title": _("Logs"),
@@ -110,9 +129,11 @@ def page(request):
             ("1", _("Last hour")), ("24", _("Last 24 hours")), ("168", _("Last 7 days")), ("720", _("Last 30 days")),
         )],
         "shown": shown,
-        "security_rows": _security_rows(since) if "security" in shown else None,
-        "housekeeping_rows": _housekeeping_rows(since) if "housekeeping" in shown else None,
-        "import_rows": _import_rows(since) if "import" in shown else None,
+        "line_counts": LINE_COUNTS,
+        "lines_selected": str(count),
+        "security_lines": text_box_lines("security", since, count) if "security" in shown else None,
+        "housekeeping_lines": text_box_lines("housekeeping", since, count) if "housekeeping" in shown else None,
+        "import_lines": text_box_lines("import", since, count) if "import" in shown else None,
         "file_links": [
             ("application", reverse("admin:logs_view", kwargs={"log": "application"})),
             ("security", reverse("admin:logs_view", kwargs={"log": "security"})),
@@ -246,9 +267,11 @@ def settings_view(request):
         "range": DEFAULT_RANGE,
         "ranges": [],
         "shown": set(DATABASE_SOURCES),
-        "security_rows": None,
-        "housekeeping_rows": None,
-        "import_rows": None,
+        "line_counts": LINE_COUNTS,
+        "lines_selected": DEFAULT_LINES,
+        "security_lines": None,
+        "housekeeping_lines": None,
+        "import_lines": None,
         "file_links": [],
         "suppressed": suppressed_counts(),
         "log_list_url": reverse("admin:logs"),
