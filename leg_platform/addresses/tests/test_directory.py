@@ -2267,7 +2267,7 @@ class PlantBlockAdminTests(TestCase):
         ):
             self.assertContains(response, text)
         self.assertContains(
-            response, '<dd id="plant-result"><span class="status-dot status-ok" aria-hidden="true"></span>Completed</dd>',
+            response, '<strong id="plant-result">Completed</strong>',
         )
         self.assertContains(response, '<dd id="plant-rejected-count">12</dd>')
 
@@ -2275,13 +2275,13 @@ class PlantBlockAdminTests(TestCase):
         self._plant_register()
         self._last_run("succeeded")
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)")
+        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), freie Nutzung (Open Use)")
         self.assertContains(response, "PV-Anlagen (BFE)")
         self.assertContains(response, "Datenimporte")
         self.assertContains(response, "341’981")
         for text in (
             "Letzte Aktualisierung der Anlagen", "Einträge der Datei", "Nicht übernommene Einträge: Prüfung nicht bestanden",
-            "Übersprungene Anlagen: ohne Gebäudenummer (EGID)", "Zahlen der letzten erfolgreichen Aktualisierung",
+            "Übersprungene Anlagen: ohne Gebäudenummer (EGID)", "Statistik",
         ):
             self.assertContains(response, text)
         self.assertNotContains(response, "Letzter Lauf")
@@ -2290,10 +2290,10 @@ class PlantBlockAdminTests(TestCase):
 
     def test_a_never_imported_plant_register_shows_the_empty_state(self):
         response = self._client().get(self.page)
-        self.assertContains(response, '<p id="plant-not-imported">Not imported yet</p>')
+        self.assertContains(response, '<dd id="plant-not-imported">Not imported yet</dd>')
         self.assertNotContains(response, 'id="plant-imported-at"')
         self.assertContains(
-            response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
+            response, '<strong id="plant-result">Not run today</strong>',
         )
 
     def _hint(self, page_html, identifier):
@@ -2355,7 +2355,7 @@ class PlantBlockAdminTests(TestCase):
         self._last_run("failed", error=plants.UNREADABLE_FAILURE)
         response = self._client().get(self.page)
         self.assertContains(
-            response, '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed</dd>',
+            response, '<strong id="plant-result">Failed</strong>',
         )
         self.assertContains(
             response,
@@ -2373,9 +2373,9 @@ class PlantBlockAdminTests(TestCase):
         self._last_run("succeeded", today=False)
         response = self._client().get(self.page)
         self.assertContains(
-            response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
+            response, '<strong id="plant-result">Not run today</strong>',
         )
-        self.assertNotContains(response, '<span class="status-dot status-ok" aria-hidden="true"></span>Completed')
+        self.assertNotContains(response, '<strong id="plant-result">Completed')
 
     def test_a_failure_of_yesterday_is_still_shown_today_with_its_time_and_the_alert(self):
         self._plant_register()
@@ -2384,7 +2384,7 @@ class PlantBlockAdminTests(TestCase):
         response = self._client().get(self.page)
         self.assertContains(response, f'<dd id="plant-run-at">{finished.strftime("%d.%m.%Y %H:%M")}</dd>')
         self.assertContains(
-            response, '<dd id="plant-result"><span class="status-dot status-bad" aria-hidden="true"></span>Failed</dd>',
+            response, '<strong id="plant-result">Failed</strong>',
         )
         self.assertContains(response, '<p class="import-error" id="plant-error" role="alert">')
         self.assertNotContains(response, "Not run today")
@@ -2397,7 +2397,7 @@ class PlantBlockAdminTests(TestCase):
             last_plant_scheduled_run_on=timezone.localdate(),
         )
         response = self._client().get(self.page)
-        self.assertContains(response, '<span class="status-dot status-ok" aria-hidden="true"></span>Completed</dd>')
+        self.assertContains(response, '<strong id="plant-result">Completed</strong>')
         self.assertNotContains(response, 'id="plant-error"')
         self.assertNotContains(response, "could not be downloaded or read")
 
@@ -2412,7 +2412,7 @@ class PlantBlockAdminTests(TestCase):
         self._plant_register()
         self._last_run("failed", error="/srv/data/ElectricityProductionPlant.csv https://data.geo.admin.ch/x.zip Traceback")
         response = self._client().get(self.page)
-        self.assertContains(response, "The import failed unexpectedly. The application log has the details.")
+        self.assertContains(response, "The import failed unexpectedly. Details in the import log.")
         body = response.content.decode()
         for text in ("https://data", "http://data", "Traceback", "/srv/", "ElectricityProductionPlant", ".zip", "File \""):
             with self.subTest(text=text):
@@ -2999,6 +2999,8 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0012_content_changed_at"),
                 ("addresses", "0013_housekeepingstatus"),
                 ("addresses", "0015_remove_housekeepingstatus_notify_email_and_more"),
+                ("addresses", "0016_importlogentry"),
+                ("addresses", "0017_importrequest_progress_at"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

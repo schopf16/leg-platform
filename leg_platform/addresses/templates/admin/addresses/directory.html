@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
 {% load i18n static %}
-{# The address directory page (D-090). The server renders the status; the script of the same origin asks the #}
-{# status address every few seconds while an import is queued or running and writes the text into the same #}
-{# elements (no inline script or style). Without JavaScript the page shows the status of the last load. #}
+{# The import page (D-090, D-117, D-118, D-121). One block per source in a fixed order; at most one action per block, and only
+   the address directory has one. The server renders the status; the script of the same origin polls the status address
+   while an import runs and writes the text into the same elements (no inline script or style). #}
 {% block extrahead %}{{ block.super }}<script defer src="{% static 'js/import-status.js' %}"></script>{% endblock %}
 {% block content %}
 <div class="data-import-blocks">
+
 <section class="data-import-block" aria-label="{% translate 'Address directory' %}" id="import-status" data-status-url="{{ status_url }}" data-poll-seconds="{{ poll_seconds }}" data-active="{% if import_status.active %}1{% else %}0{% endif %}" data-text-ended="{% translate 'The status can no longer be updated. Reload the page; you may have to sign in again.' %}" data-text-retry="{% translate 'The status could not be loaded. Trying again.' %}">
   <h2>{% translate "Address directory" %}</h2>
   <div class="import-box import-{{ import_status.state }}" id="import-box">
@@ -18,9 +19,11 @@
       <span id="import-percent">{% if import_status.percent is not None %}{{ import_status.percent }} %{% endif %}</span>
     </p>
     <p class="import-detail" id="import-detail"{% if not import_status.detail %} hidden{% endif %}>{{ import_status.detail }}</p>
+    <p class="help" id="import-progress-text">{{ import_status.progress_text }}</p>
+    <p role="alert" class="import-error" id="import-stall"{% if not import_status.stall_text %} hidden{% endif %}>{{ import_status.stall_text }}</p>
     <p class="import-leave" id="import-leave"{% if not import_status.active %} hidden{% endif %}>{% translate "You can leave this page; the import goes on. A restart of the portal interrupts it." %}</p>
     {# role="alert": a failure is announced when it appears (DESIGN section 3.5, UX-006) #}
-    <p class="import-error" id="import-error" role="alert"{% if not import_status.error %} hidden{% endif %}><strong>{% translate "Reason" %}:</strong> <span id="import-error-text">{{ import_status.error }}</span></p>
+    <p class="import-error" id="import-error" role="alert"{% if not import_status.error %} hidden{% endif %}><strong>{% translate "Reason" %}:</strong> <span id="import-error-text">{{ import_status.error }}</span>{% if user.is_superuser %} <a href="{{ import_log_url }}">{% translate "Details in the import log" %}</a>{% endif %}</p>
     <p class="import-note" id="import-script-note" hidden></p>
   </div>
 
@@ -29,10 +32,6 @@
     <dt>{% translate "Started at" %}</dt><dd id="import-started-at">{{ import_status.started_at|default:"–" }}</dd>
     <dt>{% translate "Finished at" %}</dt><dd id="import-finished-at">{{ import_status.finished_at|default:"–" }}</dd>
     <dt>{% translate "Last automatic attempt at" %}</dt><dd id="import-last-automatic">{{ import_status.last_automatic_attempt_at|default:"–" }}</dd>
-  </dl>
-
-  <h2>{% translate "Directory in use" %}</h2>
-  <dl class="import-facts">
     <dt>{% translate "Data date" %}</dt><dd id="directory-data-date">{{ import_status.directory.data_date|default:"–" }}</dd>
     <dt>{% translate "Imported at" %}</dt><dd id="directory-imported-at">{{ import_status.directory.imported_at|default:"–" }}</dd>
     <dt>{% translate "Address count" %}</dt><dd id="directory-row-count">{% if import_status.directory.available %}{{ import_status.directory.row_count }}{% else %}–{% endif %}</dd>
@@ -41,32 +40,24 @@
   <p role="status" id="directory-warning"{% if not import_status.directory.warning %} hidden{% endif %}>{{ import_status.directory.warning }}</p>
   {% if import_status.directory.content_warning %}<p role="status" class="help" id="directory-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ import_status.directory.content_warning }}</p>{% endif %}
 
-  <p class="help">{% translate "A request on this page runs in the portal itself. Addresses already entered are not changed. The result is also written to the application log and to the security log." %}</p>
   <p class="help" id="import-automatic">{{ import_status.automatic_text }}</p>
 
   <form method="post" class="import-form">{% csrf_token %}
-    {# The admin button (class "default" is the filled one); after a failure it says "Try again" (UX-013). #}
+    {# The one action of this block; after a failure it says "Try again" (UX-013). #}
     <input type="submit" class="default" id="import-start" data-label-start="{% translate 'Request directory update' %}" data-label-retry="{% translate 'Try again' %}" value="{% if import_status.state == 'failed' or import_status.state == 'interrupted' %}{% translate 'Try again' %}{% else %}{% translate 'Request directory update' %}{% endif %}"{% if import_status.active %} disabled{% endif %}>
   </form>
 </section>
 
 <section class="data-import-block" id="plant-status" aria-labelledby="plant-status-heading">
   <h2 id="plant-status-heading">{% translate "PV plants (BFE)" %}</h2>
-  <p class="help">{% translate "The plant register is loaded once a day by the daily run. It cannot be started here." %}</p>
-
+  <p class="help" id="plant-progress-text">{{ plant_status.progress_text }}</p>
+  {% if plant_status.stall_text %}<p role="alert" class="import-error" id="plant-stall">{{ plant_status.stall_text }}</p>{% endif %}
+  <p class="import-headline"><span class="status-dot status-{{ plant_status.result_tone }}" aria-hidden="true"></span> <strong id="plant-result">{{ plant_status.result_label }}</strong></p>
+  {# role="alert": a failure stays visible until a later run replaces it (D-117); the reason is a fixed text #}
+  {% if plant_status.result_reason %}<p class="import-error" id="plant-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="plant-error-text">{{ plant_status.result_reason }}</span>{% if user.is_superuser %} <a href="{{ import_log_url }}?source=plant">{% translate "Details in the import log" %}</a>{% endif %}</p>{% endif %}
   <dl class="import-facts">
     <dt>{% translate "Last plant run" %}</dt><dd id="plant-run-at">{{ plant_status.run_at|default:"–" }}</dd>
-    <dt>{% translate "Result" %}</dt>
-    <dd id="plant-result"><span class="status-dot status-{{ plant_status.result_tone }}" aria-hidden="true"></span>{{ plant_status.result_label }}</dd>
-  </dl>
-  {# role="alert": a failure stays visible until a later run replaces it (D-117); the reason is a fixed text #}
-  {% if plant_status.result_reason %}<p class="import-error" id="plant-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="plant-error-text">{{ plant_status.result_reason }}</span></p>{% endif %}
-  {% if plant_status.older_data_date %}<p class="help" id="plant-older-data">{% blocktranslate with date=plant_status.older_data_date %}The data from {{ date }} stays valid.{% endblocktranslate %}</p>{% endif %}
-  {% if plant_status.content_warning %}<p role="status" class="help" id="plant-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ plant_status.content_warning }}</p>{% endif %}
-
-  <h3>{% translate "Statistic of the last successful import" %}</h3>
-  {% if plant_status.imported %}
-  <dl class="import-facts">
+    {% if plant_status.imported %}
     <dt>{% translate "Imported at" %}</dt><dd id="plant-imported-at">{{ plant_status.imported_at }}</dd>
     <dt>{% translate "Data date" %}</dt><dd id="plant-data-date">{{ plant_status.data_date|default:"–" }}</dd>
     <dt>{% translate "Addresses in the directory" %}</dt><dd id="plant-address-count">{{ plant_status.address_count }}</dd>
@@ -74,36 +65,36 @@
     <dt>{% translate "Plants taken over" %}</dt><dd id="plant-row-count">{{ plant_status.row_count }}</dd>
     <dt>{% translate "Rows ignored: failed a check" %}</dt><dd id="plant-rejected-count">{{ plant_status.rejected_count }}</dd>
     <dt>{% translate "Plants skipped: no building number (EGID)" %}</dt><dd id="plant-skipped-count">{{ plant_status.skipped_count }}</dd>
+    {% else %}
+    <dt>{% translate "Statistic" %}</dt><dd id="plant-not-imported">{% translate "Not imported yet" %}</dd>
+    {% endif %}
   </dl>
-  {% else %}
-  <p id="plant-not-imported">{% translate "Not imported yet" %}</p>
-  {% endif %}
-  <p class="help" id="plant-source">{% translate "Source: Federal Office of Energy (BFE), open use (Open Use)" %}</p>
+  {% if plant_status.older_data_date %}<p class="help" id="plant-older-data">{% blocktranslate with date=plant_status.older_data_date %}The data from {{ date }} stays valid.{% endblocktranslate %}</p>{% endif %}
+  {% if plant_status.content_warning %}<p role="status" class="help" id="plant-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ plant_status.content_warning }}</p>{% endif %}
+  <p class="help">{% translate "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)." %}</p>
 </section>
+
 <section class="data-import-block" id="transformer-status" aria-labelledby="transformer-status-heading">
   <h2 id="transformer-status-heading">{% translate "Transformer stations" %}</h2>
-  <p class="help">{% translate "The scan runs once a week, on Saturday, after the plant register. It cannot be started here." %}</p>
+  <p class="help" id="transformer-progress-text">{{ transformer_status.progress_text }}</p>
+  {% if transformer_status.stall_text %}<p role="alert" class="import-error" id="transformer-stall">{{ transformer_status.stall_text }}</p>{% endif %}
+  <p class="import-headline"><span class="status-dot status-{{ transformer_status.result_tone }}" aria-hidden="true"></span> <strong id="transformer-result">{{ transformer_status.result_label }}</strong></p>
+  {# role="alert": a failure stays visible until a later scan replaces it (D-118); the reason is a fixed text #}
+  {% if transformer_status.result_reason %}<p class="import-error" id="transformer-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="transformer-error-text">{{ transformer_status.result_reason }}</span>{% if user.is_superuser %} <a href="{{ import_log_url }}?source=transformer">{% translate "Details in the import log" %}</a>{% endif %}</p>{% endif %}
   <dl class="import-facts">
     <dt>{% translate "Postal codes" %}</dt><dd id="transformer-postal-codes">{{ transformer_status.postal_codes|default:"–" }}</dd>
     <dt>{% translate "Last scan" %}</dt><dd id="transformer-run-at">{{ transformer_status.run_at|default:"–" }}</dd>
-    <dt>{% translate "Result" %}</dt>
-    <dd id="transformer-result"><span class="status-dot status-{{ transformer_status.result_tone }}" aria-hidden="true"></span>{{ transformer_status.result_label }}</dd>
-  </dl>
-  {# role="alert": a failure stays visible until a later scan replaces it (D-118); the reason is a fixed text #}
-  {% if transformer_status.result_reason %}<p class="import-error" id="transformer-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="transformer-error-text">{{ transformer_status.result_reason }}</span></p>{% endif %}
-
-  <h3>{% translate "Statistic of the last successful scan" %}</h3>
-  {% if transformer_status.has_stats %}
-  <dl class="import-facts">
+    {% if transformer_status.has_stats %}
     <dt>{% translate "Postal codes scanned" %}</dt><dd id="transformer-scanned-codes">{{ transformer_status.scanned_postal_codes }}</dd>
     <dt>{% translate "Buildings" %}</dt><dd id="transformer-buildings">{{ transformer_status.buildings }}</dd>
     <dt>{% translate "With a transformer station" %}</dt><dd id="transformer-with-name">{{ transformer_status.with_name }}</dd>
     <dt>{% translate "Without a transformer station" %}</dt><dd id="transformer-without-name">{{ transformer_status.without_name }}</dd>
+    {% else %}
+    <dt>{% translate "Statistic" %}</dt><dd id="transformer-not-scanned">{% translate "Not scanned yet" %}</dd>
+    {% endif %}
   </dl>
-  {% else %}
-  <p id="transformer-not-scanned">{% translate "Not scanned yet" %}</p>
-  {% endif %}
-  <p class="help" id="transformer-source">{% translate "Source: BKW Netz, high-discount map (public)" %}</p>
+  <p class="help">{% translate "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)." %}</p>
 </section>
+
 </div>
 {% endblock %}

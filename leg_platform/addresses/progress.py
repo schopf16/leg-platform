@@ -1,6 +1,8 @@
 """Progress of a running import (D-090): plain counters that the importer sets and the heartbeat of
 the runner copies into the ``ImportRequest`` row for the status page. No database access here."""
 
+from django.utils import timezone
+
 PHASES = ("starting", "catalogue", "downloading", "importing", "publishing", "finishing")
 
 
@@ -18,15 +20,20 @@ class Progress:
         # Whether a download happened; without it a successful import means "already up to date".
         self.downloaded = False
         self.check = check
+        # The time of the last change of any value above: the status shows "last progress N minutes ago" (D-121).
+        self.changed_at = None
 
     def phase(self, name):
         if self.check is not None:
             self.check()
         self.current_phase = name
+        self.changed_at = timezone.now()
 
     def download(self, done, total):
         self.bytes_done = done
         self.bytes_total = total
+        self.changed_at = timezone.now()
 
     def rows(self, count):
         self.rows_done = count
+        self.changed_at = timezone.now()

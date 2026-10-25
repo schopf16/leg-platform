@@ -1,17 +1,22 @@
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse, StreamingHttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 
+from leg_platform import log_views
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
+from leg_platform.log_filters import redact_personal_data, redact_tokens
+
 from . import housekeeping, runner, status
 from .limits import allow_request
-from .models import HousekeepingStatus, ImportRequest, ServicePostalCode
+from .models import HousekeepingStatus, ImportLogEntry, ImportRequest, ServicePostalCode
 
 PERMISSION = "addresses.request_directory_import"
 # The postal codes of the service area of the transformer station scan (D-118); its own right, like the one above.
@@ -88,7 +93,58 @@ class ImportRequestAdmin(admin.ModelAdmin):
                  name="addresses_importrequest_changelist"),
             path("status/", self.admin_site.admin_view(self.status_view),
                  name="addresses_importrequest_status"),
+            path("log/", self.admin_site.admin_view(self.log_view), name="addresses_importrequest_log"),
+            path("log/download/<str:source>/", self.admin_site.admin_view(self.log_download),
+                 name="addresses_importrequest_log_download"),
         ]
+
+    def log_view(self, request):
+        """The import error log (D-121): system administrators only; every view is a security event."""
+        from leg_platform.log_menu import require_superuser
+
+        require_superuser(request)
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
+        log_views.record_view(request, "importlog")
+        source = request.GET.get("source", "")
+        if source not in ("", *IMPORT_LOG_SOURCES):
+            source = ""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Import log"),
+            "opts": self.model._meta,
+            "rows": import_log_rows(source),
+            "source": source,
+            "sources": [("", _("All sources")), *[(key, label) for key, label in IMPORT_LOG_SOURCES.items()]],
+            "download_url": reverse("admin:addresses_importrequest_log_download", kwargs={"source": source or "all"}),
+            "back_url": reverse("admin:addresses_importrequest_changelist"),
+        }
+        return TemplateResponse(request, "admin/addresses/importlog.html", context)
+
+    def log_download(self, request, source):
+        """The rows of the import error log as text, redacted like the log files (D-121, D-099)."""
+        from leg_platform.log_menu import require_superuser
+
+        require_superuser(request)
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
+        if source != "all" and source not in IMPORT_LOG_SOURCES:
+            raise Http404
+        log_views.record(request, SecurityEvent.Event.LOG_DOWNLOADED, f"importlog-{source}")
+        lines = (
+            "\t".join([
+                f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}", str(IMPORT_LOG_SOURCES[row.source]),
+                row.step or "-", str(_(row.reason)),
+            ])
+            for row in import_log_queryset(source if source != "all" else "")
+        )
+        response = StreamingHttpResponse(
+            (redact_personal_data(redact_tokens(line)) + "\n" for line in lines),
+            content_type="text/plain; charset=utf-8",
+        )
+        response["Content-Disposition"] = 'attachment; filename="protokoll-import.txt"'
+        response["Cache-Control"] = "no-store"
+        return response
 
     def directory_view(self, request):
         if not request.user.has_perm(PERMISSION):
@@ -117,6 +173,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
             "plant_status": status.plant_status(),
             "transformer_status": status.transformer_status(),
             "status_url": reverse("admin:addresses_importrequest_status"),
+            "import_log_url": reverse("admin:addresses_importrequest_log"),
             "poll_seconds": POLL_SECONDS,
         }
         return TemplateResponse(request, "admin/addresses/directory.html", context)
@@ -130,6 +187,34 @@ class ImportRequestAdmin(admin.ModelAdmin):
         response = JsonResponse(status.build())
         response["Cache-Control"] = "no-store"
         return response
+
+
+# The import error log (D-121): the sources and their labels, the row limit of the page and of the download.
+IMPORT_LOG_SOURCES = {
+    ImportRequest.Source.ADDRESS: gettext_lazy("Address directory"),
+    ImportRequest.Source.PLANT: gettext_lazy("PV plants (BFE)"),
+    # The key of the transformer source as a string: the label only, nothing here starts a scan (D-121).
+    "transformer": gettext_lazy("Transformer stations"),
+}
+IMPORT_LOG_LIMIT = 500
+
+
+def import_log_queryset(source=""):
+    rows = ImportLogEntry.objects.all()
+    if source:
+        rows = rows.filter(source=source)
+    return rows.order_by("-occurred_at", "-pk")[:IMPORT_LOG_LIMIT]
+
+
+def import_log_rows(source=""):
+    """The rows for the page: the source label, the time, the step and the fixed reason text (translated)."""
+    return [
+        {
+            "occurred_at": row.occurred_at, "source": IMPORT_LOG_SOURCES[row.source], "step": row.step or "–",
+            "reason": _(row.reason), "open": row.cleared_at is None,
+        }
+        for row in import_log_queryset(source)
+    ]
 
 
 # The housekeeping of both databases (D-119): its own right, checked on the page, the POST and the status endpoint.

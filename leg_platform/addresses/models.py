@@ -144,6 +144,8 @@ class ImportRequest(models.Model):
     bytes_done = models.PositiveBigIntegerField(null=True, editable=False)
     bytes_total = models.PositiveBigIntegerField(null=True, editable=False)
     rows_done = models.PositiveIntegerField(null=True, editable=False)
+    # The time of the last progress of the running job (D-121): the status page shows how long ago it was.
+    progress_at = models.DateTimeField(null=True, editable=False)
     # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
     last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
     # The update flag (KONZEPT 3a, D-066): set once when a building could not be found in the directory nor at
@@ -380,3 +382,23 @@ class HousekeepingError(models.Model):
         ordering = ["-occurred_at", "-id"]
         verbose_name = _("Housekeeping error")
         verbose_name_plural = _("Housekeeping errors")
+
+
+class ImportLogEntry(models.Model):
+    """A failed import run of the address directory, the plant register or the transformer scan (D-121).
+
+    Holds the source, the step, the fixed reason text of the importer and the time: never SQL, file content or personal
+    data. Open until a later successful run of the same source clears it.
+    """
+
+    occurred_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Occurred at"))
+    source = models.CharField(max_length=12, choices=ImportRequest.Source, editable=False, verbose_name=_("Source"))
+    step = models.CharField(max_length=20, blank=True, editable=False, verbose_name=_("Step"))
+    reason = models.CharField(max_length=255, editable=False, verbose_name=_("Reason"))
+    cleared_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cleared at"))
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["-occurred_at", "-id"]
+        verbose_name = _("Import error")
+        verbose_name_plural = _("Import errors")

@@ -6,6 +6,8 @@ by the server and the JSON that the script polls say the same. Nothing here writ
 
 import os
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import DatabaseError
 from django.utils import timezone
@@ -69,7 +71,7 @@ REASONS = {
         "The plant register could not be downloaded or read. Check the network connection and try again."
     ),
     "The official directory could not be imported.": _("The official directory could not be downloaded or read. Check the network connection and try again."),
-    jobs.UNEXPECTED_FAILURE: _("The import failed unexpectedly. The application log has the details."),
+    jobs.UNEXPECTED_FAILURE: _("The import failed unexpectedly. Details in the import log."),
     jobs.INTERRUPTED: _("The import was interrupted because the application stopped or restarted. Request it again."),
 }
 
@@ -169,7 +171,7 @@ def next_automatic_text(job):
     return base + " " + gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
 
 
-def transformer_status(now=None):
+def _transformer_status_base(now=None):
     """The block "Trafostationen" of the data imports page (D-118): the postal codes of the service area, the last scan
     with its date and result, and the statistic of the last successful scan. Read only; the scan runs in the weekly run.
 
@@ -224,7 +226,7 @@ def transformer_status(now=None):
     }
 
 
-def plant_status(now=None):
+def _plant_status_base(now=None):
     """The block "PV-Anlagen (BFE)" of the address page (D-117): the statistic of the last successful plant import and
     the last result of the plant run with its date and time. Read only: the plant import runs only in the daily run.
 
@@ -290,6 +292,43 @@ def plant_status(now=None):
     }
 
 
+# A running import without progress for this long is shown as stalled (D-121). Every step has a longer time-out
+# (download and scan), so the warning comes before the time-out.
+STALL_AFTER = timedelta(minutes=10)
+
+
+def progress_lines(job, source, now):
+    """The last progress of a running job of ``source`` and, after ``STALL_AFTER``, the stall warning (D-121).
+
+    A number of minutes only: no percentage is computed here (a percentage needs a known total, see ``build``)."""
+    empty = {"progress_text": "", "stall_text": "", "progress_stalled": False}
+    if job is None or job.state != ImportRequest.State.RUNNING or job.source != source or job.progress_at is None:
+        return empty
+    silent = now - job.progress_at
+    minutes = int(silent.total_seconds() // 60)
+    return {
+        "progress_text": gettext("Last progress %(minutes)s minutes ago.") % {"minutes": minutes},
+        "stall_text": (
+            gettext("No movement for %(minutes)s minutes.") % {"minutes": minutes} if silent > STALL_AFTER else ""
+        ),
+        "progress_stalled": silent > STALL_AFTER,
+    }
+
+
+def _current_job():
+    return ImportRequest.objects.filter(pk=1).first()
+
+
+def plant_status(now=None):
+    now = now or timezone.now()
+    return {**_plant_status_base(now), **progress_lines(_current_job(), ImportRequest.Source.PLANT, now)}
+
+
+def transformer_status(now=None):
+    now = now or timezone.now()
+    return {**_transformer_status_base(now), **progress_lines(_current_job(), ImportRequest.Source.TRANSFORMER, now)}
+
+
 def build():
     """Everything the page and the polling endpoint show, as plain values (texts translated)."""
     job = ImportRequest.objects.filter(pk=1).first()
@@ -352,6 +391,12 @@ def build():
         "message": message,
         "detail": detail,
         "percent": percent,
+        # The counts of the running job, the same numbers as the detail line: a percentage only where the total is known.
+        "progress_rows": job.rows_done if job is not None else None,
+        "progress_bytes_done": job.bytes_done if job is not None else None,
+        "progress_bytes_total": job.bytes_total if job is not None else None,
+        "progress_at": _when(job.progress_at) if job is not None else "",
+        **progress_lines(job, ImportRequest.Source.ADDRESS, now),
         "error": error,
         "requested_at": _when(job.requested_at) if job else "",
         "started_at": _when(job.started_at) if job else "",

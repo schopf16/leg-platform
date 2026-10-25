@@ -428,7 +428,7 @@ class StatusEndpointTests(TestCase):
         response = client.get(PAGE_URL)
         self.assertContains(response, 'data-status-url="%s"' % STATUS_URL)
         self.assertContains(response, "js/import-status.js")
-        self.assertContains(response, "Eine Anforderung auf dieser Seite läuft im Portal selbst")
+        self.assertNotContains(response, "Eine Anforderung auf dieser Seite läuft im Portal selbst")
         self.assertNotContains(response, "separaten Hintergrundprozess")
         self.assertNotContains(response, "Hintergrund-Worker")
         # No inline script or handler on the page (Content Security Policy).

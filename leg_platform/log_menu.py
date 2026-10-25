@@ -22,7 +22,7 @@ from leg_platform.accounts import security_log
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
 from leg_platform.log_filters import redact_personal_data, redact_tokens
 
-DATABASE_SOURCES = ("security", "housekeeping")
+DATABASE_SOURCES = ("security", "housekeeping", "import")
 TIME_RANGES = {"1": timedelta(hours=1), "24": timedelta(hours=24), "168": timedelta(days=7), "720": timedelta(days=30)}
 DEFAULT_RANGE = "24"
 ROW_LIMIT = 200
@@ -40,11 +40,10 @@ NOTICE_SENTENCE = _("A notice was recorded.")
 # The security events that notify, with their fixed source label and severity. Other events never notify.
 NOTIFYING_EVENTS = {
     SecurityEvent.Event.LOGIN_LOCKOUT: ("security", LogNotificationSettings.Severity.WARNING),
-    SecurityEvent.Event.ADDRESS_IMPORT_FAILED: ("import", LogNotificationSettings.Severity.ERROR),
-    SecurityEvent.Event.PV_IMPORT_FAILED: ("import", LogNotificationSettings.Severity.ERROR),
-    SecurityEvent.Event.TRANSFORMER_SCAN_FAILED: ("import", LogNotificationSettings.Severity.ERROR),
 }
 HOUSEKEEPING_SEVERITY = LogNotificationSettings.Severity.ERROR
+# The import errors notify as the source "import" (D-121); their rows are the import error log, not security events.
+IMPORT_SEVERITY = LogNotificationSettings.Severity.ERROR
 
 
 def source_label(key):
@@ -76,6 +75,12 @@ def _security_rows(since):
     return SecurityEvent.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk")[:ROW_LIMIT]
 
 
+def _import_rows(since):
+    from leg_platform.addresses.models import ImportLogEntry
+
+    return ImportLogEntry.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk")[:ROW_LIMIT]
+
+
 def _housekeeping_rows(since):
     # Imported here: the addresses app is loaded by the admin; the rows are the housekeeping error log (D-119).
     from leg_platform.addresses import housekeeping
@@ -100,6 +105,7 @@ def page(request):
         "shown": shown,
         "security_rows": _security_rows(since) if "security" in shown else None,
         "housekeeping_rows": _housekeeping_rows(since) if "housekeeping" in shown else None,
+        "import_rows": _import_rows(since) if "import" in shown else None,
         "file_links": [
             ("application", reverse("admin:logs_view", kwargs={"log": "application"})),
             ("security", reverse("admin:logs_view", kwargs={"log": "security"})),
@@ -134,6 +140,12 @@ def _text_lines(source, since):
     if source == "security":
         for row in _security_rows(since):
             yield f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}\t{row.get_event_display()}"
+    elif source == "import":
+        for row in _import_rows(since):
+            yield "	".join([
+                f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}", str(row.get_source_display()),
+                row.step or "-", str(_(row.reason)),
+            ])
     else:
         for row in _housekeeping_rows(since):
             yield "\t".join([
@@ -184,6 +196,7 @@ def settings_view(request):
         "shown": set(DATABASE_SOURCES),
         "security_rows": None,
         "housekeeping_rows": None,
+        "import_rows": None,
         "file_links": [],
         "suppressed": suppressed_counts(),
         "log_list_url": reverse("admin:logs"),
@@ -219,6 +232,10 @@ def _new_items(state):
 
     for error in HousekeepingError.objects.filter(pk__gt=checked.get("housekeeping", 0)).order_by("pk"):
         items.append(("housekeeping", error.pk, "housekeeping", HOUSEKEEPING_SEVERITY, error.occurred_at))
+    from leg_platform.addresses.models import ImportLogEntry
+
+    for entry in ImportLogEntry.objects.filter(pk__gt=checked.get("import", 0)).order_by("pk"):
+        items.append(("import", entry.pk, "import", IMPORT_SEVERITY, entry.occurred_at))
     return items
 
 

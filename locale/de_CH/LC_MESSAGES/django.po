@@ -586,8 +586,8 @@ msgstr "Die heruntergeladene Datei stimmt nicht mit ihrer Prüfsumme überein un
 msgid "The official directory could not be downloaded or read. Check the network connection and try again."
 msgstr "Das offizielle Verzeichnis konnte nicht heruntergeladen oder gelesen werden. Prüfen Sie die Netzwerkverbindung und versuchen Sie es erneut."
 
-msgid "The import failed unexpectedly. The application log has the details."
-msgstr "Der Import ist unerwartet fehlgeschlagen. Das Anwendungsprotokoll enthält die Einzelheiten."
+msgid "The import failed unexpectedly. Details in the import log."
+msgstr "Der Import ist unerwartet fehlgeschlagen. Details im Importprotokoll."
 
 msgid "The import was interrupted because the application stopped or restarted. Request it again."
 msgstr "Der Import wurde unterbrochen, weil die Anwendung angehalten oder neu gestartet wurde. Fordern Sie ihn erneut an."
@@ -8290,3 +8290,39 @@ msgstr "Die E-Mail bei Fehler und die Protokollmeldungen werden auf der Protokol
 
 msgid "Email notice"
 msgstr "E-Mail-Meldung"
+
+msgid "Details in the import log"
+msgstr "Details im Importprotokoll"
+
+msgid "Import log"
+msgstr "Importprotokoll"
+
+msgid "Source"
+msgstr "Quelle"
+
+msgid "All sources"
+msgstr "Alle Quellen"
+
+msgid "No entry."
+msgstr "Kein Eintrag."
+
+msgid "Back to the imports"
+msgstr "Zurück zu den Importen"
+
+msgid "Failed imports and scans. An error stays open until a later successful run of the same source. The log holds the source, the step, a fixed reason and the time only."
+msgstr "Fehlgeschlagene Importe und Scans. Ein Fehler bleibt offen, bis ein späterer erfolgreicher Lauf derselben Quelle ihn ablöst. Das Protokoll enthält nur Quelle, Schritt, einen festen Grund und die Zeit."
+
+msgid "Last progress %(minutes)s minutes ago."
+msgstr "Letzter Fortschritt vor %(minutes)s Minuten."
+
+msgid "No movement for %(minutes)s minutes."
+msgstr "Keine Bewegung seit %(minutes)s Minuten."
+
+msgid "Statistic"
+msgstr "Statistik"
+
+msgid "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)."
+msgstr "Wird täglich durch den täglichen Lauf geladen. Keine Aktion hier. Quelle: Bundesamt für Energie (BFE), freie Nutzung (Open Use)."
+
+msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
+msgstr "Die Abfrage läuft einmal pro Woche, am Samstag, nach dem Anlagenregister. Keine Aktion hier. Quelle: BKW Netz, öffentliche Karte mit hohem Rabatt."

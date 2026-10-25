@@ -16,6 +16,7 @@
     <p>
       <label><input type="checkbox" name="show" value="security"{% if "security" in shown %} checked{% endif %}> {% translate "Security events" %}</label>
       <label><input type="checkbox" name="show" value="housekeeping"{% if "housekeeping" in shown %} checked{% endif %}> {% translate "Housekeeping errors" %}</label>
+      <label><input type="checkbox" name="show" value="import"{% if "import" in shown %} checked{% endif %}> {% translate "Import errors" %}</label>
     </p>
     <button type="submit" class="button">{% translate "Show" %}</button>
   </form>
@@ -58,6 +59,23 @@
       <tr><td>{{ row.occurred_at }}</td><td>{{ row.step }}</td><td>{{ row.reason }}</td><td>{{ row.dump|default:"–" }}</td></tr>
     {% empty %}
       <tr><td colspan="4">{% translate "No entry in this time range." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if import_rows is not None %}
+<section class="data-import-block" id="logmenu-import" aria-labelledby="logmenu-import-heading">
+  <h2 id="logmenu-import-heading">{% translate "Import errors" %}</h2>
+  <p><a href="{% url 'admin:logmenu_download' 'import' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
+  <table>
+    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th></tr></thead>
+    <tbody>
+    {% for row in import_rows %}
+      <tr><td>{{ row.occurred_at }}</td><td>{{ row.step|default:"–" }}</td><td>{{ row.reason }}</td></tr>
+    {% empty %}
+      <tr><td colspan="3">{% translate "No entry in this time range." %}</td></tr>
     {% endfor %}
     </tbody>
   </table>

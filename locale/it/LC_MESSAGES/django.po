@@ -584,8 +584,8 @@ msgstr "Il file scaricato non corrisponde alla propria somma di controllo ed è 
 msgid "The official directory could not be downloaded or read. Check the network connection and try again."
 msgstr "Non è stato possibile scaricare o leggere l'elenco ufficiale. Verifichi la connessione di rete e riprovi."
 
-msgid "The import failed unexpectedly. The application log has the details."
-msgstr "L'importazione non è riuscita in modo inatteso. I dettagli si trovano nel log dell'applicazione."
+msgid "The import failed unexpectedly. Details in the import log."
+msgstr "L'importazione è fallita in modo imprevisto. Dettagli nel registro delle importazioni."
 
 msgid "The import was interrupted because the application stopped or restarted. Request it again."
 msgstr "L'importazione è stata interrotta perché l'applicazione si è fermata o è stata riavviata. La richieda di nuovo."
@@ -8264,3 +8264,39 @@ msgstr "L'e-mail in caso di errore e gli avvisi del registro si impostano nella 
 
 msgid "Email notice"
 msgstr "Avviso via e-mail"
+
+msgid "Details in the import log"
+msgstr "Dettagli nel registro delle importazioni"
+
+msgid "Import log"
+msgstr "Registro delle importazioni"
+
+msgid "Source"
+msgstr "Fonte"
+
+msgid "All sources"
+msgstr "Tutte le fonti"
+
+msgid "No entry."
+msgstr "Nessuna voce."
+
+msgid "Back to the imports"
+msgstr "Torna alle importazioni"
+
+msgid "Failed imports and scans. An error stays open until a later successful run of the same source. The log holds the source, the step, a fixed reason and the time only."
+msgstr "Import e scansioni non riusciti. Un errore resta aperto fino a un'esecuzione riuscita successiva della stessa fonte. Il registro contiene solo fonte, fase, un motivo fisso e l'ora."
+
+msgid "Last progress %(minutes)s minutes ago."
+msgstr "Ultimo progresso %(minutes)s minuti fa."
+
+msgid "No movement for %(minutes)s minutes."
+msgstr "Nessun movimento da %(minutes)s minuti."
+
+msgid "Statistic"
+msgstr "Statistica"
+
+msgid "Loaded once a day by the daily run. No action here. Source: Federal Office of Energy (BFE), open use (Open Use)."
+msgstr "Caricato ogni giorno dall'esecuzione quotidiana. Nessuna azione qui. Fonte: Ufficio federale dell'energia (UFE), uso libero (Open Use)."
+
+msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
+msgstr "La scansione avviene una volta alla settimana, il sabato, dopo il registro degli impianti. Nessuna azione qui. Fonte: BKW Rete, mappa pubblica con forte sconto."
