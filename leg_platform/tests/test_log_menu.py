@@ -18,7 +18,7 @@ from django.utils import timezone
 from leg_platform import log_menu
 from leg_platform.accounts import mail_queue
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
-from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user
 from leg_platform.addresses.models import HousekeepingError, ImportLogEntry, ImportRequest
 
 ZURICH = ZoneInfo("Europe/Zurich")
@@ -26,6 +26,17 @@ PLANTED_EMAIL = "planted.person@example.org"
 PLANTED_IBAN = "CH9300762011623852957"
 PLANTED_TOKEN = "tok_PLANTEDSECRET123"
 SENDER = "leg_platform.accounts.emails._deliver"
+
+
+def app_proof(user):
+    """The proof of identity of a superuser who has the second factor: the code of the device now (D-062)."""
+    from leg_platform.accounts.models import AuthenticatorDevice
+    from leg_platform.accounts.tests.helpers import code_for
+
+    device = AuthenticatorDevice.objects.filter(user=user, confirmed=True).first()
+    if device is None:
+        device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
+    return {"otp_token": code_for(device)}
 
 
 class LogMenuBase(TestCase):
@@ -111,7 +122,7 @@ class SettingTests(LogMenuBase):
 
     def test_a_change_is_one_security_event_without_the_address(self):
         response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "notice.target@example.org",
+            "enabled": "on", "email": "notice.target@example.org", **app_proof(self.superuser),
         })
         self.assertEqual(response.status_code, 302)
         events = SecurityEvent.objects.filter(event=SecurityEvent.Event.LOG_NOTIFICATION_CHANGED)
@@ -137,7 +148,7 @@ class NotificationTests(LogMenuBase):
         self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.LOG_NOTIFICATION).exists())
 
 
-    def test_a_warning_event_mails_when_the_minimum_is_warning(self):
+    def test_a_warning_event_mails_when_the_warning_tick_is_on(self):
         self.set_notification(enabled=True, email="notice.target@example.org",
                               notify_warning=True)
         SecurityEvent.objects.create(event=SecurityEvent.Event.LOGIN_LOCKOUT)
@@ -196,7 +207,7 @@ class TickTests(LogMenuBase):
     def configure(self, **ticks):
         values = {
             "enabled": True, "email": "notice.target@example.org", "notify_error": True, "notify_warning": False,
-            "notify_notice": False, "notify_stale": False, "notify_unchanged": False, "muted_failures": [],
+            "notify_stale": False, "muted_failures": [],
         }
         values.update(ticks)
         LogNotificationSettings.objects.update_or_create(pk=1, defaults=values)
@@ -226,13 +237,10 @@ class TickTests(LogMenuBase):
         self.import_entry(self.MISSING)
         self.assertEqual(self.notify(), 1)
 
-    def test_the_unchanged_tick_alone_sends_nothing_without_the_notice_tick(self):
-        self.configure(notify_error=False, notify_unchanged=True, notify_notice=False)
+    def test_an_unchanged_file_is_never_mailed(self):
+        self.configure(notify_error=True, notify_warning=True, notify_stale=True)
         self.import_entry(self.UNCHANGED, kind="unchanged")
         self.assertEqual(self.notify(), 0)
-        self.configure(notify_error=False, notify_unchanged=True, notify_notice=True)
-        self.import_entry(self.UNCHANGED, kind="unchanged")
-        self.assertEqual(self.notify(), 1)
 
     def test_the_stale_tick_alone_sends_the_old_data_error(self):
         stale_day = (self.now - timedelta(days=40)).date()

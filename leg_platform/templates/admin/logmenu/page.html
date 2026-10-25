@@ -75,12 +75,10 @@
       <legend>{% translate "By severity" %}</legend>
       <p><label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}"{% if settings_form.notify_error.value %} checked{% endif %}> {% translate "Errors" %}</label></p>
       <p><label><input type="checkbox" name="{{ settings_form.notify_warning.html_name }}"{% if settings_form.notify_warning.value %} checked{% endif %}> {% translate "Warnings" %}</label></p>
-      <p><label><input type="checkbox" name="{{ settings_form.notify_notice.html_name }}"{% if settings_form.notify_notice.value %} checked{% endif %}> {% translate "Notices" %}</label></p>
     </fieldset>
     <fieldset>
       <legend>{% translate "By event" %}</legend>
       <p><label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {% translate "Address directory not changed for a long time" %}</label></p>
-      <p><label><input type="checkbox" name="{{ settings_form.notify_unchanged.html_name }}"{% if settings_form.notify_unchanged.value %} checked{% endif %}> {% translate "Downloaded file unchanged" %}</label></p>
     </fieldset>
     <fieldset>
       <legend>{% translate "Import errors" %}</legend>
@@ -88,6 +86,12 @@
         <h4>{{ heading }}</h4>
         {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}
       {% endfor %}
+    </fieldset>
+    <fieldset>
+      <legend>{% translate "Proof of identity" %}</legend>
+      <p class="help">{% translate "A change of the switch or the address needs one proof: the code from the app, or your password." %}</p>
+      {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
+      {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
     </fieldset>
     <button type="submit" class="button">{% translate "Save" %}</button>
   </form>

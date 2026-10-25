@@ -239,7 +239,8 @@
 * Error pages disclose no secrets, stack traces or internal configuration. Development data and test accounts use no real personal data.
 * Assess legal data protection and retention requirements only against official sources (e.g. fedlex.admin.ch). Clarify legally unclear points with the project owner.
 
-## 6. Web Security
+* **Import error log (D-121, D-122).** Rows older than 180 days are deleted by the scheduled task `cleanup_import_log`. Notice mails carry no log line, no reason text and no file name.
+
 
 * Consider at least CSRF, XSS, SQL injection, insecure direct object references, session and cookie security, rate limiting, secure error handling and protection against accidental disclosure of files and configuration. Do not disable Django's security features without a documented, reviewed justification.
 * **Headers:** HSTS in stage and production, CSP, `X-Content-Type-Options`, `Referrer-Policy: same-origin` or stricter, protection against framing (`X-Frame-Options: DENY`, `frame-ancestors 'none'`; the one exception is the contract's reading view, D-108, section 6 "Contract PDF").

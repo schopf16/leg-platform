@@ -53,14 +53,20 @@ def _notification(sender, greets=True):
 
 
 def _log_notification(address):
-    """The notice of the log menu (D-120): the waiting notices (time, severity, source) are read when the mail is made."""
+    """The notice of the log menu (D-120): the waiting notices are read now and removed only after the mail was sent
+    (security review): a failed send keeps them for the next try."""
     # Imported here: the log menu imports the mail queue.
     from leg_platform import log_menu
 
-    notices = log_menu.take_pending()
+    notices = log_menu.peek_pending()
     if not notices:
         return None
-    return lambda: emails.send_log_notification(address, notices)
+
+    def send():
+        emails.send_log_notification(address, notices)
+        log_menu.clear_pending(notices)
+
+    return send
 
 
 HANDLERS = {

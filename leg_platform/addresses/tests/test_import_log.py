@@ -143,7 +143,7 @@ class ImportNoticeTests(ImportLogBase):
         self.assertNotIn("Missing", body)
         self.assertNotIn("EGID", body)
 
-    def test_no_mail_when_disabled_or_below_the_severity(self):
+    def test_no_mail_when_disabled_or_when_the_error_tick_is_off(self):
         self.failed_run()
         LogNotificationSettings.objects.filter(pk=1).update(enabled=False)
         self.assertEqual(log_menu.notify_log_events(NOW), 0)
