@@ -10,7 +10,7 @@
       <ul class="portal-steps">
         {% for step in first_steps %}
           <li>
-            <span class="portal-state {% if step.ok is True %}portal-state-ok{% elif step.ok is False %}portal-state-todo{% endif %}">{{ step.status }}</span>
+            <span class="portal-state"><span class="status-dot {% if step.ok is True %}status-ok{% else %}status-muted{% endif %}" aria-hidden="true"></span>{{ step.status }}</span>
             <a href="{{ step.url }}">{{ step.label }}</a>
           </li>
         {% endfor %}
@@ -20,3 +20,5 @@
   {% if index_hint %}<p class="help">{{ index_hint }}</p>{% endif %}
   {{ block.super }}
 {% endblock %}
+{# The box of recent actions is removed (design review C): the start page shows the groups only. #}
+{% block sidebar %}{% endblock %}

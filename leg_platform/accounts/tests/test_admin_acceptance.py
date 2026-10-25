@@ -66,6 +66,16 @@ class FirstStepsTests(TestCase):
         self.assertIn(reverse("admin:accounts_portalsettings_change", args=(1,)), page)
         self.assertIn(reverse("admin:accounts_emailtext_changelist"), page)
 
+    def test_the_start_page_has_no_recent_actions_box_and_no_exclamation_mark(self):
+        client, _administrator = administrator_client()
+
+        page = client.get(INDEX_URL).content.decode()
+
+        self.assertNotIn("recent-actions-module", page)
+        self.assertNotIn("Neueste Aktionen", page)
+        self.assertNotIn("portal-state-todo", page)
+        self.assertIn('class="status-dot status-muted"', page)
+
     def test_the_status_follows_the_settings(self):
         client, _administrator = administrator_client()
         PortalSettings.objects.update_or_create(

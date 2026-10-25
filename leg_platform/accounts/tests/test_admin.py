@@ -816,7 +816,8 @@ class AdminLogEntryTests(TestCase):
             history = self.client.get(
                 reverse("admin:accounts_user_history", args=(self.member.pk,))
             ).content.decode()
-        self.assertIn(f"Konto mit interner Nummer {self.member.pk}", index)
+        # The box of recent actions is removed from the start page (design review C): nothing of it is shown there.
+        self.assertNotIn("recent-actions-module", index)
         self.assertNotIn(self.member.customer_number_display, index)
         # The history page names the actor, read from the account at display time.
         self.assertIn(self.administrator.email, history)

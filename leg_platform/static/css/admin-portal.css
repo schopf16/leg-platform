@@ -126,16 +126,17 @@ fieldset .description,
   font-weight: 600;
 }
 
-.portal-state-ok::before {
-  content: "\2713\00a0";
-}
+/* A first step is a dot plus the word (the status-dot classes); a step that is not set yet is neither red nor marked "!". */
+@media (max-width: 767px) {
+  .portal-box,
+  .portal-help {
+    overflow-wrap: anywhere;
+  }
 
-.portal-state-todo::before {
-  content: "!\00a0";
-}
-
-.portal-state-todo {
-  color: var(--error-fg, #ba2121);
+  .portal-steps li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
 }
 
 .portal-help table {
