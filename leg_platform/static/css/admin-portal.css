@@ -736,3 +736,23 @@ ol.breadcrumbs {
 /* A log as text (owner decision): a fixed-height monospace box, the newest line at the bottom, long lines wrap. */
 .log-box { font-family: monospace; font-size: 0.875rem; line-height: 1.4; max-height: 28rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 1px solid; }
 .log-line { display: block; }
+
+/* The security events (review item 3): the filters go below the table, so that the table has the full width. */
+.model-securityevent #changelist .changelist-form-container {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.model-securityevent #changelist .changelist-form-container:has(#changelist-filter) > div {
+  max-width: 100%;
+}
+
+.model-securityevent #changelist-filter {
+  order: 2;
+  flex: none;
+  width: 100%;
+}
+
+.model-securityevent #changelist .changelist-form-container > div:not(#changelist-filter) {
+  order: 1;
+}

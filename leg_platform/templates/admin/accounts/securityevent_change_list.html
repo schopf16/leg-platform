@@ -1,0 +1,7 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+{# The security events (review item 4): one lead line above the table; the filters stay in the sidebar column below it. #}
+{% block content %}
+<p class="help">{% translate "Choose an entry to view it." %}</p>
+{{ block.super }}
+{% endblock %}

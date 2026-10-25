@@ -8282,6 +8282,12 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "security event"
+msgstr "événement de sécurité"
+
+msgid "Choose an entry to view it."
+msgstr "Choisir une entrée à consulter."
+
 msgid "texts excluded"
 msgstr "textes exclus"
 

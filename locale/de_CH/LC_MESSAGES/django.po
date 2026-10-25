@@ -8279,6 +8279,12 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "security event"
+msgstr "Sicherheitsereignis"
+
+msgid "Choose an entry to view it."
+msgstr "Einen Eintrag zum Ansehen wählen."
+
 msgid "texts excluded"
 msgstr "Texte ausgeschlossen"
 

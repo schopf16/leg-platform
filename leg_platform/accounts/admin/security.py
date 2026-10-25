@@ -34,6 +34,7 @@ AccessFailureLog._meta.verbose_name_plural = _("log of failed logins")
 
 
 # The security log is named "Security events" in the sidebar (design review E); the model keeps its name.
+SecurityEvent._meta.verbose_name = _("security event")
 SecurityEvent._meta.verbose_name_plural = _("Security events")
 
 # The event types by area, for the grouped select of the filter (design review E). A type not named here is "Other".
@@ -86,53 +87,6 @@ class EventGroupFilter(admin.ChoicesFieldListFilter):
         return [self.select]
 
 
-class SecurityEventAdmin(admin.ModelAdmin):
-    """The security log: read only, system administrators only (D-018, D-041).
-
-    Entries leave only through the retention.
-    """
-
-    actions = None  # not even the site-wide "delete selected"
-    list_display = ("occurred_at", "event", "account_number", "actor_number", "retention")
-    list_filter = (("event", EventGroupFilter), "long_retention")
-    ordering = ("-occurred_at", "-id")
-    list_per_page = 100
-    show_full_result_count = False
-    fields = readonly_fields = ("occurred_at", "event", "account_id", "actor_id", "long_retention")
-
-    @admin.display(description=_("Account"), ordering="account_id")
-    def account_number(self, obj):
-        return obj.account_id if obj.account_id is not None else "-"
-
-    @admin.display(description=_("From"), ordering="actor_id")
-    def actor_number(self, obj):
-        return obj.actor_id if obj.actor_id is not None else "-"
-
-    @admin.display(description=_("kept"))
-    def retention(self, obj):
-        days = (
-            settings.SECURITY_LOG_LONG_RETENTION_DAYS
-            if obj.long_retention
-            else settings.SECURITY_LOG_RETENTION_DAYS
-        )
-        return gettext("%(days)d days") % {"days": days}
-
-    def has_module_permission(self, request):
-        return request.user.is_superuser
-
-    def has_view_permission(self, request, obj=None):
-        return request.user.is_superuser
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
 class NamedFilter:
     """A list filter with a plain title. Django prints "By <title>" (German "Nach <title>"), so the title is the
     noun only (design review G). Django sets the title from the field in the base class; this one is set after it."""
@@ -161,6 +115,60 @@ class PathFilter(NamedFilter, admin.AllValuesFieldListFilter):
     """The address (path) of the attempt: "By address" (German "Nach Adresse")."""
 
     filter_title = _("address")
+
+
+class SecurityEventAdmin(admin.ModelAdmin):
+    """The security log: read only, system administrators only (D-018, D-041).
+
+    Entries leave only through the retention.
+    """
+
+    actions = None  # not even the site-wide "delete selected"
+    list_display = ("occurred_at", "event", "account_number", "actor_number", "retention")
+    list_filter = (("event", EventGroupFilter), ("occurred_at", TimeFilter))
+    change_list_template = "admin/accounts/securityevent_change_list.html"
+    # No "Show counts" link in the filter column (review item 5): the filters are plain.
+    show_facets = admin.ShowFacets.NEVER
+    ordering = ("-occurred_at", "-id")
+    list_per_page = 100
+    show_full_result_count = False
+    fields = readonly_fields = ("occurred_at", "event", "account_id", "actor_id", "long_retention")
+
+    @admin.display(description=_("Account"), ordering="account_id")
+    def account_number(self, obj):
+        return obj.account_id if obj.account_id is not None else "-"
+
+    @admin.display(description=_("From"), ordering="actor_id")
+    def actor_number(self, obj):
+        return obj.actor_id if obj.actor_id is not None else "-"
+
+    @admin.display(description=_("kept"))
+    def retention(self, obj):
+        days = (
+            settings.SECURITY_LOG_LONG_RETENTION_DAYS
+            if obj.long_retention
+            else settings.SECURITY_LOG_RETENTION_DAYS
+        )
+        return gettext("%(days)d days") % {"days": days}
+
+    def changelist_view(self, request, extra_context=None):
+        # The page is named "Security events" (review item 4); the lead line is in its template.
+        return super().changelist_view(request, {"title": _("Security events"), **(extra_context or {})})
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class ReadOnlyAxesAdmin(admin.ModelAdmin):

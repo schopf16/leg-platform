@@ -2,9 +2,11 @@
 (docs/SECURITY.md, sections 10 and 11; D-018, D-041)."""
 
 from datetime import timedelta
+from pathlib import Path
 from io import StringIO
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
 from django.db import transaction
@@ -332,4 +334,18 @@ class SecurityLogLayoutTests(TestCase):
     def test_the_sidebar_names_the_table_security_events(self):
         html = self.page().content.decode()
         self.assertIn(">Sicherheitsereignisse</a>", html)
+
+    def test_the_page_is_named_security_events_with_plain_filters(self):
+        html = self.page().content.decode()
+        self.assertIn("<h1>Sicherheitsereignisse</h1>", html)
+        self.assertIn("Einen Eintrag zum Ansehen wählen.", html)
+        self.assertNotIn("Lange aufbewahrt", html)
+        self.assertIn("Nach Zeitpunkt", html)
+        self.assertNotIn("Anzahl anzeigen", html)
+
+    def test_the_filters_are_stacked_below_the_table_by_the_stylesheet(self):
+        # The filter column is placed by the stylesheet (order 2, full width); no layout is checked in a browser here.
+        css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
+        self.assertIn(".model-securityevent #changelist-filter {", css)
+        self.assertIn("order: 2;", css)
 

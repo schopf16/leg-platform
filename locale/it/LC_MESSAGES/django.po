@@ -8253,6 +8253,12 @@ msgstr "Impostazioni e-mail"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "security event"
+msgstr "evento di sicurezza"
+
+msgid "Choose an entry to view it."
+msgstr "Scegliere una voce da consultare."
+
 msgid "texts excluded"
 msgstr "testi esclusi"
 
