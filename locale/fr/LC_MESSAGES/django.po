@@ -429,9 +429,6 @@ msgstr "Motif"
 msgid "Directory in use"
 msgstr "Répertoire utilisé"
 
-msgid "File size"
-msgstr "Taille du fichier"
-
 msgid "Download progress"
 msgstr "Progression du téléchargement"
 
@@ -490,9 +487,6 @@ msgstr "%(count)s adresses lues"
 
 msgid "The automatic refresh is turned off on this server. The directory is only updated when you request it here or when the operator starts the import on the server."
 msgstr "La mise à jour automatique est désactivée sur ce serveur. Le répertoire n’est mis à jour que si vous le demandez ici ou si l’exploitant lance l’importation sur le serveur."
-
-msgid "Once a day from %(time)s the scheduled tasks of the server check whether the directory must be updated: when an address could not be found, or when the regular refresh is due. A request on this page starts at once."
-msgstr "Une fois par jour à partir de %(time)s, les tâches planifiées du serveur vérifient si le répertoire doit être mis à jour : lorsqu’une adresse est introuvable ou lorsque la mise à jour régulière est due. Une demande sur cette page démarre immédiatement."
 
 msgid "An address could not be found: the directory is updated at the next daily run."
 msgstr "Une adresse est introuvable : le répertoire sera mis à jour lors de la prochaine exécution quotidienne."

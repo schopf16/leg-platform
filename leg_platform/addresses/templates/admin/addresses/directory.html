@@ -37,12 +37,11 @@
     <dt>{% translate "Data date" %}</dt><dd id="directory-data-date">{{ import_status.directory.data_date|default:"–" }}</dd>
     <dt>{% translate "Address count" %}</dt><dd id="directory-row-count">{% if import_status.directory.available %}{{ import_status.directory.row_count }}{% else %}–{% endif %}</dd>
   </dl>
-  <p class="help">{% translate "Imported at" %} <span id="directory-imported-at">{{ import_status.directory.imported_at|default:"–" }}</span>, {% translate "File size" %} <span id="directory-file-size">{% if import_status.directory.file_megabytes %}{{ import_status.directory.file_megabytes }} MB{% else %}–{% endif %}</span></p>
   <p role="status" id="directory-warning"{% if not import_status.directory.warning %} hidden{% endif %}>{{ import_status.directory.warning }}</p>
   {% if import_status.directory.content_warning %}<p role="status" class="help" id="directory-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ import_status.directory.content_warning }}</p>{% endif %}
 
   <p class="help" id="import-automatic">{{ import_status.automatic_text }}</p>
-  <p class="help">{% translate "Last automatic attempt at" %} <span id="import-last-automatic">{{ import_status.last_automatic_attempt_at|default:"–" }}</span></p>
+  <span id="import-last-automatic" hidden>{{ import_status.last_automatic_attempt_at|default:"–" }}</span>
 
   <form method="post" class="import-form">{% csrf_token %}
     {# The one primary button of this card; after a failure it says "Try again" (UX-013). #}

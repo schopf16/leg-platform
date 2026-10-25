@@ -330,11 +330,11 @@ class AutomaticRefreshTextTests(TestCase):
     databases = {"default", "addresses"}
 
     @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
-    def test_the_text_of_the_page_names_the_trigger_and_the_time(self):
+    def test_the_text_is_one_sentence_about_the_next_refresh(self):
         with translation.override("de-ch"):
             text = status.next_automatic_text(None)
-        self.assertIn("geplanten Aufgaben", text)
-        self.assertIn("ab 03:00", text)
+        # Design review 4: one sentence; the trigger and the time are not repeated on the card.
+        self.assertEqual(text, "Die erste Aktualisierung ist jetzt fällig.")
         self.assertNotIn("niemand das Portal benutzt", text)
 
     @override_settings(ADDRESS_IMPORT_AUTOMATIC=True)
@@ -342,8 +342,8 @@ class AutomaticRefreshTextTests(TestCase):
         ImportRequest.objects.create(pk=1, run_time=time(4, 30), update_flag_set_at=timezone.now())
         with translation.override("en"):
             text = status.next_automatic_text(ImportRequest.objects.get(pk=1))
-        self.assertIn("from 04:30", text)
         self.assertIn("An address could not be found", text)
+        self.assertNotIn("04:30", text)
 
     @override_settings(ADDRESS_IMPORT_AUTOMATIC=False)
     def test_the_text_of_the_page_says_when_it_is_turned_off(self):

@@ -427,9 +427,6 @@ msgstr "Grund"
 msgid "Directory in use"
 msgstr "Verwendetes Verzeichnis"
 
-msgid "File size"
-msgstr "Dateigrösse"
-
 msgid "Download progress"
 msgstr "Fortschritt des Downloads"
 
@@ -488,9 +485,6 @@ msgstr "%(count)s Adressen gelesen"
 
 msgid "The automatic refresh is turned off on this server. The directory is only updated when you request it here or when the operator starts the import on the server."
 msgstr "Die automatische Aktualisierung ist auf diesem Server ausgeschaltet. Das Verzeichnis wird nur aktualisiert, wenn Sie es hier anfordern oder wenn die Betreiber den Import auf dem Server starten."
-
-msgid "Once a day from %(time)s the scheduled tasks of the server check whether the directory must be updated: when an address could not be found, or when the regular refresh is due. A request on this page starts at once."
-msgstr "Einmal täglich ab %(time)s prüfen die geplanten Aufgaben des Servers, ob das Verzeichnis aktualisiert werden muss: wenn eine Adresse nicht gefunden wurde oder wenn die regelmässige Aktualisierung fällig ist. Eine Anforderung auf dieser Seite startet sofort."
 
 msgid "An address could not be found: the directory is updated at the next daily run."
 msgstr "Eine Adresse wurde nicht gefunden: Das Verzeichnis wird bei der nächsten täglichen Aktualisierung aktualisiert."
@@ -7887,7 +7881,7 @@ msgid "Statistic of the last successful import"
 msgstr "Zahlen der letzten erfolgreichen Aktualisierung"
 
 msgid "Not run today"
-msgstr "Heute noch nicht aktualisiert"
+msgstr "Noch nicht aktualisiert"
 
 msgid "The data from %(date)s stays valid."
 msgstr "Die Daten vom %(date)s bleiben gültig."

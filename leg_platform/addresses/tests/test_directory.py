@@ -2346,7 +2346,7 @@ class PlantBlockAdminTests(TestCase):
     def test_the_empty_state_and_the_run_of_today_have_the_german_texts(self):
         response = self._client(language="de-ch").get(self.page)
         self.assertContains(response, "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie.")
-        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertContains(response, "Noch nicht aktualisiert")
         self.assertNotContains(response, "Noch nicht importiert")
         self.assertNotContains(response, "Heute nicht ausgeführt")
 
@@ -2405,7 +2405,7 @@ class PlantBlockAdminTests(TestCase):
         self._plant_register()
         self._last_run("succeeded", today=False)
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Heute noch nicht aktualisiert")
+        self.assertContains(response, "Noch nicht aktualisiert")
         self.assertNotContains(response, 'id="plant-error"')
 
     def test_a_failure_shows_only_its_fixed_reason_and_no_path_url_or_trace(self):
