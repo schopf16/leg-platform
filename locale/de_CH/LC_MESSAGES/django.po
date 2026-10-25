@@ -8279,6 +8279,12 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "texts excluded"
+msgstr "Texte ausgeschlossen"
+
+msgid "Applies to all errors, including import errors."
+msgstr "Gilt für alle Fehler, auch für Importfehler."
+
 msgid "code (shortened)"
 msgstr "Kennung, gekürzt"
 
@@ -8311,9 +8317,6 @@ msgstr "Andere"
 
 msgid "Sources"
 msgstr "Quellen"
-
-msgid "Excluded texts:"
-msgstr "Ausgeschlossene Texte:"
 
 msgid "Confirmation required"
 msgstr "Bestätigung erforderlich"

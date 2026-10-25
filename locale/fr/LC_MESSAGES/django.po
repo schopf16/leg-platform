@@ -8282,6 +8282,12 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "texts excluded"
+msgstr "textes exclus"
+
+msgid "Applies to all errors, including import errors."
+msgstr "S'applique à toutes les erreurs, y compris les erreurs d'importation."
+
 msgid "code (shortened)"
 msgstr "code (abrégé)"
 
@@ -8314,9 +8320,6 @@ msgstr "Autres"
 
 msgid "Sources"
 msgstr "Sources"
-
-msgid "Excluded texts:"
-msgstr "Textes exclus :"
 
 msgid "Confirmation required"
 msgstr "Confirmation requise"

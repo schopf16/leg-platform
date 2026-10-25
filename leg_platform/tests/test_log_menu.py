@@ -417,7 +417,8 @@ class PageLayoutTests(LogMenuBase):
         self.set_notification(muted_failures=log_menu.failure_texts()[:2])
         html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
         self.assertIn("Einzelne Importfehler wählen", html)
-        self.assertIn("(Ausgeschlossene Texte: 2)", html)
+        self.assertIn("(2 Texte ausgeschlossen)", html)
+        self.assertIn("Gilt für alle Fehler, auch für Importfehler.", html)
 
     def test_the_proof_block_has_a_plain_title_and_one_sentence(self):
         html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()

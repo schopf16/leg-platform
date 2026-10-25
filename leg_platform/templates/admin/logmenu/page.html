@@ -66,8 +66,9 @@
     <fieldset>
       <legend>{% translate "When to send" %}</legend>
       <p>{{ settings_form.notify_error.errors }}<label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}" id="{{ settings_form.notify_error.auto_id }}"{% if settings_form.notify_error.value %} checked{% endif %}> {{ settings_form.notify_error.label }}</label></p>
+      <p class="help">{% translate "Applies to all errors, including import errors." %}</p>
       <details id="logmenu-failures" class="import-form">
-        <summary>{% translate "Choose single errors" %} <span class="help">({% translate "Excluded texts:" %} {{ settings_form.excluded_count }})</span></summary>
+        <summary>{% translate "Choose single errors" %} <span class="help">({{ settings_form.excluded_count }} {% translate "texts excluded" %})</span></summary>
         {% for heading, boxes in settings_form.grouped_failures %}
           <h4>{{ heading }}</h4>
           {% for checkbox in boxes %}<p>{{ checkbox }}</p>{% endfor %}

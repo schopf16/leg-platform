@@ -8253,6 +8253,12 @@ msgstr "Impostazioni e-mail"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "texts excluded"
+msgstr "testi esclusi"
+
+msgid "Applies to all errors, including import errors."
+msgstr "Vale per tutti gli errori, compresi quelli di importazione."
+
 msgid "code (shortened)"
 msgstr "codice (abbreviato)"
 
@@ -8285,9 +8291,6 @@ msgstr "Altri"
 
 msgid "Sources"
 msgstr "Fonti"
-
-msgid "Excluded texts:"
-msgstr "Testi esclusi:"
 
 msgid "Confirmation required"
 msgstr "Conferma richiesta"
