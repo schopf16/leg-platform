@@ -3120,7 +3120,7 @@ msgid "history entry"
 msgstr "Verlaufseintrag"
 
 msgid "history entries"
-msgstr "Verlaufseinträge"
+msgstr "Verlauf"
 
 msgid "identifier"
 msgstr "Identifikator"
@@ -3129,7 +3129,7 @@ msgid "warning threshold"
 msgstr "Warnschwelle"
 
 msgid "management settings"
-msgstr "Einstellungen der Verwaltung"
+msgstr "Verwaltungseinstellungen"
 
 msgid "note"
 msgstr "Notiz"
@@ -3144,7 +3144,7 @@ msgid "share change"
 msgstr "Änderung der Anteile"
 
 msgid "share changes"
-msgstr "Änderungen der Anteile"
+msgstr "Anteilsänderungen"
 
 msgid "grid operator"
 msgstr "Netzbetreiber"
@@ -8049,7 +8049,7 @@ msgid "Application database"
 msgstr "Anwendungsdatenbank"
 
 msgid "Housekeeping"
-msgstr "Wartung"
+msgstr "Datenbankwartung"
 
 msgid "Started by"
 msgstr "Gestartet durch"
@@ -8493,7 +8493,7 @@ msgid "General"
 msgstr "Allgemein"
 
 msgid "Log menu"
-msgstr "Protokoll-Menü"
+msgstr "Protokolle"
 
 msgid "Locked"
 msgstr "Gesperrt"
