@@ -588,8 +588,9 @@ class LogPageTests(TestCase):
         self.assertIn("Die Einträge sind technische Protokollzeilen der Anwendung.", html)
         self.assertLess(html.index("Die Einträge sind technische"), html.index('id="log-output"'))
         css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
-        self.assertIn("--log-lines: 24;", css)  # 24 lines of the file viewer, from the one custom property
-        self.assertIn("height: calc(var(--log-lines) * 1lh);", css)
+        self.assertIn("--log-lines: 24;", css)  # 24 lines, the same rule as the boxes of the log page
+        self.assertIn(".log-box,\n.log-output {", css)
+        self.assertIn("height: calc(var(--log-lines) * 1.4em + 1rem + 2px);", css)
         self.assertNotIn("27.3rem", css)
         self.assertIn("background: var(--body-bg, #fff);", css)
         self.assertNotIn("background: #111;", css)
