@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.db.models import Max
@@ -457,4 +458,18 @@ class SidebarEntryTests(LogMenuBase):
 
     def test_the_sidebar_has_no_quick_filter_field(self):
         self.assertNotIn('id="nav-filter"', self.sidebar())
+
+
+class LogBoxHeightTests(LogMenuBase):
+    """Fourth review item 4: every log box has the height of 24 lines and scrolls, also when it is empty."""
+
+    def test_an_empty_log_page_still_has_the_boxes_of_24_lines(self):
+        response = self.client_for(self.superuser).get(reverse("admin:logmenu"))
+        html = response.content.decode()
+        self.assertIn('class="log-box"', html)
+        self.assertIn("Kein Eintrag in diesem Zeitraum.", html)
+        css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
+        box = css[css.index(".log-box {"):css.index("}", css.index(".log-box {"))]
+        self.assertIn("height: 29.4rem;", box)  # 24 lines at 0.875rem and line height 1.4
+        self.assertIn("overflow: auto;", box)
 
