@@ -90,9 +90,28 @@
   {% endif %}
   <form method="post" action="{% url 'admin:logmenu_settings' %}" class="import-form">{% csrf_token %}
     {{ settings_form.non_field_errors }}
-    <p>{{ settings_form.enabled.errors }}<label for="{{ settings_form.enabled.id_for_label }}">{{ settings_form.enabled }} {% translate "Send an email" %}</label></p>
-    <p>{{ settings_form.email.errors }}<label for="{{ settings_form.email.id_for_label }}">{% translate "Email address" %}</label><br>{{ settings_form.email }}</p>
-    <p><label for="{{ settings_form.minimum_severity.id_for_label }}">{% translate "Minimum severity" %}</label> {{ settings_form.minimum_severity }}</p>
+    <fieldset>
+      <legend>{% translate "Send" %}</legend>
+      <p>{{ settings_form.enabled.errors }}<label for="{{ settings_form.enabled.id_for_label }}">{{ settings_form.enabled }} {% translate "Send an email" %}</label></p>
+      <p>{{ settings_form.email.errors }}<label for="{{ settings_form.email.id_for_label }}">{% translate "Email address" %}</label><br>{{ settings_form.email }}</p>
+    </fieldset>
+    <fieldset>
+      <legend>{% translate "By severity" %}</legend>
+      <p><label><input type="checkbox" name="{{ settings_form.notify_error.html_name }}"{% if settings_form.notify_error.value %} checked{% endif %}> {% translate "Errors" %}</label></p>
+      <p><label><input type="checkbox" name="{{ settings_form.notify_warning.html_name }}"{% if settings_form.notify_warning.value %} checked{% endif %}> {% translate "Warnings" %}</label></p>
+      <p><label><input type="checkbox" name="{{ settings_form.notify_notice.html_name }}"{% if settings_form.notify_notice.value %} checked{% endif %}> {% translate "Notices" %}</label></p>
+    </fieldset>
+    <fieldset>
+      <legend>{% translate "By event" %}</legend>
+      <p><label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {% translate "Address directory not changed for a long time" %}</label></p>
+      <p><label><input type="checkbox" name="{{ settings_form.notify_unchanged.html_name }}"{% if settings_form.notify_unchanged.value %} checked{% endif %}> {% translate "Downloaded file unchanged" %}</label></p>
+    </fieldset>
+    <fieldset>
+      <legend>{% translate "Import errors" %}</legend>
+      {% for checkbox in settings_form.failures %}
+        <p>{{ checkbox }}</p>
+      {% endfor %}
+    </fieldset>
     <button type="submit" class="button">{% translate "Save" %}</button>
   </form>
 </section>

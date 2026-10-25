@@ -1,9 +1,10 @@
-"""The log menu "Protokolle" (D-120): one page for system administrators only, the e-mail notification of log events.
+"""The log menu "Protokolle" (D-120, D-121, D-122): one page for system administrators only, and the e-mail notice.
 
-Sources: the database sources (security events, housekeeping errors) with a time range and a redacted text download;
-the two log files are linked to their existing pages (``log_views``). Every page view and download is a security event
-(``log_views.record_view`` / ``log_views.record``). The notifier looks at the new rows of the database sources once per
-scheduled run (``notify_log_events``) and queues at most one mail per source and hour; the mail holds no log line.
+Sources: the database sources (security events, housekeeping errors, import errors) with a time range and a redacted text
+download; the two log files are linked to their existing pages (``log_views``). Every page view and download is a security
+event (``log_views.record_view`` / ``log_views.record``). The notifier looks at the new rows of the database sources once
+per scheduled run (``notify_log_events``), applies the ticks of the setting and queues at most one mail per source and
+hour. The mail holds no log line, no reason text and no file name.
 """
 
 from datetime import datetime, timedelta
@@ -26,24 +27,30 @@ DATABASE_SOURCES = ("security", "housekeeping", "import")
 TIME_RANGES = {"1": timedelta(hours=1), "24": timedelta(hours=24), "168": timedelta(days=7), "720": timedelta(days=30)}
 DEFAULT_RANGE = "24"
 ROW_LIMIT = 200
-# One mail per source and this many seconds at most; further events in that time are only counted (owner decision).
+# One mail per source and this long at most; further events in that time are only counted (owner decision, D-120).
 MAIL_INTERVAL = timedelta(hours=1)
-SEVERITY_RANK = {
-    LogNotificationSettings.Severity.WARNING: 1,
-    LogNotificationSettings.Severity.ERROR: 2,
-    LogNotificationSettings.Severity.CRITICAL: 3,
-}
-HIGH_SEVERITY_SENTENCE = _(
-    "A high-severity entry was recorded. Please sign in to the server and check the log."
-)
+HIGH_SEVERITY_SENTENCE = _("A high-severity entry was recorded. Please sign in to the server and check the log.")
 NOTICE_SENTENCE = _("A notice was recorded.")
 # The security events that notify, with their fixed source label and severity. Other events never notify.
 NOTIFYING_EVENTS = {
     SecurityEvent.Event.LOGIN_LOCKOUT: ("security", LogNotificationSettings.Severity.WARNING),
 }
 HOUSEKEEPING_SEVERITY = LogNotificationSettings.Severity.ERROR
-# The import errors notify as the source "import" (D-121); their rows are the import error log, not security events.
+# The import error log (D-121) notifies as the source "import". Its kinds (D-122): an error; the data is old (stale: an
+# error when it opens); the downloaded file is unchanged (an information event, level notice).
 IMPORT_SEVERITY = LogNotificationSettings.Severity.ERROR
+UNCHANGED_SEVERITY = LogNotificationSettings.Severity.NOTICE
+KIND_ERROR, KIND_STALE, KIND_UNCHANGED = "error", "stale", "unchanged"
+STALE_REASON = _("The address directory has not changed for a long time.")
+
+
+def failure_texts():
+    """Every fixed failure text of the import (addresses, plant register, transformer scan): one tick each (D-122)."""
+    from leg_platform.addresses import jobs
+
+    texts = set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
+    texts |= {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED}
+    return sorted(texts)
 
 
 def source_label(key):
@@ -142,7 +149,7 @@ def _text_lines(source, since):
             yield f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}\t{row.get_event_display()}"
     elif source == "import":
         for row in _import_rows(since):
-            yield "	".join([
+            yield "\t".join([
                 f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}", str(row.get_source_display()),
                 row.step or "-", str(_(row.reason)),
             ])
@@ -159,9 +166,22 @@ def settings_row():
 
 
 class NotificationForm(forms.ModelForm):
+    """The notice setting (D-122): the switch, the one address, the ticks by severity and by event kind, and one tick
+    per fixed failure text of the import. A ticked text is mailed; an unticked one is not."""
+
+    failures = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple, label=_("Import errors"))
+
     class Meta:
         model = LogNotificationSettings
-        fields = ["enabled", "email", "minimum_severity"]
+        fields = [
+            "enabled", "email", "notify_error", "notify_warning", "notify_notice", "notify_stale", "notify_unchanged",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        muted = set(self.instance.muted_failures or [])
+        self.fields["failures"].choices = [(text, _(text)) for text in failure_texts()]
+        self.fields["failures"].initial = [text for text in failure_texts() if text not in muted]
 
     def clean(self):
         cleaned = super().clean()
@@ -172,7 +192,9 @@ class NotificationForm(forms.ModelForm):
     def save_settings(self):
         """Save the setting fields only: the bookkeeping of the notifier (``state``) stays as it is."""
         row = self.save(commit=False)
-        row.save(update_fields=["enabled", "email", "minimum_severity"])
+        ticked = set(self.cleaned_data.get("failures") or [])
+        row.muted_failures = [text for text in failure_texts() if text not in ticked]
+        row.save(update_fields=[*self.Meta.fields, "muted_failures"])
         return row
 
 
@@ -204,7 +226,7 @@ def settings_view(request):
     return TemplateResponse(request, "admin/logmenu/page.html", context, status=400)
 
 
-# --- notification -----------------------------------------------------------------------------------------------
+# --- notification (D-120, D-122) --------------------------------------------------------------------------------
 
 def _state(row):
     state = row.state if isinstance(row.state, dict) else {}
@@ -219,28 +241,77 @@ def suppressed_counts():
     return dict(_state(settings_row())["suppressed"])
 
 
+def directory_changed_on():
+    """The day the address directory last changed (None when there is no directory)."""
+    from leg_platform.addresses.models import Directory
+
+    return Directory.objects.filter(pk=1).values_list("content_changed_at", flat=True).first()
+
+
+def check_stale(now):
+    """The data is old (no change for more than ``STALE_CONTENT_DAYS``): one error event when it opens (D-122).
+
+    The event is cleared by the next successful import of the source that changes the file (``jobs``)."""
+    from leg_platform.addresses import status
+    from leg_platform.addresses.models import ImportLogEntry, ImportRequest
+
+    changed = directory_changed_on()
+    if changed is None:
+        return
+    stale = (now.date() - changed).days > status.STALE_CONTENT_DAYS
+    open_stale = ImportLogEntry.objects.filter(kind=KIND_STALE, cleared_at__isnull=True)
+    if stale and not open_stale.exists():
+        ImportLogEntry.objects.create(
+            source=ImportRequest.Source.ADDRESS, kind=KIND_STALE, step="", reason=STALE_REASON, occurred_at=now,
+        )
+
+
 def _new_items(state):
-    """Notifying items after the last checked row, as (row key, source, severity, time), in row order."""
+    """Items after the last checked row: (key, row pk, source, severity, time, kind, reason), in row order.
+
+    ``reason`` is the fixed failure text of an import error (its tick decides); None for the other sources."""
     checked = state["checked"]
     items = []
     for event in SecurityEvent.objects.filter(
         pk__gt=checked.get("security", 0), event__in=list(NOTIFYING_EVENTS),
     ).order_by("pk"):
         source, severity = NOTIFYING_EVENTS[event.event]
-        items.append(("security", event.pk, source, severity, event.occurred_at))
-    from leg_platform.addresses.models import HousekeepingError
+        items.append(("security", event.pk, source, severity, event.occurred_at, "security", None))
+    from leg_platform.addresses.models import HousekeepingError, ImportLogEntry
 
     for error in HousekeepingError.objects.filter(pk__gt=checked.get("housekeeping", 0)).order_by("pk"):
-        items.append(("housekeeping", error.pk, "housekeeping", HOUSEKEEPING_SEVERITY, error.occurred_at))
-    from leg_platform.addresses.models import ImportLogEntry
-
+        items.append(("housekeeping", error.pk, "housekeeping", HOUSEKEEPING_SEVERITY, error.occurred_at,
+                      KIND_ERROR, None))
     for entry in ImportLogEntry.objects.filter(pk__gt=checked.get("import", 0)).order_by("pk"):
-        items.append(("import", entry.pk, "import", IMPORT_SEVERITY, entry.occurred_at))
+        if entry.kind == KIND_UNCHANGED:
+            items.append(("import", entry.pk, "import", UNCHANGED_SEVERITY, entry.occurred_at, KIND_UNCHANGED, None))
+        elif entry.kind == KIND_STALE:
+            items.append(("import", entry.pk, "import", IMPORT_SEVERITY, entry.occurred_at, KIND_STALE, None))
+        else:
+            items.append(("import", entry.pk, "import", IMPORT_SEVERITY, entry.occurred_at, KIND_ERROR,
+                          entry.reason))
     return items
 
 
+def wanted(row, severity, kind, reason):
+    """The rule of the ticks (D-122): every kind is sent only by its own tick(s), nothing else."""
+    level = LogNotificationSettings.Severity
+    if kind == "security":
+        return severity == level.WARNING and row.notify_warning
+    if kind == KIND_STALE:
+        return row.notify_stale
+    if kind == KIND_UNCHANGED:
+        return row.notify_unchanged and row.notify_notice
+    if kind == KIND_ERROR:
+        if severity != level.ERROR or not row.notify_error:
+            return False
+        # An import error is sent only if its own failure text is ticked (one tick per text).
+        return reason is None or reason not in set(row.muted_failures or [])
+    return False
+
+
 def notify_log_events(now=None):
-    """Check the new rows of the database sources once; queue at most one mail per source and hour.
+    """Check the database sources once; queue at most one mail per source and hour (D-120, D-122).
 
     The high-water marks always advance, so a switch turned on later does not mail old events. Returns the number of
     notices queued in this run.
@@ -248,16 +319,15 @@ def notify_log_events(now=None):
     from leg_platform.accounts import mail_queue
 
     now = now or timezone.now()
+    check_stale(now)
     with transaction.atomic():
         LogNotificationSettings.objects.get_or_create(pk=1)
         row = LogNotificationSettings.objects.select_for_update().get(pk=1)
         state = _state(row)
         queued = 0
-        for source_key, pk, source, severity, occurred in _new_items(state):
+        for source_key, pk, source, severity, occurred, kind, reason in _new_items(state):
             state["checked"][source_key] = max(pk, state["checked"].get(source_key, 0))
-            if not row.enabled or not row.email:
-                continue
-            if SEVERITY_RANK[severity] < SEVERITY_RANK[row.minimum_severity]:
+            if not row.enabled or not row.email or not wanted(row, severity, kind, reason):
                 continue
             last = state["last_mail"].get(source)
             if last and now - datetime.fromisoformat(last) < MAIL_INTERVAL:

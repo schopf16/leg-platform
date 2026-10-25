@@ -261,9 +261,16 @@ def _log_failure(source, reason, step, now):
     )
 
 
-def _clear_failures(source, now):
-    """A successful run of the source clears the open rows of that source only (D-121)."""
-    ImportLogEntry.objects.filter(source=source, cleared_at__isnull=True).update(cleared_at=now)
+def _clear_failures(source, now, keep_kinds=()):
+    """A successful run of the source clears the open rows of that source only (D-121). ``keep_kinds``: rows that
+    stay open (the stale event stays until the file changes, D-122)."""
+    ImportLogEntry.objects.filter(source=source, cleared_at__isnull=True).exclude(kind__in=keep_kinds).update(
+        cleared_at=now,
+    )
+
+
+# The information event of an unchanged file (D-122): level notice, not an error.
+UNCHANGED_TEXT = "The downloaded file is unchanged since the last run."
 
 
 def record_success(claimed, count, *, downloaded=None, transformer=None):
@@ -286,11 +293,22 @@ def record_success(claimed, count, *, downloaded=None, transformer=None):
         })
     else:
         fields["columns_missing_at"] = None
+    unchanged = downloaded is False and claimed.source == ImportRequest.Source.ADDRESS
+    if claimed.source == ImportRequest.Source.ADDRESS:
+        # Consecutive runs that found the file unchanged (D-122); a changed download starts again at zero.
+        previous = ImportRequest.objects.filter(pk=1).values_list("unchanged_runs", flat=True).first() or 0
+        fields["unchanged_runs"] = previous + 1 if unchanged else 0
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(**fields)
     if not finished:
         logger.warning("An import finished, but its job was taken over meanwhile.")
         return
-    _clear_failures(claimed.source, fields["finished_at"])
+    # The stale event stays open until the file changes again (D-122): an unchanged run does not clear it.
+    _clear_failures(claimed.source, fields["finished_at"], keep_kinds=("stale",) if unchanged else ())
+    if unchanged:
+        ImportLogEntry.objects.create(
+            source=claimed.source, kind="unchanged", step="", reason=UNCHANGED_TEXT, count=fields["unchanged_runs"],
+            occurred_at=fields["finished_at"],
+        )
     if scan:
         logger.info("Transformer station scan completed (%s): %s buildings.", _kind(claimed), transformer.buildings)
         with transaction.atomic():

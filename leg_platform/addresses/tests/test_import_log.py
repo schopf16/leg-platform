@@ -115,7 +115,6 @@ class ImportNoticeTests(ImportLogBase):
         super().setUp()
         LogNotificationSettings.objects.update_or_create(pk=1, defaults={
             "enabled": True, "email": "notice.target@example.org",
-            "minimum_severity": LogNotificationSettings.Severity.ERROR,
         })
 
     def test_an_import_error_queues_one_mail_without_the_reason(self):
@@ -136,7 +135,7 @@ class ImportNoticeTests(ImportLogBase):
         LogNotificationSettings.objects.filter(pk=1).update(enabled=False)
         self.assertEqual(log_menu.notify_log_events(NOW), 0)
         LogNotificationSettings.objects.filter(pk=1).update(
-            enabled=True, minimum_severity=LogNotificationSettings.Severity.CRITICAL,
+            enabled=True, notify_error=False,
         )
         self.assertEqual(log_menu.notify_log_events(NOW + timedelta(hours=2)), 0)
         self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.LOG_NOTIFICATION).exists())

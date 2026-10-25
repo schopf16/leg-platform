@@ -11,7 +11,10 @@ from django.utils.translation import gettext_lazy as _
 
 
 class LogNotificationSettings(models.Model):
+    """The setting of the notice; the ticks say WHEN a mail is sent (D-122). The address and the switch are shared."""
+
     class Severity(models.TextChoices):
+        NOTICE = "notice", _("Notice")
         WARNING = "warning", _("Warning")
         ERROR = "error", _("Error")
         CRITICAL = "critical", _("Critical")
@@ -19,9 +22,15 @@ class LogNotificationSettings(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     enabled = models.BooleanField(default=False, verbose_name=_("Send an email"))
     email = models.EmailField(blank=True, verbose_name=_("Email address"))
-    minimum_severity = models.CharField(
-        max_length=10, choices=Severity, default=Severity.ERROR, verbose_name=_("Minimum severity"),
-    )
+    # By severity: one tick each (an error is also a critical one).
+    notify_error = models.BooleanField(default=True, verbose_name=_("Errors"))
+    notify_warning = models.BooleanField(default=False, verbose_name=_("Warnings"))
+    notify_notice = models.BooleanField(default=False, verbose_name=_("Notices"))
+    # Events of the import: the data is old, the file is unchanged.
+    notify_stale = models.BooleanField(default=False, verbose_name=_("Address directory not changed for a long time"))
+    notify_unchanged = models.BooleanField(default=False, verbose_name=_("Downloaded file unchanged"))
+    # Import errors: the fixed failure texts that are NOT ticked (one tick per text; all ticked by default, D-122).
+    muted_failures = models.JSONField(default=list, blank=True, editable=False)
     state = models.JSONField(default=dict, blank=True, editable=False)
 
     class Meta:

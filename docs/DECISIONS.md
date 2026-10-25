@@ -776,3 +776,14 @@ Look rules: `docs/DESIGN.md` section 6. Owner orders and designer reports of 202
 * **Progress.** While an import runs, the status shows the last progress as a number of minutes (`progress_at`: set by the importer on every change, copied by the heartbeat). After ten minutes without progress the status shows "No movement for N minutes." A percentage is shown only where the total is known (the bytes of the address archive with its declared size). Rows are shown as a count only.
 * **Not done.** The transformer scan's counts (buildings against the EGIDs of the postal codes, tiles against the tiles of the run) and the plant file's row total are not yet counted; those blocks show the last progress time only.
 * **Consequence.** Migrations `addresses.0016` (`ImportLogEntry`) and `addresses.0017` (`ImportRequest.progress_at`). Translations: 12 new msgids; the old unexpected-failure sentence is replaced.
+
+## 26. Decisions of 2026-10-26, notice ticks and import events (D-122)
+
+### D-122 Notice ticks: when a mail is sent; import events: unchanged file (information) and data older than 30 days (error); one tick per fixed failure text (2026-10-26; owner decisions 2026-10-26; amends D-120, D-121)
+
+* **Decision.** The notice of the log menu keeps one address and one switch (default off). The ticks say WHEN a mail is sent: by severity (errors, default on; warnings; notices), by event (address directory not changed for more than 30 days; downloaded file unchanged), and one tick per fixed failure text of the import (all ticked by default). Each kind is sent only by its own tick(s).
+* **Events.** Unchanged file: an information event (level notice), recorded at each run that finds the downloaded file unchanged, with the number of consecutive unchanged runs (`ImportRequest.unchanged_runs`); it is sent only with the event tick AND the notice tick. Data older than `status.STALE_CONTENT_DAYS`: one error event (level error, source import) when it opens, cleared by the next successful change of the file; it is sent only with its own tick.
+* **Failure texts.** A failed run that carries a ticked text is sent; an unticked text is not sent. The stored list holds the unticked texts (`LogNotificationSettings.muted_failures`).
+* **Unchanged.** Owner correction 2026-10-26: an unchanged checksum is never an error.
+* **Not done.** Transformer scan: the buildings counted per postal code against the EGIDs of the address directory, and the CSV row total after the download (progress "x von y"; owner item 1 and 2 of the round, not implemented in this round).
+* **Consequence.** Migrations `accounts.0049` (ticks replace the minimum severity; the old setting is not carried over) and `addresses.0018` (`ImportLogEntry.kind`, `count`; `ImportRequest.unchanged_runs`).

@@ -146,6 +146,8 @@ class ImportRequest(models.Model):
     rows_done = models.PositiveIntegerField(null=True, editable=False)
     # The time of the last progress of the running job (D-121): the status page shows how long ago it was.
     progress_at = models.DateTimeField(null=True, editable=False)
+    # Consecutive runs of the address directory that found the file unchanged (D-122).
+    unchanged_runs = models.PositiveIntegerField(default=0, editable=False)
     # The safe, fixed text of the last failure (``importer.ImportFailure``); never upstream data.
     last_error = models.CharField(max_length=255, blank=True, default="", editable=False)
     # The update flag (KONZEPT 3a, D-066): set once when a building could not be found in the directory nor at
@@ -396,6 +398,9 @@ class ImportLogEntry(models.Model):
     step = models.CharField(max_length=20, blank=True, editable=False, verbose_name=_("Step"))
     reason = models.CharField(max_length=255, editable=False, verbose_name=_("Reason"))
     cleared_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cleared at"))
+    # The kind of the event: an error, the data is old (stale), or the downloaded file is unchanged (D-122).
+    kind = models.CharField(max_length=10, default="error", editable=False, verbose_name=_("Kind"))
+    count = models.PositiveIntegerField(null=True, blank=True, editable=False, verbose_name=_("Unchanged runs"))
 
     class Meta:
         default_permissions = ()

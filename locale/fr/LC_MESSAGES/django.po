@@ -8329,3 +8329,150 @@ msgstr "Chargé chaque jour par l'exécution quotidienne. Aucune action ici. Sou
 
 msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
 msgstr "Le scan a lieu une fois par semaine, le samedi, après le registre des installations. Aucune action ici. Source : BKW Réseau, carte publique à forte réduction."
+
+msgid "A repair was tried recently and did not succeed."
+msgstr "Une réparation a été tentée récemment sans succès."
+
+msgid "CSV exceeds its resource limit."
+msgstr "Le CSV dépasse la limite de ressources."
+
+msgid "Catalogue data date predates the published directory."
+msgstr "La date des données du catalogue précède le répertoire publié."
+
+msgid "Download exceeds its resource limit."
+msgstr "Le téléchargement dépasse la limite de ressources."
+
+msgid "Download exceeds the size limit."
+msgstr "Le téléchargement dépasse la taille maximale."
+
+msgid "Empty directory."
+msgstr "Répertoire vide."
+
+msgid "Expected exactly one CSV member."
+msgstr "Une seule entrée CSV est attendue dans l'archive."
+
+msgid "Incomplete download."
+msgstr "Téléchargement incomplet."
+
+msgid "Invalid CSV header."
+msgstr "En-tête CSV invalide."
+
+msgid "Invalid CSV row count or width."
+msgstr "Nombre de lignes ou de colonnes CSV invalide."
+
+msgid "Invalid address field length."
+msgstr "Longueur d'un champ d'adresse invalide."
+
+msgid "Invalid address field."
+msgstr "Champ d'adresse invalide."
+
+msgid "Invalid official archive format."
+msgstr "Format de l'archive officielle invalide."
+
+msgid "Invalid official catalogue metadata."
+msgstr "Métadonnées du catalogue officiel invalides."
+
+msgid "Invalid postal label."
+msgstr "Libellé postal invalide."
+
+msgid "Missing EGID column."
+msgstr "Colonne EGID manquante."
+
+msgid "Missing approved CSV columns."
+msgstr "Colonnes CSV approuvées manquantes."
+
+msgid "Missing coordinate column."
+msgstr "Colonne des coordonnées manquante."
+
+msgid "Missing entrance column."
+msgstr "Colonne de l'entrée manquante."
+
+msgid "No buildings with coordinates for the postal codes."
+msgstr "Aucun bâtiment avec coordonnées pour les codes postaux."
+
+msgid "No postal code is set for the transformer scan."
+msgstr "Aucun code postal n'est défini pour le scan des stations."
+
+msgid "Not enough free disk space for an import."
+msgstr "Espace disque libre insuffisant pour un import."
+
+msgid "Official archive checksum mismatch."
+msgstr "Somme de contrôle de l'archive officielle incorrecte."
+
+msgid "Official download failed."
+msgstr "Le téléchargement officiel a échoué."
+
+msgid "Official file not found."
+msgstr "Fichier officiel introuvable."
+
+msgid "The import failed unexpectedly."
+msgstr "L'import a échoué de manière inattendue."
+
+msgid "The import lease was lost."
+msgstr "Le bail de l'import a été perdu."
+
+msgid "The import was interrupted because the application stopped or restarted."
+msgstr "L'import a été interrompu parce que l'application s'est arrêtée ou a redémarré."
+
+msgid "The map server could not be reached."
+msgstr "Le serveur de cartes est injoignable."
+
+msgid "The official directory could not be imported."
+msgstr "Le répertoire officiel n'a pas pu être importé."
+
+msgid "The plant register could not be downloaded or read."
+msgstr "Le registre des installations n'a pas pu être téléchargé ou lu."
+
+msgid "The transformer scan takes too long."
+msgstr "Le scan des stations prend trop de temps."
+
+msgid "Too many map tiles for one run."
+msgstr "Trop de tuiles de carte pour une exécution."
+
+msgid "Unapproved download URL."
+msgstr "URL de téléchargement non approuvée."
+
+msgid "Unexpected HTTP content encoding."
+msgstr "Encodage de contenu HTTP inattendu."
+
+msgid "Unexpected HTTP content type."
+msgstr "Type de contenu HTTP inattendu."
+
+msgid "Unsafe ZIP member."
+msgstr "Entrée ZIP dangereuse."
+
+msgid "Send"
+msgstr "Envoyer"
+
+msgid "By severity"
+msgstr "Par gravité"
+
+msgid "By event"
+msgstr "Par événement"
+
+msgid "Import errors"
+msgstr "Erreurs d'import"
+
+msgid "Errors"
+msgstr "Erreurs"
+
+msgid "Warnings"
+msgstr "Avertissements"
+
+msgid "Notice"
+msgstr "Remarque"
+
+msgid "Warning"
+msgstr "Avertissement"
+
+msgid "Address directory not changed for a long time"
+msgstr "Répertoire d'adresses inchangé depuis longtemps"
+
+msgid "Downloaded file unchanged"
+msgstr "Fichier téléchargé inchangé"
+
+msgid "The address directory has not changed for a long time."
+msgstr "Le répertoire d'adresses n'a pas changé depuis longtemps."
+
+msgid "The downloaded file is unchanged since the last run."
+msgstr "Le fichier téléchargé est inchangé depuis la dernière exécution."

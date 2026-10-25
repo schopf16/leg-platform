@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import Permission
 from django.test import TestCase
+from django.db.models import Max
 from django.urls import reverse
 from django.utils import timezone
 
@@ -18,7 +19,7 @@ from leg_platform import log_menu
 from leg_platform.accounts import mail_queue
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.addresses.models import HousekeepingError
+from leg_platform.addresses.models import HousekeepingError, ImportLogEntry, ImportRequest
 
 ZURICH = ZoneInfo("Europe/Zurich")
 PLANTED_EMAIL = "planted.person@example.org"
@@ -96,21 +97,21 @@ class AccessTests(LogMenuBase):
 class SettingTests(LogMenuBase):
     def test_enabling_without_an_address_is_refused(self):
         response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "", "minimum_severity": "error",
+            "enabled": "on", "email": "",
         })
         self.assertEqual(response.status_code, 400)
         self.assertFalse(LogNotificationSettings.objects.filter(pk=1, enabled=True).exists())
 
     def test_an_invalid_address_is_refused(self):
         response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "not-an-address", "minimum_severity": "error",
+            "enabled": "on", "email": "not-an-address",
         })
         self.assertEqual(response.status_code, 400)
         self.assertFalse(LogNotificationSettings.objects.filter(pk=1, enabled=True).exists())
 
     def test_a_change_is_one_security_event_without_the_address(self):
         response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "notice.target@example.org", "minimum_severity": "critical",
+            "enabled": "on", "email": "notice.target@example.org",
         })
         self.assertEqual(response.status_code, 302)
         events = SecurityEvent.objects.filter(event=SecurityEvent.Event.LOG_NOTIFICATION_CHANGED)
@@ -118,10 +119,11 @@ class SettingTests(LogMenuBase):
         self.assertEqual(events.get().actor_id, self.superuser.pk)
         self.assertNotIn("notice.target", str(events.get().__dict__))
 
-    def test_the_default_is_off_with_severity_error(self):
+    def test_the_default_is_off_and_errors_are_ticked(self):
         setting = LogNotificationSettings.objects.create(pk=1)
         self.assertFalse(setting.enabled)
-        self.assertEqual(setting.minimum_severity, LogNotificationSettings.Severity.ERROR)
+        self.assertTrue(setting.notify_error)
+        self.assertFalse(setting.notify_stale)
 
 
 class NotificationTests(LogMenuBase):
@@ -134,16 +136,10 @@ class NotificationTests(LogMenuBase):
         self.assertEqual(self.run_notifier(), 0)
         self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.LOG_NOTIFICATION).exists())
 
-    def test_a_mail_only_at_or_above_the_severity(self):
-        self.set_notification(enabled=True, email="notice.target@example.org",
-                              minimum_severity=LogNotificationSettings.Severity.CRITICAL)
-        self.housekeeping_error()  # an error is below critical
-        self.assertEqual(self.run_notifier(), 0)
-        self.assertFalse(MailJob.objects.filter(kind=MailJob.Kind.LOG_NOTIFICATION).exists())
 
     def test_a_warning_event_mails_when_the_minimum_is_warning(self):
         self.set_notification(enabled=True, email="notice.target@example.org",
-                              minimum_severity=LogNotificationSettings.Severity.WARNING)
+                              notify_warning=True)
         SecurityEvent.objects.create(event=SecurityEvent.Event.LOGIN_LOCKOUT)
         self.assertEqual(self.run_notifier(), 1)
         self.assertTrue(MailJob.objects.filter(kind=MailJob.Kind.LOG_NOTIFICATION).exists())
@@ -183,3 +179,103 @@ class NotificationTests(LogMenuBase):
 
     def test_the_mail_queue_handler_without_a_notice_makes_no_mail(self):
         self.assertIsNone(mail_queue.HANDLERS[MailJob.Kind.LOG_NOTIFICATION]("notice.target@example.org"))
+
+
+class TickTests(LogMenuBase):
+    """Each tick sends exactly its own event kind (D-122); the defaults send errors and nothing else."""
+
+    MISSING = "Missing EGID column."
+    UNREACHABLE = "The map server could not be reached."
+    UNCHANGED = "The downloaded file is unchanged since the last run."
+
+    def setUp(self):
+        super().setUp()
+        self.now = timezone.now()
+        self.configure()
+
+    def configure(self, **ticks):
+        values = {
+            "enabled": True, "email": "notice.target@example.org", "notify_error": True, "notify_warning": False,
+            "notify_notice": False, "notify_stale": False, "notify_unchanged": False, "muted_failures": [],
+        }
+        values.update(ticks)
+        LogNotificationSettings.objects.update_or_create(pk=1, defaults=values)
+        # Only the rows created after this point are new: the marks of the notifier start at the last existing rows.
+        marks = {
+            "security": SecurityEvent.objects.aggregate(m=Max("pk"))["m"] or 0,
+            "housekeeping": HousekeepingError.objects.aggregate(m=Max("pk"))["m"] or 0,
+            "import": ImportLogEntry.objects.aggregate(m=Max("pk"))["m"] or 0,
+        }
+        LogNotificationSettings.objects.filter(pk=1).update(state={"checked": marks})
+        ImportLogEntry.objects.filter(pk__gt=0).delete()
+        HousekeepingError.objects.filter(pk__gt=0).delete()
+
+    def import_entry(self, reason, kind="error"):
+        ImportLogEntry.objects.create(
+            source=ImportRequest.Source.ADDRESS, kind=kind, step="", reason=reason, occurred_at=self.now,
+            count=1 if kind == "unchanged" else None,
+        )
+
+    def notify(self):
+        return log_menu.notify_log_events(self.now)
+
+    def test_the_defaults_send_an_error_and_nothing_for_an_unchanged_file(self):
+        self.configure()
+        self.import_entry(self.UNCHANGED, kind="unchanged")
+        self.assertEqual(self.notify(), 0)
+        self.import_entry(self.MISSING)
+        self.assertEqual(self.notify(), 1)
+
+    def test_the_unchanged_tick_alone_sends_nothing_without_the_notice_tick(self):
+        self.configure(notify_error=False, notify_unchanged=True, notify_notice=False)
+        self.import_entry(self.UNCHANGED, kind="unchanged")
+        self.assertEqual(self.notify(), 0)
+        self.configure(notify_error=False, notify_unchanged=True, notify_notice=True)
+        self.import_entry(self.UNCHANGED, kind="unchanged")
+        self.assertEqual(self.notify(), 1)
+
+    def test_the_stale_tick_alone_sends_the_old_data_error(self):
+        stale_day = (self.now - timedelta(days=40)).date()
+        with patch.object(log_menu, "directory_changed_on", return_value=stale_day):
+            self.configure(notify_error=False, notify_stale=False)
+            self.assertEqual(self.notify(), 0)
+            self.assertTrue(ImportLogEntry.objects.filter(kind="stale").exists())
+            self.configure(notify_error=False, notify_stale=True)
+            ImportLogEntry.objects.create(source=ImportRequest.Source.ADDRESS, kind="stale", step="",
+                                          reason=log_menu.STALE_REASON, occurred_at=self.now)
+            self.assertEqual(self.notify(), 1)
+
+    def test_the_warning_tick_alone_sends_the_lockout(self):
+        self.configure(notify_error=False, notify_warning=False)
+        SecurityEvent.objects.create(event=SecurityEvent.Event.LOGIN_LOCKOUT)
+        self.assertEqual(self.notify(), 0)
+        self.configure(notify_error=False, notify_warning=True)
+        SecurityEvent.objects.create(event=SecurityEvent.Event.LOGIN_LOCKOUT)
+        self.assertEqual(self.notify(), 1)
+
+    def test_the_error_tick_alone_sends_housekeeping_errors(self):
+        self.configure(notify_error=True)
+        HousekeepingError.objects.create(step=HousekeepingError.Step.SQLITE, reason="sqlite_vacuum_failed")
+        self.assertEqual(self.notify(), 1)
+        self.configure(notify_error=False)
+        HousekeepingError.objects.create(step=HousekeepingError.Step.SQLITE, reason="sqlite_vacuum_failed")
+        self.assertEqual(self.notify(), 0)
+
+    def test_one_ticked_failure_text_sends_only_that_text(self):
+        muted = [text for text in log_menu.failure_texts() if text != self.MISSING]
+        self.configure(muted_failures=muted)
+        self.import_entry(self.MISSING)
+        self.import_entry(self.UNREACHABLE)
+        self.assertEqual(self.notify(), 1)
+
+    def test_an_unticked_failure_text_sends_nothing(self):
+        self.configure(muted_failures=log_menu.failure_texts())
+        self.import_entry(self.MISSING)
+        self.import_entry(self.UNREACHABLE)
+        self.assertEqual(self.notify(), 0)
+
+    def test_the_failure_texts_are_the_fixed_texts_of_the_import(self):
+        texts = log_menu.failure_texts()
+        self.assertIn(self.MISSING, texts)
+        self.assertIn(self.UNREACHABLE, texts)
+        self.assertEqual(len(texts), len(set(texts)))

@@ -8326,3 +8326,150 @@ msgstr "Wird täglich durch den täglichen Lauf geladen. Keine Aktion hier. Quel
 
 msgid "The scan runs once a week, on Saturday, after the plant register. No action here. Source: BKW Netz, high-discount map (public)."
 msgstr "Die Abfrage läuft einmal pro Woche, am Samstag, nach dem Anlagenregister. Keine Aktion hier. Quelle: BKW Netz, öffentliche Karte mit hohem Rabatt."
+
+msgid "A repair was tried recently and did not succeed."
+msgstr "Eine Reparatur wurde kürzlich versucht und war nicht erfolgreich."
+
+msgid "CSV exceeds its resource limit."
+msgstr "Die CSV-Datei überschreitet das Ressourcenlimit."
+
+msgid "Catalogue data date predates the published directory."
+msgstr "Das Datum der Katalogdaten liegt vor dem veröffentlichten Verzeichnis."
+
+msgid "Download exceeds its resource limit."
+msgstr "Der Download überschreitet das Ressourcenlimit."
+
+msgid "Download exceeds the size limit."
+msgstr "Der Download überschreitet die Grössenbegrenzung."
+
+msgid "Empty directory."
+msgstr "Leeres Verzeichnis."
+
+msgid "Expected exactly one CSV member."
+msgstr "Erwartet genau eine CSV-Datei im Archiv."
+
+msgid "Incomplete download."
+msgstr "Der Download ist unvollständig."
+
+msgid "Invalid CSV header."
+msgstr "Ungültige Kopfzeile der CSV-Datei."
+
+msgid "Invalid CSV row count or width."
+msgstr "Ungültige Zeilenzahl oder Spaltenzahl der CSV-Datei."
+
+msgid "Invalid address field length."
+msgstr "Ungültige Länge eines Adressfeldes."
+
+msgid "Invalid address field."
+msgstr "Ungültiges Adressfeld."
+
+msgid "Invalid official archive format."
+msgstr "Ungültiges Format des amtlichen Archivs."
+
+msgid "Invalid official catalogue metadata."
+msgstr "Ungültige Metadaten des amtlichen Katalogs."
+
+msgid "Invalid postal label."
+msgstr "Ungültige Postleitzahl-Bezeichnung."
+
+msgid "Missing EGID column."
+msgstr "Spalte EGID fehlt."
+
+msgid "Missing approved CSV columns."
+msgstr "Freigegebene CSV-Spalten fehlen."
+
+msgid "Missing coordinate column."
+msgstr "Koordinatenspalte fehlt."
+
+msgid "Missing entrance column."
+msgstr "Spalte Eingang fehlt."
+
+msgid "No buildings with coordinates for the postal codes."
+msgstr "Keine Gebäude mit Koordinaten für die Postleitzahlen."
+
+msgid "No postal code is set for the transformer scan."
+msgstr "Für die Abfrage der Trafostationen ist keine Postleitzahl gesetzt."
+
+msgid "Not enough free disk space for an import."
+msgstr "Zu wenig freier Speicherplatz für einen Import."
+
+msgid "Official archive checksum mismatch."
+msgstr "Prüfsumme des amtlichen Archivs stimmt nicht."
+
+msgid "Official download failed."
+msgstr "Der amtliche Download ist fehlgeschlagen."
+
+msgid "Official file not found."
+msgstr "Amtliche Datei nicht gefunden."
+
+msgid "The import failed unexpectedly."
+msgstr "Der Import ist unerwartet fehlgeschlagen."
+
+msgid "The import lease was lost."
+msgstr "Der Importauftrag wurde verloren."
+
+msgid "The import was interrupted because the application stopped or restarted."
+msgstr "Der Import wurde unterbrochen, weil die Anwendung angehalten oder neu gestartet wurde."
+
+msgid "The map server could not be reached."
+msgstr "Der Kartenserver konnte nicht erreicht werden."
+
+msgid "The official directory could not be imported."
+msgstr "Das amtliche Verzeichnis konnte nicht importiert werden."
+
+msgid "The plant register could not be downloaded or read."
+msgstr "Das Anlagenregister konnte nicht heruntergeladen oder gelesen werden."
+
+msgid "The transformer scan takes too long."
+msgstr "Die Abfrage der Trafostationen dauert zu lange."
+
+msgid "Too many map tiles for one run."
+msgstr "Zu viele Kartenkacheln für einen Lauf."
+
+msgid "Unapproved download URL."
+msgstr "Nicht freigegebene Download-Adresse."
+
+msgid "Unexpected HTTP content encoding."
+msgstr "Unerwartete HTTP-Inhaltskodierung."
+
+msgid "Unexpected HTTP content type."
+msgstr "Unerwarteter HTTP-Inhaltstyp."
+
+msgid "Unsafe ZIP member."
+msgstr "Unsicherer ZIP-Eintrag."
+
+msgid "Send"
+msgstr "Senden"
+
+msgid "By severity"
+msgstr "Nach Schweregrad"
+
+msgid "By event"
+msgstr "Nach Ereignis"
+
+msgid "Import errors"
+msgstr "Importfehler"
+
+msgid "Errors"
+msgstr "Fehler"
+
+msgid "Warnings"
+msgstr "Warnungen"
+
+msgid "Notice"
+msgstr "Hinweis"
+
+msgid "Warning"
+msgstr "Warnung"
+
+msgid "Address directory not changed for a long time"
+msgstr "Adressverzeichnis seit längerer Zeit unverändert"
+
+msgid "Downloaded file unchanged"
+msgstr "Heruntergeladene Datei unverändert"
+
+msgid "The address directory has not changed for a long time."
+msgstr "Das Adressverzeichnis ist seit längerer Zeit unverändert."
+
+msgid "The downloaded file is unchanged since the last run."
+msgstr "Die heruntergeladene Datei ist seit der letzten Ausführung unverändert."
