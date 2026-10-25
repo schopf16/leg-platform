@@ -321,6 +321,8 @@ def _publish(archive, checksum, data_date, progress, claim_token):
         return register.row_count
     previous = register.generation
     previous_count = register.row_count
+    # The day the content changed (D-117 hint): today for another file, the old day for the same one.
+    content_changed_at = timezone.localdate() if register.checksum != checksum else register.content_changed_at
     generation = uuid.uuid4()
     if progress is not None:
         progress.phase("importing")
@@ -332,6 +334,7 @@ def _publish(archive, checksum, data_date, progress, claim_token):
             "data_date": data_date, "imported_at": timezone.now(), "checksum": checksum,
             "row_count": stored, "rejected_count": counts["rejected"], "skipped_count": counts["skipped"],
             "file_row_count": counts["rows"], "address_count": _address_count(),
+            "content_changed_at": content_changed_at,
         }
         if progress is not None:
             progress.phase("publishing")

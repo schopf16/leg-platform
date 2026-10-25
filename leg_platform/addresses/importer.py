@@ -583,6 +583,8 @@ def _publish(archive, checksum, data_date, *, repair=False, progress=None):
         if _is_published(directory, checksum, repair=repair):
             return directory.row_count
         previous = directory.generation
+        # The day the content changed (D-117 hint): today for another file, the old day for the same one.
+        content_changed_at = timezone.localdate() if directory.checksum != checksum else directory.content_changed_at
         try:
             if progress is not None:
                 progress.phase("importing")
@@ -592,7 +594,7 @@ def _publish(archive, checksum, data_date, *, repair=False, progress=None):
             with transaction.atomic(using=DIRECTORY_ALIAS):
                 switched = Directory.objects.filter(pk=1, import_token=token).update(
                     generation=generation, data_date=data_date, imported_at=timezone.now(),
-                    checksum=checksum, row_count=count, has_egid=True,
+                    checksum=checksum, row_count=count, has_egid=True, content_changed_at=content_changed_at,
                 )
                 if not switched:
                     raise ImportFailure("The import lease was lost.")

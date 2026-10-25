@@ -23,6 +23,9 @@ class Directory(models.Model):
     data_date = models.DateField(null=True, verbose_name=_("Data date"))
     imported_at = models.DateTimeField(null=True, verbose_name=_("Imported at"))
     checksum = models.CharField(max_length=64, blank=True)
+    # The day (instance time zone) on which the published file last changed, that is its checksum differed from the one
+    # before (D-117, hint "stale"). Kept when the same file is downloaded again; null before the first publication.
+    content_changed_at = models.DateField(null=True, editable=False)
     row_count = models.PositiveIntegerField(default=0, verbose_name=_("Address count"))
     # Whether the published generation carries the building identifier (EGID, D-049). A generation published
     # before that was added has none: it is replaced by the next import even if the checksum is unchanged.
@@ -259,6 +262,8 @@ class PlantRegister(models.Model):
     imported_at = models.DateTimeField(null=True, editable=False)
     # SHA-256 of the downloaded ZIP. Not compared with an official value (none is published; D-117).
     checksum = models.CharField(max_length=64, blank=True, editable=False)
+    # The day on which the published file last changed (same rule as ``Directory.content_changed_at``, D-117).
+    content_changed_at = models.DateField(null=True, editable=False)
     row_count = models.PositiveIntegerField(default=0, editable=False)
     rejected_count = models.PositiveIntegerField(default=0, editable=False)
     # Plants without an EGID: skipped, not stored (D-117).

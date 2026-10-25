@@ -7987,3 +7987,6 @@ msgstr "Noch nicht ausgewertet"
 
 msgid "Source: BKW Netz, high-discount map (public)"
 msgstr "Quelle: BKW Netz, Hochrabatt-Karte (öffentlich)"
+
+msgid "The file has not changed since %(date)s. Check whether the source is still updated."
+msgstr "Die Datei ist seit dem %(date)s unverändert. Prüfen Sie, ob die Quelle noch aktualisiert wird."

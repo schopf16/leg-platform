@@ -39,6 +39,7 @@
     <dt>{% translate "File size" %}</dt><dd id="directory-file-size">{% if import_status.directory.file_megabytes %}{{ import_status.directory.file_megabytes }} MB{% else %}–{% endif %}</dd>
   </dl>
   <p role="status" id="directory-warning"{% if not import_status.directory.warning %} hidden{% endif %}>{{ import_status.directory.warning }}</p>
+  {% if import_status.directory.content_warning %}<p role="status" class="help" id="directory-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ import_status.directory.content_warning }}</p>{% endif %}
 
   <p class="help">{% translate "A request on this page runs in the portal itself. Addresses already entered are not changed. The result is also written to the application log and to the security log." %}</p>
   <p class="help" id="import-automatic">{{ import_status.automatic_text }}</p>
@@ -61,6 +62,7 @@
   {# role="alert": a failure stays visible until a later run replaces it (D-117); the reason is a fixed text #}
   {% if plant_status.result_reason %}<p class="import-error" id="plant-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="plant-error-text">{{ plant_status.result_reason }}</span></p>{% endif %}
   {% if plant_status.older_data_date %}<p class="help" id="plant-older-data">{% blocktranslate with date=plant_status.older_data_date %}The data from {{ date }} stays valid.{% endblocktranslate %}</p>{% endif %}
+  {% if plant_status.content_warning %}<p role="status" class="help" id="plant-content-warning"><span class="status-dot status-warn" aria-hidden="true"></span>{{ plant_status.content_warning }}</p>{% endif %}
 
   <h3>{% translate "Statistic of the last successful import" %}</h3>
   {% if plant_status.imported %}
