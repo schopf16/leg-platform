@@ -111,6 +111,12 @@ class LockoutListTests(TestCase):
         self.assertIn('<td data-label="Code (shortened)">', locked)
         self.assertNotIn("<table", log)
 
+    def test_the_filters_and_the_line_count_have_plain_labels(self):
+        html = self.client_.get(reverse("admin:failed_logins")).content.decode()
+        self.assertIn("Nach Zeitpunkt", html)
+        self.assertIn("Anzahl anzeigen", html)
+        self.assertIn(">Alle</a>", html)
+
     def test_the_identifier_is_shortened_in_both_sections(self):
         self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
         locked, log = self.sections()

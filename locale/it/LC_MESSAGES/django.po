@@ -8262,6 +8262,9 @@ msgstr "Impostazioni e-mail"
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
 
+msgid "By time"
+msgstr "Per orario"
+
 msgid "Event type"
 msgstr "Tipo di evento"
 

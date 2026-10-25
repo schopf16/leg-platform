@@ -8291,6 +8291,9 @@ msgstr "Paramètres de messagerie"
 msgid "Details in the error log"
 msgstr "Détails dans le journal des erreurs"
 
+msgid "By time"
+msgstr "Par moment"
+
 msgid "Event type"
 msgstr "Type d'événement"
 

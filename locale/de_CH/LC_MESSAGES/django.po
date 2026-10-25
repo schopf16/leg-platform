@@ -8288,6 +8288,9 @@ msgstr "E-Mail-Einstellungen"
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
 
+msgid "By time"
+msgstr "Nach Zeitpunkt"
+
 msgid "Event type"
 msgstr "Ereignisart"
 
@@ -8535,4 +8538,4 @@ msgid "Failed logins"
 msgstr "Fehlgeschlagene Anmeldungen"
 
 msgid "Lines"
-msgstr "Zeilen"
+msgstr "Anzahl anzeigen"

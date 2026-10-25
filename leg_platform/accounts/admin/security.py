@@ -133,12 +133,27 @@ class SecurityEventAdmin(admin.ModelAdmin):
         return False
 
 
+class TimeFilter(admin.DateFieldListFilter):
+    """The time filter of the lockout lists (design review I): titled "By time"; its first choice reads "All"."""
+
+    def __init__(self, field, request, params, model, model_admin, field_path):
+        super().__init__(field, request, params, model, model_admin, field_path)
+        # Django sets the title from the field name in the base class; the plain title is set after it.
+        self.title = _("By time")
+
+    def choices(self, changelist):
+        for index, choice in enumerate(super().choices(changelist)):
+            if index == 0:
+                choice = {**choice, "display": _("All")}
+            yield choice
+
+
 class ReadOnlyAxesAdmin(admin.ModelAdmin):
     """Pseudonymous lockout records, system administrators only."""
 
     actions = None
     list_display = ("attempt_time", "short_username", "path_info", "failures_since_start")
-    list_filter = ("attempt_time", "path_info")
+    list_filter = (("attempt_time", TimeFilter), "path_info")
     ordering = ("-attempt_time",)
     list_per_page = 100
     show_full_result_count = False
