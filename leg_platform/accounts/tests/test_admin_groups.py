@@ -14,10 +14,16 @@ class AdminGroupTests(TestCase):
         self.client_obj.force_login(self.superuser)
 
     def test_the_groups_are_collapsible_blocks(self):
-        response = self.client_obj.get(reverse("admin:index"))
-        html = response.content.decode("utf-8")
-        self.assertIn('<details class="admin-group app-system" open>', html)
-        self.assertIn('<details class="admin-group app-users" open>', html)
+        # Open only with the current page (the rule of the sidebar): the start page has no current page, so no group is open.
+        html = self.client_obj.get(reverse("admin:index")).content.decode("utf-8")
+        self.assertIn('<details class="admin-group app-system">', html)
+        self.assertIn('<details class="admin-group app-users">', html)
+        self.assertNotIn('class="admin-group app-system" open', html)
+        self.assertNotIn('class="admin-group app-users" open', html)
+        # A page of the system group opens that group, and only that group.
+        logmenu = self.client_obj.get(reverse("admin:logmenu")).content.decode("utf-8")
+        self.assertIn('<details class="admin-group app-system" open>', logmenu)
+        self.assertNotIn('class="admin-group app-users" open', logmenu)
 
     def test_the_system_entries_are_in_the_spec_order(self):
         html = self.client_obj.get(reverse("admin:index")).content.decode("utf-8")
