@@ -166,20 +166,41 @@ class HousekeepingStatusAdmin(admin.ModelAdmin):
     def housekeeping_view(self, request):
         if not request.user.has_perm(HOUSEKEEPING_PERMISSION):
             raise PermissionDenied
+        page = reverse("admin:addresses_housekeepingstatus_changelist")
+        notify_form = None
         if request.method == "POST":
-            result = housekeeping.start_manual(request.user)
-            if result == housekeeping.STARTED:
-                self.message_user(request, _("The housekeeping has started. This page shows the result."), messages.SUCCESS)
+            action = request.POST.get("action")
+            if action == "acknowledge":
+                cleared = housekeeping.acknowledge_errors(request.user)
+                self.message_user(request, _("The open errors were acknowledged. The weekly run may run again."), messages.SUCCESS)
+                return HttpResponseRedirect(page)
+            if action == "notify":
+                notify_form = housekeeping.NotificationForm(
+                    request.POST, instance=HousekeepingStatus.objects.get_or_create(pk=1)[0],
+                )
+                if notify_form.is_valid():
+                    with transaction.atomic():
+                        notify_form.save_settings()
+                        security_log.record(SecurityEvent.Event.HOUSEKEEPING_NOTIFICATION_CHANGED, actor=request.user)
+                    self.message_user(request, _("The error email was saved."), messages.SUCCESS)
+                    return HttpResponseRedirect(page)
             else:
-                self.message_user(request, housekeeping.refusal_text(result), messages.WARNING)
-            return HttpResponseRedirect(reverse("admin:addresses_housekeepingstatus_changelist"))
-        if request.method != "GET":
+                result = housekeeping.start_manual(request.user)
+                if result == housekeeping.STARTED:
+                    self.message_user(request, _("The housekeeping has started. This page shows the result."), messages.SUCCESS)
+                else:
+                    self.message_user(request, housekeeping.refusal_text(result), messages.WARNING)
+                return HttpResponseRedirect(page)
+        if request.method not in ("GET", "POST"):
             return HttpResponseNotAllowed(["GET", "POST"])
         context = {
             **self.admin_site.each_context(request),
             **housekeeping.page_context(),
             "title": _("Housekeeping"),
             "opts": self.model._meta,
+            "notify_form": notify_form or housekeeping.NotificationForm(
+                instance=HousekeepingStatus.objects.get_or_create(pk=1)[0],
+            ),
         }
         return TemplateResponse(request, "admin/addresses/housekeeping.html", context)
 

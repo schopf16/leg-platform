@@ -52,7 +52,19 @@ def _notification(sender, greets=True):
     return lambda address, greeting_name="": lambda: sender(address)
 
 
+def _housekeeping_error(address):
+    """The error mail of the housekeeping (D-119): the open error lines are read when the mail is made."""
+    # Imported here: the addresses app imports this package.
+    from leg_platform.addresses import housekeeping
+
+    rows = housekeeping.error_rows(open_only=True)
+    if not rows:
+        return None
+    return lambda: emails.send_housekeeping_error(address, rows)
+
+
 HANDLERS = {
+    MailJob.Kind.HOUSEKEEPING_ERROR: _housekeeping_error,
     MailJob.Kind.RECOVERY_GUIDANCE: recovery.process_recovery_request,
     MailJob.Kind.SIGN_IN_CHANGED: _notification(emails.send_sign_in_changed),
     MailJob.Kind.REGISTRATION: registration.process_registration,

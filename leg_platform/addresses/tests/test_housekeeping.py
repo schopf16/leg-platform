@@ -20,10 +20,11 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts.models import SecurityEvent
+from leg_platform.accounts import mail_queue
+from leg_platform.accounts.models import MailJob, SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.addresses import housekeeping, jobs
-from leg_platform.addresses.models import HousekeepingStatus, ImportRequest
+from leg_platform.addresses.models import HousekeepingError, HousekeepingStatus, ImportRequest
 
 ZURICH = ZoneInfo("Europe/Zurich")
 # 2026-10-25 is a Sunday; 2026-10-19 is the Monday of the same ISO week.
@@ -365,3 +366,150 @@ class ReviewFixTests(HousekeepingBase):
         status = HousekeepingStatus.objects.get(pk=1)
         self.assertEqual(status.sqlite_state, "")
         self.assertIsNotNone(status.running_until)
+
+
+class ErrorStateTests(HousekeepingBase):
+    """The error flag (no weekly run while an error is open), the error log, the error mail and its body."""
+
+    def setUp(self):
+        super().setUp()
+        self.dump.write()
+        self.sqlite.return_value = housekeeping._sqlite_result(
+            HousekeepingStatus.State.FAILED, housekeeping.SQLITE_VACUUM_FAILED, 4096)
+
+    def succeed(self):
+        self.sqlite.return_value = housekeeping._sqlite_result(
+            HousekeepingStatus.State.SUCCEEDED, housekeeping.SQLITE_COMPACTED, 4096, 2048)
+
+    def open_errors(self):
+        return HousekeepingError.objects.filter(cleared_at__isnull=True).count()
+
+    def test_a_failed_step_opens_an_error_with_step_reason_and_dump_name(self):
+        self.run_now()
+        error = HousekeepingError.objects.get()
+        self.assertEqual(error.step, HousekeepingError.Step.SQLITE)
+        self.assertEqual(error.reason, housekeeping.SQLITE_VACUUM_FAILED)
+        self.assertEqual(error.dump_file_name, "housekeeping-20261025T0420Z.sql.gz")
+
+    def test_the_weekly_run_does_not_run_again_while_an_error_is_open(self):
+        self.run_now()
+        self.sqlite.reset_mock()
+        # Same week: no second attempt (the week is already used).
+        self.assertEqual(housekeeping.run_scheduled(SUNDAY_0430), housekeeping.ALREADY_RAN)
+        # Next week: the open error still holds the weekly run back.
+        next_sunday = datetime(2026, 11, 1, 4, 30, tzinfo=ZURICH)
+        self.assertEqual(housekeeping.run_scheduled(next_sunday), housekeeping.ERROR_OPEN)
+        self.sqlite.assert_not_called()
+
+    def test_a_manual_run_is_allowed_while_an_error_is_open(self):
+        self.run_now()
+        self.sqlite.reset_mock()
+        self.assertEqual(self.run_now(NOW + timedelta(minutes=5)), housekeeping.DONE)
+        self.sqlite.assert_called_once()
+
+    def test_a_successful_run_clears_the_error(self):
+        self.run_now()
+        self.succeed()
+        self.run_now(NOW + timedelta(hours=1))
+        self.assertEqual(self.open_errors(), 0)
+        self.assertEqual(HousekeepingError.objects.count(), 1)
+
+    def test_the_error_log_lists_only_housekeeping_errors(self):
+        self.run_now()
+        SecurityEvent.objects.create(event=SecurityEvent.Event.LOG_VIEWED)
+        rows = housekeeping.error_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(set(rows[0]), {"occurred_at", "step", "reason", "dump", "open"})
+
+    def test_the_error_mail_is_queued_only_when_enabled_and_once_per_open_error(self):
+        self.run_now()  # switch off by default
+        with patch("leg_platform.accounts.mail_queue.enqueue") as enqueue:
+            self.run_now(NOW + timedelta(minutes=5))
+            enqueue.assert_not_called()
+        HousekeepingStatus.objects.update_or_create(pk=1, defaults={
+            "notify_enabled": True, "notify_email": "housekeeping@example.org",
+        })
+        self.succeed()
+        self.run_now(NOW + timedelta(hours=1))  # clears the errors
+        self.failing()
+        with patch("leg_platform.accounts.mail_queue.enqueue") as enqueue:
+            self.run_now(NOW + timedelta(hours=2))
+            enqueue.assert_called_once_with(MailJob.Kind.HOUSEKEEPING_ERROR, "housekeeping@example.org")
+            self.run_now(NOW + timedelta(hours=2, minutes=5))  # error still open: no second mail
+            enqueue.assert_called_once()
+
+    def failing(self):
+        self.sqlite.return_value = housekeeping._sqlite_result(
+            HousekeepingStatus.State.FAILED, housekeeping.SQLITE_VACUUM_FAILED, 4096)
+
+    def test_the_error_mail_body_holds_the_log_lines_and_no_dump_content(self):
+        dump_file = self.dump.path.parent / "housekeeping-20261025T0420Z.sql.gz"
+        dump_file.write_text("SECRET-DUMP-CONTENT INSERT INTO accounts_user", encoding="utf-8")
+        self.run_now()
+        send = mail_queue.HANDLERS[MailJob.Kind.HOUSEKEEPING_ERROR]("housekeeping@example.org")
+        self.assertIsNotNone(send)
+        with patch("leg_platform.accounts.emails._deliver") as deliver:
+            send()
+        address, subject, body = deliver.call_args.args
+        self.assertEqual(address, "housekeeping@example.org")
+        self.assertIn("housekeeping-20261025T0420Z.sql.gz", body)
+        self.assertIn(" | ", body)
+        self.assertNotIn("SECRET-DUMP-CONTENT", body)
+        self.assertNotIn("INSERT", body)
+
+    def test_no_mail_job_is_made_without_an_open_error(self):
+        self.assertIsNone(mail_queue.HANDLERS[MailJob.Kind.HOUSEKEEPING_ERROR]("housekeeping@example.org"))
+
+
+class ErrorAdminTests(HousekeepingBase):
+    def setUp(self):
+        super().setUp()
+        self.dump.write()
+        self.sqlite.return_value = housekeeping._sqlite_result(
+            HousekeepingStatus.State.FAILED, housekeeping.SQLITE_VACUUM_FAILED, 4096)
+        self.person = create_active_user("housekeeping.errors@example.org")
+        self.person.set_privileges(is_staff=True, is_superuser=False)
+
+    def client_for(self, with_permission):
+        if with_permission:
+            self.person.user_permissions.add(Permission.objects.get(codename="run_housekeeping"))
+        client = VerifiedClient()
+        client.force_login(self.person)
+        return client
+
+    def test_acknowledge_clears_the_flag_and_starts_and_changes_no_run(self):
+        self.run_now()
+        calls = self.sqlite.call_count
+        client = self.client_for(True)
+        with patch("leg_platform.addresses.housekeeping.threading.Thread") as thread:
+            response = client.post(reverse("admin:addresses_housekeepingstatus_changelist"), {"action": "acknowledge"})
+        self.assertEqual(response.status_code, 302)
+        thread.assert_not_called()
+        self.assertEqual(self.sqlite.call_count, calls)
+        self.assertEqual(HousekeepingError.objects.filter(cleared_at__isnull=True).count(), 0)
+        self.assertEqual(HousekeepingStatus.objects.get(pk=1).running_until, None)
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED).count(), 1)
+
+    def test_acknowledge_is_denied_without_the_right(self):
+        self.run_now()
+        client = self.client_for(False)
+        response = client.post(reverse("admin:addresses_housekeepingstatus_changelist"), {"action": "acknowledge"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(HousekeepingError.objects.filter(cleared_at__isnull=True).count(), 1)
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED).exists())
+
+    def test_the_notification_setting_needs_the_right_and_a_valid_address(self):
+        page = reverse("admin:addresses_housekeepingstatus_changelist")
+        data = {"action": "notify", "notify_enabled": "on", "notify_email": "housekeeping@example.org"}
+        response = self.client_for(False).post(page, data)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
+        client = self.client_for(True)
+        invalid = client.post(page, {**data, "notify_email": "not-an-address"})
+        self.assertEqual(invalid.status_code, 200)
+        self.assertFalse(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
+        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_NOTIFICATION_CHANGED).exists())
+        valid = client.post(page, data)
+        self.assertEqual(valid.status_code, 302)
+        self.assertTrue(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
+        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_NOTIFICATION_CHANGED).count(), 1)

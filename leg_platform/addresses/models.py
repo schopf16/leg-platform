@@ -341,6 +341,9 @@ class HousekeepingStatus(models.Model):
     mariadb_message = models.CharField(max_length=40, blank=True, verbose_name=_("Application database result"))
     # {"table name": {"before": bytes, "after": bytes}} for the tables of the optimisation.
     mariadb_sizes = models.JSONField(default=dict, blank=True, verbose_name=_("Table sizes"))
+    # The error mail (D-119): off by default; the recipient is checked as an email address.
+    notify_enabled = models.BooleanField(default=False, verbose_name=_("Send an email on error"))
+    notify_email = models.EmailField(blank=True, verbose_name=_("Email address for errors"))
 
     class Meta:
         default_permissions = ()
@@ -355,3 +358,28 @@ class HousekeepingStatus(models.Model):
     def lease_active(cls, now):
         """True while a housekeeping run holds its lease (``jobs.claim`` refuses imports then)."""
         return cls.objects.filter(pk=1, running_until__gt=now).exists()
+
+
+class HousekeepingError(models.Model):
+    """One error of a housekeeping run (D-119), application database. Open until a successful run clears it.
+
+    Holds fixed message codes and the name of the dump file only: never SQL, table content or dump content.
+    """
+
+    class Step(models.TextChoices):
+        SQLITE = "sqlite", _("Address directory")
+        MARIADB = "mariadb", _("Application database")
+        DUMP = "dump", _("Dump")
+        CLEANUP = "cleanup", _("Cleanup")
+
+    occurred_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Occurred at"))
+    step = models.CharField(max_length=12, choices=Step, verbose_name=_("Step"))
+    reason = models.CharField(max_length=40, verbose_name=_("Reason"))
+    dump_file_name = models.CharField(max_length=255, blank=True, verbose_name=_("Dump file"))
+    cleared_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cleared at"))
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["-occurred_at", "-id"]
+        verbose_name = _("Housekeeping error")
+        verbose_name_plural = _("Housekeeping errors")

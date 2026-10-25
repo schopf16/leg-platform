@@ -23,6 +23,7 @@ import threading
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
+from django import forms
 from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -31,7 +32,7 @@ from leg_platform.accounts import security_log
 from leg_platform.accounts.models import ConfirmationFailure, LoginIpAttempt, MailJob, SecurityEvent, SessionCodeFailure
 
 from . import jobs, storage
-from .models import BuildingLookup, HousekeepingStatus, ImportRequest
+from .models import BuildingLookup, HousekeepingError, HousekeepingStatus, ImportRequest
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ DONE = "done"
 STARTED = "started"
 BUSY = "busy"
 SETUP_RUNNING = "setup_running"
+ERROR_OPEN = "error_open"
 IMPORT_RUNNING = "import_running"
 NOT_SUNDAY = "not_sunday"
 BEFORE_TIME = "before_time"
@@ -136,6 +138,9 @@ def _claim(trigger, actor, now, once_per_week=False):
         week = _week(now)
         if once_per_week and status.last_run_week == week:
             return ALREADY_RAN
+        # The weekly run never repeats while an error is open: the failed dump is not replaced (owner decision).
+        if once_per_week and open_error_exists():
+            return ERROR_OPEN
         status.running_until = now + RUN_LEASE
         status.started_at = now
         status.finished_at = None
@@ -320,13 +325,86 @@ def _guarded(step, now, failed_fields):
         return failed_fields(STEP_FAILED)
 
 
+DUMP_REASONS = frozenset({BACKUP_MISSING, BACKUP_UNREADABLE, BACKUP_INVALID, BACKUP_FAILED, BACKUP_OLD})
+
+
+def _errors_of(sqlite_fields, mariadb_fields):
+    """The failed steps of a run as ``(step, message code)``. A MariaDB step that is not applicable is no error."""
+    found = []
+    if sqlite_fields["sqlite_state"] != HousekeepingStatus.State.SUCCEEDED:
+        found.append((HousekeepingError.Step.SQLITE, sqlite_fields["sqlite_message"]))
+    state, message = mariadb_fields["mariadb_state"], mariadb_fields["mariadb_message"]
+    if state == HousekeepingStatus.State.FAILED:
+        found.append((HousekeepingError.Step.MARIADB, message))
+    elif state == HousekeepingStatus.State.SKIPPED and message in DUMP_REASONS:
+        found.append((HousekeepingError.Step.DUMP, message))
+    return found
+
+
+def _dump_name():
+    """The name of the dump the status file names (no content is read), "" when there is none."""
+    backup, _code = read_backup_status()
+    return backup["file_name"][:255] if backup else ""
+
+
+def _record_outcome(errors):
+    """Open the errors of a failed run, or clear the open ones after a successful run; the error mail on opening."""
+    # Imported here: the mail queue imports the accounts app, which imports the admin of this app.
+    from leg_platform.accounts import mail_queue
+    from leg_platform.accounts.models import MailJob
+
+    with transaction.atomic():
+        if not errors:
+            HousekeepingError.objects.filter(cleared_at__isnull=True).update(cleared_at=timezone.now())
+            return
+        was_open = HousekeepingError.objects.filter(cleared_at__isnull=True).exists()
+        dump_name = _dump_name()
+        for step, reason in errors:
+            HousekeepingError.objects.create(step=step, reason=reason, dump_file_name=dump_name)
+        status = HousekeepingStatus.objects.get(pk=1)
+        if not was_open and status.notify_enabled and status.notify_email:
+            mail_queue.enqueue(MailJob.Kind.HOUSEKEEPING_ERROR, status.notify_email)
+
+
+def open_error_exists():
+    return HousekeepingError.objects.filter(cleared_at__isnull=True).exists()
+
+
+def acknowledge_errors(actor, now=None):
+    """Acknowledge the errors: clears the open-error flag only. It touches no dump, no database table, no file and
+    starts no run; the next weekly run may then run again (D-119). Returns the number of errors cleared."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        cleared = HousekeepingError.objects.filter(cleared_at__isnull=True).update(cleared_at=now)
+        if cleared:
+            security_log.record(SecurityEvent.Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED, actor=actor)
+    return cleared
+
+
+def error_rows(limit=None, open_only=False):
+    """The housekeeping errors, newest first: step, fixed reason text, dump file name (never content or SQL)."""
+    query = HousekeepingError.objects.order_by("-occurred_at", "-id")
+    if open_only:
+        query = query.filter(cleared_at__isnull=True)
+    if limit:
+        query = query[:limit]
+    return [
+        {
+            "occurred_at": error.occurred_at, "step": error.get_step_display(),
+            "reason": message_text(error.reason), "dump": error.dump_file_name, "open": error.cleared_at is None,
+        }
+        for error in query
+    ]
+
+
 def _execute(now):
     """Both steps, then the results and the release of the lease in one write.
 
     The write is limited to the run that holds the lease (``started_at``): a run that ends late cannot overwrite the
-    results of a newer run.
+    results of a newer run. Errors are recorded only for the run that wrote its results.
     """
     fields = {}
+    errors = []
     try:
         sqlite_fields = _guarded(
             _sqlite_step, now,
@@ -337,15 +415,38 @@ def _execute(now):
             lambda code: _mariadb_result(HousekeepingStatus.State.FAILED, code),
         )
         fields = {**sqlite_fields, **mariadb_fields}
+        errors = _errors_of(sqlite_fields, mariadb_fields)
     finally:
-        HousekeepingStatus.objects.filter(pk=1, started_at=now).update(
+        written = HousekeepingStatus.objects.filter(pk=1, started_at=now).update(
             running_until=None, finished_at=timezone.now(), **fields,
         )
-    if fields:
+    if fields and written:
+        _record_outcome(errors)
         logger.info(
             "Housekeeping finished: address directory %s, application database %s.",
             fields["sqlite_state"], fields["mariadb_state"],
         )
+
+
+class NotificationForm(forms.ModelForm):
+    """The error mail of the administration page (D-119): an enable switch and the address, checked as an email."""
+
+    class Meta:
+        model = HousekeepingStatus
+        fields = ["notify_enabled", "notify_email"]
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("notify_enabled") and not cleaned.get("notify_email"):
+            self.add_error("notify_email", _("Enter an email address for the errors, or switch the email off."))
+        return cleaned
+
+    def save_settings(self):
+        """Save the two fields only: the row also holds the lease and the results of a run that may be going on."""
+        status = self.save(commit=False)
+        status.save(update_fields=["notify_enabled", "notify_email"])
+        return status
+
 
 
 def _release_lease():
@@ -416,6 +517,7 @@ def refusal_text(result):
         BUSY: _("Another housekeeping run is active."),
         IMPORT_RUNNING: _("An import is running. Try again when it has finished."),
         SETUP_RUNNING: _("The address directory is being set up. Try again later."),
+        ERROR_OPEN: _("An error of an earlier run is open. The weekly run waits; start a run here."),
     }
     return texts.get(result, _("The housekeeping did not start."))
 
@@ -455,6 +557,8 @@ def page_context(now=None):
         "backup": backup,
         "backup_text": message_text(backup_code) if backup_code else "",
         "backup_fresh": backup_verdict(now) is None,
+        "errors": error_rows(limit=20),
+        "open_error": open_error_exists(),
     }
 
 

@@ -8134,3 +8134,72 @@ msgstr "Schritt"
 
 msgid "The address directory is being set up. Try again later."
 msgstr "Das Adressverzeichnis wird eingerichtet. Versuchen Sie es später erneut."
+
+msgid "Send an email on error"
+msgstr "E-Mail bei Fehler senden"
+
+msgid "Email address for errors"
+msgstr "E-Mail-Adresse für Fehler"
+
+msgid "Housekeeping error"
+msgstr "Wartungsfehler"
+
+msgid "Housekeeping errors"
+msgstr "Wartungsfehler"
+
+msgid "Occurred at"
+msgstr "Eingetreten am"
+
+msgid "Dump file"
+msgstr "Sicherungsdatei"
+
+msgid "Cleared at"
+msgstr "Quittiert am"
+
+msgid "Dump"
+msgstr "Sicherung"
+
+msgid "Cleanup"
+msgstr "Aufräumen"
+
+msgid "Errors of the housekeeping"
+msgstr "Fehler der Wartung"
+
+msgid "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds."
+msgstr "Ein Fehler ist offen. Die wöchentliche Wartung läuft nicht erneut, bis der Fehler quittiert ist oder eine manuelle Wartung erfolgreich war."
+
+msgid "Acknowledge the errors"
+msgstr "Fehler quittieren"
+
+msgid "No error has been recorded."
+msgstr "Kein Fehler erfasst."
+
+msgid "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)."
+msgstr "Eine Sicherungsdatei wird von dieser Seite nicht zurückgespielt. Das Zurückspielen ist ein manuelles Verfahren auf dem Server (Anleitung: Betriebsdokument, Abschnitt 12.2)."
+
+msgid "Email on error"
+msgstr "E-Mail bei Fehler"
+
+msgid "The open errors were acknowledged. The weekly run may run again."
+msgstr "Die offenen Fehler wurden quittiert. Die wöchentliche Wartung darf wieder laufen."
+
+msgid "The error email was saved."
+msgstr "Die E-Mail bei Fehler wurde gespeichert."
+
+msgid "Enter an email address for the errors, or switch the email off."
+msgstr "Geben Sie eine E-Mail-Adresse für die Fehler ein oder schalten Sie die E-Mail aus."
+
+msgid "An error of an earlier run is open. The weekly run waits; start a run here."
+msgstr "Ein Fehler eines früheren Laufs ist offen. Die wöchentliche Wartung wartet; starten Sie hier eine Wartung."
+
+msgid "Housekeeping of the databases: error"
+msgstr "Wartung der Datenbanken: Fehler"
+
+msgid "The housekeeping of the databases has an open error. The lines below are the error log. They contain no data of the databases and no content of a dump file."
+msgstr "Die Wartung der Datenbanken hat einen offenen Fehler. Die Zeilen unten sind das Fehlerprotokoll. Sie enthalten keine Daten der Datenbanken und keinen Inhalt einer Sicherungsdatei."
+
+msgid "Housekeeping error notification changed"
+msgstr "Fehler-E-Mail der Wartung geändert"
+
+msgid "Housekeeping errors acknowledged"
+msgstr "Wartungsfehler quittiert"

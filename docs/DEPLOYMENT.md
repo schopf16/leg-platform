@@ -1310,17 +1310,20 @@ set -euo pipefail
 umask 077
 dir=/var/backups/leg-platform
 rm -f -- "$dir"/housekeeping-*.sql.gz.tmp  # leftovers of killed runs, always
-answer=$(mariadb --batch --skip-column-names leg_platform -e "SELECT mariadb_state, running_until IS NULL FROM addresses_housekeepingstatus WHERE id=1")
-if [ "$answer" != $'succeeded\t1' ]; then
-  echo "The housekeeping did not succeed or still runs; no dump deleted." >&2
+row=$(mariadb --batch --skip-column-names leg_platform -e "SELECT running_until IS NULL, (SELECT COUNT(*) FROM addresses_housekeepingerror WHERE cleared_at IS NULL) FROM addresses_housekeepingstatus WHERE id=1")
+IFS=$'\t' read -r finished open <<< "$row"
+if [ "$finished" != "1" ]; then
+  echo "A housekeeping run still runs; no dump deleted." >&2
   exit 0
 fi
-newest=$(ls -1 "$dir"/housekeeping-*.sql.gz 2>/dev/null | sort | tail -n 1 || true)
-[ -n "$newest" ] || exit 0
-ls -1 "$dir"/housekeeping-*.sql.gz | sort | { grep -v -x -F "$newest" || true; } | xargs -r rm -f --
+# Keep the newest dump. While an error is open keep the newest two (the dump of the failed run stays).
+keep=1
+if [ "$open" != "0" ]; then keep=2; fi
+{ ls -1 "$dir"/housekeeping-*.sql.gz 2>/dev/null || true; } | sort | head -n -"$keep" | xargs -r rm -f --
 ```
 
-* **Retention of the housekeeping dumps (not decided).** The cleanup above removes only `housekeeping-*.sql.gz.tmp` leftovers in every case. Finished dumps are deleted only after an error-free run, as shown. Dumps of runs whose MariaDB step did not succeed stay in `/var/backups/leg-platform` until the owner decides how long to keep them. Check their disk use before go-live.
+* **Retention of the housekeeping dumps (owner decision 2026-10-26).** The cleanup removes `housekeeping-*.sql.gz.tmp` leftovers in every case. With no open error it keeps the newest dump only. While an error is open it keeps the newest two dumps, so the dump of a failed run stays for a manual restore. The root cleanup never deletes the only dump of an open error. The daily dump (12.2) is not touched.
+* **Restore (owner decision pending).** No restore button and no restore code exist. A restore is a manual root procedure: the runbook of 12.2 (`mariadb` restore of a dump into a scratch database first, then the owner's decision on the live database).
 * **Status file.** `/var/lib/leg-platform` (root, 0755) holds `housekeeping-backup.json` (0644, root). The application only reads it. A file that is missing, unreadable, reports a failure or is older than two hours skips the optimisation of the application tables; the reason is shown on the page.
 * **Owner steps on the server (not done; not verified).** (1) Create the two scripts, mode 0750, owner root. (2) Create the four units and enable the timers: `systemctl enable --now leg-housekeeping-backup.timer leg-housekeeping-cleanup.timer`. (3) Run `systemctl start leg-housekeeping-backup.service`, then check `/var/lib/leg-platform/housekeeping-backup.json` and run `gzip -t` on the new dump. (4) Keep `run_scheduled_tasks` on its 15-minute schedule. (5) Check that the free disk space in the folder of the address directory is at least twice its size (file plus `-wal`) plus 1 GiB; `VACUUM` needs the temporary copy there.
 * **Lock time.** `OPTIMIZE TABLE` locks each table while it runs. The default time is Sunday 04:30; the daily address import runs at 03:00 and must have finished by then.

@@ -2998,6 +2998,8 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0011_transformer_scan"),
                 ("addresses", "0012_content_changed_at"),
                 ("addresses", "0013_housekeepingstatus"),
+                ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
+                ("addresses", "0013_housekeepingstatus"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.

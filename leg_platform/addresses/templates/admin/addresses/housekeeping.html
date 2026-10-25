@@ -21,6 +21,41 @@
   </table>
 </section>
 
+<section class="data-import-block" id="housekeeping-errors" aria-labelledby="housekeeping-errors-heading">
+  <h2 id="housekeeping-errors-heading">{% translate "Errors of the housekeeping" %}</h2>
+  {% if open_error %}
+    <p class="import-error" role="alert">{% translate "An error is open. The weekly run does not run again until the error is acknowledged or a manual run succeeds." %}</p>
+    <form method="post" class="import-form">{% csrf_token %}
+      <input type="hidden" name="action" value="acknowledge">
+      <button type="submit" class="button">{% translate "Acknowledge the errors" %}</button>
+    </form>
+  {% endif %}
+  {% if errors %}
+  <table id="housekeeping-error-log">
+    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Dump file" %}</th><th>{% translate "Open" %}</th></tr></thead>
+    <tbody>
+    {% for error in errors %}
+      <tr><td>{{ error.occurred_at }}</td><td>{{ error.step }}</td><td>{{ error.reason }}</td><td>{{ error.dump|default:"–" }}</td><td>{% if error.open %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="help">{% translate "No error has been recorded." %}</p>
+  {% endif %}
+  <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)." %}</p>
+</section>
+
+<section class="data-import-block" id="housekeeping-notify" aria-labelledby="housekeeping-notify-heading">
+  <h2 id="housekeeping-notify-heading">{% translate "Email on error" %}</h2>
+  <form method="post" class="import-form">{% csrf_token %}
+    <input type="hidden" name="action" value="notify">
+    {{ notify_form.non_field_errors }}
+    <p>{{ notify_form.notify_enabled.errors }}<label for="{{ notify_form.notify_enabled.id_for_label }}">{{ notify_form.notify_enabled }} {% translate "Send an email on error" %}</label></p>
+    <p>{{ notify_form.notify_email.errors }}<label for="{{ notify_form.notify_email.id_for_label }}">{% translate "Email address for errors" %}</label><br>{{ notify_form.notify_email }}</p>
+    <button type="submit" class="button">{% translate "Save" %}</button>
+  </form>
+</section>
+
 {% if sizes %}
 <section class="data-import-block" id="housekeeping-sizes" aria-labelledby="housekeeping-sizes-heading">
   <h2 id="housekeeping-sizes-heading">{% translate "Table sizes of the application database" %}</h2>
@@ -41,7 +76,7 @@
     <dl class="import-facts">
       <dt>{% translate "Finished at" %}</dt><dd>{{ backup.finished_at }}</dd>
       <dt>{% translate "Result" %}</dt><dd>{% if backup.ok %}{% translate "Successful" %}{% else %}{% translate "Failed" %}{% endif %}</dd>
-      <dt>{% translate "File" %}</dt><dd>{{ backup.file_name }}</dd>
+      <dt>{% translate "Dump file" %}</dt><dd>{{ backup.file_name }}</dd>
       <dt>{% translate "Usable for the optimisation" %}</dt><dd>{% if backup_fresh %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</dd>
     </dl>
   {% else %}
