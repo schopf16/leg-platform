@@ -62,11 +62,11 @@ Configuration comes only from environment variables (`leg_platform/settings.py`,
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY` | user variables (setup script) | Local MariaDB, its application account, the local secret key. |
 | `EMAIL_MODE` | not set; default `console` | Emails go to the standard output of the mail worker (section 6). `graph` is refused locally; the allowlist mode is gone (D-116). |
 | `DJANGO_ALLOWED_HOSTS` | per process, start block (section 6) | `127.0.0.1,localhost`. Not a permanent user variable. |
-| (no variable) | in the administration | The address of the portal ("Adresse des Portals", Portal-Einstellungen, D-116) is the origin for email links and WebAuthn. Enter `http://localhost:<port>` for the port in use; one value per database. |
+| `INSTANCE_BASE_URL` | per process for passkey work | Canonical origin for email links and WebAuthn. Use `http://localhost:<port>` consistently for server, worker and browser; do not mix it with the loopback IP hostname. |
 | `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, start block (section 6) | **Fallback** for "Portal-Einstellungen" (D-056, D-073). Logos: `$HOME\.leg-platform-dev\instance-static\instance\LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg` (copied from `LEG-Design-Vorgaben\logo\`). Without them the pages show the name as text. |
 | `DJANGO_DEBUG` | not set (False) | `True` only with `APP_ENV=local`; not needed (production-like errors and the full CSP suit a design review). |
 
-Never permanent user variables locally: `BOOTSTRAP_SYSTEM_ADMIN_EMAIL`, `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`, `EMAIL_ALLOWED_RECIPIENTS`, `INSTANCE_BASE_URL`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS`; the application refuses to start with the last four (D-116). The bootstrap variables only for one `setup_instance` run (section 5).
+Never permanent user variables locally: `BOOTSTRAP_SYSTEM_ADMIN_EMAIL`, `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`, `EMAIL_ALLOWED_RECIPIENTS`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS`; the application refuses to start with them (D-116). The bootstrap variables only for one `setup_instance` run (section 5).
 
 ## 5. Database and migrations
 
@@ -110,7 +110,7 @@ $Port = 8000
 $Settings = 'leg_platform.settings'
 
 if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
-    "Port $Port is in use. Do not kill the process. Use the running server, or choose another port and set the address of the portal in the administration (section 4)."
+    "Port $Port is in use. Do not kill the process. Use the running server, or choose another port and set INSTANCE_BASE_URL (section 4)."
 } elseif ((Test-Path "$State\runserver.pid") -or (Test-Path "$State\worker.pid")) {
     'A PID file exists. Run the status block of section 8 first; remove a PID file only if it is stale.'
 } else {
@@ -119,7 +119,7 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
     $env:ADDRESS_IMPORT_AUTOMATIC = 'False'
     # D-106: localhost is a potentially trustworthy WebAuthn origin with a domain RP-ID.
     # Open only this canonical hostname; the listener remains loopback-only.
-    # D-116: the address of the portal (WebAuthn origin) is set in the administration: http://localhost:$Port
+    $env:INSTANCE_BASE_URL = "http://localhost:$Port"
     # Local instance presentation (section 4)
     $env:INSTANCE_NAME = 'LEG-Portal'
     $env:INSTANCE_WEBSITE_URL = 'https://leg-ittigen.ch'
@@ -332,6 +332,7 @@ Deployment check with synthetic production-style variables (no real secrets; the
 ```powershell
 $env:APP_ENV = 'production'; $env:EMAIL_MODE = 'graph'
 $env:DJANGO_ALLOWED_HOSTS = 'portal.example.org'
+$env:INSTANCE_BASE_URL = 'https://portal.example.org'
 $env:INSTANCE_PRIVACY_URL = 'https://www.example.org/privacy'
 $env:DJANGO_SECRET_KEY = (.\.venv\Scripts\python -c "import secrets; print(secrets.token_urlsafe(50))")
 Remove-Item Env:DJANGO_DEBUG, Env:EMAIL_ALLOWED_RECIPIENTS -ErrorAction SilentlyContinue

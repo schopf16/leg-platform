@@ -180,12 +180,6 @@ msgstr "Anzahl Adressen"
 msgid "Address directory"
 msgstr "Adressverzeichnis"
 
-msgid "Address directory import"
-msgstr "Import des Adressverzeichnisses"
-
-msgid "Address directory imports"
-msgstr "Importe des Adressverzeichnisses"
-
 msgid "Matching addresses"
 msgstr "Passende Adressen"
 
@@ -499,7 +493,7 @@ msgid "Once a day from %(time)s the scheduled tasks of the server check whether 
 msgstr "Einmal täglich ab %(time)s prüfen die geplanten Aufgaben des Servers, ob das Verzeichnis aktualisiert werden muss: wenn eine Adresse nicht gefunden wurde oder wenn die regelmässige Aktualisierung fällig ist. Eine Anforderung auf dieser Seite startet sofort."
 
 msgid "An address could not be found: the directory is updated at the next daily run."
-msgstr "Eine Adresse wurde nicht gefunden: Das Verzeichnis wird beim nächsten täglichen Lauf aktualisiert."
+msgstr "Eine Adresse wurde nicht gefunden: Das Verzeichnis wird bei der nächsten täglichen Aktualisierung aktualisiert."
 
 msgid "The first refresh is due now."
 msgstr "Die erste Aktualisierung ist jetzt fällig."
@@ -1672,9 +1666,6 @@ msgstr "Mandanten-ID"
 
 msgid "client ID"
 msgstr "Client-ID"
-
-msgid "sender mailbox"
-msgstr "Absender-Postfach"
 
 msgid "Microsoft Graph configuration"
 msgstr "Microsoft-Graph-Konfiguration"
@@ -2905,9 +2896,6 @@ msgstr "Vertrauenswürdige Herkunft von Formularen"
 
 msgid "Email delivery"
 msgstr "E-Mail-Versand"
-
-msgid "Sender address of emails"
-msgstr "Absenderadresse der E-Mails"
 
 msgid "Security log: days kept (usual, long)"
 msgstr "Sicherheitsprotokoll: Aufbewahrung in Tagen (üblich, lang)"
@@ -7787,50 +7775,122 @@ msgstr "Dies ist eine Kopie der Nachricht, die Sie an die LEG gesendet haben:"
 msgid "Please try again later."
 msgstr "Bitte versuchen Sie es später erneut."
 
-msgid "Enter the address of the portal with https://, for example https://portal.example.org."
-msgstr "Geben Sie die Adresse des Portals mit https:// ein, zum Beispiel https://portal.example.org."
-
-msgid "Enter only the address, without a path."
-msgstr "Geben Sie nur die Adresse ein, ohne Pfad."
-
-msgid "Enter a valid port."
-msgstr "Geben Sie einen gültigen Port ein."
-
-msgid "The host of this address must be one of the allowed host names of the server."
-msgstr "Der Host dieser Adresse muss einer der erlaubten Host-Namen des Servers sein."
-
 msgid "Enter one complete email address, for example noreply@example.org."
 msgstr "Geben Sie eine vollständige E-Mail-Adresse ein, zum Beispiel noreply@example.org."
-
-msgid "address of the portal"
-msgstr "Adresse des Portals"
-
-msgid "sender address of emails"
-msgstr "Absenderadresse der E-Mails"
 
 msgid "address for the messages of the contact form"
 msgstr "Adresse für die Nachrichten des Kontaktformulars"
 
-msgid "The address with which the portal is reached, for example https://portal.example.org (only the origin, no path). Links in emails are built from it: without it no email with a link is sent. Development: http://127.0.0.1:8000."
-msgstr "Die Adresse, unter der das Portal erreicht wird, zum Beispiel https://portal.example.org (nur der Ursprung, ohne Pfad). Links in E-Mails werden daraus gebildet: Ohne diese Adresse wird keine E-Mail mit Link versendet. Entwicklung: http://127.0.0.1:8000."
-
-msgid "The address all emails are sent from. Without it no email is sent. Use an address of the instance that does not invite a reply, for example noreply@example.org."
-msgstr "Die Adresse, von der alle E-Mails gesendet werden. Ohne sie wird keine E-Mail versendet. Verwenden Sie eine Adresse der Instanz, die nicht zu einer Antwort einlädt, zum Beispiel noreply@example.org."
-
 msgid "The LEG receives the messages of the contact form here. Without it the contact form is not offered."
 msgstr "Die LEG empfängt hier die Nachrichten des Kontaktformulars. Ohne diese Adresse wird das Kontaktformular nicht angeboten."
 
-msgid "Addresses of the instance"
-msgstr "Adressen der Instanz"
-
-msgid "The address of the portal and the addresses of the emails. Without the address of the portal no email with a link is sent; without the sender no email is sent."
-msgstr "Die Adresse des Portals und die Adressen der E-Mails. Ohne die Adresse des Portals wird keine E-Mail mit Link versendet; ohne Absender wird keine E-Mail versendet."
-
-msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the security settings decide how the portal is reached."
-msgstr "Diese Werte setzt der Betreiber in der Serverkonfiguration; sie können hier nicht geändert werden. Hostname, erlaubte Hosts und Sicherheitseinstellungen bestimmen, wie das Portal erreicht wird."
-
-msgid "https://portal.example.org"
-msgstr "https://portal.example.org"
-
 msgid "noreply@example.org"
 msgstr "noreply@example.org"
+
+msgid "Plant register"
+msgstr "Anlagenregister"
+
+msgid "Plants of the register"
+msgstr "Anlagen des Registers"
+
+msgid "Plant of the register"
+msgstr "Anlage des Registers"
+
+msgid "Plant register import completed"
+msgstr "Import des Anlagenregisters abgeschlossen"
+
+msgid "Plant register import failed"
+msgstr "Import des Anlagenregisters fehlgeschlagen"
+
+msgid "The plant register file has an unexpected format."
+msgstr "Die Datei des Anlagenregisters hat ein unerwartetes Format."
+
+msgid "The plant register file is larger than allowed."
+msgstr "Die Datei des Anlagenregisters ist grösser als erlaubt."
+
+msgid "The number of plants changed too much. Nothing was changed."
+msgstr "Die Anzahl der Anlagen hat sich zu stark verändert. Es wurde nichts geändert."
+
+msgid "The plant register contains no plants."
+msgstr "Das Anlagenregister enthält keine Anlagen."
+
+msgid "The plant register could not be downloaded or read. Check the network connection and try again."
+msgstr "Das Anlagenregister konnte nicht heruntergeladen oder gelesen werden. Prüfen Sie die Netzwerkverbindung und versuchen Sie es erneut."
+
+msgid "Base address of the portal (links in emails)"
+msgstr "Basisadresse des Portals (Links in E-Mails)"
+
+msgid "These values are set by the operator in the server configuration and cannot be changed here: the host name, the allowed hosts and the base address decide where the links in emails and the security settings point, so they are not stored where the portal settings can change them."
+msgstr "Diese Werte legt der Betrieb in der Serverkonfiguration fest, und sie können hier nicht geändert werden: Der Host-Name, die erlaubten Hosts und die Basisadresse bestimmen, wohin die Links in E-Mails und die Sicherheitseinstellungen zeigen. Darum liegen sie nicht dort, wo die Portal-Einstellungen sie ändern können."
+
+msgid "sender address"
+msgstr "Absenderadresse"
+
+msgid "The address all emails are sent from. It is the mailbox of the Microsoft Graph application. Without it no email is sent. Use an address of the instance that does not invite a reply, for example noreply@example.org."
+msgstr "Die Adresse, von der aus alle E-Mails gesendet werden. Es ist das Postfach der Microsoft-Graph-Anwendung. Ohne sie wird keine E-Mail versendet. Verwenden Sie eine Adresse, die nicht zu einer Antwort einlädt, zum Beispiel noreply@example.org."
+
+msgid "Microsoft Graph"
+msgstr "Microsoft Graph"
+
+msgid "The application that sends the emails through Microsoft Graph."
+msgstr "Die Anwendung, die die E-Mails über Microsoft Graph versendet."
+
+msgid "Sender and contact"
+msgstr "Absender und Kontakt"
+
+msgid "All emails are sent from the sender address; without it no email is sent. The messages of the contact form go to the contact address."
+msgstr "Alle E-Mails werden von der Absenderadresse aus versendet; ohne sie wird keine E-Mail versendet. Die Nachrichten des Kontaktformulars gehen an die Kontaktadresse."
+
+msgid "Email texts"
+msgstr "E-Mail-Texte"
+
+msgid "The subject and the text of every email are edited under Mail texts."
+msgstr "Betreff und Text jeder E-Mail werden unter Mailtexte bearbeitet."
+
+msgid "Data import"
+msgstr "Datenimport"
+
+msgid "Data imports"
+msgstr "Datenimporte"
+
+msgid "PV plants (BFE)"
+msgstr "PV-Anlagen (BFE)"
+
+msgid "Not imported yet"
+msgstr "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie."
+
+msgid "Last plant run"
+msgstr "Letzte Aktualisierung der Anlagen"
+
+msgid "Result"
+msgstr "Ergebnis"
+
+msgid "Addresses in the directory"
+msgstr "Adressen im Verzeichnis"
+
+msgid "Rows of the plant file"
+msgstr "Einträge der Datei"
+
+msgid "Plants taken over"
+msgstr "Übernommene Anlagen"
+
+msgid "Rows ignored: failed a check"
+msgstr "Nicht übernommene Einträge: Prüfung nicht bestanden"
+
+msgid "Plants skipped: no building number (EGID)"
+msgstr "Übersprungene Anlagen: ohne Gebäudenummer (EGID)"
+
+msgid "Statistic of the last successful import"
+msgstr "Zahlen der letzten erfolgreichen Aktualisierung"
+
+msgid "Not run today"
+msgstr "Heute noch nicht aktualisiert"
+
+msgid "The data from %(date)s stays valid."
+msgstr "Die Daten vom %(date)s bleiben gültig."
+
+msgid "The plant register is loaded once a day by the daily run. It cannot be started here."
+msgstr "Das Anlagenregister wird einmal täglich mit der täglichen Aktualisierung geladen. Hier kann er nicht gestartet werden."
+
+msgid "Source: Federal Office of Energy (BFE), open use (Open Use)"
+msgstr "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)"

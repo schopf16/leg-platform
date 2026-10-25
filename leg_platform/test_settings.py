@@ -63,25 +63,23 @@ LOG_DIRECTORY = ""
 LOGGING = logging_config("")  # noqa: F405
 ADDRESS_IMPORT_AUTOMATIC = False
 
-# The portal settings hold the addresses of the instance (D-116). After the migrations of the test database they hold
-# the addresses of a test instance; the tests that need other values set them (leg_platform.accounts.tests.helpers,
-# portal_addresses). Django runs the TestCase classes before the TransactionTestCase classes, so the row survives
-# until the first flush.
-TEST_INSTANCE_ADDRESSES = {
-    "base_url": "https://portal.example.org",
+# The E-Mail chapter holds the sender of the instance (D-116). After the migrations of the test database it holds the
+# sender of a test instance; the tests that need other values set them (leg_platform.accounts.tests.helpers,
+# instance_mail_addresses). The base address of the portal is not stored: it comes from the environment (INSTANCE_BASE_URL,
+# local default http://127.0.0.1:8000), and the tests that need another one use override_settings. Django runs the
+# TestCase classes before the TransactionTestCase classes, so the row survives until the first flush.
+TEST_MAIL_ADDRESSES = {
     "sender_address": "noreply@portal.example.org",
     "contact_address": "",
 }
 
 
-def _store_test_instance_addresses(app_config, using="default", **_kwargs):
+def _store_test_mail_addresses(app_config, using="default", **_kwargs):
     if app_config.label != "accounts" or using != "default":
         return
-    from leg_platform.accounts.models import PortalSettings
+    from leg_platform.accounts.models import GraphConfiguration
 
-    PortalSettings.objects.using(using).update_or_create(pk=1, defaults=TEST_INSTANCE_ADDRESSES)
+    GraphConfiguration.objects.using(using).update_or_create(pk=1, defaults=TEST_MAIL_ADDRESSES)
 
 
-post_migrate.connect(
-    _store_test_instance_addresses, dispatch_uid="leg_platform_test_instance_addresses"
-)
+post_migrate.connect(_store_test_mail_addresses, dispatch_uid="leg_platform_test_mail_addresses")

@@ -42,23 +42,74 @@ def token_routes():
 
 
 class InstanceConfigurationTests(SimpleTestCase):
-    def test_local_defaults_need_no_privacy_url(self):
-        config = load_environment(make_env("local", INSTANCE_PRIVACY_URL=None))
+    def test_local_defaults_need_no_instance_values(self):
+        config = load_environment(
+            make_env("local", INSTANCE_BASE_URL=None, INSTANCE_PRIVACY_URL=None)
+        )
 
         self.assertEqual(config.instance_name, DEFAULT_INSTANCE_NAME)
+        self.assertEqual(config.instance_base_url, "http://127.0.0.1:8000")
         self.assertEqual(config.instance_privacy_url, "")
         self.assertEqual(config.instance_website_url, "")
 
-    def test_outside_local_the_privacy_url_is_required(self):
+    def test_outside_local_the_base_url_and_the_privacy_url_are_required(self):
         for app_env in ("stage", "production"):
-            with self.subTest(app_env=app_env), self.assertRaisesMessage(ImproperlyConfigured, "INSTANCE_PRIVACY_URL"):
-                load_environment(make_env(app_env, INSTANCE_PRIVACY_URL=None))
+            for name in ("INSTANCE_BASE_URL", "INSTANCE_PRIVACY_URL"):
+                with self.subTest(app_env=app_env, name=name):
+                    with self.assertRaisesMessage(ImproperlyConfigured, name):
+                        load_environment(make_env(app_env, **{name: None}))
 
-    def test_values_are_read(self):
-        config = load_environment(make_env(INSTANCE_NAME="Example Community", INSTANCE_WEBSITE_URL="https://www.example.org/"))
+    def test_values_are_read_and_normalised(self):
+        config = load_environment(
+            make_env(
+                INSTANCE_NAME="Example Community",
+                INSTANCE_BASE_URL="https://portal.example.org/",
+                INSTANCE_WEBSITE_URL="https://www.example.org/",
+            )
+        )
 
         self.assertEqual(config.instance_name, "Example Community")
+        self.assertEqual(config.instance_base_url, "https://portal.example.org")
         self.assertEqual(config.instance_website_url, "https://www.example.org/")
+
+    def test_the_base_url_must_be_an_https_origin_of_an_allowed_host(self):
+        invalid = (
+            "http://portal.example.org",
+            "https://portal.example.org/login",
+            "https://portal.example.org/?a=b",
+            "https://portal.example.org#x",
+            "https://user:secret@portal.example.org",
+            "https://other.example.org",
+            "https://portal.example.org:99999",
+            "portal.example.org",
+            "javascript:alert(1)",
+            "https://por tal.example.org",
+            # Control and format characters, and an unclosed bracket (review of phase 2, E-1/E-2).
+            "https://portal.example.org\x7f",
+            "https://portal.example.org\u200b",
+            "https://portal.example.org\u2028x",
+            "https://[::1",
+        )
+        for value in invalid:
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "INSTANCE_BASE_URL"):
+                    load_environment(make_env(INSTANCE_BASE_URL=value))
+
+    def test_local_allows_http_for_the_development_server(self):
+        config = load_environment(
+            make_env(
+                "local",
+                DJANGO_ALLOWED_HOSTS="127.0.0.1",
+                INSTANCE_BASE_URL="http://127.0.0.1:8000",
+            )
+        )
+
+        self.assertEqual(config.instance_base_url, "http://127.0.0.1:8000")
+
+    def test_the_host_is_compared_without_case(self):
+        config = load_environment(make_env(INSTANCE_BASE_URL="https://PORTAL.example.org"))
+
+        self.assertEqual(config.instance_base_url, "https://PORTAL.example.org")
 
     def test_links_must_be_absolute_https_urls(self):
         for name in ("INSTANCE_PRIVACY_URL", "INSTANCE_WEBSITE_URL"):
@@ -70,8 +121,15 @@ class InstanceConfigurationTests(SimpleTestCase):
                 "https://www.example.org/#fragment",
                 "https://www.example.org/ x",
             ):
-                with self.subTest(name=name, value=value), self.assertRaisesMessage(ImproperlyConfigured, name):
-                    load_environment(make_env("local", **{name: value}))
+                with self.subTest(name=name, value=value):
+                    with self.assertRaisesMessage(ImproperlyConfigured, name):
+                        load_environment(make_env("local", **{name: value}))
+
+    def test_the_instance_name_is_limited_and_has_no_control_characters(self):
+        for value in ("x" * 101, "Name\nBcc: someone", "Name\x00", "Na\u2028me"):
+            with self.subTest(value=repr(value)):
+                with self.assertRaisesMessage(ImproperlyConfigured, "INSTANCE_NAME"):
+                    load_environment(make_env(INSTANCE_NAME=value))
 
     def test_error_messages_do_not_contain_the_values(self):
         with self.assertRaises(ImproperlyConfigured) as caught:

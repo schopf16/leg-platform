@@ -1,4 +1,5 @@
-"""Administration of the Microsoft Graph email delivery (D-006): one row, system administrators only."""
+"""Administration of the E-Mail chapter (D-006, D-116): the Microsoft Graph delivery, the sender and the contact
+address, and a link to the email texts. One row, system administrators only."""
 
 import logging
 
@@ -34,7 +35,7 @@ Event = SecurityEvent.Event
 
 GRAPH_CONFIGURATION_PK = 1
 GRAPH_UPLOAD_MAX_BYTES = 16 * 1024
-GRAPH_SETTING_FIELDS = ("tenant_id", "client_id", "sender_address")
+GRAPH_SETTING_FIELDS = ("tenant_id", "client_id", "sender_address", "contact_address")
 
 
 class GraphConfigurationForm(forms.ModelForm):
@@ -86,7 +87,23 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
 
     form = GraphConfigurationForm
     fieldsets = (
-        (None, {"fields": (*GRAPH_SETTING_FIELDS, "is_ready")}),
+        (
+            _("Microsoft Graph"),
+            {
+                "description": _("The application that sends the emails through Microsoft Graph."),
+                "fields": ("tenant_id", "client_id", "is_ready"),
+            },
+        ),
+        (
+            _("Sender and contact"),
+            {
+                "description": _(
+                    "All emails are sent from the sender address; without it no email is sent. The messages of the "
+                    "contact form go to the contact address."
+                ),
+                "fields": ("sender_address", "contact_address"),
+            },
+        ),
         (
             _("Certificate"),
             {
@@ -100,6 +117,13 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
                 )
             },
         ),
+        (
+            _("Email texts"),
+            {
+                "description": _("The subject and the text of every email are edited under Mail texts."),
+                "fields": ("mail_texts_link",),
+            },
+        ),
     )
     readonly_fields = (
         "is_ready",
@@ -107,11 +131,20 @@ class GraphConfigurationAdmin(admin.ModelAdmin):
         "certificate_sha1",
         "certificate_sha256",
         "certificate_expiry",
+        "mail_texts_link",
     )
 
     @admin.display(boolean=True, description=_("ready to send"))
     def is_ready(self, obj):
         return obj.is_configured
+
+    @admin.display(description=_("Mail texts"))
+    def mail_texts_link(self, obj):
+        return format_html(
+            '<a href="{}">{}</a>',
+            reverse("admin:accounts_emailtext_changelist"),
+            _("Mail texts"),
+        )
 
     @staticmethod
     def _certificate_details(obj):

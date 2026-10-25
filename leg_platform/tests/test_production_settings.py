@@ -115,7 +115,6 @@ PASSED_THROUGH = ("PATH", "SYSTEMROOT", "TEMP", "TMP", "PYTHONWARNINGS")
 REFUSALS = {
     "missing_email_mode": {"EMAIL_MODE": ""},
     "console": {"EMAIL_MODE": "console"},
-    "base_url": {"INSTANCE_BASE_URL": "https://portal.example.org"},
     "sender": {"EMAIL_SENDER_ADDRESS": "noreply@example.org"},
     "contact": {"CONTACT_EMAIL_ADDRESS": "leg@example.org"},
     "allowed_recipients": {"EMAIL_ALLOWED_RECIPIENTS": "tester@example.org"},
@@ -131,6 +130,7 @@ def child_environment(**overrides):
             "APP_ENV": "production",
             "DJANGO_SECRET_KEY": STRONG_KEY,
             "DJANGO_ALLOWED_HOSTS": "portal.example.org",
+            "INSTANCE_BASE_URL": "https://portal.example.org",
             "INSTANCE_PRIVACY_URL": "https://www.example.org/privacy",
             "EMAIL_MODE": "graph",
             "DB_NAME": "leg_platform",
@@ -262,10 +262,9 @@ class ProductionSettingsModuleTests(SimpleTestCase):
                 self.assert_refused(app_env, "console", "EMAIL_MODE=graph")
 
     def test_the_moved_addresses_refuse_start(self):
-        # D-116: the addresses of the instance live in the portal settings; a value left in the environment is refused.
+        # D-116: the sender and the contact address live in the E-Mail chapter; a value left in the environment is refused.
         for app_env in PRODUCTION_GRADE_APP_ENVS:
             for key, message in (
-                ("base_url", "INSTANCE_BASE_URL"),
                 ("sender", "EMAIL_SENDER_ADDRESS"),
                 ("contact", "CONTACT_EMAIL_ADDRESS"),
                 ("allowed_recipients", "EMAIL_ALLOWED_RECIPIENTS"),

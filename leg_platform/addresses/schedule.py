@@ -16,6 +16,10 @@ column the run waits a week before it downloads again (``COLUMNS_RETRY_INTERVAL`
 
 Already queued requests (including setup imports) are consumed first, even with automatic refresh off,
 before the time, or after today's daily check. Without a queued request the daily run is idempotent.
+
+``run_daily`` then calls ``run_plant_daily`` (D-117) in the same process: the plant register, once per day, after the
+address run, with the same claim. It is not started when the address import of the day has failed; the next daily run
+tries again.
 """
 
 import logging
@@ -78,13 +82,27 @@ def refresh_is_due(job, now):
 
 
 def run_daily(now=None):
-    """Consume a queued request, otherwise check the daily policy; return one of the words above.
+    """The daily run (D-117): the address directory first, then the plant register in the same process.
 
-    Raises what the import raised (it is recorded in the job row and the logs by ``jobs.execute``).
+    The address part returns one of the words above. The plant register starts after it, every day from the configured
+    time, also when the address import failed. A failure of either import is raised (it is recorded in the job row and
+    the logs by ``jobs.execute``), so the caller reports it.
     """
+    now = timezone.localtime(now or timezone.now())
+    try:
+        outcome = _run_address(now)
+    except Exception:
+        # The plant register runs every day even when the address import failed (owner decision 2026-10-25).
+        run_plant_daily(now)
+        raise
+    run_plant_daily(now)
+    return outcome
+
+
+def _run_address(now):
+    """The address part of the daily run: consume a queued request, otherwise check the daily policy."""
     # Explicit durable requests (including setup after a schema rebuild) must not be stranded
     # when the optional worker is absent. They are independent of automatic refresh policy.
-    now = timezone.localtime(now or timezone.now())
     with transaction.atomic():
         if ImportRequest.objects.filter(pk=1, state=ImportRequest.State.QUEUED).exists():
             claimed = jobs.claim(web=True)
@@ -120,6 +138,33 @@ def run_daily(now=None):
             return BUSY
         # Committed with the claim, before the download: a failed import is not repeated today.
         ImportRequest.objects.filter(pk=1).update(last_scheduled_run_on=today)
+    _execute_with_heartbeat(claimed)
+    return IMPORTED
+
+
+def run_plant_daily(now=None):
+    """The plant register (BFE, D-117): once per day from ``import_run_time``, called by ``run_daily`` after the address run.
+
+    It takes the same claim as the address import (D-090): it waits while an address request is queued or an import
+    runs, and the address schedule is not touched. Returns one of the words above; raises what the import raised.
+    """
+    if not settings.ADDRESS_IMPORT_AUTOMATIC:
+        return DISABLED
+    now = timezone.localtime(now or timezone.now())
+    if now.time() < import_run_time():
+        return BEFORE_TIME
+    today = now.date()
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        job = ImportRequest.objects.select_for_update().get(pk=1)
+        if job.last_plant_scheduled_run_on == today:
+            return ALREADY_RAN
+        claimed = jobs.claim(scheduled=True, web=True, source=ImportRequest.Source.PLANT)
+        if claimed is None:
+            # Busy: the day is not used up, the next call tries again.
+            return BUSY
+        # Committed with the claim, before the download: a failed import is not repeated today.
+        ImportRequest.objects.filter(pk=1).update(last_plant_scheduled_run_on=today)
     _execute_with_heartbeat(claimed)
     return IMPORTED
 

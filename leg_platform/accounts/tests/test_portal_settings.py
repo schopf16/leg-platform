@@ -238,8 +238,7 @@ class PortalSettingsAdminTests(TestCase):
         self.client.force_login(self.administrator)
         self.client.get(self.url)
         self.client.post(self.url, {
-            "privacy_url": "", "imprint_url": "", "base_url": "https://portal.example.org",
-            "sender_address": "noreply@portal.example.org", "contact_address": "", "_save": "Sichern",
+            "privacy_url": "", "imprint_url": "", "_save": "Sichern",
         })
         self.assertFalse(
             SecurityEvent.objects.filter(event=SecurityEvent.Event.PORTAL_SETTINGS_CHANGED).exists()

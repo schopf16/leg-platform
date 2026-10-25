@@ -49,10 +49,21 @@ SAFE_FAILURES = frozenset({
     "The free disk space could not be checked.", "Not enough free disk space for an import.",
     "Catalogue data date predates the published directory.",
     "A repair was tried recently and did not succeed.", "Official archive checksum mismatch.",
-    "The official directory could not be imported.",
+    "The official directory could not be imported.", "Unexpected HTTP content type.",
 })
 # The official file lacks a required column: the same file fails again, so the daily run waits a week (``schedule``).
 COLUMN_FAILURES = frozenset({"Missing EGID column.", "Missing entrance column."})
+# The fixed texts of the plant register import (``plants``, D-117): stored, logged and shown like SAFE_FAILURES.
+PLANT_FAILURES = frozenset({
+    "The plant register file has an unexpected format.", "The plant register file is larger than allowed.",
+    "The number of plants changed too much. Nothing was changed.", "The plant register contains no plants.",
+    "The plant register could not be downloaded or read.",
+})
+
+
+def _plant_result(state, finished, error=""):
+    """The fields of the last plant run (D-117, ``ImportRequest.last_plant_*``): set when a plant run ends."""
+    return {"last_plant_state": state, "last_plant_finished_at": finished, "last_plant_error": error}
 
 
 def directory_is_empty():
@@ -107,6 +118,7 @@ def request_import():
             # Dead (stale heartbeat or expired lease): the heartbeat stays as the mark for ``claim``, which frees the lease.
             logger.warning("An address directory import job exceeded its lease and was replaced by a new request.")
         job.state = ImportRequest.State.QUEUED
+        job.source = ImportRequest.Source.ADDRESS
         job.is_automatic = False
         job.requested_at = now
         job.started_at = None
@@ -118,14 +130,16 @@ def request_import():
 
 
 class Claim(NamedTuple):
-    """The right to run the import: ``manual`` = also repairs, ``took_over`` = a dead job was found."""
+    """The right to run the import: ``manual`` = also repairs, ``took_over`` = a dead job was found, ``source`` = the
+    address directory or the plant register (D-117)."""
 
     token: uuid.UUID
     manual: bool
     took_over: bool
+    source: str = ImportRequest.Source.ADDRESS
 
 
-def claim(*, schedule_automatic=False, scheduled=False, web=False):
+def claim(*, schedule_automatic=False, scheduled=False, web=False, source=ImportRequest.Source.ADDRESS):
     """Claim the job for this process; None if nothing is queued or due, or a live import runs.
 
     A queued manual request wins. An expired RUNNING job counts as failed and is not repeated.
@@ -134,6 +148,8 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False):
     (the worker) the job is taken as alive for its six-hour lease.
     ``scheduled``: the daily run (``schedule``) has decided that an import is due; the 90-day interval of
     ``schedule_automatic`` is not asked again. The claim is an automatic one (no repair).
+    ``source`` (D-117): the plant register runs only as the daily run (``scheduled``), never while an address request
+    is queued, and it does not touch the address schedule. One claim for both sources (D-090).
     """
     took_over = False
     with transaction.atomic():
@@ -153,8 +169,20 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False):
             job.state = ImportRequest.State.FAILED
             job.finished_at = now
             job.last_error = INTERRUPTED
-            job.save(update_fields=["state", "finished_at", "last_error"])
-        if job.state != ImportRequest.State.QUEUED:
+            fields = ["state", "finished_at", "last_error"]
+            if job.source == ImportRequest.Source.PLANT:
+                # The plant run that held the claim is over: its result is kept apart from the shared fields (D-117).
+                for name, value in _plant_result(ImportRequest.State.FAILED, now, INTERRUPTED).items():
+                    setattr(job, name, value)
+                fields += ["last_plant_state", "last_plant_finished_at", "last_plant_error"]
+            job.save(update_fields=fields)
+        plant = source == ImportRequest.Source.PLANT
+        if plant:
+            if job.state == ImportRequest.State.QUEUED or not scheduled:
+                return None
+            job.is_automatic = True
+            job.requested_at = now
+        elif job.state != ImportRequest.State.QUEUED:
             if not (schedule_automatic or scheduled):
                 return None
             if not scheduled:
@@ -175,16 +203,17 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False):
         job.started_at = now
         job.finished_at = None
         job.claim_token = uuid.uuid4()
+        job.source = source
         job.heartbeat_at = now if web else None
         job.phase = "starting"
         job.bytes_done = job.bytes_total = job.rows_done = None
         job.last_error = ""
-        if job.is_automatic:
+        if job.is_automatic and not plant:
             # Commit before any download; a failure consumes this attempt.
             job.last_automatic_attempt_at = now
         job.save()
         # A manual request also repairs a damaged directory (D-076).
-        return Claim(job.claim_token, not job.is_automatic, took_over)
+        return Claim(job.claim_token, not job.is_automatic, took_over, source)
 
 
 def _kind(claimed):
@@ -194,13 +223,25 @@ def _kind(claimed):
 def record_success(claimed, count, *, downloaded=None):
     """Store and log a completed import (the claim must still be ours)."""
     count = count if isinstance(count, int) else None
-    finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
-        state=ImportRequest.State.SUCCEEDED, finished_at=timezone.now(), heartbeat_at=None,
-        phase="unchanged" if downloaded is False else "", last_error="", rows_done=count,
-        columns_missing_at=None,
-    )
+    plant = claimed.source == ImportRequest.Source.PLANT
+    fields = {
+        "state": ImportRequest.State.SUCCEEDED, "finished_at": timezone.now(), "heartbeat_at": None,
+        "phase": "unchanged" if downloaded is False else "", "last_error": "", "rows_done": count,
+    }
+    if plant:
+        fields.update(_plant_result(ImportRequest.State.SUCCEEDED, fields["finished_at"]))
+    else:
+        fields["columns_missing_at"] = None
+    finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(**fields)
     if not finished:
-        logger.warning("An address directory import finished, but its job was taken over meanwhile.")
+        logger.warning("An import finished, but its job was taken over meanwhile.")
+        return
+    if plant:
+        logger.info("Plant register import completed (%s): %s plants.", _kind(claimed), count)
+        with transaction.atomic():
+            security_log.record(
+                SecurityEvent.Event.PV_IMPORT_SUCCEEDED, detail=f"{_kind(claimed)}, {count} plants"
+            )
         return
     logger.info(
         "Address directory import completed (%s): %s addresses%s.", _kind(claimed), count,
@@ -221,24 +262,31 @@ def record_failure(claimed, exc):
     """Store and log a failed import: only the fixed text of an ``ImportFailure``, never upstream data."""
     from .importer import ImportFailure  # the web process reaches this only through the runner's thread
 
-    reason = str(exc) if isinstance(exc, ImportFailure) and str(exc) in SAFE_FAILURES else UNEXPECTED_FAILURE
+    plant = claimed.source == ImportRequest.Source.PLANT
+    known = (SAFE_FAILURES | PLANT_FAILURES) if plant else SAFE_FAILURES
+    reason = str(exc) if isinstance(exc, ImportFailure) and str(exc) in known else UNEXPECTED_FAILURE
+    now = timezone.now()
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
-        state=ImportRequest.State.FAILED, finished_at=timezone.now(), heartbeat_at=None,
+        state=ImportRequest.State.FAILED, finished_at=now, heartbeat_at=None,
         phase="", last_error=reason[:255],
         # The file itself lacks a required column: the daily run waits (``schedule.COLUMNS_RETRY_INTERVAL``).
-        **({"columns_missing_at": timezone.now()} if reason in COLUMN_FAILURES else {}),
+        **({"columns_missing_at": now} if not plant and reason in COLUMN_FAILURES else {}),
+        # The result of the plant run (D-117), kept apart from the shared fields above.
+        **(_plant_result(ImportRequest.State.FAILED, now, reason[:255]) if plant else {}),
     )
     if not finished:
         # Taken over meanwhile: the new holder owns the row.
-        logger.warning("An address directory import failed, but its job was taken over meanwhile.")
+        logger.warning("An import failed, but its job was taken over meanwhile.")
         return
+    what = "Plant register import" if plant else "Address directory import"
     logger.error(
-        "Address directory import failed (%s): %s%s", _kind(claimed), reason,
+        "%s failed (%s): %s%s", what, _kind(claimed), reason,
         f" ({type(exc).__name__})" if reason == UNEXPECTED_FAILURE else "",
     )
     with transaction.atomic():
         security_log.record(
-            SecurityEvent.Event.ADDRESS_IMPORT_FAILED, detail=f"{_kind(claimed)}, {reason}"
+            SecurityEvent.Event.PV_IMPORT_FAILED if plant else SecurityEvent.Event.ADDRESS_IMPORT_FAILED,
+            detail=f"{_kind(claimed)}, {reason}",
         )
 
 
@@ -249,13 +297,18 @@ def execute(claimed, progress=None):
 
     options = {} if progress is None else {"progress": progress}
     try:
-        if claimed.took_over:
-            # The process that held the lease on the directory is gone (its heartbeat or lease ran out, D-090).
-            clear_stale_lease()
-        if claimed.manual:
-            count = import_directory(repair=True, **options)
+        if claimed.source == ImportRequest.Source.PLANT:
+            from .plants import import_plants
+
+            count = import_plants(claim_token=claimed.token, **options)
         else:
-            count = import_directory(**options)
+            if claimed.took_over:
+                # The process that held the lease on the directory is gone (its heartbeat or lease ran out, D-090).
+                clear_stale_lease()
+            if claimed.manual:
+                count = import_directory(repair=True, **options)
+            else:
+                count = import_directory(**options)
     except Exception as exc:
         record_failure(claimed, exc)
         # Only a generic failure is stored; the exception goes to the caller (the command or the runner's log).

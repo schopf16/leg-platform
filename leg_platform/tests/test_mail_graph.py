@@ -28,9 +28,9 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils.translation import gettext, override
 
-from leg_platform.accounts.tests.helpers import portal_addresses
+from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.encryption import DecryptionError, is_current
-from leg_platform.accounts.models import GRAPH_CERTIFICATE_KEY_PURPOSE, GraphConfiguration
+from leg_platform.accounts.models import GRAPH_CERTIFICATE_KEY_PURPOSE, GraphConfiguration, SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.mail import (
     GRAPH_TIMEOUT_SECONDS,
@@ -170,7 +170,7 @@ class GraphConfigurationTests(TestCase):
 
 
 @override_settings(EMAIL_MODE="graph")
-@portal_addresses(sender_address=SENDER)
+@instance_mail_addresses(sender_address=SENDER)
 class GraphEmailBackendTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -475,7 +475,7 @@ class TokenSessionTests(SimpleTestCase):
 
 
 @override_settings(EMAIL_MODE="console")
-@portal_addresses(sender_address=SENDER)
+@instance_mail_addresses(sender_address=SENDER)
 class GraphAdminTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -552,6 +552,39 @@ class GraphAdminTests(TestCase):
                     ),
                 )
             ],
+        )
+
+
+    def test_the_e_mail_chapter_holds_the_sender_the_contact_address_and_the_link_to_the_mail_texts(self):
+        client = VerifiedClient()
+        client.force_login(self.superuser)
+
+        page = client.get(reverse("admin:accounts_graphconfiguration_change", args=(1,))).content.decode()
+
+        self.assertIn("<title>", page)
+        self.assertIn('name="sender_address"', page)
+        self.assertIn('name="contact_address"', page)
+        self.assertIn(reverse("admin:accounts_emailtext_changelist"), page)
+
+    def test_the_contact_address_is_saved_and_the_change_is_recorded(self):
+        client = VerifiedClient()
+        client.force_login(self.superuser)
+
+        response = client.post(
+            reverse("admin:accounts_graphconfiguration_change", args=(1,)),
+            {
+                "tenant_id": TENANT_ID,
+                "client_id": CLIENT_ID,
+                "sender_address": SENDER,
+                "contact_address": "leg@example.org",
+                "_save": "Save",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(GraphConfiguration.load().contact_address, "leg@example.org")
+        self.assertTrue(
+            SecurityEvent.objects.filter(event=SecurityEvent.Event.GRAPH_CONFIGURATION_CHANGED).exists()
         )
 
 

@@ -19,22 +19,19 @@ failure carries only a fixed sentence.
 **Hard total deadline.** A socket timeout limits one wait, not the whole answer: a server that sends one byte every
 few seconds would hold a synchronous worker for hours. The request therefore runs in a helper thread and the caller
 waits at most ``TOTAL_SECONDS`` (``Thread.join``). When that expires, every socket of the request is shut down
-(``_Budget.expire``: the blocked read ends at once) and ``SearchFailure`` is raised, so neither the worker nor the
+(``http_budget.Budget.expire``: the blocked read ends at once) and ``SearchFailure`` is raised, so neither the worker nor the
 helper thread outlive the deadline by more than a moment. The sockets are found through the connection classes of the
-adapter (``_connection_classes``); the helper thread does not touch the database.
+adapter (``http_budget.Adapter``); the helper thread does not touch the database.
 """
 
 import json
 import re
-import socket
 import threading
 import time
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.connection import HTTPConnection, HTTPSConnection
-from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
+from .http_budget import Adapter, Budget
 from .keys import key
 
 HOST = "api3.geo.admin.ch"
@@ -70,76 +67,6 @@ class SearchFailure(Exception):
     def __init__(self, message, *, counts=True):
         super().__init__(message)
         self.counts = counts
-
-
-class _Budget:
-    """The sockets of one request, so that the deadline can shut them down from another thread."""
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._sockets = []
-        self.expired = False
-
-    def add(self, sock):
-        with self._lock:
-            if not self.expired:
-                self._sockets.append(sock)
-                return
-        self._shut(sock)
-
-    def expire(self):
-        with self._lock:
-            self.expired = True
-            sockets, self._sockets = self._sockets, []
-        for sock in sockets:
-            self._shut(sock)
-
-    @staticmethod
-    def _shut(sock):
-        # ``shutdown`` ends a read that is blocked in another thread; ``close`` alone may not.
-        for action in (lambda: sock.shutdown(socket.SHUT_RDWR), sock.close):
-            try:
-                action()
-            except (OSError, ValueError):
-                pass
-
-
-def _connection_classes(budget):
-    """Connection pools whose sockets register with ``budget`` (the raw socket and, after TLS, the wrapped one)."""
-
-    class Connection(HTTPConnection):
-        def _new_conn(self):
-            sock = super()._new_conn()
-            budget.add(sock)
-            return sock
-
-    class SecureConnection(HTTPSConnection):
-        def _new_conn(self):
-            sock = super()._new_conn()
-            budget.add(sock)
-            return sock
-
-        def connect(self):
-            super().connect()
-            budget.add(self.sock)
-
-    class Pool(HTTPConnectionPool):
-        ConnectionCls = Connection
-
-    class SecurePool(HTTPSConnectionPool):
-        ConnectionCls = SecureConnection
-
-    return {"http": Pool, "https": SecurePool}
-
-
-class _Adapter(HTTPAdapter):
-    def __init__(self, budget):
-        self._budget = budget  # before ``super().__init__``: it builds the pool manager
-        super().__init__(max_retries=0)
-
-    def init_poolmanager(self, *args, **kwargs):
-        super().init_poolmanager(*args, **kwargs)
-        self.poolmanager.pool_classes_by_scheme = _connection_classes(self._budget)
 
 
 def _street_pattern(street):
@@ -253,7 +180,7 @@ def _fetch(params, budget, deadline):
         with requests.Session() as session:
             # No proxy variables, no .netrc of the operator's environment.
             session.trust_env = False
-            adapter = _Adapter(budget)
+            adapter = Adapter(budget)
             session.mount("https://", adapter)
             session.mount("http://", adapter)  # only a test URL can use it: FIND_URL is https
             with session.get(
@@ -278,7 +205,7 @@ def search(street, house_number, postal_code, town=""):
     if not street or len(street) > STREET_LIMIT or len(town) > TOWN_LIMIT:
         raise SearchFailure("The address cannot be searched.", counts=False)
     params = _parameters(street, house_number, postal_code)
-    budget = _Budget()
+    budget = Budget()
     outcome = {}
 
     def work():

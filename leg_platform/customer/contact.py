@@ -1,6 +1,6 @@
 """The contact form of the customers (D-115): one message to the LEG, answered by mail or by phone.
 
-The message goes from the sender address of the portal settings to the contact address of the portal settings (D-116). The answer goes
+The message goes from the sender address to the contact address of the E-Mail chapter of the administration (D-116). The answer goes
 to the address in ``Reply-To``: the address the customer entered for a mail answer, otherwise the verified address of the
 account. A copy, when asked, goes to the verified address of the account. Nothing of a message is logged; a failed
 delivery raises and the view shows a refusal.
@@ -12,15 +12,15 @@ from django.core.mail import EmailMessage
 from django.utils import translation
 from django.utils.translation import gettext as _
 
-from leg_platform.accounts.models import PortalSettings
+from leg_platform.accounts import mail_addresses
 
 REPLY_EMAIL = "email"
 REPLY_PHONE = "phone"
 
 
 def available():
-    """Whether the form is offered: the contact address is set in the portal settings (D-116)."""
-    return bool(PortalSettings.contact_recipient())
+    """Whether the form is offered: the contact address is set in the E-Mail chapter (D-116)."""
+    return bool(mail_addresses.contact_recipient())
 
 
 def swiss_phone(raw):
@@ -48,8 +48,8 @@ def send(person, data):
     """Send the message (and the copy, when asked) for ``data`` (the cleaned form); returns the E.164 number when the
     customer wants a phone answer, otherwise None. Raises when the delivery fails."""
     phone = data["phone"] if data["reply_by"] == REPLY_PHONE else None
-    sender = PortalSettings.sender()
-    recipient = PortalSettings.contact_recipient()
+    sender = mail_addresses.sender()
+    recipient = mail_addresses.contact_recipient()
     reply_to = person.email if phone else data["email"]
     with translation.override(settings.LANGUAGE_CODE):
         if phone:

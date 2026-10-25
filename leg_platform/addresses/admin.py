@@ -65,9 +65,10 @@ class ImportRequestAdmin(admin.ModelAdmin):
             return HttpResponseRedirect(reverse("admin:addresses_importrequest_changelist"))
         context = {
             **self.admin_site.each_context(request),
-            "title": _("Address directory"),
+            "title": _("Data imports"),
             "opts": self.model._meta,
             "import_status": status.build(),
+            "plant_status": status.plant_status(),
             "status_url": reverse("admin:addresses_importrequest_status"),
             "poll_seconds": POLL_SECONDS,
         }

@@ -98,6 +98,10 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 * [ ] Documented for operators without in-depth IT knowledge: installation, environment variables, first administrator, new instance, Graph setup with the sender-mailbox restriction, the procedure after a report of an unrequested change (block, verify identity, restore, log), the lost second factor (`docs/SECURITY.md`, section 3), operator duties (security updates, backups, which keep deleted data until they expire, sender mailbox monitoring, reverse proxy, privacy notice), translations, tests, known limitations and open risks.
 
+## 16. Plant Register (BFE, D-117)
+
+* [ ] The owner sees the plant register correctly: the data source and the licence attribution "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)" on every page that shows plant data; the statistic of the last import in the administration; no coverage notice (owner decision, D-117). The display is not built yet (D-117, "Not included"), so this criterion stays open. Status: not yet verified in the running application. Tests: `leg_platform/addresses/tests/test_plants.py`, `test_schedule.py` and `test_import_runner.py` (automated, synthetic data, no download from the BFE).
+
 ## Not Required for Acceptance
 
 Everything in `docs/PROJECT.md`, "Explicitly Not Included".

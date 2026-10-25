@@ -53,6 +53,7 @@ def main():
         DJANGO_SECRET_KEY=secrets.token_urlsafe(64),
         DJANGO_ALLOWED_HOSTS="localhost",
         DJANGO_DEBUG="False",
+        INSTANCE_BASE_URL=origin,
         INSTANCE_NAME="Disposable Browser Fixture",
         INSTANCE_WEBSITE_URL="https://operator.example.org",
         EMAIL_MODE="console",
@@ -62,10 +63,6 @@ def main():
     import django
 
     django.setup()
-    # The address of the portal is a value of the portal settings (D-116), not of the environment.
-    from leg_platform.accounts.models import PortalSettings
-
-    PortalSettings.objects.update_or_create(pk=1, defaults={"base_url": origin})
     from django.conf import settings
     from django.contrib.auth.models import Permission
     from django.contrib.staticfiles.handlers import StaticFilesHandler

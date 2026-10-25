@@ -8,8 +8,8 @@ from django.core.mail import EmailMessage
 from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 
-from leg_platform.accounts.models import PortalSettings
-from leg_platform.accounts.tests.helpers import portal_addresses
+from leg_platform.accounts import mail_addresses
+from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.customer.contact import swiss_phone
 from leg_platform.customer.tests.helpers import customer, login
 from leg_platform.mail import GraphEmailError
@@ -33,7 +33,7 @@ class SwissPhoneTests(SimpleTestCase):
 
 
 @tag("customer")
-@portal_addresses(contact_address=LEG)
+@instance_mail_addresses(contact_address=LEG)
 class ContactTests(TestCase):
     databases = {"default", "addresses"}
 
@@ -46,6 +46,14 @@ class ContactTests(TestCase):
         data.update(values)
         return login(self.mine).post(PAGE, data)
 
+    def test_the_email_and_phone_fields_tell_password_managers_to_leave_them_alone(self):
+        html = login(self.mine).get(PAGE).content.decode()
+        for name in ("email", "phone"):
+            field = html[html.index(f'name="{name}"') - 300 : html.index(f'name="{name}"') + 300]
+            for attribute in ("data-lpignore", "data-1p-ignore", "data-bwignore"):
+                with self.subTest(field=name, attribute=attribute):
+                    self.assertIn(attribute, field)
+
     def test_the_page_offers_the_mail_answer_with_the_address_of_the_account(self):
         html = login(self.mine).get(PAGE).content.decode()
         self.assertIn('name="message"', html)
@@ -53,7 +61,7 @@ class ContactTests(TestCase):
         self.assertIn('data-reveal-value="email"', html)
         self.assertNotIn('value="+41', html)
 
-    @portal_addresses(contact_address="")
+    @instance_mail_addresses(contact_address="")
     def test_without_the_address_of_the_leg_the_page_is_not_offered(self):
         client = login(self.mine)
         self.assertIn("noch nicht verfügbar", client.get(PAGE).content.decode())
@@ -66,7 +74,7 @@ class ContactTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         sent = mail.outbox[0]
         self.assertEqual(sent.to, [LEG])
-        self.assertEqual(sent.from_email, PortalSettings.sender())
+        self.assertEqual(sent.from_email, mail_addresses.sender())
         self.assertEqual(sent.reply_to, ["anna.mail@example.org"])
         self.assertIn("Hallo LEG", sent.body)
         self.assertIn(self.mine.customer_number_display, sent.body)

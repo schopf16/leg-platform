@@ -354,7 +354,7 @@ input.portal-colour {
 
 .import-box p {
   margin: 4px 0;
-  font-size: 0.9375rem;
+  font-size: 1rem;
 }
 
 .import-box [hidden] {
@@ -363,6 +363,52 @@ input.portal-colour {
 
 .import-error {
   color: var(--error-fg, #ba2121);
+}
+
+/* A status is a dot plus a word, never colour alone (DESIGN section 3.5); the colours of the tokens, dark too. */
+:root {
+  --status-muted: #5A6068;
+  --status-ok: #2F8F5B;
+  --status-warn: #8A5A00;
+  --status-bad: #B42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --status-muted: #9AA2AB;
+    --status-ok: #5DBB86;
+    --status-warn: #E8B34A;
+    --status-bad: #F0948A;
+  }
+}
+
+:root[data-theme="dark"] {
+  --status-muted: #9AA2AB;
+  --status-ok: #5DBB86;
+  --status-warn: #E8B34A;
+  --status-bad: #F0948A;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-inline-end: 0.4em;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--status-muted);
+}
+
+.status-dot.status-ok {
+  background: var(--status-ok);
+}
+
+.status-dot.status-warn {
+  background: var(--status-warn);
+}
+
+.status-dot.status-bad {
+  background: var(--status-bad);
 }
 
 .import-spinner {
@@ -440,6 +486,23 @@ input.portal-colour {
 @media (max-width: 767px) {
   .import-facts {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Data imports (D-117): the address block and the plant block side by side; one column up to 760 px (DESIGN section 6). */
+.data-import-blocks {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.data-import-block {
+  min-width: 0;
+}
+
+@media (min-width: 761px) {
+  .data-import-blocks {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 

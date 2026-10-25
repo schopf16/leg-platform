@@ -12,7 +12,7 @@ from django.test import SimpleTestCase, TestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 
-from leg_platform.accounts.tests.helpers import portal_addresses
+from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
 from leg_platform.community import applications, contracts, deregistrations, numbers
@@ -272,7 +272,7 @@ class StepOneAndMenuTests(TestCase):
         application.buildings.all().delete()
         self.assertNotIn(sentence, text(self.client.get(url)))
 
-    @portal_addresses(contact_address="leg@example.org")
+    @instance_mail_addresses(contact_address="leg@example.org")
     def test_the_contact_link_is_in_the_information_group_not_in_the_foot(self):
         html = text(self.client.get(HOME))
         menu = html[html.index('<nav class="frame-menu') :]; menu = menu[: menu.index("</nav>")]

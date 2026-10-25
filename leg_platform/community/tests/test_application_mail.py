@@ -11,7 +11,7 @@ from django.utils import translation
 
 from leg_platform.accounts import email_texts, emails, mail_queue
 from leg_platform.accounts.admin import EMAIL_TEXT_PROCESSES
-from leg_platform.accounts.models import EmailText, MailJob, PortalSettings
+from leg_platform.accounts.models import EmailText, MailJob
 from leg_platform.community import deregistrations, own_iban
 from leg_platform.community.tests.onboarding import GOOD_IBAN, customer
 
@@ -83,7 +83,7 @@ class SendingTests(TestCase):
                 self.assertEqual(message.to, ["mail.customer@example.org"])
                 self.assertEqual(message.extra_headers["Auto-Submitted"], "auto-generated")
                 self.assertTrue(message.body.startswith("Guten Tag Anna Example"), message.body[:40])
-                self.assertIn(f"{PortalSettings.instance_origin()}/", message.body)
+                self.assertIn(f"{settings.INSTANCE_BASE_URL}/", message.body)
                 self.assertEqual(len(re.findall(r"https?://", message.body)), 1)
                 self.assertNotIn("\u00df", message.subject + message.body)
                 self.assertNotIn("{", message.body)
@@ -97,7 +97,7 @@ class SendingTests(TestCase):
         (message,) = self.sent(MailJob.Kind.APPLICATION_REMINDER)
         links = re.findall(r"^https?://\S+$", message.body, re.MULTILINE)
         self.assertEqual(links, [emails.absolute_url(reverse("accounts:login"))])
-        self.assertTrue(links[0].startswith(PortalSettings.instance_origin() + "/"))
+        self.assertTrue(links[0].startswith(settings.INSTANCE_BASE_URL + "/"))
 
     def test_the_iban_mail_names_neither_the_iban_nor_a_part_of_it(self):
         django_mail.outbox.clear()

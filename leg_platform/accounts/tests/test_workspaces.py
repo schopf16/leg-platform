@@ -14,7 +14,7 @@ from django.test import Client, RequestFactory, SimpleTestCase, TestCase, overri
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts.tests.helpers import portal_addresses
+from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.context_processors import frame_workspace
@@ -379,7 +379,7 @@ class MenuTests(TestCase):
 
     # ---- The sign of a new tab ----------------------------------------------------------------------------------
 
-    @portal_addresses(contact_address="leg@example.org")
+    @instance_mail_addresses(contact_address="leg@example.org")
     def test_the_contact_link_is_a_page_of_the_portal_not_a_new_tab(self):
         PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
         menu = menu_of(client_of(self.customer).get(HOME))
