@@ -8136,9 +8136,6 @@ msgstr "Confermare gli errori"
 msgid "No error has been recorded."
 msgstr "Nessun errore registrato."
 
-msgid "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)."
-msgstr "Un file di backup non viene ripristinato da questa pagina. Il ripristino è una procedura manuale sul server (istruzioni: documento di installazione, capitolo 12.2)."
-
 msgid "Email on error"
 msgstr "E-mail in caso di errore"
 
@@ -8255,6 +8252,12 @@ msgstr "Impostazioni e-mail"
 
 msgid "Details in the error log"
 msgstr "Dettagli nel registro degli errori"
+
+msgid "A dump file is not restored from this page. A restore is a manual procedure on the server."
+msgstr "Un file di salvataggio non viene ripristinato da questa pagina. Il ripristino è una procedura manuale sul server."
+
+msgid "Not run yet"
+msgstr "Non ancora eseguito"
 
 msgid "Changing needs a code from the app."
 msgstr "Per la modifica serve un codice dell'app."

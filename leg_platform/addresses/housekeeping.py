@@ -514,7 +514,14 @@ def _tone(state):
 
 
 def _state_label(state):
-    return HousekeepingStatus.State(state).label if state else ""
+    """The word of a step: a dot and the word, never colour alone (design review 5)."""
+    words = {
+        "": _("Not run yet"),
+        HousekeepingStatus.State.SUCCEEDED: _("Successful"),
+        HousekeepingStatus.State.FAILED: _("Failed"),
+        HousekeepingStatus.State.SKIPPED: _("Skipped"),
+    }
+    return str(words.get(state or "", words[""]))
 
 
 def _step_rows(status):

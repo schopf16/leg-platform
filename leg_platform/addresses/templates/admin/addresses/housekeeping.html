@@ -40,7 +40,7 @@
       <button type="submit" class="default">{% translate "Show" %}</button></p>
   </form>
   {% include "admin/logs/_text_box.html" with lines=error_lines box_id="housekeeping-error-box" %}
-  <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)." %}</p>
+  <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server." %}</p>
 </section>
 
 <p class="help">{% translate "The e-mail on error and the log notices are set on the logs page." %} <a href="{% url 'admin:logmenu' %}">{% translate "Logs" %}</a></p>

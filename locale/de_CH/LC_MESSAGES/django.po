@@ -8162,9 +8162,6 @@ msgstr "Fehler quittieren"
 msgid "No error has been recorded."
 msgstr "Kein Fehler erfasst."
 
-msgid "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)."
-msgstr "Eine Sicherungsdatei wird von dieser Seite nicht zurückgespielt. Das Zurückspielen ist ein manuelles Verfahren auf dem Server (Anleitung: Betriebsdokument, Abschnitt 12.2)."
-
 msgid "Email on error"
 msgstr "E-Mail bei Fehler"
 
@@ -8281,6 +8278,12 @@ msgstr "E-Mail-Einstellungen"
 
 msgid "Details in the error log"
 msgstr "Details im Fehlerprotokoll"
+
+msgid "A dump file is not restored from this page. A restore is a manual procedure on the server."
+msgstr "Eine Sicherungsdatei wird von dieser Seite nicht zurückgespielt. Das Zurückspielen ist ein manuelles Verfahren auf dem Server."
+
+msgid "Not run yet"
+msgstr "Noch nicht ausgeführt"
 
 msgid "Changing needs a code from the app."
 msgstr "Zum Ändern ist ein Code aus der App nötig."

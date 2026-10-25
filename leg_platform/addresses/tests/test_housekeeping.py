@@ -551,3 +551,15 @@ class StepCardTests(HousekeepingBase):
         content = self.client_.get(self.url).content.decode()
         self.assertEqual(content.count('role="alert"'), 1)
         self.assertIn('href="#housekeeping-errors"', content)
+
+    def test_each_step_shows_a_dot_and_one_of_three_words(self):
+        content = self.client_.get(self.url).content.decode()
+        self.assertEqual(content.count("Noch nicht ausgeführt"), 2)
+        HousekeepingStatus.objects.update_or_create(
+            pk=1, defaults={"sqlite_state": HousekeepingStatus.State.SUCCEEDED,
+                            "mariadb_state": HousekeepingStatus.State.FAILED})
+        content = self.client_.get(self.url).content.decode()
+        self.assertIn("Erfolgreich", content)
+        self.assertIn("Fehlgeschlagen", content)
+        self.assertNotIn("Noch nicht ausgeführt", content)
+
