@@ -44,6 +44,10 @@ PLANT_URL = (
     "https://data.geo.admin.ch/ch.bfe.elektrizitaetsproduktionsanlagen/csv/2056/"
     "ch.bfe.elektrizitaetsproduktionsanlagen.zip"
 )
+# The BKW high-discount map, WMS of the public server of BKW Netz (D-118): the only other host of this process. It is read
+# only by ``transformers.py`` (one request at a time, GET, HTTPS, no redirects); the request URL carries the query.
+TRANSFORMER_WMS_URL = "https://qgisserver-extern.bkw.ch/ogc/"
+APPROVED_WMS_URLS = frozenset({TRANSFORMER_WMS_URL})
 ASSET_NAME = "amtliches-gebaeudeadressverzeichnis_ch_2056.csv.zip"
 ASSET_URL = (
     "https://data.geo.admin.ch/ch.swisstopo.amtliches-gebaeudeadressverzeichnis/"

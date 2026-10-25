@@ -409,10 +409,11 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         # ``plants.py`` (D-117) is the second downloader: the daily run of the plant register, reached only through
         # ``jobs.execute``. The read helper ``plant_lookup.py`` has no network access.
         # ``http_budget.py`` (the socket budget of a download, D-117) imports the transport adapter of ``requests`` but
-        # makes no request itself; only the two downloaders use it.
+        # makes no request itself; only the downloaders use it. ``transformers.py`` (D-118) is the third one: the map
+        # server, reached only through ``jobs.execute`` and the two commands, never by a web request.
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*(import|from) requests\b", text, re.M)),
-            ["http_budget.py", "importer.py", "plants.py", "swisstopo.py"],
+            ["http_budget.py", "importer.py", "plants.py", "swisstopo.py", "transformers.py"],
         )
         self.assertEqual(
             sorted(name for name, text in sources.items() if re.search(r"^\s*from \.http_budget import", text, re.M)),
@@ -2587,6 +2588,7 @@ class ReadOnlyDefaultTests(TransactionTestCase):
         "addresses/management/commands/import_address_directory.py",
         "addresses/management/commands/scheduled_address_import.py",
         "addresses/management/commands/seed_local_address_directory.py",
+        "addresses/management/commands/scan_transformer_stations.py",
         "addresses/management/commands/migrate.py",
         "accounts/management/commands/setup_instance.py",
     }
@@ -2869,7 +2871,7 @@ class MigrateTests(SimpleTestCase):
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory",
-                              "addresses_plant", "addresses_plantregister"})
+                              "addresses_plant", "addresses_plantregister", "addresses_transformerstation"})
             self.assertEqual(address_columns, {
                 "id", "generation", "street", "house_number", "postal_code", "locality",
                 "street_key", "house_number_key", "locality_key", "egid", "entrance_id", "easting", "northing",
@@ -2897,6 +2899,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0008_plant_register_and_pv_import"),
                 ("addresses", "0009_data_import_labels_and_plant_run"),
                 ("addresses", "0010_address_coordinates"),
+                ("addresses", "0011_transformer_scan"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.

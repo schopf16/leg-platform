@@ -62,9 +62,29 @@ PLANT_FAILURES = frozenset({
 })
 
 
+# The fixed texts of the transformer station scan (``transformers``, D-118), stored, logged and shown like SAFE_FAILURES.
+MAP_UNREACHABLE = "The map server could not be reached."
+MAP_ANSWER = "The map server did not answer as expected."
+MAP_TOO_LONG = "The transformer scan takes too long."
+MAP_TOO_MANY_TILES = "Too many map tiles for one run."
+MAP_UNREADABLE = "The map could not be read."
+SCAN_NO_POSTAL_CODES = "No postal code is set for the transformer scan."
+SCAN_NO_BUILDINGS = "No buildings with coordinates for the postal codes."
+SCAN_READER_MISSING = "The map reader is not installed on this server."
+TRANSFORMER_FAILURES = frozenset({
+    MAP_UNREACHABLE, MAP_ANSWER, MAP_TOO_LONG, MAP_TOO_MANY_TILES, MAP_UNREADABLE,
+    SCAN_NO_POSTAL_CODES, SCAN_NO_BUILDINGS, SCAN_READER_MISSING,
+})
+
+
 def _plant_result(state, finished, error=""):
     """The fields of the last plant run (D-117, ``ImportRequest.last_plant_*``): set when a plant run ends."""
     return {"last_plant_state": state, "last_plant_finished_at": finished, "last_plant_error": error}
+
+
+def _transformer_result(state, finished, error=""):
+    """The fields of the last transformer scan (D-118, ``ImportRequest.last_transformer_*``): set when a scan ends."""
+    return {"last_transformer_state": state, "last_transformer_finished_at": finished, "last_transformer_error": error}
 
 
 def directory_is_empty():
@@ -176,9 +196,16 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
                 for name, value in _plant_result(ImportRequest.State.FAILED, now, INTERRUPTED).items():
                     setattr(job, name, value)
                 fields += ["last_plant_state", "last_plant_finished_at", "last_plant_error"]
+            if job.source == ImportRequest.Source.TRANSFORMER:
+                for name, value in _transformer_result(ImportRequest.State.FAILED, now, INTERRUPTED).items():
+                    setattr(job, name, value)
+                fields += ["last_transformer_state", "last_transformer_finished_at", "last_transformer_error"]
             job.save(update_fields=fields)
         plant = source == ImportRequest.Source.PLANT
-        if plant:
+        # The plant register and the transformer scan both run only as the scheduled run, never while an address request
+        # is queued, and neither touches the address schedule (D-117, D-118).
+        separate = source in (ImportRequest.Source.PLANT, ImportRequest.Source.TRANSFORMER)
+        if separate:
             if job.state == ImportRequest.State.QUEUED or not scheduled:
                 return None
             job.is_automatic = True
@@ -209,7 +236,7 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
         job.phase = "starting"
         job.bytes_done = job.bytes_total = job.rows_done = None
         job.last_error = ""
-        if job.is_automatic and not plant:
+        if job.is_automatic and not separate:
             # Commit before any download; a failure consumes this attempt.
             job.last_automatic_attempt_at = now
         job.save()
@@ -221,21 +248,37 @@ def _kind(claimed):
     return "manual" if claimed.manual else "automatic"
 
 
-def record_success(claimed, count, *, downloaded=None):
-    """Store and log a completed import (the claim must still be ours)."""
+def record_success(claimed, count, *, downloaded=None, transformer=None):
+    """Store and log a completed import (the claim must still be ours). ``transformer``: the result of a scan (D-118)."""
     count = count if isinstance(count, int) else None
     plant = claimed.source == ImportRequest.Source.PLANT
+    scan = claimed.source == ImportRequest.Source.TRANSFORMER
     fields = {
         "state": ImportRequest.State.SUCCEEDED, "finished_at": timezone.now(), "heartbeat_at": None,
         "phase": "unchanged" if downloaded is False else "", "last_error": "", "rows_done": count,
     }
     if plant:
         fields.update(_plant_result(ImportRequest.State.SUCCEEDED, fields["finished_at"]))
+    elif scan:
+        fields.update(_transformer_result(ImportRequest.State.SUCCEEDED, fields["finished_at"]))
+        fields.update({
+            "last_transformer_postal_codes": ", ".join(transformer.postal_codes)[:255],
+            "last_transformer_buildings": transformer.buildings,
+            "last_transformer_with_name": transformer.with_name,
+        })
     else:
         fields["columns_missing_at"] = None
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(**fields)
     if not finished:
         logger.warning("An import finished, but its job was taken over meanwhile.")
+        return
+    if scan:
+        logger.info("Transformer station scan completed (%s): %s buildings.", _kind(claimed), transformer.buildings)
+        with transaction.atomic():
+            security_log.record(
+                SecurityEvent.Event.TRANSFORMER_SCAN_SUCCEEDED,
+                detail=f"{_kind(claimed)}, {transformer.buildings} buildings",
+            )
         return
     if plant:
         logger.info("Plant register import completed (%s): %s plants.", _kind(claimed), count)
@@ -264,29 +307,34 @@ def record_failure(claimed, exc):
     from .importer import ImportFailure  # the web process reaches this only through the runner's thread
 
     plant = claimed.source == ImportRequest.Source.PLANT
+    scan = claimed.source == ImportRequest.Source.TRANSFORMER
     known = (SAFE_FAILURES | PLANT_FAILURES) if plant else SAFE_FAILURES
+    if scan:
+        known = SAFE_FAILURES | TRANSFORMER_FAILURES
     reason = str(exc) if isinstance(exc, ImportFailure) and str(exc) in known else UNEXPECTED_FAILURE
     now = timezone.now()
     finished = ImportRequest.objects.filter(pk=1, claim_token=claimed.token).update(
         state=ImportRequest.State.FAILED, finished_at=now, heartbeat_at=None,
         phase="", last_error=reason[:255],
         # The file itself lacks a required column: the daily run waits (``schedule.COLUMNS_RETRY_INTERVAL``).
-        **({"columns_missing_at": now} if not plant and reason in COLUMN_FAILURES else {}),
-        # The result of the plant run (D-117), kept apart from the shared fields above.
+        **({"columns_missing_at": now} if not plant and not scan and reason in COLUMN_FAILURES else {}),
+        # The result of the plant run (D-117) or of the transformer scan (D-118), kept apart from the shared fields above.
         **(_plant_result(ImportRequest.State.FAILED, now, reason[:255]) if plant else {}),
+        **(_transformer_result(ImportRequest.State.FAILED, now, reason[:255]) if scan else {}),
     )
     if not finished:
         # Taken over meanwhile: the new holder owns the row.
         logger.warning("An import failed, but its job was taken over meanwhile.")
         return
-    what = "Plant register import" if plant else "Address directory import"
+    what = "Plant register import" if plant else "Transformer station scan" if scan else "Address directory import"
     logger.error(
         "%s failed (%s): %s%s", what, _kind(claimed), reason,
         f" ({type(exc).__name__})" if reason == UNEXPECTED_FAILURE else "",
     )
     with transaction.atomic():
         security_log.record(
-            SecurityEvent.Event.PV_IMPORT_FAILED if plant else SecurityEvent.Event.ADDRESS_IMPORT_FAILED,
+            SecurityEvent.Event.PV_IMPORT_FAILED if plant
+        else SecurityEvent.Event.TRANSFORMER_SCAN_FAILED if scan else SecurityEvent.Event.ADDRESS_IMPORT_FAILED,
             detail=f"{_kind(claimed)}, {reason}",
         )
 
@@ -297,8 +345,14 @@ def execute(claimed, progress=None):
     from .importer import clear_stale_lease, import_directory
 
     options = {} if progress is None else {"progress": progress}
+    transformer = None
     try:
-        if claimed.source == ImportRequest.Source.PLANT:
+        if claimed.source == ImportRequest.Source.TRANSFORMER:
+            from .transformers import run_scan
+
+            transformer = run_scan(claimed.token, progress=progress)
+            count = transformer.buildings
+        elif claimed.source == ImportRequest.Source.PLANT:
             from .plants import import_plants
 
             count = import_plants(claim_token=claimed.token, **options)
@@ -314,7 +368,9 @@ def execute(claimed, progress=None):
         record_failure(claimed, exc)
         # Only a generic failure is stored; the exception goes to the caller (the command or the runner's log).
         raise
-    record_success(claimed, count, downloaded=None if progress is None else progress.downloaded)
+    record_success(
+        claimed, count, downloaded=None if progress is None else progress.downloaded, transformer=transformer,
+    )
     return True
 
 

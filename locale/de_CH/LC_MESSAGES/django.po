@@ -7900,3 +7900,87 @@ msgstr "Das Anlagenregister wird einmal täglich mit der täglichen Aktualisieru
 
 msgid "Source: Federal Office of Energy (BFE), open use (Open Use)"
 msgstr "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)"
+
+msgid "Can manage the postal codes of the service area"
+msgstr "Darf die Postleitzahlen des Versorgungsgebiets verwalten"
+
+msgid "Enter a Swiss postal code with four digits."
+msgstr "Eine Schweizer Postleitzahl mit vier Ziffern eingeben."
+
+msgid "Postal code of the service area"
+msgstr "Postleitzahl des Versorgungsgebiets"
+
+msgid "Postal codes of the service area"
+msgstr "Postleitzahlen des Versorgungsgebiets"
+
+msgid "Transformer station"
+msgstr "Trafostation"
+
+msgid "Transformer stations"
+msgstr "Trafostationen"
+
+msgid "Exact"
+msgstr "Genau"
+
+msgid "Nearest dot"
+msgstr "Nächster Punkt"
+
+msgid "No dot"
+msgstr "Kein Punkt"
+
+msgid "Transformer station scan completed"
+msgstr "Auswertung der Trafostationen abgeschlossen"
+
+msgid "Transformer station scan failed"
+msgstr "Auswertung der Trafostationen fehlgeschlagen"
+
+msgid "The map server could not be reached. Try again later."
+msgstr "Der Kartenserver ist nicht erreichbar. Versuchen Sie es später erneut."
+
+msgid "The map server did not answer as expected."
+msgstr "Der Kartenserver hat nicht wie erwartet geantwortet."
+
+msgid "The scan took longer than allowed."
+msgstr "Die Auswertung hat länger gedauert als erlaubt."
+
+msgid "The postal codes cover too large an area for one scan. Use fewer postal codes."
+msgstr "Die Postleitzahlen decken für eine Auswertung ein zu grosses Gebiet ab. Verwenden Sie weniger Postleitzahlen."
+
+msgid "The map could not be read."
+msgstr "Die Karte konnte nicht gelesen werden."
+
+msgid "No postal code is set for the scan."
+msgstr "Für die Auswertung ist keine Postleitzahl eingetragen."
+
+msgid "No buildings with a position were found for the postal codes."
+msgstr "Für die Postleitzahlen wurden keine Gebäude mit Position gefunden."
+
+msgid "The map reader is not installed on this server."
+msgstr "Das Lesewerkzeug für Karten ist auf diesem Server nicht installiert."
+
+msgid "The scan runs once a week, on Saturday, after the plant register. It cannot be started here."
+msgstr "Die Auswertung läuft einmal pro Woche am Samstag, nach dem Register der PV-Anlagen. Sie kann hier nicht gestartet werden."
+
+msgid "Postal codes"
+msgstr "Postleitzahlen"
+
+msgid "Last scan"
+msgstr "Letzte Auswertung"
+
+msgid "Statistic of the last successful scan"
+msgstr "Statistik der letzten erfolgreichen Auswertung"
+
+msgid "Postal codes scanned"
+msgstr "Ausgewertete Postleitzahlen"
+
+msgid "With a transformer station"
+msgstr "Mit Trafostation"
+
+msgid "Without a transformer station"
+msgstr "Ohne Trafostation"
+
+msgid "Not scanned yet"
+msgstr "Noch nicht ausgewertet"
+
+msgid "Source: BKW Netz, high-discount map (public)"
+msgstr "Quelle: BKW Netz, Hochrabatt-Karte (öffentlich)"

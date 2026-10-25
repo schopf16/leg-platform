@@ -14,7 +14,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from . import jobs, schedule
-from .models import ImportRequest, PlantRegister
+from .models import ImportRequest, PlantRegister, ServicePostalCode
 from .services import directory_status
 
 # The fixed texts of ``importer.ImportFailure`` and of the jobs, in words for the page. A text that is
@@ -57,6 +57,14 @@ REASONS = {
         "The number of plants changed too much. Nothing was changed."
     ),
     "The plant register contains no plants.": _("The plant register contains no plants."),
+    jobs.MAP_UNREACHABLE: _("The map server could not be reached. Try again later."),
+    jobs.MAP_ANSWER: _("The map server did not answer as expected."),
+    jobs.MAP_TOO_LONG: _("The scan took longer than allowed."),
+    jobs.MAP_TOO_MANY_TILES: _("The postal codes cover too large an area for one scan. Use fewer postal codes."),
+    jobs.MAP_UNREADABLE: _("The map could not be read."),
+    jobs.SCAN_NO_POSTAL_CODES: _("No postal code is set for the scan."),
+    jobs.SCAN_NO_BUILDINGS: _("No buildings with a position were found for the postal codes."),
+    jobs.SCAN_READER_MISSING: _("The map reader is not installed on this server."),
     "The plant register could not be downloaded or read.": _(
         "The plant register could not be downloaded or read. Check the network connection and try again."
     ),
@@ -141,6 +149,61 @@ def next_automatic_text(job):
     if due <= timezone.now():
         return base + " " + gettext("The next refresh is due now.")
     return base + " " + gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
+
+
+def transformer_status(now=None):
+    """The block "Trafostationen" of the data imports page (D-118): the postal codes of the service area, the last scan
+    with its date and result, and the statistic of the last successful scan. Read only; the scan runs in the weekly run.
+
+    The result is shown with its date whatever day it happened on, until a later scan replaces it (as for the plant
+    register). The statistic keeps the values of the last success.
+    """
+    now = now or timezone.now()
+    try:
+        codes = list(ServicePostalCode.objects.order_by("postal_code").values_list("postal_code", flat=True))
+    except DatabaseError:
+        codes = []
+    job = ImportRequest.objects.filter(pk=1).first()
+    result_state = ""
+    result_reason = ""
+    run_at = ""
+    if job is not None and job.source == ImportRequest.Source.TRANSFORMER and effective_state(job, now) in (
+        "running", "interrupted",
+    ):
+        run_at = _when(job.started_at)
+        if effective_state(job, now) == "running":
+            result_state = "running"
+        else:
+            result_state, result_reason = "failed", reason_text(jobs.INTERRUPTED)
+    elif job is not None and job.last_transformer_finished_at is not None:
+        run_at = _when(job.last_transformer_finished_at)
+        if job.last_transformer_state == "failed":
+            result_state = "failed"
+            result_reason = reason_text(job.last_transformer_error) or reason_text(jobs.UNEXPECTED_FAILURE)
+        elif job.last_transformer_state == "succeeded":
+            result_state = "succeeded"
+    labels = {
+        "running": ImportRequest.State.RUNNING.label,
+        "succeeded": ImportRequest.State.SUCCEEDED.label,
+        "failed": ImportRequest.State.FAILED.label,
+        "": _("Not scanned yet"),
+    }
+    tones = {"running": "warn", "succeeded": "ok", "failed": "bad", "": "muted"}
+    has_stats = job is not None and job.last_transformer_buildings is not None
+    buildings = job.last_transformer_buildings if has_stats else 0
+    with_name = (job.last_transformer_with_name or 0) if has_stats else 0
+    return {
+        "postal_codes": ", ".join(codes),
+        "run_at": run_at,
+        "result_label": str(labels[result_state]),
+        "result_tone": tones[result_state],
+        "result_reason": result_reason,
+        "has_stats": has_stats,
+        "scanned_postal_codes": job.last_transformer_postal_codes if has_stats else "",
+        "buildings": count_text(buildings) if has_stats else "",
+        "with_name": count_text(with_name) if has_stats else "",
+        "without_name": count_text(buildings - with_name) if has_stats else "",
+    }
 
 
 def plant_status(now=None):

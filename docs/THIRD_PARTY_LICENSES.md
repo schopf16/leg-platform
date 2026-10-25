@@ -26,6 +26,10 @@ Licences as declared in the package metadata (`License-Expression`, `License` or
 | phonenumberslite | Apache-2.0 | Phone number metadata for django-phonenumber-field (D-034) |
 | idna | BSD-3-Clause | UTS #46 canonicalisation of internationalised email domains (D-034) |
 | reportlab | BSD-3-Clause (metadata: "BSD license"; the bundled `LICENSE` is the 3-clause BSD licence of ReportLab Inc.) | PDF printing of the lists of the management area (D-082, D-083); checked on 2026-10-17 (version 5.0.1, PyPI metadata and the installed `LICENSE`) |
+| numpy | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 (metadata of 2.5.4) | Pixel arrays of the transformer station scan (D-118; server only, `requirements/transformers.txt`) |
+| scipy | BSD-3-Clause (classifier "BSD License"; version 1.18.1) | Dot detection and nearest-point matching of the transformer station scan (D-118; server only) |
+| opencv-python-headless | Apache-2.0 (metadata of 5.0.0.93) | Image handling of the transformer station scan (D-118; server only) |
+| rapidocr-onnxruntime | Apache-2.0 (metadata of 1.2.3) | Reading the labels of the map in the transformer station scan (D-118; server only) |
 | python-stdnum | LGPL-2.1-or-later (metadata: `License: LGPL`, classifier "GNU Lesser General Public License v2 or later (LGPLv2+)"; the bundled `licenses/COPYING` is the LGPL 2.1) | Checksum and country structure of the IBAN of a person (D-087); checked on 2026-10-17 (version 2.2, PyPI metadata and the installed `COPYING`); no dependencies; used unmodified as a library (imported, not copied or changed) |
 
 Transitive dependencies:
@@ -41,6 +45,7 @@ Transitive dependencies:
 | charset-normalizer | MIT | requests, reportlab |
 | Pillow | MIT-CMU (`License-Expression` of 13.0.0) | reportlab (declared dependency `pillow>=9.0.0`; LEG-Platform draws no image) |
 | certifi | MPL-2.0 | requests |
+| onnxruntime | MIT (metadata of 1.31.0) | rapidocr-onnxruntime (D-118; server only) |
 | cffi | MIT-0 | cryptography |
 | pycparser | BSD-3-Clause | cffi |
 | typing_extensions | PSF-2.0 | django-countries |

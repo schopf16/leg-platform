@@ -50,6 +50,8 @@ class DailyRunTests(TestCase):
     def setUp(self):
         # The plant register follows the address run (D-117); these tests never download it (see test_plants).
         self.enterContext(patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED))
+        # The transformer station scan follows it on Saturdays (D-118); these tests never scan (see test_transformers).
+        self.enterContext(patch.object(schedule, "run_transformer_weekly", return_value=schedule.NOT_SATURDAY))
         publish_directory()
         # A recent regular refresh: only the flag (or a missing identifier column) makes the run due.
         ImportRequest.objects.create(pk=1, last_automatic_attempt_at=timezone.now() - timedelta(days=1))
@@ -413,6 +415,8 @@ class HeartbeatThreadTests(TransactionTestCase):
     def setUp(self):
         # The plant register follows the address run (D-117); these tests never download it (see test_plants).
         self.enterContext(patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED))
+        # The transformer station scan follows it on Saturdays (D-118); these tests never scan (see test_transformers).
+        self.enterContext(patch.object(schedule, "run_transformer_weekly", return_value=schedule.NOT_SATURDAY))
 
     def test_the_heartbeat_moves_while_the_scheduled_import_runs(self):
         publish_directory()
@@ -442,6 +446,9 @@ class ScheduledCommandTests(TestCase):
         plant_run = patch.object(schedule, "run_plant_daily", return_value=schedule.DISABLED)
         plant_run.start()
         self.addCleanup(plant_run.stop)
+        weekly_run = patch.object(schedule, "run_transformer_weekly", return_value=schedule.NOT_SATURDAY)
+        weekly_run.start()
+        self.addCleanup(weekly_run.stop)
         publish_directory()
         ImportRequest.objects.create(pk=1, last_automatic_attempt_at=timezone.now() - timedelta(days=1))
 

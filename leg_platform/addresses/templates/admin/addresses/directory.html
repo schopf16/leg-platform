@@ -78,5 +78,30 @@
   {% endif %}
   <p class="help" id="plant-source">{% translate "Source: Federal Office of Energy (BFE), open use (Open Use)" %}</p>
 </section>
+<section class="data-import-block" id="transformer-status" aria-labelledby="transformer-status-heading">
+  <h2 id="transformer-status-heading">{% translate "Transformer stations" %}</h2>
+  <p class="help">{% translate "The scan runs once a week, on Saturday, after the plant register. It cannot be started here." %}</p>
+  <dl class="import-facts">
+    <dt>{% translate "Postal codes" %}</dt><dd id="transformer-postal-codes">{{ transformer_status.postal_codes|default:"–" }}</dd>
+    <dt>{% translate "Last scan" %}</dt><dd id="transformer-run-at">{{ transformer_status.run_at|default:"–" }}</dd>
+    <dt>{% translate "Result" %}</dt>
+    <dd id="transformer-result"><span class="status-dot status-{{ transformer_status.result_tone }}" aria-hidden="true"></span>{{ transformer_status.result_label }}</dd>
+  </dl>
+  {# role="alert": a failure stays visible until a later scan replaces it (D-118); the reason is a fixed text #}
+  {% if transformer_status.result_reason %}<p class="import-error" id="transformer-error" role="alert"><strong>{% translate "Reason" %}:</strong> <span id="transformer-error-text">{{ transformer_status.result_reason }}</span></p>{% endif %}
+
+  <h3>{% translate "Statistic of the last successful scan" %}</h3>
+  {% if transformer_status.has_stats %}
+  <dl class="import-facts">
+    <dt>{% translate "Postal codes scanned" %}</dt><dd id="transformer-scanned-codes">{{ transformer_status.scanned_postal_codes }}</dd>
+    <dt>{% translate "Buildings" %}</dt><dd id="transformer-buildings">{{ transformer_status.buildings }}</dd>
+    <dt>{% translate "With a transformer station" %}</dt><dd id="transformer-with-name">{{ transformer_status.with_name }}</dd>
+    <dt>{% translate "Without a transformer station" %}</dt><dd id="transformer-without-name">{{ transformer_status.without_name }}</dd>
+  </dl>
+  {% else %}
+  <p id="transformer-not-scanned">{% translate "Not scanned yet" %}</p>
+  {% endif %}
+  <p class="help" id="transformer-source">{% translate "Source: BKW Netz, high-discount map (public)" %}</p>
+</section>
 </div>
 {% endblock %}

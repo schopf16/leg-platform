@@ -57,6 +57,8 @@ MESSAGES = {
     Event.ADDRESS_IMPORT_FAILED: "An address directory import failed",
     Event.PV_IMPORT_SUCCEEDED: "A plant register import completed",
     Event.PV_IMPORT_FAILED: "A plant register import failed",
+    Event.TRANSFORMER_SCAN_SUCCEEDED: "A transformer station scan completed",
+    Event.TRANSFORMER_SCAN_FAILED: "A transformer station scan failed",
     Event.LOG_VIEWED: "A log file was viewed",
     Event.LOG_DOWNLOADED: "A log file was downloaded",
     Event.PERSISTENT_SESSION_STARTED: "A long session (stay signed in) was started for a privileged account",

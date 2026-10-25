@@ -20,9 +20,14 @@ before the time, or after today's daily check. Without a queued request the dail
 ``run_daily`` then calls ``run_plant_daily`` (D-117) in the same process: the plant register, once per day, after the
 address run, with the same claim. It is not started when the address import of the day has failed; the next daily run
 tries again.
+
+``run_daily`` then calls ``run_transformer_weekly`` (D-118): the transformer station scan, on Saturdays only, once per
+Saturday, after the plant register of that day, with the same claim. Each of the three steps runs even when an earlier
+one failed; the first failure is raised after them.
 """
 
 import logging
+from calendar import SATURDAY
 from datetime import time, timedelta
 
 from django.conf import settings
@@ -42,6 +47,7 @@ ALREADY_RAN = "already ran today"
 NOT_DUE = "nothing due"
 BUSY = "an import is running or queued"
 IMPORTED = "imported"
+NOT_SATURDAY = "not Saturday"
 BACKOFF = "waiting after a file without the required columns"
 # After an import that failed because the official file lacks BDG_EGID or ADR_EDID, the daily run tries again after
 # this long (the file is not going to change by itself every day; 143 MB per attempt).
@@ -82,20 +88,26 @@ def refresh_is_due(job, now):
 
 
 def run_daily(now=None):
-    """The daily run (D-117): the address directory first, then the plant register in the same process.
+    """The daily run (D-117, D-118): the address directory, the plant register, then the transformer scan (Saturdays).
 
-    The address part returns one of the words above. The plant register starts after it, every day from the configured
-    time, also when the address import failed. A failure of either import is raised (it is recorded in the job row and
-    the logs by ``jobs.execute``), so the caller reports it.
+    Each step runs even when an earlier one failed (owner decision 2026-10-25; a failure stops nothing else). The address
+    part returns one of the words above. The first failure is raised afterwards (it is recorded in the job row and the
+    logs by ``jobs.execute``), so the caller reports it.
     """
     now = timezone.localtime(now or timezone.now())
+    outcome = None
+    failure = None
     try:
         outcome = _run_address(now)
-    except Exception:
-        # The plant register runs every day even when the address import failed (owner decision 2026-10-25).
-        run_plant_daily(now)
-        raise
-    run_plant_daily(now)
+    except Exception as exc:  # noqa: BLE001 - recorded by jobs.execute; re-raised below
+        failure = exc
+    for step in (lambda: run_plant_daily(now), lambda: run_transformer_weekly(now)):
+        try:
+            step()
+        except Exception as exc:  # noqa: BLE001 - recorded by jobs.execute; re-raised below
+            failure = failure or exc
+    if failure is not None:
+        raise failure
     return outcome
 
 
@@ -165,6 +177,44 @@ def run_plant_daily(now=None):
             return BUSY
         # Committed with the claim, before the download: a failed import is not repeated today.
         ImportRequest.objects.filter(pk=1).update(last_plant_scheduled_run_on=today)
+    _execute_with_heartbeat(claimed)
+    return IMPORTED
+
+
+def run_transformer_weekly(now=None):
+    """The transformer station scan (D-118): once a week, on Saturday, after the plant register of that day.
+
+    Same claim as the other imports (``jobs.claim``, scheduled): it waits while an address request is queued or an
+    import runs. Once per Saturday (``last_transformer_scheduled_run_on``); a failed scan is not repeated that day.
+    Returns one of the words above; raises what the scan raised.
+    """
+    if not settings.ADDRESS_IMPORT_AUTOMATIC:
+        return DISABLED
+    now = timezone.localtime(now or timezone.now())
+    if now.weekday() != SATURDAY:
+        return NOT_SATURDAY
+    if now.time() < import_run_time():
+        return BEFORE_TIME
+    today = now.date()
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        job = ImportRequest.objects.select_for_update().get(pk=1)
+        if job.last_transformer_scheduled_run_on == today:
+            return ALREADY_RAN
+        claimed = jobs.claim(scheduled=True, web=True, source=ImportRequest.Source.TRANSFORMER)
+        if claimed is None:
+            return BUSY
+        # Committed with the claim, before the scan: a failed scan is not repeated today.
+        ImportRequest.objects.filter(pk=1).update(last_transformer_scheduled_run_on=today)
+    _execute_with_heartbeat(claimed)
+    return IMPORTED
+
+
+def run_transformer_now():
+    """The transformer station scan now (the command ``scan_transformer_stations``; no weekday check). Same claim."""
+    claimed = jobs.claim(scheduled=True, web=True, source=ImportRequest.Source.TRANSFORMER)
+    if claimed is None:
+        return BUSY
     _execute_with_heartbeat(claimed)
     return IMPORTED
 
