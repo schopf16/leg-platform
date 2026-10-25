@@ -2998,6 +2998,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0011_transformer_scan"),
                 ("addresses", "0012_content_changed_at"),
                 ("addresses", "0013_housekeepingstatus"),
+                ("addresses", "0015_remove_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

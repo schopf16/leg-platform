@@ -8203,3 +8203,90 @@ msgstr "Fehler-E-Mail der Wartung geändert"
 
 msgid "Housekeeping errors acknowledged"
 msgstr "Wartungsfehler quittiert"
+
+msgid "application"
+msgstr "Anwendung"
+
+msgid "security"
+msgstr "Sicherheit"
+
+msgid "housekeeping"
+msgstr "Wartung"
+
+msgid "import"
+msgstr "Import"
+
+msgid "mail"
+msgstr "Mail"
+
+msgid "A high-severity entry was recorded. Please sign in to the server and check the log."
+msgstr "Ein Eintrag mit hohem Schweregrad ist aufgetreten. Bitte melden Sie sich am Server an und prüfen Sie das Protokoll."
+
+msgid "A notice was recorded."
+msgstr "Ein Hinweis ist aufgetreten."
+
+msgid "Enter an email address, or switch the email off."
+msgstr "Geben Sie eine E-Mail-Adresse ein oder schalten Sie die E-Mail aus."
+
+msgid "Log notice"
+msgstr "Protokoll-Hinweis"
+
+msgid "Log notification"
+msgstr "Protokollmeldung"
+
+msgid "Log notification changed"
+msgstr "Protokollmeldung geändert"
+
+msgid "Critical"
+msgstr "Kritisch"
+
+msgid "Minimum severity"
+msgstr "Mindestschweregrad"
+
+msgid "Send an email"
+msgstr "E-Mail senden"
+
+msgid "Logs"
+msgstr "Protokolle"
+
+msgid "Choose the entries"
+msgstr "Einträge auswählen"
+
+msgid "Time range"
+msgstr "Zeitraum"
+
+msgid "Last hour"
+msgstr "Letzte Stunde"
+
+msgid "Last 24 hours"
+msgstr "Letzte 24 Stunden"
+
+msgid "Last 7 days"
+msgstr "Letzte 7 Tage"
+
+msgid "Last 30 days"
+msgstr "Letzte 30 Tage"
+
+msgid "Security events"
+msgstr "Sicherheitsereignisse"
+
+msgid "Download as text"
+msgstr "Als Text herunterladen"
+
+msgid "No entry in this time range."
+msgstr "Kein Eintrag in diesem Zeitraum."
+
+msgid "The log files open on their own pages: live view, download and the rotated copies."
+msgstr "Die Protokolldateien öffnen auf eigenen Seiten: Live-Ansicht, Download und die rotierten Kopien."
+
+msgid "Security log file"
+msgstr "Sicherheitsprotokoll"
+
+msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
+msgstr "Die Meldung enthält nur Zeitpunkt, Schweregrad und Quelle: keine Protokollzeile, keinen Text eines Eintrags und keinen Dateinamen. Pro Quelle und Stunde höchstens eine Meldung; weitere Einträge werden nur gezählt."
+
+msgid "The e-mail on error and the log notices are set on the logs page."
+msgstr "Die E-Mail bei Fehler und die Protokollmeldungen werden auf der Protokollseite eingestellt."
+
+msgid "Email notice"
+msgstr "E-Mail-Meldung"

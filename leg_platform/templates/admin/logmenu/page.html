@@ -1,0 +1,83 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# The log menu (D-120): system administrators only; the views refuse everyone else. No script, no inline style. #}
+{% block content %}
+<div class="data-import-blocks">
+
+<section class="data-import-block" id="logmenu-filter" aria-labelledby="logmenu-filter-heading">
+  <h2 id="logmenu-filter-heading">{% translate "Choose the entries" %}</h2>
+  <form method="get" class="import-form">
+    <p>
+      <label for="logmenu-range">{% translate "Time range" %}</label>
+      <select id="logmenu-range" name="since">
+        {% for value, label in ranges %}<option value="{{ value }}"{% if value == range %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </p>
+    <p>
+      <label><input type="checkbox" name="show" value="security"{% if "security" in shown %} checked{% endif %}> {% translate "Security events" %}</label>
+      <label><input type="checkbox" name="show" value="housekeeping"{% if "housekeeping" in shown %} checked{% endif %}> {% translate "Housekeeping errors" %}</label>
+    </p>
+    <button type="submit" class="button">{% translate "Show" %}</button>
+  </form>
+</section>
+
+<section class="data-import-block" id="logmenu-files" aria-labelledby="logmenu-files-heading">
+  <h2 id="logmenu-files-heading">{% translate "Log files" %}</h2>
+  <p class="help">{% translate "The log files open on their own pages: live view, download and the rotated copies." %}</p>
+  <ul>
+    <li><a href="{{ log_list_url }}">{% translate "All log files" %}</a></li>
+    {% for key, url in file_links %}<li><a href="{{ url }}">{% if key == "application" %}{% translate "Application log" %}{% else %}{% translate "Security log file" %}{% endif %}</a></li>{% endfor %}
+  </ul>
+</section>
+
+{% if security_rows is not None %}
+<section class="data-import-block" id="logmenu-security" aria-labelledby="logmenu-security-heading">
+  <h2 id="logmenu-security-heading">{% translate "Security events" %}</h2>
+  <p><a href="{% url 'admin:logmenu_download' 'security' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
+  <table>
+    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Event" %}</th></tr></thead>
+    <tbody>
+    {% for row in security_rows %}
+      <tr><td>{{ row.occurred_at }}</td><td>{{ row.get_event_display }}</td></tr>
+    {% empty %}
+      <tr><td colspan="2">{% translate "No entry in this time range." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if housekeeping_rows is not None %}
+<section class="data-import-block" id="logmenu-housekeeping" aria-labelledby="logmenu-housekeeping-heading">
+  <h2 id="logmenu-housekeeping-heading">{% translate "Housekeeping errors" %}</h2>
+  <p><a href="{% url 'admin:logmenu_download' 'housekeeping' %}?since={{ range }}">{% translate "Download as text" %}</a></p>
+  <table>
+    <thead><tr><th>{% translate "Occurred at" %}</th><th>{% translate "Step" %}</th><th>{% translate "Reason" %}</th><th>{% translate "Dump file" %}</th></tr></thead>
+    <tbody>
+    {% for row in housekeeping_rows %}
+      <tr><td>{{ row.occurred_at }}</td><td>{{ row.step }}</td><td>{{ row.reason }}</td><td>{{ row.dump|default:"–" }}</td></tr>
+    {% empty %}
+      <tr><td colspan="4">{% translate "No entry in this time range." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="data-import-block" id="logmenu-notify" aria-labelledby="logmenu-notify-heading">
+  <h2 id="logmenu-notify-heading">{% translate "Email notice" %}</h2>
+  <p class="help">{% translate "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted." %}</p>
+  {% if suppressed %}
+  <ul>{% for source, count in suppressed.items %}<li>{{ source }}: {{ count }}</li>{% endfor %}</ul>
+  {% endif %}
+  <form method="post" action="{% url 'admin:logmenu_settings' %}" class="import-form">{% csrf_token %}
+    {{ settings_form.non_field_errors }}
+    <p>{{ settings_form.enabled.errors }}<label for="{{ settings_form.enabled.id_for_label }}">{{ settings_form.enabled }} {% translate "Send an email" %}</label></p>
+    <p>{{ settings_form.email.errors }}<label for="{{ settings_form.email.id_for_label }}">{% translate "Email address" %}</label><br>{{ settings_form.email }}</p>
+    <p><label for="{{ settings_form.minimum_severity.id_for_label }}">{% translate "Minimum severity" %}</label> {{ settings_form.minimum_severity }}</p>
+    <button type="submit" class="button">{% translate "Save" %}</button>
+  </form>
+</section>
+
+</div>
+{% endblock %}

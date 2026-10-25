@@ -8177,3 +8177,90 @@ msgstr "E-mail di errore della manutenzione modificata"
 
 msgid "Housekeeping errors acknowledged"
 msgstr "Errori della manutenzione confermati"
+
+msgid "application"
+msgstr "applicazione"
+
+msgid "security"
+msgstr "sicurezza"
+
+msgid "housekeeping"
+msgstr "manutenzione"
+
+msgid "import"
+msgstr "import"
+
+msgid "mail"
+msgstr "posta"
+
+msgid "A high-severity entry was recorded. Please sign in to the server and check the log."
+msgstr "È stata registrata una voce di gravità elevata. Acceda al server e controlli il registro."
+
+msgid "A notice was recorded."
+msgstr "È stata registrata una segnalazione."
+
+msgid "Enter an email address, or switch the email off."
+msgstr "Inserisca un indirizzo e-mail oppure disattivi l'e-mail."
+
+msgid "Log notice"
+msgstr "Avviso del registro"
+
+msgid "Log notification"
+msgstr "Notifica del registro"
+
+msgid "Log notification changed"
+msgstr "Notifica del registro modificata"
+
+msgid "Critical"
+msgstr "Critico"
+
+msgid "Minimum severity"
+msgstr "Gravità minima"
+
+msgid "Send an email"
+msgstr "Inviare un'e-mail"
+
+msgid "Logs"
+msgstr "Registri"
+
+msgid "Choose the entries"
+msgstr "Scegliere le voci"
+
+msgid "Time range"
+msgstr "Periodo"
+
+msgid "Last hour"
+msgstr "Ultima ora"
+
+msgid "Last 24 hours"
+msgstr "Ultime 24 ore"
+
+msgid "Last 7 days"
+msgstr "Ultimi 7 giorni"
+
+msgid "Last 30 days"
+msgstr "Ultimi 30 giorni"
+
+msgid "Security events"
+msgstr "Eventi di sicurezza"
+
+msgid "Download as text"
+msgstr "Scarica come testo"
+
+msgid "No entry in this time range."
+msgstr "Nessuna voce in questo periodo."
+
+msgid "The log files open on their own pages: live view, download and the rotated copies."
+msgstr "I file di registro si aprono nelle proprie pagine: vista in diretta, download e copie ruotate."
+
+msgid "Security log file"
+msgstr "Registro di sicurezza"
+
+msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
+msgstr "L'avviso contiene solo l'ora, la gravità e la fonte: nessuna riga di registro, nessun testo di una voce e nessun nome di file. Al massimo un avviso per fonte e ora; le altre voci vengono solo contate."
+
+msgid "The e-mail on error and the log notices are set on the logs page."
+msgstr "L'e-mail in caso di errore e gli avvisi del registro si impostano nella pagina dei registri."
+
+msgid "Email notice"
+msgstr "Avviso via e-mail"

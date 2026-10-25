@@ -159,7 +159,7 @@ class SecurityEvent(models.Model):
         ACCOUNT_DELETED = "account_deleted", _("Account deleted")
         TWO_FACTOR_ENABLED = "two_factor_enabled", _("Two-factor authentication set up")
         HOUSEKEEPING_RUN = "housekeeping_run", _("Housekeeping of the databases")
-        HOUSEKEEPING_NOTIFICATION_CHANGED = "housekeeping_notification_changed", _("Housekeeping error notification changed")
+        LOG_NOTIFICATION_CHANGED = "log_notification_changed", _("Log notification changed")
         HOUSEKEEPING_ERRORS_ACKNOWLEDGED = "housekeeping_errors_acknowledged", _("Housekeeping errors acknowledged")
         TWO_FACTOR_DISABLED = "two_factor_disabled", _(
             "Two-factor authentication removed by the account itself"

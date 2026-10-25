@@ -220,13 +220,16 @@ class PortalAdminSite(AdminSite):
         # each view checks "system administrator" itself.
         from django.urls import path
 
-        from leg_platform import log_views
+        from leg_platform import log_menu, log_views
 
         return [
             path("logs/", self.admin_view(log_views.log_list), name="logs"),
             path("logs/<logkey:log>/", self.admin_view(log_views.log_view), name="logs_view"),
             path("logs/<logkey:log>/tail/", self.admin_view(log_views.log_tail), name="logs_tail"),
             path("logs/<logkey:log>/download/", self.admin_view(log_views.log_download), name="logs_download"),
+            path("logmenu/", self.admin_view(log_menu.page), name="logmenu"),
+            path("logmenu/settings/", self.admin_view(log_menu.settings_view), name="logmenu_settings"),
+            path("logmenu/download/<str:source>/", self.admin_view(log_menu.download), name="logmenu_download"),
             *super().get_urls(),
         ]
 

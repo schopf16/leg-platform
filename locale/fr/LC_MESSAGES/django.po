@@ -8206,3 +8206,90 @@ msgstr "E-mail d'erreur de la maintenance modifié"
 
 msgid "Housekeeping errors acknowledged"
 msgstr "Erreurs de maintenance acquittées"
+
+msgid "application"
+msgstr "application"
+
+msgid "security"
+msgstr "sécurité"
+
+msgid "housekeeping"
+msgstr "maintenance"
+
+msgid "import"
+msgstr "import"
+
+msgid "mail"
+msgstr "courriel"
+
+msgid "A high-severity entry was recorded. Please sign in to the server and check the log."
+msgstr "Une entrée de gravité élevée a été enregistrée. Veuillez vous connecter au serveur et consulter le journal."
+
+msgid "A notice was recorded."
+msgstr "Une remarque a été enregistrée."
+
+msgid "Enter an email address, or switch the email off."
+msgstr "Saisissez une adresse e-mail, ou désactivez l'e-mail."
+
+msgid "Log notice"
+msgstr "Avis du journal"
+
+msgid "Log notification"
+msgstr "Notification du journal"
+
+msgid "Log notification changed"
+msgstr "Notification du journal modifiée"
+
+msgid "Critical"
+msgstr "Critique"
+
+msgid "Minimum severity"
+msgstr "Gravité minimale"
+
+msgid "Send an email"
+msgstr "Envoyer un e-mail"
+
+msgid "Logs"
+msgstr "Journaux"
+
+msgid "Choose the entries"
+msgstr "Choisir les entrées"
+
+msgid "Time range"
+msgstr "Période"
+
+msgid "Last hour"
+msgstr "Dernière heure"
+
+msgid "Last 24 hours"
+msgstr "Dernières 24 heures"
+
+msgid "Last 7 days"
+msgstr "7 derniers jours"
+
+msgid "Last 30 days"
+msgstr "30 derniers jours"
+
+msgid "Security events"
+msgstr "Événements de sécurité"
+
+msgid "Download as text"
+msgstr "Télécharger en texte"
+
+msgid "No entry in this time range."
+msgstr "Aucune entrée dans cette période."
+
+msgid "The log files open on their own pages: live view, download and the rotated copies."
+msgstr "Les fichiers journaux s'ouvrent sur leurs propres pages : affichage en direct, téléchargement et copies tournées."
+
+msgid "Security log file"
+msgstr "Journal de sécurité"
+
+msgid "The notice contains the time, the severity and the source only: no log line, no text of an entry and no file name. At most one notice per source and hour; further entries are only counted."
+msgstr "L'avis ne contient que l'heure, la gravité et la source : aucune ligne de journal, aucun texte d'entrée et aucun nom de fichier. Au plus un avis par source et par heure ; les autres entrées sont seulement comptées."
+
+msgid "The e-mail on error and the log notices are set on the logs page."
+msgstr "L'e-mail en cas d'erreur et les avis du journal se règlent sur la page des journaux."
+
+msgid "Email notice"
+msgstr "Avis par e-mail"

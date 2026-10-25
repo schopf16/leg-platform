@@ -45,16 +45,7 @@
   <p class="help">{% translate "A dump file is not restored from this page. A restore is a manual procedure on the server (runbook: the deployment document, section 12.2)." %}</p>
 </section>
 
-<section class="data-import-block" id="housekeeping-notify" aria-labelledby="housekeeping-notify-heading">
-  <h2 id="housekeeping-notify-heading">{% translate "Email on error" %}</h2>
-  <form method="post" class="import-form">{% csrf_token %}
-    <input type="hidden" name="action" value="notify">
-    {{ notify_form.non_field_errors }}
-    <p>{{ notify_form.notify_enabled.errors }}<label for="{{ notify_form.notify_enabled.id_for_label }}">{{ notify_form.notify_enabled }} {% translate "Send an email on error" %}</label></p>
-    <p>{{ notify_form.notify_email.errors }}<label for="{{ notify_form.notify_email.id_for_label }}">{% translate "Email address for errors" %}</label><br>{{ notify_form.notify_email }}</p>
-    <button type="submit" class="button">{% translate "Save" %}</button>
-  </form>
-</section>
+<p class="help">{% translate "The e-mail on error and the log notices are set on the logs page." %} <a href="{% url 'admin:logmenu' %}">{% translate "Logs" %}</a></p>
 
 {% if sizes %}
 <section class="data-import-block" id="housekeeping-sizes" aria-labelledby="housekeeping-sizes-heading">

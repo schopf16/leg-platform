@@ -130,29 +130,24 @@ def send_test(address, key, subject, body, greeting_name=""):
     _deliver(address, subject, f"{notice}\n\n{body}")
 
 
-def send_housekeeping_error(address, rows):
-    """The error mail of the housekeeping of the databases (D-119): the error log lines only.
+def send_log_notification(address, notices):
+    """The notice of the log menu (D-120): time, severity and source label, and one fixed sentence. No log line, no
+    text of an event, no dump, no file name and no personal data."""
+    from datetime import datetime
 
-    Each line holds the time, the step, the fixed reason text and the name of the dump file, if there is one. No SQL,
-    no table content and no content of any dump: the rows are read from the error log, nothing else is read.
-    """
     from django.utils import timezone
 
+    from leg_platform import log_menu
+
+    severities = {notice["severity"] for notice in notices}
+    high = bool(severities & {"error", "critical"})
     with translation.override(settings.LANGUAGE_CODE):
-        subject = gettext("Housekeeping of the databases: error")
-        lines = [
-            gettext(
-                "The housekeeping of the databases has an open error. The lines below are the error log. "
-                "They contain no data of the databases and no content of a dump file."
-            ),
-            "",
-        ]
-        for row in rows:
-            when = timezone.localtime(row["occurred_at"]).strftime("%d.%m.%Y %H:%M")
-            line = f"{when} | {row['step']} | {row['reason']}"
-            if row["dump"]:
-                line += f" | {row['dump']}"
-            lines.append(line)
+        subject = gettext("Log notice")
+        lines = [log_menu.HIGH_SEVERITY_SENTENCE if high else log_menu.NOTICE_SENTENCE, ""]
+        for notice in notices:
+            when = timezone.localtime(datetime.fromisoformat(notice["time"])).strftime("%d.%m.%Y %H:%M")
+            label = log_menu.source_label(notice["source"])
+            lines.append(f"{when} | {notice['severity']} | {label}")
     _deliver(address, subject, "\n".join(lines))
 
 

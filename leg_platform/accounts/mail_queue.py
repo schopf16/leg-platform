@@ -52,19 +52,19 @@ def _notification(sender, greets=True):
     return lambda address, greeting_name="": lambda: sender(address)
 
 
-def _housekeeping_error(address):
-    """The error mail of the housekeeping (D-119): the open error lines are read when the mail is made."""
-    # Imported here: the addresses app imports this package.
-    from leg_platform.addresses import housekeeping
+def _log_notification(address):
+    """The notice of the log menu (D-120): the waiting notices (time, severity, source) are read when the mail is made."""
+    # Imported here: the log menu imports the mail queue.
+    from leg_platform import log_menu
 
-    rows = housekeeping.error_rows(open_only=True)
-    if not rows:
+    notices = log_menu.take_pending()
+    if not notices:
         return None
-    return lambda: emails.send_housekeeping_error(address, rows)
+    return lambda: emails.send_log_notification(address, notices)
 
 
 HANDLERS = {
-    MailJob.Kind.HOUSEKEEPING_ERROR: _housekeeping_error,
+    MailJob.Kind.LOG_NOTIFICATION: _log_notification,
     MailJob.Kind.RECOVERY_GUIDANCE: recovery.process_recovery_request,
     MailJob.Kind.SIGN_IN_CHANGED: _notification(emails.send_sign_in_changed),
     MailJob.Kind.REGISTRATION: registration.process_registration,

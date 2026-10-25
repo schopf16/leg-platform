@@ -352,6 +352,13 @@ AREAS: dict[str, Area] = {
             + ("leg_platform.customer.tests.test_profile_cards", C + "test_profile_address")
         ),
     ),
+    "logs-menu": Area(
+        "The log menu (D-120): the page for system administrators only, its redacted downloads, and the e-mail notice of "
+        "log events.",
+        paths=("leg_platform/log_menu.py", "leg_platform/accounts/models/log_notice.py",
+               "leg_platform/accounts/management/commands/notify_log_events.py"),
+        tests=("leg_platform.tests.test_log_menu",),
+    ),
     "admin": Area(
         "The administration: users, rights, email texts, Graph configuration and portal settings.",
         paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py", "leg_platform/community/admin.py",

@@ -20,8 +20,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.accounts import mail_queue
-from leg_platform.accounts.models import MailJob, SecurityEvent
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.addresses import housekeeping, jobs
 from leg_platform.addresses.models import HousekeepingError, HousekeepingStatus, ImportRequest
@@ -421,45 +420,9 @@ class ErrorStateTests(HousekeepingBase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(set(rows[0]), {"occurred_at", "step", "reason", "dump", "open"})
 
-    def test_the_error_mail_is_queued_only_when_enabled_and_once_per_open_error(self):
-        self.run_now()  # switch off by default
-        with patch("leg_platform.accounts.mail_queue.enqueue") as enqueue:
-            self.run_now(NOW + timedelta(minutes=5))
-            enqueue.assert_not_called()
-        HousekeepingStatus.objects.update_or_create(pk=1, defaults={
-            "notify_enabled": True, "notify_email": "housekeeping@example.org",
-        })
-        self.succeed()
-        self.run_now(NOW + timedelta(hours=1))  # clears the errors
-        self.failing()
-        with patch("leg_platform.accounts.mail_queue.enqueue") as enqueue:
-            self.run_now(NOW + timedelta(hours=2))
-            enqueue.assert_called_once_with(MailJob.Kind.HOUSEKEEPING_ERROR, "housekeeping@example.org")
-            self.run_now(NOW + timedelta(hours=2, minutes=5))  # error still open: no second mail
-            enqueue.assert_called_once()
-
     def failing(self):
         self.sqlite.return_value = housekeeping._sqlite_result(
             HousekeepingStatus.State.FAILED, housekeeping.SQLITE_VACUUM_FAILED, 4096)
-
-    def test_the_error_mail_body_holds_the_log_lines_and_no_dump_content(self):
-        dump_file = self.dump.path.parent / "housekeeping-20261025T0420Z.sql.gz"
-        dump_file.write_text("SECRET-DUMP-CONTENT INSERT INTO accounts_user", encoding="utf-8")
-        self.run_now()
-        send = mail_queue.HANDLERS[MailJob.Kind.HOUSEKEEPING_ERROR]("housekeeping@example.org")
-        self.assertIsNotNone(send)
-        with patch("leg_platform.accounts.emails._deliver") as deliver:
-            send()
-        address, subject, body = deliver.call_args.args
-        self.assertEqual(address, "housekeeping@example.org")
-        self.assertIn("housekeeping-20261025T0420Z.sql.gz", body)
-        self.assertIn(" | ", body)
-        self.assertNotIn("SECRET-DUMP-CONTENT", body)
-        self.assertNotIn("INSERT", body)
-
-    def test_no_mail_job_is_made_without_an_open_error(self):
-        self.assertIsNone(mail_queue.HANDLERS[MailJob.Kind.HOUSEKEEPING_ERROR]("housekeeping@example.org"))
-
 
 class ErrorAdminTests(HousekeepingBase):
     def setUp(self):
@@ -497,19 +460,3 @@ class ErrorAdminTests(HousekeepingBase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(HousekeepingError.objects.filter(cleared_at__isnull=True).count(), 1)
         self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED).exists())
-
-    def test_the_notification_setting_needs_the_right_and_a_valid_address(self):
-        page = reverse("admin:addresses_housekeepingstatus_changelist")
-        data = {"action": "notify", "notify_enabled": "on", "notify_email": "housekeeping@example.org"}
-        response = self.client_for(False).post(page, data)
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
-        client = self.client_for(True)
-        invalid = client.post(page, {**data, "notify_email": "not-an-address"})
-        self.assertEqual(invalid.status_code, 200)
-        self.assertFalse(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_NOTIFICATION_CHANGED).exists())
-        valid = client.post(page, data)
-        self.assertEqual(valid.status_code, 302)
-        self.assertTrue(HousekeepingStatus.objects.filter(pk=1, notify_enabled=True).exists())
-        self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.HOUSEKEEPING_NOTIFICATION_CHANGED).count(), 1)

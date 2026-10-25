@@ -341,9 +341,6 @@ class HousekeepingStatus(models.Model):
     mariadb_message = models.CharField(max_length=40, blank=True, verbose_name=_("Application database result"))
     # {"table name": {"before": bytes, "after": bytes}} for the tables of the optimisation.
     mariadb_sizes = models.JSONField(default=dict, blank=True, verbose_name=_("Table sizes"))
-    # The error mail (D-119): off by default; the recipient is checked as an email address.
-    notify_enabled = models.BooleanField(default=False, verbose_name=_("Send an email on error"))
-    notify_email = models.EmailField(blank=True, verbose_name=_("Email address for errors"))
 
     class Meta:
         default_permissions = ()

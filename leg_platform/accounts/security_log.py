@@ -61,7 +61,7 @@ MESSAGES = {
     Event.TRANSFORMER_SCAN_FAILED: "A transformer station scan failed",
     Event.SERVICE_AREA_CHANGED: "The postal codes of the service area were changed",
     Event.HOUSEKEEPING_RUN: "The housekeeping of the databases was run",
-    Event.HOUSEKEEPING_NOTIFICATION_CHANGED: "The housekeeping error notification was changed",
+    Event.LOG_NOTIFICATION_CHANGED: "The log notification setting was changed",
     Event.HOUSEKEEPING_ERRORS_ACKNOWLEDGED: "The open housekeeping errors were acknowledged",
     Event.LOG_VIEWED: "A log file was viewed",
     Event.LOG_DOWNLOADED: "A log file was downloaded",
