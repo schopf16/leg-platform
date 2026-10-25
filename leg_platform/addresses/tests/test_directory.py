@@ -12,8 +12,8 @@ import tempfile
 import types
 import uuid
 import zipfile
+from datetime import date, timedelta
 from decimal import Decimal
-from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlencode
@@ -29,12 +29,12 @@ from django.db import DatabaseError, OperationalError, connections
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase, TransactionTestCase, override_settings, tag
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.models import RateLimitBucket, RateLimitEvent, SecurityEvent
 from leg_platform.accounts.rate_limits import RATE_LIMIT_PURPOSE
-from leg_platform.addresses import importer, jobs, plants, storage
+from leg_platform.addresses import importer, jobs, plants, status, storage
 from leg_platform.addresses.jobs import process_one, request_import
 from leg_platform.addresses.keys import fold, key, prefix_range
 from leg_platform.addresses.limits import allow_request
@@ -2296,6 +2296,53 @@ class PlantBlockAdminTests(TestCase):
             response, '<dd id="plant-result"><span class="status-dot status-muted" aria-hidden="true"></span>Not run today</dd>',
         )
 
+    def _hint(self, page_html, identifier):
+        match = re.search(rf'<p role="status" class="help" id="{identifier}"><span [^>]*></span>(.*?)</p>', page_html)
+        return match
+
+    def test_a_file_unchanged_for_thirty_one_days_shows_the_hint_of_both_sources(self):
+        day = timezone.localdate() - timedelta(days=31)
+        self._plant_register()
+        PlantRegister.objects.filter(pk=1).update(content_changed_at=day)
+        Directory.objects.filter(pk=1).update(content_changed_at=day)
+        text = f"The file has not changed since {day.strftime('%d.%m.%Y')}. Check whether the source is still updated."
+        html = self._client().get(self.page).content.decode()
+        for identifier in ("plant-content-warning", "directory-content-warning"):
+            match = self._hint(html, identifier)
+            self.assertIsNotNone(match, identifier)
+            self.assertEqual(match.group(1), text)
+            # The hint names no address of the source and no checksum.
+            self.assertNotIn("http", match.group(0))
+        self.assertNotIn("1" * 64, html)
+        self.assertNotIn("0" * 64, html)
+
+    def test_the_hint_has_the_german_text_in_the_swiss_date_form(self):
+        day = timezone.localdate() - timedelta(days=31)
+        self._plant_register()
+        PlantRegister.objects.filter(pk=1).update(content_changed_at=day)
+        html = self._client(language="de-ch").get(self.page).content.decode()
+        self.assertIn(
+            f"Die Datei ist seit dem {day.strftime('%d.%m.%Y')} unverändert. "
+            "Prüfen Sie, ob die Quelle noch aktualisiert wird.",
+            html,
+        )
+
+    def test_no_hint_for_a_file_unchanged_for_twenty_nine_days(self):
+        day = timezone.localdate() - timedelta(days=29)
+        self._plant_register()
+        PlantRegister.objects.filter(pk=1).update(content_changed_at=day)
+        Directory.objects.filter(pk=1).update(content_changed_at=day)
+        html = self._client().get(self.page).content.decode()
+        self.assertNotIn('id="plant-content-warning"', html)
+        self.assertNotIn('id="directory-content-warning"', html)
+
+    def test_no_hint_when_the_source_was_never_imported(self):
+        # The setUp directory has no content day, and no plant register exists.
+        Directory.objects.filter(pk=1).update(content_changed_at=None)
+        html = self._client().get(self.page).content.decode()
+        self.assertNotIn('id="plant-content-warning"', html)
+        self.assertNotIn('id="directory-content-warning"', html)
+
     def test_the_empty_state_and_the_run_of_today_have_the_german_texts(self):
         response = self._client(language="de-ch").get(self.page)
         self.assertContains(response, "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie.")
@@ -2429,6 +2476,54 @@ class PlantBlockAdminTests(TestCase):
         jobs.record_success(jobs.Claim(plant_token, False, False, ImportRequest.Source.PLANT), 341981)
         job = ImportRequest.objects.get(pk=1)
         self.assertEqual((job.last_plant_state, job.last_plant_error), ("succeeded", ""))
+
+
+class ContentWarningTests(SimpleTestCase):
+    # The hint of a source whose file has not changed for more than 30 days (D-117); a hint only.
+
+    def test_no_hint_without_a_day_or_up_to_thirty_days(self):
+        today = date(2026, 10, 25)
+        with translation.override("en"):
+            self.assertEqual(status.content_warning(None, today), "")
+            self.assertEqual(status.content_warning(today - timedelta(days=29), today), "")
+            self.assertEqual(status.content_warning(today - timedelta(days=30), today), "")
+
+    def test_the_hint_from_thirty_one_days_names_the_day_in_the_swiss_form(self):
+        today = date(2026, 10, 25)
+        with translation.override("en"):
+            self.assertEqual(
+                status.content_warning(today - timedelta(days=31), today),
+                "The file has not changed since 24.09.2026. Check whether the source is still updated.",
+            )
+
+
+class ContentChangeTests(TestCase):
+    # The day of the last content change (D-117 hint): set when the published file differs, kept for the same file.
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        self.disk = patch.object(
+            importer.shutil, "disk_usage",
+            return_value=types.SimpleNamespace(total=10**12, used=0, free=importer.MIN_FREE_DISK_BYTES * 10),
+        )
+        self.disk.start()
+        self.addCleanup(self.disk.stop)
+        self.day = timezone.localdate() - timedelta(days=40)
+
+    def publish_on(self, day, checksum):
+        with patch("django.utils.timezone.localdate", return_value=day):
+            return importer._publish(io.BytesIO(archive_bytes()), checksum, day)
+
+    def test_the_first_publication_sets_the_day_and_the_same_file_keeps_it(self):
+        self.publish_on(self.day, "1" * 64)
+        self.assertEqual(Directory.objects.get(pk=1).content_changed_at, self.day)
+        self.publish_on(self.day + timedelta(days=31), "1" * 64)
+        self.assertEqual(Directory.objects.get(pk=1).content_changed_at, self.day)
+
+    def test_a_changed_file_resets_the_day(self):
+        self.publish_on(self.day, "1" * 64)
+        self.publish_on(self.day + timedelta(days=31), "2" * 64)
+        self.assertEqual(Directory.objects.get(pk=1).content_changed_at, self.day + timedelta(days=31))
 
 
 @tag("mariadb")
@@ -2877,7 +2972,7 @@ class MigrateTests(SimpleTestCase):
                 "street_key", "house_number_key", "locality_key", "egid", "entrance_id", "easting", "northing",
             })
             self.assertEqual(directory_columns, {
-                "id", "generation", "data_date", "imported_at", "checksum", "row_count",
+                "id", "generation", "data_date", "imported_at", "checksum", "content_changed_at", "row_count",
                 "has_egid", "import_token", "import_lease_until",
             })
             self.assertEqual(address_indexes, {
@@ -2900,6 +2995,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0009_data_import_labels_and_plant_run"),
                 ("addresses", "0010_address_coordinates"),
                 ("addresses", "0011_transformer_scan"),
+                ("addresses", "0012_content_changed_at"),
             })
             # Full-graph migrate records even router-excluded apps as applied. This is not
             # permission-table creation: the exact table set above must still be directory-only.

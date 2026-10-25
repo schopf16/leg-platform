@@ -100,6 +100,24 @@ def _day(value):
     return date_format(value, "d.m.Y") if value else ""
 
 
+# The hint that a source may be stale (owner decision, D-117): its file has not changed for more than this many days. A hint
+# only; it changes no import outcome and writes no security event.
+STALE_CONTENT_DAYS = 30
+
+
+def content_warning(changed_on, today=None):
+    """The hint for a source whose file has not changed for more than ``STALE_CONTENT_DAYS`` days, with the day of the last
+    change in the Swiss form; "" when there is no hint (never imported, or changed within the limit)."""
+    if changed_on is None:
+        return ""
+    today = today or timezone.localdate()
+    if (today - changed_on).days <= STALE_CONTENT_DAYS:
+        return ""
+    return gettext("The file has not changed since %(date)s. Check whether the source is still updated.") % {
+        "date": _day(changed_on),
+    }
+
+
 def count_text(value):
     """A count with the Swiss thousands separator, a typographic apostrophe: 341’981 (DESIGN section 8)."""
     return f"{value:,}".replace(",", "’")
@@ -268,6 +286,7 @@ def plant_status(now=None):
         "result_reason": result_reason,
         # After a failed run the values of the last success stay valid; the date names their data.
         "older_data_date": older if result_state == "failed" and imported else "",
+        "content_warning": content_warning(register.content_changed_at, today) if imported else "",
     }
 
 
@@ -346,6 +365,7 @@ def build():
             "row_count": count_text(directory.row_count) if directory else "",
             "file_megabytes": _megabytes(size),
             "warning": str(status["warning"]) if status["warning"] else "",
+            "content_warning": content_warning(directory.content_changed_at) if directory else "",
         },
         "server_time": _when(now),
     }

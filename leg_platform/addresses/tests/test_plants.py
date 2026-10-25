@@ -586,6 +586,34 @@ class PublicationTests(TestCase):
         self.assertEqual(plant_lookup.plant_summary(1001).count, 1)
         self.assertEqual(plant_lookup.plant_summary(1007).count, 0)
 
+    def publish_on(self, day, lines, checksum=CHECKSUM):
+        with patch("django.utils.timezone.localdate", return_value=day):
+            return self.publish(lines, checksum)
+
+    def test_the_day_of_the_change_is_set_for_a_new_file_and_kept_for_the_same_one(self):
+        day = timezone.localdate() - timedelta(days=40)
+        self.publish_on(day, [plant_line(1)])
+        self.assertEqual(PlantRegister.objects.get(pk=1).content_changed_at, day)
+        self.publish_on(day + timedelta(days=31), [plant_line(1)])
+        self.assertEqual(PlantRegister.objects.get(pk=1).content_changed_at, day)
+        self.publish_on(day + timedelta(days=31), [plant_line(2)], checksum="e" * 64)
+        self.assertEqual(PlantRegister.objects.get(pk=1).content_changed_at, day + timedelta(days=31))
+
+    def test_the_hint_shows_from_thirty_one_days_without_a_change_and_not_before(self):
+        day = timezone.localdate() - timedelta(days=40)
+        self.publish_on(day, [plant_line(1)])
+        for offset, shown in ((29, False), (30, False), (31, True)):
+            with patch("django.utils.timezone.localdate", return_value=day + timedelta(days=offset)):
+                warning = status.plant_status()["content_warning"]
+            self.assertEqual(bool(warning), shown, offset)
+
+    def test_a_changed_file_removes_the_hint(self):
+        day = timezone.localdate() - timedelta(days=40)
+        self.publish_on(day, [plant_line(1)])
+        self.publish_on(day + timedelta(days=31), [plant_line(2)], checksum="e" * 64)
+        with patch("django.utils.timezone.localdate", return_value=day + timedelta(days=40)):
+            self.assertEqual(status.plant_status()["content_warning"], "")
+
     def test_a_new_publication_replaces_the_previous_generation(self):
         self.publish([plant_line(1), plant_line(2)])
         old = PlantRegister.objects.get(pk=1).generation

@@ -12,6 +12,7 @@ import logging
 import os
 import sqlite3
 import tempfile
+import uuid
 import threading
 import uuid
 from io import StringIO
@@ -602,7 +603,12 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
         with tempfile.TemporaryDirectory() as folder, directory_file(Path(folder) / "directory.sqlite3") as alias:
             self.run_command()
             call_command("migrate", "addresses", "0006", database=DIRECTORY_ALIAS, verbosity=0)
-            Directory.objects.create(pk=1, row_count=7, checksum="a" * 64)
+            # Raw insert: the model has columns (content_changed_at) that the table at migration 0006 lacks.
+            with alias.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO addresses_directory (id, generation, row_count, checksum, has_egid) VALUES (1, %s, 7, %s, 0)",
+                    [uuid.uuid4().hex, "a" * 64],
+                )
             ImportRequest.objects.filter(pk=1).update(
                 state=ImportRequest.State.FAILED, last_error="Official download failed.",
                 bytes_done=123, rows_done=12,
