@@ -196,6 +196,11 @@ class ReadOnlyAxesFailureAdmin(ReadOnlyAxesAdmin):
     fields = readonly_fields = ("username", "path_info", "locked_out", "attempt_time")
 
 
+def headers_of(columns, model, model_admin):
+    """The column headers of a list, as text."""
+    return [str(label_for_field(name, model, model_admin)) for name in columns]
+
+
 def failed_logins_view(request):
     """The one page "Failed logins" (owner decision): two read-only sections, "Locked" (AccessAttempt) and "Log"
     (AccessFailureLog). Superusers only; the columns, filters, search and the cool-off note are those of the two lists."""
@@ -222,11 +227,16 @@ def failed_logins_view(request):
         )
         cl = model_admin.get_changelist_instance(request)
         columns = list(cl.list_display)
+        headers = headers_of(columns, model, model_admin)
         sections.append({
             "id": section_id,
             "title": title,
-            "headers": [str(label_for_field(name, model, model_admin)) for name in columns],
-            "rows": [[lookup_field(name, obj, model_admin)[2] for name in columns] for obj in cl.result_list],
+            "headers": headers,
+            # Each cell carries its header: the table becomes one block per entry on a phone (design review H).
+            "rows": [
+                [(label, lookup_field(name, obj, model_admin)[2]) for label, name in zip(headers, columns)]
+                for obj in cl.result_list
+            ],
             "filters": [(spec.title, list(spec.choices(cl))) for spec in cl.filter_specs],
             "query": cl.query,
             "note": minutes if section_id == "locked" else None,

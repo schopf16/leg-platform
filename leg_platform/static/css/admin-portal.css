@@ -431,6 +431,44 @@ input.portal-colour {
   background: var(--status-bad);
 }
 
+/* The failed-login tables (design review H): on a phone each entry is one block, the label of each cell in front of it. */
+@media (max-width: 767px) {
+  .phone-table,
+  .phone-table tbody,
+  .phone-table tr,
+  .phone-table th,
+  .phone-table td {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .phone-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .phone-table tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--hairline-color, #ccc);
+  }
+
+  .phone-table th,
+  .phone-table td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .phone-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+  }
+}
+
 /* The table of the security log: the column headers are not cut off, the account and the actor columns are wide enough
    for the short headers "Konto" and "Von" (design review E). */
 #result_list thead th {

@@ -20,11 +20,11 @@
   {% if section.lines is not None %}
     {% include "admin/logs/_text_box.html" with lines=section.lines box_id="failed-logins-log-box" %}
   {% else %}
-  <table>
+  <table class="phone-table">
     <thead><tr>{% for header in section.headers %}<th>{{ header|capfirst }}</th>{% endfor %}</tr></thead>
     <tbody>
     {% for row in section.rows %}
-      <tr>{% for value in row %}<td>{{ value|default_if_none:"–" }}</td>{% endfor %}</tr>
+      <tr>{% for label, value in row %}<td data-label="{{ label|capfirst }}">{{ value|default_if_none:"–" }}</td>{% endfor %}</tr>
     {% empty %}
       <tr><td colspan="{{ section.headers|length }}">{% translate "No entry." %}</td></tr>
     {% endfor %}

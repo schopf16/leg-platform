@@ -104,6 +104,13 @@ class LockoutListTests(TestCase):
         locked, _log = self.sections()
         self.assertNotIn(BLOCKED[:8], locked)
 
+    def test_each_cell_of_the_tables_has_its_label(self):
+        self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
+        locked, log = self.sections()
+        self.assertIn('class="phone-table"', locked)
+        self.assertIn('<td data-label="Code (shortened)">', locked)
+        self.assertNotIn("<table", log)
+
     def test_the_identifier_is_shortened_in_both_sections(self):
         self.attempt(BLOCKED, LOGIN_FAILURE_LIMIT)
         locked, log = self.sections()
