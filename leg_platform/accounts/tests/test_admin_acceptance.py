@@ -279,7 +279,7 @@ class BlockedLoginListTests(TestCase):
     def test_the_list_explains_itself_and_says_how_to_unblock(self):
         client, _administrator = administrator_client()
 
-        page = client.get(reverse("admin:axes_accessattempt_changelist")).content.decode()
+        page = client.get(reverse("admin:failed_logins")).content.decode()
 
         self.assertIn("Diese Listen zeigen fehlgeschlagene und gesperrte Anmeldungen.", page)
         self.assertIn("ist ein Code und keine Adresse", page)

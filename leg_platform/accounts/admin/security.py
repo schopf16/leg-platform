@@ -3,8 +3,16 @@
 from axes.models import AccessAttempt, AccessFailureLog
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.admin.utils import label_for_field, lookup_field
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseNotAllowed, HttpResponseRedirect
+from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
+
+# The one entry "Failed logins" shows both models (owner decision): "Locked" (current state) and "Log" (history).
+FAILED_LOGIN_MODELS = (AccessAttempt, AccessFailureLog)
 
 # Plain words instead of the product name; the models are those of django-axes.
 AccessAttempt._meta.verbose_name = _("blocked or failed login")
@@ -75,6 +83,9 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
     change_list_template = "admin/axes_change_list.html"
 
     def changelist_view(self, request, extra_context=None):
+        # The one page "Failed logins" shows both lists (owner decision); the old list redirects there for superusers.
+        if request.user.is_superuser and request.method == "GET" and not request.GET:
+            return HttpResponseRedirect(reverse("admin:failed_logins"))
         from leg_platform.accounts.login_protection import LOGIN_COOLOFF
 
         minutes = int(LOGIN_COOLOFF.total_seconds() // 60)
@@ -99,3 +110,60 @@ class ReadOnlyAxesAdmin(admin.ModelAdmin):
 class ReadOnlyAxesFailureAdmin(ReadOnlyAxesAdmin):
     list_display = ("attempt_time", "username", "path_info", "locked_out")
     fields = readonly_fields = ("username", "path_info", "locked_out", "attempt_time")
+
+
+def failed_logins_view(request):
+    """The one page "Failed logins" (owner decision): two read-only sections, "Locked" (AccessAttempt) and "Log"
+    (AccessFailureLog). Superusers only; the columns, filters, search and the cool-off note are those of the two lists."""
+    from leg_platform.accounts.login_protection import LOGIN_COOLOFF
+
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    minutes = int(LOGIN_COOLOFF.total_seconds() // 60)
+    from django.utils import timezone
+
+    from leg_platform.log_filters import redact_personal_data, redact_tokens
+    from leg_platform.log_menu import DEFAULT_LINES, LINE_COUNTS, line_count
+
+    count = line_count(request)
+    # "lines" is not a filter of the lists: the change lists must not read it as a lookup.
+    request.GET = request.GET.copy()
+    request.GET.pop("lines", None)
+    sections = []
+    for model, title, section_id in ((AccessAttempt, _("Locked"), "locked"), (AccessFailureLog, _("Log"), "log")):
+        model_admin = ReadOnlyAxesAdmin(model, admin.site) if model is AccessAttempt else ReadOnlyAxesFailureAdmin(
+            model, admin.site,
+        )
+        cl = model_admin.get_changelist_instance(request)
+        columns = list(cl.list_display)
+        sections.append({
+            "id": section_id,
+            "title": title,
+            "headers": [str(label_for_field(name, model, model_admin)) for name in columns],
+            "rows": [[lookup_field(name, obj, model_admin)[2] for name in columns] for obj in cl.result_list],
+            "filters": [(spec.title, list(spec.choices(cl))) for spec in cl.filter_specs],
+            "query": cl.query,
+            "note": minutes if section_id == "locked" else None,
+            # The "Log" section is a text box (owner decision): the newest lines at the bottom, redacted.
+            "lines": (
+                [
+                    redact_personal_data(redact_tokens(
+                        f"{timezone.localtime(obj.attempt_time):%Y-%m-%d %H:%M:%S}  {obj.username}  "
+                        f"{obj.path_info}  locked_out={obj.locked_out}"
+                    ))
+                    for obj in reversed(list(cl.queryset[:count]))
+                ]
+                if section_id == "log" else None
+            ),
+        })
+    context = {
+        **admin.site.each_context(request),
+        "title": _("Failed logins"),
+        "sections": sections,
+        "lockout_minutes": minutes,
+        "line_counts": LINE_COUNTS,
+        "lines_selected": str(count) if str(count) in LINE_COUNTS else DEFAULT_LINES,
+    }
+    return TemplateResponse(request, "admin/accounts/failed_logins.html", context)

@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# The one page "Failed logins" (owner decision): two read-only sections, in this order. No add, change, delete or action. #}
+{% block content %}
+<p class="help">{% blocktranslate %}These lists show failed and blocked logins. The "username" is a code, not an address: the portal does not show who tried to log in. A temporary lockout ends by itself after {{ lockout_minutes }} minutes.{% endblocktranslate %}</p>
+<p class="help">{% translate "If a person cannot log in because an administrator blocked the account, open the account under Users, Accounts and choose Unblock account." %}</p>
+<form method="get" class="import-form">
+  <p><label for="failed-logins-q">{% translate "Search" %}</label> <input type="search" id="failed-logins-q" name="q" value="{{ sections.0.query }}"></p>
+  <p><label for="failed-logins-lines">{% translate "Lines" %}</label>
+    <select id="failed-logins-lines" name="lines">{% for value in line_counts %}<option value="{{ value }}"{% if value == lines_selected %} selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+  </p>
+  <button type="submit" class="button">{% translate "Search" %}</button>
+</form>
+{% for section in sections %}
+<section class="data-import-block" id="failed-logins-{{ section.id }}" aria-labelledby="failed-logins-{{ section.id }}-heading">
+  <h2 id="failed-logins-{{ section.id }}-heading">{{ section.title }}</h2>
+  {% for title, choices in section.filters %}
+    {% include "admin/filter.html" with title=title choices=choices %}
+  {% endfor %}
+  {% if section.lines is not None %}
+    {% include "admin/logs/_text_box.html" with lines=section.lines box_id="failed-logins-log-box" %}
+  {% else %}
+  <table>
+    <thead><tr>{% for header in section.headers %}<th>{{ header|capfirst }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in section.rows %}
+      <tr>{% for value in row %}<td>{{ value|default_if_none:"–" }}</td>{% endfor %}</tr>
+    {% empty %}
+      <tr><td colspan="{{ section.headers|length }}">{% translate "No entry." %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

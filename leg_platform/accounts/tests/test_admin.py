@@ -396,7 +396,7 @@ class AdminPresentationTests(TestCase):
             "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
             content,
         )
-        for name in ("Mailtexte", "Portal-Einstellungen", "Gesperrte und fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
+        for name in ("Mailtexte", "Portal-Einstellungen", "Fehlgeschlagene Anmeldungen", "Sicherheitsprotokoll"):
             self.assertIn(name, content)
         # No product name of a package as a heading.
         self.assertNotIn(">Axes<", content)

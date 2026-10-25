@@ -181,6 +181,8 @@ class PortalAdminSite(AdminSite):
         if app_label is not None:
             return app_list
         entries = [model for app in app_list for model in app["models"]]
+        # The two lockout lists are one entry, "Failed logins" (owner decision; see the link below).
+        entries = [model for model in entries if model["object_name"] not in ("AccessAttempt", "AccessFailureLog")]
         index_url = reverse("admin:index", current_app=self.name)
         grouped = []
         for key, name, object_names in ADMIN_GROUPS:
@@ -200,6 +202,14 @@ class PortalAdminSite(AdminSite):
                             "object_name": "LogFiles",
                             "perms": {"view": True},
                             "admin_url": reverse("admin:logs", current_app=self.name),
+                            "add_url": None,
+                            "view_only": True,
+                        },
+                        {
+                            "name": _("Failed logins"),
+                            "object_name": "FailedLogins",
+                            "perms": {"view": True},
+                            "admin_url": reverse("admin:failed_logins", current_app=self.name),
                             "add_url": None,
                             "view_only": True,
                         },
@@ -239,12 +249,14 @@ class PortalAdminSite(AdminSite):
         from django.urls import path
 
         from leg_platform import log_menu, log_views
+        from leg_platform.accounts.admin.security import failed_logins_view
 
         return [
             path("logs/", self.admin_view(log_views.log_list), name="logs"),
             path("logs/<logkey:log>/", self.admin_view(log_views.log_view), name="logs_view"),
             path("logs/<logkey:log>/tail/", self.admin_view(log_views.log_tail), name="logs_tail"),
             path("logs/<logkey:log>/download/", self.admin_view(log_views.log_download), name="logs_download"),
+            path("failed-logins/", self.admin_view(failed_logins_view), name="failed_logins"),
             path("logmenu/", self.admin_view(log_menu.page), name="logmenu"),
             path("logmenu/settings/", self.admin_view(log_menu.settings_view), name="logmenu_settings"),
             path("logmenu/download/<str:source>/", self.admin_view(log_menu.download), name="logmenu_download"),
