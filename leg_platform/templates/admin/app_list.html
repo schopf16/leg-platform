@@ -1,0 +1,15 @@
+{% load i18n %}{# The admin groups as collapsible blocks (spec section 2): the sidebar and the start page share this list. #}
+{% if app_list %}
+  {% for app in app_list %}
+    <details class="admin-group app-{{ app.app_label }}" open>
+      <summary class="admin-group-title">{{ app.name }}</summary>
+      <ul class="admin-group-entries">
+        {% for model in app.models %}
+          <li><a href="{{ model.admin_url }}"{% if model.admin_url in request.path|urlencode %} aria-current="page"{% endif %}>{{ model.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endfor %}
+{% else %}
+  <p>{% translate 'You don’t have permission to view or edit anything.' %}</p>
+{% endif %}

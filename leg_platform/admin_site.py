@@ -42,6 +42,9 @@ ADMIN_GROUPS = (
         ),
     ),
 )
+SYSTEM_ORDER = (
+    "ImportRequest", "HousekeepingStatus", "LogMenu", "LogFiles", "FailedLogins", "SecurityEvent", "GraphConfiguration",
+)
 INDEX_HINT = _(
     "You maintain the name, the logo, the colours and the addresses of the portal and the "
     "texts of the emails under Content."
@@ -223,6 +226,10 @@ class PortalAdminSite(AdminSite):
                         },
                         ]
                     )
+            if key == "system":
+                # The order of the System group (spec section 2): imports, maintenance, logs, log files, failed logins,
+                # security log, Graph configuration; anything else last.
+                members.sort(key=lambda m: SYSTEM_ORDER.index(m["object_name"]) if m["object_name"] in SYSTEM_ORDER else len(SYSTEM_ORDER))
             if members:
                 grouped.append(
                     {

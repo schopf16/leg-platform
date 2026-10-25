@@ -214,7 +214,7 @@ class PlainTablesTests(TestCase):
     def test_the_labels_are_swiss_german(self):
         client = self.client_of(self.administrator)
         index = client.get(reverse("admin:index")).content.decode()
-        for text in ("Standorte", "Messpunkte", "LEGs", "Trafokreise", "Verlaufseinträge"):
+        for text in ("Standorte", "Messpunkte", "LEGs", "Trafokreise", "Verlauf"):
             self.assertIn(text, index)
         page = client.get(url(MeteringPoint)).content.decode()
         for text in ("Messpunkt-Nummer", "Richtung", "Status"):

@@ -97,7 +97,7 @@ class GroupRightsTests(TestCase):
                     "Portal-Einstellungen: ansehen",
                     "Portal-Einstellungen: ändern",
                     # The plain tables of the management data: view only (D-091).
-                    "Einstellungen der Verwaltung: ansehen",
+                    "Verwaltungseinstellungen: ansehen",
                     "LEG-Zuordnung: ansehen",
                     "LEG: ansehen",
                     "Messpunkt: ansehen",

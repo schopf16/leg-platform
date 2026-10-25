@@ -390,7 +390,7 @@ class AdminPresentationTests(TestCase):
         with translation.override("de-ch"):
             content = self.client.get(reverse("admin:index")).content.decode()
 
-        groups = re.findall(r'<a href="[^"]*" class="section"[^>]*>([^<]+)</a>', content)
+        groups = re.findall(r'<summary class="admin-group-title">([^<]+)</summary>', content)
         self.assertEqual(groups, ["Benutzer", "Inhalte", "Verwaltungsdaten", "System"])
         self.assertIn(
             "Name, Logo, Farben und Adressen des Portals sowie die Texte der E-Mails pflegen Sie unter Inhalte.",
