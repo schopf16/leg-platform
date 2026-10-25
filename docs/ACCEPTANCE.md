@@ -102,6 +102,10 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 
 * [ ] The owner sees the plant register correctly: the data source and the licence attribution "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)" on every page that shows plant data; the statistic of the last import in the administration; no coverage notice (owner decision, D-117). The display is not built yet (D-117, "Not included"), so this criterion stays open. Status: not yet verified in the running application. Tests: `leg_platform/addresses/tests/test_plants.py`, `test_schedule.py` and `test_import_runner.py` (automated, synthetic data, no download from the BFE).
 
+## 17. Housekeeping of the databases (D-119)
+
+* [ ] The owner sees the result of the last housekeeping per step in the administration page "Housekeeping" and the status of the dump read from the status file; a user without the right "Can run the housekeeping of the databases" gets no page, no button and no status (403). Status: not yet verified in the running application (the server units are not set up). Tests: `leg_platform/addresses/tests/test_housekeeping.py` (automated, fake clock and fake status file).
+
 ## Not Required for Acceptance
 
 Everything in `docs/PROJECT.md`, "Explicitly Not Included".

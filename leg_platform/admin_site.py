@@ -38,6 +38,7 @@ ADMIN_GROUPS = (
             "AccessFailureLog",
             "Directory",
             "ImportRequest",
+            "HousekeepingStatus",
         ),
     ),
 )

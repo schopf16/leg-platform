@@ -130,6 +130,32 @@ def send_test(address, key, subject, body, greeting_name=""):
     _deliver(address, subject, f"{notice}\n\n{body}")
 
 
+def send_housekeeping_error(address, rows):
+    """The error mail of the housekeeping of the databases (D-119): the error log lines only.
+
+    Each line holds the time, the step, the fixed reason text and the name of the dump file, if there is one. No SQL,
+    no table content and no content of any dump: the rows are read from the error log, nothing else is read.
+    """
+    from django.utils import timezone
+
+    with translation.override(settings.LANGUAGE_CODE):
+        subject = gettext("Housekeeping of the databases: error")
+        lines = [
+            gettext(
+                "The housekeeping of the databases has an open error. The lines below are the error log. "
+                "They contain no data of the databases and no content of a dump file."
+            ),
+            "",
+        ]
+        for row in rows:
+            when = timezone.localtime(row["occurred_at"]).strftime("%d.%m.%Y %H:%M")
+            line = f"{when} | {row['step']} | {row['reason']}"
+            if row["dump"]:
+                line += f" | {row['dump']}"
+            lines.append(line)
+    _deliver(address, subject, "\n".join(lines))
+
+
 def graph_test_message(address, sender_address):
     """The test email of the Microsoft Graph configuration (D-006), without a secret; sent by the administration with GraphEmailBackend."""
     with translation.override(settings.LANGUAGE_CODE):

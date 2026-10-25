@@ -309,3 +309,77 @@ class Plant(models.Model):
             # Plants of one building.
             models.Index(fields=["generation", "egid"], name="plant_generation_egid"),
         ]
+
+
+class HousekeepingStatus(models.Model):
+    """The result of the housekeeping of both databases (D-119), one row (``pk=1``), application database.
+
+    ``running_until`` is the lease of a run: while it is in the future no import starts (``jobs.claim``) and no
+    second run starts. The per-step fields hold the last result of each step (state, time, fixed message code);
+    the sizes are the table sizes before and after the MariaDB step, in bytes.
+    """
+
+    class State(models.TextChoices):
+        SUCCEEDED = "succeeded", _("Completed")
+        FAILED = "failed", _("Failed")
+        SKIPPED = "skipped", _("Skipped")
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    running_until = models.DateTimeField(null=True, editable=False)
+    started_at = models.DateTimeField(null=True, verbose_name=_("Started at"))
+    finished_at = models.DateTimeField(null=True, verbose_name=_("Finished at"))
+    trigger = models.CharField(max_length=12, blank=True, verbose_name=_("Started by"))
+    # The ISO week of the last run (manual or scheduled): the scheduled run runs once per week (D-119).
+    last_run_week = models.CharField(max_length=8, blank=True, editable=False)
+    sqlite_state = models.CharField(max_length=12, choices=State, blank=True, verbose_name=_("Address directory"))
+    sqlite_finished_at = models.DateTimeField(null=True, verbose_name=_("Address directory finished at"))
+    sqlite_message = models.CharField(max_length=40, blank=True, verbose_name=_("Address directory result"))
+    sqlite_size_before = models.BigIntegerField(null=True, verbose_name=_("File size before (bytes)"))
+    sqlite_size_after = models.BigIntegerField(null=True, verbose_name=_("File size after (bytes)"))
+    mariadb_state = models.CharField(max_length=12, choices=State, blank=True, verbose_name=_("Application database"))
+    mariadb_finished_at = models.DateTimeField(null=True, verbose_name=_("Application database finished at"))
+    mariadb_message = models.CharField(max_length=40, blank=True, verbose_name=_("Application database result"))
+    # {"table name": {"before": bytes, "after": bytes}} for the tables of the optimisation.
+    mariadb_sizes = models.JSONField(default=dict, blank=True, verbose_name=_("Table sizes"))
+    # The error mail (D-119): off by default; the recipient is checked as an email address.
+    notify_enabled = models.BooleanField(default=False, verbose_name=_("Send an email on error"))
+    notify_email = models.EmailField(blank=True, verbose_name=_("Email address for errors"))
+
+    class Meta:
+        default_permissions = ()
+        permissions = [("run_housekeeping", _("Can run the housekeeping of the databases"))]
+        verbose_name = _("Housekeeping")
+        verbose_name_plural = _("Housekeeping")
+
+    def __str__(self):
+        return str(_("Housekeeping"))
+
+    @classmethod
+    def lease_active(cls, now):
+        """True while a housekeeping run holds its lease (``jobs.claim`` refuses imports then)."""
+        return cls.objects.filter(pk=1, running_until__gt=now).exists()
+
+
+class HousekeepingError(models.Model):
+    """One error of a housekeeping run (D-119), application database. Open until a successful run clears it.
+
+    Holds fixed message codes and the name of the dump file only: never SQL, table content or dump content.
+    """
+
+    class Step(models.TextChoices):
+        SQLITE = "sqlite", _("Address directory")
+        MARIADB = "mariadb", _("Application database")
+        DUMP = "dump", _("Dump")
+        CLEANUP = "cleanup", _("Cleanup")
+
+    occurred_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_("Occurred at"))
+    step = models.CharField(max_length=12, choices=Step, verbose_name=_("Step"))
+    reason = models.CharField(max_length=40, verbose_name=_("Reason"))
+    dump_file_name = models.CharField(max_length=255, blank=True, verbose_name=_("Dump file"))
+    cleared_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name=_("Cleared at"))
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["-occurred_at", "-id"]
+        verbose_name = _("Housekeeping error")
+        verbose_name_plural = _("Housekeeping errors")
