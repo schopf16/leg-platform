@@ -42,7 +42,7 @@ Tokens of the design package, defined in `portal.css` (light on `:root`, dark in
 | `--line` | `#DEE2E7` | `#2A2F35` | Dividers and borders |
 | `--accent` | `#005BA2` | `#6AA9E0` | Primary button, links, focus, selected language, active navigation |
 | `--on-accent` | `#FFFFFF` | `#0B1520` | Text on the accent |
-| `--yellow` | `#DDDD22` | `#DDDD22` | Dots of the benefit list only; never text (R9) |
+| `--yellow` | `#DDDD22` | `#DDDD22` | Dots of the benefit list, and the dots of PV plants on the map of the page Nachbarschaft (D-120, owner decision 2026-10-26); never text (R9) |
 | `--bad` | `#B42318` | `#F0948A` | Errors, status "problem" |
 | `--ok` | `#2F8F5B` | `#5DBB86` | Status "done", success (always with a word; 4.04:1 on white, so dot or icon, not text) |
 | `--warn` | `#8A5A00` | `#E8B34A` | Status "open" and "not set up", warning alerts (K16) |

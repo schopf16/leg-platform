@@ -61,3 +61,14 @@ The subagents in `.claude/agents/` and their workflow are defined in `docs/DECIS
 ## Starting Implementation
 
 Do not start with extensive implementation. Follow the next steps in `README.md` ("Current Status") one after another.
+
+## Owner Decisions for the Neighbourhood Page (2026-10-26)
+
+Source: project owner, in German, 2026-10-26. Details: `docs/NACHBARSCHAFT.md`.
+
+* The page "Nachbarschaft" under participation is for logged-in participants only (`CustomerAccessMixin`).
+* Map: the swisstopo colour base map (`ch.swisstopo.pixelkarte-farbe`) is embedded in the page. Tiles come from `wmts.geo.admin.ch`; the owner approved the Content Security Policy change for images (`img-src`) and the attribution "© Data: swisstopo". Map library: self-hosted, never a CDN.
+* Trafokreis data: the transformer station names of the BKW (address directory file, `TransformerStation`, D-118) and the building positions of the address directory. No public counts of participants; only counts of buildings and of buildings with a PV plant.
+* Trafokreis outline: a polygon that contains all buildings of the circuit. A building without a transformer station belongs to the circuit of its nearest building with one.
+* The portal sends no invitation mails. An invitation opens the member's own mail program (`mailto:`), so the mail comes from the member's own address.
+* The page shows no names or addresses of other persons.

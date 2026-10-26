@@ -59,8 +59,8 @@ class CustomerMenuTests(TestCase):
     def test_entries_without_a_page_are_no_links_and_say_later(self):
         menu = menu_of(self.client.get(HOME))
         later = re.findall(r'<a class="frame-(?:item|sub-item) is-later"[^>]*>', menu)
-        # Start date, neighbourhood, questions, event, invoice, energy, message (the contract page is built).
-        self.assertEqual(len(later), 7)
+        # Start date, questions, event, invoice, energy, message (the contract page and the neighbourhood page are built).
+        self.assertEqual(len(later), 6)
         for tag_text in later:
             self.assertIn('aria-disabled="true"', tag_text)
             self.assertNotIn("href", tag_text)

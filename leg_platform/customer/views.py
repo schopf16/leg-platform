@@ -7,15 +7,22 @@ through the logged-in account: the building of another account and a metering po
 404, the same answer as for a missing one. Nothing here writes a name, an address, a number or an IBAN to a log.
 """
 
+from urllib.parse import quote, urlencode
+
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.csp import CSP
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
+from django.views.decorators.csp import csp_override
 
 from leg_platform.accounts import profile_views
+from leg_platform.addresses import neighbourhood
 from leg_platform.community import archived, buildings, contracts, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.persons import PersonError
@@ -39,6 +46,80 @@ class BuildingsView(CustomerAccessMixin, View):
         # Only after the page was built, and only for a real visit (not HEAD, not a prefetch).
         banners.mark_shown(request, request.user, read)
         return response
+
+
+# The swisstopo tiles of the map: the one external host the page's policy allows, for images only (D-120). Set for this
+# view alone (``csp_override``); every other page keeps ``img-src 'self'``.
+NEIGHBOURHOOD_TILES = "https://wmts.geo.admin.ch"
+
+
+@method_decorator(
+    csp_override({**settings.SECURE_CSP, "img-src": [CSP.SELF, NEIGHBOURHOOD_TILES]}), name="dispatch",
+)
+class NeighbourhoodView(CustomerAccessMixin, View):
+    """The page Nachbarschaft (D-120): the transformer circuits around the building of the profile address.
+
+    The map gets public building and plant data only (outlines, PV points, counts); no other participant is read."""
+
+    def get(self, request):
+        profile = buildings.profile_address_building(request.user)
+        hood = neighbourhood.for_building(profile.egid) if profile else None
+        return render(request, "customer/neighbourhood.html", {
+            "neighbourhood": hood,
+            "legend": _legend(hood) if hood else [],
+            "map_data": _map_data(hood) if hood else None,
+            "profile_building": profile is not None,
+            "invite_url": _invite_url(),
+        })
+
+
+# The four circuit colours of the map and the legend: the index of a colour (``.nb-swatch-0`` to ``-3`` in customer.css,
+# ``COLOURS`` in ``neighbourhood-map.js``). A fifth circuit reuses the first colour.
+COLOURS = 4
+
+
+def _colour(index):
+    return index % COLOURS
+
+
+def _legend(hood):
+    return [
+        {
+            "circuit": circuit,
+            "colour": _colour(index),
+            "own": circuit.name == hood.own_circuit,
+        }
+        for index, circuit in enumerate(hood.circuits)
+    ]
+
+
+def _map_data(hood):
+    """The data of the map as plain lists of (longitude, latitude); read by ``customer/js/neighbourhood-map.js``."""
+    return {
+        "own": list(hood.own_point) if hood.own_point else None,
+        "ownCircuit": hood.own_circuit,
+        "circuits": [
+            {
+                "name": circuit.name,
+                "buildings": circuit.building_count,
+                "pv": circuit.pv_count,
+                "colour": _colour(index),
+                "outline": [list(point) for point in circuit.outline],
+                "pvPoints": [list(point) for point in circuit.pv_points],
+            }
+            for index, circuit in enumerate(hood.circuits)
+        ],
+    }
+
+
+def _invite_url():
+    """A ``mailto:`` link with the text of an invitation; it opens the mail program of the member, so the mail leaves
+    from the member's own address and the portal sends nothing (D-120)."""
+    text = {
+        "subject": _("Local electricity community %(name)s") % {"name": settings.INSTANCE_NAME},
+        "body": _("I take part in the local electricity community. Would you like to join as well?"),
+    }
+    return "mailto:?" + urlencode(text, quote_via=quote)
 
 
 class BuildingDetailsView(CustomerAccessMixin, View):
