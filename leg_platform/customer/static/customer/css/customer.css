@@ -1458,3 +1458,103 @@ span.note-warn {
 .stage-returned-reason {
   white-space: pre-line;
 }
+
+/* The page Nachbarschaft (D-120): the map, its legend and the circuit list. The colours are the tokens of portal.css
+   (light and dark); the map script reads the same tokens (customer/js/neighbourhood-map.js). */
+.nb-page {
+  max-width: 720px;
+  display: grid;
+  gap: 16px;
+}
+
+.nb-h {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.nb-small {
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+.nb-map {
+  height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.nb-legend,
+.nb-circuits,
+.nb-sources {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.nb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.nb-circuits {
+  display: grid;
+  gap: 12px;
+}
+
+.nb-circuit {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.nb-circuit-count {
+  grid-column: 2;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.nb-circuit.is-own .nb-circuit-name {
+  font-weight: 600;
+}
+
+.nb-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.nb-swatch,
+.nb-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.nb-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.nb-swatch-0 { background: var(--accent); }
+.nb-swatch-1 { background: var(--ok); }
+.nb-swatch-2 { background: var(--warn); }
+.nb-swatch-3 { background: var(--muted); }
+
+.nb-own { background: var(--bad); }
+.nb-pv { background: var(--yellow); border: 1px solid var(--fg); }
+.nb-outline { background: transparent; border: 2px solid var(--muted); border-radius: 4px; }
+
+.nb-sources {
+  padding-left: 24px;
+  list-style: disc;
+}

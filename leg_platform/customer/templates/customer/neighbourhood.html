@@ -1,0 +1,93 @@
+{% extends "customer/base.html" %}
+{% load i18n static %}{% comment %}
+The page Nachbarschaft (D-120; docs/NACHBARSCHAFT.md; Warm register). Context: ``neighbourhood`` (customer.views, None
+without a profile building), ``legend`` (the circuits with their colour index and the own circuit), ``map_data`` (read by
+the script as JSON), ``profile_building`` and ``invite_url`` (a mailto link). The map is an enhancement: the legend and the
+counts below it carry the same information for screen readers and without a script.
+{% endcomment %}
+{% block title %}{% translate "Neighbourhood" %}{% endblock %}
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {% if map_data %}
+    <script defer src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+    <script defer src="{% static 'customer/js/neighbourhood-map.js' %}"></script>
+  {% endif %}
+{% endblock %}
+{% block content %}
+  <div class="narrow-page nb-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Neighbourhood" %}</h1>
+    <p class="start-sub">{% translate "Your transformer circuit and the buildings around it. Public data only." %}</p>
+
+    {% if not profile_building %}
+      <section class="step-card" aria-labelledby="nb-missing">
+        <h2 id="nb-missing" class="nb-h">{% translate "No building at your profile address" %}</h2>
+        <p>{% translate "Your neighbourhood starts from the address in your profile. Once a building at that address belongs to your account, the circuit appears here." %}</p>
+        <p><a href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a></p>
+      </section>
+    {% elif not neighbourhood %}
+      <section class="step-card" aria-labelledby="nb-unknown">
+        <h2 id="nb-unknown" class="nb-h">{% translate "Your building is not on the map" %}</h2>
+        <p>{% translate "The address directory has no position for your building yet. The map updates with the directory import." %}</p>
+      </section>
+    {% else %}
+      <section class="step-card" aria-labelledby="nb-circuit">
+        <h2 id="nb-circuit" class="nb-h">
+          {% if neighbourhood.own_circuit %}{% blocktranslate with name=neighbourhood.own_circuit %}Your circuit: {{ name }}{% endblocktranslate %}{% else %}{% translate "No circuit known for your building" %}{% endif %}
+        </h2>
+        <div id="nb-map" class="nb-map" role="img" aria-label="{% translate 'Map of the circuits around your building' %}"></div>
+        {% if map_data %}{{ map_data|json_script:"nb-map-data" }}{% endif %}
+        <ul class="nb-legend">
+          <li><span class="nb-dot nb-own" aria-hidden="true"></span> {% translate "Your building" %}</li>
+          <li><span class="nb-dot nb-pv" aria-hidden="true"></span> {% translate "Building with a PV plant" %}</li>
+          <li><span class="nb-dot nb-outline" aria-hidden="true"></span> {% translate "Outline of a circuit (approximate)" %}</li>
+        </ul>
+      </section>
+
+      <section class="step-card" aria-labelledby="nb-circuits">
+        <h2 id="nb-circuits" class="nb-h">{% translate "The circuits of your postal code" %}</h2>
+        {% if legend %}
+          <ul class="nb-circuits">
+            {% for item in legend %}
+              <li class="nb-circuit{% if item.own %} is-own{% endif %}">
+                <span class="nb-swatch nb-swatch-{{ item.colour }}" aria-hidden="true"></span>
+                <span class="nb-circuit-name">{{ item.circuit.name }}{% if item.own %} <span class="nb-tag">{% translate "your circuit" %}</span>{% endif %}</span>
+                <span class="nb-circuit-count">
+                  {% blocktranslate count n=item.circuit.building_count %}{{ n }} building{% plural %}{{ n }} buildings{% endblocktranslate %}
+                  · {% blocktranslate with pv=item.circuit.pv_count %}{{ pv }} with PV{% endblocktranslate %}
+                </span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">{% translate "No circuit names are published for this postal code yet." %}</p>
+        {% endif %}
+        <p class="muted nb-small">{% translate "Counts are buildings and PV plants only. Outlines are an approximation drawn from the building positions of the BKW map." %}</p>
+      </section>
+
+      <section class="step-card" aria-labelledby="nb-rate">
+        <h2 id="nb-rate" class="nb-h">{% translate "The discount on grid usage" %}</h2>
+        <p>{% translate "The BKW grants a discount on the grid usage when all participants are on the same grid level. The discount is 40 percent when no transformation is needed for the exchange, and 20 percent when one is needed." %}</p>
+        <p class="muted nb-small">{% translate "Source: BKW, page on the local electricity community." %}</p>
+      </section>
+
+      <section class="step-card" aria-labelledby="nb-invite">
+        <h2 id="nb-invite" class="nb-h">{% translate "Invite neighbours" %}</h2>
+        <p>{% translate "The invitation opens your own mail program. The mail is sent from your address, not from the portal." %}</p>
+        <p><a href="{{ invite_url }}">{% translate "Prepare invitation" %}</a></p>
+      </section>
+    {% endif %}
+
+    <section class="step-card" aria-labelledby="nb-sources">
+      <h2 id="nb-sources" class="nb-h">{% translate "Sources" %}</h2>
+      <ul class="nb-sources">
+        <li>{% translate "Buildings and transformer stations: BKW map of high discount" %}</li>
+        <li>{% translate "PV plants: Federal Office of Energy (BFE), plant register" %}</li>
+      </ul>
+    </section>
+  </div>
+{% endblock %}

@@ -52,4 +52,5 @@ def customer_menu(context):
         "information": name in INFORMATION_VIEWS,
         "contract": name == "customer:contract",
         "contact": name == "customer:contact",
+        "neighbourhood": name == "customer:neighbourhood",
     }
