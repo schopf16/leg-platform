@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.template import Context, Template
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings, tag
+from django.test import RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
@@ -17,7 +17,7 @@ from django.utils.html import escape
 from leg_platform.accounts.tests.helpers import instance_mail_addresses
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
-from leg_platform.community import application_staff, applications, contracts, customer_messages, participation
+from leg_platform.community import applications, contracts, customer_messages, participation
 from leg_platform.community.models import Application, CustomerBuilding, CustomerMessage, Deregistration, Direction
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.customer import banners

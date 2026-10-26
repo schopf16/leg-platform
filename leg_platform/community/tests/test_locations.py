@@ -258,13 +258,10 @@ class TransformerCircuitServiceTests(TestCase):
         make_metering_point(4, location=cls.second, is_archived=True)
         make_metering_point(5, location=cls.archived)
 
-    def test_labels_and_the_number_of_a_choice(self):
+    def test_labels_of_a_circuit(self):
         self.assertEqual(transformer_circuits.label(self.circuit), "TRA21359 · Ittigen Nord")
         self.assertEqual(transformer_circuits.label(self.other), "TRA21361")
         self.assertEqual(transformer_circuits.label(None), "")
-        for text in ("TRA21359 · Ittigen Nord", " tra21359 ", "tra21359·x"):
-            self.assertEqual(transformer_circuits.number_of_choice(text), "TRA21359")
-        self.assertEqual(transformer_circuits.number_of_choice(""), "")
 
     def test_find_normalises_and_create_refuses_a_number_that_exists(self):
         self.assertEqual(transformer_circuits.find(" tra21359"), self.circuit)

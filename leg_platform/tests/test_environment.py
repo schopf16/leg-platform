@@ -22,8 +22,6 @@ OTHER_STRONG_KEY = "other-test-key-" + "ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210zyxw
 TEST_DB_PASSWORD = "test-password"
 
 DEFAULT_EMAIL_MODE = {"local": "console", "stage": "graph", "production": "graph"}
-# Addresses under reserved domains only (RFC 2606).
-TEST_RECIPIENT = "tester@example.org"
 
 
 def make_env(app_env="production", **overrides):

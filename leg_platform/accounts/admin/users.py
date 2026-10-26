@@ -21,7 +21,6 @@ from leg_platform.accounts.forms import clean_postal_code, postal_code_field
 from leg_platform.accounts.models import (
     CUSTOMER_NUMBER_SPACE,
     AccountIntegrityError,
-    AuthenticatorDevice,
     IssuedCustomerNumber,
     SecurityEvent,
     User,

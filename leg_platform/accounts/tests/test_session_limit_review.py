@@ -3,14 +3,12 @@ confirmations survives the renewal of the session key (M-1), a wrong password co
 code and never reaches Axes (M-2), all sessions end at the cap of the account (M-1), parallel
 requests cannot exceed the limits, and the key rotation of the secret key is handled (L-b)."""
 
-import threading
 from unittest import mock
 
 from axes.models import AccessAttempt
 from django.conf import settings
 from django.contrib.sessions.backends.db import SessionStore
 from django.core import mail
-from django.db import connection
 from django.test import Client, RequestFactory, TestCase, TransactionTestCase, override_settings, tag
 from django.urls import reverse
 
@@ -28,6 +26,7 @@ from leg_platform.accounts.models import (
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    ParallelRunMixin,
     code_for,
     create_active_user,
     run_mail_queue,
@@ -302,26 +301,8 @@ class CapOfTheAccountTests(TestCase):
 
 
 @tag("mariadb")
-class ParallelRequestsTests(TransactionTestCase):
+class ParallelRequestsTests(ParallelRunMixin, TransactionTestCase):
     """Parallel wrong entries in one session (and in many sessions) cannot exceed the limits."""
-
-    def run_all(self, functions):
-        barrier = threading.Barrier(len(functions))
-        results = []
-
-        def work(function):
-            try:
-                barrier.wait()
-                results.append(function())
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        return results
 
     def shared_session_clients(self, user, count, legacy=False):
         first = Client()

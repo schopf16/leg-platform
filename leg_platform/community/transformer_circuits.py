@@ -15,11 +15,6 @@ def label(circuit):
     return f"{circuit.grid_number}{SEPARATOR}{circuit.name}" if circuit.name else circuit.grid_number
 
 
-def number_of_choice(text):
-    """The normalised grid number of a typed or chosen value ("TRA21359 · Ittigen Nord", "tra21359"); "" if empty."""
-    return numbers.normalise_transformer_circuit_number((text or "").split(SEPARATOR.strip())[0])
-
-
 def find(number):
     """The circuit with this number (normalised comparison), or None."""
     number = numbers.normalise_transformer_circuit_number(number)

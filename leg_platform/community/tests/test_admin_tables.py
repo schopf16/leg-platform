@@ -4,7 +4,6 @@ Who may see it: the "view" right of the table, handed out by a system administra
 name in code). A staff account with that right changes nothing there. Free text of the staff, the IBAN and the
 email address of a person never appear. System administrators edit the same tables raw: ``test_admin_raw_tables``."""
 
-from datetime import date
 
 from django.contrib import admin
 from django.contrib.auth.models import Group, Permission
@@ -26,12 +25,7 @@ from leg_platform.community.models import (
     TransformerCircuit,
 )
 from leg_platform.community.tests.helpers import (
-    assign_leg,
-    assign_person,
-    make_circuit,
-    make_leg,
-    make_location,
-    make_metering_point,
+    create_table_rows,
     staff_user,
 )
 
@@ -59,29 +53,7 @@ class PlainTablesTests(TestCase):
     def setUpTestData(cls):
         cls.administrator = staff_user("administrator.person@example.org", superuser=True)
         cls.customer = create_active_user(SECRET_EMAIL, first_name="Secretia", last_name="Customerson")
-        cls.circuit = make_circuit("TRA4711", "Circuit name")
-        cls.location = make_location(transformer_circuit=cls.circuit, remark=SECRET_REMARK)
-        cls.point = make_metering_point(5, location=cls.location, remark=SECRET_REMARK)
-        cls.leg = make_leg("LEG Table", remark=SECRET_REMARK)
-        cls.leg_assignment = assign_leg(cls.point, cls.leg)
-        cls.person_assignment = assign_person(cls.point, cls.customer)
-        cls.record = PersonRecord(person=cls.customer, staff_note=SECRET_NOTE, operator_customer_number="OP-1")
-        cls.record.iban = SECRET_IBAN
-        cls.record.save()
-        cls.shares = ShareChange.objects.create(
-            record=cls.record, quantity=4, valid_from=date(2026, 1, 1), actor=cls.administrator
-        )
-        cls.history = HistoryEntry.objects.create(
-            subject_type="location", subject_id=cls.location.pk, event="created", actor=cls.administrator,
-            detail={"fields": ["street"]},
-        )
-        cls.settings_row = ManagementSettings.load()
-        cls.objects = {
-            HistoryEntry: cls.history, Leg: cls.leg, LegAssignment: cls.leg_assignment, Location: cls.location,
-            ManagementSettings: cls.settings_row, MeteringPoint: cls.point,
-            PersonAssignment: cls.person_assignment, PersonRecord: cls.record, ShareChange: cls.shares,
-            TransformerCircuit: cls.circuit,
-        }
+        create_table_rows(cls, cls.customer, cls.administrator, note=SECRET_NOTE, remark=SECRET_REMARK, iban=SECRET_IBAN)
 
     def client_of(self, person):
         client = VerifiedClient()

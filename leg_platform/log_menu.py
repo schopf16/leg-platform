@@ -468,7 +468,7 @@ def notify_log_events(now=None):
         check_stale(now)
         state = _state(row)
         queued = 0
-        for source_key, pk, source, severity, occurred, kind, reason in _new_items(state):
+        for _source_key, _pk, source, severity, occurred, kind, reason in _new_items(state):
             if not row.enabled or not row.email or not wanted(row, severity, kind, reason):
                 continue
             last = state["last_mail"].get(source)

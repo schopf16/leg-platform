@@ -59,7 +59,7 @@ def accounts_with_iban(person_ids):
     return found
 
 
-def _record_change(fresh, record, mail):
+def _record_change(fresh, mail):
     """Security event and history (never the value); the mail to every address only for a change of an existing IBAN
     or its removal, not for the first entry from empty (owner decision 2026-10-19)."""
     history.record(fresh, HistoryEvent.PERSON_IBAN_CHANGED, fresh)
@@ -103,7 +103,7 @@ def set_own_iban(person, value):
         had_one = bool(record.iban_encrypted)
         record.iban = number
         record.save(update_fields=["iban_encrypted", "updated_at"])
-        _record_change(fresh, record, mail=had_one)
+        _record_change(fresh, mail=had_one)
     return True
 
 
@@ -120,5 +120,5 @@ def remove_own_iban(person):
         _check_rate(fresh)
         record.iban_encrypted = ""
         record.save(update_fields=["iban_encrypted", "updated_at"])
-        _record_change(fresh, record, mail=True)
+        _record_change(fresh, mail=True)
     return True

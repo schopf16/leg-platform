@@ -5,19 +5,17 @@ date on the result, the card and the start page, the deletion texts, the EGID se
 "Aufschaltung"."""
 
 import re
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
-from django.test import SimpleTestCase, TestCase, override_settings, tag
+from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 
 from leg_platform.accounts.tests.helpers import instance_mail_addresses
-from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.tests.helpers import PASSWORD
 from leg_platform.community import applications, contracts, deregistrations, numbers
 from leg_platform.community.models import Application, GridOperator
-from leg_platform.community.tests.helpers import staff_user
 from leg_platform.customer.tests.helpers import (
     BUILDINGS,
     HOME,
@@ -34,7 +32,6 @@ from leg_platform.customer.tests.helpers import (
 )
 from leg_platform.customer.tests.test_deregistration import START as DEREGISTRATION
 from leg_platform.customer.tests.test_deregistration import active_point
-from leg_platform.customer.tests.test_start_page import complete_application
 
 PACKAGE = Path(__file__).resolve().parents[1]
 CSS = (PACKAGE / "static" / "customer" / "css" / "customer.css").read_text(encoding="utf-8")

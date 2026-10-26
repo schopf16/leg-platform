@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.conf import settings
-from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings, tag
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import translation
 

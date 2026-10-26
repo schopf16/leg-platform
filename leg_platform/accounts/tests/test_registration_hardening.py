@@ -23,7 +23,6 @@ from leg_platform.accounts.forms import (
 )
 from leg_platform.accounts.models import (
     MailJob,
-    PortalSettings,
     RateLimitBucket,
     SecurityEvent,
     User,

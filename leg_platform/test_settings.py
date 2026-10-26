@@ -44,8 +44,8 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 # test run.
 _ADDRESS_TEST_FOLDER = tempfile.mkdtemp(prefix="leg-platform-address-tests-")
 atexit.register(shutil.rmtree, _ADDRESS_TEST_FOLDER, True)
-DATABASES = {  # noqa: F405
-    **DATABASES,
+DATABASES = {
+    **DATABASES,  # noqa: F405
     "addresses": {
         **DATABASES["addresses"],  # noqa: F405
         "TEST": {"NAME": str(Path(_ADDRESS_TEST_FOLDER) / "address-directory.sqlite3")},

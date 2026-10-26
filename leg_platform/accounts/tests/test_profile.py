@@ -9,7 +9,7 @@ import re
 from datetime import timedelta
 
 from django.core import mail
-from django.test import Client, TestCase, override_settings, tag
+from django.test import Client, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 

@@ -18,7 +18,7 @@ from leg_platform.accounts.logo_images import (
     validate_favicon,
     validate_logo,
 )
-from leg_platform.accounts.models import PortalSettings, SecurityEvent
+from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.portal_settings import LOGO_VERSION_LENGTH, environment_values, portal_values
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.accounts.tests.test_logo_images import MINIMAL, make_png, svg

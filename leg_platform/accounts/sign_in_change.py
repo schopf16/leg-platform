@@ -26,11 +26,6 @@ PROOF, CHOOSE, SAME, DISABLE, SCAN, NUMBER, CANCEL = (
     "proof", "choose", "same", "disable", "scan", "number", "cancel",
 )
 STEPS = (PROOF, CHOOSE, SAME, DISABLE, SCAN, NUMBER, CANCEL)
-# Steps that make no change and need the grant (the screens a person reads). The choice "Passkey" has no screen of its
-# own: it hands the grant to the passkey setup at once (D-112).
-CONFIRM_STEPS = (CHOOSE, SAME, DISABLE)
-# Of three screens in all, as in the building wizard: "Step n of 3".
-TOTAL_STEPS = 3
 
 
 def uses_flow(user):

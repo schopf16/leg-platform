@@ -1,7 +1,6 @@
 """Template tags of the management area."""
 
 from django import forms, template
-from django.urls import NoReverseMatch, reverse
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext
@@ -11,7 +10,6 @@ from leg_platform.community.models import Direction
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.management import navigation
 from leg_platform.management.access import is_management_user
-from leg_platform.management.returns import return_url
 
 register = template.Library()
 
@@ -58,21 +56,6 @@ def staff_page_title(title, workspace):
 def operator_name():
     """The grid operator name: ``{% operator_name as operator %}`` (D-086)."""
     return grid_operator.name()
-
-
-@register.simple_tag
-def optional_url(name, *args):
-    """The URL of a page that may not exist yet, or ""."""
-    try:
-        return reverse(name, args=args)
-    except NoReverseMatch:
-        return ""
-
-
-@register.simple_tag(takes_context=True)
-def management_return_url(context, default):
-    """The safe address to go back to (``next``), else ``default``."""
-    return return_url(context["request"], default)
 
 
 @register.filter

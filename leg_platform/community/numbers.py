@@ -125,17 +125,6 @@ def compose_metering_point_number(country, identifier, entered):
     return f"{country}{identifier}{normalise_entered_number(entered, prefix=f'{country}{identifier}')}"
 
 
-def split_metering_point_number(number):
-    """``(country, identifier, digits)`` of a complete number, or None if it is not valid."""
-    if not is_valid_metering_point_number(number):
-        return None
-    return (
-        number[:COUNTRY_LENGTH],
-        number[COUNTRY_LENGTH : COUNTRY_LENGTH + IDENTIFIER_LENGTH],
-        number[COUNTRY_LENGTH + IDENTIFIER_LENGTH :],
-    )
-
-
 def normalise_metering_point_number(value):
     """White space removed (D-109), capital letters (the stored form)."""
     return compact_number(value).upper()

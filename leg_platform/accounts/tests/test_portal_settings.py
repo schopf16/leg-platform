@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.admin import PortalSettingsAdmin
-from leg_platform.accounts.models import PortalSettings, SecurityEvent, validate_https_address
+from leg_platform.accounts.models import SecurityEvent, validate_https_address
 from leg_platform.accounts.portal_settings import legal_links
 from leg_platform.accounts.tests.helpers import ProvingClient, create_active_user
 

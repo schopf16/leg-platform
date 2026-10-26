@@ -69,9 +69,6 @@ CARD_ANCHORS = {
     "two_factor": "card-two-factor",
     "delete": "card-delete",
 }
-# Steps of the two-factor card that a person can open by address; codes are only ever the answer to a form.
-# "choose" is the choice "Sign-in method" (D-106); it is shown only to an account that has something to choose.
-TWO_FACTOR_STEPS = ("choose", "setup", "app", "codes_new", "disable", "lost_phone")
 # The fields of the profile that make up the address: locked once the staff confirmed the building at that address.
 ADDRESS_FIELDS = ("street", "house_number", "postal_code", "town", "country")
 
@@ -135,7 +132,7 @@ def deletion_state(user):
     }
 
 
-def delete_form(request, data=None, retained=False):
+def delete_form(request, data=None):
     """The confirmation of the deletion: the one proof (D-062)."""
     return AccountDeleteForm(data, request=request) if data is not None else AccountDeleteForm(request=request)
 
@@ -237,9 +234,7 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
             user, request=request
         )
     elif edit == "delete":
-        context["delete_form"] = forms.get("delete") or delete_form(
-            request, retained=context["delete_info"]["retained"]
-        )
+        context["delete_form"] = forms.get("delete") or delete_form(request)
     if edit == "two_factor" or only_two_factor:
         state = "codes" if codes is not None else two_factor_state(user, edit, step, request.session)
         context["tf_state"] = state
@@ -905,9 +900,8 @@ class AccountDeleteView(ProfileCardView):
     def page(self, request, form=None, blocked=False):
         from leg_platform.customer import access as customer_access
 
-        info = deletion_state(request.user)
         return render(request, self.template_name, {
-            "form": form or delete_form(request, retained=info["retained"]),
+            "form": form or delete_form(request),
             "customer": customer_access.is_customer(request.user),
             "blocked": blocked,
             "privacy_url": legal_links(request).privacy_url,
@@ -919,8 +913,7 @@ class AccountDeleteView(ProfileCardView):
     def post(self, request):
         from leg_platform.community import account_deletion
 
-        info = deletion_state(request.user)
-        form = delete_form(request, request.POST, retained=info["retained"])
+        form = delete_form(request, request.POST)
         if not form.is_valid():
             if getattr(request, second_factor.SESSION_ENDED_ATTRIBUTE, False):
                 second_factor.end_session_for_wrong_codes(request)

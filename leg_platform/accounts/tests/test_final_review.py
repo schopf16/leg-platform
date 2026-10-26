@@ -184,7 +184,7 @@ class RequestsEndWithTheHoldOnTheAccountTests(TestCase):
         with_second_factor(self.user)
         boss = administrator()
 
-        second_factor_reset.reset_privileged(boss, self.user)
+        second_factor_reset.request_link(boss, self.user)
         run_mail_queue()
         token = VerificationToken.objects.get(user=self.user, purpose=VerificationToken.Purpose.TWO_FACTOR_RESET)
         self.assertIsNotNone(second_factor_reset.confirm_link(token))

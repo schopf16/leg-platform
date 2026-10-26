@@ -144,7 +144,7 @@ def returned_reason(application):
     return reason or ""
 
 
-def rollback_date(application, now=None):
+def rollback_date(application):
     """The day on which the scheduler deletes the draft if the customer does nothing: the reminder day plus
     ``rollback_after_days`` for a paused draft, and the day the contract deadline lapses for a draft that waits only for
     the contract (the earlier of the two if both run); ``None`` for any other state or a day beyond the range of

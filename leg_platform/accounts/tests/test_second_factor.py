@@ -52,6 +52,7 @@ from leg_platform.accounts.tests.helpers import (
     age_authentication,
     OTHER_PASSWORD,
     PASSWORD,
+    ParallelRunMixin,
     code_for,
     complete_second_factor,
     create_active_user,
@@ -1222,7 +1223,7 @@ class RecoveryCodeNotificationTests(TestCase):
 
 
 @tag("mariadb")
-class ParallelUseTests(TransactionTestCase):
+class ParallelUseTests(ParallelRunMixin, TransactionTestCase):
     """The same code used by parallel requests succeeds once (docs/SECURITY.md, section 11)."""
 
     def run_in_threads(self, function, count=4):
@@ -1266,24 +1267,6 @@ class ParallelUseTests(TransactionTestCase):
         results = self.run_in_threads(verify_under_account_lock)
 
         self.assertEqual(sum(result is not None for result in results), 1)
-
-    def run_all(self, functions):
-        barrier = threading.Barrier(len(functions))
-        results = []
-
-        def work(function):
-            try:
-                barrier.wait()
-                results.append(function())
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        return results
 
     def test_parallel_wrong_codes_cannot_exceed_the_limit(self):
         user, device = create_user_with_totp()
@@ -1907,25 +1890,7 @@ class CodeBudgetPauseTests(TestCase):
 
 
 @tag("mariadb")
-class ParallelBudgetTests(TransactionTestCase):
-    def run_all(self, functions):
-        barrier = threading.Barrier(len(functions))
-        results = []
-
-        def work(function):
-            try:
-                barrier.wait()
-                results.append(function())
-            finally:
-                connection.close()
-
-        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        return results
-
+class ParallelBudgetTests(ParallelRunMixin, TransactionTestCase):
     def wrong_codes_in_parallel(self, user):
         clients = []
         for number in range(8):

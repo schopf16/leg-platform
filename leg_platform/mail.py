@@ -19,7 +19,6 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import msal
 import requests
-from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
 from django.views.decorators.debug import sensitive_variables
 from requests.adapters import HTTPAdapter

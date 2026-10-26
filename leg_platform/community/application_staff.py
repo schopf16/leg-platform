@@ -238,7 +238,7 @@ def completion_defaults(application, actor, today=None):
     )
 
 
-def _new_location(building, staff, confirm):
+def _new_location(building, confirm):
     location = Location(
         street=building.street, house_number=building.house_number, postal_code=building.postal_code,
         town=building.town, egid=building.egid, needs_confirmation=not confirm,
@@ -275,7 +275,7 @@ def _existing_for(building):
     return existing
 
 
-def _location_for(application, building, staff, confirm):
+def _location_for(building, staff, confirm):
     if building.location_id is not None:
         location = Location.objects.select_for_update().get(pk=building.location_id)
         try:
@@ -286,7 +286,7 @@ def _location_for(application, building, staff, confirm):
     existing = _existing_for(building)
     if existing is not None:
         return existing
-    location = _new_location(building, staff, confirm)
+    location = _new_location(building, confirm)
     try:
         _insert(location)
     except IntegrityError:
@@ -321,7 +321,7 @@ def complete(application, actor, start_date, *, today=None, confirm_addresses=Fa
         # A fixed order (EGID, then id) so two completions at shared buildings take their locks in the same order.
         ordered = sorted(fresh.buildings.select_related("location"), key=lambda b: (b.egid or 0, b.pk))
         for building in ordered:
-            location = _location_for(fresh, building, staff, confirm_addresses)
+            location = _location_for(building, staff, confirm_addresses)
             if building.location_id is None:
                 building.location = location
                 building.save(update_fields=["location", "updated_at"])

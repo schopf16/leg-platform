@@ -90,8 +90,6 @@ class StartPageTests(WizardCase):
     def test_the_starting_point_add_a_metering_point_makes_the_building_green(self):
         location = make_location("Musterstrasse", "1", "3063", "Ittigen", egid=90001234)
         point = make_metering_point(60, location=location)
-        from leg_platform.community.tests.helpers import assign_person
-
         assign_person(point, self.mine, valid_from=date(2025, 1, 1))
         html = text(self.client.get(START, {"building": location.pk}))
         self.assertIn("1 von 4 Schritten erledigt", html)
@@ -336,8 +334,6 @@ class BuildingStepTests(WizardCase):
         self.assertFalse(self.application.buildings.exists())
         location = make_location("Musterstrasse", "1", "3063", "Ittigen", egid=90001234)
         point = make_metering_point(61, location=location)
-        from leg_platform.community.tests.helpers import assign_person
-
         assign_person(point, self.mine, valid_from=date(2025, 1, 1))
         applications.cancel(self.mine, self.application)
         fixed = applications.start_draft(self.mine, location=location)
@@ -492,8 +488,6 @@ class MeteringPointStepTests(WizardCase):
     def test_a_number_of_another_account_gets_the_neutral_refusal_without_any_detail(self):
         location = make_location("Fremdweg", "1", "3000", "Bern")
         foreign = make_metering_point(77, location=location)
-        from leg_platform.community.tests.helpers import assign_person
-
         assign_person(foreign, customer("owner.wizard@example.org"), valid_from=date(2025, 1, 1))
         response = self.client.post(self.url, {"draw_number": "77", "feed_in": "no"})
         html = text(response)
@@ -534,8 +528,6 @@ class MeteringPointStepTests(WizardCase):
     def test_where_the_account_has_a_draw_already_only_the_feed_in_is_asked(self):
         location = make_location("Bestehend", "4", "3063", "Ittigen", egid=90007777)
         draw = make_metering_point(90, Direction.CONSUMPTION, location, registered_with_operator_on=date(2025, 1, 1), confirmed_on=date(2025, 1, 1), start_date=date(2025, 2, 1))
-        from leg_platform.community.tests.helpers import assign_person
-
         assign_person(draw, self.mine, valid_from=date(2025, 2, 1))
         applications.cancel(self.mine, self.application)
         application = applications.start_draft(self.mine, location=location)

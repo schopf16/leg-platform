@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone, translation
 
 from leg_platform.accounts.models import PortalSettings
-from leg_platform.accounts.models import EmailText, GraphConfiguration, PortalSettings
+from leg_platform.accounts.models import EmailText, GraphConfiguration
 from leg_platform.accounts.tests.test_admin_acceptance import (
     INDEX_URL,
     administrator_client,

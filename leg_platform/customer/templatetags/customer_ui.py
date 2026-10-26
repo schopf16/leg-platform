@@ -9,7 +9,7 @@ from django import template
 from django.utils.html import format_html
 from django.utils.translation import gettext
 
-from leg_platform.customer import access, contact
+from leg_platform.customer import access
 
 register = template.Library()
 
@@ -30,12 +30,6 @@ def leg_link(context):
         '<a href="{}" target="_blank" rel="noopener noreferrer">{}<span class="visually-hidden"> ({})</span></a>',
         url, word, gettext("opens in a new tab"),
     )
-
-
-@register.simple_tag
-def contact_available():
-    """Whether the menu offers "Contact the LEG": the address of the LEG is configured (D-115)."""
-    return contact.available()
 
 
 @register.simple_tag(takes_context=True)

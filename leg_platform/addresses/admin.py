@@ -224,17 +224,6 @@ def import_log_text(source, count):
     ]
 
 
-def import_log_rows(source=""):
-    """The rows for the page: the source label, the time, the step and the fixed reason text (translated)."""
-    return [
-        {
-            "occurred_at": row.occurred_at, "source": IMPORT_LOG_SOURCES[row.source], "step": row.step or "–",
-            "reason": _(row.reason), "open": row.cleared_at is None,
-        }
-        for row in import_log_queryset(source)
-    ]
-
-
 # The housekeeping of both databases (D-119): its own right, checked on the page, the POST and the status endpoint.
 HOUSEKEEPING_PERMISSION = "addresses.run_housekeeping"
 
@@ -282,7 +271,7 @@ class HousekeepingStatusAdmin(admin.ModelAdmin):
         if request.method == "POST":
             action = request.POST.get("action")
             if action == "acknowledge":
-                cleared = housekeeping.acknowledge_errors(request.user)
+                housekeeping.acknowledge_errors(request.user)
                 self.message_user(request, _("The open errors were acknowledged. The weekly run may run again."), messages.SUCCESS)
                 return HttpResponseRedirect(page)
             result = housekeeping.start_manual(request.user)

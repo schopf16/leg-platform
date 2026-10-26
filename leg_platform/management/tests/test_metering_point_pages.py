@@ -284,7 +284,7 @@ class MeteringPointPageTests(TestCase):
         self.assertContains(client.get(self.detail(point)), d(30).strftime("%d.%m.%Y"))
         self.assertEqual(client.get(start).status_code, 302)  # there is no start date to record any more
         history_page = client.get(self.detail(point)).content.decode()
-        for text in ("Als angemeldet gesetzt", f"Bestätigung erfasst", "Startdatum erfasst"):
+        for text in ("Als angemeldet gesetzt", "Bestätigung erfasst", "Startdatum erfasst"):
             self.assertIn(text, history_page)
 
     def test_the_termination_needs_the_end_of_a_month_and_an_active_point(self):

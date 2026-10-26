@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.utils import translation
 
 from leg_platform.accounts import passkey_methods, passkey_views, second_factor
-from leg_platform.accounts.models import MailJob, Passkey, SecurityEvent, User
+from leg_platform.accounts.models import MailJob, Passkey, SecurityEvent
 from leg_platform.accounts.tests import test_passkeys
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.accounts.tests.test_passkeys import CeremonyFixture

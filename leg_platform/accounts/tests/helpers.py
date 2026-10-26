@@ -2,11 +2,13 @@
 
 import functools
 import re
+import threading
 import time
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.db import connection
 from django.test import Client
 from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
@@ -238,3 +240,25 @@ def code_for(device):
     )
     generator.time = time.time()
     return str(generator.token()).zfill(device.DIGITS)
+
+
+class ParallelRunMixin:
+    """``run_all``: the functions run at the same moment in their own threads and connections; returns the results."""
+
+    def run_all(self, functions):
+        barrier = threading.Barrier(len(functions))
+        results = []
+
+        def work(function):
+            try:
+                barrier.wait()
+                results.append(function())
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=work, args=(function,)) for function in functions]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return results

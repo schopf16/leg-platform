@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import mail_queue, registration
-from leg_platform.accounts.models import MailJob, PortalSettings, User, VerificationToken
+from leg_platform.accounts.models import MailJob, User, VerificationToken
 from leg_platform.accounts.second_factor import AUTHENTICATED_AT_KEY
 from leg_platform.accounts.tests.helpers import (
     OTHER_PASSWORD,

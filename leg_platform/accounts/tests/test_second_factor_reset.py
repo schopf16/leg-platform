@@ -8,7 +8,6 @@ from io import StringIO
 from unittest import mock
 from urllib.parse import urlsplit
 
-from django.contrib.sessions.models import Session
 from django.core import mail
 from django.core.management import CommandError, call_command
 from django.db import connection
@@ -31,7 +30,6 @@ from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
     code_for,
-    complete_second_factor,
     create_active_user,
     run_mail_queue,
 )

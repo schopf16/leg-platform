@@ -115,7 +115,7 @@ class Fixture(TestCase):
             "Musterweg", "12", transformer_circuit=cls.circuit, address_correction_open=True,
             remark="Schlüssel beim Hauswart", needs_confirmation=True,
         )
-        cls.quiet_place = make_location("Lindenweg", "7", transformer_circuit=cls.circuit)
+        make_location("Lindenweg", "7", transformer_circuit=cls.circuit)
         cls.anna = create_active_user(
             "anna.person@example.org", first_name="<b>Anna</b>", last_name="Mu&ster", street="Dorfstrasse",
             house_number="1", town="Ittigen", swiss_postal_code=3063,
@@ -135,7 +135,7 @@ class Fixture(TestCase):
         cls.old = make_leg("LEG Alt", is_archived=True)
         cls.point_one = make_metering_point(1, Direction.CONSUMPTION, cls.place)
         cls.point_two = make_metering_point(2, Direction.FEED_IN, cls.place)
-        cls.point_three = make_metering_point(3, Direction.CONSUMPTION)  # nothing: three problems
+        make_metering_point(3, Direction.CONSUMPTION)  # nothing: three problems
         for point in (cls.point_one, cls.point_two):
             assign_leg(point, cls.leg, valid_from=EARLIER)
         assign_leg(cls.point_one, cls.fine, valid_from=EARLIER - timedelta(days=60), valid_to=EARLIER - timedelta(days=1))

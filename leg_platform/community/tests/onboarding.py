@@ -90,11 +90,5 @@ def ready_draft(person, *, egid=90004269, feed_in=False, accept=True, start=True
     return application, building
 
 
-def months_later(day, months):
-    from leg_platform.community.application_common import add_months
-
-    return add_months(day, months)
-
-
 def days(count):
     return timedelta(days=count)

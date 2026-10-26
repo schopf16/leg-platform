@@ -10,7 +10,6 @@ from django.test import SimpleTestCase, TestCase, tag
 
 from leg_platform.community import addressing, legs, numbers, preferences
 from leg_platform.community.models import LEGAL_MINIMUM_QUOTA_PERCENT, Direction
-from leg_platform.community.settings_service import sender_signature
 from leg_platform.community.status import MeteringPointStatus as S
 from leg_platform.community.status import derive_status
 
@@ -23,7 +22,6 @@ class MeteringPointNumberTests(SimpleTestCase):
 
         self.assertEqual(number, "CH1A2B3C4D5E600000000000000000004")
         self.assertEqual(len(number), 33)
-        self.assertEqual(numbers.split_metering_point_number(number), ("CH", "1A2B3C4D5E6", "0" * 19 + "4"))
         self.assertEqual(
             numbers.compose_metering_point_number("CH", "1A2B3C4D5E6", " " + "9" * 20 + " ")[13:], "9" * 20
         )
@@ -56,7 +54,6 @@ class MeteringPointNumberTests(SimpleTestCase):
         ):
             with self.subTest(value=invalid):
                 self.assertFalse(numbers.is_valid_metering_point_number(invalid))
-        self.assertIsNone(numbers.split_metering_point_number("short"))
         self.assertEqual(numbers.normalise_metering_point_number("  ch1a2b3c4d5e600000000000000000004 "),
                          "CH1A2B3C4D5E600000000000000000004")
 
@@ -243,16 +240,6 @@ class AddressRuleTests(SimpleTestCase):
         self.assertEqual(
             addressing.suggestion_banner_text(suggestion),
             "Die Adresse weicht vom Adressverzeichnis ab. Vorschlag: Musterstrasse 1, 3063 Ittigen.",
-        )
-
-    def test_the_sender_signature_ignores_the_address_addition(self):
-        values = {
-            "sender_street": "Musterstrasse", "sender_house_number": "1", "sender_postal_code": "3063",
-            "sender_town": "Ittigen", "sender_address_addition": "c/o X",
-        }
-        self.assertEqual(
-            sender_signature(values),
-            addressing.address_signature("Musterstrasse", "1", "3063", "Ittigen"),
         )
 
 

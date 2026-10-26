@@ -457,9 +457,9 @@ class RouteTableTests(MatrixBase):
                 continue
             with self.subTest(case=case.name):
                 with transaction.atomic():
-                    before, before_preferences = snapshot(), preferences()
+                    before = snapshot()
                     response = self.request(client, case, "post")
-                    after, after_preferences = snapshot(), preferences()
+                    after = snapshot()
                     transaction.set_rollback(True)
                 self.assertIn(response.status_code, (200, 204, 302, 405), response.status_code)
                 if case.changes:

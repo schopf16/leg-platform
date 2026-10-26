@@ -4,7 +4,6 @@ the start-page tile, the routing into the existing flows and the server-side val
 All methods are implemented; unsupported values and privileged password-only choices are refused.
 """
 
-from unittest import mock
 
 from django.conf import settings
 from django.test import Client, SimpleTestCase, TestCase, override_settings, tag
@@ -30,7 +29,6 @@ PROFILE_URL = reverse("accounts:profile")
 HOME_URL = reverse("home")
 SETUP_URL = reverse("accounts:two_factor_setup")
 CONFIRM_URL = reverse("accounts:two_factor_confirm")
-TWO_FACTOR_URL = reverse("accounts:two_factor")
 LOGIN_URL = reverse("accounts:login")
 PASSWORD_CHANGE_URL = reverse("accounts:password_change")
 ENDED = "Aus Sicherheitsgründen wurden Sie ausgeloggt"

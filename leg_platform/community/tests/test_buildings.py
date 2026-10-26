@@ -156,7 +156,7 @@ class DirectoryAdapterTests(TestCase):
              Building(EGID, 2, "Ittigenstrasse", "51", "3063", "Ittigen")), FOUND, "directory",
         )
         with mock_patch("leg_platform.addresses.buildings.find_buildings", return_value=found):
-            candidate_row, egid = buildings.offered_building(("Ittigenstrasse", "51", "3063", "Ittigen"), None)
+            _candidate_row, egid = buildings.offered_building(("Ittigenstrasse", "51", "3063", "Ittigen"), None)
         self.assertEqual(egid, EGID)
 
     def test_invalid_and_unavailable_searches_choose_nothing_and_not_found_is_kept_for_the_review(self):

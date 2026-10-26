@@ -2,10 +2,9 @@
 
 from unittest.mock import patch
 
-from django.conf import settings
 from django.core import mail
 from django.core.mail import EmailMessage
-from django.test import SimpleTestCase, TestCase, override_settings, tag
+from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts import mail_addresses

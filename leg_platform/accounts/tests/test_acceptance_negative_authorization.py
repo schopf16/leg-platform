@@ -37,7 +37,6 @@ from leg_platform.accounts.models import (
     HiddenTask,
     MailJob,
     PendingEmailChange,
-    PortalSettings,
     RecoveryCode,
     SecurityEvent,
     User,

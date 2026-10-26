@@ -65,7 +65,7 @@ class LoginTests(TestCase):
         blocked.set_status(User.Status.BLOCKED)
         deactivated = create_active_user("former.person@example.org")
         deactivated.set_status(User.Status.DEACTIVATED)
-        pending = User.objects.create_user("pending.person@example.org")
+        User.objects.create_user("pending.person@example.org")
         attempts = [
             ("active.person@example.org", "wrong password for this account"),
             ("unknown.person@example.org", PASSWORD),

@@ -31,12 +31,9 @@ from leg_platform.community.models import (
 )
 from leg_platform.community.raw_tables import DATABASE_REFUSED, NEVER_EDITABLE, RawTableAdmin
 from leg_platform.community.tests.helpers import (
-    assign_leg,
-    assign_person,
+    create_table_rows,
     make_circuit,
     make_leg,
-    make_location,
-    make_metering_point,
     staff_user,
 )
 
@@ -78,30 +75,8 @@ class RawTablesTests(TestCase):
         cls.administrator = staff_user("administrator.person@example.org", superuser=True)
         cls.customer = create_active_user("customer.person@example.org")
         cls.other_customer = create_active_user("other.customer@example.org")
-        cls.circuit = make_circuit("TRA4711", "Circuit name")
+        create_table_rows(cls, cls.customer, cls.administrator, note=SECRET_NOTE, remark=SECRET_REMARK, iban=SECRET_IBAN)
         cls.spare_circuit = make_circuit("TRA4712")
-        cls.location = make_location(transformer_circuit=cls.circuit, remark=SECRET_REMARK)
-        cls.point = make_metering_point(5, location=cls.location, remark=SECRET_REMARK)
-        cls.leg = make_leg("LEG Table", remark=SECRET_REMARK)
-        cls.leg_assignment = assign_leg(cls.point, cls.leg)
-        cls.person_assignment = assign_person(cls.point, cls.customer)
-        cls.record = PersonRecord(person=cls.customer, staff_note=SECRET_NOTE, operator_customer_number="OP-1")
-        cls.record.iban = SECRET_IBAN
-        cls.record.save()
-        cls.shares = ShareChange.objects.create(
-            record=cls.record, quantity=4, valid_from=date(2026, 1, 1), actor=cls.administrator
-        )
-        cls.history = HistoryEntry.objects.create(
-            subject_type="location", subject_id=cls.location.pk, event="created", actor=cls.administrator,
-            detail={"fields": ["street"]},
-        )
-        cls.settings_row = ManagementSettings.load()
-        cls.objects = {
-            HistoryEntry: cls.history, Leg: cls.leg, LegAssignment: cls.leg_assignment, Location: cls.location,
-            ManagementSettings: cls.settings_row, MeteringPoint: cls.point,
-            PersonAssignment: cls.person_assignment, PersonRecord: cls.record, ShareChange: cls.shares,
-            TransformerCircuit: cls.circuit,
-        }
 
     def setUp(self):
         self.client = VerifiedClient()

@@ -11,7 +11,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone, translation
 
-from leg_platform.accounts import method_changes, passkey_methods, passkeys, second_factor, second_factor_reset
+from leg_platform.accounts import method_changes, passkey_methods, second_factor, second_factor_reset
 from leg_platform.accounts.mail_queue import enqueue_for_account
 from leg_platform.accounts.models import (
     AuthenticatorDevice, MailJob, PendingSignInChange, User, VerificationToken,
