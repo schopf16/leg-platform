@@ -138,7 +138,7 @@
     * **Residual risk (owner-accepted):** a stolen 14-day session of a privileged account has its privileges for up to 14 days without a new code.
     * **Mitigations (D-100):** security event `persistent_session_started` (long retention), no email (owner 2026-10-19: normal security level); "End all sessions" (event `account_sessions_ended_by_admin`) for system administrators; password reset and rights change end sessions.
     * **No step-up code** before IBAN, PDF lists or any other action (owner, D-102): whoever is signed in is authenticated. An unattended device is the operator's responsibility.
-  * **Proof of identity for the portal settings (D-100, D-062; replaces the five-minute rule of D-055/D-073).** Saving asks for one proof: the app code (staff always have one), else the password. Wrong entries count per session and account (five end the session).
+  * **Portal settings (owner decision 2026-10-26).** Saving in the administration needs no further proof; the administration is only for system administrators behind the second factor at login. The proof for the profile (D-062) is unchanged.
     * The upload is validated, and its rejection logged, before the code is checked (a code works once). A password proof is checked first.
     * `RECENT_AUTHENTICATION_WINDOW` (five minutes) stays only for setting up the second factor (D-055).
   * Session and CSRF cookies are `Secure` in stage and production and `HttpOnly` where possible. `SESSION_COOKIE_DOMAIN` and `CSRF_COOKIE_DOMAIN` are not set (host-only, D-025). `CSRF_TRUSTED_ORIGINS` never contains the instance's website or a wildcard for its parent domain.
@@ -279,7 +279,7 @@
   * The favicon (browser tab icon) follows the same rules and the same validator: PNG or SVG only, by content; smaller limits (PNG 128 KB, SVG 64 KB). ICO is not accepted: no validator exists for it and every current browser shows a PNG or SVG icon. One file for both colour modes, independent of the logos; removing it returns to the built-in icon. It is allowed by `img-src 'self'`; a change is `PORTAL_SETTINGS_CHANGED` (type, bytes, short digest), a rejected file `portal_upload_rejected` (reason `favicon <code>`).
   * The view reads no session (no `Set-Cookie`, no `Vary: Cookie`). `Cache-Control` is `max-age` (content hash in the address) or `no-cache`, never `public`. `MEDIA_URL` serves nothing.
   * Every request below `/admin/accounts/portalsettings` is limited to 3 MiB before the form is read, by path prefix (the admin routes the object id as `<path:object_id>`, so `01`, `+1`, `%201`, `_31`, `add`, `history` reach the same admin).
-  * Saving needs one proof of identity (code of the authenticator app, else the password; D-100).
+  * Saving needs no further proof (owner decision 2026-10-26; the second factor at login protects the administration).
   * A rejected upload is a security event with a reason code only (`portal_upload_rejected`). A change is a long-kept event with a line per field (never file content).
   * The risk of the right (it changes what every visitor sees, like the email texts, D-039) is accepted and limited by the audit trail and by no role having it by default.
   * **Open:** the rendering of an SVG with style attributes under the sandbox policy and the effect of CSSOM changes under `style-src 'self'` were not checked in a browser.
