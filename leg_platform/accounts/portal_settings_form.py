@@ -7,13 +7,11 @@ Name, website, legal notice addresses, colours, the two logos and the favicon. T
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import second_factor, security_log
-from leg_platform.accounts.forms import OneProofMixin, passkey_proof_field
 from leg_platform.accounts.logo_images import (
     FAVICON_MAX_UPLOAD_BYTES,
     MAX_UPLOAD_BYTES,
@@ -29,14 +27,6 @@ LOGOS = ("light", "dark")
 
 ONLY_ONE_LOGO = _(
     "Upload both logos or none. The portal needs one version for light and one for dark mode."
-)
-# Saving needs one proof of identity (D-062, D-088), like the other sensitive actions: the code of
-# the authenticator app if a second factor is set up, else the password. It replaces the earlier
-# rule "log in again within five minutes", which forced a logout and login (D-055, D-073).
-PROOF_MISSING = _("The identity cannot be checked. Nothing was saved.")
-PROOF_HELP = _(
-    "To protect what every visitor sees, confirm the change with the code from your authenticator "
-    "app or, if you have none, with your password."
 )
 REMOVE_AND_UPLOAD = _(
     "Choose either new logos or the removal of the uploaded logos, not both."
@@ -88,22 +78,12 @@ def colour_message(problem):
     return HIGHLIGHT_TOO_WEAK % {"ratio": ratio}
 
 
-class PortalSettingsForm(OneProofMixin, forms.ModelForm):
-    passkey_assertion = passkey_proof_field()
-    # Set by ``PortalSettingsAdmin.get_form``: a rejected upload is a security event (D-073) and a
-    # save needs one proof of identity. None outside the administration (fails closed).
+class PortalSettingsForm(forms.ModelForm):
+    # Set by ``PortalSettingsAdmin.get_form``: a rejected upload is a security event (D-073). None outside the
+    # administration.
     actor = None
     request = None
     password_error = _("The password is not correct. Please try again.")
-
-    # One of the two is removed in ``__init__`` (``OneProofMixin.use_one_proof``).
-    current_password = forms.CharField(
-        label=_("Current password"),
-        strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
-        error_messages={"required": _("Enter your current password.")},
-    )
-    otp_token = forms.CharField(label=_("Code from the app"), max_length=256, widget=forms.TextInput())
 
     logo_light_file = forms.FileField(
         required=False,
@@ -172,15 +152,6 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
         self.new_favicon = None
         self.rejections = []
         self._add_server_hints()
-        # One proof of the acting account; without a request both fields stay and ``clean`` refuses.
-        self.user = getattr(self.request, "user", None)
-        if self.user is not None:
-            self.use_one_proof(self.user, autofocus=False)
-            self.fields[self.proof_field].help_text = PROOF_HELP
-
-    @property
-    def proof_field(self):
-        return {"code": "otp_token", "passkey": "passkey_assertion", "password": "current_password"}[self.proof]
 
     def _add_server_hints(self):
         """Under every field with a server value: what an empty field means (D-073). Only public values; escaped."""
@@ -243,22 +214,6 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        if self.user is None:
-            # Without a request nobody can prove anything: fail closed (nothing else is looked at).
-            self.add_error(None, ValidationError(PROOF_MISSING, code="proof"))
-            return cleaned
-        if self.proof_changed():
-            self.add_error(None, self.changed_message)
-            return cleaned
-        if self.proof == "password":
-            # The password is checked first, under the abuse protection of the login; before it
-            # nothing else is looked at (the upload is not even read).
-            password = cleaned.get("current_password")
-            if password is None:
-                return cleaned
-            if not second_factor.verify_password(self.request, self.user, password):
-                self.add_error("current_password", self.password_error)
-                return cleaned
         for field in COLOUR_FIELDS:
             if cleaned.get(field):
                 cleaned[field] = cleaned[field].upper()
@@ -274,7 +229,7 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
                 check()
             except ValidationError as error:
                 self.add_error(None, error)
-        if self.rejections and self.actor is not None and self._may_log_rejection():
+        if self.rejections and self.actor is not None:
             # One event for the whole request, with reason codes only (never the content).
             with transaction.atomic():
                 security_log.record(
@@ -282,26 +237,7 @@ class PortalSettingsForm(OneProofMixin, forms.ModelForm):
                     actor=self.actor,
                     detail=", ".join(self.rejections),
                 )
-        # The app code is used up only when nothing else is wrong (it works once).
-        self.check_code(cleaned)
         return cleaned
-
-    REJECTION_LOG_INTERVAL = 60  # seconds per session (M-5)
-
-    def _may_log_rejection(self):
-        """At most one event "upload rejected" per session and minute (M-5 of the review of 2026-10-17): with an app
-        code as the proof the upload is judged before the code is checked, so a session without the code could
-        otherwise fill the security log. Without a session (a test without a request) every rejection is logged."""
-        session = getattr(self.request, "session", None)
-        if session is None or self.proof == "password":
-            # A password proof was checked before the upload was looked at: nothing to collapse.
-            return True
-        now = int(timezone.now().timestamp())
-        last = session.get("upload_rejected_logged_at")
-        if isinstance(last, int) and 0 <= now - last < self.REJECTION_LOG_INTERVAL:
-            return False
-        session["upload_rejected_logged_at"] = now
-        return True
 
     def _check_colours(self, cleaned):
         stored = {field: cleaned.get(field) or "" for field in COLOUR_FIELDS}

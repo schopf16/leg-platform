@@ -105,21 +105,11 @@ class PortalSettingsAdmin(admin.ModelAdmin):
                     },
                 )
             )
-        if can_change:
-            fieldsets.append(
-                (
-                    _("Confirmation"),
-                    {"fields": (
-                        "passkey_assertion" if request.user.authentication_method == request.user.AuthenticationMethod.PASSKEY
-                        else "otp_token" if second_factor.has_second_factor(request.user) else "current_password",
-                    )},
-                )
-            )
         return fieldsets
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        # The acting account of a rejected upload and the request for the proof of identity; the
+        # The acting account of a rejected upload and the request for the security log; the
         # class is built for this request only.
         return type(form.__name__, (form,), {"actor": request.user, "request": request})
 

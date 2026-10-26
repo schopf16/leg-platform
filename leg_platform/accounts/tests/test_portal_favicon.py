@@ -399,13 +399,11 @@ class AdminFormTests(TestCase):
         self.assertContains(response, "Laden Sie beide Logos hoch oder keines.")
         self.assertContains(response, "Es sind nur PNG- und SVG-Dateien erlaubt.")
 
-    def test_saving_needs_the_proof_of_identity(self):
-        self.client.auto_proof = False
-
+    def test_saving_needs_no_proof(self):
         response = self.post(favicon_file=upload(FAVICON_PNG))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(PortalSettings.objects.exists() and self.row().favicon_sha256)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(self.row().favicon_sha256)
 
 
 @override_settings(**SERVER)
