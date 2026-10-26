@@ -10952,6 +10952,7 @@ msgid "%(n)s building"
 msgid_plural "%(n)s buildings"
 msgstr[0] "%(n)s bâtiment"
 msgstr[1] "%(n)s bâtiments"
+msgstr[2] "%(n)s bâtiments"
 
 msgid "%(pv)s with PV"
 msgstr "%(pv)s avec PV"
