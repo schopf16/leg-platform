@@ -780,7 +780,7 @@ class FieldAttributesTests(TestCase):
                 self.assert_plain_code_field(wrong_code(client, name, value="123abc").content.decode())
 
     def test_every_password_field_is_hidden_and_has_the_eye_element(self):
-        user_b, client_b = make_b("attrs.password.b@example.org")
+        _user_b, client_b = make_b("attrs.password.b@example.org")
         age_authentication(client_b)
         _user_a, _device, client_a = make_a("attrs.password.a@example.org")
         pages = (

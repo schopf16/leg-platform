@@ -1003,57 +1003,6 @@ span.note-warn {
   display: none;
 }
 
-/* ---- The card "Your way into the LEG" on the start page ---- */
-.journey {
-  display: grid;
-  gap: 16px;
-  margin-top: 32px;
-  padding: 24px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.journey-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
-.journey-head h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.journey .step-list li.is-muted {
-  opacity: 0.6;
-}
-
-.journey-next {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.journey-next p {
-  margin: 0;
-}
-
-.journey-next .btn {
-  min-height: 48px;
-}
-
-.journey + .task-grid {
-  margin-top: 32px;
-}
-
 /* ---- One-time banners, status lines, the returned note (design walkthrough W1-18, W2-01, W2-03) ---- */
 .banner-list {
   display: grid;
@@ -1189,14 +1138,12 @@ span.note-warn {
   .card-foot .btn,
   .step-actions .btn,
   .step-actions .inline-form,
-  .step-actions .inline-form .btn,
-  .journey-next .btn {
+  .step-actions .inline-form .btn {
     width: 100%;
   }
 
   .step-card,
   .building-card,
-  .journey,
   .stage-card {
     padding: 16px;
   }
@@ -1279,10 +1226,6 @@ span.note-warn {
 
   .mp-progress-actions {
     flex-direction: column;
-  }
-
-  .journey {
-    margin-top: 24px;
   }
 }
 

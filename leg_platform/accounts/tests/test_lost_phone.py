@@ -22,7 +22,6 @@ from leg_platform.accounts.models import (
     RecoveryCodeDevice,
     SecurityEvent,
     SessionCodeFailure,
-    User,
 )
 from leg_platform.accounts.tests.helpers import PASSWORD, code_for, create_active_user, run_mail_queue
 from leg_platform.accounts.tests.test_second_factor import (
@@ -38,7 +37,6 @@ LOST_PAGE = f"{PROFILE}?edit=two_factor&step=lost_phone"
 DISABLE_PAGE = f"{PROFILE}?edit=two_factor&step=disable"
 SECOND = "second.lost.phone@example.org"
 GENERIC = "Das Passwort oder der Wiederherstellungscode ist falsch. Prüfen Sie beide Angaben und versuchen Sie es erneut."
-FIELD_ERRORS = re.compile(r'<div class="invalid-feedback d-block"[^>]*>(.*?)</div>', re.S)
 
 
 def summary_of(html):

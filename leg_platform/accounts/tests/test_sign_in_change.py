@@ -36,7 +36,6 @@ DISABLE = f"{FLOW}?step=disable"
 SCAN = f"{FLOW}?step=scan"
 NUMBER = f"{FLOW}?step=number"
 CANCEL = f"{FLOW}?step=cancel"
-PROOF_STEP = f"{FLOW}?step=proof"
 CARD = f"{PROFILE}#card-two-factor"
 
 

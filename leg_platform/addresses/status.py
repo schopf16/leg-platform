@@ -15,7 +15,7 @@ from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from . import jobs, schedule
+from . import jobs
 from .models import ImportRequest, PlantRegister, ServicePostalCode
 from .services import directory_status
 

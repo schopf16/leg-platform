@@ -30,7 +30,6 @@ from leg_platform.accounts.models import (
     EmailText,
     GraphConfiguration,
     PendingEmailChange,
-    PortalSettings,
     SecurityEvent,
     User,
     VerificationToken,
@@ -198,7 +197,7 @@ class OpenChangesEndWithTheHoldOnTheAccountTests(TestCase):
         self.holder.set_privileges(is_staff=True, is_superuser=False)
         with_second_factor(self.holder)
 
-        second_factor_reset.reset_privileged(administrator(), self.holder)
+        second_factor_reset.request_link(administrator(), self.holder)
         # D-106: requesting never clears anything; explicit owner confirmation does.
         from leg_platform.accounts.tests.helpers import run_mail_queue
 

@@ -17,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from leg_platform.accounts import mail_queue, session_timeout
-from leg_platform.accounts.models import MailJob, SecurityEvent, VerificationToken
+from leg_platform.accounts.models import MailJob, SecurityEvent
 from leg_platform.accounts.second_factor import PENDING_SESSION_KEY
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,

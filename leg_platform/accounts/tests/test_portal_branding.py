@@ -26,7 +26,6 @@ from leg_platform.accounts import emails, second_factor
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     EmailText,
-    PortalSettings,
     SecurityEvent,
     SessionCodeFailure,
     User,
@@ -42,12 +41,11 @@ from leg_platform.accounts.portal_settings_form import PortalSettingsForm
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     ProvingClient,
-    VerifiedClient,
     age_authentication,
     code_for,
     create_active_user,
 )
-from leg_platform.accounts.tests.test_logo_images import MINIMAL, chunk, make_png, svg
+from leg_platform.accounts.tests.test_logo_images import MINIMAL, make_png, svg
 from leg_platform.branding import colour_problems, load_branding
 from leg_platform.middleware import body_limit
 

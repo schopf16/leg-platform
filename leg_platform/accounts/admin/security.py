@@ -14,8 +14,6 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.models import SecurityEvent
 
-# The one entry "Failed logins" shows both models (owner decision): "Locked" (current state) and "Log" (history).
-FAILED_LOGIN_MODELS = (AccessAttempt, AccessFailureLog)
 
 def short_identifier(value):
     """The identifier shortened for the screen: the first 8 and the last 4 characters; never the whole digest."""

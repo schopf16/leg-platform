@@ -14,7 +14,6 @@ import sqlite3
 import tempfile
 import uuid
 import threading
-import uuid
 from io import StringIO
 from pathlib import Path
 from unittest import mock

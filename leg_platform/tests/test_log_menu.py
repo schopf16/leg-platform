@@ -4,8 +4,7 @@ one security event per change of the setting.
 """
 
 import re
-import tempfile
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -20,7 +19,7 @@ from django.utils import timezone
 from leg_platform import log_menu
 from leg_platform.accounts import mail_queue
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
-from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 from leg_platform.addresses.models import HousekeepingError, ImportLogEntry, ImportRequest
 
 ZURICH = ZoneInfo("Europe/Zurich")

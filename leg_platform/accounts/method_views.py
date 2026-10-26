@@ -23,7 +23,7 @@ from leg_platform.accounts.profile_views import render_profile
 from leg_platform.accounts.views import NeverCacheMixin, TokenPageMixin, PasswordResetRequestView
 
 
-def finish_setup(request, pending):
+def finish_setup(request):
     if request.user.authentication_method == User.AuthenticationMethod.RECOVERY:
         result = method_changes.complete(request.user.pk, recovery=True)
         if result is None:
@@ -84,7 +84,7 @@ class PasswordMethodView(NeverCacheMixin, LoginRequiredMixin, View):
             return redirect("accounts:login_method")
         if pending.method == "app":
             return redirect("accounts:method_app")
-        return finish_setup(request, pending)
+        return finish_setup(request)
 
 
 class AppMethodView(NeverCacheMixin, LoginRequiredMixin, View):
@@ -117,7 +117,7 @@ class AppMethodView(NeverCacheMixin, LoginRequiredMixin, View):
             return HttpResponse(status=429)
         if form.is_valid():
             if method_changes.confirm_app(request, form.cleaned_data["otp_token"]):
-                return finish_setup(request, method_changes.session_pending(request))
+                return finish_setup(request)
             form.add_error("otp_token", form.invalid_code_message)
         return self.page(request, form)
 

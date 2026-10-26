@@ -43,7 +43,6 @@ from leg_platform.accounts.tests.helpers import (
     run_mail_queue,
 )
 from leg_platform.accounts.tests.test_second_factor import (
-    CODE_URL,
     create_user_with_totp,
     log_in,
     send_code,

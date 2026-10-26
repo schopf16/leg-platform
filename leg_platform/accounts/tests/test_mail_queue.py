@@ -6,7 +6,6 @@ from datetime import timedelta
 from threading import Barrier
 from unittest.mock import Mock, patch
 
-from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.db import OperationalError, connection, connections

@@ -12,7 +12,7 @@ from django.urls import reverse
 
 from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts import tasks
-from leg_platform.accounts.models import HiddenTask, PortalSettings
+from leg_platform.accounts.models import HiddenTask
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient, create_active_user
 from leg_platform.accounts.tests.test_second_factor import create_user_with_totp, log_in, promote
 

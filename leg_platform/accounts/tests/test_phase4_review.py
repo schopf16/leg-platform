@@ -49,7 +49,7 @@ STOP_CONFIRM = reverse("accounts:email_change_stop_confirm")
 INVALID_TEXT = "Link nicht mehr gültig"
 
 
-def request_login_change(client, address=NEW, secondary="", user_email="holder.person@example.org"):
+def request_login_change(client, address=NEW, secondary=""):
     return client.post(
         EMAIL_URL,
         {"email": address, "secondary_email": secondary, "current_password": PASSWORD},
@@ -141,7 +141,7 @@ class StopLinkMeaningTests(TestCase):
         survivor = Client()
         survivor.force_login(self.user)
 
-        posted = stopper.post(STOP_CONFIRM, {}, follow=True)
+        stopper.post(STOP_CONFIRM, {}, follow=True)
         self.assertEqual(survivor.get(PROFILE_URL).status_code, 200)
 
     def test_stop_all_without_a_request_returns_nothing_and_ends_no_session(self):

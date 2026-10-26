@@ -2,7 +2,7 @@
 
 from django.db import transaction
 
-from leg_platform.community import addressing, history
+from leg_platform.community import history
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import ManagementSettings
 
@@ -14,14 +14,6 @@ SENDER_FIELDS = (
     "sender_town",
 )
 EDITABLE_FIELDS = ("country_code", "identifier", "warning_threshold_percent", *SENDER_FIELDS)
-
-
-def sender_signature(values_or_row):
-    """The memory key of the sender address (the address addition is not part of it)."""
-    get = values_or_row.get if isinstance(values_or_row, dict) else lambda name: getattr(values_or_row, name)
-    return addressing.address_signature(
-        get("sender_street"), get("sender_house_number"), get("sender_postal_code"), get("sender_town")
-    )
 
 
 def update(values, actor):

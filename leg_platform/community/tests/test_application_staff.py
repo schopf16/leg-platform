@@ -536,9 +536,9 @@ class ConcurrentBuildingTests(StaffCase):
         order = []
         real = application_staff._location_for
 
-        def spy(app, building, *args):
+        def spy(building, *args):
             order.append(building.egid)
-            return real(app, building, *args)
+            return real(building, *args)
 
         with mock.patch.object(application_staff, "_location_for", side_effect=spy):
             application_staff.complete(application, self.staff, START, today=TODAY)

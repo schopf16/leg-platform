@@ -11,20 +11,17 @@ from unittest.mock import patch
 from django.test import Client, TestCase, tag
 from django.urls import reverse
 
-from leg_platform.accounts.models import AuthenticatorDevice, MailJob, PendingEmailChange, SecurityEvent, SessionCodeFailure, User
+from leg_platform.accounts.models import AuthenticatorDevice, MailJob, PendingEmailChange, SecurityEvent, User
 from leg_platform.accounts.tests.helpers import PASSWORD, VerifiedClient
-from leg_platform.community import applications, contracts, deregistrations, own_iban
+from leg_platform.community import deregistrations, own_iban
 from leg_platform.community.models import Direction
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.customer import limits
 from leg_platform.customer.tests.helpers import (
     GOOD_IBAN,
     OTHER_IBAN,
-    configure_numbers,
     customer,
-    draft_with_points,
     login,
-    publish_contract,
 )
 
 PROFILE = reverse("accounts:profile")

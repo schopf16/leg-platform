@@ -18,7 +18,6 @@ from django.utils import timezone
 
 from leg_platform.accounts import views
 from leg_platform.accounts.models import (
-    AuthenticatorDevice,
     PendingEmailChange,
     User,
     VerificationToken,

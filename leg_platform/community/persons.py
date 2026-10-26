@@ -118,20 +118,6 @@ def _clean_operator_number(number):
     return number
 
 
-def set_operator_customer_number(person, number, actor=None):
-    """Save the optional customer number at the grid operator (empty clears it)."""
-    number = _clean_operator_number(number)
-    with transaction.atomic():
-        fresh = _lock_person(person)
-        record = _locked_record(fresh, create=bool(number))
-        if record is None or record.operator_customer_number == number:
-            return record
-        record.operator_customer_number = number
-        record.save(update_fields=["operator_customer_number", "updated_at"])
-        history.record(fresh, HistoryEvent.PERSON_OPERATOR_NUMBER_CHANGED, actor)
-    return record
-
-
 def add_share_change(person, quantity, valid_from, actor=None):
     """Add a share history entry: ``quantity`` shares (whole number from 0) hold from ``valid_from``. Entries are
     never changed; a correction is a new entry (see ``current_shares``)."""

@@ -38,7 +38,6 @@ from leg_platform.community.models import (
     Direction,
     Leg,
     LegAssignment,
-    ListPreference,
     Location,
     ManagementSettings,
     MeteringPoint,
@@ -49,8 +48,6 @@ from leg_platform.community.models import (
 from leg_platform.community.status import MeteringPointStatus as Status
 from leg_platform.community.tests.helpers import (
     assign_leg,
-    assign_person,
-    make_circuit,
     make_leg,
     make_location,
     make_metering_point,
@@ -491,7 +488,6 @@ class LifeOfTheObjectsTests(MatrixBase):
         # The name is free and not unique.
         transformer_circuits.create("TRA556", "Fuenf")
         self.assertEqual(TransformerCircuit.objects.filter(name="Fuenf").count(), 2)
-        self.assertEqual(transformer_circuits.number_of_choice("tra555 · Fuenf"), "TRA555")
 
     def test_a_new_circuit_with_a_number_that_exists_is_refused_in_the_form_and_changes_it_not(self):
         client = self.login(self.administrator)

@@ -14,10 +14,9 @@ from leg_platform.accounts.admin import EMAIL_TEXT_PROCESSES
 from leg_platform.accounts.models import (
     EmailText,
     GraphConfiguration,
-    PortalSettings,
     SecurityEvent,
 )
-from leg_platform.accounts.tests.helpers import ProvingClient, VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import ProvingClient, create_active_user
 
 INDEX_URL = reverse("admin:index")
 

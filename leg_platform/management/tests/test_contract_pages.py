@@ -72,7 +72,7 @@ class ContractListTests(ContractBase):
         self.assertLess(content.index("contract-2026-12-01.pdf"), content.index("contract-2026-10-07.pdf"))
         self.assertLess(content.index("contract-2026-10-07.pdf"), content.index("contract-2025-03-01.pdf"))
         for word in ("Aktuell", "Hochgeladen", "Ältere"):
-            self.assertContains(page, f'<span class="mgmt-status is-')
+            self.assertContains(page, '<span class="mgmt-status is-')
             self.assertContains(page, word)
         for label in ("Dateiname", "Status", "Hochgeladen", "Zustimmungen", "Aktionen"):
             self.assertContains(page, label)

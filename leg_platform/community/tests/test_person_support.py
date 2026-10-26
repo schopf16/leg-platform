@@ -284,7 +284,7 @@ class ChangeCustomerDataTests(TestCase):
         cls.staff = staff_user("staff.change@example.org")
         cls.other_staff = staff_user("other.change@example.org")
         cls.administrator = staff_user("administrator.change@example.org", superuser=True)
-        cls.second_administrator = staff_user("second.change@example.org", superuser=True)
+        staff_user("second.change@example.org", superuser=True)
         cls.customer = create_active_user(
             "customer.change@example.org", first_name="Anna", last_name="Muster", salutation="mrs", street="Dorfstrasse",
             house_number="1", town="Ittigen", swiss_postal_code=3063,

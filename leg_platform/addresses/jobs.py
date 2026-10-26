@@ -206,7 +206,6 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
             job.save(update_fields=fields)
             # The interrupted run is a failure of its source too (D-121).
             _log_failure(job.source, INTERRUPTED, "", now)
-        plant = source == ImportRequest.Source.PLANT
         # The plant register and the transformer scan both run only as the scheduled run, never while an address request
         # is queued, and neither touches the address schedule (D-117, D-118).
         separate = source in (ImportRequest.Source.PLANT, ImportRequest.Source.TRANSFORMER)

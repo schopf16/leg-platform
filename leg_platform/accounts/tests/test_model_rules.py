@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 from django.utils import translation
 
-from leg_platform.accounts.models import PortalSettings
 from leg_platform.accounts.backends import EmailModelBackend
 from leg_platform.accounts.models import (
     EXACT_COLLATION,

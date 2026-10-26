@@ -18,7 +18,6 @@ from django.core.management import call_command
 from django.db import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.translation import gettext
 
 from leg_platform.accounts.models import SecurityEvent
@@ -151,7 +150,7 @@ class SqliteStepTests(HousekeepingBase):
         self.addCleanup(directory.cleanup)
         self.file = Path(directory.name) / "address-directory.sqlite3"
         self.file.write_bytes(b"x" * 4096)
-        self.file_path = self._patch("leg_platform.addresses.housekeeping._directory_path", return_value=self.file)
+        self._patch("leg_platform.addresses.housekeeping._directory_path", return_value=self.file)
         self.vacuum = self._patch("leg_platform.addresses.housekeeping._vacuum")
         self.check = self._patch("leg_platform.addresses.housekeeping._quick_check", return_value=True)
         self.disk = self._patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024 ** 3))

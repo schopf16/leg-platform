@@ -253,7 +253,7 @@ class PersonChangeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.person = create_active_user("person.change@example.org", first_name="Anna", last_name="Muster")
-        cls.actor = create_active_user("actor.change@example.org")
+        cls.actor = staff_user("actor.change@example.org")
         cls.unverified = User.objects.create_user("unverified.change@example.org")
 
     def events(self):
@@ -263,12 +263,12 @@ class PersonChangeTests(TestCase):
         self.assertIsNone(persons.record_of(self.person))
         # Nothing to save: no record, no history.
         persons.set_note(self.person, "  ", self.actor)
-        persons.set_operator_customer_number(self.person, "", self.actor)
+        persons.update_payment_data(self.person, self.actor, operator_customer_number="")
         self.assertIsNone(persons.record_of(self.person))
         self.assertEqual(self.events(), [])
 
         persons.set_note(self.person, "  Rückruf vereinbart.  ", self.actor)
-        persons.set_operator_customer_number(self.person, " OPR   4711 ", self.actor)
+        persons.update_payment_data(self.person, self.actor, operator_customer_number=" OPR   4711 ")
         record = persons.record_of(self.person)
         self.assertEqual((record.staff_note, record.operator_customer_number), ("Rückruf vereinbart.", "OPR 4711"))
         # The entries name the event, the actor and the time, never the note, the number or an address (L-6).
@@ -281,11 +281,11 @@ class PersonChangeTests(TestCase):
     def test_a_change_that_changes_nothing_writes_no_history_and_an_empty_value_clears(self):
         persons.set_note(self.person, "Eine Notiz", self.actor)
         persons.set_note(self.person, "Eine Notiz", self.actor)
-        persons.set_operator_customer_number(self.person, "OPR 1", self.actor)
-        persons.set_operator_customer_number(self.person, "OPR 1", self.actor)
+        persons.update_payment_data(self.person, self.actor, operator_customer_number="OPR 1")
+        persons.update_payment_data(self.person, self.actor, operator_customer_number="OPR 1")
         self.assertEqual(len(self.events()), 2)
         persons.set_note(self.person, "", self.actor)
-        persons.set_operator_customer_number(self.person, "", self.actor)
+        persons.update_payment_data(self.person, self.actor, operator_customer_number="")
         record = persons.record_of(self.person)
         self.assertEqual((record.staff_note, record.operator_customer_number), ("", ""))
         self.assertEqual(len(self.events()), 4)
@@ -293,8 +293,8 @@ class PersonChangeTests(TestCase):
     def test_the_rules_refuse_what_does_not_fit(self):
         for call, code in (
             (lambda: persons.set_note(self.person, "x" * (persons.NOTE_MAX_LENGTH + 1)), "note_too_long"),
-            (lambda: persons.set_operator_customer_number(self.person, "1" * 31), "number_invalid"),
-            (lambda: persons.set_operator_customer_number(self.person, "12\x0034"), "number_invalid"),
+            (lambda: persons.update_payment_data(self.person, self.actor, operator_customer_number="1" * 31), "number_invalid"),
+            (lambda: persons.update_payment_data(self.person, self.actor, operator_customer_number="12\x0034"), "number_invalid"),
             (lambda: persons.set_note(self.unverified, "Notiz"), "not_a_person"),
             (lambda: persons.add_share_change(self.unverified, 1, TODAY), "not_a_person"),
         ):

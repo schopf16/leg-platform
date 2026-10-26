@@ -3,7 +3,7 @@ change the quota and the master data, archive, delete), the list (search, displa
 detail page (members, the state of the last column, the occupants, the sort). The pages themselves are in
 ``management/tests/test_leg_pages.py``."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.test import SimpleTestCase, TestCase, tag

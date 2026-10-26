@@ -128,15 +128,6 @@ def request_link(actor, target):
         security_log.record(Event.TWO_FACTOR_RESET_REQUESTED, account=target_row, actor=actor_row)
 
 
-def reset_privileged(actor, target):
-    """Compatibility entry point for requesting the same owner-confirmed recovery link.
-
-    The administration requires the official-ID name check for every target. This delegates to
-    request_link and never performs an immediate privileged reset; its refusal rules are identical.
-    """
-    request_link(actor, target)
-
-
 def process_reset_link(account_id, address, greeting_name="", *, self_service=False):
     """Handle the link request in the background worker; return the sending function.
 

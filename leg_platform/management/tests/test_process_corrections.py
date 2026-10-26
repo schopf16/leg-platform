@@ -20,7 +20,6 @@ from leg_platform.community import application_corrections, applications, histor
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     Application,
-    ApplicationBuilding,
     ApplicationMeteringPoint,
     ApplicationNotice,
     Direction,
@@ -33,7 +32,6 @@ from leg_platform.community.tests.onboarding import (
     customer,
     directory,
     full_number,
-    publish_contract,
     ready_draft,
 )
 from leg_platform.management.tests.test_process_pages import ProcessBase

@@ -5,7 +5,6 @@ from datetime import timedelta
 
 from axes.backends import AxesStandaloneBackend
 from django import forms
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin

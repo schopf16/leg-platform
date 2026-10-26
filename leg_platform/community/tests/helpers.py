@@ -5,11 +5,15 @@ from datetime import date, timedelta
 from leg_platform.accounts.tests.helpers import create_active_user
 from leg_platform.community.models import (
     Direction,
+    HistoryEntry,
     Leg,
     LegAssignment,
     Location,
+    ManagementSettings,
     MeteringPoint,
     PersonAssignment,
+    PersonRecord,
+    ShareChange,
     TransformerCircuit,
 )
 
@@ -59,6 +63,33 @@ def assign_person(metering_point, person, valid_from=date(2026, 1, 1), valid_to=
     return PersonAssignment.objects.create(
         metering_point=metering_point, person=person, valid_from=valid_from, valid_to=valid_to
     )
+
+
+def create_table_rows(cls, customer, administrator, *, note, remark, iban):
+    """Fill ``cls`` with one row of every table of the management data; ``cls.objects`` maps each model to its row."""
+    cls.circuit = make_circuit("TRA4711", "Circuit name")
+    cls.location = make_location(transformer_circuit=cls.circuit, remark=remark)
+    cls.point = make_metering_point(5, location=cls.location, remark=remark)
+    cls.leg = make_leg("LEG Table", remark=remark)
+    cls.leg_assignment = assign_leg(cls.point, cls.leg)
+    cls.person_assignment = assign_person(cls.point, customer)
+    cls.record = PersonRecord(person=customer, staff_note=note, operator_customer_number="OP-1")
+    cls.record.iban = iban
+    cls.record.save()
+    cls.shares = ShareChange.objects.create(
+        record=cls.record, quantity=4, valid_from=date(2026, 1, 1), actor=administrator
+    )
+    cls.history = HistoryEntry.objects.create(
+        subject_type="location", subject_id=cls.location.pk, event="created", actor=administrator,
+        detail={"fields": ["street"]},
+    )
+    cls.settings_row = ManagementSettings.load()
+    cls.objects = {
+        HistoryEntry: cls.history, Leg: cls.leg, LegAssignment: cls.leg_assignment, Location: cls.location,
+        ManagementSettings: cls.settings_row, MeteringPoint: cls.point,
+        PersonAssignment: cls.person_assignment, PersonRecord: cls.record, ShareChange: cls.shares,
+        TransformerCircuit: cls.circuit,
+    }
 
 
 def day(offset=0, base=None):

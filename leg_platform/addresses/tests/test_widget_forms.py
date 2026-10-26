@@ -11,7 +11,7 @@ the rules of its source in ``accounts.tests.test_address_notice``."""
 import re
 
 from django.core import mail
-from django.test import Client, TestCase, tag
+from django.test import Client, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import VerificationToken
@@ -25,7 +25,7 @@ from leg_platform.accounts.tests.helpers import (
 from leg_platform.accounts.tests.helpers import verification_path
 from leg_platform.accounts.tests.test_registration import register
 from leg_platform.community import applications
-from leg_platform.community.tests.helpers import make_location, staff_user
+from leg_platform.community.tests.helpers import make_location
 from leg_platform.customer.tests.helpers import login as customer_login
 from leg_platform.management.tests.test_process_pages import ProcessBase
 
