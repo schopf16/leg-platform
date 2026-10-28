@@ -214,6 +214,12 @@
   gap: 16px;
 }
 
+.nerd-line {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.nerd-line .mono { font-family: ui-monospace, Consolas, monospace; }
 .sub-line {
   margin: 4px 0 0;
   font-size: 14px;
@@ -280,11 +286,128 @@
 
 .mp-list > li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px 208px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 12px 24px;
+  gap: 4px 24px;
   padding: 16px 0;
   border-top: 1px solid var(--line);
+}
+
+.mp-list > li > .mp-edit {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.card-part + .card-part {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.part-title {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.facts.nerd {
+  margin-top: 8px;
+  font-size: 0.9375rem;
+}
+
+.facts .mono {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.building-info {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+}
+
+.building-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--warm);
+  color: var(--accent);
+}
+
+.building-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.building-actions {
+  display: flex;
+  flex: none;
+  margin: -8px -8px 0 0;
+}
+
+.facts.facts-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+  margin-top: 12px;
+}
+
+.facts.facts-grid > div {
+  display: block;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.facts.facts-grid > div.wide {
+  grid-column: 1 / -1;
+}
+
+.facts.facts-grid dt,
+.facts.facts-grid dd {
+  padding: 0;
+  line-height: 20px;
+  border: 0;
+}
+
+.status-line {
+  margin: 0;
+}
+
+.bank-card {
+  margin-top: 24px;
+}
+
+.card-status {
+  display: grid;
+  gap: 12px;
+}
+
+.mp-list > li > .dotword {
+  grid-column: 2;
+  grid-row: 1;
+  white-space: nowrap;
+}
+
+.mp-list > li > .mp-dir {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+.mp-dir > .mp-since {
+  display: inline;
+  margin-top: 0;
+}
+
+.mp-dir > .mp-since::before {
+  content: "\00b7";
+  margin-right: 8px;
 }
 
 .mp-list > li:first-child {
@@ -367,6 +490,21 @@
 .card-note {
   font-size: 14px;
   color: var(--muted);
+}
+
+.btn.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.change-action {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.change-action .muted {
+  margin: 0;
 }
 
 /* ---- The wizard ---- */
@@ -587,6 +725,18 @@
   gap: 8px;
 }
 
+/* The notice after the building step, above the metering points (D-124): a dot and a word, then the address. */
+.building-notice {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+/* Step 1 (D-124): room under the card, so that the street list (an overlay) does not end below the page and make it scroll. */
+.step-card.step-card-building {
+  margin-bottom: 9rem;
+}
+
 .found-address {
   font-size: 18px;
   font-weight: 600;
@@ -606,7 +756,8 @@ fieldset.question {
 fieldset.question[tabindex="-1"]:focus,
 fieldset.question[tabindex="-1"]:focus-visible,
 .suggest[tabindex="-1"]:focus,
-.note-bad[tabindex="-1"]:focus {
+.note-bad[tabindex="-1"]:focus,
+.note-warn[tabindex="-1"]:focus {
   padding: 12px;
   border-radius: 8px;
   outline: 2px solid var(--accent);
@@ -619,6 +770,21 @@ fieldset.question[tabindex="-1"]:focus-visible,
   font-size: 14px;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+/* A question set off from the fields above by a rule; its choices sit close together as one unit. */
+div.question-separated {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+div.question-separated fieldset.question {
+  gap: 0;
+}
+
+div.question-separated .entry-check {
+  min-height: 32px;
 }
 
 fieldset.question legend {
@@ -1138,6 +1304,15 @@ span.note-warn {
     grid-column: 1 / -1;
   }
 
+  .mp-list > li > .dotword {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  .mp-list > li > .mp-dir {
+    grid-row: auto;
+  }
+
   .card-foot {
     flex-direction: column;
     align-items: stretch;
@@ -1515,4 +1690,215 @@ span.note-warn {
 .nb-sources {
   padding-left: 24px;
   list-style: disc;
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.building-status {
+  margin-left: auto;
+  white-space: nowrap;
+  padding-top: 8px;
+}
+
+.facts-grid .icon-btn {
+  width: 32px;
+  height: 32px;
+  margin: -6px 0 -6px 6px;
+}
+
+.facts-grid dd > .plain-list {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.facts-grid dd > .plain-list + .icon-btn {
+  margin-top: -2px;
+}
+
+.facts-grid dd {
+  line-height: 22px;
+}
+
+/* ---- Building card: sections in one aligned label/value grid, and the edit state ---- */
+.spec-section + .spec-section {
+  margin-top: 24px;
+}
+
+.spec-title {
+  margin: 24px 0 4px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--fg);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+.spec {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  margin: 0;
+}
+
+.spec-row {
+  display: contents;
+}
+
+.spec dt,
+.spec dd {
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  line-height: 24px;
+}
+
+.spec-row:first-child dt,
+.spec-row:first-child dd {
+  border-top: 0;
+}
+
+.spec dt {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.spec dd {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.spec .mono {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.building-card.is-editing {
+  border: 2px solid var(--accent);
+}
+
+.edit-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.edit-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.edit-head .error-summary {
+  margin: 12px 0 0;
+}
+
+.spec-locked {
+  color: var(--muted);
+}
+
+.spec .lock,
+.edit-hint .lock {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.spec .lock {
+  margin-left: 8px;
+  vertical-align: -2px;
+}
+
+.spec-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 26rem;
+}
+
+.spec-input .form-control {
+  min-height: 40px;
+  width: 100%;
+}
+
+.spec-input.has-unit {
+  max-width: none;
+}
+
+.spec-input.has-unit .form-control {
+  width: 8rem;
+}
+
+.spec-unit {
+  min-width: 2.5rem;
+  color: var(--muted);
+}
+
+.spec-point {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.spec-point .spec-input {
+  flex: 1 1 14rem;
+}
+
+.spec-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin-bottom: 8px;
+}
+
+.spec-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.spec-radio input {
+  flex: none;
+  margin: 0;
+}
+
+.spec-error {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--bad);
+}
+
+.spec-hint {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .spec {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spec dt {
+    padding-bottom: 0;
+  }
+
+  .spec dd {
+    padding-top: 2px;
+    border-top: 0;
+  }
+
+  .spec-row:first-child dt {
+    border-top: 0;
+  }
 }

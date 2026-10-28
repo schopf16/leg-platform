@@ -169,11 +169,14 @@ class SubmittedPageTests(TestCase):
 
         html = text(client.get(reverse("customer:application_submitted", args=[application.pk])))
 
-        self.assertEqual(html.count("Beispiel Netz AG"), 1)
-        self.assertIn("Ihr Wunschdatum", html)
-        self.assertIn(wish.strftime("%d.%m.%Y"), html)
+        # The short submitted page names the operator in two sentences (forwarding the details, confirming the invitation).
+        self.assertEqual(html.count("Beispiel Netz AG"), 2)
+        # The short page lists no details: the wish and the numbers stand on the card of the page Buildings.
+        self.assertNotIn("Ihr Wunschdatum", html)
+        card = text(client.get(BUILDINGS))
+        self.assertIn(wish.strftime("%d.%m.%Y"), card)
         for point in building.metering_points.all():
-            self.assertIn(numbers.format_metering_point_number(point.number), html)
+            self.assertIn(numbers.format_metering_point_number(point.number), card)
         self.assertNotIn("<progress", html)
 
 

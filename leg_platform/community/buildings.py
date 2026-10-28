@@ -33,6 +33,7 @@ from leg_platform.community.models import (
     Application,
     ApplicationBuilding,
     CustomerBuilding,
+    Direction,
     Location,
     MeteringPoint,
     PersonAssignment,
@@ -345,10 +346,19 @@ def set_building_details(person, location, *, name, description):
     return changed
 
 
-def set_metering_point_name(person, metering_point, name):
+PLANT_FIELDS = ("pv_power_kwp", "battery_kwh", "wallbox_kw")
+
+
+def set_metering_point_name(person, metering_point, name, **figures):
     """The customer's name of one of their metering points (changeable at any time while the account holds it: a CURRENT
-    assignment; a former holder gets ``not_found``; an archived point is read-only)."""
+    assignment; a former holder gets ``not_found``; an archived point is read-only).
+
+    ``figures`` (``pv_power_kwp``, ``battery_kwh``, ``wallbox_kw``; ``None`` clears one) are only for a feed-in point
+    (``plant_data_feed_in_only`` otherwise); they do not touch the application. The history lists the changed field
+    names, never the values. ``ValidationError`` for a negative or too large figure."""
     name = clean_free_text(name, METERING_POINT_NAME_MAX_LENGTH)
+    if set(figures) - set(PLANT_FIELDS):
+        raise ApplicationError("not_allowed")
     with transaction.atomic():
         locked_customer(person)
         own_metering_point(person, metering_point.pk)
@@ -358,11 +368,21 @@ def set_metering_point_name(person, metering_point, name):
             raise ApplicationError("not_found") from None
         if fresh.is_archived:
             raise ApplicationError("not_editable")
-        if fresh.name == name:
+        if figures and fresh.direction != Direction.FEED_IN:
+            raise ApplicationError("plant_data_feed_in_only")
+        changed = []
+        if fresh.name != name:
+            fresh.name = name
+            changed.append("name")
+        for field, value in figures.items():
+            if getattr(fresh, field) != value:
+                setattr(fresh, field, value)
+                changed.append(field)
+        if not changed:
             return False
-        fresh.name = name
-        fresh.save(update_fields=["name", "updated_at"])
-        history.record(fresh, HistoryEvent.METERING_POINT_DATA_CHANGED, person, {"fields": ["name"]})
+        fresh.clean_fields(exclude={"number", "location", "remark"})
+        fresh.save(update_fields=[*changed, "updated_at"])
+        history.record(fresh, HistoryEvent.METERING_POINT_DATA_CHANGED, person, {"fields": changed})
     return True
 
 

@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 
 from leg_platform.community.addressing import home_area
+from leg_platform.customer.access import has_customer_access
 
 from .limits import allow_approximate, allow_request
 from .services import TYPEAHEAD_MINIMUM, lookup
@@ -41,6 +42,9 @@ def address_lookup(request):
             result = lookup(
                 request.POST, mode=mode, home=home, minimum=TYPEAHEAD_MINIMUM,
                 approximate=lambda: allow_approximate(request),
+                # The status line of the customer wizard (D-124) also asks for the EGID of a match: customers only
+                # (active, customer number, second factor), the same rule as the customer pages.
+                building=request.POST.get("building") == "1" and has_customer_access(request),
             )
             response = JsonResponse(result)
         except ValueError:

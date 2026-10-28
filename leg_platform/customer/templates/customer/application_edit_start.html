@@ -1,0 +1,27 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Edit start date" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Edit start date" %}</h1>
+    <p class="start-sub">{% translate "Choose the earliest date or a desired date." %}</p>
+    <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Start date' %}">
+      {% csrf_token %}
+      {% include "customer/_error_summary.html" %}
+      <fieldset class="question">
+        <legend>{% translate "When should it start?" %}</legend>
+        {% for radio in form.start %}
+          <label class="entry-check"><input class="entry-check-input" type="radio" name="start" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}</span></label>
+        {% endfor %}
+      </fieldset>
+      <div class="reveal{% if form.start.value == 'date' %} is-open{% endif %}" data-reveal-name="start" data-reveal-value="date">
+        {% include "customer/_field.html" with field=form.desired_date %}
+      </div>
+      <div class="step-actions">
+        <button type="submit" class="btn btn-primary" data-gate-date="id_desired_date">{% translate "Save" %}</button>
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

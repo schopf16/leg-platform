@@ -478,6 +478,27 @@ def go_to_step(person, application, step):
 # ---- Buildings ----
 
 
+def _look_up_address(person, street, house_number, postal_code, town, egid):
+    """Validate a typed address and ask the directory: ``(address, egid, review)`` (shared by ``choose_building`` and
+    ``edit_submitted_building``; no lock is held while the directory answers).
+
+    An address that the directory does not know (or cannot be asked about now: budget, circuit breaker, failure) is kept
+    as typed, without an EGID, for the review by the LEG; the customer goes on (``review``). Only without an EGID of the
+    person's choice. ``ValidationError`` for an address that fails the rules."""
+    typed = addressing.normalise_address(street, house_number, postal_code, town)
+    probe = Location(street=typed[0], house_number=typed[1], postal_code=typed[2], town=typed[3])
+    probe.clean_fields(exclude={"egid", "address_digest"})
+    egid = None if egid is None else buildings.normalise_egid(egid)
+    review = False
+    try:
+        candidate, new_egid = buildings.offered_building(typed, egid, user=person)
+    except ApplicationError as error:
+        if egid is not None or error.code != "building_not_found" or not error.details.get("review"):
+            raise
+        candidate, new_egid, review = None, None, True
+    return buildings.official_address(candidate, typed), new_egid, review
+
+
 def choose_building(
     person, application, *, street, house_number, postal_code, town, egid=None, name="", description=""
 ):
@@ -491,23 +512,9 @@ def choose_building(
     ``already_in_progress`` (an own application names it), ``building_complete`` (the account has a draw and a feed-in
     there), ``too_many_buildings``; ``ValidationError`` for an address or text that fails the rules. ``name`` and
     ``description`` are the account's own words for the building."""
-    typed = addressing.normalise_address(street, house_number, postal_code, town)
-    probe = Location(street=typed[0], house_number=typed[1], postal_code=typed[2], town=typed[3])
-    probe.clean_fields(exclude={"egid", "address_digest"})
     name = buildings.clean_free_text(name, BUILDING_NAME_MAX_LENGTH)
     description = buildings.clean_free_text(description, BUILDING_DESCRIPTION_MAX_LENGTH)
-    egid = None if egid is None else buildings.normalise_egid(egid)
-    # The directory is read before the transaction starts (no lock is held while it answers). An address that the
-    # directory does not know (or cannot be asked about now: budget, circuit breaker, failure) is kept as typed, without
-    # an EGID, for the review by the LEG; the customer goes on (``review``). Only without an EGID of the person's choice.
-    review = False
-    try:
-        candidate, new_egid = buildings.offered_building(typed, egid, user=person)
-    except ApplicationError as error:
-        if egid is not None or error.code != "building_not_found" or not error.details.get("review"):
-            raise
-        candidate, new_egid, review = None, None, True
-    address = buildings.official_address(candidate, typed)
+    address, new_egid, review = _look_up_address(person, street, house_number, postal_code, town, egid)
     today = timezone.localdate()
     try:
         with transaction.atomic():
@@ -804,3 +811,183 @@ def submit(person, application, *, today=None):
     except buildings.Refusal as refusal:
         buildings.refuse(refusal, person)
     return draft
+
+
+# ---- Single details of a submitted application ("edit in place") ----
+# While the application is SUBMITTED (the LEG has not started the review) the customer changes single details on the
+# page Buildings. Same validation as the wizard; the application stays SUBMITTED (no new submission, no mail, the queue
+# position stays). Every function locks the account and the application row (``start_review`` of the staff locks the
+# same rows, so a change that races a review ends in exactly one of the two) and refuses with ``review_started`` once the
+# LEG is checking (``wrong_state`` in any other state).
+
+
+def can_edit_submitted(application):
+    """True while the customer may change single details (state ``submitted`` only)."""
+    return application.state == Application.State.SUBMITTED
+
+
+def _lock_submitted(person, application):
+    """The application locked, through the account, in state ``submitted``; ``not_found`` for another account's,
+    ``review_started`` when the LEG is checking it, ``wrong_state`` in any other state."""
+    try:
+        return _lock_draft(person, application, states=(Application.State.SUBMITTED,))
+    except ApplicationError as error:
+        if error.code != "not_editable":
+            raise
+        if Application.objects.filter(
+            pk=getattr(application, "pk", None), person=person, state=Application.State.IN_REVIEW
+        ).exists():
+            raise ApplicationError("review_started") from None
+        raise ApplicationError("wrong_state") from None
+
+
+def _touched(application):
+    application.save(update_fields=["updated_at"])
+
+
+def _record_edit(application, person, fields):
+    """History of an edit after the submission: field names only, never values (staff read the history)."""
+    history.record(
+        application, HistoryEvent.METERING_POINT_DATA_CHANGED, person, {"fields": sorted(fields), "after_submission": True}
+    )
+
+
+def edit_submitted_metering_point(
+    person, application, point_id, *, entered_number, name=UNSET, pv_power_kwp=UNSET, battery_kwh=UNSET,
+    wallbox_kw=UNSET,
+):
+    """Change the number (and, when given, the name and the figures) of a point of a submitted application: the same
+    checks as ``replace_metering_point`` (zero-padding, number rules, uniqueness). A changed number puts the application
+    at the back of the queue (new ``submitted_at``) and is entered in the history (field names only)."""
+    number = _full_number(entered_number)
+    try:
+        with transaction.atomic():
+            fresh = locked_customer(person)
+            locked = _lock_submitted(fresh, application)
+            row = _find_row(locked, ApplicationMeteringPoint, point_id, building__application=locked)
+            _check_number(fresh, locked, number, ignore=row)
+            changed = set()
+            if row.number != number:
+                changed.add("number")
+            row.number = number
+            if name is not UNSET:
+                name = buildings.clean_free_text(name, METERING_POINT_NAME_MAX_LENGTH)
+                if row.name != name:
+                    changed.add("name")
+                row.name = name
+            given = {"pv_power_kwp": pv_power_kwp, "battery_kwh": battery_kwh, "wallbox_kw": wallbox_kw}
+            for field, value in given.items():
+                if value is not UNSET:
+                    if getattr(row, field) != value:
+                        changed.add(field)
+                    setattr(row, field, value)
+            _figures(row.direction, row.pv_power_kwp, row.battery_kwh, row.wallbox_kw)
+            row.clean_fields(exclude={"building", "metering_point"})
+            row.save()
+            if "number" in changed:
+                _record_edit(locked, fresh, changed)
+            _touched(locked)
+    except buildings.Refusal as refusal:
+        buildings.refuse(refusal, person)
+    return row
+
+
+def edit_submitted_start(person, application, *, asap=False, desired_date=None, today=None):
+    """Change the start of a submitted application: the checks of ``set_start`` (one of the two, not before
+    ``earliest_start_date``, the contract accepted). A change is entered in the history; the queue position stays."""
+    today = today or timezone.localdate()
+    if bool(asap) == (desired_date is not None):
+        raise ApplicationError("start_invalid")
+    if desired_date is not None and desired_date < earliest_start_date(today):
+        raise ApplicationError("start_invalid", earliest=earliest_start_date(today))
+    with transaction.atomic():
+        fresh = locked_customer(person)
+        locked = _lock_submitted(fresh, application)
+        if not contracts.has_accepted_current(fresh):
+            raise ApplicationError("contract_missing")
+        choice = Application.StartChoice.ASAP if asap else Application.StartChoice.DATE
+        new_date = None if asap else desired_date
+        if (locked.start_choice, locked.desired_start_date) != (choice, new_date):
+            _record_edit(locked, fresh, {"start"})
+        locked.start_choice = choice
+        locked.desired_start_date = new_date
+        locked.save(update_fields=["start_choice", "desired_start_date", "updated_at"])
+    return locked
+
+
+def edit_submitted_bank_connection(person, application, value):
+    """Change the account's IBAN from a submitted application with a feed-in (``step_not_available`` without one):
+    ``own_iban.set_own_iban`` does the validation, the security event, the history and the mail. Returns whether it
+    changed."""
+    with transaction.atomic():
+        fresh = locked_customer(person)
+        locked = _lock_submitted(fresh, application)
+        if not ApplicationMeteringPoint.objects.filter(
+            building__application=locked, direction=Direction.FEED_IN
+        ).exists():
+            raise ApplicationError("step_not_available")
+        changed = own_iban.set_own_iban(fresh, value)
+        _touched(locked)
+    return changed
+
+
+def edit_submitted_building(
+    person, application, building_id, *, street, house_number, postal_code, town, egid=None, name=""
+):
+    """Replace the address of a building of a submitted application (its metering points stay with it): the lookup and
+    the checks of ``choose_building`` (EGID offered by the directory, already added / in progress, the account's own
+    points at the stored building). A building that was fixed by "add a metering point" is ``building_fixed``. Returns
+    ``BuildingChoice``. The row is changed, never a stored ``Location``."""
+    name = buildings.clean_free_text(name, BUILDING_NAME_MAX_LENGTH)
+    address, new_egid, review = _look_up_address(person, street, house_number, postal_code, town, egid)
+    today = timezone.localdate()
+    try:
+        with transaction.atomic():
+            fresh = locked_customer(person)
+            locked = _lock_submitted(fresh, application)
+            row = _find_row(locked, ApplicationBuilding, building_id, application=locked)
+            if row.preselected:
+                raise ApplicationError("building_fixed")
+            siblings = locked.buildings.exclude(pk=row.pk)
+            if new_egid is not None and siblings.filter(egid=new_egid).exists():
+                raise ApplicationError("already_added")
+            if review and siblings.filter(
+                egid__isnull=True, street=address[0], house_number=address[1], postal_code=address[2], town=address[3]
+            ).exists():
+                raise ApplicationError("already_added")
+            location, existing = buildings.resolve(fresh, new_egid, address)
+            others = ApplicationBuilding.objects.filter(
+                application__person=fresh, application__state__in=Application.OPEN_STATES
+            ).exclude(application=locked)
+            if location is not None:
+                if siblings.filter(location=location).exists():
+                    raise ApplicationError("already_added")
+                if others.filter(location=location).exists():
+                    raise ApplicationError("already_in_progress")
+                occupied = buildings.occupied_directions(location, fresh, today)
+                if occupied >= {Direction.CONSUMPTION, Direction.FEED_IN}:
+                    raise ApplicationError("building_complete")
+                if occupied & set(row.metering_points.values_list("direction", flat=True)):
+                    raise ApplicationError("direction_taken")
+                if new_egid is None:
+                    new_egid = location.egid
+                review = review and location.egid is None
+            elif new_egid is not None and others.filter(egid=new_egid).exists():
+                raise ApplicationError("already_in_progress")
+            row.name = name
+            row.egid = new_egid
+            if location is None:
+                row.location = None
+                row.street, row.house_number, row.postal_code, row.town = address
+            else:
+                row.location = location
+                row.street = row.house_number = row.postal_code = row.town = ""
+            row.save()
+            detail = {"building_id": row.pk, "existing": existing, "changed": True}
+            if review:
+                detail["needs_review"] = True
+            history.record(locked, HistoryEvent.APPLICATION_BUILDING_SET, fresh, detail)
+            _touched(locked)
+    except buildings.Refusal as refusal:
+        buildings.refuse(refusal, person)
+    return BuildingChoice(row, existing, review)

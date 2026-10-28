@@ -28,7 +28,7 @@ PROFILE = reverse("accounts:profile")
 BANK = reverse("customer:bank_connection")
 DELETE = reverse("accounts:account_delete")
 LONG_AGO = date.today() - timedelta(days=400)
-HINT = "Die IBAN steht auf Ihrem Konto- oder Zahlungsauszug und auf der Rückseite Ihrer Bankkarte."
+HINT = "Sie finden die IBAN auf Ihrem Konto- oder Zahlungsauszug und auf der Rückseite Ihrer Bankkarte."
 
 
 def active_point(last, person, location, direction=Direction.CONSUMPTION, start=LONG_AGO):

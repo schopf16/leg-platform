@@ -1,4 +1,4 @@
-{% comment %}
+{% load i18n %}{% comment %}
 The notice of the address directory about the address as a whole (D-065, D-066): include it directly
 after the postal code and town row. The element is always in the page and has no content (no white
 space inside), so that a screen reader announces what the script puts into it. The script (static/js/
@@ -6,4 +6,15 @@ address-directory.js) shows at most one paragraph with the class alert-warning, 
 directory is available and does not know the complete address. Nothing else is ever shown here (not
 an unavailable, old or limited directory). It never takes the focus and never blocks saving. Without
 JavaScript it stays empty.
-{% endcomment %}<div class="address-notice" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice role="status">{% if card_template %}{% include card_template %}{% endif %}</div>
+With ``status_line`` (the building step of the customer wizard, D-124) the element is the status line instead: in the flow
+(``.address-status``, never an overlay, a fixed minimum height), a polite live region, and the script writes one of its
+states into it (checking, building found, to be checked by the LEG, several buildings, or the card "Did you mean this
+address?"). The texts for the script are in the ``data-status-*`` attributes.
+{% endcomment %}{% if status_line %}{% translate "LEG" as leg_word %}{% blocktranslate asvar status_review_hint with leg=leg_word %}You can continue. The {{ leg }} will check the address.{% endblocktranslate %}{% translate "EGID" as egid_word %}<div class="address-notice address-status" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice data-status-line role="status" aria-live="polite" aria-atomic="true"
+     data-status-checking="{% translate 'Checking the address …' %}"
+     data-status-found="{% translate 'Building found' %}"
+     data-status-egid="{{ egid_word }} %(egid)s"
+     data-status-review="{% translate 'To be checked by the LEG' %}"
+     data-status-review-hint="{{ status_review_hint }}"
+     data-status-several="{% translate 'Several buildings at this address' %}"
+     data-status-several-hint="{% translate 'Press Continue and choose your building.' %}">{% if card_template %}{% include card_template %}{% endif %}</div>{% else %}<div class="address-notice" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice role="status">{% if card_template %}{% include card_template %}{% endif %}</div>{% endif %}

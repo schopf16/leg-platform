@@ -13,16 +13,19 @@ registration running (warn), deregistration running (bad), draft or ended (muted
 from dataclasses import dataclass, field
 from datetime import date
 
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from leg_platform.community import applications, buildings, grid_operator, labels
+from leg_platform.addresses.models import TransformerStation
+from leg_platform.community import applications, buildings, grid_operator, labels, own_iban
 from leg_platform.community.models import (
     Application,
     CustomerBuilding,
     Deregistration,
     Direction,
     GridOperator,
+    LegAssignment,
     PersonAssignment,
 )
 from leg_platform.community.status import MeteringPointStatus
@@ -84,6 +87,15 @@ class PointRow:
     point_id: int | None = None  # a stored metering point of the account: its name can be changed
     group: tuple = ()  # ("point", id) / ("application", id): rows of one process are adjacent
     block: Block | None = None
+    # The page that changes the number of this point of a SUBMITTED application ("" = no pencil; set only while the
+    # application can be edited in place: state submitted, the LEG has not started the review).
+    edit_url: str = ""
+    figures: dict = field(default_factory=dict)  # the optional figures of a feed-in point: field name -> text ("" = not given)
+    leg_name: str = ""  # the name of the community the LEG administration assigned the point to; "" = not assigned yet
+    # The point of a submitted application the customer may still change (``card_edit``): the application and the row id.
+    application: object = None
+    application_point_id: int | None = None
+    form: object = None  # set by ``card_edit`` while the card is in edit mode
 
     @property
     def direction_label(self):
@@ -108,6 +120,10 @@ class Card:
     title: str = ""
     address: str = ""
     egid: int | None = None
+    name: str = ""  # the name the person gave the building ("" = none)
+    leg_name: str = ""  # the community of the building's metering points ("" = not assigned yet)
+    feed_in: object = None  # the feed-in PointRow, if the building has one
+    transformer: str = ""  # name of the transformer circuit of the building from the address directory ("" = unknown)
     description: str = ""
     has_name: bool = False
     state: str = "ended"
@@ -124,6 +140,27 @@ class Card:
     change_pk: int | None = None  # a submitted application the LEG has not taken into review yet: "Change application"
     review_locked: bool = False  # the LEG is checking it: the card says that it can no longer be changed here
     deregistrable: bool = False  # an active point that is in no deregistration
+    # Edit pages of a SUBMITTED application (D: edit in place), keys ``address`` / ``start`` / ``bank``; a key is present
+    # only while the application can be edited (state submitted) and the detail applies (no address for a fixed
+    # building, no bank connection without a feed-in). Empty dict = no pencil. The page checks again on the server.
+    edit: dict = field(default_factory=dict)
+    start_text: str = ""  # the chosen start of a submitted / in-review application ("As soon as possible" / "Desired date: ...")
+    iban_masked: str = ""  # the account's IBAN, masked, where the application has a feed-in
+    edit_application: object = None  # the submitted application whose address / start the card may change
+    can_edit: bool = False  # set by ``card_edit.mark``: something on the card can be changed in place
+    editing: object = None  # the ``card_edit.EditState`` while the card is shown in edit mode
+
+    @property
+    def has_status_blocks(self):
+        """Whether a registration progress block (not a deregistration) is shown in the status part."""
+        return bool(self.extra_blocks) or any(
+            row.block is not None and row.block.kind != "deregistration" for row in self.rows
+        )
+
+    @property
+    def edit_id(self):
+        """The id of the card in ``?edit=<id>``: the kind and the number of its key."""
+        return f"{self.key[0][0]}{self.key[1]}"
 
     @property
     def withdraw_in_footer(self):
@@ -136,6 +173,7 @@ class Overview:
     cards: list
     operator_name: str
     can_deregister: bool
+    editing_id: str = ""  # the card shown in edit mode ("" = none); only one at a time
 
 
 def _lines(address, name):
@@ -206,6 +244,15 @@ def _deregistration_block(deregistration):
     )
 
 
+def _figures(point):
+    """The optional figures of a point as text per field name; "" where nothing is given."""
+    values = {}
+    for name in ("pv_power_kwp", "battery_kwh", "wallbox_kw"):
+        value = getattr(point, name, None)
+        values[name] = "" if value is None else format(value.normalize(), "f")
+    return values
+
+
 def _stored_row(assignment, point, deregistration, today):
     status = point.status(today)
     since = point.start_date or assignment.valid_from
@@ -229,7 +276,7 @@ def _stored_row(assignment, point, deregistration, today):
         state, tone, label = REGISTERING, WARN, _("Registration running")
     return PointRow(
         number=point.number or "", name=point.name, direction=point.direction, since=since, state=state, tone=tone,
-        label=label, point_id=point.pk, group=("point", point.pk),
+        label=label, point_id=point.pk, group=("point", point.pk), figures=_figures(point),
     )
 
 
@@ -243,9 +290,50 @@ def _application_state(application):
     return AT_OPERATOR, WARN, _("Registration running")
 
 
+def _masked_iban(person):
+    """The account's IBAN with the middle hidden (the first and the last four characters show), "" if none."""
+    value = own_iban.own_iban(person)
+    if len(value) < 12:
+        return ""
+    return f"{value[:4]} •••• •••• {value[-4:]}"
+
+
+def _start_text(application):
+    if application.start_choice == Application.StartChoice.DATE and application.desired_start_date:
+        return _("Desired date") + ": " + application.desired_start_date.strftime("%d.%m.%Y")
+    if application.start_choice == Application.StartChoice.ASAP:
+        return _("As soon as possible")
+    return ""
+
+
+def _edit_details(card, application, building, editable, iban_text):
+    """The facts and edit URLs of a submitted / in-review registration for the card (see ``Card.edit``)."""
+    if application.state not in (Application.State.SUBMITTED, Application.State.IN_REVIEW):
+        return
+    card.start_text = card.start_text or _start_text(application)
+    has_feed_in = any(point.direction == Direction.FEED_IN for point in building.metering_points.all())
+    if has_feed_in:
+        card.iban_masked = card.iban_masked or iban_text()
+    if not editable:
+        return
+    card.edit_application = application
+    if not building.preselected:
+        card.edit["address"] = reverse("customer:application_edit_address", args=[application.pk, building.pk])
+    card.edit["start"] = reverse("customer:application_edit_start", args=[application.pk])
+    if has_feed_in:
+        card.edit["bank"] = reverse("customer:application_edit_bank", args=[application.pk])
+
+
 def build(person, today=None):
     """The ``Overview`` of the account."""
     today = today or timezone.localdate()
+    iban_cache = []
+
+    def iban_text():
+        if not iban_cache:
+            iban_cache.append(_masked_iban(person))
+        return iban_cache[0]
+
     operator = GridOperator.objects.filter(pk=1).values_list("name", flat=True).first() or ""
     # The word in sentences ("Registration at %(operator)s"): the name, or the neutral word while none is entered.
     operator_text = operator or str(grid_operator.FALLBACK)
@@ -293,14 +381,19 @@ def build(person, today=None):
             card.building = card.building or building
             card.application_states.append(state)
             card.application_labels.append(label)
+            editable = applications.can_edit_submitted(application)
             rows = [
                 PointRow(
                     number=point.number, name=point.name, direction=point.direction, since=started, state=state,
-                    tone=tone, label=label, group=("application", application.pk),
+                    tone=tone, label=label, group=("application", application.pk), figures=_figures(point),
+                    edit_url=reverse("customer:application_edit_point", args=[application.pk, point.pk]) if editable else "",
+                    application=application if editable else None,
+                    application_point_id=point.pk if editable else None,
                 )
                 for point in building.metering_points.all()
             ]
             rows.sort(key=lambda row: row.direction != Direction.CONSUMPTION)
+            _edit_details(card, application, building, editable, iban_text)
             if rows:
                 rows[-1].block = block
             elif block not in card.extra_blocks:
@@ -317,7 +410,21 @@ def build(person, today=None):
     for row, row_dereg in seen_deregistrations.values():
         row.block = _deregistration_block(row_dereg)
 
+    leg_of = {}
+    for leg_assignment in LegAssignment.objects.not_ended(today).filter(
+        metering_point__in=[row.point_id for card in cards.values() for row in card.rows if row.point_id]
+    ).select_related("leg"):
+        leg_of.setdefault(leg_assignment.metering_point_id, leg_assignment.leg.name)
+    for card in cards.values():
+        for row in card.rows:
+            row.leg_name = leg_of.get(row.point_id, "") if row.point_id else ""
+
     result = [_finish(card, person, own_words, today) for card in cards.values()]
+    transformers = dict(
+        TransformerStation.objects.filter(egid__in=[card.egid for card in result if card.egid]).values_list("egid", "name")
+    )
+    for card in result:
+        card.transformer = transformers.get(card.egid, "") if card.egid else ""
     result.sort(key=lambda card: (card.location is None and card.building is None, card.title.casefold()))
     return Overview(result, operator, any(card.deregistrable for card in result))
 
@@ -341,6 +448,9 @@ def _finish(card, person, own_words, today):
     else:
         card.title, card.address = _lines(address, name)
     card.has_name = bool(name)
+    card.leg_name = next((row.leg_name for row in card.rows if row.leg_name), "")
+    card.feed_in = next((row for row in card.rows if row.direction == Direction.FEED_IN), None)
+    card.name = name
 
     states = {row.state for row in card.rows}
     stored = [row for row in card.rows if row.group and row.group[0] == "point"]

@@ -181,6 +181,7 @@ class BuildingStepTests(WizardCase):
         super().setUp()
         self.application = applications.start_draft(self.mine)
         self.url = step_url(self.application, "building")
+        self.step2 = step_url(self.application, "metering_points")
 
     def test_the_input_state_has_the_fields_the_progress_and_the_two_buttons(self):
         html = text(self.client.get(self.url))
@@ -196,16 +197,20 @@ class BuildingStepTests(WizardCase):
     def test_a_found_building_is_chosen_and_shown_with_its_address_and_egid(self):
         with directory(candidate(90004269)):
             response = self.client.post(self.url, {**ADDRESS_FORM, "name": "Wohnhaus"})
-        self.assertRedirects(response, self.url)
+        self.assertRedirects(response, self.step2, fetch_redirect_response=False)
         row = self.application.buildings.get()
         self.assertEqual((row.egid, row.name), (90004269, "Wohnhaus"))
-        html = text(self.client.get(self.url))
+        html = text(self.client.get(self.step2))
         self.assertIn("Gebäude gefunden", html)
         self.assertIn("Ittigenstrasse 51, 3063 Ittigen", html)
         self.assertIn("EGID 90004269", html)
         self.assertNotIn("schon angelegt", html)
-        self.assertIn(reverse("customer:application", args=[self.application.pk]), html)
-        self.assertIn(">Anderes Gebäude wählen<", html)
+        # The notice is shown once: the session holds only the application id (D-124).
+        self.assertNotIn("Gebäude gefunden", text(self.client.get(self.step2)))
+        # The page of step 1 stays as the fallback and offers the way back.
+        fallback = text(self.client.get(self.url))
+        self.assertIn(reverse("customer:application", args=[self.application.pk]), fallback)
+        self.assertIn(">Anderes Gebäude wählen<", fallback)
 
     def test_an_existing_building_is_attached_to_and_the_customer_is_told(self):
         existing = make_location("Ittigenstrasse", "51", "3063", "Ittigen", egid=90004269)
@@ -230,7 +235,7 @@ class BuildingStepTests(WizardCase):
         self.assertFalse(self.application.buildings.exists())
         with directory(*two):
             chosen = self.client.post(self.url, {**ADDRESS_FORM, "egid": "90004270"})
-        self.assertRedirects(chosen, self.url)
+        self.assertRedirects(chosen, self.step2, fetch_redirect_response=False)
         self.assertEqual(self.application.buildings.get().egid, 90004270)
 
     def test_a_building_that_is_not_found_is_a_red_state_with_the_owners_text_and_nothing_is_stored(self):
@@ -243,7 +248,8 @@ class BuildingStepTests(WizardCase):
             "Diese Adresse konnte nicht eindeutig einem Gebäude zugeordnet werden. Bitte prüfen Sie die Eingabe oder wenden Sie sich an die LEG.",
             html,
         )
-        self.assertIn("is-error", html)
+        self.assertNotIn("is-error", html)
+        self.assertIn("note-warn", html)  # no red state on this page (D-124)
         self.assertFalse(self.application.buildings.exists())
 
     def test_an_address_that_needs_a_review_is_kept_for_the_leg_and_the_customer_goes_on(self):
@@ -261,15 +267,17 @@ class BuildingStepTests(WizardCase):
                     buildings, "suggest_candidates", return_value=[]
                 ):
                     response = self.client.post(self.url, ADDRESS_FORM)
-                self.assertRedirects(response, self.url)
+                self.assertRedirects(response, self.step2, fetch_redirect_response=False)
                 row = self.application.buildings.get()
                 self.assertEqual((row.egid, row.street, row.town), (None, "Ittigenstrasse", "Ittigen"))
-                page = text(self.client.get(self.url))
-                self.assertIn("Wird von der LEG geprüft", page)
-                self.assertIn("Diese Adresse wurde im Gebäuderegister noch nicht gefunden. Die LEG prüft sie. Sie können weitermachen.", page)
-                self.assertIn(reverse("customer:application", args=[self.application.pk]), page)
-                # The next step is open: the customer can continue with the metering points.
-                self.assertEqual(self.client.get(step_url(self.application, "metering_points")).status_code, 200)
+                page = text(self.client.get(self.step2))
+                self.assertIn("Adresse nicht in der Datenbank gefunden", page)
+                self.assertIn("prüft diese Adresse", page)
+                # The step page itself is open and the fallback page of step 1 still says the whole sentence.
+                self.assertIn(
+                    "Diese Adresse wurde im Gebäuderegister noch nicht gefunden.", text(self.client.get(self.url))
+                )
+                self.assertEqual(self.client.get(self.step2).status_code, 200)
 
     def test_a_visitor_who_cannot_be_asked_stays_an_error_and_nothing_is_stored(self):
         from leg_platform.addresses import buildings as directory_module
@@ -309,7 +317,9 @@ class BuildingStepTests(WizardCase):
         # The server's card is INSIDE the notice of the address widget (card_template), the one overlay of the script; there
         # is no second card in the page and no card class of the old layout.
         self.assertRegex(
-            html, r'<div class="address-notice" id="address-notice" data-address-notice role="status">\s*<div class="suggest address-proposal"',
+            html,
+            r'<div class="address-notice address-status" id="address-notice" data-address-notice data-status-line '
+            r'role="status"[^>]*>\s*<div class="suggest address-proposal"',
         )
         self.assertEqual(html.count("address-proposal-keep"), 1)
         self.assertEqual(html.count('class="suggest address-proposal"'), 1)
@@ -323,7 +333,7 @@ class BuildingStepTests(WizardCase):
         suggestion = candidate(90004269, street="Ittigenstrasse")
         with directory(candidate(90004269), suggestions=[suggestion]):
             response = self.client.post(self.url, {**ADDRESS_FORM, "street": "Ittigenstrase", "suggestion": "0"})
-        self.assertRedirects(response, self.url)
+        self.assertRedirects(response, self.step2, fetch_redirect_response=False)
         self.assertEqual(self.application.buildings.get().street, "Ittigenstrasse")
 
     def test_a_forged_suggestion_number_is_no_building(self):
@@ -335,7 +345,7 @@ class BuildingStepTests(WizardCase):
     def test_my_entry_is_correct_goes_on_to_the_search_without_suggestions(self):
         with directory(candidate(90004269), suggestions=[candidate(90004269)]) as lookup:
             response = self.client.post(self.url, {**ADDRESS_FORM, "confirm_typed": "1"})
-        self.assertRedirects(response, self.url)
+        self.assertRedirects(response, self.step2, fetch_redirect_response=False)
         lookup.assert_called()
 
     def test_a_chosen_building_can_be_changed_but_a_preselected_one_cannot(self):
@@ -417,12 +427,12 @@ class MeteringPointStepTests(WizardCase):
         html = text(self.client.get(self.url))
         for marker in (
             "Schritt 2: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?",
-            "Der Messpunkt ist der Anschluss Ihres Stromzählers.", f"Seine Nummer beginnt mit CH{IDENTIFIER}.",
-            "Messpunkt-Nummer für den Bezug", f">CH{IDENTIFIER}<",
-            "Die Nummer finden Sie auf Ihrer Stromrechnung, bei den Angaben zu Ihrer Bezugsstelle.",
+            "Weisen Sie Ihrem Gebäude die Messpunkte zu.", "Ihren Stromverbrauch?", f">CH{IDENTIFIER}<",
+            "Auf Ihrer Stromrechnung bei der Bezugsstelle, auch Messpunkt-ID genannt (nicht die kürzere Zählernummer).",
+            f"Sie beginnt mit CH{IDENTIFIER}, das ist schon eingetragen.",
             "Name des Messpunkts", "z. B. Wohnhaus", "Speisen Sie Solarstrom ein?", ">Nein<", ">Ja<",
-            "Messpunkt-Nummer für die Einspeisung",
-            "Die Nummer finden Sie in den Unterlagen Ihres Netzbetreibers, bei den Angaben zu Ihrer Einspeisestelle.",
+            "Ihre Solarstrom-Einspeisung?",
+            "In den Unterlagen Ihres Netzbetreibers bei der Einspeisestelle, auch Messpunkt-ID genannt",
             "Diese Angaben sind freiwillig und dienen nur der Statistik.", ">Einspeisung<",
             "PV-Leistung in kWp", "Batteriespeicher in kWh", "Wallbox in kW",
             'data-reveal-name="feed_in"',
@@ -440,8 +450,8 @@ class MeteringPointStepTests(WizardCase):
 
         from leg_platform.customer.forms import MeteringPointsForm
 
-        tail = {"de-ch": "Sie heisst auch Messpunkt-ID und ist nicht die kürzere Zählernummer.",
-                "fr": "Il s’appelle aussi ID du point de mesure", "it": "Si chiama anche ID del punto di misura"}
+        tail = {"de-ch": "auch Messpunkt-ID genannt (nicht die kürzere Zählernummer)",
+                "fr": "aussi appelé ID du point de mesure", "it": "chiamato anche ID del punto di misura"}
         for language, ending in tail.items():
             with translation.override(language):
                 form = MeteringPointsForm()
@@ -450,6 +460,25 @@ class MeteringPointStepTests(WizardCase):
             self.assertIn(ending, feed_in)
             self.assertNotEqual(draw, feed_in)
             self.assertNotIn("ß", draw + feed_in)
+
+    def test_the_prefill_of_the_pv_power_comes_from_the_plant_register_and_a_failure_means_no_prefill(self):
+        from decimal import Decimal
+        from unittest.mock import patch
+
+        from django.db import DatabaseError
+        from django.utils.connection import ConnectionDoesNotExist
+
+        self.assertTrue(self.building.egid)
+        with patch("leg_platform.customer.wizard.plant_lookup.pv_power_kw", return_value=Decimal("12.50")):
+            self.assertIn('value="12.5"', text(self.client.get(self.url)).replace("12,5", "12.5"))
+        for error in (DatabaseError("detail"), ConnectionDoesNotExist("detail")):
+            with self.subTest(type(error).__name__), patch(
+                "leg_platform.customer.wizard.plant_lookup.pv_power_kw", side_effect=error
+            ), self.assertLogs("leg_platform.customer.wizard", level="WARNING") as logged:
+                response = self.client.get(self.url)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn(str(self.building.egid), "".join(logged.output))
+                self.assertNotIn("12.5", text(response))
 
     def test_a_draw_only(self):
         response = self.client.post(self.url, {"draw_number": "12345", "draw_name": "Wohnhaus", "feed_in": "no"})
@@ -544,9 +573,9 @@ class MeteringPointStepTests(WizardCase):
         application = applications.start_draft(self.mine, location=location)
         url = step_url(application, "metering_points")
         html = text(self.client.get(url))
-        self.assertNotIn("Messpunkt-Nummer für den Bezug", html)
+        self.assertNotIn("Ihren Stromverbrauch?", html)
         self.assertNotIn("Speisen Sie Solarstrom ein?", html)
-        self.assertIn("Messpunkt-Nummer für die Einspeisung", html)
+        self.assertIn("Ihre Solarstrom-Einspeisung?", html)
         response = self.client.post(url, {"feed_in_number": "91", "pv_power_kwp": "7"})
         self.assertRedirects(response, step_url(application, "bank_connection"), fetch_redirect_response=False)
         self.assertEqual(application.buildings.get().metering_points.get().direction, Direction.FEED_IN)
@@ -564,7 +593,9 @@ class BankStepTests(WizardCase):
         for marker in (
             "Schritt 3 von 5: Bank- oder Postverbindung", "Wohin sollen wir Ihre Vergütung überweisen?",
             "Damit bezahlen wir Ihnen die Vergütung für den eingespeisten Strom.",
-            "IBAN", "CH93 0076 2011 6238 5295 7", "Die IBAN steht auf Ihrem Konto- oder Zahlungsauszug und auf der Rückseite Ihrer Bankkarte.",
+            "IBAN", "CH93 0076 2011 6238 5295 7",
+            "Wir brauchen Ihre IBAN nur, um Ihnen die Vergütung für den eingespeisten Strom auszuzahlen.",
+            "Sie finden die IBAN auf Ihrem Konto- oder Zahlungsauszug und auf der Rückseite Ihrer Bankkarte.",
             'autocomplete="off"',
         ):
             self.assertIn(marker, html)
@@ -701,7 +732,8 @@ class StartDateStepTests(WizardCase):
         ):
             self.assertIn(marker, html)
         self.assertRegex(html, r'value="asap" checked|checked[^>]*value="asap"')
-        self.assertNotRegex(html, r'type="date"[^>]*value="\d')
+        # The date field holds the earliest possible day, so a person who chooses "date" has a valid start (wizard.py).
+        self.assertRegex(html, r'type="date"[^>]*value="\d')
         self.assertRegex(html, r'type="date"[^>]*min="\d{4}-\d\d-\d\d"|min="\d{4}-\d\d-\d\d"[^>]*type="date"')
 
     def test_as_soon_as_possible_submits_and_shows_the_page_once(self):
@@ -767,30 +799,21 @@ class SubmittedAndWithdrawTests(WizardCase):
     def test_the_page_shows_the_five_steps_the_details_and_the_two_buttons_once(self):
         html = text(self.client.get(self.submitted))
         for marker in (
-            "Ihre Anmeldung ist abgeschickt",
-            "Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei Netzbetreiber an. Danach erhalten Sie eine E-Mail vom Netzbetreiber. Bitte bestätigen Sie die Anmeldung dort.",
+            "Ihre Anmeldung ist abgeschickt", "Vielen Dank. Wir haben Ihre Anmeldung erhalten.",
             "So geht es weiter", "Angaben abgeschickt", "Prüfung durch die LEG", "Anmeldung beim Netzbetreiber",
-            "Sie bestätigen die Anfrage in der E-Mail vom Netzbetreiber", "Wird vom Netzbetreiber festgelegt",
-            "Bitte bestätigen Sie die Anmeldung innerhalb von 14 Tagen nach der E-Mail vom Netzbetreiber.",
-            "Ihre Angaben", "Ittigenstrasse 51", "EGID 90004269",
-            "Bezug", "Einspeisung", "Startdatum", "So bald wie möglich",
-            "Sie können Ihre Angaben noch ändern, bis die LEG mit der Prüfung beginnt.",
-            ">Zur Startseite<", ">Anmeldung ändern<", ">Anmeldung zurückziehen<",
-            "Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim Netzbetreiber eingereicht hat.",
+            "Sie bestätigen die Einladung in Ihrem Konto beim Netzbetreiber", "Wird vom Netzbetreiber festgelegt",
+            "Die LEG-Verwaltung leitet Ihre Angaben an Ihren Netzbetreiber",
+            "Bitte bestätigen Sie die Einladung innerhalb von 14 Tagen.",
+            "Wenn Sie nicht bestätigen, wird die Anmeldung automatisch rückgängig gemacht und es entstehen Ihnen keine Kosten.",
+            ">Zu meinen Gebäuden<",
         ):
             self.assertIn(marker, html)
-        self.assertNotIn("Änderungen sind jetzt nur noch über die LEG möglich.", html)
-        # N-09: every point with its number (the customer can check what was typed), the operator named once, no bar.
-        for point in self.building.metering_points.all():
-            self.assertIn(numbers.format_metering_point_number(point.number), html)
-        self.assertNotIn("<progress", html)
-        # One list, no second count (W1-14): the bar only; the old words are gone.
-        self.assertNotIn("step-note", html)
-        for gone in ("Kundenanfrage durch", "Warten auf Startdatum", "Bestätigung durch Netzbetreiber offen"):
+        # The page is short: no details, no change or withdraw button (they are on the page Buildings), no bar.
+        for gone in ("Ittigenstrasse", "EGID", ">Anmeldung ändern<", ">Anmeldung zurückziehen<", "<progress", "step-note"):
             self.assertNotIn(gone, html)
-        self.assertIn(f'href="{HOME}"', html)
-        # No button for another building: a further one is made with "Start registration" on the page Buildings.
-        self.assertNotIn("weiteres Gebäude", html)
+        self.assertIn(f'href="{BUILDINGS}"', html)
+        for old in ("Kundenanfrage durch", "Warten auf Startdatum", "Bestätigung durch Netzbetreiber offen", "weiteres Gebäude"):
+            self.assertNotIn(old, html)
 
     def test_the_days_come_from_the_settings(self):
         ManagementSettings.objects.filter(id=1).update(operator_confirmation_days=9)
@@ -835,7 +858,7 @@ class SubmittedAndWithdrawTests(WizardCase):
         self.assertEqual(Application.objects.get(pk=self.application.pk).state, Application.State.IN_REVIEW)
         # The card says why there is no button; the withdrawal stays as documented (until the grid operator started).
         page = text(self.client.get(BUILDINGS))
-        self.assertIn("Die LEG prüft Ihre Anmeldung. Sie können sie hier nicht mehr ändern.", page)
+        self.assertIn("Darum können Sie die Anmeldung nicht mehr ändern.", page)
         self.assertNotIn(url, page)
 
     def test_the_change_is_refused_for_a_draft_a_foreign_application_and_after_the_registration_started(self):

@@ -53,6 +53,7 @@ MESSAGES = {
     "wrong_state": _("This is not possible any more."),
     "step_not_available": _("This step is not available yet."),
     "building_fixed": _("This building is fixed and cannot be changed."),
+    "already_added": _("This building is already part of your application."),
     "rate_limited": _("You changed your bank connection too often. Please try again later."),
     "iban_required": _("Enter your IBAN."),
     "not_active_yet": NOT_DEREGISTRABLE,

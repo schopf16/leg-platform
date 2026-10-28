@@ -10,7 +10,7 @@
     </div>
     {% if overview.cards %}
       <div class="head-actions">
-        <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% translate "Start application" %}</button></form>
+        <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% if overview.cards|length > 1 %}{% translate "Add another building" %}{% else %}{% translate "Add new building" %}{% endif %}</button></form>
         {% if can_deregister %}<a class="btn btn-danger-outline" href="{{ deregistration_url }}">{% translate "Start deregistration" %}</a>{% endif %}
       </div>
     {% endif %}

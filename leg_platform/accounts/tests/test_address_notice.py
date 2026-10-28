@@ -92,7 +92,7 @@ class ScriptRuleTests(SimpleTestCase):
         self.assertNotIn("alert-info", CODE)
         self.assertRegex(CODE, r"Boolean\(text\.directoryMissing\) && Boolean\(data\)")
         self.assertRegex(CODE, r'data\.status === "available" && data\.match === false')
-        self.assertRegex(CODE, r"if \(!answer \|\| !answer\.ok\) return;")
+        self.assertRegex(CODE, r"if \(!answer\.ok\) \{\s*if \(statusMode\) showReview\(\);\s*return;")
 
     def test_a_form_without_a_country_field_names_a_fixed_country_and_the_lookup_stays_swiss_only(self):
         self.assertIn("widget.dataset.countryValue", CODE)

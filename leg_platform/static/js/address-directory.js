@@ -38,6 +38,8 @@
   const MAX_OPTIONS = 7;
   const SUGGEST_DELAY = 200;
   const CHECK_DELAY = 1000;
+  const STATUS_CHECK_DELAY = 600; // the status line of the customer wizard (D-124)
+  const STATUS_PENDING_DELAY = 400; // "Checking the address …" only after this long
   const RETRY_DELAY = 800;
 
   // One pass over the template: each "%(name)s" is replaced by its value, and a value is never
@@ -97,6 +99,7 @@
     const addressFields = [fields.street, fields.house_number, fields.postal_code, fields.locality];
 
     let checkTimer;
+    let pendingTimer; // status line: "Checking the address …" only when the answer takes a moment (D-124)
     let pausedUntil = 0; // set by a 429 answer: no request before this time (M-4)
     const timers = {};
     const channels = {
@@ -141,9 +144,44 @@
     const hideNotice = (force) => {
       if (!notice) return;
       if (notice.dataset.kind === "directory" && !force) return;
+      clearTimeout(pendingTimer);
       notice.replaceChildren();
       delete notice.dataset.kind;
       describe(false);
+    };
+    // The status line of the customer wizard (D-124): the notice is in the flow and holds one state at a time, always a
+    // dot and a word (the colour is never alone). It is display only: the wizard works out the building again on submit.
+    const statusMode = Boolean(notice) && notice.dataset.statusLine !== undefined;
+    const status = statusMode ? notice.dataset : {};
+    const checkDelay = statusMode ? STATUS_CHECK_DELAY : CHECK_DELAY;
+    const showStatus = (tone, title, detail) => {
+      clearTimeout(pendingTimer);
+      const box = make("div", "address-status-box");
+      const word = make("p", "dotword");
+      const dot = make("span", `dot tone-${tone}`);
+      dot.setAttribute("aria-hidden", "true");
+      word.append(dot, document.createTextNode(title));
+      box.append(word);
+      if (detail) box.append(make("p", "muted", detail));
+      notice.replaceChildren(box);
+      notice.dataset.kind = "status";
+    };
+    const showReview = () => showStatus("warn", status.statusReview, status.statusReviewHint);
+    // "No, my address is correct" in the status line is sent as the flag the server already knows (``confirm_typed``): the
+    // server then asks no more about similar addresses; it still works out the building itself.
+    const setConfirmed = (on) => {
+      if (!statusMode) return;
+      const existing = form.querySelector("input[data-address-confirm]");
+      if (!on) {
+        if (existing) existing.remove();
+      } else if (!existing) {
+        const input = make("input");
+        input.type = "hidden";
+        input.name = "confirm_typed";
+        input.value = "1";
+        input.dataset.addressConfirm = "";
+        form.append(input);
+      }
     };
     const showNotice = (level, message, kind) => {
       if (!notice || !message) return;
@@ -159,6 +197,7 @@
     const directoryProblem = (data) =>
       Boolean(text.directoryMissing) && Boolean(data) && (data.status === "missing" || data.status === "unavailable");
     const noteDirectory = (data) => {
+      if (statusMode) return; // the status line says what the directory could not do (check)
       if (directoryProblem(data)) showNotice("secondary", text.directoryMissing, "directory");
       else if (data && data.status === "available" && notice && notice.dataset.kind === "directory") hideNotice(true);
     };
@@ -247,6 +286,7 @@
 
     // Abort what is in flight and make its answer stale.
     const invalidate = () => {
+      setConfirmed(false); // every change of the values (typed, chosen or filled) ends a "my address is correct"
       Object.values(channels).forEach((channel) => {
         channel.version += 1;
         if (channel.controller) channel.controller.abort();
@@ -254,6 +294,7 @@
     };
     const cancelTimers = () => {
       clearTimeout(checkTimer);
+      clearTimeout(pendingTimer);
       Object.keys(timers).forEach((name) => clearTimeout(timers[name]));
     };
 
@@ -266,6 +307,8 @@
       if (Date.now() < pausedUntil) return null; // after a 429 no request until the pause has passed (M-4)
       channel.controller = new AbortController();
       const body = new URLSearchParams({mode});
+      // The status line also asks for the EGID of a match (display only; signed-in accounts, D-124).
+      if (statusMode && mode === "check") body.set("building", "1");
       // The town and the postal code ask only for themselves.
       const names = mode === "locality" ? ["postal_code", "locality", "country"] : Object.keys(fields);
       names.forEach((name) => {
@@ -429,7 +472,7 @@
       say(message);
       // The filled value completes the address: it is checked like a typed one, after the usual pause.
       clearTimeout(checkTimer);
-      checkTimer = setTimeout(() => check(false), CHECK_DELAY);
+      checkTimer = setTimeout(() => check(false), checkDelay);
     };
 
     const resolve = async (source) => {
@@ -505,7 +548,12 @@
     };
     const keepEntered = () => {
       dismissed.add(signature());
-      hideNotice();
+      if (statusMode) {
+        setConfirmed(true);
+        showReview();
+      } else {
+        hideNotice();
+      }
       say(text.proposalKept);
       (lastField || fields.street).focus();
     };
@@ -538,13 +586,55 @@
       reveal(card);
     };
 
+    // The status line (D-124): one state for each answer of the check. A complete address that the directory knows is
+    // "Building found" with the EGID when there is exactly one; several buildings and everything the directory cannot
+    // answer is the yellow "To be checked by the LEG" (never red, never a block: the person can always continue).
+    const renderStatus = (data) => {
+      clearTimeout(pendingTimer);
+      if (!data || data.status !== "available") {
+        showReview();
+        return;
+      }
+      if (data.match === true) {
+        if (data.egid) showStatus("ok", status.statusFound, fill(status.statusEgid, {egid: data.egid}));
+        else if (data.buildings > 1) showStatus("warn", status.statusSeveral, status.statusSeveralHint);
+        else showReview();
+        return;
+      }
+      if (dismissed.has(signature())) {
+        setConfirmed(true);
+        showReview();
+        return;
+      }
+      const proposals = Array.isArray(data.proposals) ? data.proposals.slice(0, 3) : [];
+      if (proposals.length) showProposal(data.reason, proposals);
+      else if (whole()) showReview();
+      else hideNotice();
+    };
+
     // ``atLoad``: the form was just opened (the person clicked "Edit"). Then an address that is not
     // found also fills the panel, so that the suggestions are ready next to the notice. Only the
     // not-found notice is shown to everybody; the state of the directory only to staff (D-066, D-111).
     const check = async (atLoad, retried = false) => {
-      if (!complete()) return;
+      if (!complete()) {
+        if (statusMode) hideNotice();
+        return;
+      }
+      if (statusMode && !retried) {
+        clearTimeout(pendingTimer);
+        pendingTimer = setTimeout(() => showStatus("muted", status.statusChecking), STATUS_PENDING_DELAY);
+      }
       const answer = await send("check");
-      if (!answer || !answer.ok) return;
+      if (!answer) {
+        // A stale answer says nothing (a newer check has its own timer); a pause after a 429 is the one case without a
+        // newer check: the person goes on and the LEG checks.
+        if (statusMode && Date.now() < pausedUntil) showReview();
+        return;
+      }
+      if (!answer.ok) {
+        if (statusMode) showReview();
+        return;
+      }
       const data = answer.data;
       if (data && data.status === "unavailable" && !retried) {
         // Busy for a moment (a slow request at the same time): ask once more, silently.
@@ -553,6 +643,10 @@
         return;
       }
       noteDirectory(data);
+      if (statusMode) {
+        renderStatus(data);
+        return;
+      }
       if (data && data.status === "available" && data.match === false && data.warning) {
         // Said "No, my address is correct" for exactly these inputs: nothing more is said.
         if (dismissed.has(signature())) return;
@@ -586,7 +680,7 @@
       if (name === "postal_code") autoFilled.postal_code = false;
       if (name === "locality") autoFilled.locality = false;
       if (!isSwiss()) hideAll();
-      checkTimer = setTimeout(() => check(false), CHECK_DELAY);
+      checkTimer = setTimeout(() => check(false), checkDelay);
       // The street asks for suggestions; the house number only narrows a list that is open. The postal code asks
       // when it is complete, the town from three characters. A panel stays until the answer arrives, so it does
       // not flicker.
@@ -646,7 +740,7 @@
     });
     // Escape closes the card (and the notice) when no list is open; the form can be sent at any time.
     const closeCard = () => {
-      if (!notice || notice.dataset.kind === "directory") return;
+      if (!notice || notice.dataset.kind === "directory" || notice.dataset.kind === "status") return;
       if (notice.firstElementChild) {
         hideNotice();
         (lastField || fields.street).focus({preventScroll: true});
@@ -690,7 +784,7 @@
             event.preventDefault();
             event.stopPropagation();
             hide(combo);
-          } else if (notice && notice.firstElementChild && notice.dataset.kind !== "directory") {
+          } else if (notice && notice.firstElementChild && notice.dataset.kind !== "directory" && notice.dataset.kind !== "status") {
             event.preventDefault();
             hideNotice();
           }

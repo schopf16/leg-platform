@@ -1,16 +1,32 @@
 {% extends "customer/wizard_base.html" %}
-{% load i18n %}
+{% load i18n customer_ui %}
 {% block heading %}{% translate "Which metering points belong to your building?" %}{% endblock %}
-{% block lead %}{% if feed_in_required %}{% translate "You enter the feed-in metering point." %}{% else %}{% translate "The metering point is the connection of your electricity meter." %}{% if numbers_ready %} {% blocktranslate %}Its number starts with {{ prefix }}.{% endblocktranslate %}{% endif %}{% endif %}{% endblock %}
+{% block lead %}{% if feed_in_required %}{% translate "You enter the feed-in metering point." %}{% else %}{% translate "Assign the metering points to your building." %}{% endif %}{% endblock %}
 {% block step %}
+  {% if building_notice %}
+    {% leg_link as leg %}
+    {% with address=building.current_address %}
+      <div class="building-notice" role="status">
+        {% if building.egid %}
+          <p class="dotword"><span class="dot tone-ok" aria-hidden="true"></span>{% translate "Building found" %}</p>
+          <p class="muted">{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }} · {% translate "EGID" %} {{ building.egid }}</p>
+        {% else %}
+          <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "To be checked by the LEG" %}</p>
+          <p class="muted">{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}</p>
+          <p class="muted">{% blocktranslate %}The {{ leg }} will check this address.{% endblocktranslate %}</p>
+        {% endif %}
+        {% if building.location_id %}<p class="note-info">{% translate "This building is already created. Your metering points are assigned to it." %}</p>{% endif %}
+      </div>
+    {% endwith %}
+  {% endif %}
   <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Metering points' %}">
     {% csrf_token %}
-    {% include "customer/_error_summary.html" %}
+    {% include "customer/_error_summary.html" with title_only=True %}
     {% if not numbers_ready %}<div class="alert alert-warning" role="alert">{% translate "Metering point numbers cannot be entered yet. Please contact the LEG." %}</div>{% endif %}
 
     {% if draw_needed %}
       <div class="mb-3">
-        <label class="form-label" for="{{ form.draw_number.id_for_label }}">{% translate "Metering point number for consumption" %}</label>
+        <label class="form-label" for="{{ form.draw_number.id_for_label }}">{{ form.draw_number.label }}</label>
         <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.draw_number }}</span>
         {% if form.draw_number.errors %}<div class="invalid-feedback d-block" id="{{ form.draw_number.auto_id }}_error">{% for error in form.draw_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
         <div class="form-hint" id="{{ form.draw_number.auto_id }}_helptext">{{ form.draw_number.help_text }}</div>
@@ -20,28 +36,28 @@
 
     {% if feed_in_offered %}
       {% if not feed_in_required %}
-        <fieldset class="question">
+        <div class="question-separated"><fieldset class="question">
           <legend>{% translate "Do you feed in solar power?" %}</legend>
           {% for radio in form.feed_in %}
             <label class="entry-check"><input class="entry-check-input" type="radio" name="feed_in" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}</span></label>
           {% endfor %}
-        </fieldset>
+        </fieldset></div>
       {% endif %}
-      <div class="reveal{% if feed_in_required or form.feed_in.value == 'yes' %} is-open{% endif %}" data-reveal-name="feed_in" data-reveal-value="yes">
+      <div class="reveal{% if feed_in_required or form.feed_in.value == 'yes' %} is-open{% endif %}" data-reveal-name="feed_in"       data-reveal-value="yes">
         <h2 class="block-title">{% translate "Feed-in" %}</h2>
         <div class="mb-3">
-          <label class="form-label" for="{{ form.feed_in_number.id_for_label }}">{% translate "Metering point number for the feed-in" %}</label>
+          <label class="form-label" for="{{ form.feed_in_number.id_for_label }}">{{ form.feed_in_number.label }}</label>
           <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.feed_in_number }}</span>
           {% if form.feed_in_number.errors %}<div class="invalid-feedback d-block" id="{{ form.feed_in_number.auto_id }}_error">{% for error in form.feed_in_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
           <div class="form-hint" id="{{ form.feed_in_number.auto_id }}_helptext">{{ form.feed_in_number.help_text }}</div>
         </div>
         {% include "customer/_field.html" with field=form.feed_in_name optional=True %}
-        <p class="muted">{% translate "These details are optional and are used for statistics only." %}</p>
         <div class="figures">
           {% include "customer/_field.html" with field=form.pv_power_kwp optional=True %}
           {% include "customer/_field.html" with field=form.battery_kwh optional=True %}
           {% include "customer/_field.html" with field=form.wallbox_kw optional=True %}
         </div>
+        <p class="muted">{% translate "These details are optional and are used for statistics only." %}</p>
       </div>
     {% endif %}
     {% include "customer/_step_actions.html" %}

@@ -75,6 +75,18 @@
     update();
   });
 
+  // Metering point numbers: zeros are put in front when the field is left, as the server does on submit (D-102).
+  // Display only; the server normalises the entry again.
+  document.querySelectorAll("input[data-pad-length]").forEach((input) => {
+    input.addEventListener("blur", () => {
+      const length = parseInt(input.dataset.padLength, 10);
+      const compact = input.value.replace(/\s+/g, "").toUpperCase();
+      if (compact && compact.length < length && /^[A-Z0-9]+$/.test(compact)) {
+        input.value = "0".repeat(length - compact.length) + compact;
+      }
+    });
+  });
+
   // The IBAN in groups of four when the field is left; nothing is removed that is not white space or a hyphen.
   document.querySelectorAll(".iban-input").forEach((input) => {
     input.addEventListener("blur", () => {

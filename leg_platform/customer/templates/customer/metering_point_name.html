@@ -10,6 +10,14 @@
       {% csrf_token %}
       {% include "customer/_error_summary.html" %}
       {% include "accounts/_field.html" with field=form.name optional=True %}
+      {% if form.pv_power_kwp %}
+        <div class="figures">
+          {% include "customer/_field.html" with field=form.pv_power_kwp optional=True %}
+          {% include "customer/_field.html" with field=form.battery_kwh optional=True %}
+          {% include "customer/_field.html" with field=form.wallbox_kw optional=True %}
+        </div>
+        <p class="muted">{% translate "These details are optional and are used for statistics only." %}</p>
+      {% endif %}
       <div class="step-actions">
         <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
         <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>

@@ -1,0 +1,41 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Edit metering point" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Edit metering point" %}</h1>
+    <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Metering points' %}">
+      {% csrf_token %}
+      {% include "customer/_error_summary.html" with title_only=True %}
+      {% if not numbers_ready %}<div class="alert alert-warning" role="alert">{% translate "Metering point numbers cannot be entered yet. Please contact the LEG." %}</div>{% endif %}
+      {% if is_feed_in %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.feed_in_number.id_for_label }}">{{ form.feed_in_number.label }}</label>
+          <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.feed_in_number }}</span>
+          {% if form.feed_in_number.errors %}<div class="invalid-feedback d-block" id="{{ form.feed_in_number.auto_id }}_error">{% for error in form.feed_in_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+          <div class="form-hint" id="{{ form.feed_in_number.auto_id }}_helptext">{{ form.feed_in_number.help_text }}</div>
+        </div>
+        {% include "customer/_field.html" with field=form.feed_in_name optional=True %}
+        <div class="figures">
+          {% include "customer/_field.html" with field=form.pv_power_kwp optional=True %}
+          {% include "customer/_field.html" with field=form.battery_kwh optional=True %}
+          {% include "customer/_field.html" with field=form.wallbox_kw optional=True %}
+        </div>
+        <p class="muted">{% translate "These details are optional and are used for statistics only." %}</p>
+      {% else %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.draw_number.id_for_label }}">{{ form.draw_number.label }}</label>
+          <span class="prefix-input"><span class="prefix" aria-hidden="true">{{ prefix }}</span>{{ form.draw_number }}</span>
+          {% if form.draw_number.errors %}<div class="invalid-feedback d-block" id="{{ form.draw_number.auto_id }}_error">{% for error in form.draw_number.errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+          <div class="form-hint" id="{{ form.draw_number.auto_id }}_helptext">{{ form.draw_number.help_text }}</div>
+        </div>
+        {% include "customer/_field.html" with field=form.draw_name optional=True %}
+      {% endif %}
+      <div class="step-actions">
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

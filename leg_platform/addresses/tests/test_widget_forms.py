@@ -119,7 +119,12 @@ class EveryAddressFormTests(ProcessBase):
                     self.assertEqual(html.count(' id="id_country"'), 1)
                 # The one notice after the postal code and the town; the widget names it.
                 self.assertEqual(html.count("data-address-notice"), 1)
-                self.assertRegex(html, r'<div class="address-notice" id="address-notice" data-address-notice role="status"></div>')
+                # The status line of the customer wizard (D-124) is the same element with more attributes.
+                self.assertRegex(
+                    html,
+                    r'<div class="address-notice(?: address-status)?" id="address-notice" data-address-notice'
+                    r'(?: data-status-line)? role="status"[^>]*></div>',
+                )
                 self.assertIn('data-notice-id="address-notice"', widget)
                 self.assertLess(positions[3], html.index("data-address-notice"))
                 # The widget sits under the street input, before the next field.

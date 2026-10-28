@@ -2064,6 +2064,34 @@ class DirectoryDatabaseTests(TestCase):
                 "/addresses/lookup/", urlencode(values), content_type="application/x-www-form-urlencoded", **extra
             )
 
+    def test_the_egid_answer_is_for_customer_accounts_only(self):
+        """D-124: ``building=1`` asks for the EGID; an anonymous client and an account that is no customer never get it."""
+        from leg_platform.accounts.tests.helpers import create_active_user
+        from leg_platform.community.tests.onboarding import customer
+
+        values = {"street": "Previous Street", "house_number": "1", "postal_code": "9999", "locality": "Example Town",
+                  "mode": "check", "building": "1"}
+        person = customer("lookup.egid@example.org")
+        no_number = create_active_user("lookup.nonumber@example.org")
+        no_number.set_status(get_user_model().Status.BLOCKED)
+
+        def asked(user):
+            self.client.logout()
+            if user is not None:
+                self.client.force_login(user)
+            with patch("leg_platform.addresses.views.lookup", return_value={"status": "available"}) as query:
+                self.post_lookup(values)
+            return query.call_args.kwargs["building"]
+
+        self.assertFalse(asked(None))
+        self.assertFalse(asked(no_number))
+        self.assertTrue(asked(person))
+        # Without the parameter nobody gets it, and the real answer of an anonymous client has no EGID.
+        self.client.logout()
+        answer = self.post_lookup(values).json()
+        self.assertNotIn("egid", answer)
+        self.assertNotIn("buildings", answer)
+
     def test_endpoint_shows_no_warning_for_any_state_in_which_the_directory_cannot_answer(self):
         # D-066: the person cannot do anything about it, so no text is sent for these states (they
         # are logged on the server). The answers keep their status and HTTP code.

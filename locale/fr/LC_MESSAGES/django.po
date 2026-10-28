@@ -7325,13 +7325,6 @@ msgstr "Borne de recharge en kW"
 msgid "Enter the last digits of the number."
 msgstr "Saisissez les derniers chiffres du numéro."
 
-msgid ""
-"The IBAN is on your account or payment statement and on the back of your "
-"bank card."
-msgstr ""
-"L’IBAN figure sur votre relevé de compte ou de paiement et au dos de votre "
-"carte bancaire."
-
 msgid "When should it start?"
 msgstr "Quand cela doit-il commencer ?"
 
@@ -7411,10 +7404,6 @@ msgstr "Vérification par la CEL"
 #, python-format
 msgid "Registration at %(operator)s"
 msgstr "Annonce auprès de %(operator)s"
-
-#, python-format
-msgid "You confirm the request in the email from %(operator)s"
-msgstr "Vous confirmez la demande dans l’e-mail de %(operator)s"
 
 #, python-format
 msgid "Set by %(operator)s"
@@ -7819,10 +7808,6 @@ msgstr ""
 
 msgid "Which metering points belong to your building?"
 msgstr "Quels points de mesure appartiennent à votre bâtiment ?"
-
-msgid "The metering point is the connection of your electricity meter."
-msgstr ""
-"Le point de mesure est le raccordement de votre compteur d’électricité."
 
 #, python-format
 msgid "Its number starts with %(prefix)s."
@@ -8335,9 +8320,6 @@ msgstr "s’ouvre dans un nouvel onglet"
 
 msgid "Registration at the grid operator"
 msgstr "Annonce auprès du gestionnaire de réseau"
-
-msgid "You confirm the request in the email from the grid operator"
-msgstr "Vous confirmez la demande dans l’e-mail du gestionnaire de réseau"
 
 msgid "Set by the grid operator"
 msgstr "Défini par le gestionnaire de réseau"
@@ -11041,3 +11023,159 @@ msgid ""
 msgstr ""
 "Aucun bâtiment à votre adresse de profil n'est encore dans le répertoire "
 "d'adresses. La carte montre les cercles de transformateurs de votre région."
+
+#: leg_platform/addresses/templates/addresses/widget_notice.html:0
+msgid "Checking the address …"
+msgstr "Vérification de l'adresse …"
+
+#: leg_platform/addresses/templates/addresses/widget_notice.html:0
+#, python-format
+msgid "You can continue. The %(leg)s will check the address."
+msgstr "Vous pouvez continuer. La %(leg)s vérifiera l'adresse."
+
+#: leg_platform/addresses/templates/addresses/widget_notice.html:0
+msgid "Several buildings at this address"
+msgstr "Plusieurs bâtiments à cette adresse"
+
+#: leg_platform/addresses/templates/addresses/widget_notice.html:0
+msgid "Press Continue and choose your building."
+msgstr "Cliquez sur Continuer et choisissez votre bâtiment."
+
+#: leg_platform/customer/templates/customer/step_metering_points.html:0
+#, python-format
+msgid "The %(leg)s will check this address."
+msgstr "La %(leg)s vérifiera cette adresse."
+
+msgid "Which metering point number does %(operator)s use to measure your electricity consumption?"
+msgstr "Quel numéro de point de mesure %(operator)s utilise-t-il pour mesurer votre consommation d’électricité ?"
+
+msgid "Which metering point number does %(operator)s use to measure your solar power feed-in?"
+msgstr "Quel numéro de point de mesure %(operator)s utilise-t-il pour mesurer votre injection d’électricité solaire ?"
+
+#, python-format
+msgid "On your electricity bill, with the details of your supply point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
+msgstr "Sur votre facture d’électricité, avec les indications de votre point de soutirage, aussi appelé ID du point de mesure (pas le numéro de compteur, plus court). Il commence par %(prefix)s, déjà saisi. Ajoutez les %(length)s caractères restants."
+
+#, python-format
+msgid "In the documents of your grid operator, with the details of your feed-in point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
+msgstr "Dans les documents de votre gestionnaire de réseau, avec les indications de votre point d’injection, aussi appelé ID du point de mesure (pas le numéro de compteur, plus court). Il commence par %(prefix)s, déjà saisi. Ajoutez les %(length)s caractères restants."
+
+msgid "We only need your IBAN to pay you the compensation for the electricity you feed in. We transfer the credit to this account. You find the IBAN on your account or payment statement and on the back of your bank card."
+msgstr "Nous avons besoin de votre IBAN uniquement pour vous verser la rétribution de l’électricité que vous injectez. Nous virons le montant sur ce compte. Vous trouvez l’IBAN sur votre relevé de compte ou de paiement et au dos de votre carte bancaire."
+
+#, python-format
+msgid "You confirm the invitation in your account at %(operator)s"
+msgstr "Vous confirmez l’invitation dans votre compte chez %(operator)s"
+
+msgid "Assign the metering points to your building."
+msgstr "Attribuez les points de mesure à votre bâtiment."
+
+msgid "You confirm the invitation in your account at the grid operator"
+msgstr "Vous confirmez l’invitation dans votre compte chez le gestionnaire de réseau"
+
+msgid "Changing turns your application back into a draft. Submit it again afterwards."
+msgstr "Avec « Modifier », votre demande redevient un brouillon. Envoyez-la ensuite de nouveau."
+
+msgid "The LEG administration is checking your details, so you can no longer change them."
+msgstr "L’administration de la CEL vérifie actuellement vos indications. Vous ne pouvez donc plus modifier la demande."
+
+msgid "The LEG administration is checking your details, so you can no longer change them. Until the registration at the grid operator starts, you can still withdraw the application."
+msgstr "L’administration de la CEL vérifie actuellement vos indications. Vous ne pouvez donc plus modifier la demande. Tant que l’annonce auprès du gestionnaire de réseau n’a pas commencé, vous pouvez encore la retirer."
+
+msgid "Thank you. We have received your application."
+msgstr "Merci. Nous avons bien reçu votre demande."
+
+#, python-format
+msgid "The LEG administration passes your details on to your grid operator %(operator)s. To make sure the application is really from you, %(operator)s sends you an invitation in your user account there. You are notified by email and can log in to the account from it. Please confirm the invitation within %(days)s days. If you do not confirm, the application is cancelled automatically and you incur no costs."
+msgstr "L’administration de la CEL transmet vos indications à votre gestionnaire de réseau %(operator)s. Pour s’assurer que la demande émane bien de vous, %(operator)s vous envoie une invitation dans votre compte utilisateur chez lui. Vous en êtes informé par e-mail et pouvez vous connecter au compte à partir de celui-ci. Veuillez confirmer l’invitation dans les %(days)s jours. Sans confirmation, la demande est annulée automatiquement et vous n’avez aucun frais."
+
+msgid "To my buildings"
+msgstr "Vers mes bâtiments"
+
+msgid "Edit start date"
+msgstr "Modifier la date de début"
+
+msgid "Edit bank or postal connection"
+msgstr "Modifier les coordonnées bancaires ou postales"
+
+msgid "This building is already part of your application."
+msgstr "Ce bâtiment fait déjà partie de votre demande."
+
+msgid "Credit to"
+msgstr "Crédit sur"
+
+msgid "Edit bank connection"
+msgstr "Modifier les coordonnées bancaires"
+
+msgid "Not assigned to a community yet"
+msgstr "Pas encore attribué à une communauté"
+
+msgid "Metering"
+msgstr "Mesure"
+
+msgid "Add another building"
+msgstr "Ajouter un autre bâtiment"
+
+msgid "Add new building"
+msgstr "Ajouter un nouveau bâtiment"
+
+msgid "Credit for fed-in electricity"
+msgstr "Rétribution de l’électricité injectée"
+
+msgid "This account applies to all your buildings."
+msgstr "Ce compte vaut pour tous vos bâtiments."
+
+msgid "Building name"
+msgstr "Nom du bâtiment"
+
+#, python-format
+msgid "PV %(value)s kWp"
+msgstr "PV %(value)s kWc"
+
+#, python-format
+msgid "Battery %(value)s kWh"
+msgstr "Batterie %(value)s kWh"
+
+#, python-format
+msgid "Wallbox %(value)s kW"
+msgstr "Wallbox %(value)s kW"
+
+msgid "Edit building name"
+msgstr "Modifier le nom du bâtiment"
+
+msgid "LEG name"
+msgstr "Nom de la CEL"
+
+msgid "Not assigned yet"
+msgstr "Pas encore attribué"
+
+msgid "Plant data"
+msgstr "Données de l’installation"
+
+msgid "PV system"
+msgstr "Installation PV"
+
+msgid "kWp"
+msgstr "kWc"
+
+msgid "kWh"
+msgstr "kWh"
+
+msgid "kW"
+msgstr "kW"
+
+msgid "Edit plant data"
+msgstr "Modifier les données de l’installation"
+
+msgctxt "building card"
+msgid "Edit"
+msgstr "Modifier"
+
+msgid "Greyed-out values cannot be changed here."
+msgstr "Les indications grisées ne peuvent pas être modifiées ici."
+
+msgid "Cannot be changed"
+msgstr "Non modifiable"
+
+msgid "Not recorded"
+msgstr "Non renseigné"

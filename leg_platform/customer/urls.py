@@ -7,7 +7,7 @@ the views and services.
 
 from django.urls import path
 
-from leg_platform.customer import deregistration, views, wizard
+from leg_platform.customer import application_edit, deregistration, views, wizard
 
 app_name = "customer"
 
@@ -32,6 +32,20 @@ urlpatterns = [
     path("application/<int:pk>/submitted/", wizard.ApplicationSubmittedView.as_view(), name="application_submitted"),
     path("application/<int:pk>/withdraw/", wizard.ApplicationWithdrawView.as_view(), name="application_withdraw"),
     path("application/<int:pk>/change/", wizard.ApplicationChangeView.as_view(), name="application_change"),
+    # Single details of a submitted application, edited in place (only while state is submitted).
+    path("application/<int:pk>/edit/start-date/", application_edit.StartEditView.as_view(), name="application_edit_start"),
+    path(
+        "application/<int:pk>/edit/bank-connection/", application_edit.BankEditView.as_view(),
+        name="application_edit_bank",
+    ),
+    path(
+        "application/<int:pk>/edit/metering-point/<int:point_id>/", application_edit.PointEditView.as_view(),
+        name="application_edit_point",
+    ),
+    path(
+        "application/<int:pk>/edit/building/<int:building_id>/", application_edit.AddressEditView.as_view(),
+        name="application_edit_address",
+    ),
     path("contract/", views.ContractView.as_view(), name="contract"),
     path("contact/", views.ContactView.as_view(), name="contact"),
     path("contract/accept/", views.ContractAcceptView.as_view(), name="contract_accept"),
