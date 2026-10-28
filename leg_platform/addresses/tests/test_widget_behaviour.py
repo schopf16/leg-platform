@@ -27,6 +27,7 @@ SCRIPT = STATIC / "js" / "address-directory.js"
 STYLE = STATIC / "css" / "address-suggest.css"
 
 HEAD_STYLE = """
+:root { --fg: #222; }
 body { font: 16px/1.4 sans-serif; margin: 0; padding: 8px 16px; }
 form { display: grid; gap: 16px; }
 .field-pair { display: grid; grid-template-columns: 1fr 8rem; gap: 8px; }

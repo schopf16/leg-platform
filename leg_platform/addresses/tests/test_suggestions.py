@@ -24,18 +24,12 @@ from django.utils import timezone
 
 from leg_platform.accounts.models import RateLimitEvent
 from leg_platform.accounts.tests.helpers import create_active_user
-from leg_platform.addresses import services
+from leg_platform.addresses import fixes as fix_module
+from leg_platform.addresses import matching, services
+from leg_platform.addresses.fixes import HOUSE_CAP, fixes, prerank
+from leg_platform.addresses.matching import SIMILAR_CAP, similar_streets
 from leg_platform.addresses.models import Address, AddressStreet, Directory, fill_place_centres
-from leg_platform.addresses.services import (
-    HOUSE_CAP,
-    SIMILAR_CAP,
-    fixes,
-    lookup,
-    prerank,
-    ranked_rows,
-    similar_streets,
-    split_house_number,
-)
+from leg_platform.addresses.services import lookup, ranked_rows, split_house_number
 
 URL = reverse("addresses:lookup")
 FORM = "application/x-www-form-urlencoded"
@@ -368,7 +362,7 @@ class FixLimitsTests(SuggestionBase):
 
         self.assertEqual(answer["reason"], "house_number")
         self.assertEqual(len(answer["proposals"]), 3)
-        self.assertEqual(len(answer["proposals"]), services.PROPOSAL_LIMIT)
+        self.assertEqual(len(answer["proposals"]), fix_module.PROPOSAL_LIMIT)
 
     def test_an_empty_house_number_gives_no_proposals_but_the_notice_stays(self):
         answer = self.check("Ittigenstrasse", "", "3061", "Ittigen")
@@ -404,7 +398,7 @@ class FixLimitsTests(SuggestionBase):
         self.assertEqual((answer["status"], answer["proposals"], answer["warning"]), ("missing", [], ""))
 
     def test_a_passed_deadline_returns_no_card(self):
-        with patch.object(services, "FIX_TIME_BUDGET", -1):
+        with patch.object(fix_module, "FIX_TIME_BUDGET", -1):
             answer = self.check("ittigenstrasse", "51", "3061", "Ittigen")
             direct = fixes(
                 self.generation, Address.objects.filter(generation=self.generation),
@@ -456,7 +450,7 @@ class FixLimitsTests(SuggestionBase):
         self.assertTrue(answer["warning"])
 
     def test_a_street_in_too_many_places_gives_no_card_instead_of_a_scan(self):
-        with patch.object(services, "PLACES_CAP", 2):
+        with patch.object(fix_module, "PLACES_CAP", 2):
             answer = self.check("Teststrasse", "7", "3063", "Ittigen")
 
         self.assertEqual(answer["proposals"], [])
@@ -508,8 +502,8 @@ class BoundsTests(SuggestionBase):
 
     def test_a_street_with_thousands_of_numbers_costs_the_capped_comparisons_only(self):
         houses = {str(number) for number in range(1, 2001)}
-        with patch.object(services, "closest", wraps=services.closest) as closest:
-            services.nearest_number("777", houses)
+        with patch.object(fix_module, "closest", wraps=fix_module.closest) as closest:
+            fix_module.nearest_number("777", houses)
 
         self.assertLessEqual(len(closest.call_args.args[1]), HOUSE_CAP)
 
@@ -518,7 +512,7 @@ class BoundsTests(SuggestionBase):
         places = AddressStreet.objects.filter(generation=self.generation, postal_code="3063")
         import time
 
-        with patch.object(services, "SIMILAR_CAP", 5):
+        with patch.object(matching, "SIMILAR_CAP", 5):
             streets, kind, bounded_out = similar_streets(places, "Testallee", time.monotonic() + 5)
         self.assertEqual((len(streets), kind, bounded_out), (5, "prefix", False))
         streets, _kind, _out = similar_streets(places, "Testallee", time.monotonic() + 5)
@@ -530,7 +524,7 @@ class BoundsTests(SuggestionBase):
 
         places = AddressStreet.objects.filter(generation=self.generation)
         self.assertEqual(similar_streets(places, "Ittigenstrase", time.monotonic() - 1), ([], "approximate", True))
-        with patch.object(services, "APPROXIMATE_STREET_LIMIT", 2):
+        with patch.object(matching, "APPROXIMATE_STREET_LIMIT", 2):
             self.assertEqual(similar_streets(places, "Ittigenstrase", time.monotonic() + 5), ([], "approximate", True))
 
     def test_text_shorter_than_three_characters_finds_no_similar_street(self):

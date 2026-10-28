@@ -371,8 +371,8 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         # import thread of ``runner.py`` (and ``jobs.py`` for the failure text), which import the
         # importer only inside a function that runs in that thread or in the worker.
         directory = Path(importer.__file__).parent
-        for name in ("admin.py", "views.py", "urls.py", "services.py", "limits.py", "models.py", "apps.py",
-                     "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
+        for name in ("admin.py", "views.py", "urls.py", "services.py", "fixes.py", "matching.py", "limits.py", "models.py",
+                     "apps.py", "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
             tree = ast.parse((directory / name).read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 modules = []
@@ -1535,9 +1535,9 @@ class DirectoryDatabaseTests(TestCase):
         # A typing error, so that only the approximate path finds the four streets.
         values = {"street": "Strietname", "postal_code": "9999"}
         # The postal code has the four new streets and the street of setUp: five streets.
-        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 5):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_STREET_LIMIT", 5):
             self.assertEqual(len(lookup(values)["results"]), 4)
-        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 4):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_STREET_LIMIT", 4):
             with CaptureQueriesContext(connections["addresses"]) as queries:
                 result = lookup(values)
             self.assertEqual(result["results"], [])
@@ -1627,17 +1627,17 @@ class DirectoryDatabaseTests(TestCase):
         self.add_addresses(("\u00c9gerstrasse-xxxxxxx", "1", "9999", "Example Town"))  # 19 characters
         query = Address.objects.filter(generation=self.generation)
         values = {"street": "Egerstra", "postal_code": "9999", "house_number": ""}
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 10):  # candidates up to 20
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_LENGTH", 10):  # candidates up to 20
             self.assertEqual(len(approximate_matches(query, values)[0]), 1)
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 9):  # candidates up to 18
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_LENGTH", 9):  # candidates up to 18
             self.assertEqual(approximate_matches(query, values)[0], [])
 
     def test_the_number_of_full_comparisons_is_capped_and_nothing_is_returned_above_the_cap(self):
         self.add_addresses(*[(f"Schulstrass{letter}", "1", "9999", "Example Town") for letter in "aeo"])
         values = {"street": "Schulstrase", "postal_code": "9999"}
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 3):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_RATIO_CALLS", 3):
             self.assertEqual(len(lookup(values)["results"]), 3)
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 2):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_RATIO_CALLS", 2):
             result = lookup(values)
         self.assertEqual(result["results"], [])
         self.assertEqual(result["status"], "available")

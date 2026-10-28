@@ -10804,7 +10804,7 @@ msgstr "Fehlgeschlagene Anmeldungen"
 msgid "Lines"
 msgstr "Anzahl anzeigen"
 
-# The page Nachbarschaft (D-120; docs/NACHBARSCHAFT.md).
+# The page Nachbarschaft (D-123; docs/NACHBARSCHAFT.md).
 msgid ""
 "Your transformer circuit and the buildings around it. Public data only."
 msgstr "Ihr Trafokreis und die Gebäude darin. Nur öffentliche Daten."

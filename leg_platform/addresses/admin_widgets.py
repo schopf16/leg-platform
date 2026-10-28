@@ -1,12 +1,12 @@
-"""The address suggestions in the change forms of the Django administration (D-111, owner specification 2026-10-28).
+"""The address suggestions in the change forms of the Django administration (D-111).
 
 The portal forms include ``addresses/widget.html`` under the street and ``addresses/widget_notice.html`` under the town
 (``static/js/address-directory.js`` does the rest). The administration draws its fields itself, so the two widgets here
 append the same two templates to the street and town inputs and bring the script and the stylesheet with the form's
 media (the script is deferred: the media of the administration sit in the head). ``AddressSuggestionsMixin`` gives them
-to the change AND add form of a ``ModelAdmin`` (``get_form``); the raw list with ``list_editable`` (``community.raw_tables``) keeps plain
-inputs, because an overlay does not belong into a table row. Nothing changes who may edit what: the mixin replaces two
-widgets and never adds or removes a field.
+to the change AND add form of a ``ModelAdmin`` (``get_form``); the raw list with ``list_editable``
+(``community.raw_tables``) keeps plain inputs, because an overlay does not belong into a table row. Nothing changes who
+may edit what: the mixin replaces two widgets and never adds or removes a field.
 """
 
 from django.contrib.admin.widgets import AdminTextInputWidget

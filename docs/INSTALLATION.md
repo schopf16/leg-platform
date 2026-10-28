@@ -6,41 +6,46 @@ Local development setup and instance configuration. Stage and production: `docs/
 
 The administrator maintains name, website, privacy and legal notice addresses, two logos, the favicon and the colours in the administration ("Inhalte", "Portal-Einstellungen"; D-073). A stored value wins. An empty field falls back to the variables of `.env.example` (D-051), then to the neutral platform defaults. Environment only (read-only for system administrators): host name, `INSTANCE_BASE_URL`, allowed hosts, mail mode and sender, Graph credentials, database, secrets, retention minimums, proxy settings (an editable host name would let anyone redirect all email links).
 
-**Logos (D-073).**
+**Logos and favicon (D-073).**
 
-* One for light mode, one for dark mode (both or none). PNG (up to 1 MB, 64 to 4000 pixels per side) or SVG (up to 200 KB, no scripts, styles, images, links or editor data).
-* Stored **in the database** (`accounts_portalsettings`): **the logos and the favicon belong to the database backup**.
-* **Favicon** (browser tab icon): one optional file for both modes, PNG (up to 128 KB, 64 to 4000 pixels per side) or SVG (up to 64 KB), same checks as a logo; ICO is not accepted. Without an upload the built-in icon of the server is used.
-* Served publicly at `/branding/logo/light/`, `/branding/logo/dark/` and `/branding/favicon/`. The proxy passes these paths and may cache them for a day. It allows a request body of at least 3 MiB for `/admin/accounts/portalsettings/1/change/` (larger: 413 from the application; two logos, the favicon and the form fit).
-* Fallback while none is uploaded: `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` (local static `.svg` or `.png`, relative static paths, never absolute or external). `INSTANCE_STATIC_DIRECTORY`: an existing absolute directory outside the repository; its contents are public (no configuration, personal data or secrets). Check every SVG for scripts, event handlers and external references. Run `collectstatic` with the instance's static directories. The startup validation does not prove that a file exists.
+* One logo for light mode, one for dark mode (both or none). PNG (up to 1 MB, 64 to 4000 pixels per side) or SVG (up to 200 KB, no scripts, styles, images, links or editor data).
+* Favicon: one optional file for both modes, PNG (up to 128 KB, 64 to 4000 pixels per side) or SVG (up to 64 KB); no ICO. Without an upload the built-in icon is used.
+* Stored **in the database** (`accounts_portalsettings`): they belong to the database backup.
+* Served publicly at `/branding/logo/light/`, `/branding/logo/dark/` and `/branding/favicon/`. The proxy passes these paths and may cache them for a day. It allows a request body of at least 3 MiB for `/admin/accounts/portalsettings/1/change/` (larger: 413 from the application).
+* Fallback while none is uploaded: `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` (relative static `.svg` or `.png` paths, never absolute or external). `INSTANCE_STATIC_DIRECTORY`: an existing absolute directory outside the repository; its contents are public (no configuration, personal data or secrets). Check every SVG for scripts, event handlers and external references. Run `collectstatic` with the instance's static directories. Startup validation does not prove that a file exists.
 
 Colours are six-digit hexadecimal values. The application refuses to start if the accent lacks 4.5:1 contrast with its text, the page background or the surface, or highlight text lacks contrast. The administration form applies the same rules; a failing database value is not used (warning logged). Platform defaults: accent `#005BA2` and `#6AA9E0`, highlight `#DDDD22` (D-056).
 
 The texts of the login and registration pages change only in `locale/<language>/LC_MESSAGES/django.po` (compile with `msgfmt`, deploy). The administration start page shows what still has to be set (box "Erste Schritte"; `docs/OPERATIONS.md`, section 5a).
 
-**Grid operator (D-086):** a system administrator enters the name once in the administration (group "Inhalte", "Netzbetreiber"); until then the texts say "Netzbetreiber". It is instance data, never part of code, migrations or the environment file. The transformer circuit number format (`TRA` and digits) is that of the operator in the owner's specification; another operator needs `numbers.TRANSFORMER_CIRCUIT_NUMBER` adapted.
+**Grid operator (D-086):** a system administrator enters the name once in the administration ("Inhalte", "Netzbetreiber"). It is instance data, never part of code, migrations or the environment file. The transformer circuit number format (`TRA` and digits) is that of the current operator; another operator needs `numbers.TRANSFORMER_CIRCUIT_NUMBER` adapted.
 
 Supported browsers (D-003): Chrome and Edge 123, Firefox 128, Safari 17.5, Opera 109 or newer.
 
 ## Address Directory
 
-Profile addresses never leave the application; suggestions query only a local copy of the official directory. The UI shows no source and no warning (D-066). The swisstopo source reference belongs to the privacy notice and imprint (D-049, D-022). A missing, stale or unavailable directory is logged and shown on the operator page "Address directory" only; it never blocks registration or saving.
+Profile addresses never leave the application; suggestions query only a local copy of the official directory. The UI shows no source and no warning (D-066). The swisstopo source reference belongs to the privacy notice and imprint (D-049, D-022). A missing, stale or unavailable directory is shown on the operator page "Address directory" only; it never blocks registration or saving.
 
 * Own SQLite file (D-075), **not part of any backup**. Optional `ADDRESS_DIRECTORY_FILE`: absolute path outside the repository, no control characters.
 * Default outside `APP_ENV=local`: `/var/lib/leg-platform/address-directory.sqlite3` (`StateDirectory=leg-platform` in the systemd units). With `APP_ENV=local`: `~/.leg-platform-dev/address-directory.sqlite3`.
 * A missing file is created with mode 0600 (folder 0700). Processes open it read-only unless they are writers (worker, `import_address_directory`, `seed_local_address_directory`, `setup_instance`, `migrate`; never the web processes). Web and worker run on the same host with the same settings. No network file system.
-* `python manage.py setup_instance` (below) creates the file and tables. Manual equivalent for local development only (`migrate` alone never creates them): `python manage.py migrate addresses --database=addresses`. On a server never run it by hand (D-076): start `leg-setup.service`; a hand-run as `root` would create a root-owned 0600 file the service cannot open (`docs/DEPLOYMENT.md`, 10.2, "Repair").
-* **Restore/schema changes (D-075/D-076, owner 2026-10-22):** public catalogue rows are disposable; no historical catalogue data transfer is needed. `setup_instance` creates a missing file or rebuilds a changed address schema, then durably queues the official import in MariaDB. It never downloads during setup and never deletes application data. A current clean schema does not requeue on each start. **Exception, additive in-place migrations** (`Migration.in_place = True`, for example `addresses.0020`: the tables `AddressPlace` / `AddressStreet` and the index `addr_house`, D-111): `setup_instance` applies them to the existing file, built from the existing addresses, with no re-download and no import (one to two minutes and about 410 MB more on 3.3 million addresses, the same free again for the WAL; it is skipped with a message when the space is short, and refused while an import is alive); an incomplete schema afterwards is an error and the file is NOT wiped. A file whose schema differs from the models without a pending migration is rebuilt as before. To apply it by hand before a deployment: `python manage.py migrate addresses --database=addresses` (stop the import first). Migrations affecting only the application-side job/lookup models do not reset SQLite. Normal CSV refresh remains generation-based and atomic, without deleting the file.
-* **Availability:** the optional worker processes the queued request on its next poll; otherwise `run_scheduled_tasks` consumes it at its next tick (the server timer runs every 15 minutes, plus random delay), independently of daily refresh time and `ADDRESS_IMPORT_AUTOMATIC`. Without either consumer it stays queued. Until import succeeds, address validation/suggestions are unavailable; the application and its stored data remain. A busy file, live import or rebuild/queue failure is reported non-fatally; retry setup later, preferably with address consumers stopped. Never delete the `.reset` marker to bypass a failed rebuild; setup recovers it. Corruption repair: `docs/DEPLOYMENT.md`, section 10.2.
+* `python manage.py setup_instance` (below) creates the file and tables. Local development only: `python manage.py migrate addresses --database=addresses` (`migrate` alone never creates them). On a server never run it by hand (D-076): start `leg-setup.service`; a hand-run as `root` would create a root-owned 0600 file the service cannot open (`docs/DEPLOYMENT.md`, 10.2, "Repair").
+* **Schema changes (D-075, D-076):** public catalogue rows are disposable. `setup_instance` creates a missing file or rebuilds a file whose schema differs from the models, then queues the official import in MariaDB. It never downloads during setup and never deletes application data. A current clean schema is not requeued. Normal CSV refresh is generation-based and atomic; it never deletes the file.
+* **In-place migrations** (`Migration.in_place = True`: `addresses.0020`, `0021`; D-111). They add the tables `AddressPlace` and `AddressStreet` and the index `addr_house` (the file is about 1.7 GB for 3.3 million addresses). `setup_instance` applies them to the existing file (`leg_platform/addresses/setup.py`): no re-download, no import.
+  * Needs free disk of about 35 % of the file size twice (new tables and indexes, WAL) plus 256 MB. Otherwise the migration is skipped with a message, setup goes on, and the lookups answer "unavailable" until setup is run again.
+  * Refused while an import is alive. An incomplete schema afterwards is an error; the file is not wiped.
+  * By hand before a deployment: `python manage.py migrate addresses --database=addresses` (stop the import first).
+  * Migrations of application-side job/lookup models only do not touch the file.
+* **Availability:** the optional worker processes the queued request on its next poll; otherwise `run_scheduled_tasks` consumes it at its next tick (every 15 minutes on the server), independent of the daily refresh time and `ADDRESS_IMPORT_AUTOMATIC`. Without a consumer it stays queued. Until an import succeeds, address validation and suggestions are unavailable; stored data remains. A busy file, live import or rebuild failure is reported non-fatally; run setup again later, preferably with address consumers stopped. Never delete the `.reset` marker to bypass a failed rebuild. Corruption repair: `docs/DEPLOYMENT.md`, section 10.2.
 
 **The button needs no extra service (D-090); the automatic refresh is the daily run of `run_scheduled_tasks`.** Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.3, 8.4 and 10.2.
 
-* Triggers: an administrator with the right `addresses.request_directory_import` presses "Request directory update" (administration, "Adressverzeichnis"; at once, in a thread of the web process); or the daily run (`scheduled_address_import`, a task of `run_scheduled_tasks`, so the scheduler below is required; once per day from the configured time, default 03:00) finds an update due: the update flag is set (an address was found neither locally nor at swisstopo), the directory has no building numbers (EGID) yet, the regular refresh is due (every 90 days) or the directory is missing or empty (every 24 hours). At most one download per day. A visit of a staff member starts nothing. `ADDRESS_IMPORT_AUTOMATIC=False` turns the daily run off.
-* Needs: outbound HTTPS to `data.geo.admin.ch` (the import; the web and the tasks unit) and `api3.geo.admin.ch` (the building search of signed-in persons; the web unit); about 4 GB free on the disk of the directory file (the archive is written there as a temporary file, not to the system temporary folder); about 0.9 GB per generation on disk (reserve **three** generations at the peak). The tasks unit needs the state directory like the web unit (`docs/DEPLOYMENT.md`, 8.3).
-* Verifies the official SHA-256 multihash before parsing. One import at a time (the job row is the claim; the lease on the directory row expires after 6 hours). A web job without a sign of life for about 90 seconds counts as dead and can be requested again. A hard-killed worker job (state stays `running`) is taken over only after its 6-hour lease: never reset its state blindly.
+* Triggers: an administrator with the right `addresses.request_directory_import` presses "Request directory update" (administration, "Adressverzeichnis"; at once, in a thread of the web process); or the daily run (`scheduled_address_import`, once per day from the configured time, default 03:00) finds an update due: the update flag is set (an address was found neither locally nor at swisstopo), the directory has no building numbers (EGID) yet, the regular refresh is due (every 90 days) or the directory is missing or empty (every 24 hours). At most one download per day. A visit of a staff member starts nothing. `ADDRESS_IMPORT_AUTOMATIC=False` turns the daily run off.
+* Needs: outbound HTTPS to `data.geo.admin.ch` (import; web and tasks unit) and `api3.geo.admin.ch` (building search of signed-in persons; web unit). At least 4 GiB free on the disk of the directory file at the start of an import (the archive is written there as a temporary file, not to the system temporary folder). The file is about 1.7 GB per generation and holds up to three while importing (about 5.1 GB): reserve 10 GB for the folder. The tasks unit needs the state directory like the web unit (`docs/DEPLOYMENT.md`, 8.3).
+* Verifies the official SHA-256 multihash before parsing. One import at a time (the job row is the claim; the lease expires after 6 hours). A web job without a sign of life for about 90 seconds counts as dead. A hard-killed worker job (state stays `running`) is taken over only after its lease: never reset its state blindly.
 * Start, end and failure go to the application log (`leg_platform.addresses`) and the security log. If the published directory is the official file and passes the integrity check, a manual request ends without a download (D-076).
 
-Optional supervised worker (same environment as the web application; claims the same job, so it never runs twice with the web application). It handles queued manual imports and makes the automatic attempt (D-052). It refuses to run with less than 4 GB free where the file lives:
+Optional supervised worker (same environment as the web application; claims the same job). It handles queued manual imports and makes the automatic attempt (D-052). It refuses to run with less than 4 GB free where the file lives:
 
 ```powershell
 python manage.py process_address_imports
@@ -62,12 +67,12 @@ For Windows development machines (D-027, D-030). Never use these steps or creden
 
 ### Step 1: Remove the old MySQL installation
 
-Only where the earlier setup script installed MySQL (folders `C:\tools\mysql` and `C:\ProgramData\MySQL\data`, service `MySQL`). The setup script refuses to start while these exist and prints the exact commands, adapted to what it finds. Run them in PowerShell **as administrator** with no other user signed in.
+Only where a MySQL installation from the former setup script exists (folders `C:\tools\mysql` and `C:\ProgramData\MySQL\data`, service `MySQL`). The setup script refuses to start while these exist and prints the exact commands, adapted to what it finds. Run them in PowerShell **as administrator** with no other user signed in.
 
 1. The first command checks that none of the folders is a link (symbolic link, junction, mount point). If it lists one: run nothing else and ask for help.
 2. The others stop and disable the service, run `choco uninstall mysql -y`, delete the service and the folders with `[IO.Directory]::Delete(<path>, $true)` (does not follow links inside).
-3. All old MySQL databases are lost (nothing of value). Errors for parts that no longer exist are expected.
-4. The service `MySQL` belongs to another MySQL installation: the script warns instead of printing service commands. Do not stop or delete that service.
+3. All old MySQL databases are lost. Errors for parts that no longer exist are expected.
+4. If the service `MySQL` belongs to another MySQL installation, the script warns instead of printing service commands. Do not stop or delete that service.
 
 ### Step 2: Run the setup
 
@@ -111,7 +116,7 @@ py -3.14 -m venv .venv
 
 Checks, tests, development server, test accounts, address directory seed: `docs/STARTUP.md` (`check` and `makemigrations` need the running MariaDB).
 
-Email: locally emails go to the console (`EMAIL_MODE=console`). Graph delivery is configured only for stage and production; locally it is refused (D-116).
+Email: locally emails go to the console (`EMAIL_MODE=console`); Graph is refused locally (D-116).
 
 ### Instance Configuration
 
@@ -125,9 +130,9 @@ Each instance sets its values in the environment (`.env.example`, D-013, D-037).
 
 Email delivery (D-038):
 
-* Emails are not sent during the request. The worker `python manage.py process_mail_queue --loop` must run as a supervised service (restart on failure). Without it no email is sent. Without `--loop` it processes the queue once. A job is tried three times, then given up. Unprocessed jobs are deleted after one hour (they hold the address in plain text).
+* The worker `python manage.py process_mail_queue --loop` must run as a supervised service (restart on failure). Without it no email is sent. Without `--loop` it processes the queue once. A job is tried three times, then given up. Unprocessed jobs are deleted after one hour (they hold the address in plain text).
 * The sender domain needs SPF, DKIM and DMARC records. The sender address must be one the service may use.
-* The Graph backend sends no `Auto-Submitted` header (Microsoft Learn allows custom headers only with an `x-` prefix, D-048). Automatic replies (out-of-office) of the sender mailbox must stay switched off (D-006).
+* The Graph backend sends no `Auto-Submitted` header (D-048). Automatic replies (out-of-office) of the sender mailbox must stay switched off (D-006).
 
 ### Microsoft Graph sender
 
@@ -155,7 +160,7 @@ Upload size (D-048): certificate and private key are files of at most 16 KiB eac
 
 The scheduler is decided with the hosting (D-008, D-037, D-038, D-041).
 
-* `python manage.py run_scheduled_tasks` runs every cleanup once: `delete_expired_registrations`, `process_application_deadlines` (reminders, rollbacks and deregistrations of the customers' applications, D-103; the deadlines are set by the staff in the management settings), `cleanup_mail_requests`, `cleanup_login_ip_attempts`, `cleanup_security_log`, `cleanup_confirmation_failures`, Django's `clearsessions`, `cleanup_address_lookups` (expired stored building searches) and last the daily address directory run `scheduled_address_import` (it imports the directory when due, once per day from the configured time; it needs the state directory and the network, `docs/DEPLOYMENT.md`, 8.3).
+* `python manage.py run_scheduled_tasks` runs every cleanup task once (the task list is in the command; it ends with the daily address directory run `scheduled_address_import`, which needs the state directory and the network, `docs/DEPLOYMENT.md`, 8.3). Application deadlines (reminders, rollbacks, deregistrations; D-103) run in it too.
 * Schedule this one command, for example every 15 minutes (cron or systemd timer on Linux, task scheduler on Windows). A failing task does not stop the others; the command then exits with an error, which the scheduler must report.
 * The worker `process_mail_queue --loop` is not part of it; it is a supervised service.
 
@@ -165,7 +170,7 @@ D-005, D-041, D-076. `python manage.py setup_instance` is idempotent and runs on
 
 1. applies pending migrations (`migrate --noinput`);
 2. only while the account table is completely empty and `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` is set, creates the initial system administrator with `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`;
-3. creates/rebuilds the disposable public address schema when missing/changed and durably queues its official import, without downloading during setup (a failure there never stops the rest; see "Address Directory").
+3. creates or rebuilds the disposable public address schema when missing or changed and queues its official import, without downloading during setup (a failure there never stops the rest; "Address Directory").
 
 An installation needs only an **empty** database with its one account ("Database privileges") and the environment file.
 
@@ -236,7 +241,7 @@ If the removal is interrupted after the uninstall, a new run finds only Chocolat
 3. Sign out and in, run the script again.
 4. If the service still exists after `sc.exe delete`: close the Services console and Task Manager or restart Windows, repeat.
 
-The old MySQL is never removed automatically (step 1). For any other MariaDB or MySQL installation the script changes nothing.
+For any other MariaDB or MySQL installation the script changes nothing.
 
 Tests of the script's helper functions (no system change):
 
@@ -252,8 +257,8 @@ The application account receives only `SELECT, INSERT, UPDATE, DELETE, CREATE, D
 * `SELECT`, `INSERT`, `UPDATE`, `DELETE`: data access. `CREATE`, `DROP`, `ALTER`, `INDEX`: schema changes by Django migrations. `REFERENCES` is not granted.
 * Locally also on `test_leg_platform` (Django creates and drops the test database as the configured user).
 * `_` is a wildcard in database-level grants. The script escapes it (`leg\_platform`) and checks the stored names.
-* Create every database of an instance with `CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci` (D-030, D-031); MariaDB 10.11 would otherwise use `latin1`. The setup script does this locally. Operators of stage and production, e.g. `CREATE DATABASE leg_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;`. Identifier columns (normalised email, tokens, customer number) use the exact collation `utf8mb4_bin` per column (D-031).
-* `manage.py test --parallel` is not supported with this account (needs `test_leg_platform_1`, ...; MariaDB error 1044, D-071). Do not widen the grants for it.
+* Create every database of an instance with `CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci` (D-030, D-031), e.g. `CREATE DATABASE leg_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;` (the setup script does this locally). Identifier columns (normalised email, tokens, customer number) use `utf8mb4_bin` per column (D-031).
+* `manage.py test --parallel` is not supported with this account (MariaDB error 1044, D-071). Do not widen the grants for it.
 
 Stage and production: the same privileges only on the instance's own database, no test database, no global privileges, for an account that can connect only from the application host. `DROP` on the database level also allows dropping the whole database. A split into a migration account and a runtime account (`SELECT`, `INSERT`, `UPDATE`, `DELETE` only) is decided with the hosting (D-008).
 

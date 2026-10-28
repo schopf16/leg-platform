@@ -48,7 +48,7 @@ class BuildingsView(CustomerAccessMixin, View):
         return response
 
 
-# The swisstopo tiles of the map: the one external host the page's policy allows, for images only (D-120). Set for this
+# The swisstopo tiles of the map: the one external host the page's policy allows, for images only (D-123). Set for this
 # view alone (``csp_override``); every other page keeps ``img-src 'self'``.
 NEIGHBOURHOOD_TILES = "https://wmts.geo.admin.ch"
 
@@ -57,7 +57,7 @@ NEIGHBOURHOOD_TILES = "https://wmts.geo.admin.ch"
     csp_override({**settings.SECURE_CSP, "img-src": [CSP.SELF, NEIGHBOURHOOD_TILES]}), name="dispatch",
 )
 class NeighbourhoodView(CustomerAccessMixin, View):
-    """The page Nachbarschaft (D-120): the transformer circuits around the building of the profile address.
+    """The page Nachbarschaft (D-123): the transformer circuits around the building of the profile address.
 
     The map gets public building and plant data only (outlines, PV points, counts); no other participant is read."""
 
@@ -100,7 +100,7 @@ def _profile_egid(person):
 
 
 def _area_postal_codes(person):
-    """The postal codes to show without an own building, in order (D-120): the profile's postal code, then the postal
+    """The postal codes to show without an own building, in order (D-123): the profile's postal code, then the postal
     codes of the service area that the staff entered in the administration (``ServicePostalCode``)."""
     codes = [str(person.swiss_postal_code)] if person.swiss_postal_code else []
     return codes + [code for code in transformers.postal_codes() if code not in codes]
@@ -147,7 +147,7 @@ def _map_data(hood):
 
 def _invite_url():
     """A ``mailto:`` link with the text of an invitation; it opens the mail program of the member, so the mail leaves
-    from the member's own address and the portal sends nothing (D-120)."""
+    from the member's own address and the portal sends nothing (D-123)."""
     text = {
         "subject": _("Local electricity community %(name)s") % {"name": settings.INSTANCE_NAME},
         "body": _("I take part in the local electricity community. Would you like to join as well?"),

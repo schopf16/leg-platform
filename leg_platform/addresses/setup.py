@@ -15,10 +15,11 @@ from . import jobs
 from .models import (
     Address, AddressPlace, AddressStreet, Directory, ImportRequest, Plant, PlantRegister, TransformerStation,
 )
-
-DIRECTORY_MODELS = (Address, AddressPlace, AddressStreet, Directory, Plant, PlantRegister, TransformerStation)
 from .sqlite.base import DatabaseWrapper
 from .storage import DIRECTORY_ALIAS, directory_open_guard, rebuilding_directory, reset_marker
+
+# The models of the directory file (``router.DIRECTORY_MODELS`` names the same ones for the router).
+DIRECTORY_MODEL_CLASSES = (Address, AddressPlace, AddressStreet, Directory, Plant, PlantRegister, TransformerStation)
 
 
 def _changes_directory(migration):
@@ -32,7 +33,7 @@ def _changes_directory(migration):
             return router.allow_migrate(DIRECTORY_ALIAS, migration.app_label, **operation.hints)
         return migration.app_label == "addresses" and any(
             operation.references_model(model._meta.model_name, "addresses")
-            for model in DIRECTORY_MODELS
+            for model in DIRECTORY_MODEL_CLASSES
         )
 
     return any(relevant(operation) for operation in migration.operations)
@@ -42,7 +43,7 @@ def _schema_matches(connection):
     """Also detect missing tables, columns or declared indexes despite recorded migrations."""
     with connection.cursor() as cursor:
         tables = connection.introspection.table_names(cursor)
-        for model in DIRECTORY_MODELS:
+        for model in DIRECTORY_MODEL_CLASSES:
             table = model._meta.db_table
             if table not in tables:
                 return False
@@ -66,8 +67,8 @@ def _schema_matches(connection):
     return True
 
 
-# What an in-place migration needs besides the file itself: the new indexes and tables (about a third of the file, 416 MB on
-# 1312 MB for 0020), the same again for the WAL while it runs, and sorter files in the same folder.
+# What an in-place migration needs besides the file itself: the new indexes and tables (about a third of the file), the
+# same again for the WAL while it runs, and sorter files in the same folder.
 IN_PLACE_FILE_SHARE = 0.35
 IN_PLACE_MARGIN = 256 * 1024 * 1024
 
@@ -79,11 +80,19 @@ def _in_place_space_needed(path):
         return 0
 
 
-def _apply_in_place(connection, path, plan, stdout, stderr):
-    """Apply the additive migrations (``Migration.in_place``) to the existing file: with the exclusive opening mutex, only
-    while no import is alive, and only with enough free disk. Without space the migration is SKIPPED with a message (setup
-    goes on; the lookups answer "unavailable" until it runs). An incomplete schema afterwards is an ERROR: the populated
-    file (stations, plants, addresses) is never wiped by this path."""
+def _require_no_live_import():
+    """Locks the import claim (call inside a transaction); an import that is alive keeps its claim and file."""
+    ImportRequest.objects.get_or_create(pk=1)
+    job = ImportRequest.objects.select_for_update().get(pk=1)
+    if jobs.is_alive(job):
+        raise OperationalError("An address directory import is still running.")
+
+
+def _apply_in_place(connection, path, stdout, stderr):
+    """Apply the additive migrations (``Migration.in_place``) to the existing file: with the exclusive opening mutex,
+    only while no import is alive, and only with enough free disk. Without space the migration is SKIPPED with a message
+    (setup goes on; the lookups answer "unavailable" until it runs). An incomplete schema afterwards is an ERROR: the
+    populated file (stations, plants, addresses) is never wiped by this path."""
     needed = _in_place_space_needed(path)
     free = shutil.disk_usage(path.parent).free
     if free < needed:
@@ -91,14 +100,11 @@ def _apply_in_place(connection, path, plan, stdout, stderr):
             f"The address directory migration was skipped: it needs about {needed // 2**20} MB free in {path.parent} "
             f"({free // 2**20} MB are free). Free the space and run setup_instance again.\n"
         )
-        return False
+        return
     try:
         with directory_open_guard(path):
             with transaction.atomic(using="default"):
-                ImportRequest.objects.get_or_create(pk=1)
-                job = ImportRequest.objects.select_for_update().get(pk=1)
-                if jobs.is_alive(job):
-                    raise OperationalError("An address directory import is still running.")
+                _require_no_live_import()
                 call_command("migrate", "addresses", database=DIRECTORY_ALIAS, interactive=False,
                              verbosity=0, stdout=stdout, stderr=stderr)
     except OSError as error:
@@ -108,7 +114,6 @@ def _apply_in_place(connection, path, plan, stdout, stderr):
             "The address directory schema is incomplete after the in-place migration; the file was left as it is. "
             "Check the migration output, or rebuild the file on purpose (docs/INSTALLATION.md)."
         )
-    return True
 
 
 def _remove_catalogue(connection, path):
@@ -150,14 +155,16 @@ def prepare_directory(*, stdout, stderr):
     with rebuilding_directory():
         executor = MigrationExecutor(connection)
         plan = executor.migration_plan(executor.loader.graph.leaf_nodes("addresses"))
-        # A migration of the directory rebuilds the file and queues a full import, except an ADDITIVE one that keeps the rows
-        # (``Migration.in_place = True``: new tables and indexes built from the existing addresses, for example 0020). Those
-        # are applied to the existing file; only when the schema is still incomplete afterwards the file is rebuilt.
+        # A migration of the directory rebuilds the file and queues a full import, except an ADDITIVE one that keeps the
+        # rows (``Migration.in_place = True``: new tables and indexes built from the existing addresses). Those are
+        # applied to the existing file; only when the schema is still incomplete afterwards the file is rebuilt.
         pending = [migration for migration, _backwards in plan if _changes_directory(migration)]
-        rebuild = not fresh and (marker.exists() or any(not getattr(migration, "in_place", False) for migration in pending))
+        rebuild = not fresh and (
+            marker.exists() or any(not getattr(migration, "in_place", False) for migration in pending)
+        )
         if not (fresh or rebuild):
             if pending:
-                _apply_in_place(connection, path, plan, stdout, stderr)
+                _apply_in_place(connection, path, stdout, stderr)
                 return len(plan), False
             call_command("migrate", "addresses", database=DIRECTORY_ALIAS, interactive=False,
                          verbosity=0, stdout=stdout, stderr=stderr)
@@ -170,10 +177,7 @@ def prepare_directory(*, stdout, stderr):
         # keeps its claim and file; stale/failed jobs are requeued through the existing API.
         with directory_open_guard(path):
             with transaction.atomic(using="default"):
-                ImportRequest.objects.get_or_create(pk=1)
-                job = ImportRequest.objects.select_for_update().get(pk=1)
-                if jobs.is_alive(job):
-                    raise OperationalError("An address directory import is still running.")
+                _require_no_live_import()
                 DatabaseWrapper._make_folders(path.parent)
                 descriptor = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600) if not marker.exists() else None
                 if descriptor is not None:

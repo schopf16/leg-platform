@@ -1,4 +1,4 @@
-/* Suggestions and notice of the address directory (D-065, D-111; owner specification 2026-10-28). Imported by portal.css
+/* Suggestions and notice of the address directory (D-065, D-111). Imported by portal.css
    (every portal page) and loaded by the widgets of the Django administration, which has no portal.css: the custom
    properties of the portal come first, the variables of the administration are the fallback.
 
@@ -37,6 +37,8 @@
 :root[data-theme="dark"] .address-suggest {
   box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
 }
+/* Administration only: its "auto" colour mode follows the device (Django's own dark_mode.css, like admin-portal.css). The
+   portal always sets data-theme to light or dark (R13, D-056), so these media rules never decide anything there. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .address-suggest {
     box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
@@ -198,7 +200,7 @@
   outline-offset: 2px;
 }
 
-/* G1: on a desktop width (above 760 px, the width of the sidebar layout) the card and the notice are an overlay under the row
+/* On a desktop width (above 760 px, the width of the sidebar layout) the card and the notice are an overlay under the row
    of postal code and town, like the lists: the element in the page has no height and cancels the gap of the form grid (the
    same 16 px empty or not, so nothing moves when it fills), its content floats 4 px lower with the shadow and z-index of the
    lists. On a phone it stays in the page. Escape or a press outside closes it (address-directory.js). */
@@ -224,6 +226,7 @@
   .profile-form .address-notice > * { top: -4px; }
   :root[data-theme="dark"] .address-notice > * { box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
 }
+/* Administration only (see the first dark rule of this file). */
 @media (min-width: 761px) and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .address-notice > * { box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
 }

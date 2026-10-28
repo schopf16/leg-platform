@@ -87,8 +87,9 @@ CHUNK_ROWS = 20_000
 # host parameters per statement, D-075).
 PRUNE_BATCH_SIZE = 900
 # Import refused below this free space on the disk of the directory file: the downloaded archive
-# (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1 GB
-# per generation, up to three on disk; the disk is shared with the instance database.
+# (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1.7 GB
+# per generation (3.3 million addresses with the lookup tables and indexes), up to three on disk while
+# importing (the published, the previous and the new one); the disk is shared with the instance database.
 MIN_FREE_DISK_BYTES = 4 * 1024**3
 # ZIP end records (PKWARE APPNOTE 4.3.16, 4.3.15, 4.3.6), read before ``zipfile`` parses the central directory.
 EOCD_SIGNATURE = b"PK\x05\x06"

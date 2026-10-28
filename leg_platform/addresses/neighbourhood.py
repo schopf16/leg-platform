@@ -1,4 +1,4 @@
-"""The transformer circuits around one building for the page "Nachbarschaft" (D-120; NACHBARSCHAFT.md).
+"""The transformer circuits around one building for the page "Nachbarschaft" (D-123; NACHBARSCHAFT.md).
 
 Read only, from the address directory file: the published buildings with their LV95 position, the transformer station of
 each building (``TransformerStation``, D-118) and the plants of the published plant register (D-117). Nothing about a

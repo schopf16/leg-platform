@@ -1,7 +1,6 @@
-"""The centre of every place (owner decision 2026-10-28, round 4): the address check ranks the offered places by their
-distance instead of by the number of the postal code. Additive and IN PLACE like 0020 (``setup.prepare_directory`` does not
-rebuild for it): two nullable columns on the small table, filled from a sample of up to 60 addresses per place (4,060 places in
-about 2 s on 3.3 million addresses)."""
+"""The centre of every place, for ranking the offered places of the address check by distance. Additive and applied in
+place like 0020 (``setup.prepare_directory`` does not rebuild for it): two nullable columns on the small table, filled
+from a sample of up to 60 addresses per place."""
 
 from django.db import migrations, models
 

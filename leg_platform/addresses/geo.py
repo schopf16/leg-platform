@@ -1,4 +1,4 @@
-"""Coordinates of the map: LV95 (EPSG:2056) to WGS84 degrees for the swisstopo base map (D-120).
+"""Coordinates of the map: LV95 (EPSG:2056) to WGS84 degrees for the swisstopo base map (D-123).
 
 The approximate formulas of the Federal Office of Topography swisstopo, "Näherungsformeln für die Transformation zwischen
 Schweizer Projektionskoordinaten und WGS84", Version Dezember 2016, section 2 (accuracy 0.1 arc second in longitude

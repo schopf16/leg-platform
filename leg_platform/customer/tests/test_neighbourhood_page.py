@@ -1,4 +1,4 @@
-"""The page Nachbarschaft (D-120): the circuit of the profile building with public counts only, the map data without any
+"""The page Nachbarschaft (D-123): the circuit of the profile building with public counts only, the map data without any
 other person, the invitation as a mailto link, the menu entry and the Content Security Policy for the swisstopo tiles.
 The address directory is filled with synthetic rows; no network."""
 

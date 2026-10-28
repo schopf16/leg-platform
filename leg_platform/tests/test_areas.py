@@ -136,6 +136,15 @@ class PlanTests(SimpleTestCase):
         self.assertIn("leg_platform.accounts.tests.test_registration", result["labels"])
         self.assertNotIn("leg_platform.accounts.tests.test_models", result["labels"])
 
+    def test_the_address_script_and_style_select_the_address_directory_area(self):
+        # Their browser tests are in addresses/tests, which the area "static" does not run.
+        for path in ("leg_platform/static/js/address-directory.js", "leg_platform/static/css/address-suggest.css"):
+            with self.subTest(path=path):
+                result = test_areas.plan(files=[path])
+                self.assertEqual(result["mode"], "scoped")
+                self.assertIn("address-directory", result["areas"])
+                self.assertIn("leg_platform.addresses.tests", result["labels"])
+
     def test_a_changed_test_module_runs_only_that_module_and_the_repository_checks(self):
         module = "leg_platform/accounts/tests/test_registration.py"
         result = test_areas.plan(files=[module])

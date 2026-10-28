@@ -1417,7 +1417,7 @@ span.note-warn {
   white-space: pre-line;
 }
 
-/* The page Nachbarschaft (D-120): the map, its legend and the circuit list. The colours are the tokens of portal.css
+/* The page Nachbarschaft (D-123): the map, its legend and the circuit list. The colours are the tokens of portal.css
    (light and dark); the map script reads the same tokens (customer/js/neighbourhood-map.js). */
 .nb-page {
   max-width: 720px;

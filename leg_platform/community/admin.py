@@ -51,7 +51,8 @@ class TransformerCircuitAdmin(PlainTableAdmin):
 
 
 class LocationAdmin(AddressSuggestionsMixin, PlainTableAdmin):
-    # The address suggestions work in the change form of a row, not in the editable list (a location lies in Switzerland).
+    # The address suggestions work in the change form of a row, not in the editable list (a location lies in
+    # Switzerland).
     address_country = "CH"
     staff_list_display = (
         "street", "house_number", "postal_code", "town", "address_addition", "transformer_circuit",

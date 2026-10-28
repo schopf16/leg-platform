@@ -245,7 +245,8 @@ AREAS: dict[str, Area] = {
     "address-directory": Area(
         "The address directory, its import jobs and the address suggestions.",
         paths=("leg_platform/addresses/", "leg_platform/static/css/admin-portal.css",
-               "leg_platform/templates/admin/base_site.html"),
+               "leg_platform/templates/admin/base_site.html", "leg_platform/static/js/address-directory.js",
+               "leg_platform/static/css/address-suggest.css"),
         exclude=("leg_platform/addresses/__init__.py", "leg_platform/addresses/apps.py"),
         tests=("leg_platform.addresses.tests", D + "test_plants", A + "test_address_notice", C + "test_address_check"),
     ),

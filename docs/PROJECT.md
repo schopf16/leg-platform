@@ -34,10 +34,6 @@ Server and hosting operations are not an application role.
 
 English for all software and documentation; user interface Swiss German (`de-ch`), no further languages in the first phase (`AGENTS.md`, section 2).
 
-## Working Basis
-
-No assumptions; when in doubt ask the project owner (`AGENTS.md`, section 3).
-
 ## User Functions
 
 * Login page as the entry point (login, password reset, registration, privacy notice and website links); no public home page (D-025); privacy notice link also on all pages accessible without login (D-022)
@@ -65,7 +61,7 @@ No assumptions; when in doubt ask the project owner (`AGENTS.md`, section 3).
 | Email address | yes | Login, account notifications, sending invoices by email |
 | Phone number | no | Queries |
 
-The user model keeps all fields of the eCH-0010 structure (D-032); unused fields are stored but not shown (D-036). Invoicing is not part of the first phase; the purposes are recorded so that only necessary data is collected and are communicated in the privacy notice (DSG Art. 6 para. 3 and Art. 19; D-022).
+The user model keeps all fields of the eCH-0010 structure (D-032); unused fields are stored but not shown (D-036). Only necessary data is collected; the purposes are communicated in the privacy notice (DSG Art. 6 para. 3 and Art. 19; D-022). Invoicing is not part of the first phase.
 
 ## Registration
 
@@ -92,7 +88,7 @@ Users change their address themselves (D-016); it changes only once the new addr
 | Blocked | Decision of a system administrator (misuse, suspected takeover) | no | no | reserved | A system administrator |
 | Deactivated (shown as "Deleted (retention obligation)", D-055) | Deletion of an account with a retention obligation | no | no | released for new registrations | A system administrator ("Restore account"), only if no active, temporarily locked or blocked account uses the address |
 
-Responses never reveal whether an account is blocked or deactivated. The stored key stays `deactivated`; only its label changed (D-055).
+Responses never reveal whether an account is blocked or deactivated. The stored key is `deactivated` (D-055).
 
 ## Account Lifecycle
 
@@ -114,7 +110,7 @@ The role model is D-012; levels and enforcement: `docs/ARCHITECTURE.md`, "Users 
 
 ## Instances
 
-Each municipality runs its own, independent instance (D-013): own database, configuration, users and administrators; no shared data. A person using several instances has a separate account in each. The application runs on its own host name (e.g. a subdomain of the LEG's website), never under a path of another website; the LEG's website links to the login page (D-025). Operation, updates, backups and data are the operator's responsibility. Set-up: `docs/ARCHITECTURE.md`, "Deployment Model".
+Each municipality runs its own, independent instance (D-013): own database, configuration, users and administrators; no shared data. A person using several instances has a separate account in each. The application runs on its own host name, never under a path of another website; the LEG's website links to the login page (D-025). Set-up: `docs/ARCHITECTURE.md`, "Deployment Model".
 
 ## First System Administrator
 
@@ -131,13 +127,13 @@ Outgoing email goes via Microsoft Graph (D-006; `docs/ARCHITECTURE.md`, "Email";
 * Security notifications tell the person to contact the operator immediately if they did not request the change, name the instance's contact information where configured, and do not invite a reply (D-038).
 * They greet by first and last name only for a person with a suitable name and only at addresses belonging to the account at that time, otherwise neutrally. The name is blanked at once for a deleted or deactivated account (D-068; `docs/DESIGN.md`, section 8).
 * The owner of the mailbox of a confirmed second address learns the account holder's name (D-068, L4; input for the privacy notice).
-* The application is restricted to the sender mailbox in Microsoft Entra / Exchange Online (installation guide, which also describes the procedure after a report of an unrequested change).
+* The application is restricted to the sender mailbox in Microsoft Entra / Exchange Online (`docs/INSTALLATION.md`).
 
 ## Passkeys
 
-Passkeys are an optional login method next to password with authenticator app (TOTP). One active credential suffices for every access level, including administrator activation and promotion; the last active passkey cannot be removed. An additional passkey on another device is strongly recommended for recovery protection. The active passkey profile card links directly to adding another key, with guided help and disclosure that saving ends other sessions while keeping the current session. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). A lost method is replaced by email while no building, metering point or IBAN is entered for the account; after that, and always for staff users and system administrators, the LEG administrator starts the recovery after an identity check. Registration, username-free sign-in, management, atomic method changes and unified recovery are implemented; independent acceptance remains pending.
+Passkeys are an optional login method next to password with authenticator app (TOTP). One active credential suffices for every access level, including administrator activation and promotion; the last active passkey cannot be removed. An additional passkey on another device is strongly recommended. Saving an additional key ends other sessions and keeps the current one. Rules, recovery and reset: D-106 (`docs/DECISIONS.md`). A lost method is replaced by email while no building, metering point or IBAN is entered for the account; after that, and always for staff users and system administrators, the LEG administrator starts the recovery after an identity check.
 
-Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language (what you need, what happens if you lose it) and recommends "password and app" to users. It is offered in step 2 of the registration, later in the start tile "Choose how you sign in", in the profile card "Sign-in method", after a reset and at the first login of an administrator. Users choose password, password and app, or passkey; administrators choose password and app or passkey.
+Choosing the login method (D-106, "Guidance"): the step "Sign-in method" compares the methods in plain language and recommends "password and app" to users. It is offered in step 2 of the registration, in the start tile "Choose how you sign in", in the profile card "Sign-in method", after a reset and at the first login of an administrator. Users choose password, password and app, or passkey; administrators choose password and app or passkey.
 
 ## Environments
 
@@ -158,6 +154,6 @@ Later modules must fit without complicating the first phase.
 
 ## Phase 2: Management Area for Staff Users
 
-Phase 2 (D-077): the administration pages ("Verwaltung") for staff users, from the owner's design specification (`LEG-Design-Vorgaben/verwaltung/`, outside the repository): locations, metering points, LEGs, persons (D-078 to D-081), the overview with problem rows, PDF printing of lists (D-082, D-083; desktop only), "Person anlegen" with the encrypted IBAN (D-087). Structure: `docs/ARCHITECTURE.md`. Not built: "Anmeldung starten", change of the login address by staff, billing (D-077 "Open points"; D-087).
+Phase 2 (D-077): the administration pages ("Verwaltung") for staff users, from the owner's design specification (`LEG-Design-Vorgaben/verwaltung/`, outside the repository): locations, metering points, LEGs, persons (D-078 to D-081), the overview with problem rows, PDF printing of lists (D-082, D-083; desktop only), "Person anlegen" with the encrypted IBAN (D-087). Structure: `docs/ARCHITECTURE.md`. Open (not built): "Anmeldung starten", change of the login address by staff, billing (D-077 "Open points"; D-087).
 
 Persons are accounts. Every active staff user may use every page of the area (D-086, owner decision 2026-10-17, approved deviation from D-012). The name of the grid operator (called "BKW" in the owner's specification) is instance data entered by a system administrator in the Django administration (D-086).

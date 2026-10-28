@@ -99,13 +99,13 @@ class Address(models.Model):
                 fields=["generation", "locality_key", "locality", "postal_code"],
                 name="addr_generation_locality",
             ),
-            # Every lookup by street AND house number (the check of a complete address, the addresses of one house number in
-            # all places, the suggestions with a house number, the rows of one street): covering, so that no table row is read
-            # and the rows of one street and number are adjacent pages (H, owner decision 2026-10-28).
+            # Every lookup by street AND house number (the check of a complete address, the addresses of one house
+            # number in all places, the suggestions with a house number, the rows of one street): covering, so that no
+            # table row is read and the rows of one street and number are adjacent pages.
             models.Index(
                 fields=[
-                    "generation", "street_key", "house_number_key", "postal_code", "locality_key", "street", "house_number",
-                    "locality",
+                    "generation", "street_key", "house_number_key", "postal_code", "locality_key", "street",
+                    "house_number", "locality",
                 ],
                 name="addr_house",
             ),
@@ -124,14 +124,15 @@ class Address(models.Model):
 
 class AddressPlace(models.Model):
     """One row per postal code and town of a generation (about 4,000): postal code to towns and town to postal codes
-    without a scan of the addresses (H, owner decision 2026-10-28). Filled with the addresses (``fill_lookup_tables``)."""
+    without a scan of the addresses. Filled with the addresses (``fill_lookup_tables``)."""
 
     generation = models.UUIDField(editable=False)
     postal_code = models.CharField(max_length=4)
     locality = models.CharField(max_length=255)
     locality_key = models.CharField(max_length=255)
-    # LV95 position of the place: the mean of up to PLACE_SAMPLE addresses of it (``fill_place_centres``). The fixes of the
-    # address check rank places by their distance (km), a postal code far away is no near offer. Null: the file has none.
+    # LV95 position of the place: the mean of up to PLACE_SAMPLE addresses of it (``fill_place_centres``). The fixes
+    # of the address check rank places by their distance (km), a postal code far away is no near offer. Null: the file
+    # has none.
     easting = models.FloatField(null=True, editable=False)
     northing = models.FloatField(null=True, editable=False)
 
@@ -150,9 +151,9 @@ class AddressPlace(models.Model):
 
 
 class AddressStreet(models.Model):
-    """One row per street, postal code and town of a generation (about 200,000, a thousandth of the addresses' bytes): the
-    places of a street, the streets of a postal code or a town and the streets that start alike are index ranges of a
-    small table instead of DISTINCT scans over millions of addresses (H, owner decision 2026-10-28)."""
+    """One row per street, postal code and town of a generation (about 200,000, a thousandth of the addresses'
+    bytes): the places of a street, the streets of a postal code or a town and the streets that start alike are index
+    ranges of a small table instead of DISTINCT scans over millions of addresses."""
 
     generation = models.UUIDField(editable=False)
     street = models.CharField(max_length=255)
@@ -175,8 +176,8 @@ class AddressStreet(models.Model):
         ]
 
 
-# Addresses of a place whose coordinates give its centre (a sample, not the mean of all: 4,060 places in 1.3 s instead of
-# a pass over 3.3 million rows in 70 s).
+# Addresses of a place whose coordinates give its centre (a sample, not the mean of all: a pass over every address
+# would take far longer).
 PLACE_SAMPLE = 60
 
 
@@ -202,7 +203,8 @@ def fill_lookup_tables(addresses, *, using=None):
 
     EVERY write of addresses outside the importer (``bulk_create`` and ``save`` call this; ``update``, raw SQL and
     ``delete`` do not) must keep the tables in step: the lookups read ``AddressPlace`` and ``AddressStreet``, not the
-    addresses. The importer publishes a generation only when both tables have rows for it (``importer._is_published``)."""
+    addresses. The importer publishes a generation only when both tables have rows for it
+    (``importer._is_published``)."""
     places, streets = {}, {}
     for address in addresses:
         places[(address.generation, address.postal_code, address.locality_key, address.locality)] = None

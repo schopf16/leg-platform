@@ -1,12 +1,13 @@
-"""Schema for the lookups of the address suggestions (H, owner decision 2026-10-28): two small tables built from the
-addresses (the places of a street, the streets of a postal code or a town, the towns of a postal code) and one covering
-index for lookups by street and house number. ADDITIVE and applied IN PLACE to an existing file: no re-download, the
-existing generation is read, nothing of it is changed (``setup.prepare_directory`` does not rebuild for this migration,
-see ``in_place``). On a file of 3.3 million addresses: one to two minutes (121 s measured on a busy dev machine), about 410 MB more."""
+"""Schema for the lookups of the address suggestions: two small tables built from the addresses (the places of a
+street, the streets of a postal code or a town, the towns of a postal code) and one covering index for lookups by
+street and house number. Additive and applied in place to an existing file: no re-download, the existing generation is
+read and nothing of it is changed (``setup.prepare_directory`` does not rebuild for this migration, see ``in_place``).
+"""
 
 from django.db import migrations, models
 
-# Street rows are built in ranges of the postal code, so that one statement stays short (every Swiss code starts with 1 to 9).
+# Street rows are built in ranges of the postal code, so that one statement stays short (every Swiss code starts with
+# 1 to 9).
 POSTAL_RANGES = ["", "2", "3", "4", "5", "6", "7", "8", "9", "\U0010ffff"]
 
 
