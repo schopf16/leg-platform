@@ -429,7 +429,9 @@ class StepPagesTests(TestCase):
         html = text(response)
         summary = html[html.index("error-summary") :]
         summary = summary[: summary.index("</div>")]
-        self.assertIn('<a href="#id_draw_number">Messpunkt-Nummer für den Bezug</a>', summary)
+        # Step 2 shows the errors under the fields: the summary has the title only, no link and no message (D-125).
+        self.assertIn("Bitte prüfen Sie Ihre Angaben", summary)
+        self.assertNotIn("<a href", summary)
         self.assertNotIn("Geben Sie die letzten Stellen der Nummer ein.", summary)
         # The message stays under the field.
         self.assertIn("Geben Sie die letzten Stellen der Nummer ein.", html)
@@ -524,9 +526,11 @@ class BuildingsPageWalkthroughTests(TestCase):
 
     def test_an_active_point_says_since_and_an_empty_description_shows_a_dash(self):
         html = text(self.client.get(BUILDINGS))
-        self.assertIn(f"Seit {self.since.strftime('%d.%m.%Y')}", html)
+        # The status of the building stands top right; the rows of the points carry no "Since" line any more (D-125).
+        self.assertNotIn(f"Seit {self.since.strftime('%d.%m.%Y')}", html)
         self.assertNotIn("Angemeldet am", html)
-        self.assertIn('aria-label="Keine Beschreibung">–</span>', html)
+        # An empty description is not listed on the card at all.
+        self.assertNotIn("Keine Beschreibung", html)
 
     def test_a_point_that_starts_later_has_no_date_line_and_a_registered_one_says_registered(self):
         later = make_metering_point(71, Direction.FEED_IN, self.location)

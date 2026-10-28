@@ -1,0 +1,10 @@
+{% load i18n %}{% comment %}
+One input of a card in edit mode as a row of the aligned grid. Context: ``field`` (a bound form field), ``label``, optional
+``unit`` (a fixed suffix). The label is a real <label for=...>; the error text stands under the input.
+{% endcomment %}<div class="spec-row">
+  <dt><label for="{{ field.id_for_label }}">{{ label }}</label></dt>
+  <dd>
+    <span class="spec-input{% if unit %} has-unit{% endif %}">{{ field }}{% if unit %}<span class="spec-unit">{{ unit }}</span>{% endif %}</span>
+    {% for error in field.errors %}<p class="spec-error">{{ error }}</p>{% endfor %}
+  </dd>
+</div>

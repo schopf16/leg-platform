@@ -13,6 +13,8 @@ from .models import Plant, PlantRegister
 # The federal building identifier: a whole number of one to nine digits (as the plant register, ``plants.EGID_PATTERN``).
 MIN_EGID = 1
 MAX_EGID = 999_999_999
+# Technology code of photovoltaics in the register (column SubCategory; ``Plant.subcategory``).
+PHOTOVOLTAIC_SUBCATEGORY = "subcat_2"
 
 
 class PlantSummary(NamedTuple):
@@ -22,6 +24,21 @@ class PlantSummary(NamedTuple):
     total_kw: Decimal
     x: float | None
     y: float | None
+
+
+def pv_power_kw(egid):
+    """The total power in kW of the photovoltaic plants of one building in the published register (None when the register
+    is not published or the building has none); a hint to prefill a form, never a stored fact. Same ``egid`` rule as
+    ``plant_summary``."""
+    if type(egid) is not int or not MIN_EGID <= egid <= MAX_EGID:
+        raise ValueError("The building identifier is invalid.")
+    register = PlantRegister.objects.filter(pk=1).values("generation", "row_count").first()
+    if register is None or register["row_count"] == 0:
+        return None
+    total = Plant.objects.filter(
+        generation=register["generation"], egid=egid, subcategory=PHOTOVOLTAIC_SUBCATEGORY
+    ).aggregate(total=Sum("total_power_kw"))["total"]
+    return total or None
 
 
 def plant_summary(egid):

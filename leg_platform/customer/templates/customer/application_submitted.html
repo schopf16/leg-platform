@@ -8,7 +8,7 @@
     </div>
     <div>
       <h1 class="start-title">{% translate "Your application was submitted" %}</h1>
-      <p class="start-sub">{% blocktranslate %}The LEG checks your details and registers your building at {{ operator }}. Then you receive an email from the grid operator. Please confirm the registration there.{% endblocktranslate %}</p>
+      <p class="start-sub">{% translate "Thank you. We have received your application." %}</p>
     </div>
 
     <section class="step-card" aria-labelledby="next-steps">
@@ -18,28 +18,11 @@
           <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.name }}</span><span class="step-word step-word-{{ step.state }}">{{ step.word }}</span></li>
         {% endfor %}
       </ol>
-      <p class="muted">{% blocktranslate %}Please confirm the registration within {{ days }} days after the email from the grid operator.{% endblocktranslate %}</p>
-    </section>
-
-    <section class="step-card" aria-labelledby="your-details">
-      <h2 id="your-details">{% translate "Your submitted details" %}</h2>
-      <dl class="facts">
-        {% if building %}
-          {% with address=building.current_address %}
-            <div><dt>{% translate "Building" %}</dt><dd>{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}{% if building.egid %}<span class="mp-note">{% translate "EGID" %} {{ building.egid }}</span>{% endif %}</dd></div>
-          {% endwith %}
-        {% endif %}
-        <div><dt>{% translate "Metering points" %}</dt><dd>{% for point in points %}<span class="mp-line"><span class="mp-num">{{ point.number|metering_point }}</span><span class="mp-note">{{ point.get_direction_display }}</span></span>{% endfor %}</dd></div>
-        <div><dt>{% if application.start_choice == "date" %}{% translate "Your desired date" %}{% else %}{% translate "Start date" %}{% endif %}</dt><dd>{% if application.start_choice == "date" %}{{ application.desired_start_date|date:"d.m.Y" }}{% else %}{% translate "As soon as possible" %}{% endif %}</dd></div>
-      </dl>
-      <p class="muted">{% if changeable %}{% translate "You can still change your details until the LEG starts checking them." %}{% else %}{% translate "Changes are now only possible through the LEG." %}{% endif %}</p>
+      <p class="muted">{% blocktranslate %}The LEG administration passes your details on to your grid operator {{ operator }}. To make sure the application is really from you, {{ operator }} sends you an invitation in your user account there. You are notified by email and can log in to the account from it. Please confirm the invitation within {{ days }} days. If you do not confirm, the application is cancelled automatically and you incur no costs.{% endblocktranslate %}</p>
     </section>
 
     <div class="step-actions">
-      <a class="btn btn-primary" href="{% url 'home' %}">{% translate "To the start page" %}</a>
-      {% if changeable %}<a class="btn btn-secondary-action" href="{% url 'customer:application_change' application.pk %}">{% translate "Change application" %}</a>{% endif %}
-      {% if withdrawable %}<a class="btn btn-danger-outline" href="{% url 'customer:application_withdraw' application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
+      <a class="btn btn-primary" href="{% url 'customer:buildings' %}">{% translate "To my buildings" %}</a>
     </div>
-    {% if withdrawable %}<p class="muted">{% translate "You can withdraw the application as long as the LEG has not yet submitted it to the grid operator." %}</p>{% endif %}
   </div>
 {% endblock %}

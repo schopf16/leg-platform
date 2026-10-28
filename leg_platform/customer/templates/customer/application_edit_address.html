@@ -1,0 +1,51 @@
+{% extends "customer/base.html" %}
+{% load i18n static customer_ui %}
+{% block title %}{% translate "Edit address" %}{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {# The typing suggestions of the address directory under the address fields (D-111). #}
+  <script defer src="{% static 'js/address-directory.js' %}"></script>
+{% endblock %}
+{% block content %}
+  {% leg_link as leg %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Edit address" %}</h1>
+    <p class="start-sub">{% translate "Enter the address where your electricity is drawn." %}</p>
+    <form method="post" class="step-card step-card-building" novalidate data-submit-once aria-label="{% translate 'Address' %}">
+      {% csrf_token %}
+      {% include "customer/_error_summary.html" %}
+      {% include "customer/_field.html" with field=form.name optional=True %}
+      <div class="address-row address-row-street">
+        {% include "customer/_field.html" with field=form.street after="addresses/widget.html" address_country_value="CH" %}
+        {% include "customer/_field.html" with field=form.house_number %}
+      </div>
+      <div class="address-row address-row-locality">
+        {% include "customer/_field.html" with field=form.postal_code %}
+        {% include "customer/_field.html" with field=form.town %}
+      </div>
+      {% if suggestions %}{% include "addresses/widget_notice.html" with card_template="customer/_building_suggestions.html" status_line=True %}{% else %}{% include "addresses/widget_notice.html" with status_line=True %}{% endif %}
+
+      {% if options %}
+        <fieldset class="question" id="options-fieldset" tabindex="-1" autofocus aria-describedby="options-help">
+          <legend>{% translate "There are several buildings at this address. Which one is yours?" %}</legend>
+          <p class="muted" id="options-help">{% blocktranslate %}Choose the building where your electricity meter is. Not sure? Contact the {{ leg }}.{% endblocktranslate %} {% translate "The EGID is the number of your building in the federal register of buildings." %}</p>
+          {% for option in options %}
+            <label class="entry-check"><input class="entry-check-input" type="radio" name="egid" value="{{ option.egid }}" required><span>{{ option.label }}{% if option.entrance %} · {% blocktranslate with entrance=option.entrance %}Entrance {{ entrance }}{% endblocktranslate %}{% endif %} · {% translate "EGID" %} {{ option.egid }}</span></label>
+          {% endfor %}
+        </fieldset>
+      {% endif %}
+
+      {% if not_clear %}
+        <div class="note-warn" role="alert" tabindex="-1" autofocus>
+          <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not found clearly" %}</p>
+          <p>{% blocktranslate %}This address could not be assigned to one building clearly. Please check your entry or contact the {{ leg }}.{% endblocktranslate %}</p>
+        </div>
+      {% endif %}
+      <div class="step-actions">
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

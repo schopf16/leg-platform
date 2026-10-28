@@ -47,6 +47,13 @@ Examine the actual code, the associated tests and any test and check results pro
 * unnecessary dependencies and known security issues
 * unsubstantiated assumptions in code, configuration or documentation
 
+## Calibration (owner decision 2026-10-28)
+
+* Priority: breaking in (hacking), disclosure of data, one person seeing another person's data, and extracting a whole database (must never be possible). Report these at full severity.
+* Business-process abuse is not a security finding. Customers register their own metering points; the grid operator verifies that a number belongs to the person and asks the customer to confirm again. Do not construct competition, queue or number-race scenarios around it.
+* Report process or workflow weaknesses at most as a short note, never as Medium or higher.
+* Every finding needs a realistic attacker, a concrete path and real harm. No speculative findings.
+
 ## Review Method
 
 * Look for concrete attack possibilities.

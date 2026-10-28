@@ -72,6 +72,15 @@ def check_access(request):
     return None
 
 
+def has_customer_access(request):
+    """The same rules as ``check_access`` as a plain yes/no (for an answer that only customers may get, e.g. the EGID of
+    the address lookup, D-124): logged in, an active customer, and the second factor completed where it is required."""
+    user = request.user
+    if not is_customer(user):
+        return False
+    return not (requires_second_factor(user) and not is_second_factor_complete(user))
+
+
 class CustomerAccessMixin:
     """For class-based views: the account must be an active customer; ids are resolved through the account."""
 

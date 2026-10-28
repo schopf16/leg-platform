@@ -151,6 +151,14 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
 * Server does not come up: read `runserver.err.log` (section 14), wait about five seconds, run section 7.
 * After CSS/JavaScript changes, hard-reload the browser (static cache). Restarting refreshes Python and templates only. Do not add duplicate CSS overrides to compensate for a cached file.
 
+### Participant prototyping in VS Code
+
+* Run the task `Local participant prototyping server` instead of the server above. Open `http://localhost:8000/`. Run `D106 local console mail worker` separately if no mail worker is running.
+* The task keeps debug off and enables Django's standard autoreloader: Python changes restart the server; template changes reset the template loaders. Refresh the browser after a change; hard-reload for CSS and JavaScript.
+* Use the normal authenticated design account (section 9.1). Start at `/participation/buildings/` and use the existing registration wizard. Keep account and object access checks unchanged.
+* Use synthetic data only. Do not reset existing drafts or buildings. Mark any later mockup explicitly; it must not pretend to submit a real application.
+* Source: installed Django `django/template/autoreload.py` (`watch_for_template_changes`, `template_changed`, `reset_loaders`); `runserver` with its default autoreloader.
+
 ## 7. Health checks (read-only)
 
 ```powershell
@@ -288,7 +296,7 @@ Do not stop processes the status block did not list as yours. The mail worker ma
 Only when the main session or the project owner orders it and no designer or tester session depends on the data.
 
 1. Stop the server and the worker (section 11). Confirm `APP_ENV` is `local` and `DB_HOST` is `127.0.0.1` (section 3).
-2. `.\.venv\Scripts\python manage.py flush --noinput` removes all rows, keeps the schema (including the seeded design accounts).
+2. `.\.venv\Scripts\python manage.py flush --noinput` removes application data, including the seeded design accounts, and keeps the schema and migration records. It does not reset the separate address directory.
 3. `Remove-Item "$HOME\.leg-platform-design-accounts.json"`, then create the accounts again (section 9.1).
 4. Start server and worker again (section 6).
 

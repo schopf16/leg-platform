@@ -200,10 +200,23 @@ def _is_asked(values, mode):
     return bool(values["street"])
 
 
-def _check(directory, query, values, home, approximate, fix):
+def _buildings_of(query, values):
+    """``{"egid": the EGID or None, "buildings": 0, 1 or 2}`` for a complete address that the directory knows: the EGID
+    only when exactly one building has it (two or more: ``buildings`` is 2, the wizard asks the person after the submit)."""
+    egids = list(
+        query.filter(
+            street_key=key(values["street"]), house_number_key=key(values["house_number"]),
+            postal_code=values["postal_code"], locality_key=key(values["locality"]), egid__isnull=False,
+        ).values_list("egid", flat=True).distinct()[:2]
+    )
+    return {"egid": egids[0] if len(egids) == 1 else None, "buildings": len(egids)}
+
+
+def _check(directory, query, values, home, approximate, fix, building=False):
     """The parts of the answer of mode "check": ``match`` and, for an address that is not in a current directory, the
     ``warning`` and the ``proposals`` with their ``reason``. An old directory may lack a new address: no notice then,
-    and no proposal."""
+    and no proposal. ``building`` (the status line of the customer wizard, D-124) adds ``egid`` and ``buildings`` for a
+    match: public register data about the typed address, display only (the wizard recomputes the EGID on submit)."""
     if len(values["postal_code"]) != POSTAL_CODE_LENGTH or not values["locality"]:
         match = False
     else:
@@ -212,6 +225,8 @@ def _check(directory, query, values, home, approximate, fix):
             postal_code=values["postal_code"], locality_key=key(values["locality"]),
         ).exists()
     answer = {"match": match}
+    if match and building:
+        answer.update(_buildings_of(query, values))
     if not match and not directory.is_stale:
         if fix:
             answer["reason"], answer["proposals"] = fixes(directory.generation, query, values, home, approximate)
@@ -257,14 +272,15 @@ def _approximate(generation, query, values, home, approximate):
     return {"results": rows[:RESULT_LIMIT], "kind": kind, "more": len(rows) > RESULT_LIMIT}
 
 
-def lookup(values, *, mode="suggest", home=None, minimum=2, approximate=True, fix=True):
+def lookup(values, *, mode="suggest", home=None, minimum=2, approximate=True, fix=True, building=False):
     """The JSON answer of the lookup endpoint.
 
     ``warning`` is non-empty only in mode "check" when a current directory does not know the complete address (D-066);
     directory problems are logged and shown to the operator only. ``more`` says that the directory has further matches
     than ``results`` holds. ``proposals`` with ``reason`` (mode "check" only) are up to three complete addresses that
     fix what does not fit (``fixes``). A house number typed at the end of the street (house number field empty) is
-    split off when the street as typed finds nothing.
+    split off when the street as typed finds nothing. ``building`` (mode "check" only) adds ``egid`` and ``buildings``
+    to a match (D-124); the endpoint allows it for a signed-in account only.
     Mode "locality" (D-111) answers ``results`` of ``{"postal_code", "locality"}`` for the typed postal code or town.
     ``home`` is ``(postal code, town)`` of the LEG: its addresses come first. ``minimum`` is the shortest street
     or town that is searched. ``approximate`` allows the approximate street search after a prefix search without a hit
@@ -287,7 +303,7 @@ def lookup(values, *, mode="suggest", home=None, minimum=2, approximate=True, fi
         if mode == "locality":
             result["results"], result["more"] = locality_matches(directory.generation, values, home)
         elif mode == "check":
-            result.update(_check(directory, query, values, home, approximate, fix))
+            result.update(_check(directory, query, values, home, approximate, fix, building))
         elif len(values["street"]) >= minimum and key(values["street"]):
             result.update(_suggest(directory.generation, query, values, home, approximate))
     except (DatabaseError, ConnectionDoesNotExist):

@@ -1,6 +1,7 @@
 """The page Buildings and its pencils (GEBAEUDE.md, LEERE-ZUSTAENDE.md; D-103): the account's own buildings and metering
 points only, statuses as a dot plus a word, the progress of a running registration or deregistration, the names."""
 
+import re
 from datetime import date, timedelta
 
 from django.test import TestCase, tag
@@ -70,8 +71,8 @@ class BuildingsPageTests(TestCase):
         self.assertIn("<h2", html)
         self.assertIn("Musterstrasse 1", html)
         self.assertIn("3063 Ittigen", html)
-        self.assertIn("<dt>EGID</dt><dd>90001234</dd>", html)
-        self.assertIn("<dt>Netzbetreiber</dt><dd>Example Grid AG</dd>", html)
+        self.assertRegex(html, r"<dt>EGID</dt><dd[^>]*>90001234</dd>")
+        self.assertRegex(html, r"<dt>Netzbetreiber</dt><dd[^>]*>Example Grid AG</dd>")
         self.assertIn("Block A", html)
         self.assertNotIn("EGRID", html)
         # One line: the grid operator's block, then blocks of four, no-break spaces (D-109).
@@ -97,16 +98,17 @@ class BuildingsPageTests(TestCase):
 
     def test_a_status_is_a_dot_and_a_word(self):
         html = self.page()
+        # One status for the building, alone top right (D-125); the rows of the points carry no status of their own.
         self.assertRegex(html, r'<span class="dot tone-ok" aria-hidden="true"></span>Teilnehmend')
-        self.assertRegex(html, r'<span class="dot tone-ok" aria-hidden="true"></span>Aktiv')
-        self.assertRegex(html, r"Seit \d\d\.\d\d\.\d{4}")
+        self.assertEqual(html.count("tone-ok"), 1)
 
     def test_the_two_main_buttons_and_the_buttons_of_the_card(self):
         html = self.page()
-        self.assertIn(">Anmeldung starten<", html)
+        self.assertIn(">Neues Gebäude hinzufügen<", html)
         self.assertIn(">Abmeldung starten<", html)
-        self.assertLess(html.index(">Anmeldung starten<"), html.index(">Abmeldung starten<"))
+        self.assertLess(html.index(">Neues Gebäude hinzufügen<"), html.index(">Abmeldung starten<"))
         self.assertIn(f'href="{reverse("customer:application_start")}?building={self.location.pk}"', html)
+        self.assertIn(f'href="{BUILDINGS}?edit=l{self.location.pk}">Ändern<', html)
         self.assertIn(">Messpunkt hinzufügen<", html)
         self.assertIn(">Messpunkt entfernen<", html)
         self.assertIn(reverse("customer:deregistration_start"), html)
@@ -122,7 +124,6 @@ class BuildingsPageTests(TestCase):
         html = self.page(login(newcomer))
         self.assertNotIn("Abmeldung starten", html)
         self.assertNotIn("Messpunkt entfernen", html)
-        self.assertRegex(html, r"Start am \d\d\.\d\d\.\d{4}")
 
     def test_a_building_with_a_draw_and_a_feed_in_has_no_button_to_add_a_point(self):
         active_point(3, self.mine, self.location, Direction.FEED_IN)
@@ -194,16 +195,19 @@ class BuildingsPageTests(TestCase):
         )
         applications.set_start(newcomer, application, asap=True)
         applications.submit(newcomer, application)
-        change = reverse("customer:application_change", args=[application.pk])
         html = self.page(login(newcomer))
-        self.assertEqual(html.count(f'href="{change}"'), 1)
-        self.assertIn(">Anmeldung ändern<", html)
-        self.assertNotIn("Sie können sie hier nicht mehr ändern", html)
+        edit = re.search(r'href="{}\?edit=a\d+"'.format(re.escape(BUILDINGS)), html)
+        self.assertIsNotNone(edit)
+        edit = edit.group(0)
+        self.assertEqual(html.count(edit), 1)
+        self.assertIn(">Ändern<", html)
+        self.assertNotIn("Darum können Sie die Anmeldung nicht mehr ändern", html)
         staff = staff_user("staff.changeable@example.org")
         application_staff.start_review(application, staff)
         html = self.page(login(newcomer))
-        self.assertNotIn(change, html)
-        self.assertIn("Die LEG prüft Ihre Anmeldung. Sie können sie hier nicht mehr ändern.", html)
+        self.assertNotIn(edit, html)
+        self.assertNotIn(">Ändern<", html)
+        self.assertIn("Darum können Sie die Anmeldung nicht mehr ändern.", html)
         # The withdrawal is the documented way until the registration at the grid operator starts.
         self.assertIn(reverse("customer:application_withdraw", args=[application.pk]), html)
 
@@ -220,7 +224,7 @@ class BuildingsPageTests(TestCase):
         applications.set_start(newcomer, application, asap=True)
         applications.submit(newcomer, application)
         html = self.page(login(newcomer))
-        self.assertRegex(html, r'<span class="dot tone-warn" aria-hidden="true"></span>Bei der LEG in Prüfung')
+        self.assertRegex(html, r'<span class="dot tone-warn" aria-hidden="true"></span>In Anmeldung')
         self.assertIn("Anmeldung: 1 von 5 erledigt", html)
         for word in ("Angaben abgeschickt", "Prüfung durch die LEG", "Wird von"):
             self.assertIn(word, html)
@@ -251,7 +255,7 @@ class BuildingsPageTests(TestCase):
         draft_with_building(newcomer, egid=90005555, street="Seitenweg", house_number="9", postal_code="3000", town="Bern")
         html = self.page(login(newcomer))
         self.assertIn("Seitenweg 9", html)
-        self.assertIn("<dt>EGID</dt><dd>90005555</dd>", html)
+        self.assertRegex(html, r"<dt>EGID</dt><dd[^>]*>90005555</dd>")
 
     def test_the_page_has_no_inline_script_or_style(self):
         html = self.page()

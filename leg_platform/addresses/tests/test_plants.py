@@ -504,6 +504,24 @@ class PublicationTests(TestCase):
 
     def test_nothing_is_summarised_before_a_publication(self):
         self.assertIsNone(plant_lookup.plant_summary(1001))
+        self.assertIsNone(plant_lookup.pv_power_kw(1001))
+
+    def test_the_photovoltaic_power_sums_only_the_photovoltaic_plants_of_the_building(self):
+        self.publish([
+            plant_line(1, EGID="5000", TotalPower="10", SubCategory="subcat_2"),
+            plant_line(2, EGID="5000", TotalPower="2.5", SubCategory="subcat_2"),
+            plant_line(3, EGID="5000", TotalPower="7", SubCategory="subcat_1"),
+            plant_line(4, EGID="5001", TotalPower="3", SubCategory="subcat_1"),
+        ])
+        self.assertEqual(plant_lookup.pv_power_kw(5000), Decimal("12.500"))
+        # No photovoltaic plant (only another technology) and an unknown building: nothing to prefill.
+        self.assertIsNone(plant_lookup.pv_power_kw(5001))
+        self.assertIsNone(plant_lookup.pv_power_kw(4999))
+
+    def test_the_photovoltaic_power_refuses_an_invalid_identifier(self):
+        for egid in (0, -1, 1_000_000_000, "1001", 1001.0, None, True):
+            with self.subTest(egid=egid), self.assertRaises(ValueError):
+                plant_lookup.pv_power_kw(egid)
 
     def test_a_refused_generation_leaves_the_published_one_in_place(self):
         self.publish([plant_line(number) for number in range(1, 101)])

@@ -11,16 +11,21 @@ step that does not apply) redirects to the page that resumes the application. Ev
 account's request budget (``customer.limits``); the building search against a second one.
 """
 
+import logging
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.connection import ConnectionDoesNotExist
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 from django.views import View
 
+from leg_platform.addresses import plant_lookup
 from leg_platform.community import applications, buildings, contracts, grid_operator, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.models import Application, Direction, ManagementSettings
@@ -30,7 +35,11 @@ from leg_platform.customer import steps as steps_module
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.customer.steps import STEP_NAMES
 
+logger = logging.getLogger(__name__)
+
 SUBMITTED_SESSION_KEY = "customer_submitted_application"
+# The id of the application whose building was just chosen: the metering points page says so once (D-124).
+BUILDING_NOTICE_SESSION_KEY = "customer_building_notice"
 
 STEP_URLS = {
     applications.BUILDING: "customer:application_building",
@@ -416,6 +425,18 @@ class BuildingStepView(StepView):
             return redirect("customer:application_building", pk=application.pk)
         if chosen is not None:
             return redirect("customer:application", pk=application.pk)
+        return self.process(request, application, current)
+
+    def store(self, person, application, address, egid, data):
+        """Write the building through the service (the hook of the address change of a submitted application)."""
+        return applications.choose_building(
+            person, application, street=address[0], house_number=address[1], postal_code=address[2], town=address[3],
+            egid=egid, name=data["name"],
+        )
+
+    def process(self, request, application, current):
+        """The address form: validation, the suggestions, the directory choice, the service call."""
+        person = request.user
         form = forms.BuildingForm(request.POST)
         if not form.is_valid():
             return self.show(request, application, current, form=form)
@@ -445,15 +466,22 @@ class BuildingStepView(StepView):
                     request, application, current, form=form, suggestions=_candidate_rows(suggestions)
                 )
         try:
-            applications.choose_building(
-                person, application, street=typed[0], house_number=typed[1], postal_code=typed[2], town=typed[3],
-                egid=egid, name=data["name"],
-            )
+            choice = self.store(person, application, typed, egid, data)
         except ValidationError as error:
             add_service_error(form, error)
             return self.show(request, application, current, form=form)
         except ApplicationError as error:
             return self.refused(request, application, current, form, typed, error)
+        return self.after_choice(request, application, choice)
+
+    @staticmethod
+    def after_choice(request, application, choice):
+        """A building was added (found, or kept as typed for the review): straight to the metering points, which say it
+        once (D-124). Any other next step shows the result on this page. The session holds only the id of the
+        application, never an address or an EGID."""
+        if next_url(application) == step_url(application, applications.METERING_POINTS):
+            request.session[BUILDING_NOTICE_SESSION_KEY] = application.pk
+            return redirect(step_url(application, applications.METERING_POINTS))
         return redirect("customer:application_building", pk=application.pk)
 
     def refused(self, request, application, current, form, typed, error):
@@ -512,22 +540,38 @@ class MeteringPointsStepView(StepView):
                 feed_in_number=_typed_part(feed_in.number), feed_in_name=feed_in.name,
                 **{name: _figure(getattr(feed_in, name)) for name in self.FIGURES},
             )
+        if not values.get("pv_power_kwp") and building.egid:
+            try:
+                registered = plant_lookup.pv_power_kw(building.egid)
+            except (DatabaseError, ConnectionDoesNotExist, ValueError):
+                # The plant register is an extra: without it the field stays empty (the log holds no EGID).
+                logger.warning("The plant register could not be read for the prefill of the photovoltaic power.")
+                registered = None
+            if registered is not None:
+                values["pv_power_kwp"] = _figure(registered.normalize())
         return values
 
     def show(self, request, application, current, form=None):
         building = self.building(application)
         flags = self.flags(request, building)
         settings_row = ManagementSettings.load()
-        form = form or forms.MeteringPointsForm(initial=self.initial(building), **flags)
+        form = form or forms.MeteringPointsForm(
+            initial=self.initial(building), prefix_text=settings_row.metering_point_prefix, **flags
+        )
+        # Said once, after the building step (D-124): read from the stored building, so the page never trusts the session.
+        # Only a GET takes the flag: the redisplay of a failed POST keeps no note.
+        announced = request.method == "GET" and request.session.get(BUILDING_NOTICE_SESSION_KEY) == application.pk
+        if announced:
+            del request.session[BUILDING_NOTICE_SESSION_KEY]
         return self.render_step(
             request, application, current, form=form, building=building, prefix=settings_row.metering_point_prefix,
-            numbers_ready=bool(settings_row.identifier), **flags,
+            numbers_ready=bool(settings_row.identifier), building_notice=announced, **flags,
         )
 
     def submit(self, request, application, current):
         building = self.building(application)
         flags = self.flags(request, building)
-        form = forms.MeteringPointsForm(request.POST, **flags)
+        form = forms.MeteringPointsForm(request.POST, prefix_text=ManagementSettings.load().metering_point_prefix, **flags)
         if not ManagementSettings.load().identifier:
             messages.error(request, texts.message("prefix_not_configured"))
             return self.show(request, application, current, form=form)
@@ -705,8 +749,11 @@ class StartDateStepView(StepView):
         initial = {}
         if application.start_choice:
             initial = {"start": application.start_choice, "desired_date": application.desired_start_date}
-        form = form or forms.StartForm(initial=initial or {"start": forms.ASAP})
         earliest = applications.earliest_start_date()
+        initial = initial or {"start": forms.ASAP}
+        if not initial.get("desired_date"):
+            initial["desired_date"] = earliest
+        form = form or forms.StartForm(initial=initial)
         # The earliest day for the date picker (a hint of the browser; the service checks it again) and, up front, as the
         # help text under the field (W1-11).
         form.fields["desired_date"].widget.attrs["min"] = earliest.isoformat()

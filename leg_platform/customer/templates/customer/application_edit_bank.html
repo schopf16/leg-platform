@@ -1,0 +1,19 @@
+{% extends "customer/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Edit bank or postal connection" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <p class="page-label">{% translate "My participation" %}</p>
+    <h1 class="start-title">{% translate "Edit bank or postal connection" %}</h1>
+    <p class="start-sub">{% translate "This is how we pay you the compensation for the electricity you feed in." %}</p>
+    <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Bank or postal connection' %}">
+      {% csrf_token %}
+      {% include "customer/_error_summary.html" %}
+      {% include "customer/_field.html" with field=form.iban %}
+      <div class="step-actions">
+        <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+        <a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

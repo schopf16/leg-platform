@@ -23,10 +23,11 @@ from django.views.decorators.csp import csp_override
 
 from leg_platform.accounts import profile_views
 from leg_platform.addresses import buildings as address_buildings, neighbourhood, transformers
-from leg_platform.community import archived, buildings, contracts, own_iban
+from leg_platform.community import applications, archived, buildings, contracts, own_iban
 from leg_platform.community.application_common import ApplicationError
+from leg_platform.community.models import Direction
 from leg_platform.community.persons import PersonError
-from leg_platform.customer import banners, contact, forms, limits, overview, returns, texts
+from leg_platform.customer import banners, card_edit, contact, forms, limits, overview, returns, texts
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.mail import GraphEmailError
 from leg_platform.customer.wizard import too_many_requests
@@ -34,18 +35,55 @@ from leg_platform.downloads import pdf_attachment, pdf_inline
 
 
 class BuildingsView(CustomerAccessMixin, View):
-    """The page Buildings: a card per building with the account's own metering points."""
+    """The page Buildings: a card per building with the account's own metering points. ``?edit=<card id>`` shows that
+    card as a form; its POST saves everything of the card (``customer.card_edit``)."""
 
-    def get(self, request):
+    def _data(self, request):
         data = overview.build(request.user)
+        card_edit.mark(data)
+        return data
+
+    def _render(self, request, data, status=200):
         read = banners.pending(request.user)
         response = render(request, "customer/buildings.html", {
             "overview": data, "deregistration_url": reverse("customer:deregistration_start"),
             "can_deregister": data.can_deregister, "banners": read.banners,
-        })
+        }, status=status)
         # Only after the page was built, and only for a real visit (not HEAD, not a prefetch).
         banners.mark_shown(request, request.user, read)
         return response
+
+    def get(self, request):
+        data = self._data(request)
+        edit_id = request.GET.get("edit", "")
+        if edit_id:
+            card = card_edit.find(data, edit_id)
+            if card is None:
+                return redirect("customer:buildings")
+            card.editing = card_edit.EditState(card)
+            card.editing.focus()
+            data.editing_id = card.edit_id
+        return self._render(request, data)
+
+    def post(self, request):
+        if not limits.allow_wizard(request.user):
+            return too_many_requests(request)
+        data = self._data(request)
+        card = card_edit.find(data, request.GET.get("edit", ""))
+        if card is None:
+            messages.error(request, texts.message("not_editable"))
+            return redirect("customer:buildings")
+        state = card.editing = card_edit.EditState(card, request.POST)
+        data.editing_id = card.edit_id
+        if state.is_valid():
+            result = card_edit.save(request, state)
+            if result is True:
+                messages.success(request, _("Saved."))
+                return redirect("customer:buildings")
+            if result is not False:
+                return result
+        state.focus()
+        return self._render(request, data)
 
 
 # The swisstopo tiles of the map: the one external host the page's policy allows, for images only (D-123). Set for this
@@ -203,18 +241,31 @@ class MeteringPointNameView(CustomerAccessMixin, View):
             raise Http404
         return point
 
+    @staticmethod
+    def make_form(point, data=None):
+        """Name only for a draw; name and plant figures for a feed-in."""
+        if point.direction == Direction.FEED_IN:
+            initial = {"name": point.name, **{
+                field: "" if getattr(point, field) is None else format(getattr(point, field), "f")
+                for field in buildings.PLANT_FIELDS
+            }}
+            return forms.FeedInPointForm(data, initial=initial)
+        return forms.PointNameForm(data, initial={"name": point.name})
+
     def get(self, request, pk):
         point = self.point(request, pk)
-        return render(request, self.template_name, {"form": forms.PointNameForm(initial={"name": point.name}), "point": point})
+        return render(request, self.template_name, {"form": self.make_form(point), "point": point})
 
     def post(self, request, pk):
         if not limits.allow_wizard(request.user):
             return too_many_requests(request)
         point = self.point(request, pk)
-        form = forms.PointNameForm(request.POST)
+        form = self.make_form(point, request.POST)
         if form.is_valid():
+            data = form.cleaned_data
+            figures = {field: data[field] for field in buildings.PLANT_FIELDS} if "pv_power_kwp" in data else {}
             try:
-                buildings.set_metering_point_name(request.user, point, form.cleaned_data["name"])
+                buildings.set_metering_point_name(request.user, point, data["name"], **figures)
             except ValidationError as error:
                 form.add_error(None, error)
             except ApplicationError as error:
@@ -222,6 +273,10 @@ class MeteringPointNameView(CustomerAccessMixin, View):
                     raise Http404 from None
                 form.add_error(None, texts.message(error.code))
             else:
+                for field, _kind in applications.plant_warnings(**figures):
+                    messages.warning(request, _("The figure %(name)s is unusually large. Please check it.") % {
+                        "name": forms.FeedInPointForm.base_fields[field].label
+                    })
                 messages.success(request, _("Saved."))
                 return redirect("customer:buildings")
         return render(request, self.template_name, {"form": form, "point": point})

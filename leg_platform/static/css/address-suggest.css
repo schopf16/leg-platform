@@ -230,3 +230,27 @@
 @media (min-width: 761px) and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .address-notice > * { box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
 }
+
+/* The status line of the building step (D-124): in the flow at every width, a fixed minimum height so that nothing jumps,
+   never an overlay. It overrides the overlay rules above (same or higher specificity, later in the file). */
+.address-notice.address-status,
+.address-notice.address-status:empty {
+  position: static;
+  height: auto;
+  min-height: 48px;
+  margin-top: 0;
+}
+.address-notice.address-status > *,
+.step-card .address-notice.address-status > *,
+:root[data-theme="dark"] .address-notice.address-status > *,
+:root:not([data-theme="light"]) .address-notice.address-status > * {
+  position: static;
+  top: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+.address-status-box {
+  display: grid;
+  gap: 2px;
+}
+.address-status-box p { margin: 0; }

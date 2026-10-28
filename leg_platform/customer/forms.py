@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.forms import PortalFormMixin, ReauthenticationForm
-from leg_platform.community import deregistrations, own_iban
+from leg_platform.community import deregistrations, grid_operator, numbers, own_iban
 from leg_platform.community.application_common import month_end
 from leg_platform.community.models import (
     BUILDING_DESCRIPTION_MAX_LENGTH,
@@ -84,10 +84,12 @@ class MeteringPointsForm(CustomerForm):
     has a feed-in there; ``feed_in_required`` is True where the draw exists and only a feed-in can be added."""
 
     draw_number = forms.CharField(
-        label=_("Metering point number for consumption"), required=False, max_length=250,
+        label=grid_operator.text(
+            _("Which metering point number does %(operator)s use to measure your electricity consumption?")
+        ),
+        required=False, max_length=250,
         help_text=_(
-            "You find the number on your electricity bill, with the details of your supply point. "
-            "It is also called metering point ID and is not the shorter meter number."
+            "On your electricity bill, with the details of your supply point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
         ),
     )
     draw_name = forms.CharField(
@@ -99,10 +101,12 @@ class MeteringPointsForm(CustomerForm):
         widget=forms.RadioSelect,
     )
     feed_in_number = forms.CharField(
-        label=_("Metering point number for the feed-in"), required=False, max_length=250,
+        label=grid_operator.text(
+            _("Which metering point number does %(operator)s use to measure your solar power feed-in?")
+        ),
+        required=False, max_length=250,
         help_text=_(
-            "You find the number in the documents of your grid operator, with the details of your feed-in point. "
-            "It is also called metering point ID and is not the shorter meter number."
+            "In the documents of your grid operator, with the details of your feed-in point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
         ),
     )
     feed_in_name = forms.CharField(
@@ -120,11 +124,15 @@ class MeteringPointsForm(CustomerForm):
         label=_("Wallbox in kW"), required=False, max_length=20, widget=forms.TextInput(attrs={"inputmode": "decimal"})
     )
 
-    def __init__(self, *args, draw_needed=True, feed_in_offered=True, feed_in_required=False, **kwargs):
+    def __init__(self, *args, draw_needed=True, feed_in_offered=True, feed_in_required=False, prefix_text="", **kwargs):
         super().__init__(*args, **kwargs)
         self.draw_needed, self.feed_in_offered, self.feed_in_required = draw_needed, feed_in_offered, feed_in_required
         for name in ("draw_number", "feed_in_number"):
-            self.fields[name].widget.attrs.update({"autocapitalize": "characters", "spellcheck": "false"})
+            self.fields[name].help_text = str(self.fields[name].help_text) % {"prefix": prefix_text, "length": numbers.SUFFIX_LENGTH}
+        for name in ("draw_number", "feed_in_number"):
+            self.fields[name].widget.attrs.update(
+                {"autocapitalize": "characters", "spellcheck": "false", "data-pad-length": numbers.SUFFIX_LENGTH}
+            )
         for name in ("draw_number", "draw_name", "feed_in_number", "feed_in_name"):
             self.fields[name].widget.attrs["autocomplete"] = "off"
 
@@ -150,7 +158,11 @@ class BankForm(CustomerForm):
 
     iban = forms.CharField(
         label=_("IBAN"), max_length=60,
-        help_text=_("The IBAN is on your account or payment statement and on the back of your bank card."),
+        help_text=_(
+            "We only need your IBAN to pay you the compensation for the electricity you feed in. "
+            "We transfer the credit to this account. You find the IBAN on your account or payment statement "
+            "and on the back of your bank card."
+        ),
         widget=forms.TextInput(attrs={
             "placeholder": "CH93 0076 2011 6238 5295 7", "autocomplete": "off", "autocapitalize": "characters",
             "spellcheck": "false", "class": "iban-input",
@@ -201,6 +213,21 @@ class PointNameForm(CustomerForm):
     name = forms.CharField(
         label=_("Name of the metering point"), required=False, max_length=METERING_POINT_NAME_MAX_LENGTH,
         widget=forms.TextInput(attrs={"placeholder": _("e.g. House")}),
+    )
+
+
+class FeedInPointForm(PointNameForm):
+    """The name and the plant figures of a feed-in point (the fields and the checks of the wizard form)."""
+
+    pv_power_kwp = DecimalField(
+        label=_("PV power in kWp"), required=False, max_length=20, widget=forms.TextInput(attrs={"inputmode": "decimal"})
+    )
+    battery_kwh = DecimalField(
+        label=_("Battery storage in kWh"), required=False, max_length=20,
+        widget=forms.TextInput(attrs={"inputmode": "decimal"}),
+    )
+    wallbox_kw = DecimalField(
+        label=_("Wallbox in kW"), required=False, max_length=20, widget=forms.TextInput(attrs={"inputmode": "decimal"})
     )
 
 

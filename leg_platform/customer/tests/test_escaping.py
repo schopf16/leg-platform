@@ -71,10 +71,10 @@ class CustomerPagesEscapeTests(TestCase):
 
     def test_the_page_buildings_shows_names_addresses_and_descriptions_as_text(self):
         html = self.read(BUILDINGS)
-        # The title is the own name; it stands in the content and in the aria-label of the list.
+        # The title is the own name, shown as text in the heading of the card (the list has no aria-label of it any more).
         self.assertIn(escape(HOSTILE), html)
         self.assertIn(escape(SCRIPT), html)
-        self.assertRegex(html, r'aria-label="[^"]*&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;')
+        self.assertRegex(html, r"<h2[^>]*>[^<]*&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;")
 
     def test_the_pencil_pages_show_the_own_words_as_text_also_after_an_error(self):
         details = reverse("customer:building_details", args=[self.location.pk])

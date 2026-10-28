@@ -33,13 +33,13 @@ def post_submit_steps(application, operator, named=True):
     if named:
         labels = {
             "operator_registration": _("Registration at %(operator)s") % {"operator": operator},
-            "operator_confirmation": _("You confirm the request in the email from %(operator)s") % {"operator": operator},
+            "operator_confirmation": _("You confirm the invitation in your account at %(operator)s") % {"operator": operator},
         }
         start_word = _("Set by %(operator)s") % {"operator": operator}
     else:
         labels = {
             "operator_registration": _("Registration at the grid operator"),
-            "operator_confirmation": _("You confirm the request in the email from the grid operator"),
+            "operator_confirmation": _("You confirm the invitation in your account at the grid operator"),
         }
         start_word = _("Set by the grid operator")
     labels.update({
