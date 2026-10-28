@@ -265,6 +265,42 @@ class PersonalCardTests(TestCase):
             ("Berta", "Musterstrasse", "1", 3063, "Ittigen"),
         )
 
+    def test_a_locked_address_has_no_suggestions_no_notice_and_a_forged_post_changes_nothing(self):
+        self.building()
+
+        locked = self.get("?edit=personal")
+        # No widget, no panel, no notice: nothing can fill a field that is disabled (the script is not asked to).
+        for marker in ("data-address-directory", "data-address-notice", "address-assist", "address-suggest", "data-endpoint"):
+            self.assertNotIn(marker, locked)
+        self.assertIn('id="address-locked-note"', locked)
+        # The same page for an address that is not locked has them all.
+        other = login(self.other).get(PROFILE + "?edit=personal").content.decode()
+        self.assertEqual(other.count("data-address-directory"), 1)
+        self.assertEqual(other.count("data-address-notice"), 1)
+        # Whatever is posted for the address fields (also the country), the stored address stays and the name changes.
+        response = self.post(first_name="Berta", street="Hackweg", house_number="99", postal_code="8000", town="Zürich", country="DE")
+        self.assertEqual(response.status_code, 302)
+        self.mine.refresh_from_db()
+        self.assertEqual(
+            (self.mine.first_name, self.mine.street, self.mine.house_number, self.mine.swiss_postal_code, self.mine.town,
+             self.mine.country.code),
+            ("Berta", "Musterstrasse", "1", 3063, "Ittigen", "CH"),
+        )
+
+    def test_the_lookup_endpoint_is_not_a_way_around_the_lock(self):
+        # The endpoint answers public register data and writes nothing: a locked address cannot be changed through it.
+        self.building()
+        before = (self.mine.street, self.mine.house_number, self.mine.swiss_postal_code, self.mine.town)
+        client = login(self.mine)
+        for mode in ("suggest", "check", "locality"):
+            client.post(
+                reverse("addresses:lookup"),
+                "mode=%s&street=Hackweg&house_number=99&postal_code=8000&locality=Zurich&country=CH" % mode,
+                content_type="application/x-www-form-urlencoded",
+            )
+        self.mine.refresh_from_db()
+        self.assertEqual((self.mine.street, self.mine.house_number, self.mine.swiss_postal_code, self.mine.town), before)
+
     def test_without_a_building_of_the_account_there_is_no_egid_and_no_lock(self):
         # Another account's building at the same address is not the account's building.
         self.building(person=self.other)

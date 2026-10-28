@@ -303,7 +303,18 @@ class BuildingStepTests(WizardCase):
         self.assertIn("Ittigenstrasse 51, 3063 Ittigen", html)
         self.assertIn("EGID 90004269", html)
         self.assertIn('name="suggestion" value="0"', html)
-        self.assertIn(">Meine Eingabe ist richtig<", html)
+        # The card is the one of the address script (inside the notice); its link has the shared text (G2).
+        self.assertIn(">Nein, meine Adresse stimmt so<", html)
+        self.assertIn('class="suggest address-proposal"', html)
+        # The server's card is INSIDE the notice of the address widget (card_template), the one overlay of the script; there
+        # is no second card in the page and no card class of the old layout.
+        self.assertRegex(
+            html, r'<div class="address-notice" id="address-notice" data-address-notice role="status">\s*<div class="suggest address-proposal"',
+        )
+        self.assertEqual(html.count("address-proposal-keep"), 1)
+        self.assertEqual(html.count('class="suggest address-proposal"'), 1)
+        self.assertNotIn("address-card-server", html)
+        self.assertNotIn("suggest-option", html)
         self.assertFalse(self.application.buildings.exists())
         # The external search comes only after the person decided: nothing was looked up so far.
         lookup.assert_not_called()

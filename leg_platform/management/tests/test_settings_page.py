@@ -300,8 +300,9 @@ class RealDirectoryTests(TestCase):
         self.assertIn("Vorschlag: Musterstrasse 1, 3063 Ittigen.", html)
 
         client.post(URL, {**VALID, "sender_street": "Nirgendwo"})
-        self.assertIn("nicht gefunden", client.get(URL).content.decode())
+        # The sentence of the server; the script texts in the widget (data attributes) also contain "nicht gefunden".
+        self.assertIn("Diese Adresse wurde nicht gefunden.", client.get(URL).content.decode())
         client.post(URL, VALID)
         html = client.get(URL).content.decode()
         self.assertNotIn("Adressverzeichnis ab", html)
-        self.assertNotIn("nicht gefunden", html)
+        self.assertNotIn("Diese Adresse wurde nicht gefunden.", html)

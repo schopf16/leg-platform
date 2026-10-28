@@ -16,6 +16,8 @@ lead and the buttons are shown.
       <div class="mgmt-dialog-row is-{{ row }}">
         {% for name in names %}{% include "management/_dialog_field.html" with field=form|bound:name %}{% endfor %}
       </div>
+      {# The notice of the address directory spans the whole dialog, under the row of postal code and town (D-111). #}
+      {% if row == "postal" and "street" in form.fields and "town" in form.fields %}{% include "addresses/widget_notice.html" %}{% endif %}
       {% endif %}
     {% endfor %}
     {% if form.hint %}<div class="mgmt-hint mgmt-dialog-hint">{{ form.hint }}</div>{% endif %}

@@ -593,48 +593,6 @@
   overflow-wrap: anywhere;
 }
 
-.suggest {
-  display: grid;
-  gap: 12px;
-}
-
-.suggest h2 {
-  font-size: 16px;
-}
-
-.suggest-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.suggest-option {
-  display: block;
-  width: 100%;
-  min-height: 48px;
-  padding: 8px 16px;
-  border: 1.5px solid var(--muted);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--fg);
-  font: inherit;
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-
-.suggest-option:hover {
-  background: var(--warm);
-}
-
-.suggest-egid {
-  margin-left: 8px;
-  font-size: 14px;
-  color: var(--muted);
-}
-
 fieldset.question {
   display: grid;
   gap: 8px;

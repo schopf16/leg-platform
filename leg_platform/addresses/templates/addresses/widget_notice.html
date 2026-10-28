@@ -6,4 +6,4 @@ address-directory.js) shows at most one paragraph with the class alert-warning, 
 directory is available and does not know the complete address. Nothing else is ever shown here (not
 an unavailable, old or limited directory). It never takes the focus and never blocks saving. Without
 JavaScript it stays empty.
-{% endcomment %}<div class="address-notice" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice role="status"></div>
+{% endcomment %}<div class="address-notice" id="{{ address_notice_id|default:'address-notice' }}" data-address-notice role="status">{% if card_template %}{% include card_template %}{% endif %}</div>

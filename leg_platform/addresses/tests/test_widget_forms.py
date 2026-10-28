@@ -11,7 +11,7 @@ the rules of its source in ``accounts.tests.test_address_notice``."""
 import re
 
 from django.core import mail
-from django.test import Client, tag
+from django.test import Client, SimpleTestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import VerificationToken
@@ -160,3 +160,81 @@ class EveryAddressFormTests(ProcessBase):
         for html in (self.staff_page("locations_detail", self.location.pk), self.staff_page("persons_detail", self.anna.pk)):
             self.assertNotIn("data-address-directory", html)
             self.assertNotIn("address-directory.js", html)
+
+    def test_the_dialog_draws_the_notice_once_under_the_row_of_postal_code_and_town_outside_the_row(self):
+        # dialog_form.html (D-111): the notice spans the whole dialog; the field itself carries no notice any more.
+        for name, html in (
+            ("person creation", self.staff_page("persons_new")),
+            ("person billing address", self.staff_page("persons_address", self.anna.pk)),
+            ("location creation", self.staff_page("locations_new")),
+            ("location change", self.staff_page("locations_address", self.location.pk)),
+            ("correction of a building", self.staff_page("processes_application_building", self.application.pk, self.building.pk)),
+        ):
+            with self.subTest(name):
+                self.assertEqual(html.count("data-address-notice"), 1)
+                before = html[:html.index("data-address-notice")]
+                row = before[before.rindex("mgmt-dialog-row"):]
+                # The row of postal code and town is closed before the notice: the notice is a sibling, not a child.
+                self.assertIn('id="id_town"', row)
+                self.assertEqual(row.count("<div") - row.count("</div>"), 0, name)
+
+    def test_the_dialogs_without_an_address_have_neither_widget_nor_script(self):
+        for name in ("persons_details", "persons_contact"):
+            with self.subTest(name):
+                html = self.staff_page(name, self.anna.pk)
+                self.assertNotIn("data-address-directory", html)
+                self.assertNotIn("data-address-notice", html)
+                self.assertNotIn("address-directory.js", html)
+
+    def test_the_forms_of_the_dialogs_without_an_address_have_no_street_field(self):
+        from leg_platform.management.person_forms import ContactForm, DetailsForm
+
+        for form in (DetailsForm, ContactForm):
+            self.assertNotIn("street", form(person=self.anna).fields)
+
+
+class AddressFormInventoryTests(SimpleTestCase):
+    """A form with a street field that is not in the table above would have no typing suggestions (D-111). When this test
+    fails, a new form with an address exists: give it the widget (``management.form_fields.address_suggestions``, or the
+    ``after`` include of the portal fields), add its page to ``EveryAddressFormTests.pages`` and name it here."""
+
+    COVERED = {
+        # name of the class: the page of the table (or the test) that proves the widget
+        "leg_platform.accounts.forms.RegistrationDetailsForm": "registration details",
+        "leg_platform.accounts.forms.ProfileForm": "profile",
+        "leg_platform.customer.forms.BuildingForm": "customer wizard",
+        "leg_platform.management.person_forms.PersonCreateForm": "person creation",
+        "leg_platform.management.person_forms.BillingAddressForm": "person billing address",
+        # The base of the two above and the two forms that keep none of its address fields (checked below).
+        "leg_platform.management.person_forms.PersonDataForm": "base of the person forms",
+        "leg_platform.management.person_forms.DetailsForm": "no address fields left",
+        "leg_platform.management.person_forms.ContactForm": "no address fields left",
+        "leg_platform.management.location_forms.LocationCreateForm": "location creation",
+        "leg_platform.management.location_forms.AddressForm": "base of the location forms",
+        "leg_platform.management.location_forms.AddressEditForm": "location change",
+        "leg_platform.management.process_forms.ApplicationBuildingForm": "correction of a building",
+        "leg_platform.management.forms.ManagementSettingsForm": "settings of the LEG",
+        "leg_platform.accounts.admin.users.UserAdminForm": "administration (test_admin_widgets)",
+    }
+
+    def test_every_form_with_a_street_field_is_known(self):
+        from django import forms
+        from django.contrib import admin
+        from django.urls import get_resolver
+
+        get_resolver().url_patterns  # imports the views and with them every form
+        admin.autodiscover()
+
+        def subclasses(cls):
+            for sub in cls.__subclasses__():
+                yield sub
+                yield from subclasses(sub)
+
+        found = {
+            f"{cls.__module__}.{cls.__name__}"
+            for cls in subclasses(forms.BaseForm)
+            if cls.__module__.startswith("leg_platform") and ".tests" not in cls.__module__
+            and set(getattr(cls, "base_fields", {})) & {"street", "sender_street"}
+        }
+
+        self.assertEqual(found, set(self.COVERED))

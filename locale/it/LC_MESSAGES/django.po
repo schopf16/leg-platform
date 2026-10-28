@@ -194,28 +194,54 @@ msgstr "Numero di indirizzi"
 msgid "Address directory"
 msgstr "Elenco degli indirizzi"
 
-msgid "Matching addresses"
-msgstr "Indirizzi corrispondenti"
+msgid "Matching addresses:"
+msgstr "Indirizzi trovati:"
+
+msgid "Similar addresses:"
+msgstr "Indirizzi simili:"
 
 msgid "Did you mean this address?"
 msgid_plural "Did you mean one of these addresses?"
 msgstr[0] "Intendeva questo indirizzo?"
 msgstr[1] "Intendeva uno di questi indirizzi?"
 
-msgid "Choose an address to fill in the fields."
-msgstr "Scelga un indirizzo per compilare i campi."
+msgid "choose one."
+msgstr "ne scelga uno."
+
+msgid "More matches: keep typing."
+msgstr "Altri risultati: continui a digitare."
+
+msgid "Click an address to use it"
+msgstr "Faccia clic su un indirizzo per usarlo"
+
+msgid "My address is correct, use it as entered"
+msgstr "Il mio indirizzo è corretto, lo usi com’è"
+
+msgid "No, my address is correct"
+msgstr "No, il mio indirizzo è corretto"
+
+msgid "Address kept as entered."
+msgstr "Indirizzo mantenuto come inserito."
 
 #, python-format
-msgid ""
-"No street starting with “%(street)s” was found in %(postal_code)s. Choose an"
-" address to fill in the fields."
-msgstr ""
-"Nessuna via che inizia con «%(street)s» è stata trovata in %(postal_code)s. "
-"Scelga un indirizzo per compilare i campi."
+msgid "The postal code %(postal_code)s does not fit %(address)s."
+msgstr "Il NPA %(postal_code)s non corrisponde a %(address)s."
 
-msgid "More addresses match. Keep typing to narrow the list."
-msgstr ""
-"Corrispondono più indirizzi. Continui a digitare per restringere l'elenco."
+#, python-format
+msgid "We could not find house number %(house_number)s on %(street)s."
+msgstr "Non abbiamo trovato il numero civico %(house_number)s in %(street)s."
+
+#, python-format
+msgid "The postal code %(postal_code)s belongs to %(town)s."
+msgstr "Il NPA %(postal_code)s appartiene a %(town)s."
+
+#, python-format
+msgid "We could not find %(street)s in %(postal_code)s."
+msgstr "Non abbiamo trovato %(street)s in %(postal_code)s."
+
+#, python-format
+msgid "We could not find %(street)s in %(town)s."
+msgstr "Non abbiamo trovato %(street)s a %(town)s."
 
 #, python-format
 msgid ""
@@ -10756,27 +10782,6 @@ msgstr ""
 "Il vostro circuito di trasformazione e gli edifici circostanti. Solo dati "
 "pubblici."
 
-msgid "No building at your profile address"
-msgstr "Nessun edificio all'indirizzo del vostro profilo"
-
-msgid ""
-"Your neighbourhood starts from the address in your profile. Once a building "
-"at that address belongs to your account, the circuit appears here."
-msgstr ""
-"Il vicinato parte dall'indirizzo del vostro profilo. Non appena un edificio "
-"a questo indirizzo è collegato al vostro conto, il vostro circuito compare "
-"qui."
-
-msgid "Your building is not on the map"
-msgstr "Il vostro edificio non è ancora sulla mappa"
-
-msgid ""
-"The address directory has no position for your building yet. The map updates"
-" with the directory import."
-msgstr ""
-"L'elenco degli indirizzi non indica ancora una posizione per il vostro "
-"edificio. La mappa sarà aggiornata con il prossimo import."
-
 msgid "Your circuit: %(name)s"
 msgstr "Il vostro circuito: %(name)s"
 
@@ -10864,3 +10869,28 @@ msgid ""
 "I take part in the local electricity community. Would you like to join as "
 "well?"
 msgstr "Partecipo alla comunità locale di elettricità. Interesse?"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid "No circuits in the address directory yet"
+msgstr "Non ancora circuiti di trasformazione nel registro degli indirizzi"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid ""
+"The address directory has no buildings yet. The map updates with the "
+"directory import."
+msgstr ""
+"Il registro degli indirizzi non contiene ancora edifici. La mappa si "
+"aggiorna con l'importazione del registro."
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid "The circuits of your area"
+msgstr "I circuiti di trasformazione della tua zona"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid ""
+"No building at your profile address is in the address directory yet. The map"
+" shows the circuits of your area."
+msgstr ""
+"All'indirizzo del tuo profilo non c'è ancora alcun edificio nel registro "
+"degli indirizzi. La mappa mostra i circuiti di trasformazione della tua "
+"zona."

@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
-from leg_platform.addresses.models import DIRECTORY_ALIAS, Address, Directory
+from leg_platform.addresses.models import DIRECTORY_ALIAS, Address, AddressPlace, AddressStreet, Directory
 from leg_platform.addresses.storage import mark_writer
 
 # Not a SHA-256 value, so it never equals the checksum of a real import.
@@ -55,6 +55,9 @@ def replace_directory(rows=SYNTHETIC_ROWS) -> int:
     generation = uuid.uuid4()
     with transaction.atomic(using=DIRECTORY_ALIAS):
         Address.objects.all().delete()
+        # The lookup tables of the deleted generations (the addresses below fill those of the new one).
+        AddressStreet.objects.all().delete()
+        AddressPlace.objects.all().delete()
         Address.objects.bulk_create(
             [
                 Address(

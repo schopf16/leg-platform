@@ -53,11 +53,20 @@ class ScriptRuleTests(SimpleTestCase):
     """Rules of the script that a static check can hold (the behaviour itself is DOM-level)."""
 
     def test_the_check_never_runs_on_change_or_blur_and_the_list_keeps_the_focus_in_the_field(self):
-        self.assertNotRegex(CODE, r"""addEventListener\(\s*["'](?:change|blur|focusout)["']""")
-        # A press on a panel never moves the focus out of its input; nothing is closed by a press elsewhere (a closing
-        # panel would shift the button that is being pressed).
+        self.assertNotRegex(CODE, r"""addEventListener\(\s*["'](?:change|blur)["']""")
+        # A press on a panel never moves the focus out of its input.
         self.assertRegex(CODE, r"""popup\.addEventListener\(\s*"mousedown",\s*\(event\)\s*=>\s*event\.preventDefault\(\)""")
-        self.assertNotRegex(CODE, r"""document\.addEventListener\(\s*["'](?:mousedown|pointerdown|click)["']""")
+        self.assertNotRegex(CODE, r"""document\.addEventListener\(\s*["'](?:mousedown|click)["']""")
+        # Changed with A7 / G1 (the lists and the card are overlays: closing one moves nothing): the lists close when the
+        # focus leaves the address fields and on a press outside. Those two handlers only close; neither of them asks the
+        # server (the check never runs on a focus change, a notice appearing then could shift the Save button).
+        for name in ("focusout", "pointerdown"):
+            handler = re.search(rf"""addEventListener\("{name}",.*?
+    \}}\);?""", CODE, re.S)
+            self.assertIsNotNone(handler, name)
+            self.assertIn("closeAll()", handler.group(0), name)
+            self.assertNotIn("check(", handler.group(0), name)
+            self.assertNotIn("send(", handler.group(0), name)
 
     def test_options_are_built_with_text_content_and_the_request_stays_on_the_own_origin(self):
         for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write"):
@@ -115,6 +124,59 @@ class ScriptRuleTests(SimpleTestCase):
         self.assertIn("autoFilled", CODE)
         self.assertIn("text.filledLocality", CODE)
         self.assertIn("text.filledPostalCode", CODE)
+
+
+class WidgetTextsInEveryLanguageTests(SimpleTestCase):
+    """The texts the script reads from the widget (list head, foot, card, announcements) exist in every language of the portal."""
+
+    PLACEHOLDERS = {
+        "data-proposal-note-postal-code": {"%(postal_code)s", "%(address)s"},
+        "data-proposal-note-house-number": {"%(house_number)s", "%(street)s"},
+        "data-proposal-note-town": {"%(postal_code)s", "%(town)s"},
+        "data-proposal-note-street": {"%(street)s", "%(postal_code)s"},
+        "data-proposal-note-street-town": {"%(street)s", "%(town)s"},
+        "data-announce-prefix-many": {"%(count)s"},
+        "data-filled": {"%(address)s"},
+    }
+
+    def attributes(self, language):
+        from django.template.loader import render_to_string
+        from django.utils import translation
+
+        with translation.override(language):
+            widget = render_to_string("addresses/widget.html", {"address_country_value": "CH"})
+        return dict(re.findall(r'(data-[a-z-]+)="([^"]*)"', widget))
+
+    def test_every_text_is_translated_keeps_its_placeholders_and_has_no_sharp_s(self):
+        english = self.attributes("en")
+        texts = [
+            name for name in english if name.startswith(
+                ("data-title", "data-note", "data-more", "data-proposal", "data-use", "data-announce", "data-filled")
+            )
+        ]
+        self.assertIn("data-more", texts)
+        self.assertIn("data-use-entered", texts)
+        self.assertIn("data-proposal-keep", texts)
+        for language in ("de-ch", "fr", "it"):
+            translated = self.attributes(language)
+            for name in texts:
+                with self.subTest(language=language, text=name):
+                    self.assertTrue(translated[name])
+                    self.assertNotEqual(translated[name], english[name])
+                    self.assertNotIn("ß", translated[name])
+                    for placeholder in self.PLACEHOLDERS.get(name, ()):
+                        self.assertIn(placeholder, translated[name])
+
+    def test_the_english_texts_are_the_approved_sentences(self):
+        english = self.attributes("en")
+
+        self.assertEqual(english["data-title-prefix"], "Matching addresses:")
+        self.assertEqual(english["data-note-prefix"], "choose one.")
+        self.assertEqual(english["data-more"], "More matches: keep typing.")
+        self.assertEqual(english["data-proposal-keep"], "No, my address is correct")
+        self.assertEqual(english["data-use-entered"], "My address is correct, use it as entered")
+        self.assertEqual(english["data-proposal-hint"], "Click an address to use it")
+        self.assertEqual(english["data-proposal-title-one"], "Did you mean this address?")
 
 
 class CatalogueTests(SimpleTestCase):
@@ -205,15 +267,33 @@ class EditFormPlacementTests(TestCase):
     def test_the_texts_for_the_script_are_swiss_german_with_placeholders_and_no_sharp_s(self):
         widget = segment(self.html, '<div class="address-assist"', 'data-street-id')
 
-        self.assertIn('data-title-prefix="Passende Adressen"', widget)
-        self.assertIn('data-title-approximate-one="Meinten Sie diese Adresse?"', widget)
-        self.assertIn('data-title-approximate-many="Meinten Sie eine dieser Adressen?"', widget)
-        self.assertIn('data-note-prefix="Wählen Sie eine Adresse aus, um die Felder auszufüllen."', widget)
+        # The head is one slim line (A3): the title and the note are two attributes, the owner-approved sentence is
+        # "Passende Adressen: wählen Sie aus." (G2). The "more" line is one short sentence (A5).
+        self.assertIn('data-title-prefix="Passende Adressen:"', widget)
+        self.assertIn('data-note-prefix="wählen Sie aus."', widget)
+        self.assertIn('data-title-approximate="Ähnliche Adressen:"', widget)
+        self.assertIn('data-more="Weitere Treffer: tippen Sie weiter."', widget)
+        # The card "Did you mean this address?" (B4, E1, G2): title, one sentence per reason, the hint, the two ways out.
+        self.assertIn('data-proposal-title-one="Meinten Sie diese Adresse?"', widget)
+        self.assertIn('data-proposal-title-many="Meinten Sie eine dieser Adressen?"', widget)
+        self.assertIn('data-proposal-note-postal-code="Die PLZ %(postal_code)s passt nicht zu %(address)s."', widget)
         self.assertIn(
-            "In %(postal_code)s wurde keine Strasse gefunden, die mit «%(street)s» beginnt.", widget
+            'data-proposal-note-house-number="Die Hausnummer %(house_number)s gibt es bei «%(street)s» nicht."', widget
         )
-        self.assertIn('data-more="Es passen weitere Adressen. Geben Sie mehr ein, um die Liste einzugrenzen."', widget)
+        self.assertIn('data-proposal-note-town="Die PLZ %(postal_code)s gehört zu %(town)s."', widget)
+        self.assertIn(
+            'data-proposal-note-street="Die Strasse «%(street)s» haben wir in %(postal_code)s nicht gefunden."', widget
+        )
+        self.assertIn(
+            'data-proposal-note-street-town="Die Strasse «%(street)s» haben wir in %(town)s nicht gefunden."', widget
+        )
+        self.assertIn('data-proposal-hint="Klicken Sie auf eine Adresse, um sie zu übernehmen"', widget)
+        self.assertIn('data-use-entered="Meine Adresse stimmt, so übernehmen"', widget)
+        self.assertIn('data-proposal-keep="Nein, meine Adresse stimmt so"', widget)
+        self.assertIn('data-proposal-kept="Adresse wie eingegeben beibehalten."', widget)
         self.assertIn('data-filled="Adresse eingetragen: %(address)s."', widget)
+        self.assertIn('data-filled-locality="Ort eingetragen: %(town)s."', widget)
+        self.assertIn('data-filled-postal-code="PLZ eingetragen: %(postal_code)s."', widget)
         self.assertIn(
             'data-announce-prefix-one="%(count)s Adressvorschlag verfügbar. Mit der Pfeiltaste nach unten wählen Sie einen aus."',
             widget,

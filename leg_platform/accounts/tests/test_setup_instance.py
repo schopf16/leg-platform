@@ -509,9 +509,12 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
 
                 self.assertTrue(path.is_file())
                 self.assertEqual(
-                    set(alias.introspection.table_names()),
+                    # sqlite_stat1: the planner statistics that migration 0020 (and every import) writes with ANALYZE.
+                    set(alias.introspection.table_names()) - {"sqlite_stat1"},
                     {"django_migrations", "addresses_address", "addresses_directory", "addresses_plant",
-                     "addresses_plantregister", "addresses_transformerstation"},
+                     "addresses_plantregister", "addresses_transformerstation",
+                     # The lookup tables of the address suggestions (migration 0020, H).
+                     "addresses_addressplace", "addresses_addressstreet"},
                 )
                 job = ImportRequest.objects.get(pk=1)
                 self.assertEqual(job.state, ImportRequest.State.QUEUED)

@@ -197,6 +197,9 @@ def browser():
     for path in (
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        # Microsoft Edge is a Chromium browser (it takes the same headless flags); a Windows machine has it.
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     ):
         if Path(path).exists():
             return path

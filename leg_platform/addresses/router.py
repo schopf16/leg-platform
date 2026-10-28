@@ -2,7 +2,9 @@
 
 from .storage import DIRECTORY_ALIAS
 
-DIRECTORY_MODELS = {"address", "directory", "plant", "plantregister", "transformerstation"}  # plant: D-117, stations: D-118
+DIRECTORY_MODELS = {
+    "address", "addressplace", "addressstreet", "directory", "plant", "plantregister", "transformerstation",
+}  # plant: D-117, stations: D-118
 
 
 def _is_directory_model(model):

@@ -1,0 +1,229 @@
+/* Suggestions and notice of the address directory (D-065, D-111; owner specification 2026-10-28). Imported by portal.css
+   (every portal page) and loaded by the widgets of the Django administration, which has no portal.css: the custom
+   properties of the portal come first, the variables of the administration are the fallback.
+
+   The list under the street, the postal code and the town is an overlay: it is out of the flow (position absolute, its
+   place in the flow is the widget, which has no height), so opening and closing it never moves a field or a button.
+   It spans the whole row of the address (the script gives the row the class ``address-host``). One address is one line,
+   no scrollbar, at most seven rows (address-directory.js). */
+.address-assist {
+  display: block;
+  height: 0;
+  min-width: 0;
+}
+/* The field wrappers of the portal are grids with a gap of 8 px: the widget takes the gap back, so the list is 4 px under the
+   input (the margin of .address-suggest). */
+.step-card .mb-3 > .address-assist,
+.entry-card .mb-3 > .address-assist,
+.profile-form .mb-3 > .address-assist {
+  margin-top: -8px;
+}
+.address-host { position: relative; }
+.address-suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin-top: 4px;
+  border: 1px solid var(--line, var(--hairline-color));
+  border-radius: 8px;
+  background: var(--portal-surface, var(--body-bg));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--fg, var(--body-fg)) 22%, transparent);
+  overflow: hidden;
+}
+.address-suggest[hidden] { display: none; }
+/* In the dark theme a light halo would be the shadow of the portal's text colour: a black one (the card has a shadow only
+   as an overlay, on a desktop width, see the end of the file). */
+:root[data-theme="dark"] .address-suggest {
+  box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .address-suggest {
+    box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
+  }
+}
+/* On a phone the profile card pads the row by 16 px on each side: the overlay reaches the edges of the card, so that one
+   address stays on one line at 320 px. */
+@media (max-width: 480px) {
+  .profile-card .address-suggest {
+    left: -16px;
+    right: -16px;
+  }
+  /* The card in the page (a phone) is as wide as the list. */
+  .profile-card .address-notice > * {
+    margin-inline: -16px;
+  }
+}
+/* One slim line: title and note, 14 px. */
+.address-suggest-head {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line, var(--hairline-color));
+  font-size: 14px;
+  line-height: 1.3;
+}
+.address-suggest-title {
+  display: inline;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.address-suggest-note {
+  display: inline;
+  margin: 0 0 0 4px;
+  font-size: 14px;
+  color: var(--muted, var(--body-quiet-color));
+  overflow-wrap: anywhere;
+}
+.address-suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.address-suggest-list li + li { border-top: 1px solid var(--line, var(--hairline-color)); }
+/* One line per address: street and house number in bold, then ", postal code town" in the muted colour. */
+.address-option {
+  display: block;
+  min-height: 0;
+  padding: 6px 12px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  color: var(--tblr-body-color, var(--body-fg));
+  /* The keyboard moves the active row into view: not under the fixed bottom bar of a phone. */
+  scroll-margin-bottom: 80px;
+}
+/* The active option of the combobox: the focus stays in the input, so the ring is drawn on the option. */
+.address-option.is-active {
+  background: var(--warm, var(--selected-row));
+  outline: 2px solid var(--address-accent, var(--link-fg));
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .address-option:hover { background: var(--warm, var(--selected-row)); }
+}
+.address-option-main { font-weight: 600; }
+.address-option-sub { color: var(--muted, var(--body-quiet-color)); }
+/* Only when more addresses match than rows are shown. */
+.address-more {
+  margin: 0;
+  padding: 4px 8px;
+  border-top: 1px solid var(--line, var(--hairline-color));
+  font-size: 14px;
+  color: var(--muted, var(--body-quiet-color));
+}
+.address-more[hidden] { display: none; }
+
+/* Always in the page; empty, it cancels the gap of the form grid. */
+.address-notice:empty { margin-top: -16px; }
+.address-notice .alert { margin: 0; }
+/* The warning and its link are one box (the notice is an overlay on a desktop width). */
+.address-warning {
+  border-radius: 8px;
+  background: var(--portal-surface, var(--body-bg));
+}
+.address-notice > *,
+.address-suggest { scroll-margin-bottom: 80px; }
+
+/* "Did you mean this address?" (postal code not that of the address): a card in the notice area. Nothing in it changes
+   a field except a click on the option. */
+.address-proposal {
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--portal-alert-warning-accent, var(--warn, var(--body-quiet-color))) 40%, transparent);
+  border-inline-start: 4px solid var(--portal-alert-warning-accent, var(--warn, var(--body-quiet-color)));
+  border-radius: 8px;
+  background: var(--portal-alert-warning-bg, var(--darkened-bg));
+  color: var(--tblr-body-color, var(--body-fg));
+}
+.address-proposal .address-proposal-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.address-proposal-note,
+.address-proposal-hint {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted, var(--body-quiet-color));
+  overflow-wrap: anywhere;
+}
+.address-proposal-option {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 8px 16px;
+  border: 2px solid var(--portal-alert-warning-accent, var(--warn, var(--body-quiet-color)));
+  border-radius: 8px;
+  background: var(--portal-surface, var(--body-bg));
+  color: var(--tblr-body-color, var(--body-fg));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .address-proposal-option:hover { background: var(--warm, var(--selected-row)); }
+}
+.address-proposal-main {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.address-proposal-sub {
+  display: block;
+  font-size: 14px;
+  color: var(--muted, var(--body-quiet-color));
+}
+/* A text link of 44 px touch height; the negative margin keeps the card as high as with a smaller link. */
+.address-proposal-keep {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  margin: -8px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--address-accent, var(--link-fg));
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.address-proposal-option:focus-visible,
+.address-proposal-keep:focus-visible {
+  outline: 2px solid var(--address-accent, var(--link-fg));
+  outline-offset: 2px;
+}
+
+/* G1: on a desktop width (above 760 px, the width of the sidebar layout) the card and the notice are an overlay under the row
+   of postal code and town, like the lists: the element in the page has no height and cancels the gap of the form grid (the
+   same 16 px empty or not, so nothing moves when it fills), its content floats 4 px lower with the shadow and z-index of the
+   lists. On a phone it stays in the page. Escape or a press outside closes it (address-directory.js). */
+@media (min-width: 761px) {
+  .address-notice,
+  .address-notice:empty {
+    position: relative;
+    height: 0;
+    margin-top: -16px;
+  }
+  .address-notice > * {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--fg, var(--body-fg)) 22%, transparent);
+  }
+  .entry-card .address-notice,
+  .entry-card .address-notice:empty { margin-top: -20px; }
+  /* The rows of postal code and town end 8 px below the input in these two masks: the card is 4 px under the input. */
+  .step-card .address-notice > *,
+  .profile-form .address-notice > * { top: -4px; }
+  :root[data-theme="dark"] .address-notice > * { box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+}
+@media (min-width: 761px) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .address-notice > * { box-shadow: 0 8px 24px rgb(0 0 0 / 55%); }
+}

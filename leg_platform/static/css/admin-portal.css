@@ -794,3 +794,75 @@ ol.breadcrumbs {
 .log-chip:focus {
   text-decoration: underline;
 }
+
+/* The address suggestions in the change forms (addresses/admin_widgets.py, static/css/address-suggest.css): the list is an
+   overlay under the row of the field. The row of the administration clips its content (``overflow: hidden``); a row with
+   the suggestions does not, and keeps containing its floats. The label and the input share a flex line: the widget and the
+   notice get a line of their own, and the lists open under the whole row. */
+/* The colour of the links and rings of the address suggestions: the link colour of the administration (its --accent is yellow). */
+:root { --address-accent: var(--link-fg); }
+
+/* Rules of the administration for lists and paragraphs inside a form (``form .aligned ul``, small paragraphs) do not apply
+   to the suggestions. */
+.form-row .address-suggest-list,
+.aligned .address-suggest-list {
+  margin: 0;
+  padding: 0;
+}
+
+.form-row .address-suggest p {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+.form-row .address-suggest .address-suggest-title,
+.form-row .address-proposal .address-proposal-title {
+  font-weight: 600;
+}
+
+.form-row .address-proposal p {
+  padding: 0;
+}
+
+@media (min-width: 761px) {
+  .form-row .address-notice,
+  .form-row .address-notice:empty,
+  .form-row .address-notice:not(:empty) {
+    margin-top: 0;
+  }
+}
+
+.form-row.address-host {
+  display: flow-root;
+  overflow: visible;
+}
+
+.form-row .flex-container:has(> .address-assist, > .address-notice) {
+  flex-wrap: wrap;
+}
+
+.form-row .flex-container > .address-assist,
+.form-row .flex-container > .address-notice {
+  flex: 0 0 100%;
+}
+
+.form-row .address-suggest {
+  top: calc(100% - 10px); /* the row pads its content by 10 px: 4 px under the input with the margin of the list */
+}
+
+@media (max-width: 767px) {
+  .form-row .address-suggest {
+    top: calc(100% - 15px);
+  }
+}
+
+@media (max-width: 760px) {
+  .form-row .address-notice:empty {
+    margin-top: 0;
+  }
+
+  .form-row .address-notice:not(:empty) {
+    margin-top: 8px;
+  }
+}

@@ -27,6 +27,7 @@ from leg_platform.accounts.models import (
     customer_numbers_nearly_exhausted,
 )
 from leg_platform.accounts.permission_names import PermissionLabelsMixin
+from leg_platform.addresses.admin_widgets import AddressSuggestionsMixin
 
 Event = SecurityEvent.Event
 
@@ -97,7 +98,7 @@ class ResetSecondFactorForm(forms.Form):
         super().__init__(*args, **kwargs)
 
 
-class UserAdmin(PermissionLabelsMixin, admin.ModelAdmin):
+class UserAdmin(AddressSuggestionsMixin, PermissionLabelsMixin, admin.ModelAdmin):
     form = UserAdminForm
     list_display = (
         "customer_number_column",
