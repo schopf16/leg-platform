@@ -99,3 +99,39 @@ class AddressCheckTests(TestCase):
         unknown = addressing.check_address("Nowhere", "1", "3063", "Ittigen")
         self.assertIsNone(unknown.suggestion)
         self.assertNotEqual(unknown.not_found_notice, "")
+
+    def test_the_server_side_notice_asks_for_no_fix(self):
+        # The pages of the community domain only need the sentence "not found"; the card with the fixes is the script's.
+        from unittest.mock import patch
+
+        from leg_platform.addresses import services
+
+        real = services.lookup
+        with patch.object(addressing, "lookup", wraps=real) as spy:
+            addressing.not_found_notice("Nowhere", "1", "3063", "Ittigen")
+        self.assertIs(spy.call_args.kwargs["fix"], False)
+        self.assertEqual(spy.call_args.kwargs["mode"], "check")
+
+    def test_the_notice_reads_no_lookup_table_because_no_fix_is_computed(self):
+        from django.db import connections
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connections["addresses"]) as queries:
+            notice = addressing.not_found_notice("Musterwg", "12", "3061", "Ittigen")
+        self.assertIn("nicht gefunden", notice)
+        self.assertFalse([q for q in queries.captured_queries if "addresses_address" + "street" in q["sql"]])
+        self.assertFalse([q for q in queries.captured_queries if "addresses_address" + "place" in q["sql"]])
+
+    def test_the_check_of_the_lookup_still_offers_fixes_where_they_are_asked_for(self):
+        from leg_platform.addresses.services import lookup
+
+        answer = lookup(
+            {"street": "Musterweg", "house_number": "12", "postal_code": "3061", "locality": "Ittigen"}, mode="check",
+        )
+        self.assertEqual([(r["postal_code"], r["locality"]) for r in answer["proposals"]], [("3063", "Ittigen")])
+        quiet = lookup(
+            {"street": "Musterweg", "house_number": "12", "postal_code": "3061", "locality": "Ittigen"}, mode="check",
+            fix=False,
+        )
+        self.assertEqual((quiet["proposals"], quiet["reason"]), ([], ""))
+        self.assertEqual(quiet["warning"], answer["warning"])

@@ -21,7 +21,7 @@ Never (`AGENTS.md` sections 8 and 9, `CONDUCT.md`, D-020, D-027):
 | --- | --- | --- |
 | MariaDB 12.3 | Windows service `MySQL` (name given by the setup script), `127.0.0.1:3306` only | Databases `leg_platform` (data) and `test_leg_platform` (created and dropped by the test runner). |
 | Python environment | `.venv` in the repository root | `.venv\Scripts\python.exe` |
-| Development server | `http://127.0.0.1:8000/` (designer and acceptance); `http://127.0.0.1:8001/` (the developer's own server) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Use one canonical host consistently (host-only cookies). **D-106 passkey checks require `localhost`, not an IP RP-ID: set `INSTANCE_BASE_URL=http://localhost:<port>` for server and worker, then browse only that address.** Port 8000 belongs to the session that checks the design or accepts the work. The developer uses 8001 (`$Port = 8001`, section 6). Restart after a template change (no reload). |
+| Development server | `http://127.0.0.1:8000/` (designer and acceptance); `http://127.0.0.1:8001/` (the developer's own server, `$Port = 8001` in section 6) | `manage.py runserver 127.0.0.1:8000 --noreload --insecure`. Restart after a template change (no reload). Use one canonical host (host-only cookies). **Passkey checks (D-106) need `localhost`: set `INSTANCE_BASE_URL=http://localhost:<port>` for server and worker and browse only that address.** |
 | Mail worker | background process | `manage.py process_mail_queue --loop`. Required (section 6). |
 | Address directory (optional) | SQLite file `$HOME\.leg-platform-dev\address-directory.sqlite3` | Synthetic data only (section 10). |
 | Logs and process IDs | `$HOME\.leg-platform-dev\` | Outside the repository. |
@@ -33,7 +33,7 @@ All commands are PowerShell, run from the repository root. Every tool call start
 ```powershell
 Test-Path .\manage.py                                       # True
 Test-Path .\.venv\Scripts\python.exe                        # True
-.\.venv\Scripts\python.exe --version                        # Python 3.14.x
+.\.venv\Scripts\python.exe --version                        # Python 3.13 or newer (3.12 is the minimum)
 .\.venv\Scripts\python.exe -c "import django; print(django.get_version())"   # 6.1.x
 Get-Service -Name MySQL | Select-Object Name, Status, StartType               # Running, Automatic
 Get-NetTCPConnection -State Listen -LocalPort 3306 -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort   # LocalAddress 127.0.0.1 only
@@ -60,11 +60,11 @@ Configuration comes only from environment variables (`leg_platform/settings.py`,
 | --- | --- | --- |
 | `APP_ENV` | user variable (setup script) | `local`. Required. |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DJANGO_SECRET_KEY` | user variables (setup script) | Local MariaDB, its application account, the local secret key. |
-| `EMAIL_MODE` | not set; default `console` | Emails go to the standard output of the mail worker (section 6). `graph` is refused locally; the allowlist mode is gone (D-116). |
+| `EMAIL_MODE` | not set; default `console` | Emails go to the standard output of the mail worker (section 6). `graph` is refused locally (D-116). |
 | `DJANGO_ALLOWED_HOSTS` | per process, start block (section 6) | `127.0.0.1,localhost`. Not a permanent user variable. |
-| `INSTANCE_BASE_URL` | per process for passkey work | Canonical origin for email links and WebAuthn. Use `http://localhost:<port>` consistently for server, worker and browser; do not mix it with the loopback IP hostname. |
+| `INSTANCE_BASE_URL` | per process for passkey work | Canonical origin for email links and WebAuthn. `http://localhost:<port>` for server, worker and browser alike. |
 | `INSTANCE_NAME`, `INSTANCE_WEBSITE_URL`, `INSTANCE_STATIC_DIRECTORY`, `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` | per process, start block (section 6) | **Fallback** for "Portal-Einstellungen" (D-056, D-073). Logos: `$HOME\.leg-platform-dev\instance-static\instance\LEG-Ittigen_pos_rgb.svg` and `LEG-Ittigen_neg_sw.svg` (copied from `LEG-Design-Vorgaben\logo\`). Without them the pages show the name as text. |
-| `DJANGO_DEBUG` | not set (False) | `True` only with `APP_ENV=local`; not needed (production-like errors and the full CSP suit a design review). |
+| `DJANGO_DEBUG` | not set (False) | `True` only with `APP_ENV=local`; not needed. |
 
 Never permanent user variables locally: `BOOTSTRAP_SYSTEM_ADMIN_EMAIL`, `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`, `EMAIL_ALLOWED_RECIPIENTS`, `EMAIL_SENDER_ADDRESS`, `CONTACT_EMAIL_ADDRESS`; the application refuses to start with them (D-116). The bootstrap variables only for one `setup_instance` run (section 5).
 
@@ -86,21 +86,23 @@ The local database `leg_platform` is **throw-away** (D-027, D-030). Check withou
 .\.venv\Scripts\python manage.py migrate addresses --database=addresses
 ```
 
-The second command creates the tables of the address directory (own SQLite file, D-075). **Normal setup/schema upgrades (D-075/D-076):** prefer `manage.py setup_instance` (`docs/INSTALLATION.md`, "Setup of the instance and initial system administrator"). It also creates the first system administrator, only while the account table is empty and the email variable is set. It never deletes or flushes application data. The optional public address file is disposable: missing/changed address schemas are created/rebuilt and an official import is queued in MariaDB, without downloading or waiting during setup:
+The second command creates the tables of the address directory (own SQLite file, D-075). Normal setup and schema upgrades (D-075, D-076): prefer `manage.py setup_instance` (`docs/INSTALLATION.md`, "Setup of the instance and initial system administrator"). It never deletes or flushes application data. It creates or rebuilds the disposable address file and queues the official import in MariaDB, without a download during setup. Additive address migrations are applied in place to an existing file (`docs/INSTALLATION.md`, "Address Directory"):
 
 ```powershell
 .\.venv\Scripts\python manage.py setup_instance
 ```
 
-Without the bootstrap variables it prepares the databases and any required address import, but creates no administrator (design review accounts: section 9). To also create an administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`. Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
-
-The queued address import needs the optional worker or a later `run_scheduled_tasks` invocation; the latter consumes queued requests even before the daily import time or with automatic refresh disabled. No consumer means no import. Current clean address schemas do not requeue on each startup. Busy-file/rebuild errors are nonfatal and retried on a later setup; until setup/import succeeds only address validation/suggestions are unavailable. Do not bypass a `.reset` marker; let setup retry after readers/importers have closed. Normal CSV refresh never deletes the file.
+* Without the bootstrap variables it creates no administrator (design review accounts: section 9).
+* To also create the first administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`.
+* Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
+* The queued address import needs the optional worker or a `run_scheduled_tasks` run. No consumer means no import. Until an import succeeds, address validation and suggestions are unavailable.
+* Busy-file and rebuild errors are nonfatal; run setup again later. Never bypass a `.reset` marker.
 
 ## 6. Start the development server and the mail worker
 
-Registration, password reset and email change **only queue** an email (D-038); the mail worker sends it. Without the worker nothing is sent (symptom: "email sent" page, nothing arrives; check `worker.err.log` and `worker.out.log`). With `EMAIL_MODE=console` the email goes to the **standard output of the worker**: capture it to a file.
+Registration, password reset and email change **only queue** an email (D-038); the mail worker sends it. Without the worker nothing is sent (check `worker.err.log` and `worker.out.log`). With `EMAIL_MODE=console` the email goes to the **standard output of the worker**.
 
-One block starts both. It refuses to start if port 8000 is taken (it never kills anything), writes logs and process IDs to `$HOME\.leg-platform-dev\`, sets the variables for both child processes. One-time logo copy: `New-Item -ItemType Directory -Force "$HOME\.leg-platform-dev\instance-static\instance"; Copy-Item <path of LEG-Design-Vorgaben>\logo\*.svg "$HOME\.leg-platform-dev\instance-static\instance"`:
+One block starts both. It refuses to start if port 8000 is taken (it kills nothing), writes logs and process IDs to `$HOME\.leg-platform-dev\`. One-time logo copy: `New-Item -ItemType Directory -Force "$HOME\.leg-platform-dev\instance-static\instance"; Copy-Item <path of LEG-Design-Vorgaben>\logo\*.svg "$HOME\.leg-platform-dev\instance-static\instance"`:
 
 ```powershell
 $Repo = (Get-Location).Path
@@ -117,8 +119,7 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
     $env:DJANGO_ALLOWED_HOSTS = '127.0.0.1,localhost'
     # D-090: no automatic download of the real address directory on a development machine.
     $env:ADDRESS_IMPORT_AUTOMATIC = 'False'
-    # D-106: localhost is a potentially trustworthy WebAuthn origin with a domain RP-ID.
-    # Open only this canonical hostname; the listener remains loopback-only.
+    # D-106: open only this canonical hostname; the listener remains loopback-only.
     $env:INSTANCE_BASE_URL = "http://localhost:$Port"
     # Local instance presentation (section 4)
     $env:INSTANCE_NAME = 'LEG-Portal'
@@ -144,11 +145,11 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
 }
 ```
 
-* `--insecure` serves `/static/` with debug off; `--noreload` avoids a watcher process; `-u` makes logs readable while running.
+* `--insecure` serves `/static/` with debug off; `--noreload` avoids a watcher process.
 * The venv `python.exe` is a launcher with the real interpreter as child: each process appears twice. The PID file holds the parent; section 11 stops both.
-* `runserver.err.log` shows verification tokens as `<redacted>`. The console email in `worker.out.log` holds the **complete link** (hence `EMAIL_MODE=console` is refused in stage and production).
+* The console email in `worker.out.log` holds the **complete link** (hence `EMAIL_MODE=console` is refused in stage and production).
 * Server does not come up: read `runserver.err.log` (section 14), wait about five seconds, run section 7.
-* After CSS/JavaScript changes, refresh the browser's static cache (hard reload or disable caching in development tools). Restarting `--noreload` refreshes Python/templates, not an already cached browser stylesheet. With `--insecure`, first verify that the static endpoint serves the current source before considering `collectstatic`; do not add duplicate CSS overrides to compensate for an old cached file.
+* After CSS/JavaScript changes, hard-reload the browser (static cache). Restarting refreshes Python and templates only. Do not add duplicate CSS overrides to compensate for a cached file.
 
 ## 7. Health checks (read-only)
 
@@ -188,7 +189,7 @@ foreach ($name in 'runserver', 'worker') {
 `seed_design_accounts` creates three throw-away accounts under `example.org`: `design.user@example.org` (authenticated user), `design.staff@example.org` (staff user without role), `design.administrator@example.org` (system administrator). It refuses to run unless `APP_ENV=local`.
 
 * Exist? `Test-Path "$HOME\.leg-platform-design-accounts.json"`. If `True`, **use them; never run the creation again**.
-* Creation (only if the file does not exist, only when the main session asks): `.\.venv\Scripts\python manage.py seed_design_accounts`. It writes the generated passwords and the authenticator keys of the two privileged accounts to the credentials file outside the repository (default `$HOME\.leg-platform-design-accounts.json`, option `--output`; never overwritten). It prints no secret.
+* Creation (only if the file does not exist, only when the main session asks): `.\.venv\Scripts\python manage.py seed_design_accounts`. It writes the generated passwords and authenticator keys to the credentials file outside the repository (default `$HOME\.leg-platform-design-accounts.json`, option `--output`; never overwritten). It prints no secret.
 * The file is JSON with keys `user`, `staff`, `administrator`; each has `email` and `password`; `staff` and `administrator` also `authenticator_secret`. List the structure without values:
 
   ```powershell
@@ -196,24 +197,24 @@ foreach ($name in 'runserver', 'worker') {
   ```
 
   Treat emails and passwords like secrets: read only the one you need for a login. Never copy them into reports, screenshots, logs or committed files.
-* Staff users and system administrators need a second factor. Print the current codes of the two privileged design accounts:
+* Staff users and system administrators need a second factor. Print the current codes:
 
   ```powershell
   .\.venv\Scripts\python manage.py seed_design_accounts --code
   ```
 
-  A code works **once** (30-second step plus one step of tolerance). A second login within 30 seconds needs a newer code: wait, run the command again. 15 wrong codes pause code entry for the account for 24 hours (D-040); the only ways out are a password reset or the emergency command, which would remove the seeded second factor.
+  A code works **once**. A second login within 30 seconds needs a newer code: wait, run the command again. 15 wrong codes pause code entry for the account for 24 hours (D-040); the only ways out are a password reset or the emergency command, which would remove the seeded second factor.
 * Session timeouts and "Stay signed in": D-041, D-100.
-* Logs (D-099): the dev server and mail worker write `.err.log` files; the application writes `application.log` and `security.log` to `$HOME\.leg-platform-dev\logs\` (also readable in the administration, "Protokolldateien").
-* Address directory import (D-090): the administration page "Adressverzeichnis" starts it. **It downloads the real file (about 143 MB, needs 4 GB free): do not press it casually.** The daily run (`run_scheduled_tasks`, task `scheduled_address_import`) is off in the tests and in the start block of section 6 (`ADDRESS_IMPORT_AUTOMATIC=False`). Default `True`: a scheduler that calls `run_scheduled_tasks` (not started locally) imports once per day from 03:00 when the update flag is set, no building numbers exist yet or the refresh is due. A visit to the administration starts nothing. `seed_local_address_directory` loads invented addresses with invented building numbers.
+* Logs (D-099): `$HOME\.leg-platform-dev\logs\` (`application.log`, `security.log`; also in the administration, "Protokolldateien"); the dev server and mail worker write `.err.log` files.
+* Address directory import (D-090): the administration page "Adressverzeichnis" starts it. **It downloads the real file (about 143 MB; the resulting file is about 1.7 GB for 3.3 million addresses; needs 4 GB free): do not press it casually.** The daily run is off in the tests and in the start block of section 6 (`ADDRESS_IMPORT_AUTOMATIC=False`). Details: `docs/INSTALLATION.md`, "Address Directory". `seed_local_address_directory` loads invented addresses (section 10).
 
 ### 9.2 A self-registered test account
 
 1. Open `http://127.0.0.1:8000/register/`, enter an address such as `test.user1@example.org`, submit. The response is always the page "email sent".
-2. The worker produces the email within seconds. Extract the link with the helper below (it decodes the quoted-printable console email and prints recipient and complete link; the last line for the address is the newest).
+2. Extract the link from the worker output with the helper below (it prints recipient and complete link; the last line for the address is the newest).
 3. Open the link: password step, then `/register/complete/`; "Konto erstellen" creates the account and logs you in (D-058). The password needs **at least 15 characters** (`docs/SECURITY.md`, section 3).
-4. Limits (D-038): all local requests come from `127.0.0.1`. After about 20 registrations or resets in one hour the page answers "Zu viele Anfragen" (HTTP 429). Clear the counters with the snippet of section 14. A script (curl) must send the form field `form_started` of the page, at least two seconds old, and leave `contact_fax_number` empty. Otherwise it gets the normal page without a mail (D-058).
-5. Password reset and email change work the same way (the link appears in the worker output).
+4. Limits (D-038): all local requests come from `127.0.0.1`. After about 20 registrations or resets in one hour the page answers "Zu viele Anfragen" (HTTP 429). Clear the counters with the snippet of section 14. A script (curl) must send the form field `form_started` of the page, at least two seconds old, and leave `contact_fax_number` empty, otherwise it gets the normal page without a mail (D-058).
+5. Password reset and email change work the same way.
 
 Helper for step 2 (the here-string lines start in column 0, as PowerShell requires):
 
@@ -248,18 +249,18 @@ Replace the example key with the one on the page. Only for throw-away local acco
 
 ## 10. Synthetic address directory (optional)
 
-Without a directory the forms show no suggestions and say nothing to customers (D-066); a staff account is told that there are no suggestions because the directory is not available or not imported yet (D-111). To test suggestions, load invented addresses:
+Without a directory the forms show no suggestions (D-066, D-111). To test suggestions, load invented addresses:
 
 ```powershell
 .\.venv\Scripts\python manage.py seed_local_address_directory
 ```
 
-* Loads eight invented addresses (postal codes 9997 to 9999) into the local directory file. The tables must exist (section 5). After a pull that adds a directory migration (0007: the index of the towns), run the second command of section 5 again.
+* Loads eight invented addresses (postal codes 9997 to 9999) into the local directory file. The tables must exist (section 5). After a pull that adds an address directory migration, run the second command of section 5 again.
 * **Refuses to run unless `APP_ENV=local`.** Refuses to replace a directory whose checksum is not its synthetic marker (a real import is never overwritten). Run it again to replace the synthetic rows. No restart needed.
-* Typing `Exa` in the street field gives "Example Street"; typing `9999` in the postal code gives "Example Town", typing `Tes` in the town gives "9997 Test Village". Real street names such as "Gantrischweg" give nothing here: the file holds only these invented rows (the real directory is imported by the button in the administration, which downloads 143 MB: do not press it casually).
+* Typing `Exa` in the street field gives "Example Street"; `9999` in the postal code gives "Example Town"; `Tes` in the town gives "9997 Test Village". Real street names give nothing.
 * The ranking of the LEG's area (D-111) follows the "Invoice sender" address in the settings of the management area: set its postal code to 9999 and its town to "Example Town" to see these addresses first.
 
-Remove the synthetic rows: stop the processes, delete only that file with its `-wal` and `-shm` files (`Remove-Item "$HOME\.leg-platform-dev\address-directory.sqlite3*"`), run the two commands of section 5 again. Do not run the real import casually (`docs/INSTALLATION.md`, "Address Directory").
+Remove the synthetic rows: stop the processes, delete only that file with its `-wal` and `-shm` files (`Remove-Item "$HOME\.leg-platform-dev\address-directory.sqlite3*"`), run the two commands of section 5 again. Do not run the real import casually (section 9.1; `docs/INSTALLATION.md`, "Address Directory").
 
 ## 11. Stop everything
 
@@ -289,7 +290,7 @@ Only when the main session or the project owner orders it and no designer or tes
 1. Stop the server and the worker (section 11). Confirm `APP_ENV` is `local` and `DB_HOST` is `127.0.0.1` (section 3).
 2. `.\.venv\Scripts\python manage.py flush --noinput` removes all rows, keeps the schema (including the seeded design accounts).
 3. `Remove-Item "$HOME\.leg-platform-design-accounts.json"`, then create the accounts again (section 9.1).
-4. Start server and worker again (section 6). `flush` was not run (UNVERIFIED).
+4. Start server and worker again (section 6).
 
 ## 13. Tests and checks
 
@@ -297,7 +298,7 @@ Test database:
 
 * The tests use `test_<DB_NAME>` (`test_leg_platform` locally). The runner creates and drops it (`--noinput` drops an existing one). **A test run never reads or changes the data of `leg_platform`.**
 * The address directory of a test run is a temporary SQLite file. A test class that touches it declares `databases = {"default", "addresses"}`.
-* Two test runs against the same MariaDB server overlap on `test_leg_platform`: the second drops the database the first still uses and corrupts both (D-046). **Run only one test process at a time.** Check first:
+* Two test runs against the same MariaDB server overlap on `test_leg_platform` and corrupt both (D-046). **Run only one test process at a time.** Check first:
 
   ```powershell
   Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'manage\.py"?\s+test\b' } | Select-Object ProcessId, CommandLine
@@ -306,7 +307,7 @@ Test database:
   It must print nothing (each run appears twice, parent and child). If it lists a process, wait; never stop it. `scripts/test.ps1` also holds a machine-wide named mutex (`Global\LegPlatformTestRun`) but does not see a run started by hand or on another machine (D-072).
 * Exit codes: 0 passed; 1 a test or check failed; 2 wrong usage or missing virtual environment; 3 another run is active.
 
-Scenario runner (the normal way; D-071): test the area a change touches, not the whole suite. `scripts/test_areas.py` maps source paths to test labels; `scripts/test.ps1` runs `manage.py test` like CI (`--noinput`, deprecation warnings as errors). Area table and core files: `docs/CODEMAP.md`, section 9.
+Scenario runner (D-071): test the area a change touches, not the whole suite. `scripts/test_areas.py` maps source paths to test labels; `scripts/test.ps1` runs `manage.py test` like CI (`--noinput`, deprecation warnings as errors). Area table and core files: `docs/CODEMAP.md`, section 9.
 
 ```powershell
 .\scripts\test.ps1 -List                              # the areas and the core files
@@ -321,8 +322,8 @@ Scenario runner (the normal way; D-071): test the area a change touches, not the
 * A **core file** (settings, test settings, `leg_platform/environment.py`, urls, middleware, the user model, the authentication backend, `manage.py`, dependencies, shared test helpers), a file that **no area maps**, or a test module whose name is not a plain dotted module name selects the **full suite** (D-072). A migration selects `migrations` (fresh test database, also `makemigrations --check --dry-run`). A documentation or agent file selects only `docs`. `.github/workflows/` selects `packaging`.
 * `leg_platform/tests/test_areas.py` fails when a test module or repository file is mapped to no area: add new files to `scripts/test_areas.py`.
 * **Full suite** (`-Full`, prints `Ran N tests` and `OK`): for a core change (the runner decides), before a deployment gate, in CI, and by the team lead at most once per commit block. Agents start it only when the main session orders it. A report names the area or labels and the number of tests; never present a scoped run as a full run.
-* `-KeepDb` (`--keepdb`): reuses `test_leg_platform`; local opt-in. The runner ignores it, with a warning, when the plan needs a fresh database. After a manual schema change run once without it.
-* `-Parallel N` (`--parallel`): **does not work with the local application account** (needs `test_leg_platform_1` ... `_N`; MariaDB error 1044; `docs/INSTALLATION.md`, "Database privileges"). Do not widen the privileges.
+* `-KeepDb` (`--keepdb`): reuses `test_leg_platform`; local opt-in. The runner ignores it, with a warning, when the plan needs a fresh database.
+* `-Parallel N` (`--parallel`): **does not work with the local application account** (MariaDB error 1044; `docs/INSTALLATION.md`, "Database privileges"). Do not widen the privileges.
 * A tool call that cannot wait: start the run with `Start-Process` like the server in section 6 (output to files in `$HOME\.leg-platform-dev\`; the runner writes to standard error) and poll the log.
 * The test settings use the MD5 password hasher. One module without the script: `manage.py test <label> --settings=leg_platform.test_settings --noinput` (same one-run rule). `manage.py test --exclude-tag mariadb ...` needs no MariaDB.
 * Other checks (need MariaDB): `manage.py check --fail-level WARNING`; `manage.py makemigrations --check --dry-run` (must report "No changes detected").
@@ -371,8 +372,8 @@ Clear the local login lockouts and request counters (throw-away database only; t
 .\.venv\Scripts\python manage.py shell -c "from axes.models import AccessAttempt; from leg_platform.accounts.models import LoginIpBucket, RateLimitBucket; print(AccessAttempt.objects.all().delete()[0], LoginIpBucket.objects.all().delete()[0], RateLimitBucket.objects.all().delete()[0])"
 ```
 
-It deletes the Axes failure records, the login IP counters and the request counters; no account, mail job or security log entry. **UNVERIFIED** (not run).
+It deletes the Axes failure records, the login IP counters and the request counters; no account, mail job or security log entry.
 
-## 15. Unverified points
+## 15. Unverified points (open)
 
-* End-to-end run of the directory migration and seed, `flush` (section 12), the lockout-clearing snippet (section 14) and `--parallel` with a privileged account.
+* Not run end to end: the address directory migration and seed (section 10), `flush` (section 12), the lockout-clearing snippet (section 14), `--parallel` with a privileged account (section 13).

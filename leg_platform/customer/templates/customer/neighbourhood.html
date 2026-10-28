@@ -1,6 +1,6 @@
 {% extends "customer/base.html" %}
 {% load i18n static %}{% comment %}
-The page Nachbarschaft (D-120; docs/NACHBARSCHAFT.md; Warm register). Context: ``neighbourhood`` (customer.views, None
+The page Nachbarschaft (D-123; docs/NACHBARSCHAFT.md; Warm register). Context: ``neighbourhood`` (customer.views, None
 without a profile building), ``legend`` (the circuits with their colour index and the own circuit), ``map_data`` (read by
 the script as JSON), ``profile_building`` and ``invite_url`` (a mailto link). The map is an enhancement: the legend and the
 counts below it carry the same information for screen readers and without a script.
@@ -23,22 +23,19 @@ counts below it carry the same information for screen readers and without a scri
     <h1 class="start-title">{% translate "Neighbourhood" %}</h1>
     <p class="start-sub">{% translate "Your transformer circuit and the buildings around it. Public data only." %}</p>
 
-    {% if not profile_building %}
-      <section class="step-card" aria-labelledby="nb-missing">
-        <h2 id="nb-missing" class="nb-h">{% translate "No building at your profile address" %}</h2>
-        <p>{% translate "Your neighbourhood starts from the address in your profile. Once a building at that address belongs to your account, the circuit appears here." %}</p>
-        <p><a href="{% url 'accounts:profile' %}">{% translate "Profile" %}</a></p>
-      </section>
-    {% elif not neighbourhood %}
+    {% if not neighbourhood %}
       <section class="step-card" aria-labelledby="nb-unknown">
-        <h2 id="nb-unknown" class="nb-h">{% translate "Your building is not on the map" %}</h2>
-        <p>{% translate "The address directory has no position for your building yet. The map updates with the directory import." %}</p>
+        <h2 id="nb-unknown" class="nb-h">{% translate "No circuits in the address directory yet" %}</h2>
+        <p>{% translate "The address directory has no buildings yet. The map updates with the directory import." %}</p>
       </section>
     {% else %}
       <section class="step-card" aria-labelledby="nb-circuit">
         <h2 id="nb-circuit" class="nb-h">
-          {% if neighbourhood.own_circuit %}{% blocktranslate with name=neighbourhood.own_circuit %}Your circuit: {{ name }}{% endblocktranslate %}{% else %}{% translate "No circuit known for your building" %}{% endif %}
+          {% if not profile_building %}{% translate "The circuits of your area" %}{% elif neighbourhood.own_circuit %}{% blocktranslate with name=neighbourhood.own_circuit %}Your circuit: {{ name }}{% endblocktranslate %}{% else %}{% translate "No circuit known for your building" %}{% endif %}
         </h2>
+        {% if not profile_building %}
+          <p class="muted nb-small">{% translate "No building at your profile address is in the address directory yet. The map shows the circuits of your area." %}</p>
+        {% endif %}
         <div id="nb-map" class="nb-map" role="img" aria-label="{% translate 'Map of the circuits around your building' %}"></div>
         {% if map_data %}{{ map_data|json_script:"nb-map-data" }}{% endif %}
         <ul class="nb-legend">

@@ -1,4 +1,4 @@
-"""The transformer circuits around one building for the page "Nachbarschaft" (D-120; NACHBARSCHAFT.md).
+"""The transformer circuits around one building for the page "Nachbarschaft" (D-123; NACHBARSCHAFT.md).
 
 Read only, from the address directory file: the published buildings with their LV95 position, the transformer station of
 each building (``TransformerStation``, D-118) and the plants of the published plant register (D-117). Nothing about a
@@ -42,30 +42,49 @@ class Neighbourhood:
 
 def for_building(egid):
     """The neighbourhood of the building ``egid``, or None when the address directory has no such building."""
-    generation = Directory.objects.filter(pk=1).values_list("generation", flat=True).first()
+    generation = _generation()
     if generation is None:
         return None
     own = Address.objects.filter(generation=generation, egid=egid).values_list("postal_code", flat=True).first()
     if own is None:
         return None
-    positions = _positions(generation, own)
-    names = _station_names(own, positions)
+    return _area(generation, own, egid)
+
+
+def for_postal_code(postal_code):
+    """The circuits of a postal code without an own building (no own point, no own circuit), or None when the
+    directory shows no circuit there."""
+    generation = _generation()
+    if generation is None:
+        return None
+    area = _area(generation, postal_code, None)
+    return area if area.circuits else None
+
+
+def _generation():
+    return Directory.objects.filter(pk=1).values_list("generation", flat=True).first()
+
+
+def _area(generation, postal_code, egid):
+    """The circuits of a postal code; ``egid`` is the own building (None for a whole area)."""
+    positions = _positions(generation, postal_code)
+    names = _station_names(postal_code, positions)
     assigned = _assign(positions, names)
     pv = _pv_buildings(set(positions))
     circuits = []
     for name, members in _groups(assigned).items():
-        outline = _hull([positions[egid] for egid in members])
-        pv_members = [egid for egid in members if egid in pv]
+        outline = _hull([positions[member] for member in members])
+        pv_members = [member for member in members if member in pv]
         circuits.append(Circuit(
             name=name,
             building_count=len(members),
             pv_count=len(pv_members),
             outline=tuple(_to_wgs84(point) for point in outline),
-            pv_points=tuple(_to_wgs84(positions[egid]) for egid in pv_members),
+            pv_points=tuple(_to_wgs84(positions[member]) for member in pv_members),
         ))
     own_point = _to_wgs84(positions[egid]) if egid in positions else None
     return Neighbourhood(
-        postal_code=own,
+        postal_code=postal_code,
         own_point=own_point,
         own_circuit=assigned.get(egid),
         circuits=tuple(sorted(circuits, key=lambda circuit: circuit.name)),

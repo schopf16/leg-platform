@@ -20,7 +20,11 @@ def address_lookup(request):
         response = JsonResponse({"status": "invalid", "results": [], "match": None, "warning": ""}, status=400)
         patch_cache_control(response, no_store=True, private=True)
         return response
-    if not allow_request(request):
+    # The check (mode "check") reads all rows of a street and is dearer than a suggestion: for an anonymous client (the
+    # registration) it counts as two requests of the address budget, so the limits of D-111 bound the work it can cause.
+    anonymous = not getattr(getattr(request, "user", None), "is_authenticated", False)
+    expensive = request.POST.get("mode") == "check" and anonymous
+    if not allow_request(request) or (expensive and not allow_request(request)):
         response = JsonResponse(
             {"status": "rate_limited", "results": [], "match": None, "warning": ""}, status=429
         )
@@ -32,8 +36,8 @@ def address_lookup(request):
             if any(len(request.POST.getlist(key)) != 1 for key in request.POST):
                 raise ValueError("Repeated address parameters.")
             mode = request.POST.get("mode", "suggest")
-            # The LEG's own area comes first in the answers (the check needs no ranking).
-            home = home_area() if mode != "check" else None
+            # The LEG's own area comes first in the answers, also among the addresses of a fix (mode "check").
+            home = home_area()
             result = lookup(
                 request.POST, mode=mode, home=home, minimum=TYPEAHEAD_MINIMUM,
                 approximate=lambda: allow_approximate(request),

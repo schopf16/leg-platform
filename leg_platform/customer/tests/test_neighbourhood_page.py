@@ -1,4 +1,4 @@
-"""The page Nachbarschaft (D-120): the circuit of the profile building with public counts only, the map data without any
+"""The page Nachbarschaft (D-123): the circuit of the profile building with public counts only, the map data without any
 other person, the invitation as a mailto link, the menu entry and the Content Security Policy for the swisstopo tiles.
 The address directory is filled with synthetic rows; no network."""
 
@@ -11,8 +11,8 @@ from django.test import TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
-from leg_platform.addresses.models import Address, Directory, TransformerStation
-from leg_platform.community.models import Direction
+from leg_platform.addresses.models import Address, Directory, ServicePostalCode, TransformerStation
+from leg_platform.community.models import Direction, PersonAssignment
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point
 from leg_platform.customer.tests.helpers import customer, login
 
@@ -75,14 +75,53 @@ class NeighbourhoodPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
-    def test_without_a_building_at_the_profile_address_the_page_says_so(self):
+    def test_without_a_profile_address_the_page_shows_the_circuits_of_the_postal_code(self):
         self.mine.street = ""
         self.mine.save()
-        self.assertIn("Kein Gebäude an Ihrer Profiladresse", self.page().content.decode())
+        publish_directory({OWN_EGID: (2_603_000, 1_199_000), 90001236: (2_603_000, 1_199_100)})
+        TransformerStation.objects.create(
+            egid=OWN_EGID, postal_code=POSTAL_CODE, name="Ittigen Nord", match=TransformerStation.Match.EXACT,
+            scanned_at=timezone.now(),
+        )
+        self.assertIn("Ittigen Nord", self.page().content.decode())
 
-    def test_a_building_outside_the_directory_is_named_as_not_on_the_map(self):
+    def test_without_a_postal_code_the_page_takes_the_service_area(self):
+        self.mine.street = ""
+        self.mine.swiss_postal_code = None
+        self.mine.save()
+        publish_directory({OWN_EGID: (2_603_000, 1_199_000)})
+        TransformerStation.objects.create(
+            egid=OWN_EGID, postal_code=POSTAL_CODE, name="Ittigen Nord", match=TransformerStation.Match.EXACT,
+            scanned_at=timezone.now(),
+        )
+        ServicePostalCode.objects.create(postal_code=POSTAL_CODE)
+        self.assertIn("Ittigen Nord", self.page().content.decode())
+
+    def test_without_any_postal_code_or_service_area_the_page_still_renders(self):
+        self.mine.street = ""
+        self.mine.swiss_postal_code = None
+        self.mine.save()
         publish_directory({})
-        self.assertIn("Ihr Gebäude ist noch nicht auf der Karte", self.page().content.decode())
+        self.assertEqual(self.page().status_code, 200)
+
+    def test_a_profile_address_in_the_directory_without_a_position_is_not_a_missing_building(self):
+        # The address is in the directory (the profile building is found without a metering point), but it has no
+        # position: the page shows the building's circuit section, not the hint about the missing building.
+        publish_directory({OWN_EGID: (None, None)})
+        content = self.page().content.decode()
+        self.assertNotIn("Kein Gebäude an Ihrer Profiladresse", content)
+
+    def test_the_profile_building_needs_no_metering_point_of_the_account(self):
+        # The circuit comes from the building (transformer station, positions), not from the account's metering points.
+        publish_directory({OWN_EGID: (2_603_000, 1_199_000), 90001236: (2_603_000, 1_199_100)})
+        TransformerStation.objects.create(
+            egid=OWN_EGID, postal_code=POSTAL_CODE, name="Ittigen Nord", match=TransformerStation.Match.EXACT,
+            scanned_at=timezone.now(),
+        )
+        PersonAssignment.objects.filter(person=self.mine).delete()
+        content = self.page().content.decode()
+        self.assertNotIn("Kein Gebäude an Ihrer Profiladresse", content)
+        self.assertIn("Ittigen Nord", content)
 
     def test_the_circuit_of_the_profile_building_shows_public_counts_only(self):
         publish_directory({

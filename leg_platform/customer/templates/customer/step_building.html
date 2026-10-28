@@ -49,19 +49,7 @@
         {% include "customer/_field.html" with field=form.postal_code %}
         {% include "customer/_field.html" with field=form.town %}
       </div>
-      {% include "addresses/widget_notice.html" %}
-      {% if suggestions %}
-        <div class="suggest" role="group" aria-labelledby="suggest-title">
-          <h2 id="suggest-title" tabindex="-1" autofocus>{% translate "Did you mean one of these addresses?" %}</h2>
-          <ul class="suggest-list">
-            {% for suggestion in suggestions %}
-              <li><button type="submit" name="suggestion" value="{{ suggestion.index }}" class="suggest-option">{{ suggestion.label }} <span class="suggest-egid">{% translate "EGID" %} {{ suggestion.egid }}</span></button></li>
-            {% endfor %}
-          </ul>
-          <button type="submit" name="confirm_typed" value="1" class="btn btn-secondary-action">{% translate "My entry is correct" %}</button>
-          <p class="muted">{% translate "The EGID is the number of your building in the federal register of buildings." %}</p>
-        </div>
-      {% endif %}
+      {% if suggestions %}{% include "addresses/widget_notice.html" with card_template="customer/_building_suggestions.html" %}{% else %}{% include "addresses/widget_notice.html" %}{% endif %}
 
       {% if options %}
         <fieldset class="question" id="options-fieldset" tabindex="-1" autofocus aria-describedby="options-help">

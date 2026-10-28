@@ -192,28 +192,54 @@ msgstr "Anzahl Adressen"
 msgid "Address directory"
 msgstr "Adressverzeichnis"
 
-msgid "Matching addresses"
-msgstr "Passende Adressen"
+msgid "Matching addresses:"
+msgstr "Passende Adressen:"
+
+msgid "Similar addresses:"
+msgstr "Ähnliche Adressen:"
 
 msgid "Did you mean this address?"
 msgid_plural "Did you mean one of these addresses?"
 msgstr[0] "Meinten Sie diese Adresse?"
 msgstr[1] "Meinten Sie eine dieser Adressen?"
 
-msgid "Choose an address to fill in the fields."
-msgstr "Wählen Sie eine Adresse aus, um die Felder auszufüllen."
+msgid "choose one."
+msgstr "wählen Sie aus."
+
+msgid "More matches: keep typing."
+msgstr "Weitere Treffer: tippen Sie weiter."
+
+msgid "Click an address to use it"
+msgstr "Klicken Sie auf eine Adresse, um sie zu übernehmen"
+
+msgid "My address is correct, use it as entered"
+msgstr "Meine Adresse stimmt, so übernehmen"
+
+msgid "No, my address is correct"
+msgstr "Nein, meine Adresse stimmt so"
+
+msgid "Address kept as entered."
+msgstr "Adresse wie eingegeben beibehalten."
 
 #, python-format
-msgid ""
-"No street starting with “%(street)s” was found in %(postal_code)s. Choose an"
-" address to fill in the fields."
-msgstr ""
-"In %(postal_code)s wurde keine Strasse gefunden, die mit «%(street)s» "
-"beginnt. Wählen Sie eine Adresse aus, um die Felder auszufüllen."
+msgid "The postal code %(postal_code)s does not fit %(address)s."
+msgstr "Die PLZ %(postal_code)s passt nicht zu %(address)s."
 
-msgid "More addresses match. Keep typing to narrow the list."
-msgstr ""
-"Es passen weitere Adressen. Geben Sie mehr ein, um die Liste einzugrenzen."
+#, python-format
+msgid "We could not find house number %(house_number)s on %(street)s."
+msgstr "Die Hausnummer %(house_number)s gibt es bei «%(street)s» nicht."
+
+#, python-format
+msgid "The postal code %(postal_code)s belongs to %(town)s."
+msgstr "Die PLZ %(postal_code)s gehört zu %(town)s."
+
+#, python-format
+msgid "We could not find %(street)s in %(postal_code)s."
+msgstr "Die Strasse «%(street)s» haben wir in %(postal_code)s nicht gefunden."
+
+#, python-format
+msgid "We could not find %(street)s in %(town)s."
+msgstr "Die Strasse «%(street)s» haben wir in %(town)s nicht gefunden."
 
 #, python-format
 msgid ""
@@ -10778,31 +10804,10 @@ msgstr "Fehlgeschlagene Anmeldungen"
 msgid "Lines"
 msgstr "Anzahl anzeigen"
 
-# The page Nachbarschaft (D-120; docs/NACHBARSCHAFT.md).
+# The page Nachbarschaft (D-123; docs/NACHBARSCHAFT.md).
 msgid ""
 "Your transformer circuit and the buildings around it. Public data only."
 msgstr "Ihr Trafokreis und die Gebäude darin. Nur öffentliche Daten."
-
-msgid "No building at your profile address"
-msgstr "Kein Gebäude an Ihrer Profiladresse"
-
-msgid ""
-"Your neighbourhood starts from the address in your profile. Once a building "
-"at that address belongs to your account, the circuit appears here."
-msgstr ""
-"Die Nachbarschaft beginnt bei der Adresse in Ihrem Profil. Sobald ein "
-"Gebäude an dieser Adresse zu Ihrem Konto gehört, erscheint hier Ihr "
-"Trafokreis."
-
-msgid "Your building is not on the map"
-msgstr "Ihr Gebäude ist noch nicht auf der Karte"
-
-msgid ""
-"The address directory has no position for your building yet. The map updates"
-" with the directory import."
-msgstr ""
-"Das Adressverzeichnis hat für Ihr Gebäude noch keine Position. Die Karte "
-"wird mit dem nächsten Import aktualisiert."
 
 msgid "Your circuit: %(name)s"
 msgstr "Ihr Trafokreis: %(name)s"
@@ -10888,3 +10893,27 @@ msgid ""
 "I take part in the local electricity community. Would you like to join as "
 "well?"
 msgstr "Ich mache bei der lokalen Elektrizitätsgemeinschaft mit. Interesse?"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid "No circuits in the address directory yet"
+msgstr "Noch keine Trafokreise im Adressverzeichnis"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid ""
+"The address directory has no buildings yet. The map updates with the "
+"directory import."
+msgstr ""
+"Das Adressverzeichnis enthält noch keine Gebäude. Die Karte aktualisiert "
+"sich mit dem Import des Verzeichnisses."
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid "The circuits of your area"
+msgstr "Die Trafokreise Ihrer Gegend"
+
+#: leg_platform/customer/templates/customer/neighbourhood.html:0
+msgid ""
+"No building at your profile address is in the address directory yet. The map"
+" shows the circuits of your area."
+msgstr ""
+"An Ihrer Profiladresse ist im Adressverzeichnis noch kein Gebäude. Die Karte"
+" zeigt die Trafokreise Ihrer Gegend."

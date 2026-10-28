@@ -2,7 +2,7 @@
 
 ## Goal
 
-Simple, secure, maintainable architecture with the lowest possible operating effort and good portability between hosting providers. Municipalities without in-depth IT knowledge can operate it.
+Simple, secure, maintainable; lowest possible operating effort; portable between hosting providers; operable by municipalities without in-depth IT knowledge.
 
 ## Intended Stack
 
@@ -10,8 +10,8 @@ Simple, secure, maintainable architecture with the lowest possible operating eff
 * Tabler for the user interface; the Django admin for system administration.
 * Microsoft Graph for outgoing email.
 * Security packages: `django-axes` (login abuse protection), `django-otp` (TOTP, recovery codes), `cryptography` (Fernet, HKDF).
-* Only minimum versions are specified (D-015): the oldest technically possible versions that still receive vendor security updates, from official sources, proven by tests. Newer packages are preferred over custom developments; choice: D-015.
-* Minimum Django 6.0: the oldest supported line with built-in CSP (`SECURE_CSP`). Its security support ends in April 2027; then the minimum is raised (D-015, D-026, D-028).
+* Minimum versions only (D-015). Prefer established packages over custom code.
+* Minimum Django 6.0 (oldest line with built-in CSP, `SECURE_CSP`). Its security support ends in April 2027; then the minimum is raised (D-015, D-026, D-028).
 
 ## Architecture Principles
 
@@ -23,13 +23,12 @@ Simple, secure, maintainable architecture with the lowest possible operating eff
 
 * Not multi-tenant (D-013). Each municipality has its own instance: database, configuration, secrets, users, system administrators. Instances share no data; one code base serves all.
 * Instance values (name, domain, contact details) are instance configuration, never in code, templates or migrations.
-* A new instance is set up with the documented installation steps only. Operation, update and backup are independent per instance.
+* A new instance is set up with the documented installation steps only.
 
 ## Language and Internationalization
 
-* Rules: `AGENTS.md`, section 2. Default language Swiss German: `LANGUAGE_CODE = "de-ch"`. Project translations: `locale/de_CH/LC_MESSAGES/django.po` through `LOCALE_PATHS` (highest precedence).
-* Django's `de_CH` locale holds only formats. Texts fall back from `de-ch` to `de`, which contains "ß". The project files override every such text that can appear in the UI, including third-party texts. An automated check ensures no displayed text contains "ß".
-* Languages (D-056): Swiss German (`de-ch`, the instance default), French (`fr`), Italian (`it`) and English (`en`, the source texts). The person chooses with the language menu; the language cookie decides, never the browser's `Accept-Language` (`leg_platform/language.py`). Catalogues: `locale/de_CH`, `locale/fr`, `locale/it` (the last two have the entries of `de_CH`, translated separately). A text without a translation is English, not German (`install_english_fallback`). Emails and background jobs use the instance default language.
+* Rules: `AGENTS.md`, section 2. `LANGUAGE_CODE = "de-ch"`. Project translations: `locale/de_CH/LC_MESSAGES/django.po` through `LOCALE_PATHS` (highest precedence). They override every Django or third-party text containing "ß".
+* Languages (D-056): Swiss German (`de-ch`, the instance default), French (`fr`), Italian (`it`), English (`en`, the source texts). The language cookie decides, never `Accept-Language` (`leg_platform/language.py`). Catalogues: `locale/de_CH`, `locale/fr`, `locale/it`. A text without a translation is English, not German (`install_english_fallback`). Emails and background jobs use the instance default language.
 * Stored values such as statuses are English keys shown through translated labels. User data (names, addresses, role names) is not translated.
 
 ## Users and Roles
@@ -39,26 +38,23 @@ Simple, secure, maintainable architecture with the lowest possible operating eff
   * **staff user**: `is_staff` without `is_superuser`; admin login with assigned permissions only; uses the management area (D-086);
   * **authenticated user**: no additional permissions; cards, start page and task tiles act on `request.user` only.
 * Only system administrators change `is_staff`, `is_superuser`, group memberships, direct permissions and roles; staff cannot change accounts of staff or administrators or another account's password, email address or second factor (`docs/SECURITY.md`, section 4; `AGENTS.md`, section 6).
-* Customer number and retention flag are read-only for everyone. The normalised email column is not editable and not shown (D-035; the admin login field is labelled "email address").
+* Customer number and retention flag are read-only for everyone. The normalised email column is not editable and not shown (D-035).
 * Roles are Django groups, created and linked to permissions at runtime. No code, migration or fixture creates, names or checks roles; checks use permissions with English codenames that say what can be done, not who does it.
-* Whether later roles work in the Django admin or in application views is decided when those roles are defined.
 * Privileged access is never granted through public registration.
 
 ## User Model and Login Identifiers
 
-A custom user model from the first migration (D-021; changing `AUTH_USER_MODEL` later "can be complex", Django documentation).
+Custom user model from the first migration (D-021).
 
 * **Customer number:** six digits from `secrets`, generated once when the registration is completed, stored as text (leading zeros), unique, never reused, nullable (unverified accounts have none).
-  * "Never reused" is enforced by one table of all issued numbers (`IssuedCustomerNumber`, no personal reference; D-034). On a collision a new number is drawn.
+  * "Never reused" is enforced by the table `IssuedCustomerNumber` (no personal reference; D-034). On a collision a new number is drawn.
   * Email change and reactivation never change it. It is no login identifier.
 * **Login:** a backend accepts the email address with the password. Addresses are looked up only through the normalised unique column. Abuse protection counts failures per normalised address and treats nonexistent addresses like existing ones. The backend is based on `ModelBackend` or reproduces its protection against timing differences.
 * **Normalisation of email addresses** is defined in one place (`leg_platform/accounts/normalization.py`: NFKC, trimming, lower case, IDNA ASCII domain with UTS #46, ASCII-only local part; D-034, D-035). Storage and every lookup and per-address counter use it.
   * Rejected: quoted local parts, domain literals, IP addresses, `localhost`, invisible or control characters.
   * Unverified: mail-provider delivery equivalence for compatibility-mapped variants.
-* **Email uniqueness among accounts that are not deactivated.** Django ignores conditional unique constraints on MariaDB (system check `models.W036`).
-  * A nullable column holds the normalised address while the account is not deactivated and `NULL` otherwise, under a normal unique index (SQL allows several `NULL` values in `UNIQUE`).
-  * Maintained in one central place of the model logic, covered by tests including concurrency. It is the `USERNAME_FIELD` (`normalized_email`, D-034).
-* **Profile fields:** the fields of D-032 with the eCH-0010 structure unchanged. Unused fields are not shown. One postal code field stored as Swiss (four digits) or foreign postal code (D-036). Country with `django-countries` (default `CH`). Optional phone number with `django-phonenumber-field` in E.164 (D-034).
+* **Email uniqueness among accounts that are not deactivated.** Django ignores conditional unique constraints on MariaDB (`models.W036`). A nullable column holds the normalised address while the account is not deactivated and `NULL` otherwise, under a normal unique index. It is the `USERNAME_FIELD` (`normalized_email`, D-034). Maintained in one central place of the model logic, covered by tests including concurrency.
+* **Profile fields:** D-032 (eCH-0010 structure unchanged). One postal code field, Swiss (four digits) or foreign (D-036). Country with `django-countries` (default `CH`). Optional phone number with `django-phonenumber-field` in E.164 (D-034).
 * The string representation is "Account" with the customer number or "Unconfirmed account", never an address or name. Admin log entries of accounts store only a neutral text with the internal number (D-018, D-036).
 * **Collations (D-031):** the database default `utf8mb4_uca1400_ai_ci` is case- and accent-insensitive. Identifier columns compared exactly (normalised email, token and keyed-hash values, customer number) use `utf8mb4_bin` through `db_collation`.
 
@@ -72,26 +68,27 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 ## Authentication
 
-* D-106: `webauthn` verifies discoverable, user-verified credentials. The browser helper is self-hosted. `PasskeyIdentity` stores an opaque stable handle; `Passkey` stores only public material and necessary metadata; `PasskeyChallenge` binds a five-minute, single-use ceremony to the server session, purpose, action and account authentication hash. Failed verification also consumes the challenge. Account locks precede credential/challenge/counter locks. Staged credentials cannot sign in. Atomic activation removes password, app, recovery codes, pending changes and old links; it increments the session version and queues a notice for all confirmed addresses. `PendingSignInChange` stores only a pending password hash, method and proof/session binding; a completed app remains inactive until email confirmation. The old method stays active until that atomic transition. Recovery enters a centrally restricted account mode without a usable password; the confirmed email link grants setup only.
-* Password login with the email address (D-021), or passkey-only login for every account (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is configured per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
-* The login method is chosen in the step "Sign-in method" (D-106, "Guidance"); the offered methods come from `accounts/login_methods.py`, shared by step 2 of the registration, the start tile, the profile, recovery and first administrator login. No feature flag.
-* Every access level uses the same one-active-passkey minimum for activation, promotion and removal. The active passkey profile card links directly to `SetupView`; shared native help explains another-device setup without choosing the method again. Saving an additional key retains the current session, ends other sessions and notifies confirmed addresses (existing activation behavior). The legacy identity device-confirmation field is unused and retained without a destructive migration (D-106).
+* D-106 passkeys: `webauthn` verifies discoverable, user-verified credentials; the browser helper is self-hosted. `PasskeyIdentity` stores an opaque stable handle; `Passkey` stores only public material and necessary metadata; `PasskeyChallenge` binds a five-minute, single-use ceremony to the server session, purpose, action and account authentication hash (a failed verification also consumes it). Lock order: account locks before credential/challenge/counter locks. Staged credentials cannot sign in.
+* Atomic activation removes password, app, recovery codes, pending changes and old links; increments the session version; queues a notice for all confirmed addresses. `PendingSignInChange` stores only a pending password hash, method and proof/session binding. The old method stays active until that atomic transition. Recovery enters a centrally restricted account mode without a usable password; the confirmed email link grants setup only.
+* Password login with the email address (D-021), or passkey-only login for every account (D-106). Two-factor (TOTP) is mandatory for staff users and system administrators, optional for users; recovery codes cover a lost device (D-004). Abuse protection with an established package (D-017). Behind reverse proxies the number of trusted proxies is set per instance (`AXES_IPWARE_PROXY_COUNT`). Rules: `docs/SECURITY.md`, section 3.
+* The offered login methods come from `accounts/login_methods.py`, shared by registration step 2, the start tile, the profile, recovery and first administrator login. No feature flag.
+* Every access level uses the same one-active-passkey minimum for activation, promotion and removal. Saving an additional key keeps the current session, ends other sessions and notifies confirmed addresses. The legacy identity device-confirmation field is unused; no destructive migration (D-106).
 
 ## Email
 
-* Sending is encapsulated behind one application interface: `leg_platform.mail.GraphEmailBackend` (D-006). It fails closed while no configuration exists (D-028).
+* Sending goes through one interface: `leg_platform.mail.GraphEmailBackend` (D-006). It fails closed while no configuration exists (D-028).
 * The Graph configuration lives in the database, maintained in the chapter "Email" of the administration (D-006, D-116): tenant ID, client ID, sender address, contact address, certificate authentication (signed client assertion, no client secret), public certificate with expiry warning, private key, test send. Key handling: `docs/SECURITY.md`, sections 7 and 8.
-* `EMAIL_MODE` controls delivery; the allowed values depend on `APP_ENV`. Stage behaves exactly like production (D-070): `APP_ENV=stage` is only a label, the columns `stage` and `production` are identical.
+* `EMAIL_MODE` controls delivery; the allowed values depend on `APP_ENV`. Stage behaves exactly like production (D-070): `APP_ENV=stage` is only a label.
 
 | Value | `local` | `stage` | `production` | Behaviour |
 | ----- | ------- | ------- | ------------ | --------- |
-| `console` | allowed (default) | refused | refused | Console or test output only (elsewhere, security links would end up in server logs). |
+| `console` | allowed (default) | refused | refused | Console or test output only (security links would end up in server logs). |
 | `graph` | refused | required | required | Sent via Graph without restriction (on stage: real emails to real addresses, D-070). |
 
 * Outside `APP_ENV=local`, `EMAIL_MODE` has no default and must be set; "refused" means the application refuses to start. A missing or unknown `APP_ENV` prevents the start. `leg_platform/environment.py` has no rule distinguishing stage from production (`docs/SECURITY.md`, sections 3, 8, 11).
-* Links in emails are built from the canonical base URL of the instance configuration, never from the request. `ALLOWED_HOSTS` lists only the application's host names (D-025). Automatic emails do not invite a reply (D-038; sender default `noreply@<host>`; further email rules: `docs/SECURITY.md`, sections 3 and 8).
+* Links in emails are built from the canonical base URL of the instance configuration, never from the request. `ALLOWED_HOSTS` lists only the application's host names (D-025). Automatic emails do not invite a reply (D-038; sender default `noreply@<host>`; rules: `docs/SECURITY.md`, sections 3 and 8).
 * Editable texts (D-039): `EmailText` holds an optional subject and body per email (empty = default). Placeholders are defined per email, validated when saved and rendered by plain `{name}` substitution without the template engine.
-* The greeting of the 14 notifications is `{greeting}` (D-068; the cleaned name is captured once in `MailJob.greeting_name`; `docs/SECURITY.md`, section 3).
+* The greeting of the 14 notifications is `{greeting}` (D-068; the cleaned name is captured once in `MailJob.greeting_name`).
 * **Background sending (D-038).**
   * Requests for registration, password reset and address change count against the limits and store one `MailJob`.
   * The worker `process_mail_queue` looks up the address, issues the token, sends the email outside any database transaction and deletes the job. Request path and response are identical for every address.
@@ -99,16 +96,16 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 ## Security Logging
 
-* Security-relevant events are logged centrally, append-only and visible only to system administrators (D-018; rules and retention: `docs/SECURITY.md`, section 10). The scheduled cleanup deletes expired entries.
+* Security-relevant events are logged centrally, append-only, visible only to system administrators (D-018; rules and retention: `docs/SECURITY.md`, section 10).
 * Request logs must not carry tokens. A logging filter removes them from paths for every token URL (`leg_platform/log_filters.py`, D-037, D-067). Every further URL with a token extends it, with a test (`docs/SECURITY.md`, sections 6 and 10).
 
 ## User Interface and Devices
 
-* Responsive; all user functions fully usable on a mobile phone (`docs/PROJECT.md`, "Supported Devices"). Tabler (Bootstrap 5, mobile first) needs the responsive viewport meta tag. Minimum browsers: Chrome/Edge 123, Firefox 128, Safari 17.5, Opera 109. Older devices that cannot be updated are not supported. The supported browsers are documented for operators and users.
+* Responsive; all user functions fully usable on a mobile phone (`docs/PROJECT.md`, "Supported Devices"). Tabler (Bootstrap 5, mobile first) needs the responsive viewport meta tag. Minimum browsers: Chrome/Edge 123, Firefox 128, Safari 17.5, Opera 109.
 * Static assets (Tabler, fonts, icons) are served by the instance in fixed versions. No inline CSS, theme URL parameters or third-party assets.
 * Design language: `docs/DESIGN.md` (D-024), implemented through Tabler's CSS variables.
-* Instance branding (name, website, colours, two logos and the favicon in the database) wins per field over the validated environment variables, which win over platform defaults. Resolved by `leg_platform.accounts.portal_settings.portal_values`. A same-origin generated stylesheet carries the colours (D-051, D-056, D-073). Dedicated public views serve the uploaded logos and the favicon (`docs/SECURITY.md`, section 6).
-* The colour mode is not handled by the server: the page is rendered light and external scripts keep the choice in the tab's `sessionStorage`. The language is chosen on the server (language cookie, `leg_platform/language.py`, `docs/SECURITY.md` section 6).
+* Instance branding (name, website, colours, two logos, favicon in the database) wins per field over the validated environment variables, which win over platform defaults: `leg_platform.accounts.portal_settings.portal_values`. A same-origin generated stylesheet carries the colours (D-051, D-056, D-073). Dedicated public views serve the logos and the favicon (`docs/SECURITY.md`, section 6).
+* The colour mode is not handled by the server: the page is rendered light; external scripts keep the choice in the tab's `sessionStorage`.
 * No public home page; the entry point is the login page.
 * The application runs on its own host name, never under a path of another website (D-025). A subdomain of the website's registrable domain is still the same site, so the cookie rules of `docs/SECURITY.md`, section 3, apply.
 
@@ -116,18 +113,17 @@ States and rules: `docs/PROJECT.md`, "Account States" and "Account Lifecycle" (D
 
 Three Django apps (D-077 to D-087, D-105):
 
-* **`leg_platform.community`**: the domain without pages.
-  * Models: transformer circuits, locations (unique on the normalised address and, where known, on the EGID), metering points (status derived from dates and the day, no scheduler), LEGs, person and LEG assignments (the previous assignment ends the day before the new one), append-only `HistoryEntry`, `PersonRecord` (staff-only side record; IBAN **encrypted** via `community.iban`), `ShareChange`, `GridOperator`, list preferences.
-  * Onboarding (D-103): customer applications with draft rows (`Application`, `ApplicationBuilding`, `ApplicationMeteringPoint`), staff notices, per-customer building labels (`CustomerBuilding`; a location is shared by all customers of a building), one-time customer messages (`CustomerMessage`: kind, optional staff note, times; deleted after 30 / 180 days), the staff's reason of a return for correction (`Application.returned_reason`, cleared on resubmission), contract versions and acceptances, deregistrations. The real `Location` and `MeteringPoint` rows exist only after the staff completed an application. Services only; the pages are built on them.
-  * The rules are plain modules tested without a browser. Identifier columns use the exact collation (D-031).
-  * Only `GridOperator` and the raw admin tables (D-091) are registered in the Django administration; the tables are read-only for staff with the `view` right and editable without checks for system administrators (`is_superuser`; owner order 2026-10-19). The community models have no Django permissions except `view` (D-086, D-091).
+* **`leg_platform.community`**: the domain without pages. Services and rules are plain modules tested without a browser. Identifier columns use the exact collation (D-031).
+  * Models (see the code): transformer circuits, locations (unique on the normalised address and, where known, the EGID), metering points (status derived from dates and the day, no scheduler), LEGs, person and LEG assignments (the previous assignment ends the day before the new one), append-only `HistoryEntry`, `PersonRecord` (staff-only; IBAN **encrypted** via `community.iban`), `ShareChange`, `GridOperator`, list preferences.
+  * Onboarding (D-103): applications with draft rows (`Application`, `ApplicationBuilding`, `ApplicationMeteringPoint`), staff notices, per-customer building labels (`CustomerBuilding`; a location is shared by all customers of a building), one-time customer messages (`CustomerMessage`; deleted after 30 / 180 days), `Application.returned_reason` (cleared on resubmission), contract versions and acceptances, deregistrations. The real `Location` and `MeteringPoint` rows exist only after the staff completed an application.
+  * Only `GridOperator` and the raw admin tables (D-091) are registered in the Django administration: read-only for staff with the `view` right, editable without checks for system administrators (`is_superuser`). The community models have no Django permissions except `view` (D-086, D-091).
 * **`leg_platform.management`**: views, forms and templates under `/management/`.
   * Every view uses `access.ManagementAccessMixin` or `@management_view` (`docs/SECURITY.md`, section 4). A test walks the URL configuration and fails for a route without the access check.
   * Lists share one list framework (state parsed from the address on the server).
   * Printing builds PDFs with ReportLab in memory from the same list functions as the pages. One module knows ReportLab markup and escapes every text.
-  * Onboarding pages (D-104): the list "Processes" (`community.process_list`: applications that were submitted, drafts shown read-only and marked "Draft / not submitted" (D-107), and deregistrations that are running), the page of an application or a deregistration, the staff's steps as dialogs, notices, the list "Contracts" with upload and download, and the chapter "Reminders and deadlines" of the settings page. They show and call; every rule is in `community` (`application_staff`, `application_queue`, `deregistrations`, `contracts`, `deadline_settings`).
+  * Onboarding pages (D-104, D-107): the list "Processes" (`community.process_list`; drafts read-only, marked "Draft / not submitted"), the page of an application or deregistration, the staff's steps as dialogs, notices, the list "Contracts", the chapter "Reminders and deadlines". Pages show and call; every rule is in `community` (`application_staff`, `application_queue`, `deregistrations`, `contracts`, `deadline_settings`).
 * Every active staff account may use every page of the area (D-086, approved deviation from D-012). The Django administration keeps its permission model.
-* **`leg_platform.customer`** (D-105; no models): the pages of the customer's participation under `/participation/` (the page "Buildings", the registration wizard with its server-held draft, the contract page and download, a placeholder for the deregistration) and the card and tiles of the start page. Every view uses `access.CustomerAccessMixin` (logged in, active, customer number; staff and system administrators take part too, D-113; a route walk test fails for a route without it). Pages call the `community` services only; every id is resolved through the account; POSTs have a request budget per account (`customer.limits`).
+* **`leg_platform.customer`** (D-105; no models): the customer's pages under `/participation/` (buildings, registration wizard with server-held draft, contract page and download, deregistration, neighbourhood page D-123) and the card and tiles of the start page. Every view uses `access.CustomerAccessMixin` (logged in, active, customer number; staff and system administrators take part too, D-113; a route walk test fails for a route without it). Pages call the `community` services only; every id is resolved through the account; POSTs have a request budget per account (`customer.limits`).
 * The address directory is advisory (D-066). A suggestion is stored on the location so lists can filter without asking the directory per row.
 * The grid operator's name is never in code: texts use `%(operator)s` in the message id and the name from `GridOperator` (neutral fallback "Netzbetreiber"). Templates use `{% operator_name as operator %}`.
 
@@ -135,10 +131,10 @@ Three Django apps (D-077 to D-087, D-105):
 
 * MariaDB is the database (D-002, D-030); MySQL is not supported. Django migrations are the source for schema changes.
 * Documents and receipts must not live only in an ephemeral container file system. Storage is decided once such functions are planned.
-* **Contract PDFs (D-103)** are stored in the database (`ContractVersion.pdf`, like the logos; at most 10 MiB each), with SHA-256 and size; the file name is never stored. They are part of every database backup, and the MariaDB `max_allowed_packet` must be larger than 10 MiB. Acceptances (`ContractAcceptance`) are append-only evidence.
+* **Contract PDFs (D-103)** are stored in the database (`ContractVersion.pdf`; at most 10 MiB each) with SHA-256 and size; the file name is never stored. MariaDB `max_allowed_packet` must be larger than 10 MiB. `ContractAcceptance` is append-only evidence.
 * **Address directory (D-033, D-049, D-052, D-075, D-090).**
-  * The public directory of building addresses is an own SQLite file (alias `addresses`; `ADDRESS_DIRECTORY_FILE`, default `/var/lib/leg-platform/address-directory.sqlite3`), **not part of any backup**. The import job row (`ImportRequest`: claim, progress, last error) stays in MariaDB. A router keeps the two apart; no foreign key to profile data.
-  * Connections are read-only (`PRAGMA query_only`) unless the process called `storage.mark_writer()` (optional worker, commands `import_address_directory` and `seed_local_address_directory`, `setup_instance`, `migrate`; never `wsgi.py` or `asgi.py`) or the import thread of the web process called `storage.mark_thread_writer()` (`addresses/runner.py`).
+  * The public directory of building addresses is an own SQLite file (alias `addresses`; `ADDRESS_DIRECTORY_FILE`, default `/var/lib/leg-platform/address-directory.sqlite3`), **not part of any backup**. The import job row (`ImportRequest`) stays in MariaDB. A router keeps the two apart; no foreign key to profile data.
+  * Connections are read-only (`PRAGMA query_only`) unless the process called `storage.mark_writer()` (optional worker, commands `import_address_directory`, `seed_local_address_directory`, `setup_instance`, `migrate`; never `wsgi.py` or `asgi.py`) or the import thread of the web process called `storage.mark_thread_writer()` (`addresses/runner.py`).
   * Requests only read (a prefix is a range over folded key columns, never `LIKE`) and start or show the import. The import runs in a daemon thread of one web worker (claim in the job row, heartbeat, stale-job takeover) or in the optional worker `process_address_imports`.
   * A new directory is inserted as an invisible generation in chunked transactions and published by switching `Directory.generation` in one short transaction. Only that and the previous generation are kept.
   * A missing or empty file means "no suggestions". The design assumes one host (D-075).
@@ -155,13 +151,11 @@ Source code in Git; reproducible installation and deployment; configuration outs
 
 ## Deliberately Open
 
-Not yet decided; decided only when needed for the next development step:
-
 * hosting details beyond provider and plan of the Ittigen instance (Infomaniak "VPS Lite 1", D-008) and of other instances; container-based or direct server deployment; final document storage; architecture of the later billing and financial modules
 * whether password login can later be disabled for system administrators
 * concrete roles and their permissions, and whether they use the Django admin or application views (pure data maintenance: admin; frequent guided work: application views in the Clear register, `docs/DESIGN.md`)
 * the review of the uploaded logos (D-073; security review and browser checks open)
-* whether Django's `redirect_authenticated_user` of the login view is used (Django's documentation warns it can allow social media fingerprinting)
+* whether Django's `redirect_authenticated_user` of the login view is used (social media fingerprinting warning in Django's documentation)
 * minimum number of participants for publishing aggregated figures, and the public interface needed for it (D-025); imprint and content of the privacy notice (D-022)
-* an optional guard in the settings that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (not implemented; the deployment gates in the README apply instead)
+* an optional guard that refuses to start outside `APP_ENV=local` while the placeholder email backend is active (not implemented; the deployment gates in the README apply)
 * which functions are restricted on mobile phones in later phases; timing and scope of later multilingual support

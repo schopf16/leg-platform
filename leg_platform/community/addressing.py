@@ -122,7 +122,7 @@ def not_found_notice(street, house_number, postal_code, town):
         return lookup(
             {"street": street, "house_number": house_number, "postal_code": postal_code,
              "locality": town, "country": "CH"},
-            mode="check",
+            mode="check", fix=False,
         )["warning"]
     except ValueError:
         return ""

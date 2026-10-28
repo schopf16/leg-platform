@@ -49,7 +49,11 @@ class AddressQuerySet(models.QuerySet):
         objs = list(objs)
         for address in objs:
             address.fill_keys()
-        return super().bulk_create(objs, *args, **kwargs)
+        created = super().bulk_create(objs, *args, **kwargs)
+        # The lookup tables of the same generation are filled in the same call (the importer inserts in chunks, each in
+        # one transaction, and the generation is invisible until it is published: the tables switch with it).
+        fill_lookup_tables(objs, using=self.db)
+        return created
 
 
 class Address(models.Model):
@@ -95,6 +99,16 @@ class Address(models.Model):
                 fields=["generation", "locality_key", "locality", "postal_code"],
                 name="addr_generation_locality",
             ),
+            # Every lookup by street AND house number (the check of a complete address, the addresses of one house
+            # number in all places, the suggestions with a house number, the rows of one street): covering, so that no
+            # table row is read and the rows of one street and number are adjacent pages.
+            models.Index(
+                fields=[
+                    "generation", "street_key", "house_number_key", "postal_code", "locality_key", "street",
+                    "house_number", "locality",
+                ],
+                name="addr_house",
+            ),
         ]
 
     def fill_keys(self):
@@ -105,6 +119,111 @@ class Address(models.Model):
     def save(self, *args, **kwargs):
         self.fill_keys()
         super().save(*args, **kwargs)
+        fill_lookup_tables([self], using=kwargs.get("using") or self._state.db)
+
+
+class AddressPlace(models.Model):
+    """One row per postal code and town of a generation (about 4,000): postal code to towns and town to postal codes
+    without a scan of the addresses. Filled with the addresses (``fill_lookup_tables``)."""
+
+    generation = models.UUIDField(editable=False)
+    postal_code = models.CharField(max_length=4)
+    locality = models.CharField(max_length=255)
+    locality_key = models.CharField(max_length=255)
+    # LV95 position of the place: the mean of up to PLACE_SAMPLE addresses of it (``fill_place_centres``). The fixes
+    # of the address check rank places by their distance (km), a postal code far away is no near offer. Null: the file
+    # has none.
+    easting = models.FloatField(null=True, editable=False)
+    northing = models.FloatField(null=True, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            # Also the covering index "towns of a postal code".
+            models.UniqueConstraint(
+                fields=["generation", "postal_code", "locality_key", "locality"], name="place_postal_town",
+            ),
+        ]
+        indexes = [
+            # Postal codes of a town, prefix range on the town key.
+            models.Index(fields=["generation", "locality_key", "postal_code"], name="place_town"),
+        ]
+
+
+class AddressStreet(models.Model):
+    """One row per street, postal code and town of a generation (about 200,000, a thousandth of the addresses'
+    bytes): the places of a street, the streets of a postal code or a town and the streets that start alike are index
+    ranges of a small table instead of DISTINCT scans over millions of addresses."""
+
+    generation = models.UUIDField(editable=False)
+    street = models.CharField(max_length=255)
+    street_key = models.CharField(max_length=255)
+    postal_code = models.CharField(max_length=4)
+    locality = models.CharField(max_length=255)
+    locality_key = models.CharField(max_length=255)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            # Also the covering index "places of a street" and "streets that start alike".
+            models.UniqueConstraint(
+                fields=["generation", "street_key", "street", "postal_code", "locality"], name="street_place",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["generation", "postal_code", "street_key", "street"], name="street_postal"),
+            models.Index(fields=["generation", "locality_key", "street_key", "street"], name="street_town"),
+        ]
+
+
+# Addresses of a place whose coordinates give its centre (a sample, not the mean of all: a pass over every address
+# would take far longer).
+PLACE_SAMPLE = 60
+
+
+def fill_place_centres(generation, *, using=None):
+    """Set the centre of every place of ``generation`` from the coordinates of up to PLACE_SAMPLE of its addresses."""
+    places = list(AddressPlace.objects.using(using).filter(generation=generation))
+    for place in places:
+        points = [
+            (float(e), float(n))
+            for e, n in Address.objects.using(using)
+            .filter(generation=generation, postal_code=place.postal_code, locality_key=place.locality_key)
+            .order_by().values_list("easting", "northing")[:PLACE_SAMPLE]
+            if e is not None and n is not None
+        ]
+        if points:
+            place.easting = sum(e for e, _ in points) / len(points)
+            place.northing = sum(n for _, n in points) / len(points)
+    AddressPlace.objects.using(using).bulk_update(places, ["easting", "northing"], batch_size=500)
+
+
+def fill_lookup_tables(addresses, *, using=None):
+    """Make sure the place and street rows of these addresses exist (idempotent: a unique row is inserted once).
+
+    EVERY write of addresses outside the importer (``bulk_create`` and ``save`` call this; ``update``, raw SQL and
+    ``delete`` do not) must keep the tables in step: the lookups read ``AddressPlace`` and ``AddressStreet``, not the
+    addresses. The importer publishes a generation only when both tables have rows for it
+    (``importer._is_published``)."""
+    places, streets = {}, {}
+    for address in addresses:
+        places[(address.generation, address.postal_code, address.locality_key, address.locality)] = None
+        streets[(address.generation, address.street_key, address.street, address.postal_code, address.locality)] = (
+            address.locality_key
+        )
+    if not places:
+        return
+    AddressPlace.objects.using(using).bulk_create(
+        [AddressPlace(generation=g, postal_code=p, locality_key=k, locality=n) for (g, p, k, n) in places],
+        ignore_conflicts=True, batch_size=500,
+    )
+    AddressStreet.objects.using(using).bulk_create(
+        [
+            AddressStreet(generation=g, street_key=k, street=s, postal_code=p, locality=n, locality_key=locality_key)
+            for (g, k, s, p, n), locality_key in streets.items()
+        ],
+        ignore_conflicts=True, batch_size=500,
+    )
 
 
 class ImportRequest(models.Model):

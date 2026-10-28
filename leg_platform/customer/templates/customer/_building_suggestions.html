@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+The card "Did you mean one of these addresses?" after a submit whose address the directory could only suggest. It is drawn INSIDE the
+notice of the address (``addresses/widget_notice.html`` with ``card_template``), so that it is the same overlay as the card the script
+draws (static/css/address-suggest.css) and the script clears it at the first input; a click on an option or on the link sends the form.
+{% endcomment %}<div class="suggest address-proposal" role="group" aria-labelledby="suggest-title">
+  <h2 class="address-proposal-title" id="suggest-title" tabindex="-1" autofocus>{% translate "Did you mean one of these addresses?" %}</h2>
+  <p class="address-proposal-hint">{% translate "Click an address to use it" %}. {% translate "The EGID is the number of your building in the federal register of buildings." %}</p>
+  {% for suggestion in suggestions %}
+    <button type="submit" name="suggestion" value="{{ suggestion.index }}" class="address-proposal-option"><span class="address-proposal-main">{{ suggestion.label }}</span><span class="address-proposal-sub">{% translate "EGID" %} {{ suggestion.egid }}</span></button>
+  {% endfor %}
+  <button type="submit" name="confirm_typed" value="1" class="address-proposal-keep">{% translate "No, my address is correct" %}</button>
+</div>

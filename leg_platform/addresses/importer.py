@@ -32,7 +32,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .http_budget import Adapter, Budget
-from .models import DIRECTORY_ALIAS, Address, Directory, ImportRequest
+from .models import (
+    DIRECTORY_ALIAS, Address, AddressPlace, AddressStreet, Directory, ImportRequest, fill_place_centres,
+)
 from .progress import count_rows
 
 ITEM_URL = (
@@ -85,8 +87,9 @@ CHUNK_ROWS = 20_000
 # host parameters per statement, D-075).
 PRUNE_BATCH_SIZE = 900
 # Import refused below this free space on the disk of the directory file: the downloaded archive
-# (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1 GB
-# per generation, up to three on disk; the disk is shared with the instance database.
+# (at most 256 MiB, written next to the file, not to the system temporary folder) and about 1.7 GB
+# per generation (3.3 million addresses with the lookup tables and indexes), up to three on disk while
+# importing (the published, the previous and the new one); the disk is shared with the instance database.
 MIN_FREE_DISK_BYTES = 4 * 1024**3
 # ZIP end records (PKWARE APPNOTE 4.3.16, 4.3.15, 4.3.6), read before ``zipfile`` parses the central directory.
 EOCD_SIGNATURE = b"PK\x05\x06"
@@ -421,6 +424,9 @@ def _delete_generation(generation):
         .order_by().values_list("pk", flat=True)[:PRUNE_BATCH_SIZE]
     ):
         deleted += Address.objects.filter(pk__in=pks).delete()[0]
+    # The lookup tables of the generation (a few hundred thousand small rows, one statement each).
+    AddressStreet.objects.filter(generation=generation).delete()
+    AddressPlace.objects.filter(generation=generation).delete()
     return deleted
 
 
@@ -430,7 +436,11 @@ def prune_old_generations(keep):
         Address.objects.exclude(generation__in=keep)
         .order_by().values_list("generation", flat=True).distinct()
     )
-    return sum(_delete_generation(generation) for generation in old)
+    deleted = sum(_delete_generation(generation) for generation in old)
+    # What a crashed import left in the lookup tables.
+    AddressStreet.objects.exclude(generation__in=keep).delete()
+    AddressPlace.objects.exclude(generation__in=keep).delete()
+    return deleted
 
 
 def _acquire_lease():
@@ -541,9 +551,22 @@ def _is_published(directory, checksum, *, repair):
         or directory.checksum != checksum
         # A generation without building identifiers is replaced even if it is the current official file.
         or not directory.has_egid
+        # A generation whose lookup tables are empty or missing is not usable (self-healing: it is imported again).
+        or not _has_lookup_rows(directory)
     ):
         return False
     return not repair or _is_intact(directory)
+
+
+def _has_lookup_rows(directory):
+    """Whether ``AddressPlace`` and ``AddressStreet`` have rows for the published generation."""
+    try:
+        return (
+            AddressPlace.objects.filter(generation=directory.generation).exists()
+            and AddressStreet.objects.filter(generation=directory.generation).exists()
+        )
+    except DatabaseError:
+        return False
 
 
 def _free_bytes(folder):
@@ -592,6 +615,8 @@ def _publish(archive, checksum, data_date, *, repair=False, progress=None):
             if progress is not None:
                 progress.phase("importing")
             count = _load_generation(archive, generation, token, progress)
+            # The centres of the places (distance ranking of the address check), before the generation is published.
+            fill_place_centres(generation)
             if progress is not None:
                 progress.phase("publishing")
             with transaction.atomic(using=DIRECTORY_ALIAS):

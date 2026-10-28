@@ -1,7 +1,7 @@
 {% extends "management/dialog_form.html" %}{% comment %}
 A dialog with the data of a customer (D-087): creating a person and the cards "Angaben", "Kontakt" and
 "Rechnungsadresse". Where the form has the address (a street field), the suggestions of the address directory work as in the
-registration and the profile (``addresses/widget.html`` under the street, the notice ``addresses/widget_notice.html`` under
-the town; set by the form as ``after_template``, the script is loaded by ``dialog_form.html``, D-111). Without JavaScript
+registration and the profile (``addresses/widget.html`` under the street, set by the form as ``after_template``; the notice
+``addresses/widget_notice.html`` and the script are drawn by ``dialog_form.html``, D-111). Without JavaScript
 everything still works: the server checks the data.
 {% endcomment %}

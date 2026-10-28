@@ -185,17 +185,16 @@ def make_fact(form, name, text, *, link=None, initial=None):
 
 
 def address_suggestions(form, *, country=None):
-    """Give the street field the typing suggestions of the address directory and the town the notice under it (D-111).
+    """Give the street field the typing suggestions of the address directory (D-111).
 
     One definition for every dialog with an address (``addresses/widget.html`` under the street,
-    ``addresses/widget_notice.html`` under the town, ``static/js/address-directory.js`` loaded by ``dialog_form.html``).
+    ``static/js/address-directory.js`` loaded by ``dialog_form.html``, which also draws ``addresses/widget_notice.html``
+    under the row of postal code and town).
     ``country`` is the fixed country of a form that has no country field (``"CH"``); a form with a country field passes
     nothing and the script reads the field. A form without a street or town field is left alone."""
     if "street" in form.fields:
         form.fields["street"].after_template = "addresses/widget.html"
         form.fields["street"].address_country = country
-    if "street" in form.fields and "town" in form.fields:
-        form.fields["town"].after_template = "addresses/widget_notice.html"
 
 
 __all__ = [

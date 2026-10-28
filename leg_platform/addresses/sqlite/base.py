@@ -31,7 +31,7 @@ class DatabaseWrapper(base.DatabaseWrapper):
         with ExitStack() as stack:
             if not database.startswith(("file:", ":memory:")) and not is_rebuilding():
                 try:
-                    stack.enter_context(directory_open_guard(Path(database)))
+                    stack.enter_context(directory_open_guard(Path(database), shared=True))
                 except OSError:
                     raise OperationalError("The address directory is busy during setup or execution.") from None
             # Check inside the mutex, and keep it until Django and SQLite have consumed all
@@ -69,7 +69,7 @@ class DatabaseWrapper(base.DatabaseWrapper):
         try:
             path = Path(database)
             self._make_folders(path.parent)
-            with directory_open_guard(path):
+            with directory_open_guard(path, shared=True):
                 return self._open_connection(conn_params)
         except OSError:
             raise OperationalError("The address directory cannot be opened during setup.") from None

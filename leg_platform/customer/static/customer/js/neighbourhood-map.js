@@ -1,4 +1,4 @@
-// The map of the page Nachbarschaft (D-120): the swisstopo colour base map, the outlines of the transformer circuits, the
+// The map of the page Nachbarschaft (D-123): the swisstopo colour base map, the outlines of the transformer circuits, the
 // buildings with a PV plant and the own building. An enhancement only: without this script the legend and the counts show.
 // Circuit names are never put into the map as HTML; they are shown as text in the legend of the page.
 (function () {

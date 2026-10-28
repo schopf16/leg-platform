@@ -362,6 +362,7 @@
 
 /* ---- Dialog: a centred card over a dimmed page on a desktop, the full view on a phone ---- */
 .mgmt-dialog-layer {
+  scrollbar-gutter: stable;
   position: fixed;
   inset: 0;
   z-index: 1040;
@@ -1154,6 +1155,30 @@ a.mgmt-sort:hover {
 
 .mgmt-dialog-row.is-single {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* The notice of the address directory under the row of postal code and town: full width, no gap of its own while empty. */
+.mgmt-dialog-row + .address-notice:not(:empty) {
+  margin-bottom: 12px;
+}
+
+.mgmt-dialog-row + .address-notice:empty {
+  margin-top: 0;
+}
+
+/* On a desktop width the notice and the card are an overlay (address-suggest.css): the element keeps no height, and its
+   place is the same empty or filled. */
+@media (min-width: 761px) {
+  .mgmt-dialog-row + .address-notice,
+  .mgmt-dialog-row + .address-notice:empty,
+  .mgmt-dialog-row + .address-notice:not(:empty) {
+    margin: -12px 0 0;
+  }
+
+  .mgmt-row .address-notice,
+  .mgmt-row .address-notice:empty {
+    margin-top: 0;
+  }
 }
 
 .mgmt-dialog-row.is-street {

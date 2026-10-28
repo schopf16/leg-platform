@@ -371,8 +371,8 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         # import thread of ``runner.py`` (and ``jobs.py`` for the failure text), which import the
         # importer only inside a function that runs in that thread or in the worker.
         directory = Path(importer.__file__).parent
-        for name in ("admin.py", "views.py", "urls.py", "services.py", "limits.py", "models.py", "apps.py",
-                     "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
+        for name in ("admin.py", "views.py", "urls.py", "services.py", "fixes.py", "matching.py", "limits.py", "models.py",
+                     "apps.py", "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
             tree = ast.parse((directory / name).read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 modules = []
@@ -645,15 +645,21 @@ class DirectoryDatabaseTests(TestCase):
         with CaptureQueriesContext(connections["addresses"]) as queries, patch.object(importer, "PRUNE_BATCH_SIZE", 3):
             deleted = importer.prune_old_generations({self.generation})
         self.assertEqual(deleted, 7)
-        deletes = [query["sql"] for query in queries if query["sql"].startswith("DELETE")]
+        # The lookup tables (places, streets) are emptied with one statement each, so the address statements are counted.
+        deletes = [
+            query["sql"] for query in queries
+            if query["sql"].startswith("DELETE") and 'FROM "addresses_address"' in query["sql"]
+        ]
         self.assertEqual(len(deletes), 3)  # 3 + 3 + 1 rows
-        self.assertTrue(all("addresses_address" in statement for statement in deletes))
         self.assertEqual(list(Address.objects.values_list("generation", flat=True)), [self.generation])
 
     def test_nothing_is_deleted_when_every_generation_is_kept(self):
         with CaptureQueriesContext(connections["addresses"]) as queries:
             self.assertEqual(importer.prune_old_generations({self.generation}), 0)
-        self.assertFalse([query for query in queries if query["sql"].startswith("DELETE")])
+        # The only statements are the clean-up of orphan rows of the lookup tables; no address is deleted.
+        self.assertFalse([
+            query for query in queries if query["sql"].startswith("DELETE") and 'FROM "addresses_address"' in query["sql"]
+        ])
         self.assertEqual(Address.objects.count(), 1)
 
     def test_a_failing_cleanup_does_not_fail_the_published_import(self):
@@ -1101,7 +1107,10 @@ class DirectoryDatabaseTests(TestCase):
         ])
         with CaptureQueriesContext(connections["addresses"]) as queries:
             self.assertEqual(importer.prune_old_generations({self.generation}), 2000)
-        deletes = [query["sql"] for query in queries if query["sql"].startswith("DELETE")]
+        deletes = [
+            query["sql"] for query in queries
+            if query["sql"].startswith("DELETE") and 'FROM "addresses_address"' in query["sql"]
+        ]
         self.assertEqual(len(deletes), 3)  # 900 + 900 + 200
         self.assertEqual(Address.objects.count(), 1)
 
@@ -1526,9 +1535,9 @@ class DirectoryDatabaseTests(TestCase):
         # A typing error, so that only the approximate path finds the four streets.
         values = {"street": "Strietname", "postal_code": "9999"}
         # The postal code has the four new streets and the street of setUp: five streets.
-        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 5):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_STREET_LIMIT", 5):
             self.assertEqual(len(lookup(values)["results"]), 4)
-        with patch("leg_platform.addresses.services.APPROXIMATE_STREET_LIMIT", 4):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_STREET_LIMIT", 4):
             with CaptureQueriesContext(connections["addresses"]) as queries:
                 result = lookup(values)
             self.assertEqual(result["results"], [])
@@ -1618,17 +1627,17 @@ class DirectoryDatabaseTests(TestCase):
         self.add_addresses(("\u00c9gerstrasse-xxxxxxx", "1", "9999", "Example Town"))  # 19 characters
         query = Address.objects.filter(generation=self.generation)
         values = {"street": "Egerstra", "postal_code": "9999", "house_number": ""}
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 10):  # candidates up to 20
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_LENGTH", 10):  # candidates up to 20
             self.assertEqual(len(approximate_matches(query, values)[0]), 1)
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_LENGTH", 9):  # candidates up to 18
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_LENGTH", 9):  # candidates up to 18
             self.assertEqual(approximate_matches(query, values)[0], [])
 
     def test_the_number_of_full_comparisons_is_capped_and_nothing_is_returned_above_the_cap(self):
         self.add_addresses(*[(f"Schulstrass{letter}", "1", "9999", "Example Town") for letter in "aeo"])
         values = {"street": "Schulstrase", "postal_code": "9999"}
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 3):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_RATIO_CALLS", 3):
             self.assertEqual(len(lookup(values)["results"]), 3)
-        with patch("leg_platform.addresses.services.APPROXIMATE_MAX_RATIO_CALLS", 2):
+        with patch("leg_platform.addresses.matching.APPROXIMATE_MAX_RATIO_CALLS", 2):
             result = lookup(values)
         self.assertEqual(result["results"], [])
         self.assertEqual(result["status"], "available")
@@ -1985,7 +1994,10 @@ class DirectoryDatabaseTests(TestCase):
         self.assertEqual(data["results"], [{
             "street": "Bahnhofstrasse", "house_number": "5", "postal_code": "9999", "locality": "Example Town",
         }])
-        self.assertEqual(set(data), {"status", "data_date", "stale", "warning", "results", "match", "kind"})
+        # The answer grew by "more", "proposals" and "reason" (B2, B3); the old keys stay.
+        self.assertEqual(
+            set(data), {"status", "data_date", "stale", "warning", "results", "match", "kind", "more", "proposals", "reason"},
+        )
         self.assertIn("no-store", response["Cache-Control"])
         self.assertIn("private", response["Cache-Control"])
 
@@ -2626,27 +2638,42 @@ class PrefixSearchTests(TestCase):
                     cursor.execute("EXPLAIN QUERY PLAN " + sql)
                     plan = " | ".join(row[3] for row in cursor.fetchall())
                 with self.subTest(name, sql=sql[:80]):
-                    self.assertRegex(plan, r"SEARCH addresses_address USING (COVERING )?INDEX addr_generation_")
+                    # addr_house (the lookups by street AND house number, H) or one of the older indexes.
+                    self.assertRegex(plan, r"SEARCH addresses_address USING (COVERING )?INDEX addr_(generation_|house)")
                     self.assertNotIn("SCAN addresses_address", plan)
 
-    def test_the_check_and_the_candidates_use_the_index_of_the_postal_code(self):
-        for values, mode in (
-            ({"street": "Bahnhofstrasse", "house_number": "5", "postal_code": "8001", "locality": "Z\u00fcrich"}, "check"),
-            ({"street": "Bahnhofstrase", "postal_code": "8001"}, "suggest"),
-        ):
-            with CaptureQueriesContext(connections["addresses"]) as queries:
-                lookup(values, mode=mode)
-            plans = []
-            for sql in sql_of(queries):
-                if 'FROM "addresses_address"' in sql and ("DISTINCT" in sql and '"street" FROM' in sql or mode == "check"):
-                    with connections["addresses"].cursor() as cursor:
-                        cursor.execute("EXPLAIN QUERY PLAN " + sql)
-                        plans.append(" | ".join(row[3] for row in cursor.fetchall()))
-            self.assertTrue(plans)
-            for plan in plans:
-                self.assertRegex(
-                    plan, r"USING (COVERING )?INDEX addr_generation_postal_street \(generation=\? AND postal_code=\?",
-                )
+    def plans_of(self, values, mode, table):
+        """The query plans of the statements of one lookup that read ``table``."""
+        with CaptureQueriesContext(connections["addresses"]) as queries:
+            lookup(values, mode=mode)
+        plans = []
+        for sql in sql_of(queries):
+            if f'FROM "{table}"' in sql:
+                with connections["addresses"].cursor() as cursor:
+                    cursor.execute("EXPLAIN QUERY PLAN " + sql)
+                    plans.append(" | ".join(row[3] for row in cursor.fetchall()))
+        return plans
+
+    def test_the_check_reads_the_covering_index_of_street_and_house_number(self):
+        plans = self.plans_of(
+            {"street": "Bahnhofstrasse", "house_number": "5", "postal_code": "8001", "locality": "Zürich"},
+            "check", "addresses_address",
+        )
+        self.assertTrue(plans)
+        for plan in plans:
+            self.assertRegex(
+                plan,
+                r"SEARCH addresses_address USING COVERING INDEX addr_house "
+                r"\(generation=\? AND street_key=\? AND house_number_key=\? AND postal_code=\? AND locality_key=\?\)",
+            )
+
+    def test_the_streets_of_a_postal_code_come_from_the_small_street_table_through_its_index(self):
+        # The approximate search no longer scans DISTINCT streets of the addresses: it reads AddressStreet by postal code.
+        plans = self.plans_of({"street": "Bahnhofstrase", "postal_code": "8001"}, "suggest", "addresses_addressstreet")
+        self.assertTrue(plans)
+        for plan in plans:
+            self.assertRegex(plan, r"SEARCH addresses_addressstreet USING (COVERING )?INDEX street_postal \(generation=\? AND postal_code=\?")
+            self.assertNotIn("SCAN", plan)
 
 
 @tag("mariadb")
@@ -2967,7 +2994,8 @@ class MigrateTests(SimpleTestCase):
                 database.close()
             self.assertEqual(tables - {"sqlite_sequence", "sqlite_stat1"},
                              {"django_migrations", "addresses_address", "addresses_directory",
-                              "addresses_plant", "addresses_plantregister", "addresses_transformerstation"})
+                              "addresses_plant", "addresses_plantregister", "addresses_transformerstation",
+                              "addresses_addressplace", "addresses_addressstreet"})
             self.assertEqual(address_columns, {
                 "id", "generation", "street", "house_number", "postal_code", "locality",
                 "street_key", "house_number_key", "locality_key", "egid", "entrance_id", "easting", "northing",
@@ -2984,6 +3012,11 @@ class MigrateTests(SimpleTestCase):
                     "generation", "street_key", "street", "house_number", "postal_code", "locality",
                 ],
                 "addr_generation_locality": ["generation", "locality_key", "locality", "postal_code"],
+                # 0020: the covering index of the lookups by street and house number (H).
+                "addr_house": [
+                    "generation", "street_key", "house_number_key", "postal_code", "locality_key", "street",
+                    "house_number", "locality",
+                ],
             })
             self.assertEqual({node for node in recorded if node[0] == "addresses"}, {
                 ("addresses", "0001_initial"), ("addresses", "0002_importrequest_last_failed_repair_at"),
@@ -3003,6 +3036,8 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0017_importrequest_progress_at"),
                 ("addresses", "0018_importlogentry_count_importlogentry_kind_and_more"),
                 ("addresses", "0019_importrequest_progress_units_and_more"),
+                ("addresses", "0020_lookup_tables_and_house_index"),
+                ("addresses", "0021_addressplace_centre"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

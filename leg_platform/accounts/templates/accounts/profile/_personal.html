@@ -20,14 +20,14 @@ under the address fields (W4-01) and names the LEG as a link where the instance 
           {% include "accounts/_field.html" with field=form.last_name %}
         </div>
         <div class="field-pair field-pair-street">
-          {% include "accounts/_field.html" with field=form.street after="addresses/widget.html" %}
+          {% if address_building.locked %}{% include "accounts/_field.html" with field=form.street %}{% else %}{% include "accounts/_field.html" with field=form.street after="addresses/widget.html" %}{% endif %}
           {% include "accounts/_field.html" with field=form.house_number %}
         </div>
         <div class="field-pair field-pair-locality">
           {% include "accounts/_field.html" with field=form.postal_code %}
           {% include "accounts/_field.html" with field=form.town %}
         </div>
-        {% if address_building.locked %}<p class="profile-note" id="address-locked-note">{% blocktranslate %}The address is confirmed and cannot be changed. Please contact the {{ leg }} for a change.{% endblocktranslate %}</p>{% endif %}        {% include "addresses/widget_notice.html" %}
+        {% if address_building.locked %}<p class="profile-note" id="address-locked-note">{% blocktranslate %}The address is confirmed and cannot be changed. Please contact the {{ leg }} for a change.{% endblocktranslate %}</p>{% else %}{% include "addresses/widget_notice.html" %}{% endif %}
         <details class="more-details"{% if form.is_bound %} open{% endif %}>
           <summary>{% translate "Further details (optional)" %}</summary>
           <div class="more-fields">

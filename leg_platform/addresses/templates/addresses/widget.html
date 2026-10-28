@@ -3,27 +3,37 @@ The suggestions of the address directory (D-054, D-065, D-111): street, postal c
 Include it inside the street field (the ``after`` include of ``accounts/_field.html``, ``customer/_field.html``,
 ``management/_field_row.html`` or the ``after_template`` of a dialog field), so that the list sits directly under the
 street input; ``addresses/widget_notice.html`` follows the postal code and town. One script
-(``static/js/address-directory.js``) turns the street, postal code and town inputs into ARIA comboboxes. The fields stay
+(``static/js/address-directory.js``) turns the street, postal code and town inputs into ARIA comboboxes; the lists are overlays
+(``static/css/address-suggest.css``) that move nothing on the page. The fields stay
 authoritative: nothing here changes a field except a deliberate choice, or the town (postal code) that follows from a
 postal code (town) that has exactly one answer and goes into an empty field.
 Context (all optional): ``address_prefix`` (the prefix of the field names, "sender_" in the settings: the ids are
 ``id_<prefix>street`` and so on), ``address_country_value`` ("CH" where the form has no country field; else the id of
-the country field is ``id_country``), ``address_notice_id``.
+the country field is ``id_country``), ``address_notice_id``, ``address_staff`` (true where no ``request`` is at hand but the reader is staff: the administration).
 The texts are read by the script from the data attributes; ``%(name)s`` placeholders are replaced there by plain string
 replacement and the result is set as text. Without JavaScript the panel and the notice stay empty and nothing is said
 about it (D-066). For a staff account only, ``data-directory-missing`` carries the sentence that the script shows when
 the directory has no addresses (D-111); nobody else is told about the state of the directory.
-{% endcomment %}{% blocktranslate asvar title_one count counter=1 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar title_many count counter=2 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar note_approximate with street='%(street)s' postal_code='%(postal_code)s' %}No street starting with “{{ street }}” was found in {{ postal_code }}. Choose an address to fill in the fields.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_one count counter=1 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_many count counter=2 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_one count counter=1 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_many count counter=2 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_text with address='%(address)s' %}Address filled in: {{ address }}.{% endblocktranslate %}{% blocktranslate asvar announce_locality_one count counter=1 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_locality_many count counter=2 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_locality with town='%(town)s' %}Town filled in: {{ town }}.{% endblocktranslate %}{% blocktranslate asvar filled_postal_code with postal_code='%(postal_code)s' %}Postal code filled in: {{ postal_code }}.{% endblocktranslate %}{% with prefix=address_prefix|default:"" %}<div class="address-assist" data-address-directory
+{% endcomment %}{% blocktranslate asvar title_one count counter=1 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar title_many count counter=2 %}Did you mean this address?{% plural %}Did you mean one of these addresses?{% endblocktranslate %}{% blocktranslate asvar announce_prefix_one count counter=1 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_prefix_many count counter=2 with count='%(count)s' %}{{ count }} address suggestion available. Press the down arrow key to choose one.{% plural %}{{ count }} address suggestions available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_one count counter=1 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_approximate_many count counter=2 with count='%(count)s' %}No exact match. {{ count }} similar address available. Press the down arrow key to choose it.{% plural %}No exact match. {{ count }} similar addresses available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_text with address='%(address)s' %}Address filled in: {{ address }}.{% endblocktranslate %}{% blocktranslate asvar announce_locality_one count counter=1 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar announce_locality_many count counter=2 with count='%(count)s' %}{{ count }} match available. Press the down arrow key to choose it.{% plural %}{{ count }} matches available. Press the down arrow key to choose one.{% endblocktranslate %}{% blocktranslate asvar filled_locality with town='%(town)s' %}Town filled in: {{ town }}.{% endblocktranslate %}{% blocktranslate asvar filled_postal_code with postal_code='%(postal_code)s' %}Postal code filled in: {{ postal_code }}.{% endblocktranslate %}{% blocktranslate asvar note_postal_code with address='%(address)s' postal_code='%(postal_code)s' %}The postal code {{ postal_code }} does not fit {{ address }}.{% endblocktranslate %}{% blocktranslate asvar note_house_number with street='%(street)s' house_number='%(house_number)s' %}We could not find house number {{ house_number }} on {{ street }}.{% endblocktranslate %}{% blocktranslate asvar note_town with town='%(town)s' postal_code='%(postal_code)s' %}The postal code {{ postal_code }} belongs to {{ town }}.{% endblocktranslate %}{% blocktranslate asvar note_street with street='%(street)s' postal_code='%(postal_code)s' %}We could not find {{ street }} in {{ postal_code }}.{% endblocktranslate %}{% blocktranslate asvar note_street_town with street='%(street)s' town='%(town)s' %}We could not find {{ street }} in {{ town }}.{% endblocktranslate %}{% with prefix=address_prefix|default:"" %}<div class="address-assist" data-address-directory
      data-endpoint="{% url 'addresses:lookup' %}"
      data-notice-id="{{ address_notice_id|default:'address-notice' }}"
-     data-title-prefix="{% translate 'Matching addresses' %}"
-     data-title-approximate-one="{{ title_one }}"
-     data-title-approximate-many="{{ title_many }}"
+     data-title-prefix="{% translate 'Matching addresses:' %}"
+     data-title-approximate="{% translate 'Similar addresses:' %}"
      data-title-locality="{% translate 'Choose a town' %}"
      data-title-postal-code="{% translate 'Choose a postal code' %}"
-     data-note-prefix="{% translate 'Choose an address to fill in the fields.' %}"
-     data-note-approximate="{{ note_approximate }}"
-     data-more="{% translate 'More addresses match. Keep typing to narrow the list.' %}"
+     data-note-prefix="{% translate 'choose one.' %}"
+     data-more="{% translate 'More matches: keep typing.' %}"
+     data-proposal-title-one="{{ title_one }}"
+     data-proposal-title-many="{{ title_many }}"
+     data-proposal-note-postal-code="{{ note_postal_code }}"
+     data-proposal-note-house-number="{{ note_house_number }}"
+     data-proposal-note-town="{{ note_town }}"
+     data-proposal-note-street="{{ note_street }}"
+     data-proposal-note-street-town="{{ note_street_town }}"
+     data-proposal-hint="{% translate 'Click an address to use it' %}"
+     data-use-entered="{% translate 'My address is correct, use it as entered' %}"
+     data-proposal-keep="{% translate 'No, my address is correct' %}"
+     data-proposal-kept="{% translate 'Address kept as entered.' %}"
      data-announce-prefix-one="{{ announce_prefix_one }}"
      data-announce-prefix-many="{{ announce_prefix_many }}"
      data-announce-approximate-one="{{ announce_approximate_one }}"
@@ -33,7 +43,7 @@ the directory has no addresses (D-111); nobody else is told about the state of t
      data-filled="{{ filled_text }}"
      data-filled-locality="{{ filled_locality }}"
      data-filled-postal-code="{{ filled_postal_code }}"
-     {% if request.user.is_staff %}data-directory-missing="{% translate 'There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration.' %}"
+     {% if request.user.is_staff or address_staff %}data-directory-missing="{% translate 'There are no address suggestions: the address directory is not available or has not been imported yet. A system administrator can import it in the system administration.' %}"
      {% endif %}data-street-id="id_{{ prefix }}street"
      data-house-number-id="id_{{ prefix }}house_number"
      data-postal-code-id="id_{{ prefix }}postal_code"

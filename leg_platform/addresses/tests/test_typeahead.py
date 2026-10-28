@@ -186,41 +186,52 @@ class LocalityTests(TypeaheadBase):
 
 
 class QueryPlanTests(TypeaheadBase):
-    PLAN = r"SEARCH addresses_address USING (COVERING )?INDEX addr_generation_"
+    PLAN = r"SEARCH addresses_address USING (COVERING )?INDEX addr_(generation_|house)"
 
-    def test_the_ranked_street_search_and_the_town_searches_read_through_the_indexes(self):
-        scenarios = {
-            "street and area": ({"street": "gantrisch"}, "suggest"),
-            "street, postal code and area": ({"street": "gantrisch", "postal_code": "30"}, "suggest"),
-            "postal code": ({"postal_code": "3063"}, "locality"),
-            "town": ({"locality": "bern"}, "locality"),
-            "town and postal code": ({"locality": "bern", "postal_code": "300"}, "locality"),
-        }
-        for name, (values, mode) in scenarios.items():
-            with self.subTest(name), CaptureQueriesContext(connections["addresses"]) as queries:
-                lookup(values, mode=mode, home=HOME)
-            selects = [sql for sql in sql_of(queries) if 'FROM "addresses_address"' in sql]
-            self.assertTrue(selects, name)
-            for sql in selects:
-                with connections["addresses"].cursor() as cursor:
-                    cursor.execute("EXPLAIN QUERY PLAN " + sql)
-                    plan = " | ".join(row[3] for row in cursor.fetchall())
-                with self.subTest(name, sql=sql[:80]):
-                    self.assertRegex(plan, self.PLAN)
-                    self.assertNotIn("SCAN addresses_address", plan)
-
-    def test_the_search_for_a_town_uses_the_index_of_the_towns(self):
+    def plans(self, values, mode, table, **extra):
         with CaptureQueriesContext(connections["addresses"]) as queries:
-            lookup({"locality": "bern"}, mode="locality")
+            lookup(values, mode=mode, home=HOME, **extra)
         plans = []
         for sql in sql_of(queries):
-            if 'FROM "addresses_address"' in sql:
+            if f'FROM "{table}"' in sql:
                 with connections["addresses"].cursor() as cursor:
                     cursor.execute("EXPLAIN QUERY PLAN " + sql)
                     plans.append(" | ".join(row[3] for row in cursor.fetchall()))
-        self.assertTrue(plans)
-        for plan in plans:
-            self.assertIn("addr_generation_locality", plan)
+        return plans
+
+    def test_the_ranked_street_search_reads_through_the_indexes(self):
+        scenarios = {
+            "street and area": {"street": "gantrisch"},
+            "street, postal code and area": {"street": "gantrisch", "postal_code": "30"},
+            "street, house number and area": {"street": "gantrischweg", "house_number": "1"},
+        }
+        for name, values in scenarios.items():
+            with self.subTest(name):
+                plans = self.plans(values, "suggest", "addresses_address")
+                self.assertTrue(plans, name)
+                for plan in plans:
+                    self.assertRegex(plan, self.PLAN)
+                    self.assertNotIn("SCAN addresses_address", plan)
+
+    def test_the_town_searches_read_the_small_place_table_through_its_indexes(self):
+        # Since the lookup tables (H) the postal code and the town are answered from AddressPlace, never from the addresses.
+        scenarios = {
+            "postal code": ({"postal_code": "3063"}, r"SEARCH addresses_addressplace USING (COVERING )?INDEX (place_postal_town|sqlite_autoindex_addresses_addressplace_1)"),
+            "town": ({"locality": "bern"}, r"SEARCH addresses_addressplace USING (COVERING )?INDEX place_town"),
+            # Either index is an index range; the planner picks the one of the postal code prefix here.
+            "town and postal code": (
+                {"locality": "bern", "postal_code": "300"},
+                r"SEARCH addresses_addressplace USING (COVERING )?INDEX (place_town|sqlite_autoindex_addresses_addressplace_1)",
+            ),
+        }
+        for name, (values, expected) in scenarios.items():
+            with self.subTest(name):
+                self.assertEqual(self.plans(values, "locality", "addresses_address"), [], "the addresses are not read")
+                plans = self.plans(values, "locality", "addresses_addressplace")
+                self.assertTrue(plans, name)
+                for plan in plans:
+                    self.assertRegex(plan, expected)
+                    self.assertNotIn("SCAN addresses_addressplace", plan)
 
 
 class EndpointTests(TypeaheadBase):
@@ -262,7 +273,8 @@ class EndpointTests(TypeaheadBase):
                 self.assertIn("private", response["Cache-Control"])
                 # Register data and the status only: nothing about the account or the instance.
                 self.assertEqual(
-                    set(response.json()), {"status", "data_date", "stale", "warning", "results", "match", "kind"}
+                    set(response.json()),
+                    {"status", "data_date", "stale", "warning", "results", "match", "kind", "more", "proposals", "reason"},
                 )
 
     def test_the_endpoint_is_post_only_checks_the_token_and_refuses_what_is_not_a_form(self):

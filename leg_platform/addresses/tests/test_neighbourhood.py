@@ -1,4 +1,4 @@
-"""The map of the neighbourhood (D-120): the approximate coordinate formulas of swisstopo against the document's example,
+"""The map of the neighbourhood (D-123): the approximate coordinate formulas of swisstopo against the document's example,
 the outline of a circuit, and the circuits of a postal code from the address directory. Synthetic data only; no network."""
 
 import uuid

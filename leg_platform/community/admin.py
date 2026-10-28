@@ -18,6 +18,7 @@ from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
+from leg_platform.addresses.admin_widgets import AddressSuggestionsMixin
 from leg_platform.community.models import (
     GridOperator,
     HistoryEntry,
@@ -49,7 +50,10 @@ class TransformerCircuitAdmin(PlainTableAdmin):
     staff_fields = ("grid_number", "name", "created_at", "updated_at")
 
 
-class LocationAdmin(PlainTableAdmin):
+class LocationAdmin(AddressSuggestionsMixin, PlainTableAdmin):
+    # The address suggestions work in the change form of a row, not in the editable list (a location lies in
+    # Switzerland).
+    address_country = "CH"
     staff_list_display = (
         "street", "house_number", "postal_code", "town", "address_addition", "transformer_circuit",
         "is_archived", "needs_confirmation", "address_correction_open", "updated_at",
@@ -151,7 +155,9 @@ class HistoryEntryAdmin(PlainTableAdmin):
         return obj.actor_id if obj.actor_id is not None else "-"
 
 
-class ManagementSettingsAdmin(PlainTableAdmin):
+class ManagementSettingsAdmin(AddressSuggestionsMixin, PlainTableAdmin):
+    address_prefix = "sender_"
+    address_country = "CH"
     staff_list_display = (
         "country_code", "identifier", "warning_threshold_percent", "sender_street", "sender_house_number",
         "sender_postal_code", "sender_town", "updated_at",
