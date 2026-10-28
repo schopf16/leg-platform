@@ -25,10 +25,8 @@ class LogNotificationSettings(models.Model):
     # By severity: one tick each (an error is also a critical one).
     notify_error = models.BooleanField(default=True, verbose_name=_("Errors"))
     notify_warning = models.BooleanField(default=False, verbose_name=_("Warnings"))
-    notify_notice = models.BooleanField(default=False, verbose_name=_("Notices"))
-    # Events of the import: the data is old, the file is unchanged.
+    # Import event: the data is old. (An unchanged file is never mailed.)
     notify_stale = models.BooleanField(default=False, verbose_name=_("Address directory not changed for a long time"))
-    notify_unchanged = models.BooleanField(default=False, verbose_name=_("Downloaded file unchanged"))
     # Import errors: the fixed failure texts that are NOT ticked (one tick per text; all ticked by default, D-122).
     muted_failures = models.JSONField(default=list, blank=True, editable=False)
     state = models.JSONField(default=dict, blank=True, editable=False)

@@ -29,6 +29,8 @@ For every open task:
 - Focus on delivering a complete solution, not isolated changes.
 - Avoid gold plating and unnecessary complexity.
 - Stay within the agreed project scope.
+- The goal is a website where customers register and sign up for a LEG. Every decision that does not change this goal is yours.
+- Defects found by any agent, review or test go to the developer and are fixed in the same run. They are not left as open points. The tester reports defects, it does not fix application code.
 
 When in doubt:
   Research.

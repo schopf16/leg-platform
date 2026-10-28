@@ -120,11 +120,6 @@ def plant_warnings(**figures):
 # ---- Reading ----
 
 
-def open_applications(person):
-    """The account's applications that are not completed, oldest first."""
-    return Application.objects.filter(person=person, state__in=Application.OPEN_STATES)
-
-
 def own_application(person, pk):
     """The application of this account; ``Application.DoesNotExist`` for any other (never reveals one)."""
     return Application.objects.get(pk=pk, person=person)

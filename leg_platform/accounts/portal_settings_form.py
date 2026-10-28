@@ -83,7 +83,6 @@ class PortalSettingsForm(forms.ModelForm):
     # administration.
     actor = None
     request = None
-    password_error = _("The password is not correct. Please try again.")
 
     logo_light_file = forms.FileField(
         required=False,

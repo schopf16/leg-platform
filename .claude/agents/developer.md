@@ -36,6 +36,7 @@ Update `docs/CODEMAP.md` in the same change when a module, class or entry point 
 * Use Django migrations for schema changes.
 * Document relevant decisions together with their sources.
 * Avoid unnecessary dependencies and speculative abstractions.
+* Fix defects, do not only report them: those in your change, in code you touch, and the findings of reviews and tests that the main session passes to you. Decide the way yourself while the goal (a website where customers register and sign up for a LEG) stays unchanged (`AGENTS.md`, section 1).
 * Correct findings of the security reviewer that the main session passes to you, and list every change with file and reason.
 * For user interface tasks, implement the accepted design specifications of the designer, who leads the look and feel (`docs/DESIGN.md`). Do not deviate from them silently; if a specification conflicts with security, the scope or technical constraints, report it to the main session.
 
@@ -68,7 +69,7 @@ Update `docs/CODEMAP.md` in the same change when a module, class or entry point 
 * Check the behaviour of Django, libraries and APIs in the official documentation of the version in use.
 * Check versions in the actual environment.
 * Do not use blogs, forums, news or tabloid content as a basis.
-* When in doubt: ask before implementing.
+* Unclear WHAT (requirement, domain rule, direction of the product): ask before implementing. Unclear HOW: decide it yourself, state it in the report (`AGENTS.md`, section 1).
 * Details: `AGENTS.md`, section 3.
 
 ## Security Rules

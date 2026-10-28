@@ -10734,9 +10734,6 @@ msgstr "Avviso"
 msgid "Address directory not changed for a long time"
 msgstr "Directory degli indirizzi invariata da molto tempo"
 
-msgid "Downloaded file unchanged"
-msgstr "File scaricato invariato"
-
 msgid "The address directory has not changed for a long time."
 msgstr "La directory degli indirizzi non è cambiata da molto tempo."
 

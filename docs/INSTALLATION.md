@@ -109,7 +109,7 @@ Only where a MySQL installation from the former setup script exists (folders `C:
 Close and reopen VS Code and every terminal to receive the new environment variables (all variables: `.env.example`). Then create the virtual environment and install the project with the newest compatible packages (D-015):
 
 ```powershell
-py -3.14 -m venv .venv
+py -3.13 -m venv .venv        # any Python from 3.12 to 3.14
 .venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\python -m pip install --upgrade -e .
 ```

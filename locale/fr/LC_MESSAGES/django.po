@@ -10882,9 +10882,6 @@ msgstr "Avertissement"
 msgid "Address directory not changed for a long time"
 msgstr "Répertoire d'adresses inchangé depuis longtemps"
 
-msgid "Downloaded file unchanged"
-msgstr "Fichier téléchargé inchangé"
-
 msgid "The address directory has not changed for a long time."
 msgstr "Le répertoire d'adresses n'a pas changé depuis longtemps."
 

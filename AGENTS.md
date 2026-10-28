@@ -27,11 +27,13 @@ Then read only the documents and sections the task needs, chosen from this topic
 * Also read all directly affected files and tests (found through `docs/CODEMAP.md`, not by searching the whole code). A change that adds, moves, renames or removes a module, class or entry point named in `docs/CODEMAP.md` updates the map in the same change.
 * Implement in small, verifiable steps. Build nothing in advance that is not in the agreed scope.
 
-If a requirement is unclear:
+What is wanted vs how to do it:
 
-* Do not assume requirements, the owner's intentions or domain rules. Ask.
-* Decide a low-risk technical detail without asking only if the official documentation of the technology names the choice as standard or recommendation. Record the decision with its source.
-* Always ask if a decision significantly affects security, data protection, data migration or external services.
+* **What (the goal):** never assume it. Requirements, domain rules, the owner's intentions and the direction of the product come only from the owner and the project documents. Do not carry over examples or concepts from other domains (for example water or gas where the project is about electricity). If the goal is not clear, ask.
+* **How (the way to reach a clear goal):** decide it yourself and do it in the same change. Choose the cleanest solution, record a decision that others must know in `docs/DECISIONS.md`, and report what you decided. Do not ask permission for it, and do not list it as an open point.
+* **Maintenance is yours:** dead code, unused fields and imports (with their migration), stale or wrong documentation, version statements inside the supported range, code structure, tidiness and test runner mappings are fixed in the same change, also when the defect predates it.
+* **Defects are fixed, not only reported:** those found in your own change, in code you touch, and by reviews and tests. **The goal of the project is a website where customers register and sign up for a LEG.** As long as a fix or a technical choice does not change this goal, you decide freely. Only a change of the goal itself (new functions, other user groups, other domains) is the owner's decision.
+* **Always ask** before a decision that significantly affects security, data protection, data migration or external services, and before an irreversible data change.
 * Do not claim a requirement is fulfilled unless it was verified.
 
 ## 2. Language: Software in English, User Interface Localized

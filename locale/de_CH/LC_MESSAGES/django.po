@@ -10761,9 +10761,6 @@ msgstr "Warnung"
 msgid "Address directory not changed for a long time"
 msgstr "Adressverzeichnis seit längerer Zeit unverändert"
 
-msgid "Downloaded file unchanged"
-msgstr "Heruntergeladene Datei unverändert"
-
 msgid "The address directory has not changed for a long time."
 msgstr "Das Adressverzeichnis ist seit längerer Zeit unverändert."
 

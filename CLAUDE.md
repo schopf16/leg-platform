@@ -31,7 +31,7 @@ Details: `AGENTS.md`, sections 2, 3 and 12.
 ### No Assumptions
 
 * Verify every point before presenting it as fact or implementing it. Rely only on the actual project state and official sources (`AGENTS.md`, section 3.3). Training knowledge may be outdated.
-* When in doubt: ask.
+* Never assume WHAT is wanted (requirements, domain rules, direction of the product): ask. HOW a clear goal is reached is decided by you (`AGENTS.md`, section 1).
 
 ## Way of Working
 
@@ -39,7 +39,7 @@ Details: `AGENTS.md`, sections 2, 3 and 12.
 * Prefer established, maintained solutions over custom developments.
 * Run appropriate tests and report actual results. Run the tests of the touched area with `.\scripts\test.ps1 -Changed` or `-Area <name>` (`docs/STARTUP.md`, section 13; D-071). The full suite runs only for core changes, before a deployment gate, in CI and once per commit block by the team lead.
 * Keep documentation and implementation in sync.
-* Ask before irreversible or security-critical decisions unless a binding rule exists.
+* Decide the way to a clear goal yourself and do it in the same change, also maintenance such as dead code and stale documentation (`AGENTS.md`, section 1). Ask before security-critical, data-protection, data-migration and external-service decisions and before irreversible data changes, unless a binding rule exists.
 * Never invent functionality or test results. Name the source or verification step for every decision and statement.
 
 ## Agents
@@ -54,7 +54,7 @@ The subagents in `.claude/agents/` and their workflow are defined in `docs/DECIS
 * Only `developer` and `tester` run commands to build and test; the main session can also run commands. `designer` only starts and observes the local application.
 * `developer` and `tester` may delegate clearly bounded tasks under `AGENTS.md`, section 11, and must review the results before using them.
 * The main session coordinates: it passes review findings to the developer, has a new review run check the corrections, and reports findings, corrections and re-checks to the project owner. Critical findings and decisions go to the project owner.
-* Claude Code may run in auto mode without individual approval of commands (D-020). The rules on asking before irreversible or security-critical decisions still apply. Project content is never published without the project owner's consent.
+* Claude Code may run in auto mode without individual approval of commands (D-020). The rules on asking before security-critical, data-protection and irreversible decisions still apply. Project content is never published without the project owner's consent.
 
 **Limits:** The agents do not guarantee an independent security review. They use the same model, receive the same project instructions, and their task is formulated by the main session. Only an @-mention guarantees that a specific agent runs. Critical changes additionally require a human review. Where possible, verify that the Claude Code version in use has loaded the agents with the intended tool restrictions.
 
