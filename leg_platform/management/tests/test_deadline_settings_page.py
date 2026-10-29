@@ -292,7 +292,7 @@ class DraftWarningTests(DeadlinesBase):
         self.assertNotContains(response, "Entwurf endgültig")
         self.assertContains(response, "Speichern und 1 Anmeldung rückabwickeln")
         self.assertContains(response, 'name="confirmed_count" value="0:1"')
-        self.assertEqual(deadline_settings.current_values()["operator_confirmation_days"], 14)
+        self.assertEqual(deadline_settings.current_values()["operator_confirmation_days"], 30)
         for fragment in ("Zora", "Quelle", "Ittigenstrasse", "anna.deadline"):
             self.assertNotContains(response, fragment)
         self.assertRedirects(
@@ -309,7 +309,7 @@ class DraftWarningTests(DeadlinesBase):
         self.assertContains(response, "1 Anmeldung, die schon bei Netzbetreiber ist")
         self.assertContains(response, "Speichern und 1 Entwurf löschen und 1 Anmeldung rückabwickeln")
         self.assertContains(response, "Frist „Entwurf gelöscht“: Sie ändern sie von 14 auf 5 Tage.")
-        self.assertContains(response, "Frist „Bestätigung durch Netzbetreiber“: Sie ändern sie von 14 auf 5 Tage.")
+        self.assertContains(response, "Frist „Bestätigung durch Netzbetreiber“: Sie ändern sie von 30 auf 5 Tage.")
         self.assertContains(response, 'name="confirmed_count" value="1:1"')
 
     def test_a_change_that_deletes_nothing_is_saved_at_once(self):

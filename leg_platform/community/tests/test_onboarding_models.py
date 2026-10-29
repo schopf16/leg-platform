@@ -65,7 +65,7 @@ class SettingsTests(TestCase):
         self.assertEqual(
             (row.reminder_after_days, row.rollback_after_days, row.contract_deadline_days,
              row.operator_confirmation_days, row.iban_missing_reminder_days),
-            (2, 14, 14, 14, 7),
+            (2, 14, 14, 30, 7),
         )
 
 

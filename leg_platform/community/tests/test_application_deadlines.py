@@ -26,6 +26,7 @@ from leg_platform.community import (
 from leg_platform.community.application_common import MAX_UNRESOLVED_NOTICES_PER_PERSON, ApplicationError
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
+    DEFAULT_OPERATOR_CONFIRMATION_DAYS,
     Application,
     ApplicationMeteringPoint,
     ApplicationNotice,
@@ -344,6 +345,10 @@ class BankConnectionReminderTests(DeadlineCase):
 
 @tag("mariadb")
 class OperatorConfirmationTests(DeadlineCase):
+    # Derived from the default of the setting (D-125: 30 days), so that a new default does not break the tests.
+    LAPSED = DEFAULT_OPERATOR_CONFIRMATION_DAYS + 1
+    NOT_YET = DEFAULT_OPERATOR_CONFIRMATION_DAYS - 1
+
     def at_operator(self, age_days, person=None, **kwargs):
         if contracts.current_version() is None:
             publish_contract(self.staff)
@@ -357,7 +362,7 @@ class OperatorConfirmationTests(DeadlineCase):
         second_staff = staff_user("deadline.staff2@example.org")
         retired = staff_user("deadline.retired@example.org")
         retired.set_privileges(is_staff=False, is_superuser=False)
-        application = self.at_operator(15, feed_in=True)
+        application = self.at_operator(self.LAPSED, feed_in=True)
 
         first = application_deadlines.process(NOW)
         second = application_deadlines.process(NOW)
@@ -379,9 +384,9 @@ class OperatorConfirmationTests(DeadlineCase):
         self.assertIsNotNone(second_staff)
 
     def test_before_the_deadline_or_once_confirmed_nothing_happens(self):
-        early = self.at_operator(13)
+        early = self.at_operator(self.NOT_YET)
         self.assertEqual(application_deadlines.process(NOW)["operator_lapsed"], 0)
-        set_state(early, operator_started_at=days_ago(30))
+        set_state(early, operator_started_at=days_ago(self.LAPSED))
         application_staff.record_operator_confirmation(early, self.staff, TODAY, today=TODAY)
         self.assertEqual(application_deadlines.process(NOW)["operator_lapsed"], 0)
         self.assertTrue(Application.objects.filter(pk=early.pk).exists())
@@ -397,17 +402,17 @@ class OperatorConfirmationTests(DeadlineCase):
             ApplicationNotice.objects.create(
                 person=self.person, kind=application_notices.Kind.NUMBER_UNAVAILABLE, numbers=[str(index)]
             )
-        application = self.at_operator(15)
+        application = self.at_operator(self.LAPSED)
         self.assertEqual(application_deadlines.process(NOW)["operator_lapsed"], 1)
         self.assertFalse(Application.objects.filter(pk=application.pk).exists())
         self.assertEqual(ApplicationNotice.objects.filter(kind="operator_lapsed").count(), 1)
         # A second lapse of the same person is recorded as well (no duplicate suppression for this kind).
-        again = self.at_operator(15)
+        again = self.at_operator(self.LAPSED)
         application_deadlines.process(NOW)
         self.assertFalse(Application.objects.filter(pk=again.pk).exists())
 
     def test_without_a_recorded_notice_nothing_is_deleted(self):
-        application = self.at_operator(15)
+        application = self.at_operator(self.LAPSED)
         with mock.patch.object(application_notices, "record", return_value=None):
             result = application_deadlines.process(NOW)
         self.assertEqual((result["operator_lapsed"], result["failed"]), (0, 1))
