@@ -7,7 +7,7 @@ from django.test import TestCase, tag
 from django.utils import timezone
 
 from leg_platform.community import application_deadlines, application_staff, applications, customer_messages
-from leg_platform.community.models import Application, CustomerMessage
+from leg_platform.community.models import DEFAULT_OPERATOR_CONFIRMATION_DAYS, Application, CustomerMessage
 from leg_platform.community.tests.helpers import staff_user
 from leg_platform.community.tests.onboarding import TODAY, configure_numbers, customer, publish_contract, ready_draft
 
@@ -104,7 +104,8 @@ class WrittenByTheEventsTests(TestCase):
     def test_a_missing_confirmation_of_the_grid_operator_leaves_a_message(self):
         application = self.submitted()
         application_staff.mark_operator_started(application, self.staff, TODAY, today=TODAY)
-        Application.objects.filter(pk=application.pk).update(operator_started_at=timezone.now() - timedelta(days=15))
+        lapsed = timedelta(days=DEFAULT_OPERATOR_CONFIRMATION_DAYS + 1)
+        Application.objects.filter(pk=application.pk).update(operator_started_at=timezone.now() - lapsed)
 
         application_deadlines.process()
         application_deadlines.process()
