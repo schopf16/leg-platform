@@ -803,7 +803,7 @@ class SubmittedAndWithdrawTests(WizardCase):
             "So geht es weiter", "Angaben abgeschickt", "Prüfung durch die LEG", "Anmeldung beim Netzbetreiber",
             "Sie bestätigen die Einladung in Ihrem Konto beim Netzbetreiber", "Wird vom Netzbetreiber festgelegt",
             "Die LEG-Verwaltung leitet Ihre Angaben an Ihren Netzbetreiber",
-            "Bitte bestätigen Sie die Einladung innerhalb von 14 Tagen.",
+            "Bitte bestätigen Sie die Einladung innerhalb von 30 Tagen.",
             "Wenn Sie nicht bestätigen, wird die Anmeldung automatisch rückgängig gemacht und es entstehen Ihnen keine Kosten.",
             ">Zu meinen Gebäuden<",
         ):
