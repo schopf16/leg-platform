@@ -58,9 +58,6 @@ MESSAGES = {
     "iban_required": _("Enter your IBAN."),
     "not_active_yet": NOT_DEREGISTRABLE,
     "nothing_to_deregister": NOT_DEREGISTRABLE,
-    "too_many_deregistrations": _(
-        "You have too many deregistrations running. Please wait until the LEG has processed them."
-    ),
     "date_before_earliest": DATE_TOO_EARLY,
     "not_month_end": DATE_NOT_MONTH_END,
 }

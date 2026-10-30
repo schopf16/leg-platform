@@ -42,10 +42,6 @@ urlpatterns = [
         name="processes_application_review",
     ),
     path(
-        "processes/applications/<int:pk>/return/", process_actions.ApplicationReturnView.as_view(),
-        name="processes_application_return",
-    ),
-    path(
         "processes/applications/<int:pk>/operator-started/",
         process_actions.ApplicationOperatorStartedView.as_view(), name="processes_application_operator_started",
     ),

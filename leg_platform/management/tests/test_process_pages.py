@@ -336,16 +336,16 @@ class ApplicationPageTests(ProcessBase):
     def test_the_buttons_follow_the_state(self):
         application = self.submitted(self.anna)
         names = (
-            "review", "return", "operator_started", "operator_confirmed", "complete", "reject",
+            "review", "operator_started", "operator_confirmed", "complete", "reject",
         )
 
         def buttons():
             page = self.client.get(self.url(application)).content.decode()
             return {name for name in names if f"/applications/{application.pk}/{name.replace('_', '-')}/" in page}
 
-        self.assertEqual(buttons(), {"review", "return", "operator_started", "reject"})
+        self.assertEqual(buttons(), {"review", "operator_started", "reject"})
         application_staff.start_review(application, self.staff)
-        self.assertEqual(buttons(), {"return", "operator_started", "reject"})
+        self.assertEqual(buttons(), {"operator_started", "reject"})
         application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)
         self.assertEqual(buttons(), {"operator_confirmed", "reject"})
         application_staff.record_operator_confirmation(application, self.staff, CONFIRMED, today=TODAY)
@@ -362,12 +362,12 @@ class ApplicationPageTests(ProcessBase):
         self.assertContains(page, "Der Kunde hat diese Anmeldung begonnen und nicht eingereicht.")
         self.assertContains(page, "Ittigenstrasse 52")
         # What the customer entered is readable; no button of a staff step is drawn, and the IBAN is never shown.
-        for name in ("review", "return", "operator_started", "operator_confirmed", "complete", "reject"):
+        for name in ("review", "operator_started", "operator_confirmed", "complete", "reject"):
             self.assertNotContains(page, reverse(f"management:processes_application_{name}", args=[draft.pk]))
         self.assertNotContains(page, "Anmeldung rückabwickeln")
         self.assertNotContains(page, GOOD_IBAN)
         # The services and dialogs refuse every step and change nothing (a second line of defence, not only hidden buttons).
-        for name in ("processes_application_return", "processes_application_operator_started",
+        for name in ("processes_application_operator_started",
                      "processes_application_operator_confirmed", "processes_application_complete",
                      "processes_application_reject"):
             with self.subTest(name=name):
@@ -377,7 +377,6 @@ class ApplicationPageTests(ProcessBase):
         self.assertEqual(self.client.get(reverse("management:processes_application_review", args=[draft.pk])).status_code, 405)
         self.assertEqual(self.client.post(reverse("management:processes_application_review", args=[draft.pk])).status_code, 302)
         self.assertEqual(self.state(draft), State.DRAFT)
-        self.assertFalse(Application.objects.get(pk=draft.pk).returned_at)
         # The customer's own route to the draft is closed to the staff (404), so the staff cannot edit it there either.
         self.assertEqual(self.client.get(reverse("customer:application", args=[draft.pk])).status_code, 404)
         self.assertEqual(self.client.post(reverse("customer:application_cancel", args=[draft.pk])).status_code, 404)
@@ -465,47 +464,6 @@ class ApplicationStepTests(ProcessBase):
         self.assertEqual(self.state(application), State.IN_REVIEW)
         events = list(history.entries_for(application).values_list("event", flat=True))
         self.assertEqual(events.count(HistoryEvent.APPLICATION_IN_REVIEW), 1)
-
-    def test_return_for_correction_asks_first_for_a_reason_and_makes_it_a_draft_again(self):
-        application = self.submitted(self.anna)
-        page = self.client.get(self.url(application, "return"))
-        self.assertContains(page, "Zur Korrektur zurückgeben")
-        self.assertContains(page, "Der Kunde erhält eine E-Mail und liest Ihre Begründung im Portal.")
-        self.assertContains(page, "Begründung der Korrektur")
-        self.assertContains(page, "<textarea")
-        self.assertContains(page, 'maxlength="500"')
-        self.assertEqual(self.state(application), State.SUBMITTED)
-        # Without a reason nothing happens.
-        empty = self.client.post(self.url(application, "return"), {"reason": "", "next": self.detail(application)})
-        self.assertEqual(empty.status_code, 200)
-        self.assertEqual(self.state(application), State.SUBMITTED)
-        response = self.client.post(
-            self.url(application, "return"), {"reason": "Nummer prüfen", "next": self.detail(application)},
-            follow=True,
-        )
-        # W2-02: after the step the way on is the list, with a message (the draft has a read-only page, D-107).
-        self.assertRedirects(response, reverse("management:processes"))
-        self.assertContains(response, "Die Anmeldung wurde zur Korrektur zurückgegeben.")
-        application.refresh_from_db()
-        self.assertEqual(application.state, State.DRAFT)
-        self.assertIsNotNone(application.returned_at)
-        self.assertEqual(application.returned_reason, "Nummer prüfen")
-        # The returned draft is marked as not submitted on its read-only page.
-        self.assertContains(self.client.get(self.detail(application)), "Entwurf / nicht eingereicht")
-        self.assertEqual(MailJob.objects.filter(kind="application_returned").count(), 1)
-        self.assertEqual(MailJob.objects.filter(kind="application_rolled_back").count(), 0)
-
-    def test_the_reason_of_a_return_is_at_most_500_characters_and_never_a_500_error(self):
-        application = self.submitted(self.anna)
-        url = self.url(application, "return")
-        for reason in ("x" * 501, "   ", "bad\x00text"):
-            with self.subTest(reason=reason[:10]):
-                response = self.client.post(url, {"reason": reason, "next": self.detail(application)})
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(self.state(application), State.SUBMITTED)
-        ok = self.client.post(url, {"reason": "y" * 500, "next": self.detail(application)})
-        self.assertEqual(ok.status_code, 302)
-        self.assertEqual(self.state(application), State.DRAFT)
 
     def test_the_registration_at_the_grid_operator_needs_a_date_that_is_not_in_the_future(self):
         application = self.submitted(self.anna)
@@ -687,7 +645,7 @@ class ApplicationStepTests(ProcessBase):
     def test_every_step_needs_the_token(self):
         application = self.submitted(self.anna)
         client = self.login(self.staff, enforce_csrf_checks=True)
-        for name in ("review", "return", "operator_started", "reject"):
+        for name in ("review", "operator_started", "reject"):
             with self.subTest(name=name):
                 self.assertEqual(client.post(self.url(application, name), {}).status_code, 403)
         self.assertEqual(self.state(application), State.SUBMITTED)
@@ -994,7 +952,7 @@ class ProcessAccessTests(ProcessBase):
         application = self.submitted(self.anna)
         customer_client = self.login(self.anna)
         for client, expected in ((customer_client, 404), (Client(), 302)):
-            for name in ("review", "return", "operator_started", "operator_confirmed", "complete", "reject"):
+            for name in ("review", "operator_started", "operator_confirmed", "complete", "reject"):
                 with self.subTest(name=name, client=type(client).__name__):
                     url = reverse(f"management:processes_application_{name}", args=[application.pk])
                     self.assertEqual(client.post(url, {"reason": "rejected"}).status_code, expected)

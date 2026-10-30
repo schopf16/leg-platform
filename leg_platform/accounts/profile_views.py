@@ -106,32 +106,6 @@ def personal_form(user, data=None):
     return form
 
 
-def deletion_state(user):
-    """What the card "Delete account" needs: ``released`` (no running metering point without a started deregistration
-    and no registration in flight, ``community.deregistrations``), ``can_start`` (a customer with metering points that
-    can be deregistered now: the button leads to the deregistration) and ``retained`` (the account is deactivated, not
-    deleted: a retention obligation or a metering point assignment, ``User.delete_or_deactivate``)."""
-    from leg_platform.community import deregistrations
-    from leg_platform.community.models import Deregistration
-    from leg_platform.customer import access
-
-    released = deregistrations.deletion_released(user)
-    customer = access.is_customer(user)
-    return {
-        "released": released,
-        "customer": customer,
-        "can_start": bool(customer and not released and deregistrations.eligible_points(user)),
-        "retained": bool(user.retention_obligation or user.metering_point_assignments.exists()),
-        # A deregistration is open: it continues after the account is gone or deactivated (W3-05).
-        "deregistration_running": bool(
-            customer and released
-            and Deregistration.objects.filter(
-                person=user, state__in=(Deregistration.State.SUBMITTED, Deregistration.State.CONFIRMED)
-            ).exists()
-        ),
-    }
-
-
 def delete_form(request, data=None):
     """The confirmation of the deletion: the one proof (D-062)."""
     return AccountDeleteForm(data, request=request) if data is not None else AccountDeleteForm(request=request)
@@ -150,7 +124,11 @@ def bank_context(request, editing, form):
         "bank_next": returns.safe_return_path(request.POST.get("next") or request.GET.get("next") or ""),
     }
     if editing:
-        context["bank_form"] = form or customer_forms.BankForm(initial={"iban": iban})
+        form = form or customer_forms.BankForm(initial={"iban": iban})
+        # In the profile the card is always there, so it says first that the IBAN is only needed with a feed-in.
+        field = form.fields["iban"]
+        field.help_text = _("Only needed if you feed in solar power.") + " " + str(field.help_text)
+        context["bank_form"] = form
     return context
 
 
@@ -221,7 +199,6 @@ def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enr
     }
     if not only_two_factor:
         context["address_building"] = address_building(user)
-        context["delete_info"] = deletion_state(user)
     context["bank_card"] = bank_card
     if bank_card:
         context.update(bank_context(request, edit == "bank", forms.get("bank")))
@@ -885,14 +862,35 @@ class TwoFactorLostPhoneView(TwoFactorDisableView):
         return back_to("two_factor")
 
 
-class AccountDeleteView(ProfileCardView):
-    """"Delete account" (owner decision 2026-10-24): a page of its own with the consequences and the one proof (D-062).
+class AccountEndView(ProfileCardView):
+    """"End participation or delete account": the fork before the deletion page (owner decision 2026-10-29).
 
-    The deletion is always possible. It withdraws the running applications and starts the deregistration of the running
-    metering points by itself (``community.account_deletion.prepare``). The one refusal: an application that the LEG
-    already registered at the grid operator. An account that keeps details under the retention duty is only deactivated
-    (``User.delete_or_deactivate``); its sign-in is removed in every case. The answer of a deleted account is rendered here,
-    because the session ends.
+    Only a customer who takes part (a running metering point or a registration in progress) sees the two options: only
+    deregister (the account stays) or delete the whole account. Everyone else goes straight to the deletion page. A GET
+    changes nothing; the choices are links to the pages that ask for the proof."""
+
+    template_name = "accounts/account_end.html"
+
+    def get(self, request):
+        from leg_platform.community import account_deletion
+        from leg_platform.customer import access as customer_access
+
+        if not (customer_access.is_customer(request.user) and account_deletion.has_participation(request.user)):
+            return redirect("accounts:account_delete")
+        return render(request, self.template_name)
+
+
+class AccountDeleteView(ProfileCardView):
+    """"Delete account" (owner decisions 2026-10-24 and 2026-10-29): a page of its own with the consequences and the one proof
+    (D-062). The account is gone at once and for good.
+
+    The deletion is always possible, nothing has to be deregistered first. It withdraws the running applications and
+    starts the deregistration of the running metering points and of those that are not active yet by itself
+    (``community.account_deletion.prepare``); no missing IBAN and no number of open deregistrations refuses it. The only
+    answers that remain are a friendly "could not be deleted, contact the LEG" for a state that the rules of the account
+    refuse (``AccountIntegrityError``, e.g. a parallel change) and for a deregistration that fails in a race. An account
+    that keeps details under the retention duty is only deactivated (``User.delete_or_deactivate``); its sign-in is removed
+    in every case. The answer of a deleted account is rendered here, because the session ends.
     """
 
     template_name = "accounts/account_delete.html"

@@ -1,0 +1,16 @@
+{% load i18n metering_points %}{% comment %}
+The block "Registration in progress" of the deregistration page. Context: ``in_progress`` (rows: title, numbers, withdrawable),
+``editable`` (inside the form: a submitted registration gets a box, not chosen at the start; else read only).
+{% endcomment %}{% translate "Registration" as registration_word %}<section class="step-card" aria-labelledby="progress-title">
+  <h2 id="progress-title">{% translate "Registration in progress" %}</h2>
+  {% if editable %}<p class="form-hint">{% translate "Tick a registration to withdraw it. Then this participation does not start." %}</p>{% endif %}
+  <div class="checks">
+    {% for row in in_progress %}
+      {% if editable and row.withdrawable %}
+        <label class="entry-check point-check" for="id_withdraw_applications_{{ row.pk }}"><input class="entry-check-input" type="checkbox" id="id_withdraw_applications_{{ row.pk }}" name="withdraw_applications" value="{{ row.pk }}"><span class="point-row"><span class="point-name">{% blocktranslate with name=row.title|default:registration_word %}Withdraw registration: {{ name }}{% endblocktranslate %}</span>{% if row.numbers %}<span class="point-line mp-num">{% for number in row.numbers %}{{ number|metering_point }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}</span></label>
+      {% else %}
+        <div class="point-row"><span class="point-name">{{ row.title|default:_("Registration") }}</span>{% if row.numbers %}<span class="point-line mp-num">{% for number in row.numbers %}{{ number|metering_point }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% if not row.withdrawable %}<span class="point-line muted">{% translate "This registration can no longer be withdrawn here. Please contact the LEG." %}</span>{% endif %}</div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>

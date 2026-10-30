@@ -4,7 +4,6 @@
 {% block lead %}{% if feed_in_required %}{% translate "You enter the feed-in metering point." %}{% else %}{% translate "Assign the metering points to your building." %}{% endif %}{% endblock %}
 {% block step %}
   {% if building_notice %}
-    {% leg_link as leg %}
     {% with address=building.current_address %}
       <div class="building-notice" role="status">
         {% if building.egid %}
@@ -13,7 +12,7 @@
         {% else %}
           <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "To be checked by the LEG" %}</p>
           <p class="muted">{{ address.0 }} {{ address.1 }}, {{ address.2 }} {{ address.3 }}</p>
-          <p class="muted">{% blocktranslate %}The {{ leg }} will check this address.{% endblocktranslate %}</p>
+          <p class="muted">{% translate "We check the address for you. You do not need to do anything." %}</p>
         {% endif %}
         {% if building.location_id %}<p class="note-info">{% translate "This building is already created. Your metering points are assigned to it." %}</p>{% endif %}
       </div>
@@ -21,7 +20,7 @@
   {% endif %}
   <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Metering points' %}">
     {% csrf_token %}
-    {% include "customer/_error_summary.html" with title_only=True %}
+    {% include "customer/_error_summary.html" %}
     {% if not numbers_ready %}<div class="alert alert-warning" role="alert">{% translate "Metering point numbers cannot be entered yet. Please contact the LEG." %}</div>{% endif %}
 
     {% if draw_needed %}

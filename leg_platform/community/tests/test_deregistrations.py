@@ -9,7 +9,7 @@ from leg_platform.accounts.models import MailJob
 from leg_platform.community import application_deadlines, deregistrations, history, own_iban
 from leg_platform.community.application_common import ApplicationError, add_months, month_end
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Application, Deregistration, Direction, MeteringPoint
+from leg_platform.community.models import Deregistration, Direction, MeteringPoint
 from leg_platform.community.status import MeteringPointStatus
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.community.tests.onboarding import GOOD_IBAN, TODAY, customer
@@ -70,20 +70,13 @@ class RequestTests(TestCase):
     def request(self, **kwargs):
         return deregistrations.request_deregistration(self.person, today=TODAY, **kwargs)
 
-    def test_a_feed_in_needs_an_iban_on_the_account_and_a_draw_does_not(self):
+    def test_a_missing_iban_never_blocks_a_deregistration_of_a_feed_in(self):
         own_iban.remove_own_iban(self.person)
 
-        for kwargs in ({"location_id": self.location.pk}, {"metering_point_ids": [self.feed_in.pk]},
-                       {"metering_point_ids": [self.draw.pk, self.feed_in.pk]}):
-            with self.subTest(kwargs=kwargs):
-                self.assertEqual(code_of(lambda: self.request(**kwargs)), "iban_required")
-        self.assertEqual(Deregistration.objects.count(), 0)
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.DEREGISTRATION_SUBMITTED).count(), 0)
+        dereg = self.request(location_id=self.location.pk)
 
-        dereg = self.request(metering_point_ids=[self.draw.pk])
-        self.assertEqual(dereg.items.count(), 1)
-        own_iban.set_own_iban(self.person, GOOD_IBAN)
-        self.assertEqual(self.request(metering_point_ids=[self.feed_in.pk]).items.count(), 1)
+        self.assertEqual(dereg.items.count(), 2)
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.DEREGISTRATION_SUBMITTED).count(), 1)
 
     def test_a_whole_building_takes_all_its_active_points(self):
         self.person.set_secondary_email("dereg.second@example.org")
@@ -136,7 +129,7 @@ class RequestTests(TestCase):
                 self.assertEqual(code_of(lambda: self.request(**kwargs)), "not_found")
         self.assertEqual(Deregistration.objects.count(), 0)
 
-    def test_a_point_that_is_not_active_yet_cannot_be_deregistered(self):
+    def test_a_point_that_is_not_active_yet_is_deregistered_like_an_active_one(self):
         waiting = make_metering_point(
             4, location=self.location, registered_with_operator_on=date(2026, 8, 1), confirmed_on=date(2026, 9, 1),
             start_date=date(2027, 1, 1),
@@ -144,12 +137,16 @@ class RequestTests(TestCase):
         assign_person(waiting, self.person, valid_from=date(2027, 1, 1))
         notified = make_metering_point(5, registered_with_operator_on=date(2026, 8, 1))
         assign_person(notified, self.person, valid_from=date(2027, 1, 1))
-        for ids in ([waiting.pk], [notified.pk], [self.draw.pk, waiting.pk]):
-            with self.subTest(ids=ids):
-                self.assertEqual(code_of(lambda: self.request(metering_point_ids=ids)), "not_active_yet")
-        # The whole building takes only what is active.
+
+        single = self.request(metering_point_ids=[notified.pk])
+        self.assertEqual((single.state, single.items.count(), single.wants_earliest), (State.SUBMITTED, 1, True))
+        self.assertEqual(single.earliest_date, date(2027, 2, 28))  # four months from the request, as for an active point
+        # The whole building takes the active and the not yet active points.
         dereg = self.request(location_id=self.location.pk)
-        self.assertEqual(dereg.items.count(), 2)
+        self.assertEqual(
+            sorted(dereg.items.values_list("metering_point_id", flat=True)), sorted([self.draw.pk, self.feed_in.pk, waiting.pk])
+        )
+        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.DEREGISTRATION_SUBMITTED).count(), 2)
 
     def test_a_point_is_in_one_deregistration_at_a_time(self):
         self.request(metering_point_ids=[self.draw.pk])
@@ -170,12 +167,10 @@ class RequestTests(TestCase):
             with self.subTest(point=point.pk):
                 self.assertEqual(code_of(lambda: self.request(metering_point_ids=[point.pk])), "not_active_yet")
 
-    def test_the_open_deregistrations_per_account_are_capped(self):
-        from unittest import mock
-
-        with mock.patch.object(deregistrations, "MAX_OPEN_DEREGISTRATIONS_PER_PERSON", 1):
-            self.request(metering_point_ids=[self.draw.pk])
-            self.assertEqual(code_of(lambda: self.request(metering_point_ids=[self.feed_in.pk])), "too_many_deregistrations")
+    def test_the_number_of_open_deregistrations_is_not_limited(self):
+        self.request(metering_point_ids=[self.draw.pk])
+        self.request(metering_point_ids=[self.feed_in.pk])
+        self.assertEqual(Deregistration.objects.count(), 2)
 
     def test_an_inactive_account_cannot_request(self):
         self.person.set_status(type(self.person).Status.BLOCKED)
@@ -222,9 +217,24 @@ class ConfirmAndEffectTests(TestCase):
         deregistrations.confirm(self.dereg, self.staff, date(2027, 3, 31), today=TODAY)
         self.assertEqual(code_of(lambda: deregistrations.confirm(self.dereg, self.staff, date(2027, 4, 30), TODAY)), "wrong_state")
 
+    def test_a_point_that_is_not_active_yet_is_terminated_and_free_after_the_date(self):
+        waiting = make_metering_point(
+            9, registered_with_operator_on=date(2026, 8, 1), confirmed_on=date(2026, 9, 1), start_date=date(2027, 1, 1),
+        )
+        assign_person(waiting, self.person, valid_from=date(2027, 1, 1))
+        dereg = deregistrations.request_deregistration(self.person, metering_point_ids=[waiting.pk], today=TODAY)
+        self.assertEqual(dereg.state, State.SUBMITTED)
+
+        deregistrations.confirm(dereg, self.staff, date(2027, 3, 31), today=TODAY)
+
+        waiting.refresh_from_db()
+        self.assertEqual(waiting.terminated_on, date(2027, 3, 31))
+        self.assertEqual(waiting.status(date(2027, 3, 31)), MeteringPointStatus.TERMINATED)
+        self.assertEqual(deregistrations.finish_due(date(2027, 3, 31)), 1)
+
     def test_a_point_that_cannot_be_terminated_stops_the_whole_confirmation(self):
-        # The feed-in is not active any more when the staff confirms (start date moved): ``terminate`` refuses it.
-        MeteringPoint.objects.filter(pk=self.feed_in.pk).update(start_date=date(2027, 1, 1))
+        # The feed-in was archived after the request: ``terminate`` refuses it.
+        MeteringPoint.objects.filter(pk=self.feed_in.pk).update(is_archived=True)
         self.assertEqual(code_of(lambda: deregistrations.confirm(self.dereg, self.staff, date(2026, 10, 31), TODAY)),
                          "cannot_terminate")
         self.assertTrue(all(point.terminated_on is None for point in MeteringPoint.objects.all()))
@@ -293,64 +303,24 @@ class ConfirmAndEffectTests(TestCase):
         self.assertEqual(code_of(lambda: deregistrations.confirmation_defaults(self.dereg, self.staff)), "wrong_state")
 
 
-class EarliestDatePreviewTests(SimpleTestCase):
-    def test_the_preview_is_the_earliest_month_end_of_a_notice_given_on_that_day(self):
-        for day, expected in ((date(2026, 10, 19), date(2027, 2, 28)), (date(2027, 1, 31), date(2027, 5, 31))):
-            with self.subTest(day=day):
-                self.assertEqual(deregistrations.earliest_date_preview(day), expected)
-                self.assertEqual(deregistrations.earliest_date_preview(day), deregistrations.earliest_termination_date(day))
-
-    def test_without_a_day_it_is_today(self):
-        from django.utils import timezone
-
-        self.assertEqual(
-            deregistrations.earliest_date_preview(), deregistrations.earliest_termination_date(timezone.localdate())
-        )
-
-
 @tag("mariadb")
-class DeletionReleaseTests(TestCase):
+class EligiblePointsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.person = customer("release.customer@example.org")
+        cls.person = customer("eligible.customer@example.org")
 
-    def test_an_account_without_metering_points_is_released(self):
-        self.assertTrue(deregistrations.deletion_released(self.person, TODAY))
-
-    def test_running_points_block_until_a_deregistration_was_actively_started(self):
-        location = make_location(egid=72_001)
-        active_point(1, self.person, location)
-        active_point(2, self.person, location, Direction.FEED_IN)
-        own_iban.set_own_iban(self.person, GOOD_IBAN)
-        self.assertEqual(
-            deregistrations.deletion_blockers(self.person, TODAY),
-            {"running_metering_points": 2, "applications_in_flight": 0},
-        )
-        self.assertFalse(deregistrations.deletion_released(self.person, TODAY))
-
-        deregistrations.request_deregistration(self.person, metering_point_ids=[MeteringPoint.objects.first().pk], today=TODAY)
-        self.assertEqual(deregistrations.deletion_blockers(self.person, TODAY)["running_metering_points"], 1)
-
-        deregistrations.request_deregistration(self.person, location_id=location.pk, today=TODAY)
-        # Started, not necessarily confirmed by the operator: released.
-        self.assertTrue(deregistrations.deletion_released(self.person, TODAY))
-
-    def test_a_point_that_is_not_active_yet_and_an_application_in_flight_block(self):
+    def test_active_and_not_yet_active_points_of_the_account_only_are_eligible(self):
+        other = customer("eligible.other@example.org")
+        active = active_point(1, self.person)
+        active_point(2, other)
         waiting = make_metering_point(3, confirmed_on=date(2026, 9, 1), registered_with_operator_on=date(2026, 8, 1),
                                       start_date=date(2027, 1, 1))
         assign_person(waiting, self.person, valid_from=date(2027, 1, 1))
-        self.assertEqual(deregistrations.deletion_blockers(self.person, TODAY)["running_metering_points"], 1)
-        MeteringPoint.objects.filter(pk=waiting.pk).update(terminated_on=date(2026, 9, 30))
-        self.assertTrue(deregistrations.deletion_released(self.person, TODAY))
-        Application.objects.create(person=self.person, state=Application.State.SUBMITTED)
-        self.assertEqual(deregistrations.deletion_blockers(self.person, TODAY)["applications_in_flight"], 1)
-        # A draft holds nothing back: it is deleted with the account.
-        Application.objects.all().delete()
-        Application.objects.create(person=self.person)
-        self.assertTrue(deregistrations.deletion_released(self.person, TODAY))
+        ended = active_point(4, self.person)
+        MeteringPoint.objects.filter(pk=ended.pk).update(terminated_on=date(2026, 8, 31))
 
-    def test_the_blockers_are_those_of_the_account_asked_about(self):
-        other = customer("release.other@example.org")
-        active_point(1, other)
-        self.assertTrue(deregistrations.deletion_released(self.person, TODAY))
-        self.assertFalse(deregistrations.deletion_released(other, TODAY))
+        points = deregistrations.eligible_points(self.person, TODAY)
+
+        self.assertEqual({point.pk for point in points}, {active.pk, waiting.pk})
+        self.assertTrue(deregistrations.is_not_active(waiting, TODAY))
+        self.assertFalse(deregistrations.is_not_active(active, TODAY))

@@ -835,7 +835,7 @@ class AccountDeleteForm(ReauthenticationForm):
     """The confirmation of the deletion: the proof (D-062) and the box that says the deletion cannot be undone (owner, 2026-10-24)."""
 
     confirm = forms.BooleanField(
-        label=_("I know that my account will be deleted or deactivated and that this cannot be undone."),
+            label=_("I know that my account will be deleted immediately and that this cannot be undone."),
         error_messages={
             "required": _("Please tick the box to confirm that you want to delete your account.")
         },

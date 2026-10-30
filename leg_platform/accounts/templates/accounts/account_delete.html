@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% load i18n static %}{% comment %}
-"Delete account" (owner decision 2026-10-24): the page after the card "Delete account" of the profile. It says what happens,
+"Delete account" (owner decisions 2026-10-24 and 2026-10-29): the page after the card "End participation or delete account" of
+the profile (for a customer who takes part: after the fork). It says what happens (the account is gone at once, for good),
 asks for the one proof (D-062: password, number code from the app or passkey, whichever the account uses) and leads to the
-deletion. "Deregister metering points" is the way to keep the account; "Cancel" returns to the profile. Context: ``form``
+deletion. "Just deregister metering points" is the way to keep the account; "Cancel" returns to the profile. Context: ``form``
 (AccountDeleteForm), ``customer`` (the account takes part: the cost note and the deregistration are shown), ``blocked`` (the LEG
 has to act first), ``privacy_url``.
 {% endcomment %}
@@ -19,22 +20,25 @@ has to act first), ``privacy_url``.
     <section class="step-card" aria-labelledby="flow-title">
       <h2 id="flow-title">{% translate "Really delete the account?" %}</h2>
       {% if blocked %}
-        <div class="alert alert-danger" role="alert">{% translate "The account could not be deleted." %}</div>
+        <div class="alert alert-danger" role="alert">
+          <strong>{% translate "The account could not be deleted." %}</strong>
+          <p>{% translate "Please contact the LEG. We will help you." %}{% if customer %} <a href="{% url 'customer:contact' %}">{% translate "Contact the LEG" %}</a>{% endif %}</p>
+        </div>
       {% else %}
-        <p>{% translate "When you delete your account, the following happens automatically:" %}</p>
+        <div class="step-warning">
+          <strong>{% translate "Your account is deleted immediately and cannot be restored." %}</strong>
+          {% if customer %}<p>{% translate "Open invoices remain valid and must still be paid." %}</p>{% endif %}
+        </div>
+        <p>{% translate "When you delete your account, the following happens:" %}</p>
         <ul>
           <li>{% translate "An application that is not submitted yet is deleted." %}</li>
           <li>{% translate "A submitted application is withdrawn." %}</li>
-          <li>{% translate "Your metering points are deregistered. The deregistration takes effect on the earliest possible date." %}</li>
-          <li>{% translate "You lose access to the portal." %}</li>
+          {% if customer %}<li>{% translate "Your metering points are deregistered on the earliest possible date (notice period: four months to the end of a month). Until then you receive invoices by email only." %}</li>{% endif %}
+          <li>{% translate "You lose access to the portal at once." %}</li>
         </ul>
-        <div class="step-warning">
-          <strong>{% translate "This deletion cannot be withdrawn or revoked." %}</strong>
-          {% if customer %}<p>{% translate "If you have drawn electricity from the LEG, the costs up to your final deregistration with the grid operator will still be billed at the end of the quarter. Afterwards you will receive your invoices only by email." %}</p>{% endif %}
-        </div>
         <div class="step-info">
           <strong>{% translate "All details are deleted." %}</strong>
-          <p>{% translate "Exempt are the details that we are legally obliged to keep." %}</p>
+          <p>{% translate "Exempt are the details that we are legally obliged to keep, for example invoice data." %}</p>
         </div>
       {% endif %}
       {% if not blocked %}
@@ -47,7 +51,7 @@ has to act first), ``privacy_url``.
         <p class="form-hint" id="confirm-gate-hint">{% translate "Tick the box to enable the deletion." %}</p>
         <div class="step-actions">
           <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
-          {% if customer %}<a class="btn btn-secondary-action" href="{% url 'customer:deregistration_start' %}">{% translate "Deregister metering points" %}</a>{% endif %}
+          {% if customer %}<a class="btn btn-secondary-action" href="{% url 'customer:deregistration_start' %}?from=delete">{% translate "Just deregister metering points instead" %}</a>{% endif %}
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
         </div>
       </form>

@@ -1,6 +1,10 @@
 {% extends "customer/base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% translate "Buildings" %}{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  {% if overview.searchable %}<script defer src="{% static 'customer/js/buildings-filter.js' %}"></script>{% endif %}
+{% endblock %}
 {% block content %}
   <div class="page-head">
     <div>
@@ -11,12 +15,23 @@
     {% if overview.cards %}
       <div class="head-actions">
         <form method="post" class="inline-form" action="{% url 'customer:application_start' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% if overview.cards|length > 1 %}{% translate "Add another building" %}{% else %}{% translate "Add new building" %}{% endif %}</button></form>
-        {% if can_deregister %}<a class="btn btn-danger-outline" href="{{ deregistration_url }}">{% translate "Start deregistration" %}</a>{% endif %}
       </div>
     {% endif %}
   </div>
   {% include "customer/_banners.html" %}
   {% if overview.cards %}
+    {% if overview.searchable %}
+      {# Shown by the script only (hidden without it); the list works without. #}
+      <div class="building-tools" data-building-tools hidden>
+        <div class="building-search">
+          <label class="visually-hidden" for="building-search">{% translate "Search buildings" %}</label>
+          <input type="search" id="building-search" class="form-control" autocomplete="off" placeholder="{% translate 'Search by name, address, EGID or metering point' %}" data-building-search>
+        </div>
+        <button type="button" class="btn btn-secondary-action" data-expand-all>{% translate "Expand all" %}</button>
+        <button type="button" class="btn btn-secondary-action" data-collapse-all>{% translate "Collapse all" %}</button>
+      </div>
+      <p class="building-no-results" role="status" data-building-empty hidden>{% translate "No buildings match your search." %}</p>
+    {% endif %}
     <div class="building-cards">
       {% for card in overview.cards %}{% include "customer/_building_card.html" %}{% endfor %}
     </div>

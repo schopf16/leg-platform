@@ -1,11 +1,14 @@
 {% load i18n %}{% comment %}
 The progress under a metering point that is in a running registration or deregistration (GEBAEUDE.md, section 4.1a): the
 count, a bar (a native progress element: no inline style) and the steps with a dot and a word. Context: ``block``.
-{% endcomment %}<div class="mp-progress">
-  <p class="mp-progress-head">{% if block.kind == "registration" %}{% blocktranslate with done=block.done total=block.total %}Application: {{ done }} of {{ total }} done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} done{% endblocktranslate %}{% endif %}</p>
-  <progress class="path-bar" max="{{ block.total }}" value="{{ block.done }}" aria-label="{% if block.kind == 'registration' %}{% blocktranslate with done=block.done total=block.total %}Application: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% else %}{% blocktranslate with done=block.done total=block.total %}Deregistration: {{ done }} of {{ total }} steps done{% endblocktranslate %}{% endif %}">{{ block.done }}/{{ block.total }}</progress>
+A deregistration shows only a heading and one status sentence (``block.note``).
+{% endcomment %}{% if block.kind == "deregistration" %}<div class="mp-progress">
+  <p class="mp-progress-head">{% translate "Deregistration" %}</p>
+  <p>{{ block.note }}</p>
+</div>{% else %}<div class="mp-progress">
+  <p class="mp-progress-head">{% blocktranslate with done=block.done total=block.total %}Application: {{ done }} of {{ total }} done{% endblocktranslate %}</p>
+  <progress class="path-bar" max="{{ block.total }}" value="{{ block.done }}" aria-label="{% blocktranslate with done=block.done total=block.total %}Application: {{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ block.done }}/{{ block.total }}</progress>
   {% if block.paused %}<p class="note-warn">{% include "customer/_paused_note.html" with paused_date=block.paused_date %}</p>{% endif %}
-  {% include "customer/_returned_note.html" with reason=block.reason returned=block.returned %}
   {% if block.note %}<p class="muted">{{ block.note }}</p>{% endif %}
   <details>
     <summary>{% translate "Show details" %}</summary>
@@ -17,8 +20,8 @@ count, a bar (a native progress element: no inline style) and the steps with a d
   </details>
   {% if block.resume or block.withdrawable and not footer_withdraw %}
     <div class="mp-progress-actions">
-      {% if block.resume %}{% if block.returned %}<a class="btn btn-secondary-action" href="{% url 'customer:application_start' %}">{% translate "Check your details" %}</a>{% else %}<a class="btn btn-secondary-action" href="{% url 'customer:application' block.application.pk %}">{% translate "Continue application" %}</a>{% endif %}{% endif %}
+      {% if block.resume %}<a class="btn btn-secondary-action" href="{% url 'customer:application' block.application.pk %}">{% translate "Continue application" %}</a>{% endif %}
       {% if block.withdrawable and not footer_withdraw %}<a class="btn btn-secondary-action" href="{% url 'customer:application_withdraw' block.application.pk %}">{% translate "Withdraw application" %}</a>{% endif %}
     </div>
   {% endif %}
-</div>
+</div>{% endif %}

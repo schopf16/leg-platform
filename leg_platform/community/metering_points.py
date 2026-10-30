@@ -204,16 +204,25 @@ def is_month_end(day):
     return day.day == calendar.monthrange(day.year, day.month)[1]
 
 
-def terminate(metering_point, terminated_on, actor=None, today=None):
-    """Record the termination date: a month end, not before the start. A future date keeps the status "active"."""
+def terminate(metering_point, terminated_on, actor=None, today=None, *, allow_not_active=False):
+    """Record the termination date: a month end, not before the start. A future date keeps the status "active".
+    ``allow_not_active`` (a deregistration that the customer asked for, owner decision 2026-10-29) also terminates a
+    point that is registered, notified or confirmed with a later start; there is no start to compare the date with then."""
     today = today or timezone.localdate()
     with transaction.atomic():
-        fresh = _step(metering_point, MeteringPointStatus.ACTIVE, today)
+        fresh = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
+        if fresh.is_archived:
+            raise StatusError("archived")
+        not_active = fresh.status(today) in (
+            MeteringPointStatus.REGISTERED, MeteringPointStatus.NOTIFIED, MeteringPointStatus.CONFIRMED
+        )
+        if fresh.status(today) != MeteringPointStatus.ACTIVE and not (allow_not_active and not_active):
+            raise StatusError("wrong_status")
         if fresh.terminated_on is not None:
             raise StatusError("wrong_status")
         if not is_month_end(terminated_on):
             raise StatusError("not_month_end")
-        if terminated_on < fresh.start_date:
+        if not not_active and terminated_on < fresh.start_date:
             raise StatusError("date_before_previous")
         fresh.terminated_on = terminated_on
         fresh.save(update_fields=["terminated_on", "updated_at"])

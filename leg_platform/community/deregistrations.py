@@ -4,13 +4,13 @@
   adds four calendar months to the day of the request and takes the end of that month (never earlier than the period).
   This reading of "four months to month end" is the developer's; the staff confirms the real date.
 * The customer chooses the earliest date or a later month end (never before the earliest, so never in the past).
-* Only active points of the account can be deregistered. A point that is not active yet is withdrawn through its
-  application (``applications.withdraw`` / ``cancel``), without a notice period.
+* Active points and points that are assigned but not active yet (registered, notified, confirmed with a later start) can
+  be deregistered, the same way and with the same notice period from the request (owner decision 2026-10-29: the customer
+  can always cancel). The staff sees a note on a point that is not active (the grid operator may have to be asked where
+  to search it); ``confirm`` terminates it like an active one, so it is free again at the date.
 * The staff confirms the date (``confirm``), which records the termination with ``metering_points.terminate``; the
   scheduler marks the deregistration effective when the date is reached and sends the mail
   (``application_deadlines.process``).
-* ``deletion_blockers`` / ``deletion_released`` tell the account deletion whether the account may go (the hook itself is
-  in ``accounts``): every running metering point needs a deregistration that was actively started.
 * The customer's confirmation with the second factor or the password (D-062) is the page's job, not the service's.
 """
 
@@ -24,9 +24,8 @@ from django.utils import timezone
 
 from leg_platform.accounts import mail_queue
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import history, metering_points, own_iban
+from leg_platform.community import history, metering_points
 from leg_platform.community.application_common import (
-    MAX_OPEN_DEREGISTRATIONS_PER_PERSON,
     ApplicationError,
     add_months,
     locked_customer,
@@ -36,10 +35,8 @@ from leg_platform.community.application_common import (
 )
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
-    Application,
     Deregistration,
     DeregistrationItem,
-    Direction,
     Location,
     MeteringPoint,
     PersonAssignment,
@@ -50,19 +47,12 @@ NOTICE_MONTHS = 4
 logger = logging.getLogger(__name__)
 State = Deregistration.State
 OPEN_STATES = (State.SUBMITTED, State.CONFIRMED)
+PENDING_STATUSES = (MeteringPointStatus.REGISTERED, MeteringPointStatus.NOTIFIED, MeteringPointStatus.CONFIRMED)
 
 
 def earliest_termination_date(on=None):
     """The earliest month end for a notice given on ``on`` (default today): four months later, to the month end."""
     return month_end(add_months(on or timezone.localdate(), NOTICE_MONTHS))
-
-
-def earliest_date_preview(today=None):
-    """For the customer page: "Frühestens am <date>", the earliest month end if the customer gave notice today. The
-    same value ``request_deregistration`` stores as ``earliest_date``. It is a reading of the notice period, not a
-    promise: the LEG confirms the date. Deviates from ABMELDUNG section 3 (no calculated date): team lead decision
-    2026-10-19, owner to confirm (D-103)."""
-    return earliest_termination_date(today)
 
 
 @dataclass(frozen=True)
@@ -100,14 +90,24 @@ def _covered():
 
 
 def eligible_points(person, today=None):
-    """The account's metering points that can be deregistered now: assigned to it today, active, not archived, no
-    termination date yet and in no deregistration."""
+    """The account's metering points that can be deregistered now: assigned to it, not archived, no termination date yet
+    and in no deregistration, and either active (assigned today) or not active yet (``is_not_active``: registered,
+    notified, or confirmed with a later start; the assignment may start later)."""
     today = today or timezone.localdate()
     candidates = MeteringPoint.objects.filter(
-        pk__in=PersonAssignment.objects.in_force(today).filter(person=person).values("metering_point_id"),
+        pk__in=PersonAssignment.objects.not_ended(today).filter(person=person).values("metering_point_id"),
         is_archived=False, terminated_on__isnull=True,
     ).exclude(pk__in=_covered()).select_related("location")
-    return [point for point in candidates if point.status(today) == MeteringPointStatus.ACTIVE]
+    in_force = set(PersonAssignment.objects.in_force(today).filter(person=person).values_list("metering_point_id", flat=True))
+    return [
+        point for point in candidates
+        if (point.status(today) == MeteringPointStatus.ACTIVE and point.pk in in_force) or is_not_active(point, today)
+    ]
+
+
+def is_not_active(point, today=None):
+    """Whether the point is assigned but not active yet (the staff gets a note, the notice period is the same)."""
+    return point.status(today or timezone.localdate()) in PENDING_STATUSES
 
 
 def request_deregistration(person, *, metering_point_ids=None, location_id=None, desired_date=None, today=None):
@@ -115,9 +115,10 @@ def request_deregistration(person, *, metering_point_ids=None, location_id=None,
 
     ``desired_date`` None means the earliest date; otherwise a month end not before it (``date_before_earliest``,
     ``not_month_end``). Points and buildings are found through the account's assignments: an id of anyone else's is
-    ``not_found``. ``not_active_yet`` for a point of the account that is not active; ``nothing_to_deregister`` for a
-    building without eligible points; ``iban_required`` when a feed-in is among the points and the account has no IBAN
-    (KONZEPT 7.2); ``too_many_deregistrations``. Queues the confirmation mail to every address."""
+    ``not_found``. ``not_active_yet`` for a point of the account that cannot be deregistered (ended, archived or in a
+    deregistration already); ``nothing_to_deregister`` for a building without such points. A missing IBAN of a feed-in
+    and the number of open deregistrations never refuse it (owner decision 2026-10-29: the customer can always cancel; the
+    staff sees the IBAN state in the process). Queues the confirmation mail to every address."""
     today = today or timezone.localdate()
     if (metering_point_ids is None) == (location_id is None):
         raise ApplicationError("not_found")
@@ -129,8 +130,6 @@ def request_deregistration(person, *, metering_point_ids=None, location_id=None,
             raise ApplicationError("not_month_end")
     with transaction.atomic():
         fresh = locked_customer(person)
-        if Deregistration.objects.filter(person=fresh, state__in=OPEN_STATES).count() >= MAX_OPEN_DEREGISTRATIONS_PER_PERSON:
-            raise ApplicationError("too_many_deregistrations")
         own = {point.pk: point for point in eligible_points(fresh, today)}
         assigned = set(PersonAssignment.objects.filter(person=fresh).values_list("metering_point_id", flat=True))
         if location_id is not None:
@@ -149,12 +148,11 @@ def request_deregistration(person, *, metering_point_ids=None, location_id=None,
         # The points are locked in id order, then checked once more (a staff step may have changed one).
         locked = list(MeteringPoint.objects.select_for_update().filter(pk__in=[p.pk for p in chosen]).order_by("pk"))
         if len(locked) != len(chosen) or any(
-            point.terminated_on is not None or point.status(today) != MeteringPointStatus.ACTIVE for point in locked
+            point.terminated_on is not None
+            or not (point.status(today) == MeteringPointStatus.ACTIVE or is_not_active(point, today))
+            for point in locked
         ) or DeregistrationItem.objects.filter(metering_point__in=locked).exists():
             raise ApplicationError("not_active_yet")
-        if any(point.direction == Direction.FEED_IN for point in locked) and not own_iban.has_iban(fresh):
-            # A feed-in is paid out: the bank connection is needed before the deregistration (KONZEPT 7.2).
-            raise ApplicationError("iban_required")
         deregistration = Deregistration.objects.create(
             person=fresh, earliest_date=earliest, desired_date=desired_date or earliest,
             wants_earliest=desired_date is None,
@@ -196,7 +194,7 @@ def confirm(deregistration, actor, confirmed_date, today=None):
             raise ApplicationError("wrong_state")
         for item in fresh.items.select_related("metering_point").order_by("metering_point_id"):
             try:
-                metering_points.terminate(item.metering_point, confirmed_date, staff, today)
+                metering_points.terminate(item.metering_point, confirmed_date, staff, today, allow_not_active=True)
             except metering_points.StatusError:
                 raise ApplicationError("cannot_terminate") from None
         fresh.state = State.CONFIRMED
@@ -236,29 +234,3 @@ def finish_due(today=None, failures=None):
             if failures is not None:
                 failures.append(pk)
     return finished
-
-
-def deletion_blockers(person, today=None):
-    """What stops the deletion of the account: ``running_metering_points`` (points of the account that are not
-    terminated and in no started deregistration) and ``applications_in_flight`` (submitted, not completed)."""
-    today = today or timezone.localdate()
-    running = [
-        point
-        for point in MeteringPoint.objects.filter(
-            pk__in=PersonAssignment.objects.not_ended(today).filter(person=person).values("metering_point_id"),
-            is_archived=False, terminated_on__isnull=True,
-        ).exclude(pk__in=_covered())
-        if point.status(today) != MeteringPointStatus.TERMINATED
-    ]
-    return {
-        "running_metering_points": len(running),
-        "applications_in_flight": Application.objects.filter(
-            person=person, state__in=Application.IN_FLIGHT_STATES
-        ).count(),
-    }
-
-
-def deletion_released(person, today=None):
-    """Whether the account deletion is released: every running metering point has a deregistration that was actively
-    started (requested by the customer; the grid operator need not have confirmed) and no application is in flight."""
-    return not any(deletion_blockers(person, today).values())

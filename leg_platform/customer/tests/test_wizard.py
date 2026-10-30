@@ -8,7 +8,7 @@ from django.test import TestCase, tag
 from django.urls import reverse
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_staff, applications, buildings, contracts, history, numbers, own_iban
+from leg_platform.community import application_staff, applications, buildings, contracts, history, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
@@ -42,6 +42,11 @@ from leg_platform.customer.tests.helpers import (
 )
 
 ADDRESS_FORM = {"street": "Ittigenstrasse", "house_number": "51", "postal_code": "3063", "town": "Ittigen"}
+
+
+def typed(last):
+    """The typed end of a metering point number: all 20 characters (a shorter entry is an error, D-128)."""
+    return str(last).zfill(20)
 
 
 def text(response):
@@ -136,11 +141,6 @@ class StartPageTests(WizardCase):
         # Any change ends the pause.
         self.client.post(step_url(draft, "contract"), {"version": self.version.pk, "agrees_contract": "on"})
         self.assertEqual(self.draft().state, Application.State.DRAFT)
-
-    def test_a_draft_returned_by_the_leg_says_so(self):
-        draft, _building = draft_with_points(self.mine)
-        Application.objects.filter(pk=draft.pk).update(returned_at=draft.created_at)
-        self.assertIn("Die LEG hat Ihre Anmeldung zurückgegeben.", text(self.client.get(step_url(draft, "contract"))))
 
 
 @tag("mariadb")
@@ -272,7 +272,7 @@ class BuildingStepTests(WizardCase):
                 self.assertEqual((row.egid, row.street, row.town), (None, "Ittigenstrasse", "Ittigen"))
                 page = text(self.client.get(self.step2))
                 self.assertIn("Adresse nicht in der Datenbank gefunden", page)
-                self.assertIn("prüft diese Adresse", page)
+                self.assertIn("Wir prüfen die Adresse für Sie. Sie müssen nichts tun.", page)
                 # The step page itself is open and the fallback page of step 1 still says the whole sentence.
                 self.assertIn(
                     "Diese Adresse wurde im Gebäuderegister noch nicht gefunden.", text(self.client.get(self.url))
@@ -426,7 +426,7 @@ class MeteringPointStepTests(WizardCase):
     def test_the_fields_the_fixed_beginning_and_the_hints_of_the_documents(self):
         html = text(self.client.get(self.url))
         for marker in (
-            "Schritt 2: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?",
+            "Schritt 2 von 4: Messpunkte", "Welche Messpunkte gehören zu Ihrem Gebäude?",
             "Weisen Sie Ihrem Gebäude die Messpunkte zu.", "Ihren Stromverbrauch?", f">CH{IDENTIFIER}<",
             "Auf Ihrer Stromrechnung bei der Bezugsstelle, auch Messpunkt-ID genannt (nicht die kürzere Zählernummer).",
             f"Sie beginnt mit CH{IDENTIFIER}, das ist schon eingetragen.",
@@ -438,8 +438,9 @@ class MeteringPointStepTests(WizardCase):
             'data-reveal-name="feed_in"',
         ):
             self.assertIn(marker, html)
-        # No total in step 2: a feed-in adds a step (W1-01).
-        self.assertNotIn("Schritt 2 von", html)
+        # D-128: the numbers count the steps the customer really sees; the total follows the answers (see
+        # ``StepNumberTests``).
+        self.assertNotIn("Schritt 2: Messpunkte", html)
         # The answer "No" is chosen first; the part of the feed-in is hidden by the script, never by the server.
         self.assertRegex(html, r'value="no" checked|checked[^>]*value="no"')
         self.assertNotIn("is-open", html)
@@ -481,7 +482,7 @@ class MeteringPointStepTests(WizardCase):
                 self.assertNotIn("12.5", text(response))
 
     def test_a_draw_only(self):
-        response = self.client.post(self.url, {"draw_number": "12345", "draw_name": "Wohnhaus", "feed_in": "no"})
+        response = self.client.post(self.url, {"draw_number": typed(12345), "draw_name": "Wohnhaus", "feed_in": "no"})
         self.assertRedirects(response, step_url(self.application, "contract"), fetch_redirect_response=False)
         row = self.building.metering_points.get()
         self.assertEqual((row.direction, row.number, row.name), (Direction.CONSUMPTION, full_number(12345), "Wohnhaus"))
@@ -490,7 +491,7 @@ class MeteringPointStepTests(WizardCase):
 
     def test_a_feed_in_with_figures_leads_to_the_bank_connection(self):
         response = self.client.post(self.url, {
-            "draw_number": "1", "feed_in": "yes", "feed_in_number": "2", "feed_in_name": "PV-Anlage",
+            "draw_number": typed(1), "feed_in": "yes", "feed_in_number": typed(2), "feed_in_name": "PV-Anlage",
             "pv_power_kwp": "9,5", "battery_kwh": "10", "wallbox_kw": "",
         })
         self.assertRedirects(response, step_url(self.application, "bank_connection"), fetch_redirect_response=False)
@@ -499,7 +500,7 @@ class MeteringPointStepTests(WizardCase):
         # Back on the step the values are there again; answering "No" removes the feed-in.
         page = text(self.client.get(self.url))
         self.assertIn('value="9.50"', page)
-        self.client.post(self.url, {"draw_number": "1", "feed_in": "no"})
+        self.client.post(self.url, {"draw_number": typed(1), "feed_in": "no"})
         self.assertFalse(self.building.metering_points.filter(direction=Direction.FEED_IN).exists())
 
     def test_a_number_that_is_too_long_gets_the_owners_text(self):
@@ -509,19 +510,36 @@ class MeteringPointStepTests(WizardCase):
         self.assertIn('aria-invalid="true"', text(response))
         self.assertFalse(self.building.metering_points.exists())
 
+    def test_a_too_short_number_is_an_error_and_is_never_padded_with_zeros(self):
+        for value in ("5", "12345", "1" * 19):
+            with self.subTest(value=value):
+                response = self.client.post(self.url, {"draw_number": value, "feed_in": "no"})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("Bitte geben Sie alle 20 Zeichen ein.", text(response))
+                self.assertFalse(self.building.metering_points.exists())
+        response = self.client.post(self.url, {
+            "draw_number": typed(5), "feed_in": "yes", "feed_in_number": "7",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Bitte geben Sie alle 20 Zeichen ein.", text(response))
+        self.assertFalse(self.building.metering_points.exists())
+
     def test_zeros_on_the_left_are_added_and_removed_by_the_rule(self):
         self.client.post(self.url, {"draw_number": "0" * 25 + "7", "feed_in": "no"})
         self.assertEqual(self.building.metering_points.get().number, full_number(7))
 
     def test_an_empty_or_forbidden_entry_is_a_message_at_the_field(self):
-        for value, message in (("", "Geben Sie die letzten Stellen der Nummer ein."), ("12 3!", "Erlaubt sind nur die Buchstaben")):
+        for value, message in (
+            ("", "Geben Sie die letzten Stellen der Nummer ein."),
+            ("1234567890123456789!", "Erlaubt sind nur die Buchstaben"),
+        ):
             with self.subTest(value=value):
                 response = self.client.post(self.url, {"draw_number": value, "feed_in": "no"})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(message, text(response))
 
     def test_the_feed_in_needs_its_number_when_the_answer_is_yes(self):
-        response = self.client.post(self.url, {"draw_number": "1", "feed_in": "yes", "feed_in_number": ""})
+        response = self.client.post(self.url, {"draw_number": typed(1), "feed_in": "yes", "feed_in_number": ""})
         self.assertEqual(response.status_code, 200)
         self.assertIn("Geben Sie die letzten Stellen der Nummer ein.", text(response))
 
@@ -529,7 +547,7 @@ class MeteringPointStepTests(WizardCase):
         location = make_location("Fremdweg", "1", "3000", "Bern")
         foreign = make_metering_point(77, location=location)
         assign_person(foreign, customer("owner.wizard@example.org"), valid_from=date(2025, 1, 1))
-        response = self.client.post(self.url, {"draw_number": "77", "feed_in": "no"})
+        response = self.client.post(self.url, {"draw_number": typed(77), "feed_in": "no"})
         html = text(response)
         self.assertEqual(response.status_code, 200)
         self.assertIn("Diese Messpunkt-Nummer kann nicht angelegt werden. Bitte melden Sie sich bei der LEG.", html)
@@ -538,14 +556,14 @@ class MeteringPointStepTests(WizardCase):
         self.assertFalse(self.building.metering_points.exists())
 
     def test_an_own_number_twice_is_named(self):
-        self.client.post(self.url, {"draw_number": "5", "feed_in": "yes", "feed_in_number": "5"})
+        self.client.post(self.url, {"draw_number": typed(5), "feed_in": "yes", "feed_in_number": typed(5)})
         self.assertIn("Dieser Messpunkt ist bei diesem Gebäude schon angelegt.", text(self.client.get(self.url)) + text(
-            self.client.post(self.url, {"draw_number": "5", "feed_in": "yes", "feed_in_number": "5"})
+            self.client.post(self.url, {"draw_number": typed(5), "feed_in": "yes", "feed_in_number": typed(5)})
         ))
 
     def test_an_unusually_large_figure_is_a_warning_and_still_saved(self):
         response = self.client.post(self.url, {
-            "draw_number": "1", "feed_in": "yes", "feed_in_number": "2", "pv_power_kwp": "5000",
+            "draw_number": typed(1), "feed_in": "yes", "feed_in_number": typed(2), "pv_power_kwp": "5000",
         }, follow=True)
         self.assertIn("ist ungewöhnlich gross", text(response))
         self.assertEqual(str(self.building.metering_points.get(direction=Direction.FEED_IN).pv_power_kwp), "5000.00")
@@ -553,7 +571,7 @@ class MeteringPointStepTests(WizardCase):
     def test_a_figure_that_is_no_number_is_refused(self):
         for value in ("abc", "-3"):
             with self.subTest(value=value):
-                response = self.client.post(self.url, {"draw_number": "1", "feed_in": "yes", "feed_in_number": "2", "pv_power_kwp": value})
+                response = self.client.post(self.url, {"draw_number": typed(1), "feed_in": "yes", "feed_in_number": typed(2), "pv_power_kwp": value})
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("Geben Sie eine Zahl", text(response))
 
@@ -561,7 +579,7 @@ class MeteringPointStepTests(WizardCase):
         ManagementSettings.objects.filter(id=1).update(identifier="")
         page = text(self.client.get(self.url))
         self.assertIn("Messpunkt-Nummern können noch nicht eingegeben werden.", page)
-        response = self.client.post(self.url, {"draw_number": "1", "feed_in": "no"})
+        response = self.client.post(self.url, {"draw_number": typed(1), "feed_in": "no"})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.building.metering_points.exists())
 
@@ -576,9 +594,40 @@ class MeteringPointStepTests(WizardCase):
         self.assertNotIn("Ihren Stromverbrauch?", html)
         self.assertNotIn("Speisen Sie Solarstrom ein?", html)
         self.assertIn("Ihre Solarstrom-Einspeisung?", html)
-        response = self.client.post(url, {"feed_in_number": "91", "pv_power_kwp": "7"})
+        response = self.client.post(url, {"feed_in_number": typed(91), "pv_power_kwp": "7"})
         self.assertRedirects(response, step_url(application, "bank_connection"), fetch_redirect_response=False)
         self.assertEqual(application.buildings.get().metering_points.get().direction, Direction.FEED_IN)
+
+
+@tag("mariadb")
+class StepNumberTests(WizardCase):
+    """D-128: the numbers count the steps the customer really sees (applicable, not settled from before)."""
+
+    def numbered(self, application, name):
+        return text(self.client.get(step_url(application, name)))
+
+    def test_a_contract_agreed_before_is_not_counted(self):
+        contracts.accept_contract(self.mine, self.version.pk, agrees_contract=True)
+        application, _building = draft_with_points(self.mine)
+        self.assertIn("Schritt 2 von 3: Messpunkte", self.numbered(application, "metering_points"))
+        self.assertIn("Schritt 3 von 3: Startdatum", self.numbered(application, "start_date"))
+        self.assertNotIn("von 4", self.numbered(application, "start_date"))
+
+    def test_without_anything_settled_the_steps_are_counted_in_order(self):
+        application, _building = draft_with_points(self.mine)
+        self.assertIn("Schritt 2 von 4: Messpunkte", self.numbered(application, "metering_points"))
+        self.assertIn("Schritt 3 von 4: Vertrag", self.numbered(application, "contract"))
+
+    def test_a_feed_in_adds_the_bank_step_to_the_count(self):
+        application, _building = draft_with_points(self.mine, feed_in=True)
+        self.assertIn("Schritt 3 von 5: Bank- oder Postverbindung", self.numbered(application, "bank_connection"))
+        self.assertIn("Schritt 4 von 5: Vertrag", self.numbered(application, "contract"))
+
+    def test_the_steps_of_another_account_are_not_reachable(self):
+        application, _building = draft_with_points(customer("other.numbers@example.org"))
+        for name in ("metering_points", "contract", "start_date"):
+            with self.subTest(name):
+                self.assertEqual(self.client.get(step_url(application, name)).status_code, 404)
 
 
 @tag("mariadb")
@@ -732,8 +781,9 @@ class StartDateStepTests(WizardCase):
         ):
             self.assertIn(marker, html)
         self.assertRegex(html, r'value="asap" checked|checked[^>]*value="asap"')
-        # The date field holds the earliest possible day, so a person who chooses "date" has a valid start (wizard.py).
-        self.assertRegex(html, r'type="date"[^>]*value="\d')
+        # No date is prefilled (D-128): "as soon as possible" is chosen and the date field is empty.
+        self.assertNotRegex(html, r'type="date"[^>]*value="\d')
+        self.assertNotRegex(html, r'value="\d{4}-\d\d-\d\d"')
         self.assertRegex(html, r'type="date"[^>]*min="\d{4}-\d\d-\d\d"|min="\d{4}-\d\d-\d\d"[^>]*type="date"')
 
     def test_as_soon_as_possible_submits_and_shows_the_page_once(self):

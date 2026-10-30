@@ -27,7 +27,6 @@ NEW_KINDS = (
     MailJob.Kind.DEREGISTRATION_EFFECTIVE,
     MailJob.Kind.IBAN_CHANGED,
     MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED,
-    MailJob.Kind.APPLICATION_RETURNED,
     MailJob.Kind.APPLICATION_REJECTED,
     MailJob.Kind.APPLICATION_REJECTED_OPERATOR,
 )
@@ -167,19 +166,7 @@ class PlainWordsTests(SimpleTestCase):
         self.assertIn("For privacy reasons we deleted your building and metering point details. Your account remains.", plain)
         self.assertIn("You can start a new application at any time", plain)
         self.assertNotIn("grid operator", plain)
-        self.assertIn("The grid operator did not accept the registration of your metering points.", operator)
-
-    def test_the_return_text_has_no_reason_and_points_to_the_portal(self):
-        with self.settings(LANGUAGE_CODE="en"):
-            subject, body = email_texts.default_texts(Key.APPLICATION_RETURNED)
-        self.assertIn("returned your application", body)
-        self.assertIn("after you log in", body)
-        self.assertIn("{login_url}", body)
-        self.assertEqual(email_texts.placeholders_of(Key.APPLICATION_RETURNED).count(email_texts.GREETING), 1)
-        # No placeholder can carry the reason: the mail jobs have no payload.
-        self.assertEqual(
-            {p.name for p in email_texts.DEFINITIONS[Key.APPLICATION_RETURNED].placeholders}, {"greeting"}
-        )
+        self.assertIn("The grid operator did not accept the registration of your metering points.", operator        )
 
 
 @tag("mariadb")
@@ -216,12 +203,9 @@ class ContactLineTests(TestCase):
         with translation.override("de-ch"):
             rejected = self.sent(MailJob.Kind.APPLICATION_REJECTED)
             operator = self.sent(MailJob.Kind.APPLICATION_REJECTED_OPERATOR)
-            returned = self.sent(MailJob.Kind.APPLICATION_RETURNED)
         self.assertIn("wurde nicht angenommen", rejected.subject)
         self.assertIn("Ihr Konto bleibt bestehen", rejected.body)
         self.assertIn("Der Netzbetreiber hat die Registrierung Ihrer Messpunkte nicht angenommen", operator.body)
-        self.assertIn("muss korrigiert werden", returned.subject)
-        self.assertIn("zur Korrektur zurückgegeben", returned.body)
 
 
 @tag("mariadb")
@@ -256,11 +240,7 @@ class LoginWordsTests(TestCase):
             "Sie können jederzeit eine neue Anmeldung starten. Loggen Sie sich dazu ein:",
             self.sent(MailJob.Kind.APPLICATION_REJECTED).body,
         )
-        self.assertIn(
-            "Den Grund und was Sie prüfen müssen, sehen Sie nach dem Einloggen im Portal:",
-            self.sent(MailJob.Kind.APPLICATION_RETURNED).body,
-        )
-        dereg = self.sent(MailJob.Kind.DEREGISTRATION_SUBMITTED).body
+        dereg =  self.sent(MailJob.Kind.DEREGISTRATION_SUBMITTED).body
         self.assertIn("Sie können die Kündigung nicht selbst zurücknehmen.", dereg)
         self.assertIn("Die LEG bestätigt den Termin.", dereg)
 
@@ -362,7 +342,7 @@ class ReminderDateTests(TestCase):
 
     def test_the_placeholder_is_offered_to_the_editor_and_the_preview_shows_a_day(self):
         self.assertIn(email_texts.DELETION_DATE, email_texts.placeholders_of(Key.APPLICATION_REMINDER))
-        self.assertNotIn(email_texts.DELETION_DATE, email_texts.placeholders_of(Key.APPLICATION_RETURNED))
+        self.assertNotIn(email_texts.DELETION_DATE, email_texts.placeholders_of(Key.APPLICATION_REJECTED))
         subject, body = emails.preview(Key.APPLICATION_REMINDER, "", "")
         self.assertRegex(body, r"31\.12\.2026")
 

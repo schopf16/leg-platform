@@ -67,7 +67,7 @@ class MailJob(models.Model):
         DEREGISTRATION_EFFECTIVE = "deregistration_effective", "Deregistration effective"
         IBAN_CHANGED = "iban_changed", "IBAN changed"
         OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", "Confirmation by the grid operator missing"
-        APPLICATION_RETURNED = "application_returned", "Application returned for correction"
+        APPLICATION_RETURNED = "application_returned", "Application returned for correction"  # kept: old jobs, no longer sent
         APPLICATION_REJECTED = "application_rejected", "Application not accepted"
         APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", "Application not accepted by the grid operator"
         # The error mail of the housekeeping of the databases (D-119): no payload, the lines are read when it is made.
@@ -102,7 +102,6 @@ class MailJob(models.Model):
         Kind.DEREGISTRATION_EFFECTIVE,
         Kind.IBAN_CHANGED,
         Kind.OPERATOR_CONFIRMATION_LAPSED,
-        Kind.APPLICATION_RETURNED,
         Kind.APPLICATION_REJECTED,
         Kind.APPLICATION_REJECTED_OPERATOR,
     )
@@ -215,7 +214,6 @@ class EmailText(models.Model):
         OPERATOR_CONFIRMATION_LAPSED = "operator_confirmation_lapsed", _(
             "Staff: confirmation by the grid operator is missing, withdraw the registration"
         )
-        APPLICATION_RETURNED = "application_returned", _("Application: returned for correction")
         APPLICATION_REJECTED = "application_rejected", _("Application: not accepted by the LEG")
         APPLICATION_REJECTED_OPERATOR = "application_rejected_operator", _(
             "Application: not accepted by the grid operator"

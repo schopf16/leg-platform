@@ -396,11 +396,6 @@ def send_operator_confirmation_lapsed(address, greeting_name=""):
     _send(address, Key.OPERATOR_CONFIRMATION_LAPSED, {}, greeting_name)
 
 
-def send_application_returned(address, greeting_name=""):
-    """Tell the customer that the LEG returned the application for correction; the reason is only in the portal."""
-    _send(address, Key.APPLICATION_RETURNED, {}, greeting_name)
-
-
 def send_application_rejected(address, greeting_name=""):
     """Tell the customer that the LEG did not accept the application (the details were deleted, the account stays)."""
     _send(address, Key.APPLICATION_REJECTED, {}, greeting_name)

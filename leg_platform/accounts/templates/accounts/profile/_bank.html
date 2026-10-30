@@ -15,7 +15,7 @@ customer's pages) when the wizard or the deregistration sent the customer here.
       <form method="post" action="{% url 'customer:bank_connection' %}" class="profile-form" novalidate>
         {% csrf_token %}
         {% if bank_next %}<input type="hidden" name="next" value="{{ bank_next }}">{% endif %}
-        {% include "accounts/_error_summary.html" %}
+        {% include "customer/_error_summary.html" %}
         {% include "accounts/_field.html" with field=form.iban %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>

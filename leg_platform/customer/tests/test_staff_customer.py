@@ -220,5 +220,5 @@ class StaffAccountDeletionTests(TestCase):
 
         html = login(staff).get(reverse("accounts:account_delete")).content.decode()
 
-        self.assertIn(f'href="{reverse("customer:deregistration_start")}"', html)
+        self.assertIn(f'href="{reverse("customer:deregistration_start")}?from=delete"', html)
         self.assertIn('name="confirm"', html)

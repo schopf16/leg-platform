@@ -1,9 +1,10 @@
 {% load i18n %}{% comment %}
-The card "Delete account" (owner decision 2026-10-24): one sentence and the button that leads to the page "Delete account", where
-the consequences and the proof are. The card itself never deletes. Context: ``messages_delete`` (messages of the card).
+The card "End participation or delete account" (owner decisions 2026-10-24 and 2026-10-29): one sentence and the button that leads
+to the fork or the page "Delete account", where the consequences and the proof are. The card itself never deletes. Context:
+``messages_delete`` (messages of the card).
 {% endcomment %}<section class="profile-card profile-card-danger" id="card-delete" aria-labelledby="card-delete-title">
   {% include "accounts/profile/_card_messages.html" with items=messages_delete %}
-  <h2 id="card-delete-title">{% translate "Delete account" %}</h2>
-  <p class="profile-text">{% translate "You can delete your account at any time. Running applications are withdrawn, any metering points are deregistered. Open claims remain until they are settled. This cannot be undone." %}</p>
-  <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:account_delete' %}">{% translate "Delete account" %}</a></div>
+  <h2 id="card-delete-title">{% translate "End participation or delete account" %}</h2>
+  <p class="profile-text">{% translate "You can stop taking part in the LEG or delete your account. Deleting the account cannot be undone." %}</p>
+  <div class="profile-actions"><a class="btn btn-danger-outline" href="{% url 'accounts:account_end' %}">{% translate "End participation or delete account" %}</a></div>
 </section>

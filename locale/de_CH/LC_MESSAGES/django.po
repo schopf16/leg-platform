@@ -173,10 +173,6 @@ msgstr "Adresse ergänzen"
 msgid "Choose how you sign in"
 msgstr "Anmeldemethode wählen"
 
-msgid "Password only, or password and a code from an app on your phone."
-msgstr ""
-"Nur Passwort, oder Passwort und Code aus einer App auf Ihrem Smartphone."
-
 msgid "Set up 2FA"
 msgstr "2FA einrichten"
 
@@ -494,15 +490,6 @@ msgid "The address directory is unavailable."
 msgstr "Das Adressverzeichnis ist nicht verfügbar."
 
 msgid ""
-"A request on this page runs in the portal itself. Addresses already entered "
-"are not changed. The result is also written to the application log and to "
-"the security log."
-msgstr ""
-"Eine Anforderung auf dieser Seite läuft im Portal selbst. Bereits "
-"eingegebene Adressen werden nicht verändert. Das Ergebnis wird auch in das "
-"Anwendungsprotokoll und in das Sicherheitsprotokoll geschrieben."
-
-msgid ""
 "This address was not found. Please check street, house number, postal code "
 "and town. You can still save it as entered."
 msgstr ""
@@ -520,9 +507,6 @@ msgstr "Unterbrochen"
 
 msgid "Reason"
 msgstr "Grund"
-
-msgid "Directory in use"
-msgstr "Verwendetes Verzeichnis"
 
 msgid "Download progress"
 msgstr "Fortschritt des Downloads"
@@ -972,15 +956,6 @@ msgstr "Zugang zur Verwaltung"
 msgid "retention obligation"
 msgstr "Aufbewahrungspflicht"
 
-#. Verbose names that Django derives from the field names
-#. (privacy_accepted_at/url); the
-#. catalogue test requires a translation for every field of the account.
-msgid "privacy accepted at"
-msgstr "Datenschutzerklärung akzeptiert am"
-
-msgid "privacy accepted url"
-msgstr "Adresse der akzeptierten Datenschutzerklärung"
-
 msgid "salutation"
 msgstr "Anrede"
 
@@ -1314,9 +1289,6 @@ msgstr "Vorname"
 msgid "Last name"
 msgstr "Nachname"
 
-msgid "Company name"
-msgstr "Firmenname"
-
 msgid "Address addition"
 msgstr "Adresszusatz"
 
@@ -1331,18 +1303,6 @@ msgstr "Postfach"
 
 msgid "Town"
 msgstr "Ort"
-
-msgid "Access to administration"
-msgstr "Zugang zur Verwaltung"
-
-msgid "Superuser status"
-msgstr "Systemadministrator"
-
-msgid "Groups"
-msgstr "Gruppen"
-
-msgid "User permissions"
-msgstr "Berechtigungen"
 
 msgid "Name"
 msgstr "Name"
@@ -1368,20 +1328,8 @@ msgstr ""
 msgid "Specific permissions for this user."
 msgstr "Berechtigungen, die diesem Konto direkt zugewiesen sind."
 
-#. Texts of Django 6.1 without a German translation in Django itself.
-msgid "- Select an option -"
-msgstr "- Bitte auswählen -"
-
 msgid "Run"
 msgstr "Ausführen"
-
-#, python-format
-msgid "Search %(name)s"
-msgstr "%(name)s durchsuchen"
-
-#, python-format
-msgid "Pagination %(name)s"
-msgstr "Seitennavigation %(name)s"
 
 #. Overrides the German country name of django-countries, which contains a
 #. sharp s.
@@ -1505,9 +1453,6 @@ msgstr "freiwillig"
 #: leg_platform/accounts/templates/accounts/login.html
 msgid "Log in"
 msgstr "Anmelden"
-
-msgid "No account yet?"
-msgstr "Noch kein Konto?"
 
 msgid "Register as a new user"
 msgstr "Neu registrieren"
@@ -1733,12 +1678,6 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Sie haben %(counter)s unbenutzten Wiederherstellungscode."
 msgstr[1] "Sie haben %(counter)s unbenutzte Wiederherstellungscodes."
 
-msgid ""
-"Your account must use two-factor authentication. It cannot be turned off."
-msgstr ""
-"Ihr Konto muss die Zwei-Faktor-Anmeldung (2FA) verwenden. Sie kann nicht "
-"ausgeschaltet werden."
-
 msgid "Continue"
 msgstr "Weiter"
 
@@ -1839,10 +1778,6 @@ msgstr "Sicherheitsprotokoll-Eintrag"
 msgid "security log"
 msgstr "Sicherheitsprotokoll"
 
-#: leg_platform/accounts/admin.py
-msgid "account (internal number)"
-msgstr "Konto (interne Nummer)"
-
 msgid "performed by (internal number)"
 msgstr "Ausgeführt von (interne Nummer)"
 
@@ -1865,47 +1800,6 @@ msgid "Personal link to remove two-factor authentication."
 msgstr "Persönlicher Link, um die Zwei-Faktor-Anmeldung (2FA) zu entfernen."
 
 #, python-format
-msgid "Remove two-factor authentication at %(instance_name)s"
-msgstr "Zwei-Faktor-Anmeldung (2FA) bei %(instance_name)s entfernen"
-
-#, python-format
-msgid "Two-factor authentication was reset at %(instance_name)s"
-msgstr ""
-"Die Zwei-Faktor-Anmeldung (2FA) bei %(instance_name)s wurde zurückgesetzt"
-
-#: leg_platform/accounts/templates/accounts/email/two_factor_reset_link.txt
-#, python-format
-msgid ""
-"The operator started the removal of two-factor authentication for your account at %(instance_name)s.\n"
-"\n"
-"To remove it, open this link within %(lifetime_hours)s hours:\n"
-"\n"
-"%(two_factor_reset_url)s\n"
-"\n"
-"The link can be used once. If you did not ask for this, do not open the link; your two-factor authentication stays unchanged."
-msgstr ""
-"Die Betreiber haben das Entfernen der Zwei-Faktor-Anmeldung (2FA) für Ihr Konto bei %(instance_name)s veranlasst.\n"
-"\n"
-"Um sie zu entfernen, öffnen Sie innerhalb von %(lifetime_hours)s Stunden diesen Link:\n"
-"\n"
-"%(two_factor_reset_url)s\n"
-"\n"
-"Der Link kann nur einmal verwendet werden. Wenn Sie das nicht veranlasst haben, öffnen Sie den Link nicht; Ihre Zwei-Faktor-Anmeldung bleibt dann unverändert."
-
-#: leg_platform/accounts/templates/accounts/email/two_factor_reset.txt
-#, python-format
-msgid ""
-"Two-factor authentication of your account at %(instance_name)s was reset. "
-"The earlier authenticator app and recovery codes no longer work, and all "
-"sessions were ended. You can set up two-factor authentication again after "
-"you log in."
-msgstr ""
-"Die Zwei-Faktor-Anmeldung (2FA) Ihres Kontos bei %(instance_name)s wurde "
-"zurückgesetzt. Die frühere Authenticator-App und die Wiederherstellungscodes"
-" funktionieren nicht mehr, und alle Sitzungen wurden beendet. Nach dem "
-"Einloggen können Sie die Zwei-Faktor-Anmeldung erneut einrichten."
-
-#, python-format
 msgid ""
 "If you did not expect this, contact the operator immediately. You will find contact information here:\n"
 "\n"
@@ -1921,39 +1815,10 @@ msgstr ""
 "Wenn Sie das nicht erwartet haben, wenden Sie sich sofort an die Betreiber "
 "dieses Portals."
 
-#: leg_platform/accounts/views.py
-msgid ""
-"Two-factor authentication was removed. You can now log in with your "
-"password."
-msgstr ""
-"Die Zwei-Faktor-Anmeldung (2FA) wurde entfernt. Sie können sich jetzt mit "
-"Ihrem Passwort anmelden."
-
-#: leg_platform/accounts/templates/accounts/two_factor_reset_confirm.html
-msgid "Remove two-factor authentication"
-msgstr "Zwei-Faktor-Anmeldung (2FA) entfernen"
-
-#, python-format
-msgid ""
-"%(instance_name)s started the removal of two-factor authentication for your "
-"account. After this you only need your password to log in. Your "
-"authenticator app and your recovery codes stop working, and all sessions of "
-"your account end. You can set up two-factor authentication again in your "
-"profile."
-msgstr ""
-"%(instance_name)s hat veranlasst, dass die Zwei-Faktor-Anmeldung (2FA) für "
-"Ihr Konto entfernt wird. Danach genügt Ihr Passwort zur Anmeldung. Ihre "
-"Authenticator-App und Ihre Wiederherstellungscodes funktionieren nicht mehr,"
-" und alle Sitzungen Ihres Kontos werden beendet. Sie können die Zwei-Faktor-"
-"Anmeldung in Ihrem Profil jederzeit neu einrichten."
-
 msgid "Did you not expect this? Then close this page. Nothing changes."
 msgstr ""
 "Haben Sie das nicht erwartet? Dann schliessen Sie diese Seite. Es ändert "
 "sich nichts."
-
-msgid "Remove now"
-msgstr "Jetzt entfernen"
 
 #: leg_platform/accounts/templates/accounts/password_change.html
 msgid ""
@@ -1966,49 +1831,6 @@ msgstr ""
 #: leg_platform/accounts/forms.py
 msgid "Choose a password that is different from the current one."
 msgstr "Wählen Sie ein Passwort, das sich vom aktuellen unterscheidet."
-
-#: leg_platform/accounts/admin.py
-msgid ""
-"I have verified the identity of this person in person, or by calling back a "
-"phone number that I know independently of the account."
-msgstr ""
-"Ich habe die Identität dieser Person persönlich geprüft oder durch einen "
-"Rückruf auf eine Telefonnummer, die ich unabhängig vom Konto kenne."
-
-msgid "Two-factor authentication was reset."
-msgstr "Die Zwei-Faktor-Anmeldung (2FA) wurde zurückgesetzt."
-
-msgid "The link for removing two-factor authentication was requested."
-msgstr ""
-"Der Link zum Entfernen der Zwei-Faktor-Anmeldung (2FA) wurde angefordert."
-
-msgid "Reset two-factor authentication"
-msgstr "Zwei-Faktor-Anmeldung (2FA) zurücksetzen"
-
-#: leg_platform/accounts/templates/admin/accounts/user/reset_second_factor.html
-msgid "This account has no two-factor authentication."
-msgstr "Dieses Konto hat keine Zwei-Faktor-Anmeldung (2FA)."
-
-msgid ""
-"The second factor of this account is removed at once. The authenticator app "
-"and the recovery codes stop working and all sessions of the account end. The"
-" person sets up two-factor authentication again at the next login. Do this "
-"only after you have verified the identity of the person."
-msgstr ""
-"Der zweite Faktor dieses Kontos wird sofort entfernt. Die Authenticator-App "
-"und die Wiederherstellungscodes funktionieren nicht mehr, und alle Sitzungen"
-" des Kontos werden beendet. Die Person richtet die Zwei-Faktor-Anmeldung "
-"(2FA) bei der nächsten Anmeldung neu ein. Tun Sie das erst, nachdem Sie die "
-"Identität der Person geprüft haben."
-
-msgid ""
-"A link for removing two-factor authentication is sent to the email address "
-"of this account. The second factor is removed only when the person opens the"
-" link and confirms it. Nothing changes until then."
-msgstr ""
-"An die E-Mail-Adresse dieses Kontos wird ein Link zum Entfernen der Zwei-"
-"Faktor-Anmeldung (2FA) gesendet. Der zweite Faktor wird erst entfernt, wenn "
-"die Person den Link öffnet und bestätigt. Bis dahin ändert sich nichts."
 
 msgid "Send the link"
 msgstr "Link senden"
@@ -2116,13 +1938,6 @@ msgid ""
 msgstr ""
 "Die Microsoft-Graph-Konfiguration ist unvollständig. Speichern Sie zuerst "
 "die Einstellungen und laden Sie ein Zertifikat hoch."
-
-msgid ""
-"In this mode, email goes only to the allowed recipients. Your address is not"
-" one of them, so no test email was sent."
-msgstr ""
-"In diesem Modus geht E-Mail nur an die erlaubten Empfänger. Ihre Adresse "
-"gehört nicht dazu, daher wurde keine Test-E-Mail gesendet."
 
 msgid ""
 "In console mode, no test email is sent, so the Microsoft Graph delivery is "
@@ -2235,9 +2050,6 @@ msgstr ""
 
 msgid "Two-factor authentication is mandatory for your role."
 msgstr "Für Ihre Rolle ist die Zwei-Faktor-Anmeldung (2FA) Pflicht."
-
-msgid "Two-factor authentication was turned off."
-msgstr "Die Zwei-Faktor-Anmeldung (2FA) wurde ausgeschaltet."
 
 msgid "The codes were copied."
 msgstr "Die Codes wurden kopiert."
@@ -2801,38 +2613,8 @@ msgstr "Ihre Angaben und Sicherheitseinstellungen."
 msgid "Really delete the account?"
 msgstr "Konto wirklich löschen?"
 
-msgid ""
-"With the deletion you lose access to the portal. Your personal details, your"
-" locations and your messages are deleted."
-msgstr ""
-"Mit dem Löschen verlieren Sie den Zugang zum Portal. Ihre persönlichen "
-"Angaben, Ihre Standorte und Ihre Mitteilungen werden gelöscht."
-
-msgid ""
-"Your details are deleted. We keep invoices and booking records for as long "
-"as the law requires. More in the <a href=\"%(url)s\" target=\"_blank\" "
-"rel=\"noopener noreferrer\">privacy notice</a>."
-msgstr ""
-"Ihre Angaben werden gelöscht. Rechnungen und Buchungsbelege bewahren wir so "
-"lange auf, wie das Gesetz es verlangt. Mehr dazu in der <a href=\"%(url)s\" "
-"target=\"_blank\" rel=\"noopener noreferrer\">Datenschutzerklärung</a>."
-
-msgid ""
-"Your details are deleted. We keep invoices and booking records for as long "
-"as the law requires. More in the privacy notice."
-msgstr ""
-"Ihre Angaben werden gelöscht. Rechnungen und Buchungsbelege bewahren wir so "
-"lange auf, wie das Gesetz es verlangt. Mehr dazu in der "
-"Datenschutzerklärung."
-
 msgid "Delete account permanently"
 msgstr "Konto unwiderruflich löschen"
-
-msgid ""
-"Your account and your personal details are deleted. This cannot be undone."
-msgstr ""
-"Ihr Konto und Ihre persönlichen Angaben werden gelöscht. Das lässt sich "
-"nicht rückgängig machen."
 
 msgid "Email addresses"
 msgstr "E-Mail-Adressen"
@@ -2881,21 +2663,11 @@ msgstr "Zwei-Faktor-Anmeldung (2FA)"
 msgid "Not set up"
 msgstr "Nicht eingerichtet"
 
-msgid ""
-"You need a code from your app at every login, in addition to your password."
-msgstr "Bei jeder Anmeldung brauchen Sie zusätzlich einen Code aus Ihrer App."
-
 msgid "Create new codes"
 msgstr "Neue Codes erzeugen"
 
 msgid "Turn off 2FA"
 msgstr "2FA deaktivieren"
-
-msgid ""
-"New codes replace the old ones. The old codes no longer work afterwards."
-msgstr ""
-"Neue Codes ersetzen die bisherigen. Die alten Codes funktionieren danach "
-"nicht mehr."
 
 msgid ""
 "You sign in with your password only. With a code from an app you protect "
@@ -2921,13 +2693,6 @@ msgstr "Kein Scannen möglich? Geben Sie diesen Schlüssel in der App ein:"
 
 msgid "Step 2 of 2"
 msgstr "Schritt 2 von 2"
-
-msgid ""
-"You need these codes if you have no access to the app. Each code works only "
-"once. They are shown only now."
-msgstr ""
-"Diese Codes brauchen Sie, wenn Sie keinen Zugang zur App haben. Jeder Code "
-"funktioniert nur einmal. Sie werden nur jetzt angezeigt."
 
 msgid "I saved the codes."
 msgstr "Ich habe die Codes gespeichert."
@@ -3262,25 +3027,6 @@ msgid "Phone lost?"
 msgstr "Handy verloren?"
 
 msgid ""
-"If you cannot use your authenticator app, you can turn off 2FA with your "
-"password and one of your recovery codes. Afterwards only your password "
-"protects the account. You can set up 2FA again at any time."
-msgstr ""
-"Wenn Sie Ihre Authenticator-App nicht nutzen können, schalten Sie 2FA mit "
-"Ihrem Passwort und einem Ihrer Wiederherstellungscodes aus. Danach schützt "
-"nur noch Ihr Passwort das Konto. Sie können 2FA jederzeit wieder einrichten."
-
-msgid ""
-"You have neither the app nor a recovery code? Then contact the operator of "
-"the portal. An administrator can start the removal of 2FA, and you confirm "
-"it with a link that is sent to your email address."
-msgstr ""
-"Sie haben weder die App noch einen Wiederherstellungscode? Dann wenden Sie "
-"sich an den Betrieb des Portals. Ein Administrator kann das Entfernen von "
-"2FA starten, und Sie bestätigen es mit einem Link, der an Ihre E-Mail-"
-"Adresse gesendet wird."
-
-msgid ""
 "For your safety you were logged out: wrong codes or passwords were entered "
 "several times. Please log in again."
 msgstr ""
@@ -3483,17 +3229,6 @@ msgid ""
 msgstr ""
 "Laden Sie beide Logos hoch oder keines. Das Portal braucht je eine Version "
 "für den hellen und den dunklen Modus."
-
-msgid "The identity cannot be checked. Nothing was saved."
-msgstr "Die Identität kann nicht geprüft werden. Es wurde nichts gespeichert."
-
-msgid ""
-"To protect what every visitor sees, confirm the change with the code from "
-"your authenticator app or, if you have none, with your password."
-msgstr ""
-"Zum Schutz dessen, was alle Besucher sehen, bestätigen Sie die Änderung mit "
-"dem Code aus Ihrer Authenticator-App oder, falls Sie keine haben, mit Ihrem "
-"Passwort."
 
 msgid ""
 "Choose either new logos or the removal of the uploaded logos, not both."
@@ -6044,9 +5779,6 @@ msgid ""
 msgstr ""
 "Personal: Bestätigung des Netzbetreibers fehlt, Anmeldung zurückziehen"
 
-msgid "Application: returned for correction"
-msgstr "Anmeldung: zur Korrektur zurückgegeben"
-
 msgid "Application: not accepted by the LEG"
 msgstr "Anmeldung: von der LEG nicht angenommen"
 
@@ -6076,9 +5808,6 @@ msgstr "Ihre Anmeldung beim %(instance_name)s ist noch nicht abgeschlossen"
 
 msgid "Your application at %(instance_name)s was deleted"
 msgstr "Ihre Anmeldung beim %(instance_name)s wurde gelöscht"
-
-msgid "Your application at %(instance_name)s needs a correction"
-msgstr "Ihre Anmeldung beim %(instance_name)s muss korrigiert werden"
 
 msgid "Your application at %(instance_name)s was not accepted"
 msgstr "Ihre Anmeldung beim %(instance_name)s wurde nicht angenommen"
@@ -6169,18 +5898,6 @@ msgstr ""
 "Ihre Anmeldung beim %(instance_name)s wurde gelöscht, weil dem Vertrag nicht"
 " rechtzeitig zugestimmt wurde, zusammen mit Ihren Angaben zu Gebäuden und "
 "Messpunkten. Ihr Konto bleibt bestehen."
-
-msgid ""
-"The LEG returned your application at %(instance_name)s for correction. You "
-"can see why, and what to check, after you log in to the portal:"
-msgstr ""
-"Die LEG hat Ihre Anmeldung beim %(instance_name)s zur Korrektur "
-"zurückgegeben. Den Grund und was Sie prüfen müssen, sehen Sie nach dem "
-"Einloggen im Portal:"
-
-msgid "Please check your details and submit the application again."
-msgstr ""
-"Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab."
 
 msgid ""
 "Your application at %(instance_name)s was not accepted. For privacy reasons "
@@ -6414,11 +6131,9 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Check the details. Then start the registration at the %(operator)s, or "
-"return the application to the customer for correction."
+"Check the details. Then start the registration at the %(operator)s."
 msgstr ""
-"Prüfen Sie die Angaben. Starten Sie dann die Anmeldung bei %(operator)s oder"
-" geben Sie die Anmeldung dem Kunden zur Korrektur zurück."
+"Prüfen Sie die Angaben. Starten Sie dann die Anmeldung bei %(operator)s."
 
 #, python-format
 msgid ""
@@ -6441,9 +6156,6 @@ msgstr "Die Anmeldung ist abgeschlossen. Die Messpunkte wurden angelegt."
 
 msgid "Complete application"
 msgstr "Anmeldung abschliessen"
-
-msgid "Return for correction"
-msgstr "Zur Korrektur zurückgeben"
 
 msgid "Roll back application"
 msgstr "Anmeldung rückabwickeln"
@@ -6535,10 +6247,6 @@ msgid ""
 msgstr ""
 "Die LEG meldet die Messpunkte bei %(operator)s ab. Das Portal setzt die "
 "Abmeldung am bestätigten Termin selbst auf wirksam."
-
-#, python-format
-msgid "Terminated to %(date)s"
-msgstr "Gekündigt zum %(date)s"
 
 msgid "Open the person"
 msgstr "Person öffnen"
@@ -6639,36 +6347,12 @@ msgstr ""
 msgid "This step is not possible. Nothing was saved."
 msgstr "Dieser Schritt ist nicht möglich. Es wurde nichts gespeichert."
 
-msgid ""
-"The application becomes a draft again. The customer can correct it and "
-"submit it again. The customer receives an email and reads your reason in the"
-" portal."
-msgstr ""
-"Die Anmeldung wird wieder ein Entwurf. Der Kunde kann sie korrigieren und "
-"erneut abschicken. Der Kunde erhält eine E-Mail und liest Ihre Begründung im"
-" Portal."
-
-msgid "The application was returned for correction."
-msgstr "Die Anmeldung wurde zur Korrektur zurückgegeben."
-
-msgid "Reason for the correction"
-msgstr "Begründung der Korrektur"
-
-msgid ""
-"What the customer has to correct. The customer reads this text in the "
-"portal."
-msgstr ""
-"Was der Kunde korrigieren muss. Der Kunde liest diesen Text im Portal."
-
 msgid "Note for the customer"
 msgstr "Mitteilung an den Kunden"
 
 msgid "Shown to the customer once on the next visit, not in the email."
 msgstr ""
 "Wird dem Kunden einmal beim nächsten Besuch angezeigt, nicht in der E-Mail."
-
-msgid "Enter a reason."
-msgstr "Geben Sie einen Grund an."
 
 msgid ""
 "From now on the customer can no longer withdraw the application; only the "
@@ -7192,9 +6876,6 @@ msgstr "Geben Sie eine Zahl ein."
 msgid "Enter a number of at least 0."
 msgstr "Geben Sie eine Zahl ab 0 ein."
 
-msgid "Metering point number for consumption"
-msgstr "Messpunkt-Nummer für den Bezug"
-
 msgid "Which metering point number does %(operator)s use to measure your electricity consumption?"
 msgstr "Über welche Messpunkt-Nummer misst %(operator)s Ihren Stromverbrauch?"
 
@@ -7211,15 +6892,6 @@ msgid ""
 msgstr ""
 "In den Unterlagen Ihres Netzbetreibers bei der Einspeisestelle, auch Messpunkt-ID genannt (nicht die kürzere Zählernummer). Sie beginnt mit %(prefix)s, das ist schon eingetragen. Ergänzen Sie die restlichen %(length)s Zeichen."
 
-msgid ""
-"You find the number on your electricity bill, with the details of your "
-"supply point. It is also called metering point ID and is not the shorter "
-"meter number."
-msgstr ""
-"Die Nummer finden Sie auf Ihrer Stromrechnung, bei den Angaben zu Ihrer "
-"Bezugsstelle. Sie heisst auch Messpunkt-ID und ist nicht die kürzere "
-"Zählernummer."
-
 msgid "Name of the metering point"
 msgstr "Name des Messpunkts"
 
@@ -7228,9 +6900,6 @@ msgstr "z. B. Wohnhaus"
 
 msgid "Do you feed in solar power?"
 msgstr "Speisen Sie Solarstrom ein?"
-
-msgid "Metering point number for the feed-in"
-msgstr "Messpunkt-Nummer für die Einspeisung"
 
 msgid "e.g. PV system"
 msgstr "z. B. PV-Anlage"
@@ -7347,7 +7016,7 @@ msgstr "Wird von %(operator)s festgelegt"
 
 #, python-format
 msgid "Terminated on %(date)s"
-msgstr "Gekündigt zum %(date)s"
+msgstr "Abgemeldet per %(date)s"
 
 msgid "Deregistration running"
 msgstr "In Abmeldung"
@@ -7577,43 +7246,11 @@ msgstr "Ihre Anmeldung ist abgeschickt"
 msgid "My participation · Application"
 msgstr "Meine Teilnahme · Anmeldung"
 
-#, python-format
-msgid "%(done)s of %(total)s done"
-msgstr "%(done)s von %(total)s erledigt"
-
-#, python-format
-msgid ""
-"The LEG checks your details and registers your building at %(operator)s. "
-"Then you receive an email from the grid operator. Please confirm the "
-"registration there."
-msgstr ""
-"Die LEG prüft Ihre Angaben und meldet Ihr Gebäude bei %(operator)s an. "
-"Danach erhalten Sie eine E-Mail vom Netzbetreiber. Bitte bestätigen Sie die "
-"Anmeldung dort."
-
 msgid "What happens next"
 msgstr "So geht es weiter"
 
-#, python-format
-msgid ""
-"Please confirm the registration within %(days)s days after the email from "
-"the grid operator."
-msgstr ""
-"Bitte bestätigen Sie die Anmeldung innerhalb von %(days)s Tagen nach der "
-"E-Mail vom Netzbetreiber."
-
-msgid "Changes are now only possible through the LEG."
-msgstr "Änderungen sind jetzt nur noch über die LEG möglich."
-
 msgid "Withdraw application"
 msgstr "Anmeldung zurückziehen"
-
-msgid ""
-"You can withdraw the application as long as the LEG has not yet submitted it"
-" to the grid operator."
-msgstr ""
-"Zurückziehen ist möglich, solange die LEG die Anmeldung noch nicht beim "
-"Netzbetreiber eingereicht hat."
 
 msgid "Withdraw application?"
 msgstr "Anmeldung zurückziehen?"
@@ -7672,9 +7309,6 @@ msgstr "Der Vertrag ist noch nicht verfügbar"
 msgid "As soon as the LEG has published it, you find it here."
 msgstr "Sobald die LEG ihn veröffentlicht hat, finden Sie ihn hier."
 
-msgid "This page is not available yet."
-msgstr "Diese Seite ist noch nicht verfügbar."
-
 msgid "Back to the buildings"
 msgstr "Zurück zu den Gebäuden"
 
@@ -7704,9 +7338,6 @@ msgstr "Anderes Gebäude wählen"
 
 msgid "Did you mean one of these addresses?"
 msgstr "Meinten Sie eine dieser Adressen?"
-
-msgid "My entry is correct"
-msgstr "Meine Eingabe ist richtig"
 
 msgid "There are several buildings at this address. Which one is yours?"
 msgstr "Zu dieser Adresse gibt es mehrere Gebäude. Welches ist Ihres?"
@@ -7746,21 +7377,8 @@ msgstr "Welche Messpunkte gehören zu Ihrem Gebäude?"
 msgid "Assign the metering points to your building."
 msgstr "Weisen Sie Ihrem Gebäude die Messpunkte zu."
 
-#, python-format
-msgid "Its number starts with %(prefix)s."
-msgstr "Seine Nummer beginnt mit %(prefix)s."
-
 msgid "You enter the feed-in metering point."
 msgstr "Sie erfassen den Messpunkt für die Einspeisung."
-
-msgid ""
-"You find the number in the documents of your grid operator, with the details"
-" of your feed-in point. It is also called metering point ID and is not the "
-"shorter meter number."
-msgstr ""
-"Die Nummer finden Sie in den Unterlagen Ihres Netzbetreibers, bei den "
-"Angaben zu Ihrer Einspeisestelle. Sie heisst auch Messpunkt-ID und ist nicht"
-" die kürzere Zählernummer."
 
 msgid "These details are optional and are used for statistics only."
 msgstr "Diese Angaben sind freiwillig und dienen nur der Statistik."
@@ -7784,13 +7402,6 @@ msgstr "Zu viele Anfragen"
 
 msgid "Please wait a moment and try again."
 msgstr "Bitte warten Sie einen Moment und versuchen Sie es dann noch einmal."
-
-msgid ""
-"The LEG returned your application. Please check your details and submit it "
-"again."
-msgstr ""
-"Die LEG hat Ihre Anmeldung zurückgegeben. Bitte prüfen Sie Ihre Angaben und "
-"schicken Sie sie erneut ab."
 
 msgid "Cancel application?"
 msgstr "Anmeldung abbrechen?"
@@ -7817,25 +7428,9 @@ msgstr "Schritt %(step_number)s von %(step_total)s"
 msgid "Step %(step_number)s of %(step_total)s: %(step_name)s"
 msgstr "Schritt %(step_number)s von %(step_total)s: %(step_name)s"
 
-msgid "Edit name and description"
-msgstr "Name und Beschreibung bearbeiten"
-
-msgid "Edit description"
-msgstr "Beschreibung bearbeiten"
-
-#, python-format
-msgid "Metering points of %(title)s"
-msgstr "Messpunkte von %(title)s"
-
 #, python-format
 msgid "Since %(date)s"
 msgstr "Seit %(date)s"
-
-msgid "Edit name of the metering point"
-msgstr "Name des Messpunkts bearbeiten"
-
-msgid "Remove metering point"
-msgstr "Messpunkt entfernen"
 
 msgid "Deregistration is not possible yet until the metering point is active."
 msgstr "Abmeldung noch nicht möglich, bis der Messpunkt aktiv ist."
@@ -7858,16 +7453,19 @@ msgid "Application: %(done)s of %(total)s done"
 msgstr "Anmeldung: %(done)s von %(total)s erledigt"
 
 #, python-format
-msgid "Deregistration: %(done)s of %(total)s done"
-msgstr "Abmeldung: %(done)s von %(total)s erledigt"
+msgid "Deregistration on %(date)s."
+msgstr "Abmeldung per %(date)s."
+
+#, python-format
+msgid "Desired date %(date)s. The LEG administration confirms it."
+msgstr "Gewünschtes Datum: %(date)s. Die LEG-Verwaltung bestätigt es."
+
+msgid "Your deregistration is submitted. The LEG administration confirms the date."
+msgstr "Ihre Abmeldung ist eingereicht. Die LEG-Verwaltung bestätigt das Datum."
 
 #, python-format
 msgid "Application: %(done)s of %(total)s steps done"
 msgstr "Anmeldung: %(done)s von %(total)s Schritten erledigt"
-
-#, python-format
-msgid "Deregistration: %(done)s of %(total)s steps done"
-msgstr "Abmeldung: %(done)s von %(total)s Schritten erledigt"
 
 msgid "Show details"
 msgstr "Details anzeigen"
@@ -7919,22 +7517,11 @@ msgstr "Meine Teilnahme · Abmeldung"
 msgid "Deregistration: %(name)s"
 msgstr "Abmeldung: %(name)s"
 
-msgid "Choose the metering points and the date."
-msgstr "Wählen Sie die Messpunkte und den Termin."
-
 msgid "Nothing to deregister"
 msgstr "Nichts abzumelden"
 
 msgid "You have no metering point that can be deregistered."
 msgstr "Sie haben keinen Messpunkt, der abgemeldet werden kann."
-
-msgid ""
-"A metering point that is not active yet cannot be deregistered. Withdraw its"
-" registration on the page Buildings or wait until it is active."
-msgstr ""
-"Ein Messpunkt, der noch nicht aktiv ist, kann nicht abgemeldet werden. "
-"Ziehen Sie die Anmeldung auf der Seite Gebäude zurück oder warten Sie, bis "
-"er aktiv ist."
 
 msgid ""
 "For the compensation of the feed-in we need your bank or postal connection. "
@@ -7948,20 +7535,10 @@ msgid "Which metering points should be deregistered?"
 msgstr "Welche Messpunkte sollen abgemeldet werden?"
 
 msgid "When should the deregistration take effect?"
-msgstr "Wann soll die Abmeldung wirksam werden?"
-
-msgid "Earliest possible date"
-msgstr "Nächstmöglicher Termin"
-
-msgid "Desired date (end of a month)"
-msgstr "Wunschtermin (Monatsende)"
+msgstr "Wann soll die Abmeldung gelten?"
 
 msgid "Desired date (last day of a month)"
 msgstr "Wunschdatum (letzter Tag eines Monats)"
-
-#, python-format
-msgid "Earliest on %(date)s. The LEG confirms the date."
-msgstr "Frühestens am %(date)s. Die LEG bestätigt den Termin."
 
 msgid "Already deregistered"
 msgstr "Bereits abgemeldet"
@@ -7973,41 +7550,11 @@ msgstr ""
 "Ihre Messpunkte sind bereits abgemeldet. Den Stand sehen Sie auf der Seite "
 "Gebäude."
 
-msgid ""
-"You want to delete your account. For that, first deregister your metering "
-"points."
-msgstr ""
-"Sie möchten Ihr Konto löschen. Melden Sie dafür zuerst Ihre Messpunkte ab."
-
-#, python-format
-msgid ""
-"You cannot withdraw the termination yourself afterwards. Questions: contact "
-"the %(leg)s."
-msgstr ""
-"Die Kündigung können Sie danach nicht selbst zurücknehmen. Bei Fragen wenden"
-" Sie sich an die %(leg)s."
-
-msgid ""
-"The notice period is four months to the end of a month. The LEG confirms the"
-" date."
-msgstr ""
-"Die Kündigungsfrist beträgt vier Monate auf ein Monatsende. Die LEG "
-"bestätigt den Termin."
-
 msgid "Choose at least one metering point."
 msgstr "Wählen Sie mindestens einen Messpunkt aus."
 
-msgid "You are deregistering 1 metering point at the chosen date."
-msgstr "Sie melden 1 Messpunkt zum gewählten Termin ab."
-
-msgid "You are deregistering %(count)s metering points at the chosen date."
-msgstr "Sie melden %(count)s Messpunkte zum gewählten Termin ab."
-
-msgid "A confirmation is sent to your email addresses."
-msgstr "Eine Bestätigung geht an Ihre E-Mail-Adressen."
-
-msgid "Give binding notice"
-msgstr "Verbindlich kündigen"
+msgid "Deregister metering points (binding)"
+msgstr "Messpunkte verbindlich abmelden"
 
 msgid ""
 "This date is too early. The notice period is four months to the end of a "
@@ -8026,43 +7573,12 @@ msgstr ""
 "Einer der Messpunkte kann nicht (mehr) abgemeldet werden. Bitte prüfen Sie "
 "Ihre Auswahl."
 
-msgid ""
-"You have too many deregistrations running. Please wait until the LEG has "
-"processed them."
-msgstr ""
-"Sie haben zu viele Abmeldungen laufen. Bitte warten Sie, bis die LEG sie "
-"bearbeitet hat."
-
 msgid "Your deregistration was submitted"
 msgstr "Ihre Abmeldung ist abgeschickt"
-
-msgid ""
-"The LEG checks the date and deregisters you at %(operator)s. A confirmation "
-"was sent to your email addresses."
-msgstr ""
-"Die LEG prüft den Termin und meldet Sie bei %(operator)s ab. Eine "
-"Bestätigung wurde an Ihre E-Mail-Adressen gesendet."
-
-msgid ""
-"Until the date the metering points stay active. Afterwards they are ended."
-msgstr "Bis zum Termin bleiben die Messpunkte aktiv. Danach sind sie beendet."
 
 #, python-format
 msgid "Desired date %(date)s. The LEG confirms the date."
 msgstr "Wunschtermin %(date)s. Die LEG bestätigt den Termin."
-
-msgid "Your deregistration is started. You can now delete your account."
-msgstr "Ihre Abmeldung ist gestartet. Sie können Ihr Konto jetzt löschen."
-
-msgid ""
-"You cannot delete your account yet: a registration is still running or a "
-"metering point is not active yet. Withdraw the registration on the page "
-"Buildings, or wait until the metering point is active and deregister it."
-msgstr ""
-"Sie können Ihr Konto noch nicht löschen: Eine Anmeldung läuft noch oder ein "
-"Messpunkt ist noch nicht aktiv. Ziehen Sie die Anmeldung auf der Seite "
-"Gebäude zurück oder warten Sie, bis der Messpunkt aktiv ist, und melden Sie "
-"ihn dann ab."
 
 msgid "To the buildings"
 msgstr "Zu den Gebäuden"
@@ -8077,30 +7593,6 @@ msgid ""
 msgstr ""
 "Die Adresse ist bestätigt und kann nicht geändert werden. Wenden Sie sich "
 "bei einer Änderung an die %(leg)s."
-
-msgid "With the deletion you lose access to the portal."
-msgstr "Mit dem Löschen verlieren Sie den Zugang zum Portal."
-
-msgid ""
-"Your account will be deactivated. Your details are kept for retention "
-"reasons."
-msgstr ""
-"Ihr Konto wird deaktiviert. Ihre Angaben bleiben aus Aufbewahrungsgründen "
-"erhalten."
-
-msgid ""
-"I know that my account will be deleted or deactivated and that this cannot "
-"be undone."
-msgstr ""
-"Ich weiss, dass mein Konto gelöscht bzw. deaktiviert wird und dass das nicht"
-" rückgängig gemacht werden kann."
-
-msgid ""
-"You still have metering points. Deregister them first. Then you can delete "
-"your account."
-msgstr ""
-"Sie haben noch Messpunkte. Melden Sie diese zuerst ab. Danach können Sie Ihr"
-" Konto löschen."
 
 msgid "Your account was deactivated"
 msgstr "Ihr Konto wurde deaktiviert"
@@ -8144,29 +7636,11 @@ msgstr ""
 "Wenn Sie ein anderes Gebäude wählen, werden die erfassten Messpunkte "
 "gelöscht."
 
-msgid "No description"
-msgstr "Keine Beschreibung"
-
 msgid "Reason:"
 msgstr "Grund:"
 
-#, python-format
-msgid "Registered on %(date)s"
-msgstr "Angemeldet am %(date)s"
-
-#, python-format
-msgid "Step %(step_number)s"
-msgstr "Schritt %(step_number)s"
-
-#, python-format
-msgid "Step %(step_number)s: %(step_name)s"
-msgstr "Schritt %(step_number)s: %(step_name)s"
-
 msgid "The LEG did not accept your application."
 msgstr "Die LEG hat Ihre Anmeldung nicht angenommen."
-
-msgid "The LEG returned your application for correction:"
-msgstr "Die LEG hat Ihre Anmeldung zur Korrektur zurückgegeben:"
 
 msgid "The grid operator did not accept the registration."
 msgstr "Der Netzbetreiber hat die Anmeldung nicht angenommen."
@@ -8214,23 +7688,7 @@ msgstr ""
 "Ihre Anmeldung ist pausiert, weil Sie sie länger nicht bearbeitet haben. "
 "Machen Sie weiter, sonst wird sie am %(date)s gelöscht."
 
-msgid ""
-"Your deregistration continues. The metering points end on the date that the "
-"LEG confirms."
-msgstr ""
-"Ihre Abmeldung läuft weiter. Die Messpunkte enden zum Termin, den die LEG "
-"bestätigt."
-
 # Second designer walkthrough, customer part (N-01 to N-15).
-msgid "Check your details"
-msgstr "Angaben prüfen"
-
-msgid ""
-"Please correct what the LEG described. Then submit the application again."
-msgstr ""
-"Bitte korrigieren Sie, was die LEG beschrieben hat. Danach schicken Sie die "
-"Anmeldung erneut ab."
-
 msgid "Your deregistration was submitted."
 msgstr "Ihre Abmeldung ist eingereicht."
 
@@ -8254,9 +7712,6 @@ msgstr "Sie bestätigen die Einladung in Ihrem Konto beim Netzbetreiber"
 
 msgid "Set by the grid operator"
 msgstr "Wird vom Netzbetreiber festgelegt"
-
-msgid "Your desired date"
-msgstr "Ihr Wunschdatum"
 
 msgid "Choose"
 msgstr "Wählen"
@@ -8292,9 +7747,6 @@ msgid "A phone or computer with a screen lock. We recommend a second device."
 msgstr ""
 "Ein Handy oder Computer mit Bildschirmsperre. Wir empfehlen ein zweites "
 "Gerät."
-
-msgid "What is an authenticator app?"
-msgstr "Was ist eine Authenticator-App?"
 
 msgid ""
 "An authenticator app is a free app from your phone's app store. It shows a "
@@ -8356,18 +7808,6 @@ msgid ""
 msgstr ""
 "Ihre Anmeldung kann wieder geändert werden. Ändern Sie, was nötig ist, und "
 "schicken Sie sie dann neu ab."
-
-msgid "You can still change your details until the LEG starts checking them."
-msgstr ""
-"Sie können Ihre Angaben noch ändern, bis die LEG mit der Prüfung beginnt."
-
-msgid ""
-"The LEG is checking your application. You can no longer change it here. "
-"Until the registration at the grid operator starts, you can still withdraw "
-"it."
-msgstr ""
-"Die LEG prüft Ihre Anmeldung. Sie können sie hier nicht mehr ändern. Bis die"
-" Anmeldung beim Netzbetreiber beginnt, können Sie sie noch zurückziehen."
 
 msgid ""
 "The LEG has already started checking your application, so you can no longer "
@@ -8650,27 +8090,6 @@ msgstr "Mit Ihrem Passkey bestätigen"
 msgid "The passkey could not be verified. Please try again."
 msgstr "Der Passkey konnte nicht bestätigt werden. Versuchen Sie es erneut."
 
-msgid "Set up passkeys"
-msgstr "Passkeys einrichten"
-
-msgid "Confirm your current sign-in method before setting up passkeys."
-msgstr ""
-"Bestätigen Sie Ihre aktuelle Anmeldemethode, bevor Sie Passkeys einrichten."
-
-msgid ""
-"Your password, app and recovery codes stay valid until you finish. "
-"Afterwards you sign in only with passkeys."
-msgstr ""
-"Ihr Passwort, Ihre App und Ihre Wiederherstellungscodes bleiben gültig, bis "
-"Sie die Einrichtung abschliessen. Danach melden Sie sich nur noch mit "
-"Passkeys an."
-
-msgid "Add passkey"
-msgstr "Passkey hinzufügen"
-
-msgid "Use passkeys"
-msgstr "Passkeys verwenden"
-
 msgid "Confirm this change with your passkey when you continue."
 msgstr "Bestätigen Sie diese Änderung beim Fortfahren mit Ihrem Passkey."
 
@@ -8681,13 +8100,6 @@ msgstr ""
 
 msgid "Passkeys"
 msgstr "Passkeys"
-
-msgid ""
-"You sign in with a passkey. Your account has no password, app or recovery "
-"codes."
-msgstr ""
-"Sie melden sich mit einem Passkey an. Ihr Konto hat kein Passwort, keine App"
-" und keine Wiederherstellungscodes."
 
 msgid "Manage passkeys"
 msgstr "Passkeys verwalten"
@@ -8748,9 +8160,6 @@ msgstr ""
 "Link, um eine neue Anmeldemethode zu wählen. Sonst senden wir Ihnen eine "
 "Anleitung."
 
-msgid "Lost your sign-in method?"
-msgstr "Anmeldemittel verloren?"
-
 msgid ""
 "Your current passkeys stay valid until you confirm the completed new sign-in"
 " method."
@@ -8765,14 +8174,6 @@ msgstr ""
 "Öffnen Sie diesen einmal verwendbaren Link innerhalb von %(lifetime_hours)s "
 "Stunden. Beim Öffnen ändert sich nichts; bestätigen Sie auf der folgenden "
 "Seite."
-
-msgid ""
-"If you have another passkey, sign in with it. For an authenticator app, you "
-"can also use an unused recovery code."
-msgstr ""
-"Wenn Sie einen weiteren Passkey haben, melden Sie sich damit an. Bei einer "
-"Authenticator-App können Sie auch einen unbenutzten Wiederherstellungscode "
-"verwenden."
 
 msgid ""
 "Without a working sign-in method, send an official ID document by email to "
@@ -8821,13 +8222,6 @@ msgid "Sign-in recovery"
 msgstr "Anmeldung wiederherstellen"
 
 msgid ""
-"We send instructions to the address you enter. With a second passkey or a "
-"recovery code you can sign in directly."
-msgstr ""
-"Wir senden eine Anleitung an die eingegebene Adresse. Mit einem zweiten "
-"Passkey oder Wiederherstellungscode können Sie sich direkt anmelden."
-
-msgid ""
 "If delivery is possible, a link or instructions will arrive shortly. No "
 "sign-in method has been changed."
 msgstr ""
@@ -8840,219 +8234,11 @@ msgstr ""
 "Behalten Sie mindestens die erforderliche Anzahl Passkeys. Fügen Sie zuerst "
 "einen Ersatz hinzu."
 
-msgid ""
-"Labels are names you choose, not verified device identities. A synchronized "
-"passkey may work on several devices. We recommend a spare passkey."
-msgstr ""
-"Die Bezeichnungen wählen Sie selbst; sie bestätigen keine Geräteidentität. "
-"Ein synchronisierter Passkey kann auf mehreren Geräten funktionieren. Wir "
-"empfehlen einen zusätzlichen Reserve-Passkey."
-
-msgid ""
-"Keep at least one active passkey. Add a replacement before removing the last"
-" one. Removing a passkey ends all sessions."
-msgstr ""
-"Behalten Sie mindestens einen aktiven Passkey. Fügen Sie einen Ersatz hinzu,"
-" bevor Sie den letzten entfernen. Beim Entfernen eines Passkeys werden alle "
-"Sitzungen beendet."
-
 msgid "Last used"
 msgstr "Zuletzt verwendet"
 
-msgid "Synchronization supported"
-msgstr "Synchronisierung unterstützt"
-
-msgid "Remove passkey and end all sessions"
-msgstr "Passkey entfernen und alle Sitzungen beenden"
-
-msgid "Change sign-in method"
-msgstr "Anmeldemethode ändern"
-
 msgid "Recover sign-in method"
 msgstr "Anmeldemethode wiederherstellen"
-
-msgid ""
-"Your current sign-in method stays valid until you finish setting up "
-"passkeys. Finishing replaces it with passkeys."
-msgstr ""
-"Ihre bisherige Anmeldemethode bleibt gültig, bis Sie die Passkey-Einrichtung"
-" abschliessen. Danach melden Sie sich mit Passkeys an."
-
-msgid ""
-"Your previous sign-in methods no longer work. Set up new passkeys to restore"
-" access."
-msgstr ""
-"Ihre bisherigen Anmeldemittel funktionieren nicht mehr. Richten Sie neue "
-"Passkeys ein, um wieder Zugang zu erhalten."
-
-msgid "Add another passkey. Your existing passkeys remain usable."
-msgstr ""
-"Fügen Sie einen weiteren Passkey hinzu. Ihre bestehenden Passkeys bleiben "
-"verwendbar."
-
-msgid ""
-"One passkey is enough. We strongly recommend an additional passkey on "
-"another device to protect against losing access."
-msgstr ""
-"Ein Passkey genügt. Wir empfehlen dringend einen zusätzlichen Passkey auf "
-"einem anderen Gerät, damit Sie den Zugang nicht verlieren."
-
-msgid "Add a passkey on another device"
-msgstr "Passkey auf einem anderen Gerät hinzufügen"
-
-msgid "How to add a passkey on another device"
-msgstr "So fügen Sie einen Passkey auf einem anderen Gerät hinzu"
-
-msgid ""
-"Stay signed in on this computer. In Profile, choose Add a passkey on another"
-" device and confirm with an existing passkey. You do not need to select your"
-" sign-in method again."
-msgstr ""
-"Bleiben Sie auf diesem Computer angemeldet. Wählen Sie im Profil Passkey auf"
-" einem anderen Gerät hinzufügen und bestätigen Sie mit einem bestehenden "
-"Passkey. Sie müssen Ihre Anmeldemethode nicht erneut auswählen."
-
-msgid ""
-"Enter a recognizable name, then choose Create passkey on another device. "
-"This requests another device; it cannot force the browser to show a QR code."
-msgstr ""
-"Geben Sie einen erkennbaren Namen ein und wählen Sie Passkey auf anderem "
-"Gerät erstellen. Damit wird ein anderes Gerät angefordert; die Anzeige eines"
-" QR-Codes im Browser lässt sich nicht erzwingen."
-
-msgid ""
-"In the browser or operating-system prompt, choose your phone or tablet if "
-"offered. If a QR code appears, scan it with that device and follow its "
-"instructions to create the passkey. You do not need an existing passkey on "
-"that device."
-msgstr ""
-"Wählen Sie in der Abfrage des Browsers oder Betriebssystems Ihr Handy oder "
-"Tablet, falls angeboten. Wenn ein QR-Code erscheint, scannen Sie ihn mit "
-"diesem Gerät und folgen Sie dessen Anweisungen zum Erstellen des Passkeys. "
-"Auf diesem Gerät brauchen Sie keinen bestehenden Passkey."
-
-msgid ""
-"Do not open the portal on the phone for this flow. A localhost or 127.0.0.1 "
-"address only reaches the device where it is opened; the phone communicates "
-"through the browser's credential prompt instead."
-msgstr ""
-"Öffnen Sie für diesen Ablauf das Portal nicht auf dem Handy. Eine Adresse "
-"mit localhost oder 127.0.0.1 erreicht nur das Gerät, auf dem sie geöffnet "
-"wird; das Handy kommuniziert stattdessen über die Anmeldeabfrage des "
-"Browsers."
-
-msgid ""
-"If no suitable other-device option is offered, cancel the prompt. This flow "
-"is unavailable in that browser and provider combination. Create passkey on "
-"this device is a separate choice, not a way to obtain a QR code."
-msgstr ""
-"Wenn keine passende Option für ein anderes Gerät angeboten wird, brechen Sie"
-" die Abfrage ab. Dieser Ablauf ist mit dieser Kombination aus Browser und "
-"Anbieter nicht verfügbar. Passkey auf diesem Gerät erstellen ist eine "
-"separate Auswahl und führt nicht zu einem QR-Code."
-
-msgid ""
-"After creation, choose Save passkey to finish adding it (Use passkeys during"
-" initial setup). Only then is the new passkey activated. Your current "
-"session and existing passkeys are retained; all other sessions end, and "
-"security notices are sent to all confirmed email addresses after saving."
-msgstr ""
-"Wählen Sie nach dem Erstellen Passkey speichern, um das Hinzufügen "
-"abzuschliessen (bei der Ersteinrichtung Passkeys verwenden). Erst dann wird "
-"der neue Passkey aktiviert. Ihre aktuelle Sitzung und bestehende Passkeys "
-"bleiben erhalten; alle anderen Sitzungen enden und nach dem Speichern werden"
-" Sicherheitsmitteilungen an alle bestätigten E-Mail-Adressen gesendet."
-
-msgid ""
-"Choose where to create the passkey. For another phone or tablet, stay on "
-"this page and use the browser prompt; you do not need to open the portal "
-"there."
-msgstr ""
-"Wählen Sie, wo der Passkey erstellt werden soll. Für ein anderes Handy oder "
-"Tablet bleiben Sie auf dieser Seite und nutzen die Browserabfrage; Sie "
-"müssen das Portal dort nicht öffnen."
-
-msgid "Create passkey on another device"
-msgstr "Passkey auf anderem Gerät erstellen"
-
-msgid "Create passkey on this device"
-msgstr "Passkey auf diesem Gerät erstellen"
-
-msgid ""
-"The portal requests another device, but cannot force a QR code. Your "
-"browser, operating system or password manager may still offer local "
-"creation. If no suitable other-device option appears, cancel the prompt; "
-"this flow is unavailable in that combination."
-msgstr ""
-"Das Portal fordert ein anderes Gerät an, kann aber keinen QR-Code erzwingen."
-" Ihr Browser, Betriebssystem oder Passwortmanager kann trotzdem die lokale "
-"Erstellung anbieten. Wenn keine passende Option für ein anderes Gerät "
-"erscheint, brechen Sie die Abfrage ab; dieser Ablauf ist mit dieser "
-"Kombination nicht verfügbar."
-
-msgid ""
-"The passkey could not be created. If no suitable device is offered, cancel "
-"the browser prompt and choose another available method. The new passkey is "
-"not activated until you finish."
-msgstr ""
-"Der Passkey konnte nicht erstellt werden. Wenn kein passendes Gerät "
-"angeboten wird, brechen Sie die Browserabfrage ab und wählen Sie eine andere"
-" verfügbare Methode. Der neue Passkey wird erst beim Abschluss aktiviert."
-
-msgid ""
-"If your local password manager opens even after you choose Create passkey on"
-" another device, cancel that prompt. This does not mean you chose the wrong "
-"button. If the browser offers a phone or tablet, use that option instead. An"
-" existing passkey cannot be added a second time."
-msgstr ""
-"Wenn sich Ihr lokaler Passwortmanager auch nach der Auswahl von Passkey auf "
-"anderem Gerät erstellen öffnet, brechen Sie diese Abfrage ab. Das bedeutet "
-"nicht, dass Sie die falsche Schaltfläche gewählt haben. Falls der Browser "
-"ein Handy oder Tablet anbietet, nutzen Sie stattdessen diese Option. Ein "
-"bestehender Passkey kann nicht ein zweites Mal hinzugefügt werden."
-
-msgid ""
-"The passkey could not be created. A password manager may open even after "
-"choosing another device and may refuse an existing passkey. Cancel that "
-"prompt. If no other-device or QR option is offered, this flow is unavailable"
-" in your current browser or passkey provider. Your existing passkeys remain "
-"usable. A new passkey is activated only after saving."
-msgstr ""
-"Der Passkey konnte nicht erstellt werden. Ein Passwortmanager kann sich auch"
-" nach der Auswahl eines anderen Geräts öffnen und einen bestehenden Passkey "
-"ablehnen. Brechen Sie diese Abfrage ab. Wenn keine Option für ein anderes "
-"Gerät oder einen QR-Code angeboten wird, ist dieser Ablauf mit Ihrem "
-"aktuellen Browser oder Passkey-Anbieter nicht verfügbar. Ihre bestehenden "
-"Passkeys bleiben nutzbar. Ein neuer Passkey wird erst nach dem Speichern "
-"aktiviert."
-
-msgid ""
-"The browser reported creation on this device instead of another device. This"
-" passkey was not sent to the portal or saved there. It may still exist in "
-"your password manager."
-msgstr ""
-"Der Browser hat die Erstellung auf diesem statt auf einem anderen Gerät "
-"gemeldet. Dieser Passkey wurde nicht an das Portal gesendet oder dort "
-"gespeichert. Er kann trotzdem in Ihrem Passwortmanager vorhanden sein."
-
-msgid ""
-"The available devices and choices depend on your browser and passkey "
-"provider. A synchronized passkey may already work on several devices; a "
-"device name does not prove a separate backup."
-msgstr ""
-"Die verfügbaren Geräte und Auswahlmöglichkeiten hängen von Ihrem Browser und"
-" Passkey-Anbieter ab. Ein synchronisierter Passkey funktioniert "
-"möglicherweise bereits auf mehreren Geräten; ein Gerätename belegt keine "
-"separate Sicherung."
-
-msgid "Add a passkey"
-msgstr "Passkey hinzufügen"
-
-msgid "Create passkey"
-msgstr "Passkey erstellen"
-
-msgid "Save passkey"
-msgstr "Passkey speichern"
 
 msgid ""
 "You use passkeys and have no password. To return to a password, change your "
@@ -9159,96 +8345,12 @@ msgctxt "Passkey setup step"
 msgid "Save"
 msgstr "Speichern"
 
-msgid "Confirm your current sign-in method first."
-msgstr "Bestätigen Sie zuerst Ihre aktuelle Anmeldemethode."
-
-msgid "Choose a name you recognise."
-msgstr "Wählen Sie einen Namen, den Sie wiedererkennen."
-
-msgid ""
-"For another device, select your phone or tablet in the browser prompt, if "
-"offered. If a QR code appears, scan it with that device."
-msgstr ""
-"Wählen Sie für ein anderes Gerät Ihr Handy oder Tablet im Browserdialog, "
-"falls angeboten. Falls ein QR-Code erscheint, scannen Sie ihn mit diesem "
-"Gerät."
-
-msgid "The passkey is activated only when you save."
-msgstr "Der Passkey wird erst beim Speichern aktiviert."
-
-msgid "Not yet activated"
-msgstr "Noch nicht aktiviert"
-
-msgid "Save and use passkeys"
-msgstr "Passkeys speichern und verwenden"
-
-msgid ""
-"One passkey is enough. We strongly recommend another on a different device "
-"in case you lose access."
-msgstr ""
-"Ein Passkey genügt. Wir empfehlen dringend einen weiteren auf einem anderen "
-"Gerät, falls Sie den Zugriff verlieren."
-
 msgid ""
 "Your previous sign-in methods no longer work. Save a new passkey to restore "
 "access."
 msgstr ""
 "Ihre bisherigen Anmeldemethoden funktionieren nicht mehr. Speichern Sie "
 "einen neuen Passkey, um wieder Zugriff zu erhalten."
-
-msgid ""
-"Your existing passkeys and this session stay active. Saving ends all other "
-"sessions and sends a notice to every confirmed email address."
-msgstr ""
-"Ihre bestehenden Passkeys und diese Sitzung bleiben aktiv. Beim Speichern "
-"werden alle anderen Sitzungen beendet und alle bestätigten E-Mail-Adressen "
-"benachrichtigt."
-
-msgid ""
-"Until you save, your current sign-in method stays active. Saving removes "
-"your password, app and recovery codes, ends all other sessions and notifies "
-"every confirmed email address. This session stays active."
-msgstr ""
-"Bis zum Speichern bleibt Ihre aktuelle Anmeldemethode aktiv. Beim Speichern "
-"werden Ihr Passwort, Ihre App und Ihre Wiederherstellungscodes entfernt, "
-"alle anderen Sitzungen beendet und alle bestätigten E-Mail-Adressen "
-"benachrichtigt. Diese Sitzung bleibt aktiv."
-
-msgid "More help"
-msgstr "Weitere Hilfe"
-
-msgid ""
-"A password manager may open even after you choose another device. Cancel "
-"that prompt if it has no suitable option. Your browser may not offer another"
-" device or a QR code."
-msgstr ""
-"Ein Passwortmanager kann sich auch öffnen, wenn Sie ein anderes Gerät "
-"gewählt haben. Brechen Sie diesen Dialog ab, wenn er keine passende Option "
-"bietet. Ihr Browser bietet möglicherweise kein anderes Gerät oder keinen QR-"
-"Code an."
-
-msgid ""
-"Keep this page open. You do not need to open the portal or already have a "
-"passkey on the phone. A localhost address only opens on its own device."
-msgstr ""
-"Lassen Sie diese Seite geöffnet. Sie müssen das Portal auf dem Handy nicht "
-"öffnen und dort noch keinen Passkey haben. Eine localhost-Adresse ist nur "
-"auf dem jeweiligen Gerät erreichbar."
-
-msgid ""
-"Names are labels, not verified devices. A synchronised passkey may work on "
-"several devices."
-msgstr ""
-"Namen sind Bezeichnungen, keine bestätigten Geräte. Ein synchronisierter "
-"Passkey kann auf mehreren Geräten funktionieren."
-
-msgid "Follow the instructions in the browser prompt."
-msgstr "Folgen Sie den Anweisungen im Browserdialog."
-
-msgid "Creation did not finish. Nothing was activated. You can try again."
-msgstr ""
-"Die Erstellung wurde nicht abgeschlossen. Es wurde nichts aktiviert. Sie "
-"können es erneut versuchen."
 
 msgid ""
 "The browser reported this device instead of another device. The portal did "
@@ -9392,9 +8494,6 @@ msgid ""
 msgstr ""
 "Alle anderen Anmeldungen enden. Sie erhalten eine Nachricht an alle Ihre "
 "bestätigten Adressen."
-
-msgid "Yes, set up passkey"
-msgstr "Ja, Passkey einrichten"
 
 msgid "Set up the program on your phone"
 msgstr "Programm auf dem Handy einrichten"
@@ -9755,54 +8854,19 @@ msgid_plural "%(days)s days"
 msgstr[0] "%(days)s Tag"
 msgstr[1] "%(days)s Tage"
 
-msgid "Please correct"
-msgstr "Bitte nachbessern"
-
-msgid ""
-"You can delete your account at any time. Running applications are withdrawn,"
-" any metering points are deregistered. Open claims remain until they are "
-"settled. This cannot be undone."
-msgstr ""
-"Sie können Ihr Konto jederzeit löschen. Laufende Anmeldungen werden "
-"zurückgezogen, etwaige Messpunkte werden abgemeldet. Offene Forderungen "
-"bleiben bis zu deren Begleichung bestehen. Dieser Vorgang kann nicht "
-"rückgängig gemacht werden."
-
-msgid "When you delete your account, the following happens automatically:"
-msgstr "Wenn Sie Ihr Konto löschen, passiert automatisch Folgendes:"
-
 msgid "An application that is not submitted yet is deleted."
 msgstr "Eine Anmeldung, die noch nicht abgeschickt ist, wird gelöscht."
 
 msgid "A submitted application is withdrawn."
 msgstr "Eine abgeschickte Anmeldung wird zurückgezogen."
 
-msgid ""
-"Your metering points are deregistered. The deregistration takes effect on "
-"the earliest possible date."
-msgstr ""
-"Ihre Messpunkte werden abgemeldet. Die Abmeldung wirkt zum frühesten "
-"möglichen Datum."
-
-msgid "You lose access to the portal."
-msgstr "Sie verlieren den Zugang zum Portal."
-
-msgid ""
-"If you have drawn electricity from the LEG, the costs up to your final "
-"deregistration with the grid operator will still be billed at the end of the"
-" quarter. Afterwards you will receive your invoices only by email."
-msgstr ""
-"Haben Sie Strom von der LEG bezogen, werden Ihnen die Kosten bis zur "
-"endgültigen Abmeldung beim Strombetreiber weiterhin am Quartalsende in "
-"Rechnung gestellt. Ihre Rechnungen erhalten Sie danach nur noch per E-Mail."
-
 msgid "All details are deleted."
 msgstr "Alle Angaben werden gelöscht."
 
-msgid "Exempt are the details that we are legally obliged to keep."
+msgid "Exempt are the details that we are legally obliged to keep, for example invoice data."
 msgstr ""
-"Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet "
-"sind."
+"Ausgenommen sind Angaben, die wir gesetzlich aufbewahren müssen (zum "
+"Beispiel Rechnungsdaten)."
 
 msgid "Authenticate yourself once more to complete the deletion."
 msgstr ""
@@ -9813,9 +8877,6 @@ msgstr "Konto gelöscht: Anmeldung beim Netzbetreiber zurückziehen"
 
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Konto gelöscht: Anmeldung bei %(operator)s zurückziehen"
-
-msgid "This deletion cannot be withdrawn or revoked."
-msgstr "Diese Löschung kann nicht mehr zurückgezogen oder aufgehoben werden."
 
 msgid "Tick the box to enable the deletion."
 msgstr "Kästchen anklicken, um die Löschung freizugeben."
@@ -10079,13 +9140,6 @@ msgstr "Noch nicht aktualisiert"
 msgid "The data from %(date)s stays valid."
 msgstr "Die Daten vom %(date)s bleiben gültig."
 
-msgid ""
-"The plant register is loaded once a day by the daily run. It cannot be "
-"started here."
-msgstr ""
-"Das Anlagenregister wird einmal täglich mit der täglichen Aktualisierung "
-"geladen. Hier kann er nicht gestartet werden."
-
 msgid "Source: Federal Office of Energy (BFE), open use (Open Use)"
 msgstr "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)"
 
@@ -10151,21 +9205,11 @@ msgstr "Für die Postleitzahlen wurden keine Gebäude mit Position gefunden."
 msgid "The map reader is not installed on this server."
 msgstr "Das Lesewerkzeug für Karten ist auf diesem Server nicht installiert."
 
-msgid ""
-"The scan runs once a week, on Saturday, after the plant register. It cannot "
-"be started here."
-msgstr ""
-"Die Auswertung läuft einmal pro Woche am Samstag, nach dem Register der PV-"
-"Anlagen. Sie kann hier nicht gestartet werden."
-
 msgid "Postal codes"
 msgstr "Postleitzahlen"
 
 msgid "Last scan"
 msgstr "Letzte Auswertung"
-
-msgid "Statistic of the last successful scan"
-msgstr "Statistik der letzten erfolgreichen Auswertung"
 
 msgid "With a transformer station"
 msgstr "Mit Trafostation"
@@ -10392,42 +9436,16 @@ msgstr "Quittiert"
 msgid "Acknowledge the errors"
 msgstr "Fehler quittieren"
 
-msgid "No error has been recorded."
-msgstr "Kein Fehler erfasst."
-
-msgid "Email on error"
-msgstr "E-Mail bei Fehler"
-
 msgid "The open errors were acknowledged. The weekly run may run again."
 msgstr ""
 "Die offenen Fehler wurden quittiert. Die wöchentliche Wartung darf wieder "
 "laufen."
-
-msgid "The error email was saved."
-msgstr "Die E-Mail bei Fehler wurde gespeichert."
-
-msgid "Enter an email address for the errors, or switch the email off."
-msgstr ""
-"Geben Sie eine E-Mail-Adresse für die Fehler ein oder schalten Sie die "
-"E-Mail aus."
 
 msgid ""
 "An error of an earlier run is open. The weekly run waits; start a run here."
 msgstr ""
 "Ein Fehler eines früheren Laufs ist offen. Die wöchentliche Wartung wartet; "
 "starten Sie hier eine Wartung."
-
-msgid "Housekeeping of the databases: error"
-msgstr "Wartung der Datenbanken: Fehler"
-
-msgid ""
-"The housekeeping of the databases has an open error. The lines below are the"
-" error log. They contain no data of the databases and no content of a dump "
-"file."
-msgstr ""
-"Die Wartung der Datenbanken hat einen offenen Fehler. Die Zeilen unten sind "
-"das Fehlerprotokoll. Sie enthalten keine Daten der Datenbanken und keinen "
-"Inhalt einer Sicherungsdatei."
 
 msgid "Housekeeping error notification changed"
 msgstr "Fehler-E-Mail der Wartung geändert"
@@ -10510,9 +9528,6 @@ msgstr "Als Text herunterladen"
 
 msgid "No entry in this time range."
 msgstr "Kein Eintrag in diesem Zeitraum."
-
-msgid "Security log file"
-msgstr "Sicherheitsprotokoll-Datei"
 
 msgid "The e-mail on error and the log notices are set on the logs page."
 msgstr ""
@@ -10896,8 +9911,8 @@ msgstr ""
 msgid "Prepare invitation"
 msgstr "Einladung vorbereiten"
 
-msgid "Buildings and transformer stations: BKW map of high discount"
-msgstr "Gebäude und Transformatorstationen: BKW-Karte der hohen Rabattstufe"
+msgid "Buildings and transformer stations: BKW map of the area with the higher discount"
+msgstr "Gebäude und Transformatorstationen: BKW-Karte des Gebiets mit dem höheren Rabatt"
 
 msgid "PV plants: Federal Office of Energy (BFE), plant register"
 msgstr "PV-Anlagen: Bundesamt für Energie (BFE), Anlagenregister"
@@ -10911,16 +9926,12 @@ msgid ""
 msgstr "Ich mache bei der lokalen Elektrizitätsgemeinschaft mit. Interesse?"
 
 #: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid "No circuits in the address directory yet"
-msgstr "Noch keine Trafokreise im Adressverzeichnis"
+msgid "No data yet"
+msgstr "Noch keine Daten"
 
 #: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid ""
-"The address directory has no buildings yet. The map updates with the "
-"directory import."
-msgstr ""
-"Das Adressverzeichnis enthält noch keine Gebäude. Die Karte aktualisiert "
-"sich mit dem Import des Verzeichnisses."
+msgid "No data is available for your neighbourhood yet."
+msgstr "Für Ihr Quartier sind noch keine Daten verfügbar."
 
 #: leg_platform/customer/templates/customer/neighbourhood.html:0
 msgid "The circuits of your area"
@@ -10952,12 +9963,8 @@ msgid "Press Continue and choose your building."
 msgstr "Klicken Sie auf Weiter und wählen Sie Ihr Gebäude."
 
 #: leg_platform/customer/templates/customer/step_metering_points.html:0
-#, python-format
-msgid "The %(leg)s will check this address."
-msgstr "%(leg)s prüft diese Adresse."
-
-msgid "Changing turns your application back into a draft. Submit it again afterwards."
-msgstr "Mit «Ändern» wird Ihre Anmeldung wieder zum Entwurf. Schicken Sie sie danach erneut ab."
+msgid "We check the address for you. You do not need to do anything."
+msgstr "Wir prüfen die Adresse für Sie. Sie müssen nichts tun."
 
 msgid "The LEG administration is checking your details, so you can no longer change them."
 msgstr "Die LEG-Verwaltung prüft Ihre Angaben gerade. Darum können Sie die Anmeldung nicht mehr ändern."
@@ -10986,15 +9993,6 @@ msgstr "Bank- oder Postverbindung bearbeiten"
 msgid "This building is already part of your application."
 msgstr "Dieses Gebäude gehört bereits zu Ihrer Anmeldung."
 
-msgid "Credit to"
-msgstr "Gutschrift auf"
-
-msgid "Edit bank connection"
-msgstr "Bankverbindung bearbeiten"
-
-msgid "Not assigned to a community yet"
-msgstr "Noch keiner Gemeinschaft zugewiesen"
-
 msgid "Metering"
 msgstr "Messung"
 
@@ -11004,26 +10002,8 @@ msgstr "Weiteres Gebäude hinzufügen"
 msgid "Add new building"
 msgstr "Neues Gebäude hinzufügen"
 
-msgid "Credit for fed-in electricity"
-msgstr "Gutschrift für eingespeisten Strom"
-
-msgid "This account applies to all your buildings."
-msgstr "Dieses Konto gilt für alle Ihre Gebäude."
-
 msgid "Building name"
 msgstr "Gebäudename"
-
-msgid "PV %(value)s kWp"
-msgstr "PV %(value)s kWp"
-
-msgid "Battery %(value)s kWh"
-msgstr "Batterie %(value)s kWh"
-
-msgid "Wallbox %(value)s kW"
-msgstr "Wallbox %(value)s kW"
-
-msgid "Edit building name"
-msgstr "Gebäudenamen bearbeiten"
 
 msgid "LEG name"
 msgstr "LEG-Name"
@@ -11046,18 +10026,180 @@ msgstr "kWh"
 msgid "kW"
 msgstr "kW"
 
-msgid "Edit plant data"
-msgstr "Anlagedaten bearbeiten"
-
 msgctxt "building card"
 msgid "Edit"
 msgstr "Ändern"
 
-msgid "Greyed-out values cannot be changed here."
-msgstr "Ausgegraute Angaben können hier nicht geändert werden."
-
-msgid "Cannot be changed"
-msgstr "nicht änderbar"
-
 msgid "Not recorded"
 msgstr "nicht erfasst"
+
+msgid "Search buildings"
+msgstr "Gebäude suchen"
+
+msgid "Search by name, address, EGID or metering point"
+msgstr "Nach Name, Adresse, EGID oder Messpunkt suchen"
+
+msgid "No buildings match your search."
+msgstr "Keine Gebäude passen zu Ihrer Suche."
+
+msgid "Earliest possible"
+msgstr "Frühestmöglich"
+
+msgid "Notice period: four months to the end of a month. The LEG administration confirms the date."
+msgstr "Kündigungsfrist: vier Monate auf Monatsende. Die LEG-Verwaltung bestätigt das Datum."
+
+msgid "You are deregistering 1 metering point."
+msgstr "Sie melden 1 Messpunkt ab."
+
+msgid "You are deregistering %(count)s metering points."
+msgstr "Sie melden %(count)s Messpunkte ab."
+
+msgid "The deregistration is binding."
+msgstr "Die Abmeldung ist verbindlich."
+
+msgid "The LEG checks the date and confirms it by email. Until then the metering points stay active."
+msgstr "Die LEG prüft das Datum und bestätigt es per E-Mail. Bis dahin bleiben die Messpunkte aktiv."
+
+msgid "Only needed if you feed in solar power."
+msgstr "Nur nötig, wenn Sie Solarstrom einspeisen."
+
+#, python-format
+msgid "Please enter all %(length)s characters."
+msgstr "Bitte geben Sie alle %(length)s Zeichen ein."
+
+msgid "Feed-in metering point number"
+msgstr "Messpunktnummer der Einspeisung"
+
+msgid "Your account stays. You can keep signing in and see your data."
+msgstr "Ihr Konto bleibt bestehen. Sie können sich weiter anmelden und Ihre Daten einsehen."
+
+msgid "Already in deregistration"
+msgstr "Bereits in Abmeldung"
+
+#, python-format
+msgid "Ends on %(date)s"
+msgstr "Endet am %(date)s"
+
+msgid "Date to be confirmed"
+msgstr "Datum wird bestätigt"
+
+msgid "Registration in progress"
+msgstr "Anmeldung in Bearbeitung"
+
+msgid "Tick a registration to withdraw it. Then this participation does not start."
+msgstr "Setzen Sie ein Häkchen, um die Anmeldung zurückzuziehen. Die Teilnahme beginnt dann nicht."
+
+msgid "This registration can no longer be withdrawn here. Please contact the LEG."
+msgstr "Diese Anmeldung kann hier nicht mehr zurückgezogen werden. Bitte kontaktieren Sie die LEG."
+
+msgid "Withdraw registration"
+msgstr "Anmeldung zurückziehen"
+
+msgid "A registration could not be withdrawn. Please check the page Buildings."
+msgstr "Eine Anmeldung konnte nicht zurückgezogen werden. Bitte prüfen Sie die Seite Gebäude."
+
+msgid "Your registration was withdrawn."
+msgstr "Ihre Anmeldung wurde zurückgezogen."
+
+msgid "I know that my account will be deleted immediately and that this cannot be undone."
+msgstr "Ich weiss, dass mein Konto sofort gelöscht wird und dass das nicht rückgängig gemacht werden kann."
+
+msgid "Your account is deleted immediately and cannot be restored."
+msgstr "Ihr Konto wird sofort gelöscht und kann nicht wiederhergestellt werden."
+
+msgid "Open invoices remain valid and must still be paid."
+msgstr "Offene Rechnungen bleiben bestehen und müssen weiterhin bezahlt werden."
+
+msgid "When you delete your account, the following happens:"
+msgstr "Beim Löschen Ihres Kontos geschieht Folgendes:"
+
+msgid "Your metering points are deregistered on the earliest possible date (notice period: four months to the end of a month). Until then you receive invoices by email only."
+msgstr "Ihre Messpunkte werden zum frühestmöglichen Datum abgemeldet (Kündigungsfrist: vier Monate auf Monatsende). Bis dahin erhalten Sie Rechnungen nur per E-Mail."
+
+msgid "Enter your password to finish."
+msgstr "Zum Abschluss Passwort eingeben."
+
+msgid "Withdraw registration: %(name)s"
+msgstr "Anmeldung zurückziehen: %(name)s"
+
+msgid "You lose access to the portal at once."
+msgstr "Sie haben sofort keinen Zugang mehr zum Portal."
+
+msgid "Just deregister metering points instead"
+msgstr "Doch lieber nur Messpunkte abmelden"
+
+msgid "End participation or delete account"
+msgstr "Teilnahme beenden oder Konto löschen"
+
+msgid "You can stop taking part in the LEG or delete your account. Deleting the account cannot be undone."
+msgstr "Sie können die Teilnahme an der LEG beenden oder Ihr Konto löschen. Das Löschen des Kontos kann nicht rückgängig gemacht werden."
+
+msgid "What would you like to do?"
+msgstr "Was möchten Sie tun?"
+
+msgid "Only deregister metering points"
+msgstr "Nur Messpunkte abmelden"
+
+msgid "You no longer take part in the LEG. Your account stays. You can keep signing in and see your data."
+msgstr "Sie nehmen nicht mehr an der LEG teil. Ihr Konto bleibt bestehen, Sie können sich weiter anmelden und Ihre Daten einsehen."
+
+msgid "Delete the whole account"
+msgstr "Ganzes Konto löschen"
+
+msgid "Your access to the portal is removed at once and for good. Your metering points are deregistered. Open invoices remain valid and must still be paid."
+msgstr "Ihr Zugang zum Portal wird sofort und unwiderruflich entfernt. Ihre Messpunkte werden abgemeldet. Offene Rechnungen bleiben bestehen und müssen weiterhin bezahlt werden."
+
+msgid "Not sure?"
+msgstr "Unsicher?"
+
+msgid "Not active yet: check with the %(operator)s. The metering point may have to be searched at another place."
+msgstr "Noch nicht aktiv: mit %(operator)s klären. Der Messpunkt muss allenfalls an einem anderen Ort gesucht werden."
+
+msgid "Please contact the LEG. We will help you."
+msgstr "Bitte melden Sie sich bei der LEG. Wir helfen Ihnen gerne."
+
+msgid "As early as possible. The LEG confirms the date."
+msgstr "So früh wie möglich. Die LEG bestätigt den Termin."
+
+#. Verbose names that Django derives from the field names
+#. (privacy_accepted_at/url); the
+#. catalogue test requires a translation for every field of the account.
+msgid "privacy accepted at"
+msgstr "Datenschutzerklärung akzeptiert am"
+
+msgid "privacy accepted url"
+msgstr "Adresse der akzeptierten Datenschutzerklärung"
+
+msgid "Company name"
+msgstr "Firmenname"
+
+msgid "Access to administration"
+msgstr "Zugang zur Verwaltung"
+
+msgid "Superuser status"
+msgstr "Systemadministrator"
+
+msgid "Groups"
+msgstr "Gruppen"
+
+#. Texts of Django 6.1 without a German translation in Django itself.
+msgid "- Select an option -"
+msgstr "- Bitte auswählen -"
+
+#: leg_platform/accounts/admin.py
+msgid "account (internal number)"
+msgstr "Konto (interne Nummer)"
+
+msgid "Please correct"
+msgstr "Bitte nachbessern"
+
+msgid "User permissions"
+msgstr "Berechtigungen"
+
+#, python-format
+msgid "Search %(name)s"
+msgstr "%(name)s durchsuchen"
+
+#, python-format
+msgid "Pagination %(name)s"
+msgstr "Seitennavigation %(name)s"

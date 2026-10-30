@@ -227,7 +227,9 @@ class CodeAsTheOnlyProofTests(TestCase):
     def test_the_error_summary_names_the_field(self):
         html = self.email(otp_token="123456").content.decode()
 
-        self.assertRegex(html, r"2FA-Authentifizierungscode: Der 2FA-Authentifizierungscode ist falsch")
+        # The summary on the profile cards lists the short name as a link; the message stays under the field.
+        self.assertRegex(html, r'(?s)error-summary.*<a href="#[^"]*">2FA-Authentifizierungscode</a>')
+        self.assertRegex(html, r"Der 2FA-Authentifizierungscode ist falsch")
 
     def test_the_delete_form_has_the_same_field_and_no_note_about_a_link(self):
         html = self.client.post(DELETE_URL, {"otp_token": "123456", "confirm": "on"}).content.decode()

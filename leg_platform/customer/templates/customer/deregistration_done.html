@@ -2,30 +2,17 @@
 {% load i18n metering_points %}{% comment %}
 The result of a deregistration (ABMELDUNG.md section 5; KONZEPT 7.1 item 5): what was submitted, what happens next, the
 confirmation by email. Context: ``deregistration``, ``progress`` (customer.overview.Block: the three steps), ``points``,
-``operator``, ``deletion`` (started from "Delete account") and ``released`` (the deletion is released now). A date is shown
+``operator``. A date is shown
 only when the LEG confirmed it or the customer chose one.
 {% endcomment %}
 {% block title %}{% translate "Your deregistration was submitted" %}{% endblock %}
 {% block content %}
   <div class="wizard">
-    <div class="progress-block">
-      <p class="page-label">{% translate "My participation · Deregistration" %}</p>
-      <progress class="path-bar" max="{{ progress.total }}" value="{{ progress.done }}" aria-label="{% blocktranslate with done=progress.done total=progress.total %}Deregistration: {{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ progress.done }}/{{ progress.total }}</progress>
-    </div>
     <div>
+      <p class="page-label">{% translate "My participation · Deregistration" %}</p>
       <h1 class="start-title">{% translate "Your deregistration was submitted" %}</h1>
-      <p class="start-sub">{% blocktranslate %}The LEG checks the date and deregisters you at {{ operator }}. A confirmation was sent to your email addresses.{% endblocktranslate %}</p>
+      <p class="start-sub">{% translate "The LEG checks the date and confirms it by email. Until then the metering points stay active." %}</p>
     </div>
-
-    <section class="step-card" aria-labelledby="next-steps">
-      <h2 id="next-steps">{% translate "What happens next" %}</h2>
-      <ol class="step-list">
-        {% for step in progress.steps %}
-          <li><span class="dot tone-{% if step.state == 'done' %}ok{% elif step.state == 'next' %}accent{% else %}muted{% endif %}" aria-hidden="true"></span><span>{{ step.label }}</span><span class="step-word step-word-{{ step.state }}">{{ step.word }}</span></li>
-        {% endfor %}
-      </ol>
-      <p class="muted">{% translate "Until the date the metering points stay active. Afterwards they are ended." %}</p>
-    </section>
 
     <section class="step-card" aria-labelledby="your-details">
       <h2 id="your-details">{% translate "Your submitted details" %}</h2>
@@ -35,18 +22,7 @@ only when the LEG confirmed it or the customer chose one.
       </dl>
     </section>
 
-    {% if deletion %}
-      <section class="step-card" aria-labelledby="delete-title">
-        <h2 id="delete-title">{% translate "Delete account" %}</h2>
-        {% if released %}
-          <p>{% translate "Your deregistration is started. You can now delete your account." %}</p>
-          <p><a class="btn btn-danger-outline" href="{% url 'accounts:profile' %}?edit=delete#card-delete">{% translate "Delete account" %}</a></p>
-        {% else %}
-          <p>{% translate "You cannot delete your account yet: a registration is still running or a metering point is not active yet. Withdraw the registration on the page Buildings, or wait until the metering point is active and deregister it." %}</p>
-        {% endif %}
-      </section>
-    {% endif %}
-
+    <p class="muted">{% translate "Your account stays. You can keep signing in and see your data." %}</p>
     <div class="step-actions">
       <a class="btn btn-primary" href="{% url 'customer:buildings' %}">{% translate "To the buildings" %}</a>
     </div>

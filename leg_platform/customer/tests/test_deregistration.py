@@ -5,7 +5,6 @@ body limit, staff and anonymous visitors. The rules themselves are tested with t
 
 import re
 from datetime import date, timedelta
-from urllib.parse import parse_qs, urlsplit
 
 from django.test import Client, SimpleTestCase, TestCase, tag
 from django.urls import reverse
@@ -21,11 +20,12 @@ from leg_platform.community.models import Deregistration, Direction, MeteringPoi
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.customer import limits, returns
 from leg_platform.customer.tests.helpers import BUILDINGS, GOOD_IBAN, customer, login
+from leg_platform.customer.tests.test_card_edit import submitted
 
 START = reverse("customer:deregistration_start")
 LONG_AGO = date.today() - timedelta(days=400)
-EARLIEST_TEXT = "Nächstmöglicher Termin"
-NOTICE = "Die Kündigungsfrist beträgt vier Monate auf ein Monatsende. Die LEG bestätigt den Termin."
+EARLIEST_TEXT = "Frühestmöglich"
+NOTICE = "Kündigungsfrist: vier Monate auf Monatsende. Die LEG-Verwaltung bestätigt das Datum."
 
 
 def active_point(last, person, location, direction=Direction.CONSUMPTION, **extra):
@@ -82,12 +82,16 @@ class PageTests(DeregistrationCase):
 
         self.assertEqual(response.status_code, 200)
         for text in (
-            "Wählen Sie die Messpunkte und den Termin.", "Welche Messpunkte sollen abgemeldet werden?",
-            "Wann soll die Abmeldung wirksam werden?", EARLIEST_TEXT, "Wunschtermin (Monatsende)", NOTICE,
-            "Bestätigung", "Eine Bestätigung geht an Ihre E-Mail-Adressen.", "Verbindlich kündigen", "Abbrechen",
-            "Sie melden 2 Messpunkte zum gewählten Termin ab.", "Meine Teilnahme · Abmeldung",
+            "<title>Messpunkte abmelden", "Welche Messpunkte sollen abgemeldet werden?",
+            "Wann soll die Abmeldung gelten?", EARLIEST_TEXT, "Wunschdatum (letzter Tag eines Monats)", NOTICE,
+            "Messpunkte verbindlich abmelden", "Die Abmeldung ist verbindlich.", "Zum Abschluss Passwort eingeben.",
+            "data-proof-hint", "Abbrechen", "Sie melden 2 Messpunkte ab.", "Meine Teilnahme · Abmeldung",
         ):
             self.assertIn(text, html)
+        # The heading names a building only for ?building=<id>; no computed date anywhere.
+        self.assertNotIn("Abmeldung: Musterstrasse", html)
+        self.assertNotIn("Frühestens am", html)
+        self.assertNotIn("Verbindlich kündigen", html)
         self.assertCountEqual(all_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         self.assertIn(numbers.format_metering_point_number(self.draw.number), html)
@@ -107,23 +111,22 @@ class PageTests(DeregistrationCase):
         html = self.client.get(START).content.decode()
         # The script replaces the placeholder in the "many" text; the percent sign must not be doubled by the template
         # (then the catalogue entry is not found and the English text shows).
-        self.assertIn('data-many="Sie melden %(count)s Messpunkte zum gewählten Termin ab."', html)
-        self.assertIn('data-one="Sie melden 1 Messpunkt zum gewählten Termin ab."', html)
-        self.assertIn('data-none="Wählen Sie mindestens einen Messpunkt aus."', html)
+        self.assertIn('data-many="Sie melden %(count)s Messpunkte ab."', html)
+        self.assertIn('data-one="Sie melden 1 Messpunkt ab."', html)
         self.assertNotIn("You are deregistering", html)
         with translation.override("de-ch"):
-            self.assertEqual(dereg_views.summary_text(1), "Sie melden 1 Messpunkt zum gewählten Termin ab.")
-            self.assertEqual(dereg_views.summary_text(2), "Sie melden 2 Messpunkte zum gewählten Termin ab.")
-            self.assertEqual(dereg_views.summary_text(0), "Wählen Sie mindestens einen Messpunkt aus.")
+            self.assertEqual(dereg_views.summary_text(1), "Sie melden 1 Messpunkt ab.")
+            self.assertEqual(dereg_views.summary_text(2), "Sie melden 2 Messpunkte ab.")
+            self.assertEqual(dereg_views.summary_text(0), "")
 
-    def test_the_earliest_date_is_shown_next_to_the_earliest_option_and_the_page_is_not_stored(self):
-        # Team lead decision (W3-03), a deviation from ABMELDUNG.md section 3: the earliest month end is shown as a
-        # reading of the notice period; the LEG confirms the date.
+    def test_no_computed_date_is_shown_and_the_page_is_not_stored(self):
+        # Owner decision 2026-10-29: the customer picks "earliest possible" or a month end; the LEG confirms the date.
         response = self.client.get(START)
         html = response.content.decode()
 
-        self.assertIn(f"Frühestens am {self.earliest().strftime('%d.%m.%Y')}", html)
-        self.assertNotIn(self.earliest().isoformat(), html)
+        self.assertNotIn("Frühestens am", html)
+        self.assertNotIn(self.earliest().strftime("%d.%m.%Y"), html.split("Wunschdatum")[0])
+        self.assertFalse(hasattr(deregistrations, "earliest_date_preview"))
         for directive in ("no-cache", "no-store", "private"):
             self.assertIn(directive, response["Cache-Control"])
 
@@ -133,15 +136,18 @@ class PageTests(DeregistrationCase):
         self.client.get(START, {"for": "account_deletion"})
         self.assertEqual((Deregistration.objects.count(), MailJob.objects.count()), before)
 
-    def test_the_button_of_a_building_lists_only_that_building_and_chooses_none_of_several_points(self):
+    def test_the_button_of_a_building_lists_only_that_building_with_all_points_chosen(self):
+        second = make_location("Zweitweg", "2", "3063", "Ittigen")
+        elsewhere = active_point(7, self.mine, second)
+
         response = self.client.get(START, {"building": self.location.pk})
         html = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
         self.assertCountEqual(all_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
-        self.assertEqual(checked_boxes(html), [])
+        self.assertNotIn(str(elsewhere.pk), all_boxes(html))
+        self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
         self.assertIn("Abmeldung: Musterstrasse 1", html)
-        self.assertIn("Wählen Sie mindestens einen Messpunkt aus.", html)
 
     def test_a_building_with_one_point_has_it_chosen(self):
         other_building = make_location("Nebenweg", "4", "3063", "Ittigen")
@@ -162,18 +168,37 @@ class PageTests(DeregistrationCase):
         self.assertIn("<legend>Musterstrasse 1", html)
         self.assertIn("<legend>Nebenweg 4", html)
 
-    def test_account_deletion_chooses_every_running_point_and_leads_back_to_the_card(self):
+    def test_the_cancel_target_follows_from_and_never_a_free_address(self):
+        buildings_url = reverse("customer:buildings")
+        cases = (
+            ({"from": "end"}, reverse("accounts:account_end")),
+            ({"from": "delete"}, reverse("accounts:account_delete")),
+            ({}, buildings_url),
+            ({"building": self.location.pk}, buildings_url),
+            ({"from": "https://evil.example/"}, buildings_url),
+            ({"from": "//evil.example"}, buildings_url),
+            ({"from": "profile"}, buildings_url),
+        )
+        for query, target in cases:
+            with self.subTest(query=query):
+                html = self.client.get(START, query).content.decode()
+                self.assertRegex(html, rf'<a class="btn btn-secondary-action end-action" href="{re.escape(target)}">Abbrechen</a>')
+                self.assertNotIn("evil.example", html)
+
+    def test_the_removed_account_deletion_gate_is_gone(self):
+        before = (Deregistration.objects.count(), MailJob.objects.count())
         html = self.client.get(START, {"for": "account_deletion"}).content.decode()
 
         self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
-        self.assertIn(f'href="{reverse("accounts:profile")}#card-delete"', html)
+        self.assertNotIn("#card-delete", html)
+        self.assertNotIn("Konto löschen", html)
+        self.assertEqual((Deregistration.objects.count(), MailJob.objects.count()), before)
 
     def test_points_named_in_the_query_are_chosen(self):
-        html = self.client.get(START, {"point": [self.feed_in.pk], "termination": "date", "date": "2030-06-30"}).content.decode()
+        html = self.client.get(START, {"point": [self.feed_in.pk]}).content.decode()
 
         self.assertEqual(checked_boxes(html), [str(self.feed_in.pk)])
-        self.assertIn('value="2030-06-30"', html)
-        self.assertIn("Sie melden 1 Messpunkt zum gewählten Termin ab.", html)
+        self.assertIn("Sie melden 1 Messpunkt ab.", html)
 
     def test_a_foreign_or_unknown_id_is_a_404(self):
         for query in (
@@ -194,9 +219,9 @@ class PageTests(DeregistrationCase):
         self.assertIn("Sie haben keinen Messpunkt, der abgemeldet werden kann.", html)
         self.assertIn("Zurück zu den Gebäuden", html)
         self.assertNotIn('name="metering_points"', html)
-        self.assertNotIn("Verbindlich kündigen", html)
+        self.assertNotIn("Messpunkte verbindlich abmelden", html)
 
-    def test_a_point_that_is_not_active_yet_or_already_in_a_deregistration_is_not_offered(self):
+    def test_a_point_that_is_not_active_yet_is_offered_like_any_other_and_one_in_a_deregistration_is_only_listed(self):
         future = make_metering_point(
             5, Direction.CONSUMPTION, self.location, registered_with_operator_on=LONG_AGO, confirmed_on=LONG_AGO,
             start_date=date.today() + timedelta(days=30),
@@ -206,17 +231,35 @@ class PageTests(DeregistrationCase):
 
         html = self.client.get(START).content.decode()
 
-        self.assertEqual(all_boxes(html), [str(self.feed_in.pk)])
+        self.assertCountEqual(all_boxes(html), [str(self.feed_in.pk), str(future.pk)])
+        self.assertCountEqual(checked_boxes(html), [str(self.feed_in.pk), str(future.pk)])
+        # Read-only block below the form, without a box for the point.
+        self.assertIn("Bereits in Abmeldung", html)
+        self.assertGreater(html.index("Bereits in Abmeldung"), html.index("Messpunkte verbindlich abmelden"))
+        self.assertIn("Datum wird bestätigt", html)
 
-    def test_a_feed_in_without_an_iban_shows_the_way_to_enter_it(self):
+    def test_a_feed_in_without_an_iban_is_offered_without_a_detour(self):
         own_iban.remove_own_iban(self.mine)
 
         html = self.client.get(START).content.decode()
 
-        self.assertIn("Für die Vergütung der Einspeisung brauchen wir Ihre Bank- oder Postverbindung.", html)
-        self.assertRegex(html, r'href="/profile/\?edit=bank&amp;next=%2Fparticipation%2Fderegistration%2F[^"]*#card-bank"')
-        # Without a feed-in in the choice the notice is not shown.
-        self.assertNotIn("Für die Vergütung", self.client.get(START, {"point": [self.draw.pk]}).content.decode())
+        self.assertNotIn("Für die Vergütung der Einspeisung", html)
+        self.assertNotIn("edit=bank", html)
+        self.assertCountEqual(checked_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)])
+
+    def test_a_registration_in_progress_can_be_withdrawn_with_an_unticked_box_and_the_rest_is_shown_only(self):
+        from leg_platform.community.models import Application
+
+        application, _building = submitted(self.mine, feed_in=False, egid=90004270, number=11)
+        self.assertIn(application.state, Application.WITHDRAWABLE_STATES)
+
+        html = self.client.get(START).content.decode()
+
+        self.assertIn("Anmeldung in Bearbeitung", html)
+        self.assertRegex(
+            html, rf'<input[^>]*name="withdraw_applications"[^>]*value="{application.pk}"(?![^>]*checked)[^>]*>'
+        )
+        self.assertIn("Anmeldung zurückziehen: ", html)
 
     def test_the_proof_is_the_password_without_a_second_factor(self):
         html = self.client.get(START).content.decode()
@@ -277,12 +320,9 @@ class SubmitTests(DeregistrationCase):
 
         self.assertEqual(page.status_code, 200)
         for text in (
-            "Ihre Abmeldung ist abgeschickt", "So geht es weiter", "Abmeldung eingereicht", "Termin durch die LEG bestätigt",
-            "Abgemeldet", "Die LEG bestätigt den Termin.", numbers.format_metering_point_number(self.draw.number),
-            "Bis zum Termin bleiben die Messpunkte aktiv.", "Eine Bestätigung wurde an Ihre E-Mail-Adressen gesendet.",
+            "Ihre Abmeldung ist abgeschickt", numbers.format_metering_point_number(self.draw.number), "Zu den Gebäuden",
         ):
             self.assertIn(text, html)
-        self.assertIn(f"Frühestens am {self.earliest().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
         self.assertNotIn("Konto löschen", html)
         for directive in ("no-cache", "no-store", "private"):
             self.assertIn(directive, page["Cache-Control"])
@@ -375,17 +415,13 @@ class SubmitTests(DeregistrationCase):
         self.assertEqual(SessionCodeFailure.objects.count(), 0)
 
     def test_an_own_point_that_cannot_be_deregistered_is_refused_neutrally(self):
-        future = make_metering_point(
-            5, Direction.CONSUMPTION, self.location, registered_with_operator_on=LONG_AGO, confirmed_on=LONG_AGO,
-            start_date=date.today() + timedelta(days=30),
-        )
-        assign_person(future, self.mine, valid_from=LONG_AGO)
+        deregistrations.request_deregistration(self.mine, metering_point_ids=[self.draw.pk])
 
-        response = self.submit(points=[future.pk])
+        response = self.submit(points=[self.draw.pk])
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Einer der Messpunkte kann nicht (mehr) abgemeldet werden.", response.content.decode())
-        self.assertEqual(Deregistration.objects.count(), 0)
+        self.assertEqual(Deregistration.objects.count(), 1)
 
     def test_a_second_submit_of_the_same_points_makes_no_second_deregistration(self):
         self.assertEqual(self.submit().status_code, 302)
@@ -395,39 +431,63 @@ class SubmitTests(DeregistrationCase):
         self.assertEqual(again.status_code, 200)
         self.assertEqual(Deregistration.objects.count(), 1)
 
-    def test_a_draw_needs_no_iban(self):
-        own_iban.remove_own_iban(self.mine)
-        self.assertEqual(self.submit(points=[self.draw.pk]).status_code, 302)
-        self.assertEqual(Deregistration.objects.count(), 1)
-
-    def test_a_feed_in_without_an_iban_leads_to_the_profile_and_back_with_the_choice(self):
+    def test_a_missing_iban_never_blocks_a_deregistration_of_a_draw_or_a_feed_in(self):
         own_iban.remove_own_iban(self.mine)
         wish = month_end(add_months(self.earliest(), 1))
 
-        response = self.client.post(
+        draw = self.submit(points=[self.draw.pk])
+        feed_in = self.client.post(
             START, self.data([self.feed_in.pk], termination="date", desired_date=wish.isoformat())
         )
 
-        self.assertEqual(Deregistration.objects.count(), 0)
+        self.assertEqual((draw.status_code, feed_in.status_code), (302, 302))
+        self.assertEqual(Deregistration.objects.count(), 2)
+        self.assertNotIn("edit=bank", feed_in["Location"])
+
+    def test_a_point_that_is_not_active_yet_gets_a_real_deregistration_like_an_active_one(self):
+        later = date.today() + timedelta(days=60)
+        kinds = {
+            "registered": {},
+            "notified": {"registered_with_operator_on": LONG_AGO},
+            "confirmed": {"registered_with_operator_on": LONG_AGO, "confirmed_on": LONG_AGO, "start_date": later},
+        }
+        points = {}
+        for number, (status, extra) in enumerate(kinds.items(), start=30):
+            point = make_metering_point(number, Direction.CONSUMPTION, self.location, **extra)
+            assign_person(point, self.mine, valid_from=LONG_AGO)
+            points[status] = point
+
+        html = self.client.get(START).content.decode()
+        self.assertCountEqual(
+            all_boxes(html), [str(self.draw.pk), str(self.feed_in.pk)] + [str(point.pk) for point in points.values()]
+        )
+
+        response = self.submit(points=[point.pk for point in points.values()])
+
         self.assertEqual(response.status_code, 302)
-        target = urlsplit(response["Location"])
-        self.assertEqual((target.path, parse_qs(target.query)["edit"]), (reverse("accounts:profile"), ["bank"]))
-        back = parse_qs(target.query)["next"][0]
-        self.assertEqual(returns.safe_return_path(back), back)
-        self.assertIn(f"point={self.feed_in.pk}", back)
-        self.assertIn(f"date={wish.isoformat()}", back)
-        # The profile shows the card with the hint, the message and the way back.
-        card = self.client.get(response["Location"]).content.decode()
-        self.assertIn("Geben Sie sie zuerst an.", card)
-        self.assertIn('name="iban"', card)
-        self.assertIn(f'<input type="hidden" name="next" value="{back}">'.replace("&", "&amp;"), card)
-        # Saving the IBAN leads back to the page with the choice, which then works.
-        saved = self.client.post(reverse("customer:bank_connection"), {"iban": GOOD_IBAN, "next": back})
-        self.assertRedirects(saved, back, fetch_redirect_response=False)
-        page = self.client.get(back).content.decode()
-        self.assertEqual(checked_boxes(page), [str(self.feed_in.pk)])
-        self.assertIn(f'value="{wish.isoformat()}"', page)
-        self.assertEqual(self.client.post(START, self.data([self.feed_in.pk])).status_code, 302)
+        dereg = Deregistration.objects.get()
+        self.assertEqual(sorted(dereg.items.values_list("metering_point_id", flat=True)), sorted(p.pk for p in points.values()))
+        self.assertEqual((dereg.state, dereg.wants_earliest), (Deregistration.State.SUBMITTED, True))
+        # The customer sees no difference on the result page.
+        self.assertEqual(self.client.get(response["Location"]).status_code, 200)
+
+    def test_the_confirmation_of_a_deregistration_with_a_point_that_is_not_active_yet_ends_that_point(self):
+        pending = make_metering_point(
+            30, Direction.CONSUMPTION, self.location, registered_with_operator_on=LONG_AGO,
+            confirmed_on=LONG_AGO, start_date=date.today() + timedelta(days=60),
+        )
+        assign_person(pending, self.mine, valid_from=LONG_AGO)
+        response = self.submit(points=[pending.pk])
+        dereg = Deregistration.objects.get()
+        day = month_end(add_months(timezone.localdate(), 6))
+
+        deregistrations.confirm(dereg, self.staff, day)
+
+        pending.refresh_from_db()
+        dereg.refresh_from_db()
+        self.assertEqual((dereg.state, dereg.confirmed_date), (Deregistration.State.CONFIRMED, day))
+        self.assertEqual(pending.terminated_on, day)
+        self.assertIn(day.strftime("%d.%m.%Y"), self.client.get(response["Location"]).content.decode())
 
     def test_the_code_is_the_proof_with_a_second_factor_and_a_password_is_no_proof(self):
         user, device = create_user_with_totp("proof.dereg@example.org")
@@ -496,30 +556,24 @@ class ResultAndAccessTests(DeregistrationCase):
                 self.assertEqual(Client().post(path, self.data())["Location"], reverse("accounts:login"))
         self.assertEqual(Deregistration.objects.count(), 1)
 
-    def test_a_confirmed_date_is_shown_as_terminated_on(self):
-        deregistrations.confirm(self.dereg, self.staff, month_end(add_months(timezone.localdate(), 5)))
+    def test_a_confirmed_date_is_shown_as_deregistered_on(self):
+        day = month_end(add_months(timezone.localdate(), 5))
+        deregistrations.confirm(self.dereg, self.staff, day)
         html = self.client.get(self.done).content.decode()
-        self.assertIn("Gekündigt zum", html)
+        self.assertIn(f"Abgemeldet per {day.strftime('%d.%m.%Y')}", html)
+        self.assertNotIn("Gekündigt zum", html)
         self.assertNotIn("Die LEG bestätigt den Termin.", html)
 
-    def test_after_the_start_of_the_deregistration_the_buildings_page_says_in_deregistration_and_shows_the_note(self):
+    def test_after_the_start_of_the_deregistration_the_buildings_page_says_in_deregistration(self):
         html = self.client.get(BUILDINGS).content.decode()
-        self.assertIn(f"Frühestens am {deregistrations.earliest_date_preview().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
+        self.assertIn("Abmeldung", html)
+        self.assertNotIn("Frühestens am", html)
 
-    def test_from_the_account_deletion_the_deletion_is_offered_when_it_is_released(self):
-        deregistrations.request_deregistration(self.mine, metering_point_ids=[self.feed_in.pk])
-
+    def test_the_done_page_has_no_account_deletion_gate(self):
         html = self.client.get(self.done, {"for": "account_deletion"}).content.decode()
 
-        self.assertIn("Ihre Abmeldung ist gestartet. Sie können Ihr Konto jetzt löschen.", html)
-        self.assertIn(f'href="{reverse("accounts:profile")}?edit=delete#card-delete"', html)
-
-    def test_from_the_account_deletion_a_remaining_blocker_is_explained(self):
-        html = self.client.get(self.done, {"for": "account_deletion"}).content.decode()
-
-        # The feed-in is still running without a deregistration: nothing is released.
-        self.assertIn("Konto löschen", html)
-        self.assertNotIn(f"{reverse('accounts:profile')}?edit=delete", html)
+        self.assertNotIn("Sie können Ihr Konto jetzt löschen", html)
+        self.assertNotIn("edit=delete", html)
 
 
 class SafeReturnPathTests(SimpleTestCase):

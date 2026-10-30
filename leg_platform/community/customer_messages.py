@@ -1,5 +1,5 @@
 """One-time messages for a customer (D-103): shown once on the next visit after an event that removed or changed the
-application (a rejection, a return for correction, a missing confirmation of the grid operator).
+application (a rejection, a missing confirmation of the grid operator).
 
 A message holds a kind key, the optional short note the staff wrote and the times, nothing else (no address, number or
 name). Rows are read and marked through the account, so an id of another account is never found. At most
@@ -55,13 +55,10 @@ def mark_seen(person, message_ids=None):
 
 
 def purge(person):
-    """The account is only deactivated (retention): delete its one-time messages and blank the reasons the staff wrote on
-    its applications, so that no free text of the staff outlives the account's use of the portal. The applications
-    themselves stay (retention). Returns the number of messages deleted. Idempotent; the caller holds the transaction."""
-    from leg_platform.community.models import Application
-
+    """The account is only deactivated (retention): delete its one-time messages, so that no free text of the staff
+    outlives the account's use of the portal. Returns the number of messages deleted. Idempotent; the caller holds the
+    transaction."""
     count, _by_model = CustomerMessage.objects.filter(person_id=person.pk).delete()
-    Application.objects.filter(person_id=person.pk).exclude(returned_reason="").update(returned_reason="")
     return count
 
 

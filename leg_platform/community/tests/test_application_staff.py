@@ -74,35 +74,16 @@ class StaffCase(TestCase):
 
 @tag("mariadb")
 class TransitionTests(StaffCase):
-    def test_review_return_and_resubmit(self):
+    def test_review_and_in_review_state(self):
         application = self.submitted()
         application_staff.start_review(application, self.staff)
         application.refresh_from_db()
         self.assertEqual(application.state, State.IN_REVIEW)
-
-        application_staff.return_for_correction(application, self.staff, "Please check the number of the draw point.")
-
-        application.refresh_from_db()
-        self.assertEqual(application.state, State.DRAFT)
-        self.assertIsNotNone(application.returned_at)
-        self.assertEqual(application.returned_reason, "Please check the number of the draw point.")
-        self.assertEqual(applications.returned_reason(application), "Please check the number of the draw point.")
-        self.assertIsNone(application.submitted_at)
-        # The submission mail and the mail about the return (action required).
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 1)
-        self.assertEqual(CustomerMessage.objects.get().kind, CustomerMessage.Kind.APPLICATION_RETURNED)
-        applications.submit(self.person, application, today=TODAY)
-        application.refresh_from_db()
-        self.assertIsNone(application.returned_at)
-        # The resubmission after the return sends no second submission mail (once per application, D-107).
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_SUBMITTED).count(), 1)
-        self.assertEqual((application.returned_reason, applications.returned_reason(application)), ("", ""))
         events = list(history.entries_for(application).values_list("event", flat=True))
         self.assertEqual(
             events,
             [HistoryEvent.APPLICATION_STARTED, HistoryEvent.APPLICATION_BUILDING_SET, HistoryEvent.APPLICATION_SUBMITTED,
-             HistoryEvent.APPLICATION_IN_REVIEW, HistoryEvent.APPLICATION_RETURNED, HistoryEvent.APPLICATION_SUBMITTED],
+             HistoryEvent.APPLICATION_IN_REVIEW],
         )
 
     def test_steps_cannot_be_taken_twice_or_out_of_order(self):
@@ -116,7 +97,6 @@ class TransitionTests(StaffCase):
         application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)
         self.assertEqual(code_of(lambda: application_staff.mark_operator_started(application, self.staff, STARTED, today=TODAY)),
                          "wrong_state")
-        self.assertEqual(code_of(lambda: application_staff.return_for_correction(application, self.staff, "x")), "wrong_state")
 
     def test_the_dates_follow_the_rules(self):
         application = self.submitted()
@@ -163,7 +143,6 @@ class AuthorizationTests(StaffCase):
         for actor in (self.person, other_customer, blocked, None):
             calls = {
                 "review": lambda: application_staff.start_review(application, actor),
-                "return": lambda: application_staff.return_for_correction(application, actor, "Reason"),
                 "start": lambda: application_staff.mark_operator_started(application, actor, STARTED, today=TODAY),
                 "confirm": lambda: application_staff.record_operator_confirmation(application, actor, STARTED, TODAY),
                 "complete": lambda: application_staff.complete(application, actor, START, today=TODAY),
@@ -545,80 +524,6 @@ class ConcurrentBuildingTests(StaffCase):
 
         self.assertEqual(order, [90004270, 90004299])
         self.assertIsNotNone(second)
-
-
-@tag("mariadb")
-class ReturnForCorrectionTests(StaffCase):
-    def test_the_reason_is_required_cleaned_and_limited(self):
-        application = self.submitted()
-        for bad, error in (("", ApplicationError), ("   \n ", ApplicationError), (None, ApplicationError),
-                           ("x" * 501, ValidationError), ("a\x00b", ValidationError), ("a\u202eb", ValidationError)):
-            with self.subTest(bad=bad if bad is None else len(bad)), self.assertRaises(error) as caught:
-                application_staff.return_for_correction(application, self.staff, bad)
-            if error is ApplicationError:
-                self.assertEqual(caught.exception.code, "reason_required")
-        application.refresh_from_db()
-        self.assertEqual((application.state, application.returned_reason), (State.SUBMITTED, ""))
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 0)
-
-        application_staff.return_for_correction(application, self.staff, "  Check   the\nnumber ")
-        self.assertEqual(applications.returned_reason(application), "Check the number")
-        self.assertEqual(
-            code_of(lambda: application_staff.return_for_correction(application, self.staff, "Again")), "wrong_state"
-        )
-
-    def test_exactly_500_characters_are_accepted(self):
-        application = self.submitted()
-        application_staff.return_for_correction(application, self.staff, "x" * 500)
-        self.assertEqual(len(applications.returned_reason(application)), 500)
-
-    def test_the_history_and_the_mail_never_hold_the_text(self):
-        application = self.submitted()
-        application_staff.return_for_correction(application, self.staff, "Geheimer Grund 4711")
-        entry = history.entries_for(application).get(event=HistoryEvent.APPLICATION_RETURNED)
-        self.assertEqual(entry.detail, {"fields": ["returned_reason"]})
-        self.assertNotIn("Geheimer", str(entry.detail))
-        # The mail is a notification without payload: its text comes from the default text and holds no reason.
-        from leg_platform.accounts import email_texts
-
-        subject, body = email_texts.default_texts(email_texts.Key.APPLICATION_RETURNED)
-        self.assertNotIn("Geheimer", subject + body)
-        self.assertEqual(CustomerMessage.objects.get().text, "")
-
-    def test_the_reason_is_shown_on_the_draft_only_and_belongs_to_the_account(self):
-        application = self.submitted()
-        application_staff.return_for_correction(application, self.staff, "Please correct")
-        other = customer("review.stranger@example.org")
-        self.assertEqual(applications.returned_reason(applications.own_application(self.person, application.pk)),
-                         "Please correct")
-        with self.assertRaises(Application.DoesNotExist):
-            applications.own_application(other, application.pk)
-        # A change of the customer keeps it; the submission clears it; a pause does not hide a returned draft.
-        Application.objects.filter(pk=application.pk).update(state=State.PAUSED)
-        self.assertEqual(applications.returned_reason(application), "Please correct")
-        Application.objects.filter(pk=application.pk).update(state=State.DRAFT)
-        applications.submit(self.person, application, today=TODAY)
-        self.assertEqual(applications.returned_reason(application), "")
-
-    def test_a_draft_that_was_never_returned_has_no_reason(self):
-        application, _building = ready_draft(self.person)
-        self.assertEqual(applications.returned_reason(application), "")
-        applications.submit(self.person, application, today=TODAY)
-        self.assertEqual(applications.returned_reason(application), "")
-
-    def test_the_withdrawal_cap_does_not_stop_a_return(self):
-        application = self.submitted()
-        with mock.patch.object(applications, "MAX_DRAFTS_PER_PERSON", 0):
-            application_staff.return_for_correction(application, self.staff, "Reason")
-        application.refresh_from_db()
-        self.assertEqual(application.state, State.DRAFT)
-
-    def test_a_blocked_customer_gets_no_mail_but_the_return_happens(self):
-        application = self.submitted()
-        self.person.set_status(type(self.person).Status.BLOCKED)
-        application_staff.return_for_correction(application, self.staff, "Reason")
-        self.assertEqual(MailJob.objects.filter(kind=MailJob.Kind.APPLICATION_RETURNED).count(), 0)
-        self.assertEqual(CustomerMessage.objects.count(), 1)
 
 
 @tag("mariadb")

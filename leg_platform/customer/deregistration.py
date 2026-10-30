@@ -2,18 +2,23 @@
 
 One page with three cards: the metering points, the date, the confirmation with **one proof** (D-062: the code of the
 second factor if one is set up, else the password; wrong entries are counted per session by the form like everywhere) and
-the button "Give binding notice" (no typed word, no extra dialog: KONZEPT 7.1 item 4). The rules are the service's
+the button "Deregister metering points (binding)" (no typed word, no extra dialog: KONZEPT 7.1 item 4). The rules are the service's
 (``community.deregistrations``): this module reads, shapes the page and shows the answers.
 
 * **Where it starts** (the query of the route, nothing in it is trusted):
-  ``?building=<id>`` is the card's "Remove metering point" (only that building's points, none chosen unless there is only
-  one), no query is the page's "Start deregistration" (all points chosen), ``?for=account_deletion`` is the profile's
-  "Delete account" (all running points chosen), ``?point=<id>`` (repeatable, the way back from the IBAN) chooses points.
-  Every id is resolved through the account: the id of a building or a metering point that is not the account's own is a 404.
-* **Feed-in needs an IBAN** (``iban_required``): the page leads to the profile card, which leads back with the choice.
-* **The earliest date is shown** next to "Earliest possible date" (``deregistrations.earliest_date_preview``; W3-03, a team
-  lead decision that deviates from ABMELDUNG.md section 3, owner to confirm). It is a reading of the notice period; the
-  LEG confirms the date.
+  ``?building=<id>`` is the card's "Deregister metering points" (only that building's points, all chosen), no query is
+  the "end participation" path of the profile (all running points of all buildings, grouped by building, all chosen),
+  ``?point=<id>`` (repeatable, the way back from the IBAN) chooses points. Every id is resolved through the account: the
+  id of a building or a metering point that is not the account's own is a 404. The account stays (the deletion of the
+  account is its own page, ``accounts.profile_views.AccountDeleteView``).
+* **Read-only and optional blocks:** points that are in a deregistration already ("Already in deregistration"), and
+  registrations in progress ("Registration in progress"): a submitted one that the LEG has not passed on can be
+  withdrawn here (``withdraw_applications``, not chosen at the start; the service is ``applications.withdraw``, the
+  application becomes a draft again), one at the grid operator is shown only.
+* **Feed-in without an IBAN** does not block (owner decision 2026-10-29: the customer can always cancel); the staff sees
+  in the process whether the IBAN is on file.
+* **No computed date is shown** (owner decision): the customer picks "as early as possible" or a month end; the LEG
+  confirms the date.
 * A GET changes nothing. Nothing here writes a name, a number or an IBAN to a log.
 """
 
@@ -31,19 +36,68 @@ from django.views import View
 from django.views.decorators.debug import sensitive_post_parameters
 
 from leg_platform.accounts import second_factor
-from leg_platform.community import buildings, deregistrations, own_iban
+from leg_platform.community import applications, buildings, deregistrations
 from leg_platform.community.application_common import ApplicationError
-from leg_platform.community.models import Deregistration, Direction, PersonAssignment
-from leg_platform.customer import forms, limits, overview, returns, texts
+from leg_platform.community.models import (
+    Application,
+    DeregistrationItem,
+    Direction,
+    PersonAssignment,
+)
+from leg_platform.customer import forms, limits, overview, texts
 from leg_platform.customer.access import CustomerAccessMixin
 from leg_platform.customer.wizard import _preselected_location, operator_name, too_many_requests
 
-DELETION = "account_deletion"
+def in_progress_applications(person, location=None):
+    """The account's registrations in progress (submitted, in review, at the grid operator), of one building if given.
+    Each is a row for the page: the title (name or address of the building), the numbers and whether the customer may
+    still withdraw it (``Application.WITHDRAWABLE_STATES``)."""
+    rows = Application.objects.filter(person=person, state__in=Application.IN_FLIGHT_STATES).prefetch_related(
+        "buildings__metering_points"
+    ).order_by("pk")
+    if location is not None:
+        rows = rows.filter(buildings__location=location).distinct()
+    found = []
+    for application in rows:
+        titles, numbers = [], []
+        for building in application.buildings.all():
+            address = ", ".join(part for part in (
+                f"{building.street} {building.house_number}".strip(), f"{building.postal_code} {building.town}".strip()
+            ) if part)
+            titles.append(building.name or address)
+            numbers += [point.number for point in building.metering_points.all()]
+        found.append({
+            "pk": application.pk, "title": " · ".join(title for title in titles if title), "numbers": numbers,
+            "withdrawable": application.state in Application.WITHDRAWABLE_STATES,
+        })
+    return found
+
+
+def deregistering_points(person, location=None):
+    """The account's points that are in a deregistration already (submitted or confirmed), with the date if the LEG
+    confirmed it, of one building if given."""
+    items = DeregistrationItem.objects.filter(
+        deregistration__person=person, deregistration__state__in=deregistrations.OPEN_STATES
+    ).select_related("metering_point", "deregistration").order_by("metering_point_id")
+    if location is not None:
+        items = items.filter(metering_point__location=location)
+    found = [
+        {
+            "name": item.metering_point.name, "number": item.metering_point.number or "",
+            "direction": Direction(item.metering_point.direction).label,
+            "date": item.deregistration.confirmed_date,
+        }
+        for item in items
+    ]
+    return found
 
 
 def point_choices(person, location, today):
-    """The account's own metering points that can be deregistered now (the service's list), of one building if given."""
+    """The account's own metering points that can be deregistered now (the service's list: active ones and those that are
+    not active yet, which the page shows with a note), of one building if given."""
     points = deregistrations.eligible_points(person, today)
+    for point in points:
+        point.pending = deregistrations.is_not_active(point, today)
     if location is not None:
         points = [point for point in points if point.location_id == location.pk]
     return points
@@ -74,10 +128,10 @@ def read_ids(values, allowed):
 
 def summary_text(count):
     if count <= 0:
-        return _("Choose at least one metering point.")
+        return ""  # nothing is said until a point is chosen
     if count == 1:
-        return _("You are deregistering 1 metering point at the chosen date.")
-    return _("You are deregistering %(count)s metering points at the chosen date.") % {"count": count}
+        return _("You are deregistering 1 metering point.")
+    return _("You are deregistering %(count)s metering points.") % {"count": count}
 
 
 class DeregistrationBase(CustomerAccessMixin, View):
@@ -96,17 +150,11 @@ class DeregistrationBase(CustomerAccessMixin, View):
         return _preselected_location(request, request.GET)
 
     @staticmethod
-    def is_deletion(request):
-        return request.GET.get("for") == DELETION
-
-    @staticmethod
-    def page_url(location, deletion, selected=(), termination=None, desired=None):
+    def page_url(location, selected=(), termination=None, desired=None):
         """The address of this page with a choice in it (the way back from the profile)."""
         params = []
         if location is not None:
             params.append(("building", location.pk))
-        if deletion:
-            params.append(("for", DELETION))
         params += [("point", pk) for pk in selected]
         if termination == forms.DATE and desired is not None:
             params += [("termination", forms.DATE), ("date", desired.isoformat())]
@@ -119,14 +167,12 @@ class DeregistrationStartView(DeregistrationBase):
 
     template_name = "customer/deregistration.html"
 
-    def preselection(self, request, points, location, deletion):
+    def preselection(self, request, points):
         """The ids that start chosen: the points named by ``point`` (the way back), else by the button."""
         named = request.GET.getlist("point")
         if named:
             wanted = read_ids(named, assigned_ids(request.user))
             return [point.pk for point in points if point.pk in wanted]
-        if location is not None and not deletion:
-            return [point.pk for point in points] if len(points) == 1 else []
         return [point.pk for point in points]
 
     def initial(self, request):
@@ -142,76 +188,93 @@ class DeregistrationStartView(DeregistrationBase):
     def get(self, request):
         today = timezone.localdate()
         location = self.location(request)
-        deletion = self.is_deletion(request)
         points = point_choices(request.user, location, today)
-        selected = self.preselection(request, points, location, deletion)
-        form = forms.DeregistrationForm(request=request, points=points, initial=self.initial(request))
-        return self.show(request, form, points, selected, location, deletion, today)
+        selected = self.preselection(request, points)
+        form = forms.DeregistrationForm(
+            request=request, points=points, withdrawable=self.withdrawable(request.user, location),
+            initial=self.initial(request),
+        )
+        return self.show(request, form, points, selected, location, today)
+
+    @staticmethod
+    def back_url(request):
+        """Where "Cancel" leads: only the known internal pages a caller names with ``?from=`` (the fork page, the delete
+        page); anything else, and a building tile, lead to the buildings page. Never a free address (no open redirect)."""
+        known = {"end": "accounts:account_end", "delete": "accounts:account_delete"}
+        name = known.get(request.GET.get("from", ""))
+        return reverse(name) if name else reverse("customer:buildings")
+
+    @staticmethod
+    def withdrawable(person, location):
+        """The registrations the customer may withdraw here (the form accepts only these ids)."""
+        return [row for row in in_progress_applications(person, location) if row["withdrawable"]]
 
     def post(self, request):
         if not limits.allow_wizard(request.user):
             return too_many_requests(request)
         today = timezone.localdate()
         location = self.location(request)
-        deletion = self.is_deletion(request)
         read_ids(request.POST.getlist("metering_points"), assigned_ids(request.user))
         points = point_choices(request.user, location, today)
-        form = forms.DeregistrationForm(request.POST, request=request, points=points)
+        withdrawable = self.withdrawable(request.user, location)
+        form = forms.DeregistrationForm(request.POST, request=request, points=points, withdrawable=withdrawable)
         if not form.is_valid():
             selected = [point.pk for point in points if str(point.pk) in request.POST.getlist("metering_points")]
-            if form.iban_missing and set(form.errors) <= {"__all__"}:
-                return self.to_bank(request, form, selected, location, deletion)
-            return self.show(request, form, points, selected, location, deletion, today)
+            return self.show(request, form, points, selected, location, today)
         data = form.cleaned_data
         chosen = [int(key) for key in data["metering_points"]]
-        try:
-            deregistration = deregistrations.request_deregistration(
-                request.user, metering_point_ids=chosen, desired_date=data["desired_date"]
-            )
-        except ApplicationError as error:
-            return self.refused(request, form, error, points, chosen, location, deletion, today)
-        url = reverse("customer:deregistration_done", args=[deregistration.pk])
-        return redirect(f"{url}?for={DELETION}" if deletion else url)
+        withdraw_ids = [int(key) for key in data["withdraw_applications"]]
+        deregistration = None
+        failed = False
+        if chosen:
+            try:
+                deregistration = deregistrations.request_deregistration(
+                    request.user, metering_point_ids=chosen, desired_date=data["desired_date"]
+                )
+            except ApplicationError as error:
+                return self.refused(request, form, error, points, chosen, location, today)
+        for pk in withdraw_ids:
+            try:
+                # The service finds the application through the account and re-checks its state under the lock.
+                applications.withdraw(request.user, Application(pk=pk))
+            except ApplicationError:
+                failed = True
+        if failed:
+            messages.warning(request, _("A registration could not be withdrawn. Please check the page Buildings."))
+        elif withdraw_ids:
+            messages.success(request, _("Your registration was withdrawn."))
+        if deregistration is None:
+            return redirect("customer:buildings")
+        return redirect(reverse("customer:deregistration_done", args=[deregistration.pk]))
 
-    def refused(self, request, form, error, points, chosen, location, deletion, today):
+    def refused(self, request, form, error, points, chosen, location, today):
         code = error.code
         if code in ("not_found", "not_allowed"):
             raise Http404 from None
-        if code == "iban_required":
-            return self.to_bank(request, form, chosen, location, deletion)
         if code in ("date_before_earliest", "not_month_end"):
             form.add_error("desired_date", texts.message(code))
         else:
             form.add_error(None, texts.message(code))
-        return self.show(request, form, points, chosen, location, deletion, today)
+        return self.show(request, form, points, chosen, location, today)
 
-    def to_bank(self, request, form, selected, location, deletion):
-        """The feed-in needs the bank connection: the profile card, then back here with the same choice (KONZEPT 7.1)."""
-        data = form.cleaned_data if hasattr(form, "cleaned_data") else {}
-        back = self.page_url(location, deletion, selected, data.get("termination"), data.get("desired_date"))
-        messages.warning(request, texts.IBAN_NEEDED, extra_tags="card-bank")
-        return redirect(returns.bank_change_url(back))
-
-    def show(self, request, form, points, selected, location, deletion, today):
+    def show(self, request, form, points, selected, location, today):
         shown = set(selected)
         rows = self.rows(request.user, points, shown, today)
         groups = self.groups(request.user, rows)
-        needs_iban = any(
-            point.direction == Direction.FEED_IN and point.pk in shown for point in points
-        ) and not own_iban.has_iban(request.user)
-        back = self.page_url(location, deletion, selected)
+        in_progress = in_progress_applications(request.user, location)
+        already = deregistering_points(request.user, location)
         context = {
-            "form": form, "groups": groups, "empty": not points, "deletion": deletion,
-            "heading": groups[0]["title"] if len(groups) == 1 else "",
+            "form": form, "groups": groups, "has_points": bool(points),
+            # Nothing to do here at all: no point to deregister, no registration to withdraw.
+            "empty": not points and not any(row["withdrawable"] for row in in_progress),
+            # The title names a building only when the page was opened for one.
+            "heading": groups[0]["title"] if location is not None and groups else "",
             "summary": summary_text(len(shown)), "selected_count": len(shown),
-            "needs_iban": needs_iban, "bank_url": returns.bank_change_url(back),
-            "cancel_url": reverse("accounts:profile") + "#card-delete" if deletion else reverse("customer:buildings"),
+            "cancel_url": self.back_url(request),
             "today": today.isoformat(), "operator": operator_name(),
-            "earliest": deregistrations.earliest_date_preview(today),
+            "already": already, "in_progress": in_progress,
             # Nothing to choose because the points are in a deregistration already (W3-07), not because there are none.
-            "already_deregistered": not points and Deregistration.objects.filter(
-                person=request.user, state__in=(Deregistration.State.SUBMITTED, Deregistration.State.CONFIRMED)
-            ).exists(),
+            "already_deregistered": not points and bool(already),
         }
         return render(request, self.template_name, context)
 
@@ -264,11 +327,9 @@ class DeregistrationDoneView(DeregistrationBase):
     def get(self, request, pk):
         deregistration = deregistrations.own_deregistration(request.user, pk)
         items = list(deregistration.items.select_related("metering_point").order_by("metering_point_id"))
-        deletion = self.is_deletion(request)
         context = {
             "deregistration": deregistration, "progress": overview._deregistration_block(deregistration),
             "points": [item.metering_point for item in items], "operator": operator_name(),
             "date_text": overview.date_note(deregistration),
-            "deletion": deletion, "released": deletion and deregistrations.deletion_released(request.user),
         }
         return render(request, "customer/deregistration_done.html", context)

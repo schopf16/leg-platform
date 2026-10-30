@@ -84,7 +84,7 @@ class EditState:
             self.earliest = applications.earliest_start_date()
             self.start = forms.StartForm(post, prefix="s", initial={
                 "start": application.start_choice or forms.ASAP,
-                "desired_date": application.desired_start_date or self.earliest,
+                "desired_date": application.desired_start_date,
             })
             self.start.fields["desired_date"].widget.attrs["min"] = self.earliest.isoformat()
             self.forms.append(self.start)

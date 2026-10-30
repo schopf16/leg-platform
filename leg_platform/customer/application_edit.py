@@ -16,7 +16,7 @@ from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 from django.views import View
 
-from leg_platform.community import applications, buildings, own_iban
+from leg_platform.community import applications, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.models import ApplicationMeteringPoint, Direction, ManagementSettings
 from leg_platform.community.persons import PersonError
@@ -27,7 +27,6 @@ from leg_platform.customer.wizard import (
     _figure,
     _number_message,
     _typed_part,
-    add_service_error,
     too_many_requests,
 )
 
@@ -97,8 +96,6 @@ class StartEditView(EditView):
         earliest = applications.earliest_start_date()
         if form is None:
             initial = {"start": application.start_choice or forms.ASAP, "desired_date": application.desired_start_date}
-            if not initial["desired_date"]:
-                initial["desired_date"] = earliest
             form = forms.StartForm(initial=initial)
         form.fields["desired_date"].widget.attrs["min"] = earliest.isoformat()
         form.fields["desired_date"].help_text = _("Earliest possible: %(date)s.") % {
