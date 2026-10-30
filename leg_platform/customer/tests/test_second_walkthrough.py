@@ -53,7 +53,7 @@ def complete_draft(person):
 
 
 @tag("mariadb")
-class ReturnedDraftWayBackTests(TestCase):
+class DraftWayBackTests(TestCase):
     databases = {"default", "addresses"}
 
     def setUp(self):
@@ -62,27 +62,6 @@ class ReturnedDraftWayBackTests(TestCase):
         self.mine = customer("n01.mine@example.org")
         self.client = login(self.mine)
         self.application, _building = complete_draft(self.mine)
-        Application.objects.filter(pk=self.application.pk).update(returned_at=timezone.now(), returned_reason="Nummer prüfen")
-
-    def test_the_card_leads_to_the_overview_not_to_the_submit_step(self):
-        html = text(self.client.get(HOME))
-        card = html[html.index('class="stage-cards"') :]
-        card = card[: card.index("</section>")]
-        self.assertIn("Bitte nachbessern", card)
-        self.assertIn(f'<a class="btn btn-primary" href="{START}">Angaben prüfen</a>', card)
-        self.assertNotIn(">Anmeldung abschicken<", card)
-
-    def test_the_overview_shows_the_rows_with_change_before_the_submit_button(self):
-        html = text(self.client.get(START))
-        self.assertIn("Angaben prüfen", html)
-        self.assertGreater(html.index(">Anmeldung abschicken<"), html.index('class="overview-rows"'))
-        self.assertGreaterEqual(html.count(">Ändern<span"), 3)
-        self.assertNotIn("Als Nächstes", html)
-
-    def test_the_building_card_and_the_wizard_have_the_button_in_the_note(self):
-        self.assertIn(f'href="{START}">Angaben prüfen</a>', text(self.client.get(BUILDINGS)))
-        page = text(self.client.get(step_url(self.application, "start_date")))
-        self.assertIn(f'href="{START}">Angaben prüfen</a>', page)
 
     def test_every_step_has_a_back_link_to_the_step_before_or_the_overview(self):
         building = text(self.client.get(step_url(self.application, "building")))
@@ -92,11 +71,9 @@ class ReturnedDraftWayBackTests(TestCase):
         start = text(self.client.get(step_url(self.application, "start_date")))
         self.assertIn(f'<a class="back-link" href="{step_url(self.application, "contract")}">Zurück</a>', start)
 
-    def test_a_draft_that_was_not_returned_keeps_the_submit_button(self):
-        Application.objects.filter(pk=self.application.pk).update(returned_at=None, returned_reason="")
+    def test_a_complete_draft_keeps_the_submit_button(self):
         html = text(self.client.get(HOME))
         self.assertIn(">Anmeldung abschicken<", html)
-        self.assertNotIn("Angaben prüfen", html)
 
 
 @tag("mariadb")
@@ -117,13 +94,6 @@ class DraftCardAndOverviewTests(TestCase):
         self.assertIn("mp-progress", card)
         self.assertIn("Ihre Anmeldung ist pausiert", card)
         self.assertIn(f'href="{reverse("customer:application", args=[application.pk])}">Weiter anmelden</a>', card)
-
-    def test_a_draft_with_a_returned_reason_without_points_shows_the_reason_on_the_card(self):
-        application, _building = draft_with_building(self.mine)
-        Application.objects.filter(pk=application.pk).update(returned_at=timezone.now(), returned_reason="Adresse prüfen")
-        card = text(self.client.get(BUILDINGS))
-        self.assertIn("Adresse prüfen", card)
-        self.assertIn("Angaben prüfen", card)
 
     def test_a_draw_only_overview_numbers_the_rows_one_to_four_and_has_no_number_for_the_bank_row(self):
         html = text(self.client.get(START))
@@ -194,55 +164,55 @@ class DeregistrationDateTests(TestCase):
         self.draw = active_point(90, self.mine, self.location)
         own_iban.set_own_iban(self.mine, GOOD_IBAN)
         self.client = login(self.mine)
-        self.earliest = deregistrations.earliest_date_preview().strftime("%d.%m.%Y")
+        self.earliest = deregistrations.earliest_termination_date().strftime("%d.%m.%Y")
 
     def submit(self, **extra):
         return self.client.post(DEREGISTRATION, {
             "metering_points": [str(self.draw.pk)], "termination": "earliest", "current_password": PASSWORD, **extra,
         })
 
-    def test_the_radio_names_the_date_on_a_second_line(self):
+    def test_the_page_shows_no_computed_date_next_to_the_earliest_option(self):
         html = text(self.client.get(DEREGISTRATION))
-        self.assertRegex(html, r"Nächstmöglicher Termin<span class=\"meta\">Frühestens am " + self.earliest)
-        self.assertIn(".entry-check .meta", CSS)
-        block = CSS[CSS.index(".entry-check .meta") :]
-        self.assertIn("display: block", block[: block.index("}")])
+        self.assertIn("Frühestmöglich", html)
+        self.assertNotIn("Frühestens am", html)
+        self.assertNotIn(self.earliest, html.split("Wunschdatum")[0])
 
-    def test_the_result_the_card_and_the_start_page_say_the_same(self):
-        response = self.submit()
-        words = f"Frühestens am {self.earliest}. Die LEG bestätigt den Termin."
-        self.assertIn(words, text(self.client.get(response["Location"])))
+    def test_the_card_and_the_start_page_say_the_same_and_name_no_computed_date(self):
+        self.submit()
+        words = "Ihre Abmeldung ist eingereicht. Die LEG-Verwaltung bestätigt das Datum."
         self.assertIn(words, text(self.client.get(BUILDINGS)))
-        self.assertIn(f"Ihre Abmeldung ist eingereicht. {words}", text(self.client.get(HOME)))
+        self.assertNotIn("Frühestens am", text(self.client.get(BUILDINGS)))
+        self.assertIn("Ihre Abmeldung ist eingereicht.", text(self.client.get(HOME)))
 
     def test_a_desired_date_is_called_a_desired_date(self):
         from leg_platform.community.application_common import add_months, month_end
 
         wish = month_end(add_months(timezone.localdate(), 6))
-        response = self.submit(termination="date", desired_date=wish.isoformat())
-        self.assertIn(f"Wunschtermin {wish.strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", text(self.client.get(response["Location"])))
+        self.submit(termination="date", desired_date=wish.isoformat())
+        self.assertIn(f"Gewünschtes Datum: {wish.strftime('%d.%m.%Y')}. Die LEG-Verwaltung bestätigt es.", text(self.client.get(BUILDINGS)))
 
 
 @tag("mariadb")
 class ProfileDeletionTests(TestCase):
     databases = {"default", "addresses"}
 
-    def test_the_page_offers_deregistration_while_points_run_and_a_running_one_does_not_block(self):
+    def test_the_card_leads_to_the_fork_while_points_run_and_the_delete_page_still_offers_deregistration(self):
         from leg_platform.community.tests.helpers import make_location
 
         mine = customer("n11.mine@example.org")
         active_point(91, mine, make_location("Musterstrasse", "1", "3063", "Ittigen", egid=90001234))
         client = login(mine)
-        # The card is one sentence and leads to the page; the page offers "Messpunkte abmelden" while points run.
+        # The card is one sentence and leads to the fork (the customer takes part).
         card = text(client.get(reverse("accounts:profile")))
         card = card[card.index('id="card-delete"') :]
-        self.assertIn(f'href="{reverse("accounts:account_delete")}"', card)
+        self.assertIn("Teilnahme beenden oder Konto löschen", card)
+        self.assertIn(f'href="{reverse("accounts:account_end")}"', card)
         page = text(client.get(reverse("accounts:account_delete")))
-        self.assertIn(">Messpunkte abmelden<", page)
-        self.assertIn(reverse("customer:deregistration_start"), page)
+        self.assertIn("Doch lieber nur Messpunkte abmelden", page)
+        self.assertIn(f"{reverse('customer:deregistration_start')}?from=delete", page)
 
         deregistrations.request_deregistration(mine, metering_point_ids=[mine.metering_point_assignments.get().metering_point_id])
-        # A running deregistration is no longer a reason to refuse anything: the page still asks for the proof.
+        # A running deregistration is no reason to refuse anything: the page still asks for the proof.
         page = text(client.get(reverse("accounts:account_delete")))
         self.assertIn("Konto unwiderruflich löschen", page)
 

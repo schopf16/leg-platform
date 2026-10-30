@@ -125,20 +125,6 @@ def own_application(person, pk):
     return Application.objects.get(pk=pk, person=person)
 
 
-def returned_reason(application):
-    """The reason the LEG gave when it returned the application for correction, for the banner on the draft; ``""`` if
-    the draft was not returned (or was submitted again: the reason is cleared then). The caller got the application
-    through ``own_application``; the value is read from the database, not from the object."""
-    reason = (
-        Application.objects.filter(
-            pk=getattr(application, "pk", None), state__in=Application.DRAFT_STATES, returned_at__isnull=False
-        )
-        .values_list("returned_reason", flat=True)
-        .first()
-    )
-    return reason or ""
-
-
 def rollback_date(application):
     """The day on which the scheduler deletes the draft if the customer does nothing: the reminder day plus
     ``rollback_after_days`` for a paused draft, and the day the contract deadline lapses for a draft that waits only for
@@ -419,8 +405,7 @@ def cancel(person, application):
 
 def _take_back(person, application, states, detail=None):
     """Submitted application -> draft again with all its data, under the account's and the application's row lock (the
-    staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies; the staff's
-    ``return_for_correction`` is exempt."""
+    staff's steps lock the same rows, so exactly one of the two wins). The cap of drafts applies."""
     with transaction.atomic():
         fresh = locked_customer(person)
         locked = _lock_draft(fresh, application, states=states)
@@ -437,7 +422,7 @@ def _take_back(person, application, states, detail=None):
 def withdraw(person, application):
     """Take a submitted application back, as long as the registration at the grid operator has not started: it becomes a
     draft again with all its data (``wrong_state`` later: only the staff can act then). A draft is created by this, so the
-    cap of drafts per account applies (``too_many_drafts``; the staff's ``return_for_correction`` is exempt)."""
+    cap of drafts per account applies (``too_many_drafts``)."""
     return _take_back(person, application, Application.WITHDRAWABLE_STATES)
 
 
@@ -793,16 +778,13 @@ def submit(person, application, *, today=None):
             draft.reminded_at = None
             draft.contract_pending_since = None
             draft.iban_reminded_at = None
-            draft.returned_at = None
-            draft.returned_reason = ""
             draft.save(
                 update_fields=[
-                    "state", "submitted_at", "reminded_at", "contract_pending_since", "iban_reminded_at",
-                    "returned_at", "returned_reason", "updated_at",
+                    "state", "submitted_at", "reminded_at", "contract_pending_since", "iban_reminded_at", "updated_at",
                 ]
             )
             # The confirmation mail is sent once per application, at its first submission (D-107): a later submission
-            # (after a change, a withdrawal or a return for correction) is a resubmission and sends no mail. The history
+            # (after a change or a withdrawal) is a resubmission and sends no mail. The history
             # entry of every submission is kept (audit trail). Read before the new entry is written, under the row lock.
             first_submission = not history.entries_for(draft).filter(event=HistoryEvent.APPLICATION_SUBMITTED).exists()
             history.record(draft, HistoryEvent.APPLICATION_SUBMITTED, fresh)

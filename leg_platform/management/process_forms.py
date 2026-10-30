@@ -12,7 +12,6 @@ from django.utils.translation import gettext_lazy as _
 from leg_platform.community import grid_operator, numbers
 from leg_platform.community.models import (
     REJECTION_NOTE_MAX_LENGTH,
-    RETURN_REASON_MAX_LENGTH,
     ManagementSettings,
     validate_postal_code,
 )
@@ -67,17 +66,6 @@ class CompleteForm(DialogForm):
         cleaned = super().clean()
         cleaned.setdefault("confirm_addresses", False)
         return cleaned
-
-
-class ReturnForm(DialogForm):
-    """Return an application for correction: the reason is required and shown to the customer (500 characters)."""
-
-    reason = forms.CharField(
-        label=_("Reason for the correction"), max_length=RETURN_REASON_MAX_LENGTH,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 4, "maxlength": RETURN_REASON_MAX_LENGTH}),
-        help_text=_("What the customer has to correct. The customer reads this text in the portal."),
-    )
-    layout = [("single", ["reason"])]
 
 
 class RejectForm(DialogForm):

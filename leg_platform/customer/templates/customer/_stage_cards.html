@@ -8,13 +8,6 @@ only pages, without a script every building of a card is shown one under the oth
       <section class="stage-card{% if group.slides|length > 1 %} has-pager{% endif %}" data-stage-card aria-labelledby="stage-{{ group.key }}">
         {% for slide in group.slides %}
           <article class="stage-slide" data-slide>
-            {% if slide.returned %}
-              <div class="alert alert-warning stage-returned" role="status">
-                <p class="stage-returned-title"><strong>{% translate "Please correct" %}</strong></p>
-                <p>{% translate "The LEG returned your application for correction:" %}</p>
-                {% if slide.reason %}<p class="stage-returned-reason">{{ slide.reason }}</p>{% endif %}
-              </div>
-            {% endif %}
             <div class="stage-head">
               <div>
                 <p class="stage-eyebrow" id="stage-{{ group.key }}">{{ group.eyebrow }}</p>

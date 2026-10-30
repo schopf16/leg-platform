@@ -2,53 +2,43 @@
 {% load i18n customer_ui metering_points %}{% comment %}
 The deregistration (ABMELDUNG.md): one page with three cards, the metering points, the date and the confirmation with one
 proof. Context: ``form`` (customer.forms.DeregistrationForm), ``groups`` (the points by building), ``empty``,
-``already_deregistered`` (nothing to choose because a deregistration runs), ``deletion`` (started from "Delete account"),
-``heading``, ``summary``, ``needs_iban`` and ``bank_url`` (a feed-in without an IBAN), ``cancel_url``, ``earliest`` (the
-earliest month end if notice is given today: shown next to "Earliest possible date", a reading of the notice period; the LEG
-confirms the date). A script only keeps the button inactive until a point is chosen and the proof is typed and updates the
+``already_deregistered`` (nothing to choose because a deregistration runs), ``already`` (points in a deregistration: read only),
+``in_progress`` (registrations in progress: withdrawable ones have a box, not chosen), ``has_points``,
+``heading``, ``summary``, ``cancel_url``. No computed date is shown (owner decision). A script only keeps the button inactive until a point is chosen and the proof is typed and updates the
 count; the server checks everything again.
 {% endcomment %}
-{% block title %}{% translate "Deregistration" %}{% endblock %}
+{% block title %}{% translate "Deregister metering points" %}{% endblock %}
 {% block content %}
   {% leg_link as leg %}
   <div class="wizard">
     <div>
       <p class="page-label">{% translate "My participation · Deregistration" %}</p>
-      <h1 class="start-title">{% if heading %}{% blocktranslate with name=heading %}Deregistration: {{ name }}{% endblocktranslate %}{% else %}{% translate "Deregistration" %}{% endif %}</h1>
-      <p class="start-sub">{% translate "Choose the metering points and the date." %}</p>
+      <h1 class="start-title">{% if heading %}{% blocktranslate with name=heading %}Deregistration: {{ name }}{% endblocktranslate %}{% else %}{% translate "Deregister metering points" %}{% endif %}</h1>
+      <p class="start-sub">{% translate "Your account stays. You can keep signing in and see your data." %}</p>
     </div>
-    {% if deletion %}<div class="alert alert-info" role="status">{% translate "You want to delete your account. For that, first deregister your metering points." %}</div>{% endif %}
 
     {% if empty %}
+      {% if in_progress %}{% include "customer/_dereg_in_progress.html" with editable=False %}{% endif %}
       <section class="step-card" aria-labelledby="nothing-title">
         {% if already_deregistered %}
           <h2 id="nothing-title">{% translate "Already deregistered" %}</h2>
           <p>{% translate "Your metering points are already deregistered. You see the status on the page Buildings." %}</p>
           <div class="step-actions">
             <a class="btn btn-primary" href="{% url 'customer:buildings' %}">{% translate "To the buildings" %}</a>
-            {% if deletion %}<a class="btn btn-secondary-action" href="{{ cancel_url }}">{% translate "Back to the profile" %}</a>{% endif %}
           </div>
         {% else %}
           <h2 id="nothing-title">{% translate "Nothing to deregister" %}</h2>
           <p>{% translate "You have no metering point that can be deregistered." %}</p>
-          <p class="muted">{% translate "A metering point that is not active yet cannot be deregistered. Withdraw its registration on the page Buildings or wait until it is active." %}</p>
           <div class="step-actions">
-            <a class="btn btn-primary" href="{{ cancel_url }}">{% if deletion %}{% translate "Back to the profile" %}{% else %}{% translate "Back to the buildings" %}{% endif %}</a>
+            <a class="btn btn-primary" href="{{ cancel_url }}">{% translate "Back to the buildings" %}</a>
           </div>
         {% endif %}
       </section>
     {% else %}
-      <form method="post" class="dereg-form" novalidate data-submit-once aria-label="{% translate 'Deregistration' %}">
+      <form method="post" class="dereg-form" novalidate data-submit-once aria-label="{% translate 'Deregister metering points' %}">
         {% csrf_token %}
         {% include "customer/_error_summary.html" %}
-        {% if needs_iban %}
-          <section class="step-card" aria-labelledby="iban-title">
-            <h2 id="iban-title">{% translate "Bank or postal connection" %}</h2>
-            <p>{% translate "For the compensation of the feed-in we need your bank or postal connection. Enter it first. Afterwards you can continue the deregistration." %}</p>
-            <p><a class="btn btn-secondary-action" href="{{ bank_url }}">{% translate "Enter bank or postal connection" %}</a></p>
-          </section>
-        {% endif %}
-
+        {% if has_points %}
         <section class="step-card{% if form.metering_points.errors %} is-error{% endif %}" aria-labelledby="points-title">
           <h2 id="points-title">{% translate "Which metering points should be deregistered?" %}</h2>
           {% for group in groups %}
@@ -56,40 +46,54 @@ count; the server checks everything again.
               {% if groups|length > 1 %}<legend>{{ group.title }}{% if group.line %}<span class="muted"> · {{ group.line }}</span>{% endif %}</legend>{% endif %}
               <div class="checks">
                 {% for row in group.rows %}
-                  <label class="entry-check point-check" for="id_metering_points_{{ row.index }}"><input class="entry-check-input" type="checkbox" id="id_metering_points_{{ row.index }}" name="metering_points" value="{{ row.pk }}"{% if row.checked %} checked{% endif %}><span>{{ row.name|default:row.direction }}<span class="meta">{% if row.number %}<span class="mp-num">{{ row.number|metering_point }}</span>{% endif %}{% if row.name %}{% if row.number %} · {% endif %}{{ row.direction }}{% endif %}{% if row.since %}{% if row.number or row.name %} · {% endif %}{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}{% endif %}</span></span></label>
+                  <label class="entry-check point-check" for="id_metering_points_{{ row.index }}"><input class="entry-check-input" type="checkbox" id="id_metering_points_{{ row.index }}" name="metering_points" value="{{ row.pk }}"{% if row.checked %} checked{% endif %}><span class="point-row"><span class="point-name">{{ row.name|default:row.direction }}</span>{% if row.name or row.since %}<span class="point-line">{% if row.name %}{{ row.direction }}{% endif %}{% if row.name and row.since %} · {% endif %}{% if row.since %}{% blocktranslate with date=row.since|date:"d.m.Y" %}Since {{ date }}{% endblocktranslate %}{% endif %}</span>{% endif %}{% if row.number %}<span class="point-line mp-num">{{ row.number|metering_point }}</span>{% endif %}</span></label>
                 {% endfor %}
               </div>
             </fieldset>
           {% endfor %}
           {% if form.metering_points.errors %}<div class="invalid-feedback d-block">{{ form.metering_points.errors.0 }}</div>{% endif %}
         </section>
+        {% endif %}
+
+        {% if in_progress %}{% include "customer/_dereg_in_progress.html" with editable=True %}{% endif %}
 
         <section class="step-card" aria-labelledby="date-title">
+          {% if has_points %}
           <h2 id="date-title">{% translate "When should the deregistration take effect?" %}</h2>
+          <p class="form-hint">{% translate "Notice period: four months to the end of a month. The LEG administration confirms the date." %}</p>
           <fieldset class="question" aria-labelledby="date-title">
             {% for radio in form.termination %}
-              <label class="entry-check" for="{{ radio.id_for_label }}"><input class="entry-check-input" type="radio" id="{{ radio.id_for_label }}" name="termination" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}{% if radio.data.value == "earliest" and earliest %}<span class="meta">{% blocktranslate with date=earliest|date:"d.m.Y" %}Earliest on {{ date }}. The LEG confirms the date.{% endblocktranslate %}</span>{% endif %}</span></label>
+              <label class="entry-check" for="{{ radio.id_for_label }}"><input class="entry-check-input" type="radio" id="{{ radio.id_for_label }}" name="termination" value="{{ radio.data.value }}"{% if radio.data.selected %} checked{% endif %}><span>{{ radio.choice_label }}</span></label>
             {% endfor %}
           </fieldset>
           <div class="reveal{% if form.termination.value == 'date' %} is-open{% endif %}" data-reveal-name="termination" data-reveal-value="date">
             {% include "customer/_field.html" with field=form.desired_date %}
           </div>
-          <p class="form-hint">{% translate "The notice period is four months to the end of a month. The LEG confirms the date." %}</p>
-        </section>
-
-        <section class="step-card" aria-labelledby="confirm-title">
-          <h2 id="confirm-title">{% translate "Confirmation" %}</h2>
-          {% blocktranslate asvar summary_many with count='%(count)s' %}You are deregistering {{ count }} metering points at the chosen date.{% endblocktranslate %}{% comment %}The percent sign of the placeholder must not go through the translate tag (it doubles it and the catalogue entry is not found): the script replaces the placeholder.{% endcomment %}
-          <p class="dereg-summary" aria-live="polite" data-summary data-one="{% translate 'You are deregistering 1 metering point at the chosen date.' %}" data-many="{{ summary_many }}" data-none="{% translate 'Choose at least one metering point.' %}">{{ summary }}</p>
-          <p class="form-hint">{% blocktranslate %}You cannot withdraw the termination yourself afterwards. Questions: contact the {{ leg }}.{% endblocktranslate %}</p>
+          {% blocktranslate asvar summary_many with count='%(count)s' %}You are deregistering {{ count }} metering points.{% endblocktranslate %}{% comment %}The percent sign of the placeholder must not go through the translate tag (it doubles it and the catalogue entry is not found): the script replaces the placeholder.{% endcomment %}
+          <p class="dereg-summary" aria-live="polite" data-summary data-one="{% translate 'You are deregistering 1 metering point.' %}" data-many="{{ summary_many }}" data-none="">{{ summary }}</p>
+          <p class="form-hint">{% translate "The deregistration is binding." %}</p>
+          {% else %}
+          <h2 id="date-title">{% translate "Confirm" %}</h2>
+          {% endif %}
           {% include "accounts/profile/_proof_fields.html" %}
-          <p class="form-hint">{% translate "A confirmation is sent to your email addresses." %}</p>
           <div class="step-actions">
-            <button type="submit" class="btn btn-danger-outline" data-gate-dereg>{% translate "Give binding notice" %}</button>
+            <button type="submit" class="btn btn-danger-outline" data-gate-dereg>{% if has_points %}{% translate "Deregister metering points (binding)" %}{% else %}{% translate "Withdraw registration" %}{% endif %}</button>
             <a class="btn btn-secondary-action end-action" href="{{ cancel_url }}">{% translate "Cancel" %}</a>
           </div>
+          <p class="form-hint" data-proof-hint hidden>{% translate "Enter your password to finish." %}</p>
         </section>
       </form>
+    {% endif %}
+
+    {% if already %}
+      <section class="step-card" aria-labelledby="already-title">
+        <h2 id="already-title">{% translate "Already in deregistration" %}</h2>
+        <ul class="plain-list">
+          {% for row in already %}
+            <li><span class="point-name">{{ row.name|default:row.direction }}</span>{% if row.number %} <span class="mp-num">{{ row.number|metering_point }}</span>{% endif %} <span class="muted">· {% if row.date %}{% blocktranslate with date=row.date|date:"d.m.Y" %}Ends on {{ date }}{% endblocktranslate %}{% else %}{% translate "Date to be confirmed" %}{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </section>
     {% endif %}
   </div>
 {% endblock %}

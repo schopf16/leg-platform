@@ -1,9 +1,0 @@
-{% load i18n %}{% comment %}
-The note of a draft that the LEG returned for correction (W2-01): the reason the staff wrote (escaped text, never markup) and
-the way on. Context: ``reason`` (may be empty), ``returned`` (the draft was returned). Without a reason the earlier sentence.
-{% endcomment %}{% if reason %}<div class="alert alert-info returned-note" role="status">
-  <p><strong>{% translate "The LEG returned your application for correction:" %}</strong></p>
-  <p class="returned-reason">{{ reason }}</p>
-  <p>{% translate "Please check your details and submit the application again." %}</p>
-  {% if check_url %}<p><a class="btn btn-secondary-action" href="{{ check_url }}">{% translate "Check your details" %}</a></p>{% endif %}
-</div>{% elif returned %}<div class="alert alert-info returned-note" role="status">{% translate "The LEG returned your application. Please check your details and submit it again." %}{% if check_url %} <a class="btn btn-secondary-action" href="{{ check_url }}">{% translate "Check your details" %}</a>{% endif %}</div>{% endif %}

@@ -167,6 +167,7 @@ urlpatterns = [
         name="email_change_cancel",
     ),
     path("profile/delete/", profile_views.AccountDeleteView.as_view(), name="account_delete"),
+    path("profile/end/", profile_views.AccountEndView.as_view(), name="account_end"),
     path("profile/password/", profile_views.PasswordChangeView.as_view(), name="password_change"),
     path("profile/two-factor/", profile_views.TwoFactorOverviewView.as_view(), name="two_factor"),
     path("profile/sign-in-method/", profile_views.LoginMethodView.as_view(), name="login_method"),

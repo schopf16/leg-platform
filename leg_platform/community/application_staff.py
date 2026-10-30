@@ -1,4 +1,4 @@
-"""The staff's side of an application (D-103): review, return, the registration at the grid operator, completion and
+"""The staff's side of an application (D-103): review, the registration at the grid operator, completion and
 rejection. Every function takes an ``actor`` that is re-read from the database: an active staff account.
 
 One transaction each, the account row locked first and then the application row (the order of the customer's side),
@@ -28,11 +28,10 @@ from leg_platform.community import (
     metering_points,
 )
 from leg_platform.community.application_common import ApplicationError, add_months, notify, staff_actor
-from leg_platform.community.applications import START_AFTER_MONTHS, _changed, delete_application
+from leg_platform.community.applications import START_AFTER_MONTHS, delete_application
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
     REJECTION_NOTE_MAX_LENGTH,
-    RETURN_REASON_MAX_LENGTH,
     Application,
     ApplicationMeteringPoint,
     CustomerBuilding,
@@ -111,35 +110,6 @@ def start_review(application, actor):
             history.record(fresh, HistoryEvent.APPLICATION_IN_REVIEW, staff)
     except _NumberConflict as conflict:
         _refuse_numbers(conflict)
-    return fresh
-
-
-def return_for_correction(application, actor, reason):
-    """Submitted or in review -> draft again, marked ``returned_at``; the idle clock starts anew.
-
-    ``reason`` is required: free text of at most 500 characters (``buildings.clean_free_text``: white space collapsed,
-    no control characters; ``ApplicationError("reason_required")`` if empty, ``ValidationError`` if too long or invalid).
-    It is stored on the application and shown to the customer on the draft (``applications.returned_reason``, cleared
-    when the application is submitted again); the history entry names no text. The customer gets the mail
-    ``application_returned`` (action required; the reason is in the portal only, never in the mail) and a one-time
-    message."""
-    staff = staff_actor(actor)
-    reason = buildings.clean_free_text(reason if isinstance(reason, str) else "", RETURN_REASON_MAX_LENGTH)
-    if not reason:
-        raise ApplicationError("reason_required")
-    with transaction.atomic():
-        fresh = _lock(application, Application.WITHDRAWABLE_STATES)
-        now = timezone.now()
-        fresh.state = State.DRAFT
-        fresh.submitted_at = None
-        fresh.returned_at = now
-        fresh.returned_reason = reason
-        history.record(fresh, HistoryEvent.APPLICATION_RETURNED, staff, {"fields": ["returned_reason"]})
-        _changed(fresh, now)
-        fresh.save(update_fields=["returned_at", "returned_reason", "submitted_at", "updated_at"])
-        person = get_user_model()._base_manager.get(pk=fresh.person_id)
-        customer_messages.record(person, customer_messages.Kind.APPLICATION_RETURNED, now=now)
-        notify(MailJob.Kind.APPLICATION_RETURNED, person)
     return fresh
 
 

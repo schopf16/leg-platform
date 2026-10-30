@@ -12,6 +12,7 @@ registration running (warn), deregistration running (bad), draft or ended (muted
 
 from dataclasses import dataclass, field
 from datetime import date
+from urllib.parse import urlencode
 
 from django.urls import reverse
 from django.utils import timezone
@@ -44,6 +45,7 @@ ENDED = "ended"
 DRAFT = "draft"  # a point of an application that is still a draft
 IN_REVIEW = "in_review"  # submitted, the LEG has not registered it at the grid operator yet
 AT_OPERATOR = "at_operator"  # the registration at the grid operator started
+SEARCH_MIN_CARDS = 8  # from this many cards on, the Buildings page offers a search and expand / collapse all
 
 
 @dataclass
@@ -70,8 +72,6 @@ class Block:
     in_review: bool = False  # the LEG is checking it: no change any more (the card says why)
     paused: bool = False
     paused_date: date | None = None  # the day the scheduler deletes a paused draft
-    reason: str = ""  # why the LEG returned the draft for correction
-    returned: bool = False  # the LEG returned the draft (``reason`` may be empty)
     note: str = ""  # one line under the steps (a deregistration whose date the LEG has not confirmed yet)
 
 
@@ -148,14 +148,28 @@ class Card:
     iban_masked: str = ""  # the account's IBAN, masked, where the application has a feed-in
     edit_application: object = None  # the submitted application whose address / start the card may change
     can_edit: bool = False  # set by ``card_edit.mark``: something on the card can be changed in place
+
+    @property
+    def search_text(self):
+        """What the search field of the page matches: only values the card shows anyway (title, address, EGID, own points)."""
+        parts = [self.title, self.address, str(self.egid or "")]
+        parts.extend(row.number for row in self.rows if row.number)
+        return " ".join(part for part in parts if part)
     editing: object = None  # the ``card_edit.EditState`` while the card is shown in edit mode
 
     @property
     def has_status_blocks(self):
-        """Whether a registration progress block (not a deregistration) is shown in the status part."""
-        return bool(self.extra_blocks) or any(
-            row.block is not None and row.block.kind != "deregistration" for row in self.rows
-        )
+        """Whether a progress block (registration or deregistration) is shown in the status part."""
+        return bool(self.extra_blocks) or any(row.block is not None for row in self.rows)
+
+    @property
+    def deregistration_query(self):
+        """The query of the card's link to the deregistration: always this building (``?building=<id>``). A card without
+        a usable building (none, or an archived one that the page would refuse) names its own points instead."""
+        if self.location is not None and not self.location.is_archived:
+            return f"?building={self.location.pk}"
+        ids = [row.point_id for row in self.rows if row.point_id]
+        return "?" + urlencode([("point", pk) for pk in ids]) if ids else ""
 
     @property
     def edit_id(self):
@@ -172,8 +186,18 @@ class Card:
 class Overview:
     cards: list
     operator_name: str
-    can_deregister: bool
     editing_id: str = ""  # the card shown in edit mode ("" = none); only one at a time
+    open_id: str = ""  # the card just saved: shown open although the cards are collapsed
+
+    @property
+    def collapsible(self):
+        """With two or more cards each one folds (``<details>``); a single card is always shown open."""
+        return len(self.cards) > 1
+
+    @property
+    def searchable(self):
+        """From ``SEARCH_MIN_CARDS`` cards on, the list gets a search field and expand / collapse all buttons."""
+        return len(self.cards) >= SEARCH_MIN_CARDS
 
 
 def _lines(address, name):
@@ -206,7 +230,6 @@ def _registration_block(application, operator):
         return Block(
             "registration", steps, current.done, current.total, application=application, resume=True,
             paused=paused, paused_date=applications.rollback_date(application) if paused else None,
-            reason=applications.returned_reason(application), returned=application.returned_at is not None,
         )
     steps = [
         Step(key, state, label, word) for key, state, label, word in steps_module.post_submit_steps(application, operator)
@@ -220,12 +243,10 @@ def _registration_block(application, operator):
 
 
 def date_note(deregistration):
-    """The words about the date of a deregistration that the LEG has not confirmed yet (N-10): the earliest month end of
-    the notice period, or the customer's wish; the LEG confirms it."""
-    if deregistration.wants_earliest:
-        return _("Earliest on %(date)s. The LEG confirms the date.") % {
-            "date": deregistration.earliest_date.strftime("%d.%m.%Y")
-        }
+    """The words about the date of a deregistration that the LEG has not confirmed yet (N-10): the customer's wish. No
+    computed date (owner decision); the LEG confirms the date."""
+    if deregistration.wants_earliest or not deregistration.desired_date:
+        return _("As early as possible. The LEG confirms the date.")
     return _("Desired date %(date)s. The LEG confirms the date.") % {"date": deregistration.desired_date.strftime("%d.%m.%Y")}
 
 
@@ -240,8 +261,22 @@ def _deregistration_block(deregistration):
     return Block(
         "deregistration", steps, sum(step.state == STEP_DONE for step in steps), len(steps),
         deregistration=deregistration,
-        note="" if confirmed else date_note(deregistration),
+        note=_deregistration_text(deregistration),
     )
+
+
+def _deregistration_text(deregistration):
+    """The one status sentence of the card for a running deregistration. "As early as possible" shows no date (the LEG
+    confirms it), like a registration shows no computed date."""
+    if deregistration.state != Deregistration.State.SUBMITTED:
+        if deregistration.confirmed_date:
+            return _("Deregistration on %(date)s.") % {"date": deregistration.confirmed_date.strftime("%d.%m.%Y")}
+        return _("Deregistration running")
+    if deregistration.wants_earliest or not deregistration.desired_date:
+        return _("Your deregistration is submitted. The LEG administration confirms the date.")
+    return _("Desired date %(date)s. The LEG administration confirms it.") % {
+        "date": deregistration.desired_date.strftime("%d.%m.%Y")
+    }
 
 
 def _figures(point):
@@ -425,8 +460,13 @@ def build(person, today=None):
     )
     for card in result:
         card.transformer = transformers.get(card.egid, "") if card.egid else ""
-    result.sort(key=lambda card: (card.location is None and card.building is None, card.title.casefold()))
-    return Overview(result, operator, any(card.deregistrable for card in result))
+    # Not yet participating first, participating last; each group by name, otherwise address.
+    result.sort(key=lambda card: (
+        card.state == "participating",
+        card.location is None and card.building is None,
+        card.title.casefold(),
+    ))
+    return Overview(result, operator)
 
 
 def _finish(card, person, own_words, today):

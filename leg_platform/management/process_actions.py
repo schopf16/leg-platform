@@ -1,5 +1,5 @@
-"""The staff's steps of an application and of a deregistration as dialogs (D-103): take into review, return for
-correction, the registration at the grid operator, its confirmation, completion, roll back; confirm the date of a
+"""The staff's steps of an application and of a deregistration as dialogs (D-103): take into review, the registration
+at the grid operator, its confirmation, completion, roll back; confirm the date of a
 deregistration; every one calls a service of ``community`` that checks the state again under a lock, so the page never
 decides a rule. A dialog is a normal page (works without JavaScript) that returns to where it was opened
 (``management.returns``). An unknown id is a 404; a draft has a read-only page (D-107) and no dialog applies to it.
@@ -35,7 +35,6 @@ from leg_platform.management.process_forms import (
     OperatorConfirmationForm,
     OperatorStartedForm,
     RejectForm,
-    ReturnForm,
 )
 from leg_platform.management.process_views import VISIBLE_APPLICATION_STATES
 from leg_platform.management.returns import return_url
@@ -50,7 +49,6 @@ def error_texts():
         "date_in_future": _("The date must not be in the future."),
         "date_before_start": _("The date must not be before the registration."),
         "number_exists": _("A metering point number of this application was stored in the meantime. Nothing was saved."),
-        "reason_required": _("Enter a reason."),
         "building_unavailable": _("A building of this application is not available any more. Nothing was saved."),
         "date_before_earliest": _("The date must not be in the past."),
         "not_month_end": _("Enter the last day of a month."),
@@ -187,25 +185,6 @@ class ApplicationReviewView(ManagementAccessMixin, View):
         else:
             messages.success(request, _("The application is in review."))
         return redirect(return_url(request, reverse("management:processes_application", args=[pk])))
-
-
-class ApplicationReturnView(ProcessDialog):
-    states = Application.WITHDRAWABLE_STATES
-    title = gettext_lazy("Return for correction")
-    submit_label = gettext_lazy("Return for correction")
-    form_class = ReturnForm
-    # After the step the way on is the list (walkthrough W2-02); the draft's own page is read-only (D-107).
-    leaves_page = True
-    success_message = gettext_lazy("The application was returned for correction.")
-
-    def get_lead(self):
-        return _(
-            "The application becomes a draft again. The customer can correct it and submit it again. "
-            "The customer receives an email and reads your reason in the portal."
-        )
-
-    def run(self, application, data, actor):
-        application_staff.return_for_correction(application, actor, data["reason"])
 
 
 class ApplicationOperatorStartedView(ProcessDialog):
@@ -567,5 +546,5 @@ class DeregistrationConfirmView(DialogView):
 
 __all__ = [
     "ApplicationCompleteView", "ApplicationOperatorConfirmedView", "ApplicationOperatorStartedView",
-    "ApplicationRejectView", "ApplicationReturnView", "ApplicationReviewView", "DeregistrationConfirmView",
+    "ApplicationRejectView", "ApplicationReviewView", "DeregistrationConfirmView",
 ]

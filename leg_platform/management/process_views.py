@@ -22,6 +22,7 @@ from leg_platform.community import (
     application_queue,
     applications,
     contracts,
+    deregistrations,
     grid_operator,
     history,
     labels,
@@ -461,14 +462,12 @@ class ApplicationDetailView(ManagementAccessMixin, View):
             "operator": grid_operator.name(),
             "empty_points": _("No metering points."),
             "can_review": state == Application.State.SUBMITTED,
-            "can_return": state in Application.WITHDRAWABLE_STATES,
             "can_correct": state in Application.CORRECTABLE_STATES,
             "can_start_operator": state in Application.WITHDRAWABLE_STATES,
             "can_confirm": state == Application.State.OPERATOR_STARTED,
             "can_complete": state == Application.State.OPERATOR_CONFIRMED,
             "can_reject": in_flight,
             "review_url": reverse("management:processes_application_review", args=[application.pk]),
-            "return_url": next_url("management:processes_application_return"),
             "operator_started_url": next_url("management:processes_application_operator_started"),
             "operator_confirmed_url": next_url("management:processes_application_operator_confirmed"),
             "complete_url": next_url("management:processes_application_complete"),
@@ -523,6 +522,8 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
                     if location is not None else "",
                     "egid": location.egid if location is not None else None,
                     "terminated_on": point.terminated_on and format_date(point.terminated_on),
+                    # Assigned but not active (yet): the staff checks it with the grid operator (owner decision 2026-10-29).
+                    "not_active": point.status() in deregistrations.PENDING_STATUSES,
                     "url": reverse("management:metering_points_detail", args=[point.pk]),
                 }
             )

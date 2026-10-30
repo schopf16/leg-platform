@@ -8,7 +8,7 @@
     <ul class="mb-0">
       {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
       {% if not title_only %}{% for field in form.visible_fields %}{% if field.errors %}
-        <li><a href="#{{ field.id_for_label }}">{{ field.field.summary_label|default:field.label }}</a></li>
+        <li><a href="#{{ field.field.summary_anchor|default:field.id_for_label }}">{{ field.field.summary_label|default:field.label }}</a></li>
       {% endif %}{% endfor %}{% endif %}
     </ul>
   </div>

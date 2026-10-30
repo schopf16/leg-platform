@@ -35,8 +35,7 @@ REMARK_VALIDATORS = [MaxLengthValidator(REMARK_MAX_LENGTH)]
 BUILDING_NAME_MAX_LENGTH = 80
 BUILDING_DESCRIPTION_MAX_LENGTH = 200
 METERING_POINT_NAME_MAX_LENGTH = 80
-# The reason of a return for correction and the note of a rejection (free text of the staff, D-103).
-RETURN_REASON_MAX_LENGTH = 500
+# The note of a rejection (free text of the staff, D-103).
 REJECTION_NOTE_MAX_LENGTH = 300
 # The federal building identifier (EGID) has at most nine digits (Federal Register of Buildings and Dwellings).
 EGID_MAX = 999_999_999
@@ -709,10 +708,6 @@ class Application(TimestampedModel):
     contract_pending_since = models.DateTimeField(null=True, blank=True)
     # The reminder "bank connection missing" is sent once per period of missing.
     iban_reminded_at = models.DateTimeField(null=True, blank=True)
-    returned_at = models.DateTimeField(null=True, blank=True)
-    # The reason the staff gave when the application was returned for correction (free text, never in the history);
-    # shown to the customer on the draft and cleared when the application is submitted again.
-    returned_reason = models.CharField(max_length=RETURN_REASON_MAX_LENGTH, blank=True, editable=False)
     submitted_at = models.DateTimeField(null=True, blank=True)
     operator_started_at = models.DateTimeField(null=True, blank=True)
     operator_started_on = models.DateField(null=True, blank=True)

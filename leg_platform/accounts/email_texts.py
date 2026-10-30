@@ -304,13 +304,6 @@ DEFINITIONS = {
         (GREETING,),
         (),
     ),
-    # Action required of the customer, so it is sent: the reason is in the portal, never in the mail.
-    Key.APPLICATION_RETURNED: Definition(
-        "accounts/email/application_returned.txt",
-        lambda: gettext("Your application at %(instance_name)s needs a correction"),
-        (GREETING,),
-        (),
-    ),
     Key.APPLICATION_REJECTED: Definition(
         "accounts/email/application_rejected.txt",
         lambda: gettext("Your application at %(instance_name)s was not accepted"),

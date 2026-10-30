@@ -15,19 +15,14 @@ Context: ``rows`` (customer.wizard.OverviewRow), ``location`` (the own building 
         <p class="start-sub">{% translate "You started an application. You can continue where you left off." %}</p>
       </div>
       {% if paused %}<div class="alert alert-warning" role="status">{% include "customer/_paused_note.html" with paused_date=paused_date %}</div>{% endif %}
-      {% include "customer/_returned_note.html" with reason=reason returned=returned %}
-      {% if checking %}
-        {# A returned draft (N-01): the rows with "Change" first, "Submit application" only after them. #}
-        {% include "customer/_overview_rows.html" with title=_("Check your details") %}
-      {% endif %}
       <section class="step-card" aria-labelledby="draft-title">
         <p class="dotword"><span class="dot tone-warn" aria-hidden="true"></span>{% translate "Not completed yet" %}</p>
         <h2 id="draft-title">{% blocktranslate with done=progress.done total=progress.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}</h2>
         <progress class="path-bar" max="{{ progress.total }}" value="{{ progress.done }}" aria-label="{% blocktranslate with done=progress.done total=progress.total %}{{ done }} of {{ total }} steps done{% endblocktranslate %}">{{ progress.done }}/{{ progress.total }}</progress>
-        {% if remaining %}<p class="muted">{% blocktranslate count remaining=remaining %}{{ remaining }} step still open{% plural %}{{ remaining }} steps still open{% endblocktranslate %}</p>{% elif checking %}<p class="muted">{% translate "Please correct what the LEG described. Then submit the application again." %}</p>{% else %}<p class="muted">{% translate "Your details are complete. Submit your application now." %}</p>{% endif %}
-        {% if not checking %}<p class="next-up"><span class="muted">{% translate "Next up" %}</span> <strong>{{ next_name }}</strong></p>{% endif %}
+        {% if remaining %}<p class="muted">{% blocktranslate count remaining=remaining %}{{ remaining }} step still open{% plural %}{{ remaining }} steps still open        {% endblocktranslate %}</p>{% else %}<p class="muted">{% translate "Your details are complete. Submit your application now." %}</p>{% endif %}
+                <p class="next-up"><span class="muted">{% translate "Next up" %}</span> <strong>{{ next_name }}</strong></p>
         <div class="step-actions">
-          <a class="btn btn-primary" href="{{ next_url }}">{% if checking %}{% translate "Submit application" %}{% else %}{% translate "Continue application" %}{% endif %}</a>
+                  <a class="btn btn-primary" href="{{ next_url }}">{% translate "Continue application" %}</a>
           <form method="post" action="{% url 'customer:application_cancel' draft.pk %}" class="inline-form" data-submit-once>
             {% csrf_token %}
             <input type="hidden" name="restart" value="1">
@@ -37,7 +32,7 @@ Context: ``rows`` (customer.wizard.OverviewRow), ``location`` (the own building 
         </div>
         <p class="muted">{% translate "If you start again, the details of this application are deleted." %}</p>
       </section>
-      {% if not checking %}{% include "customer/_overview_rows.html" with title=_("How it works") %}{% endif %}
+      {% include "customer/_overview_rows.html" with title=_("How it works") %}
     {% else %}
       <div>
         <p class="page-label">{% translate "My participation" %}</p>

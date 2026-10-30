@@ -1127,21 +1127,15 @@ span.note-warn {
   display: none;
 }
 
-/* ---- One-time banners, status lines, the returned note (design walkthrough W1-18, W2-01, W2-03) ---- */
+/* ---- One-time banners, status lines (design walkthrough W1-18, W2-03) ---- */
 .banner-list {
   display: grid;
   gap: 12px;
   margin: 0 0 24px;
 }
 
-.banner-list p,
-.returned-note p {
+.banner-list p {
   margin: 0 0 4px;
-}
-
-.returned-note .returned-reason {
-  overflow-wrap: anywhere;
-  white-space: pre-line;
 }
 
 .status-lines {
@@ -1226,12 +1220,33 @@ span.note-warn {
   margin-top: 2px;
 }
 
-.point-check .meta {
+.point-check {
+  min-height: 44px;
+}
+
+.point-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.point-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.point-name {
+  display: block;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.point-line {
   display: block;
   margin-top: 4px;
   font-size: 14px;
   color: var(--muted);
-  overflow-wrap: anywhere;
 }
 
 .dereg-summary {
@@ -1579,19 +1594,6 @@ span.note-warn {
   }
 }
 
-.stage-returned {
-  margin: 0;
-}
-
-.stage-returned-title,
-.stage-returned p {
-  margin: 0 0 4px;
-}
-
-.stage-returned-reason {
-  white-space: pre-line;
-}
-
 /* The page Nachbarschaft (D-123): the map, its legend and the circuit list. The colours are the tokens of portal.css
    (light and dark); the map script reads the same tokens (customer/js/neighbourhood-map.js). */
 .nb-page {
@@ -1787,33 +1789,8 @@ span.note-warn {
   font-weight: 700;
 }
 
-.edit-hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--muted);
-}
-
 .edit-head .error-summary {
   margin: 12px 0 0;
-}
-
-.spec-locked {
-  color: var(--muted);
-}
-
-.spec .lock,
-.edit-hint .lock {
-  width: 14px;
-  height: 14px;
-  flex: none;
-}
-
-.spec .lock {
-  margin-left: 8px;
-  vertical-align: -2px;
 }
 
 .spec-input {
@@ -1850,6 +1827,13 @@ span.note-warn {
 
 .spec-point .spec-input {
   flex: 1 1 14rem;
+}
+
+/* In edit mode the number is a long plain text beside the name field: it wraps instead of widening the page (375 px). */
+.building-card.is-editing .mp-number {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .spec-radios {
@@ -1901,4 +1885,137 @@ span.note-warn {
   .spec-row:first-child dt {
     border-top: 0;
   }
+}
+
+/* ---- Building cards, two or more: each card folds (<details>, no script) ---- */
+.building-cards:has(.is-fold) {
+  gap: 8px;
+}
+
+.building-card.is-fold {
+  gap: 0;
+  padding: 0;
+}
+
+.fold-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold-summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold-summary:hover {
+  background: var(--warm);
+}
+
+.fold-summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.fold-summary .building-icon {
+  flex: none;
+}
+
+.fold-title {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fold-title h2 {
+  font-size: 18px;
+}
+
+.fold-title .sub-line {
+  margin-top: 2px;
+}
+
+.fold-summary .building-status {
+  flex: none;
+  margin-left: 0;
+  padding-top: 0;
+}
+
+.fold-chevron {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.fold[open] > .fold-summary .fold-chevron {
+  transform: rotate(180deg);
+}
+
+.fold-body {
+  display: grid;
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+
+.fold-body .building-info:first-child,
+.fold-body .edit-head + .building-info {
+  grid-template-columns: minmax(0, 1fr);
+  padding-left: 48px;
+}
+
+.fold-body .building-info:first-child .spec-title:first-child,
+.fold-body .edit-head + .building-info .spec-title:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 520px) {
+  .fold-summary {
+    gap: 12px;
+    padding: 12px 12px;
+  }
+
+  .fold-body {
+    padding: 0 16px 16px;
+  }
+
+  .fold-body .building-info:first-child,
+  .fold-body .edit-head + .building-info {
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold-chevron { transition: none; }
+}
+
+/* ---- Many cards (8 or more): search and expand / collapse all (shown by the script) ---- */
+.building-tools[hidden],
+.building-no-results[hidden],
+.building-card[hidden] {
+  display: none;
+}
+
+.building-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.building-search {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.building-no-results {
+  margin: 0 0 12px;
+  color: var(--muted);
 }

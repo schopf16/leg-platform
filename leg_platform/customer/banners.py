@@ -8,8 +8,6 @@ sentence per kind, in plain words); this module only reads and marks.
 * **Reading does not mark.** ``pending`` reads the messages; the view builds the whole response first and only then calls
   ``mark_shown``, and only for a real page view: a ``HEAD`` request, a prefetch (``Purpose`` / ``Sec-Purpose``) or a
   page that failed to render never consumes a message.
-* ``application_returned`` is not shown as a banner: the returned draft carries its own persistent banner with the
-  reason (``_returned_note.html``). The message is marked seen with the others so it does not pile up.
 * The note of the staff is plain text: the template escapes it (never markup).
 * Read through the account only (``customer_messages`` filters by person).
 """

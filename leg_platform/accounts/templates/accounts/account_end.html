@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n static %}{% comment %}
+The fork before the deletion (owner decision 2026-10-29), for a customer who takes part (a running metering point or a
+registration in progress): only deregister (the account stays; primary, calm) or delete the whole account (secondary). No red
+here: the danger styling and the proof are on the page "Delete account". Nothing on this page changes anything.
+{% endcomment %}
+{% block title %}{% translate "What would you like to do?" %}{% endblock %}
+{% block inner_class %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
+{% block content %}
+  <div class="wizard">
+    <div>
+      <p class="page-label">{% translate "My account · Profile" %}</p>
+      <h1 class="start-title">{% translate "What would you like to do?" %}</h1>
+    </div>
+    <section class="step-card" aria-labelledby="option-a-title">
+      <h2 id="option-a-title">{% translate "Only deregister metering points" %}</h2>
+      <p>{% translate "You no longer take part in the LEG. Your account stays. You can keep signing in and see your data." %}</p>
+      <div class="step-actions">
+        <a class="btn btn-primary" href="{% url 'customer:deregistration_start' %}?from=end">{% translate "Deregister metering points" %}</a>
+      </div>
+    </section>
+    <section class="step-card" aria-labelledby="option-b-title">
+      <h2 id="option-b-title">{% translate "Delete the whole account" %}</h2>
+      <p>{% translate "Your access to the portal is removed at once and for good. Your metering points are deregistered. Open invoices remain valid and must still be paid." %}</p>
+      <div class="step-actions">
+        <a class="btn btn-secondary-action" href="{% url 'accounts:account_delete' %}">{% translate "Delete account" %}</a>
+      </div>
+    </section>
+    <p class="muted">{% translate "Not sure?" %} <a href="{% url 'customer:contact' %}">{% translate "Contact the LEG" %}</a></p>
+    <div class="step-actions">
+      <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
+    </div>
+  </div>
+{% endblock %}

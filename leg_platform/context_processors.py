@@ -13,6 +13,7 @@ PROFILE_VIEWS = frozenset(
         "accounts:profile",
         "accounts:profile_edit",
         "accounts:account_delete",
+        "accounts:account_end",
         "accounts:password_change",
         "accounts:two_factor",
         "accounts:login_method",

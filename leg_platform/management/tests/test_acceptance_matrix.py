@@ -196,7 +196,7 @@ class MatrixBase(TestCase):
         cls.kunde = create_active_user("kunde.person@example.org", first_name="Kunde", last_name="Beispiel")
         made = []
         cls.building_of = {}
-        for index in range(6):
+        for index in range(5):
             application, building = onboarding.ready_draft(
                 cls.kunde, egid=90010000 + index, number=100 + 10 * index,
                 address={"house_number": str(60 + index)},
@@ -205,7 +205,7 @@ class MatrixBase(TestCase):
             application.refresh_from_db()
             made.append(application)
             cls.building_of[application.pk] = building
-        (cls.app_review, cls.app_return, cls.app_start, cls.app_confirm, cls.app_complete, cls.app_reject) = made
+        (cls.app_review, cls.app_start, cls.app_confirm, cls.app_complete, cls.app_reject) = made
         application_staff.mark_operator_started(cls.app_confirm, cls.staff, d - timedelta(days=20), today=d)
         application_staff.mark_operator_started(cls.app_complete, cls.staff, date_type(2026, 6, 1), today=d)
         application_staff.record_operator_confirmation(cls.app_complete, cls.staff, date_type(2026, 7, 1), today=d)
@@ -268,7 +268,6 @@ class MatrixBase(TestCase):
             Case("processes_notice_resolve", pk(self.notice), {}, True),
             Case("processes_application", pk(self.app_review)),
             Case("processes_application_review", pk(self.app_review), {}, True),
-            Case("processes_application_return", pk(self.app_return), {"reason": "Please check the details."}, True),
             Case("processes_application_operator_started", pk(self.app_start), {"started_on": date(0)}, True),
             Case("processes_application_operator_confirmed", pk(self.app_confirm), {"confirmed_on": date(0)}, True),
             Case(

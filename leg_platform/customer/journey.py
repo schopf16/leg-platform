@@ -42,9 +42,6 @@ READY = (
 )
 IN_REVIEW = _("The LEG is checking your details. You do not need to do anything.")
 SUBMITTED = _("Your application is submitted. You can still change it until the LEG starts checking it.")
-RETURNED = (
-    _("Please correct what the LEG described. Then submit the application again."), _("Check your details"),
-)
 AT_OPERATOR = _("The LEG has registered you at the grid operator. Please confirm the registration there.")
 CONFIRMED = _("The registration is confirmed. The LEG completes it.")
 
@@ -67,8 +64,6 @@ class Journey:
     url: str
     paused: bool = False
     paused_date: object = None  # the day a paused draft is deleted
-    reason: str = ""  # why the LEG returned the draft
-    returned: bool = False
 
 
 def current_application(person):
@@ -95,21 +90,15 @@ def for_account(person):
                 steps.append(JourneyStep(STEP_NAMES[step.key], DONE))
             else:
                 steps.append(JourneyStep(STEP_NAMES[step.key], NOW if step.key == current.next_step else TODO, not step.available))
-        returned = application.returned_at is not None
-        if current.next_step is None and returned:
-            # A returned draft: the customer first checks what the LEG described, with a way to every step (N-01).
-            sentence, button, url = RETURNED + (reverse("customer:application_start"),)
+        if current.next_step is None:
+            sentence, button, name = READY
         else:
-            if current.next_step is None:
-                sentence, button, name = READY
-            else:
-                sentence, button, name = NEXT[current.next_step]
-            url = reverse(name, args=[application.pk])
+            sentence, button, name = NEXT[current.next_step]
+        url = reverse(name, args=[application.pk])
         paused = application.state == Application.State.PAUSED
         return Journey(
             steps, current.done, current.total, sentence, button, url, paused=paused,
             paused_date=applications.rollback_date(application) if paused else None,
-            reason=applications.returned_reason(application), returned=returned,
         )
     # Submitted or later: everything the customer does is done; the LEG acts. The list of the page "submitted".
     steps = [

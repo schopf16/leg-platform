@@ -7,11 +7,12 @@ from datetime import date, timedelta
 from django.test import TestCase, tag
 from django.urls import reverse
 
-from leg_platform.community import applications, buildings, deregistrations, numbers
+from leg_platform.community import applications, buildings, deregistrations, numbers, own_iban
 from leg_platform.community.models import CustomerBuilding, Direction, GridOperator, MeteringPoint
 from leg_platform.community.tests.helpers import assign_person, make_location, make_metering_point, staff_user
 from leg_platform.customer.tests.helpers import (
     BUILDINGS,
+    GOOD_IBAN,
     configure_numbers,
     customer,
     draft_with_building,
@@ -105,12 +106,16 @@ class BuildingsPageTests(TestCase):
     def test_the_two_main_buttons_and_the_buttons_of_the_card(self):
         html = self.page()
         self.assertIn(">Neues Gebäude hinzufügen<", html)
-        self.assertIn(">Abmeldung starten<", html)
-        self.assertLess(html.index(">Neues Gebäude hinzufügen<"), html.index(">Abmeldung starten<"))
+        # D-128: the page-level "Start deregistration" button and the red "delete account" button are gone; the
+        # card has a link to the deregistration page of its building.
+        self.assertNotIn("Abmeldung starten", html)
+        self.assertNotIn("Konto löschen", html)
+        self.assertIn(
+            f'href="{reverse("customer:deregistration_start")}?building={self.location.pk}">Messpunkte abmelden<', html
+        )
         self.assertIn(f'href="{reverse("customer:application_start")}?building={self.location.pk}"', html)
         self.assertIn(f'href="{BUILDINGS}?edit=l{self.location.pk}">Ändern<', html)
         self.assertIn(">Messpunkt hinzufügen<", html)
-        self.assertIn(">Messpunkt entfernen<", html)
         self.assertIn(reverse("customer:deregistration_start"), html)
 
     def test_without_an_active_point_there_is_no_button_to_deregister(self):
@@ -123,7 +128,7 @@ class BuildingsPageTests(TestCase):
         assign_person(point, newcomer, valid_from=TODAY)
         html = self.page(login(newcomer))
         self.assertNotIn("Abmeldung starten", html)
-        self.assertNotIn("Messpunkt entfernen", html)
+        self.assertNotIn("Messpunkte abmelden", html)
 
     def test_a_building_with_a_draw_and_a_feed_in_has_no_button_to_add_a_point(self):
         active_point(3, self.mine, self.location, Direction.FEED_IN)
@@ -133,9 +138,27 @@ class BuildingsPageTests(TestCase):
         deregistrations.request_deregistration(self.mine, metering_point_ids=[self.draw.pk])
         html = self.page()
         self.assertRegex(html, r'<span class="dot tone-bad" aria-hidden="true"></span>In Abmeldung')
-        self.assertIn("Abmeldung: 1 von 3 erledigt", html)
-        self.assertIn(f"Frühestens am {deregistrations.earliest_date_preview().strftime('%d.%m.%Y')}. Die LEG bestätigt den Termin.", html)
+        # D-127: a heading and one sentence, no progress bar and no computed "earliest" date.
+        self.assertIn("Ihre Abmeldung ist eingereicht. Die LEG-Verwaltung bestätigt das Datum.", html)
+        self.assertNotIn("Frühestens", html)
+        self.assertNotIn("von 3 erledigt", html)
         self.assertNotIn("Abmeldung starten", html)
+
+    def test_a_confirmed_date_is_shown_as_the_deregistration_date(self):
+        request = deregistrations.request_deregistration(self.mine, metering_point_ids=[self.draw.pk])
+        date_ = TODAY + timedelta(days=150)
+        type(request).objects.filter(pk=request.pk).update(state="confirmed", confirmed_date=date_)
+        html = self.page()
+        self.assertIn(f"Abmeldung per {date_.strftime('%d.%m.%Y')}.", html)
+        self.assertNotIn("Frühestens", html)
+
+    def test_a_desired_date_is_shown_until_the_leg_confirms(self):
+        deregistrations.request_deregistration(
+            self.mine, metering_point_ids=[self.draw.pk], desired_date=deregistrations.earliest_termination_date()
+        )
+        html = self.page()
+        self.assertIn("Gewünschtes Datum: ", html)
+        self.assertIn("Die LEG-Verwaltung bestätigt es.", html)
 
     def test_a_terminated_point_is_ended(self):
         MeteringPoint.objects.filter(pk=self.draw.pk).update(terminated_on=LONG_AGO + timedelta(days=100))
@@ -229,11 +252,11 @@ class BuildingsPageTests(TestCase):
         for word in ("Angaben abgeschickt", "Prüfung durch die LEG", "Wird von"):
             self.assertIn(word, html)
         # ONE withdraw button (W1-15): the card's, red outline; the progress block does not repeat it and no second
-        # wording ("Remove metering point") is offered for the same action.
+        # wording ("Deregister metering points") is offered for the same action.
         withdraw = reverse("customer:application_withdraw", args=[application.pk])
         self.assertEqual(html.count(f'href="{withdraw}"'), 1)
         self.assertRegex(html, rf'btn btn-danger-outline end-action" href="{withdraw}">Anmeldung zurückziehen<')
-        self.assertNotIn(">Messpunkt entfernen<", html)
+        self.assertNotIn(">Messpunkte abmelden<", html)
         # From the start of the registration at the grid operator on nothing can be withdrawn.
         from leg_platform.community import application_staff
 
@@ -241,7 +264,7 @@ class BuildingsPageTests(TestCase):
         application_staff.mark_operator_started(application, staff)
         html = self.page(login(newcomer))
         self.assertNotIn(reverse("customer:application_withdraw", args=[application.pk]), html)
-        self.assertNotIn(">Messpunkt entfernen<", html)
+        self.assertNotIn(">Messpunkte abmelden<", html)
         self.assertIn("Abmeldung noch nicht möglich, bis der Messpunkt aktiv ist.", html)
 
     def test_a_paused_draft_says_so(self):
@@ -368,3 +391,48 @@ class NamePagesTests(TestCase):
         self.assertIn("Zu viele Anfragen", response.content.decode())
         self.point.refresh_from_db()
         self.assertEqual(self.point.name, "Alt")
+
+PROFILE = reverse("accounts:profile")
+BANK = reverse("customer:bank_connection")
+NEIGHBOURHOOD = reverse("customer:neighbourhood")
+
+
+@tag("mariadb")
+class CustomerPageTextsTests(TestCase):
+    """The words of D-128 on the pages next to the buildings: the empty neighbourhood, the bank hint of the profile and
+    the error summary of the profile cards (the account's own data only)."""
+
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        self.mine = customer("texts.mine@example.org")
+        self.other = customer("texts.other@example.org")
+        self.client = login(self.mine)
+
+    def test_a_neighbourhood_without_data_says_so(self):
+        response = self.client.get(NEIGHBOURHOOD)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("Noch keine Daten", html)
+        self.assertNotIn("nb-circuit", html)
+
+    def test_the_bank_card_starts_its_hint_with_the_condition(self):
+        html = self.client.get(f"{PROFILE}?edit=bank").content.decode()
+        self.assertIn("Nur nötig, wenn Sie Solarstrom einspeisen.", html)
+
+    def test_an_invalid_iban_shows_the_error_summary_with_a_link_and_changes_nothing(self):
+        own_iban.set_own_iban(self.other, GOOD_IBAN)
+        response = self.client.post(BANK, {"iban": "not an iban"})
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('class="alert alert-danger error-summary"', html)
+        self.assertIn("Bitte prüfen Sie Ihre Angaben", html)
+        self.assertRegex(html, r'<li><a href="#id_iban">[^<]+</a></li>')
+        self.assertEqual(own_iban.own_iban(self.mine), "")
+        self.assertEqual(own_iban.own_iban(self.other), GOOD_IBAN)
+
+    def test_the_profile_cards_need_a_login(self):
+        from django.test import Client
+
+        self.assertEqual(Client().post(BANK, {"iban": GOOD_IBAN}).status_code, 302)
+        self.assertEqual(own_iban.own_iban(self.mine), "")

@@ -346,11 +346,10 @@ class AccountDeletionTests(TestCase):
         page = self.client.get(DELETE_URL).content.decode()
 
         self.assertIn("Konto wirklich löschen?", page)
-        self.assertIn("Sie verlieren den Zugang zum Portal.", page)
+        self.assertIn("Sie haben sofort keinen Zugang mehr zum Portal.", page)
         self.assertIn("Alle Angaben werden gelöscht.", page)
-        self.assertIn("Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind.", page)
+        self.assertIn("Ausgenommen sind Angaben, die wir gesetzlich aufbewahren müssen", page)
         self.assertIn("Konto unwiderruflich löschen</button>", page)
-        self.assertIn("Diese Löschung kann nicht mehr zurückgezogen oder aufgehoben werden.", page)
 
     def test_the_card_of_the_profile_is_one_sentence_and_leads_to_the_page(self):
         card = re.search(
@@ -358,7 +357,8 @@ class AccountDeletionTests(TestCase):
             self.client.get(PROFILE_URL).content.decode(), re.S,
         ).group(0)
 
-        self.assertIn(f'href="{DELETE_URL}"', card)
+        # The card leads to the fork (D-127); the fork leads on to the page "Delete account".
+        self.assertIn('href="/profile/end/"', card)
         self.assertNotIn("<form", card)
         self.assertNotIn("Aufbewahrung", card)
         self.assertNotIn("deaktiviert", card)

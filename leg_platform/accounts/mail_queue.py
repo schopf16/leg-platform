@@ -98,7 +98,6 @@ HANDLERS = {
     MailJob.Kind.DEREGISTRATION_EFFECTIVE: _notification(emails.send_deregistration_effective),
     MailJob.Kind.IBAN_CHANGED: _notification(emails.send_iban_changed),
     MailJob.Kind.OPERATOR_CONFIRMATION_LAPSED: _notification(emails.send_operator_confirmation_lapsed),
-    MailJob.Kind.APPLICATION_RETURNED: _notification(emails.send_application_returned),
     MailJob.Kind.APPLICATION_REJECTED: _notification(emails.send_application_rejected),
     MailJob.Kind.APPLICATION_REJECTED_OPERATOR: _notification(emails.send_application_rejected_operator),
 }

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from django.template import Context, Template
 from django.test import RequestFactory, SimpleTestCase, TestCase, tag
 from django.urls import reverse
-from django.utils import timezone, translation
+from django.utils import translation
 from django.utils.html import escape
 
 from leg_platform.accounts.tests.helpers import instance_mail_addresses
@@ -87,14 +87,6 @@ class BannerTests(TestCase):
         self.assertNotIn("nicht rechtzeitig eingetroffen", text(self.client.get(HOME)))
         self.assertNotIn("nicht rechtzeitig eingetroffen", text(self.client.get(BUILDINGS)))
 
-    def test_a_return_for_correction_is_no_banner_it_has_its_own_note_and_is_marked_seen(self):
-        customer_messages.record(self.mine, Kind.APPLICATION_RETURNED)
-
-        html = text(self.client.get(HOME))
-
-        self.assertNotIn("banner-list", html)
-        self.assertEqual(customer_messages.messages_for(self.mine), [])
-
     def test_the_messages_of_another_account_are_neither_shown_nor_marked(self):
         customer_messages.record(self.other, Kind.APPLICATION_REJECTED, "Fremd")
 
@@ -161,14 +153,12 @@ class BannerTests(TestCase):
         publish_contract(staff)
         configure_numbers()
         application, _building = draft_with_points(self.mine)
-        Application.objects.filter(pk=application.pk).update(returned_at=timezone.now(), returned_reason="intern")
         customer_messages.record(self.mine, Kind.APPLICATION_REJECTED, "intern")
         customer_messages.record(self.other, Kind.APPLICATION_REJECTED, "fremd")
 
         self.assertEqual(customer_messages.purge(self.mine), 1)
 
         self.assertFalse(CustomerMessage.objects.filter(person=self.mine).exists())
-        self.assertEqual(Application.objects.get(pk=application.pk).returned_reason, "")
         self.assertTrue(CustomerMessage.objects.filter(person=self.other).exists())
         self.assertEqual(customer_messages.purge(self.mine), 0)  # idempotent
 
@@ -206,7 +196,7 @@ class BannerTests(TestCase):
 
 
 @tag("mariadb")
-class ReturnedAndPausedTests(TestCase):
+class PausedTests(TestCase):
     databases = {"default", "addresses"}
 
     def setUp(self):
@@ -214,32 +204,6 @@ class ReturnedAndPausedTests(TestCase):
         self.mine = customer("returned.mine@example.org")
         self.client = login(self.mine)
         self.application, _building = draft_with_points(self.mine)
-
-    def return_it(self, reason=HOSTILE):
-        Application.objects.filter(pk=self.application.pk).update(returned_at=timezone.now(), returned_reason=reason)
-
-    def test_the_reason_is_on_the_start_page_the_building_card_and_the_wizard_escaped(self):
-        self.return_it()
-        for url in (HOME, BUILDINGS, START, step_url(self.application, "contract")):
-            with self.subTest(url=url):
-                html = text(self.client.get(url))
-                self.assertIn("Die LEG hat Ihre Anmeldung zur Korrektur zurückgegeben:", html)
-                self.assertIn(escape(HOSTILE), html)
-                self.assertNotIn("<img src=x", html)
-                if url == HOME:
-                    self.assertIn("Bitte nachbessern", html)
-                else:
-                    self.assertIn("Bitte prüfen Sie Ihre Angaben und schicken Sie die Anmeldung erneut ab.", html)
-
-    def test_without_a_reason_the_general_sentence_stays(self):
-        self.return_it(reason="")
-        html = text(self.client.get(step_url(self.application, "contract")))
-        self.assertIn("Die LEG hat Ihre Anmeldung zurückgegeben. Bitte prüfen Sie Ihre Angaben und schicken Sie sie erneut ab.", html)
-        self.assertNotIn("zur Korrektur zurückgegeben:", html)
-
-    def test_a_draft_that_was_not_returned_has_no_note(self):
-        html = text(self.client.get(HOME))
-        self.assertNotIn("returned-note", html)
 
     def test_a_paused_draft_has_the_label_and_the_day_it_is_deleted_on_the_pages(self):
         Application.objects.filter(pk=self.application.pk).update(state=Application.State.PAUSED)
@@ -429,9 +393,9 @@ class StepPagesTests(TestCase):
         html = text(response)
         summary = html[html.index("error-summary") :]
         summary = summary[: summary.index("</div>")]
-        # Step 2 shows the errors under the fields: the summary has the title only, no link and no message (D-125).
+        # The summary names the short name of the field as a link, not the message.
         self.assertIn("Bitte prüfen Sie Ihre Angaben", summary)
-        self.assertNotIn("<a href", summary)
+        self.assertIn('<a href="#id_draw_number">Messpunkt-Nummer</a>', summary)
         self.assertNotIn("Geben Sie die letzten Stellen der Nummer ein.", summary)
         # The message stays under the field.
         self.assertIn("Geben Sie die letzten Stellen der Nummer ein.", html)
@@ -552,30 +516,20 @@ class DeregistrationWalkthroughTests(TestCase):
         own_iban.set_own_iban(self.mine, GOOD_IBAN)
         self.client = login(self.mine)
 
-    def test_the_page_names_the_earliest_day_the_irreversibility_and_a_single_direction(self):
-        from leg_platform.community import deregistrations
-
+    def test_the_page_says_it_is_binding_names_no_computed_day_and_has_a_single_direction(self):
         html = text(self.client.get(DEREGISTRATION))
-        earliest = deregistrations.earliest_date_preview().strftime("%d.%m.%Y")
-        self.assertIn(f"Frühestens am {earliest}", html)
-        self.assertIn("Die Kündigung können Sie danach nicht selbst zurücknehmen. Bei Fragen wenden Sie sich an die LEG.", flat(html))
+        self.assertNotIn("Frühestens am", html)
+        self.assertIn("Die Abmeldung ist verbindlich.", html)
         self.assertIn("Wunschdatum (letzter Tag eines Monats)", html)
         # A point without a name: the direction is the title and is not repeated in the line below it.
         label = html[html.index("point-check") :]
         label = label[: label.index("</label>")]
         self.assertEqual(label.count("Bezug"), 1)
 
-    def test_the_word_leg_is_a_link_only_where_the_instance_has_a_website(self):
-        link = '<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>'
-        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": ""})
-        self.assertNotIn(link, text(self.client.get(DEREGISTRATION)))
-        PortalSettings.objects.update_or_create(pk=1, defaults={"website_url": "https://leg.example.org/"})
-        self.assertIn(link, text(self.client.get(DEREGISTRATION)))
-
-    def test_the_account_deletion_start_says_why_the_points_come_first(self):
+    def test_the_old_account_deletion_start_with_its_reason_is_gone(self):
         html = text(self.client.get(DEREGISTRATION, {"for": "account_deletion"}))
-        self.assertIn("Sie möchten Ihr Konto löschen. Melden Sie dafür zuerst Ihre Messpunkte ab.", html)
-        self.assertNotIn("Sie möchten Ihr Konto löschen.", text(self.client.get(DEREGISTRATION)))
+        self.assertNotIn("Sie möchten Ihr Konto löschen.", html)
+        self.assertNotIn("Melden Sie dafür zuerst Ihre Messpunkte ab.", html)
 
     def test_when_everything_is_deregistered_already_the_page_says_so(self):
         self.client.post(DEREGISTRATION, {
@@ -585,6 +539,7 @@ class DeregistrationWalkthroughTests(TestCase):
         html = text(self.client.get(DEREGISTRATION))
         self.assertIn("Bereits abgemeldet", html)
         self.assertIn("Ihre Messpunkte sind bereits abgemeldet. Den Stand sehen Sie auf der Seite Gebäude.", html)
+        self.assertIn("Bereits in Abmeldung", html)
         self.assertNotIn("Nichts abzumelden", html)
 
     def test_nothing_to_deregister_without_a_running_deregistration_keeps_the_old_page(self):
@@ -626,10 +581,10 @@ class ProfileWalkthroughTests(TestCase):
         deregistrations.request_deregistration(self.mine, metering_point_ids=[active.pk], desired_date=None)
         # The card is one sentence for every account; the page says what happens (owner decision 2026-10-24).
         html = flat(text(self.client.get(self.profile)))
-        self.assertIn("Sie können Ihr Konto jederzeit löschen.", html)
+        self.assertIn("Teilnahme beenden oder Konto löschen", html)
         self.assertNotIn("Ihr Konto wird deaktiviert", html)
         page = flat(text(self.client.get(reverse("accounts:account_delete"))))
-        self.assertIn("Ausgenommen sind Angaben, zu deren Aufbewahrung wir gesetzlich verpflichtet sind.", page)
+        self.assertIn("Ausgenommen sind Angaben, die wir gesetzlich aufbewahren müssen (zum Beispiel Rechnungsdaten).", page)
 
 
 class LogOutWordTests(SimpleTestCase):

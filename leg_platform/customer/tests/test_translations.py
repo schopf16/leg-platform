@@ -98,7 +98,7 @@ class CustomerTextsTests(SimpleTestCase):
             "Start application": "Anmeldung starten",
             "Start deregistration": "Abmeldung starten",
             "Add metering point": "Messpunkt hinzufügen",
-            "Remove metering point": "Messpunkt entfernen",
+            "Deregister metering points": "Messpunkte abmelden",
             "What do we still need to know?": "Was müssen wir noch wissen?",
             "Where is your building?": "Wo liegt Ihr Gebäude?",
             "Which metering points belong to your building?": "Welche Messpunkte gehören zu Ihrem Gebäude?",

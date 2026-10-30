@@ -397,9 +397,10 @@ class DeleteCardTests(TestCase):
     def test_the_card_is_one_sentence_and_leads_to_the_page(self):
         html = card(self.client.get(PROFILE).content.decode(), "delete")
 
-        self.assertIn(f'href="{DELETE}"', html)
+        self.assertIn(f'href="{reverse("accounts:account_end")}"', html)
         self.assertNotIn('name="current_password"', html)
-        self.assertIn("Sie können Ihr Konto jederzeit löschen.", html)
+        self.assertIn("Teilnahme beenden oder Konto löschen", html)
+        self.assertIn("Sie können die Teilnahme an der LEG beenden oder Ihr Konto löschen.", html)
 
     def test_the_page_offers_the_deregistration_next_to_the_button_for_a_customer_with_points(self):
         active_point(1, self.mine, self.location)
@@ -407,8 +408,8 @@ class DeleteCardTests(TestCase):
         html = self.client.get(DELETE).content.decode()
 
         self.assertIn("Konto unwiderruflich löschen", html)
-        self.assertIn(f'href="{reverse("customer:deregistration_start")}"', html)
-        self.assertIn("Messpunkte abmelden", html)
+        self.assertIn(f'href="{reverse("customer:deregistration_start")}?from=delete"', html)
+        self.assertIn("Doch lieber nur Messpunkte abmelden", html)
 
     def test_a_running_point_is_deregistered_by_the_deletion_and_the_account_is_deactivated(self):
         point = active_point(1, self.mine, self.location)

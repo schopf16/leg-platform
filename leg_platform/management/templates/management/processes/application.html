@@ -42,7 +42,7 @@ Buttons that do not fit the state are not drawn; the service checks again.
     {% elif can_review %}
       <p>{% blocktranslate %}The application is waiting. Take it into review, or start the registration at the {{ operator }} directly.{% endblocktranslate %}</p>
     {% elif application.state == "in_review" %}
-      <p>{% blocktranslate %}Check the details. Then start the registration at the {{ operator }}, or return the application to the customer for correction.{% endblocktranslate %}</p>
+      <p>{% blocktranslate %}Check the details. Then start the registration at the {{ operator }}.{% endblocktranslate %}</p>
     {% elif can_confirm %}
       <p>{% blocktranslate with date=operator_started %}The registration at the {{ operator }} started on {{ date }}. Record the confirmation when the {{ operator }} has confirmed it.{% endblocktranslate %}</p>
     {% elif can_complete %}
@@ -61,7 +61,6 @@ Buttons that do not fit the state are not drawn; the service checks again.
       {% if can_start_operator %}<a class="btn {% if application.state == 'in_review' %}btn-primary{% else %}btn-accent-outline{% endif %}" href="{{ operator_started_url }}">{% blocktranslate %}Record the start at the {{ operator }}{% endblocktranslate %}</a>{% endif %}
       {% if can_confirm %}<a class="btn btn-primary" href="{{ operator_confirmed_url }}">{% translate "Record confirmation" %}</a>{% endif %}
       {% if can_complete %}<a class="btn btn-primary" href="{{ complete_url }}">{% translate "Complete application" %}</a>{% endif %}
-      {% if can_return %}<a class="btn btn-secondary-action" href="{{ return_url }}">{% translate "Return for correction" %}</a>{% endif %}
     </div>
   </section>
 

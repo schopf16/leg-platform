@@ -237,8 +237,6 @@ class ApplicationStartView(CustomerAccessMixin, View):
                 drafts=drafts, draft=draft, rows=rows, progress=current,
                 remaining=current.total - current.done, paused=paused,
                 paused_date=applications.rollback_date(draft) if paused else None,
-                reason=applications.returned_reason(draft), returned=draft.returned_at is not None,
-                checking=draft.returned_at is not None and current.next_step is None,
                 next_url=next_url(draft),
                 next_name=NEXT_STEP_NAMES[current.next_step] if current.next_step else _("Submit application"),
             )
@@ -312,8 +310,16 @@ class StepView(CustomerAccessMixin, View):
             return None, None, redirect("customer:application", pk=application.pk)
         return application, current, None
 
+    def shown_keys(self, current):
+        """The steps the customer really sees: applicable ones, without a step that is already settled from before (the
+        contract agreed earlier, a known bank connection or building) - except the page that is open right now."""
+        return [
+            step.key for step in current.steps
+            if step.applicable and (step.state != applications.KNOWN or step.key == self.step)
+        ]
+
     def base_context(self, request, application, current, **extra):
-        applicable = [step.key for step in current.steps if step.applicable]
+        applicable = self.shown_keys(current)
         return {
             "application": application,
             "step": self.step,
@@ -322,8 +328,6 @@ class StepView(CustomerAccessMixin, View):
             "step_name": STEP_NAMES[self.step],
             "paused": application.state == Application.State.PAUSED,
             "paused_date": applications.rollback_date(application) if application.state == Application.State.PAUSED else None,
-            "returned": application.returned_at is not None,
-            "returned_reason": applications.returned_reason(application),
             "has_iban": own_iban.has_iban(request.user),
             "back_url": self.back_url(application, current),
             "confirm_cancel": request.GET.get("cancel") == "1",
@@ -334,7 +338,7 @@ class StepView(CustomerAccessMixin, View):
     def back_url(self, application, current):
         """The page before this step (an applicable step that can be opened), else the overview with every step (N-01)."""
         before = [step for step in current.steps if step.applicable and step.available]
-        keys = [step.key for step in before]
+        keys = [step.key for step in before if step.state != applications.KNOWN or step.key == self.step]
         if self.step in keys and keys.index(self.step) > 0:
             return step_url(application, keys[keys.index(self.step) - 1])
         return reverse("customer:application_start")
@@ -642,9 +646,9 @@ def _figure(value):
 
 
 def _typed_part(number):
-    """What the person types for a stored number: the part after country and identifier, without the zeros on the left
-    that the rule adds again (``numbers.normalise_entered_number``)."""
-    return number[PREFIX_LENGTH:].lstrip("0") or "0"
+    """What the person types for a stored number: the part after country and identifier, all ``SUFFIX_LENGTH``
+    characters (a shortened number would be refused as too short)."""
+    return number[PREFIX_LENGTH:]
 
 
 def _number_message(error):
@@ -751,8 +755,7 @@ class StartDateStepView(StepView):
             initial = {"start": application.start_choice, "desired_date": application.desired_start_date}
         earliest = applications.earliest_start_date()
         initial = initial or {"start": forms.ASAP}
-        if not initial.get("desired_date"):
-            initial["desired_date"] = earliest
+        # No date is prefilled: a date that the customer did not pick is never taken (an empty "Desired date" is refused).
         form = form or forms.StartForm(initial=initial)
         # The earliest day for the date picker (a hint of the browser; the service checks it again) and, up front, as the
         # help text under the field (W1-11).

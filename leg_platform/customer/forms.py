@@ -7,22 +7,23 @@ from decimal import Decimal, InvalidOperation
 
 from django import forms
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.utils.translation import gettext_lazy as _
 
 from leg_platform.accounts.forms import PortalFormMixin, ReauthenticationForm
-from leg_platform.community import deregistrations, grid_operator, numbers, own_iban
-from leg_platform.community.application_common import month_end
+from leg_platform.community import deregistrations, grid_operator, numbers
+from leg_platform.community.application_common import add_months, month_end
 from leg_platform.community.models import (
     BUILDING_DESCRIPTION_MAX_LENGTH,
     BUILDING_NAME_MAX_LENGTH,
     METERING_POINT_NAME_MAX_LENGTH,
-    Direction,
 )
 from leg_platform.customer import contact, texts
 
 YES, NO = "yes", "no"
 ASAP, DATE = "asap", "date"
 EARLIEST = "earliest"
+DESIRED_DATE_CHOICES = 12  # how many month ends the list of desired dates offers
 
 
 class CustomerForm(PortalFormMixin, forms.Form):
@@ -130,11 +131,30 @@ class MeteringPointsForm(CustomerForm):
         for name in ("draw_number", "feed_in_number"):
             self.fields[name].help_text = str(self.fields[name].help_text) % {"prefix": prefix_text, "length": numbers.SUFFIX_LENGTH}
         for name in ("draw_number", "feed_in_number"):
-            self.fields[name].widget.attrs.update(
-                {"autocapitalize": "characters", "spellcheck": "false", "data-pad-length": numbers.SUFFIX_LENGTH}
-            )
+            self.fields[name].widget.attrs.update({"autocapitalize": "characters", "spellcheck": "false"})
+        self.fields["draw_number"].summary_label = _("Metering point number")
+        self.fields["feed_in_number"].summary_label = _("Feed-in metering point number")
         for name in ("draw_number", "draw_name", "feed_in_number", "feed_in_name"):
             self.fields[name].widget.attrs["autocomplete"] = "off"
+
+    def _complete_number(self, name):
+        """The typed part is never padded for the customer: fewer than ``SUFFIX_LENGTH`` characters is an error here
+        (a padded number would be a number the customer did not type)."""
+        value = self.cleaned_data.get(name) or ""
+        if 0 < len(numbers.compact_number(value)) < numbers.SUFFIX_LENGTH:
+            raise forms.ValidationError(
+                _("Please enter all %(length)s characters."), code="too_short", params={"length": numbers.SUFFIX_LENGTH}
+            )
+        return value
+
+    def clean_draw_number(self):
+        return self._complete_number("draw_number") if self.draw_needed else self.cleaned_data.get("draw_number")
+
+    def clean_feed_in_number(self):
+        # A hidden feed-in block (answer "No") is not checked.
+        if not self.wants_feed_in:
+            return self.cleaned_data.get("feed_in_number")
+        return self._complete_number("feed_in_number")
 
     @property
     def wants_feed_in(self):
@@ -237,32 +257,37 @@ class DeregistrationForm(ReauthenticationForm):
 
     The rules are the service's (``community.deregistrations``); this form checks what it can before the proof is used up
     (the code is checked only when nothing else is wrong): a point of the account's own list, the date (never in the
-    past, a month end, not before the notice period; the date itself is never shown) and the IBAN of a feed-in
-    (``iban_missing``: the page leads to the profile and back, KONZEPT 7.1 item 3)."""
+    past, a month end, not before the notice period; the date itself is never shown). A feed-in without an IBAN does not
+    block it."""
 
     metering_points = forms.MultipleChoiceField(
-        label=_("Which metering points should be deregistered?"), widget=forms.CheckboxSelectMultiple,
-        error_messages={
-            "required": _("Choose at least one metering point."), "invalid_choice": texts.NOT_DEREGISTRABLE,
-        },
+        label=_("Which metering points should be deregistered?"), widget=forms.CheckboxSelectMultiple, required=False,
+        error_messages={"invalid_choice": texts.NOT_DEREGISTRABLE},
+    )
+    # Registrations in progress that the customer withdraws instead (not chosen at the start); only the ids that the view
+    # offers are valid, and the service checks the account and the state again.
+    withdraw_applications = forms.MultipleChoiceField(
+        required=False, widget=forms.CheckboxSelectMultiple, error_messages={"invalid_choice": texts.NOT_DEREGISTRABLE},
     )
     termination = forms.ChoiceField(
         label=_("When should the deregistration take effect?"), initial=EARLIEST, widget=forms.RadioSelect,
-        choices=((EARLIEST, _("Earliest possible date")), (DATE, _("Desired date (end of a month)"))),
+        required=False, choices=((EARLIEST, _("Earliest possible")), (DATE, _("Desired date"))),
     )
-    desired_date = forms.DateField(
-        label=_("Desired date (last day of a month)"), required=False,
-        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
-    )
-    field_order = ("metering_points", "termination", "desired_date", "current_password", "otp_token")
+    # A list of the realistic dates (the month ends from the earliest on); the posted value is still parsed as a date and
+    # checked by ``check_changes`` and the service, so a date that is not offered is rejected.
+    desired_date = forms.DateField(label=_("Desired date (last day of a month)"), required=False, widget=forms.Select)
+    field_order = ("metering_points", "withdraw_applications", "termination", "desired_date", "current_password", "otp_token")
 
-    def __init__(self, *args, points, **kwargs):
+    def __init__(self, *args, points, withdrawable=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.points = {str(point.pk): point for point in points}
-        self.iban_missing = False
         self.fields["metering_points"].choices = [(key, key) for key in self.points]
+        self.fields["withdraw_applications"].choices = [(str(row["pk"]), str(row["pk"])) for row in withdrawable]
         self.fields["termination"].widget.attrs["class"] = "form-check-input"
-        self.fields["desired_date"].widget.attrs["min"] = timezone.localdate().isoformat()
+        first = deregistrations.earliest_termination_date()
+        dates = [month_end(add_months(first, number)) for number in range(DESIRED_DATE_CHOICES)]
+        self.fields["desired_date"].widget.choices = [(day.isoformat(), date_format(day, "d.m.Y")) for day in dates]
+        self.fields["desired_date"].initial = first
         for name in ("current_password", "otp_token"):
             if name in self.fields:
                 # The script keeps the button inactive until the proof is typed; no field takes the focus on arrival.
@@ -272,9 +297,19 @@ class DeregistrationForm(ReauthenticationForm):
 
     def clean(self):
         data = self.cleaned_data
-        if data.get("termination") == DATE and not data.get("desired_date") and "desired_date" not in self.errors:
-            self.add_error("desired_date", forms.ValidationError(_("Choose a date."), code="required"))
-        if data.get("termination") == EARLIEST:
+        if "metering_points" in data and not data["metering_points"] and not data.get("withdraw_applications"):
+            if "withdraw_applications" not in self.errors:
+                self.add_error(
+                    "metering_points" if self.points else None,
+                    forms.ValidationError(_("Choose at least one metering point."), code="required"),
+                )
+        # The date matters whenever points are deregistered (the notice period is the same for every point).
+        if data.get("metering_points"):
+            if not data.get("termination"):
+                self.add_error("termination", forms.ValidationError(_("This field is required."), code="required"))
+            if data.get("termination") == DATE and not data.get("desired_date") and "desired_date" not in self.errors:
+                self.add_error("desired_date", forms.ValidationError(_("Choose a date."), code="required"))
+        if data.get("termination") == EARLIEST or not data.get("metering_points"):
             data["desired_date"] = None
         return super().clean()
 
@@ -283,7 +318,7 @@ class DeregistrationForm(ReauthenticationForm):
         return [self.points[key] for key in data.get("metering_points", []) if key in self.points]
 
     def check_changes(self, cleaned_data):
-        """Before the code is used up: the date and the IBAN of a feed-in."""
+        """Before the code is used up: the date. A missing IBAN of a feed-in does not block (owner decision 2026-10-29)."""
         desired = cleaned_data.get("desired_date")
         if cleaned_data.get("termination") == DATE and desired is not None:
             if desired < timezone.localdate():
@@ -292,13 +327,6 @@ class DeregistrationForm(ReauthenticationForm):
                 self.add_error("desired_date", texts.DATE_NOT_MONTH_END)
             elif desired < deregistrations.earliest_termination_date():
                 self.add_error("desired_date", texts.DATE_TOO_EARLY)
-        if (
-            not self.errors and self.chosen_points(cleaned_data)
-            and any(point.direction == Direction.FEED_IN for point in self.chosen_points(cleaned_data))
-            and not own_iban.has_iban(self.user)
-        ):
-            self.iban_missing = True
-            self.add_error(None, texts.IBAN_NEEDED)
 
 
 # LastPass, 1Password and Bitwarden leave a field alone that carries their ignore attribute (D-115).

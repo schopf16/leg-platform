@@ -25,8 +25,8 @@ counts below it carry the same information for screen readers and without a scri
 
     {% if not neighbourhood %}
       <section class="step-card" aria-labelledby="nb-unknown">
-        <h2 id="nb-unknown" class="nb-h">{% translate "No circuits in the address directory yet" %}</h2>
-        <p>{% translate "The address directory has no buildings yet. The map updates with the directory import." %}</p>
+        <h2 id="nb-unknown" class="nb-h">{% translate "No data yet" %}</h2>
+        <p>{% translate "No data is available for your neighbourhood yet." %}</p>
       </section>
     {% else %}
       <section class="step-card" aria-labelledby="nb-circuit">
@@ -82,7 +82,7 @@ counts below it carry the same information for screen readers and without a scri
     <section class="step-card" aria-labelledby="nb-sources">
       <h2 id="nb-sources" class="nb-h">{% translate "Sources" %}</h2>
       <ul class="nb-sources">
-        <li>{% translate "Buildings and transformer stations: BKW map of high discount" %}</li>
+        <li>{% translate "Buildings and transformer stations: BKW map of the area with the higher discount" %}</li>
         <li>{% translate "PV plants: Federal Office of Energy (BFE), plant register" %}</li>
       </ul>
     </section>

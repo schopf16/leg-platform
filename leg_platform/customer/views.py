@@ -47,7 +47,7 @@ class BuildingsView(CustomerAccessMixin, View):
         read = banners.pending(request.user)
         response = render(request, "customer/buildings.html", {
             "overview": data, "deregistration_url": reverse("customer:deregistration_start"),
-            "can_deregister": data.can_deregister, "banners": read.banners,
+            "banners": read.banners,
         }, status=status)
         # Only after the page was built, and only for a real visit (not HEAD, not a prefetch).
         banners.mark_shown(request, request.user, read)
@@ -55,6 +55,7 @@ class BuildingsView(CustomerAccessMixin, View):
 
     def get(self, request):
         data = self._data(request)
+        data.open_id = request.session.pop("buildings_open_id", "")
         edit_id = request.GET.get("edit", "")
         if edit_id:
             card = card_edit.find(data, edit_id)
@@ -79,6 +80,7 @@ class BuildingsView(CustomerAccessMixin, View):
             result = card_edit.save(request, state)
             if result is True:
                 messages.success(request, _("Saved."))
+                request.session["buildings_open_id"] = card.edit_id
                 return redirect("customer:buildings")
             if result is not False:
                 return result

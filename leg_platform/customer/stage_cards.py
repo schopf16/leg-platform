@@ -44,9 +44,6 @@ class Slide:
     total: int
     button: str
     url: str
-    # The LEG returned the application for correction: the card says so and gives the reason.
-    returned: bool = False
-    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -101,18 +98,12 @@ def _draft_slide(application):
             steps.append(Step(STEP_NAMES[step.key], "now", _("Next up")))
         else:
             steps.append(Step(STEP_NAMES[step.key], "todo", _("Open")))
-    if progress.next_step is None and application.returned_at is not None:
-        button, url = _("Check your details"), reverse("customer:application_start")
-    elif progress.next_step is None:
+    if progress.next_step is None:
         button, url = journey.READY[1], reverse(journey.READY[2], args=[application.pk])
     else:
         button, url = journey.NEXT[progress.next_step][1], reverse(journey.NEXT[progress.next_step][2], args=[application.pk])
     address, egid, name = _building_facts(_building(application))
-    returned = application.returned_at is not None
-    reason = applications.returned_reason(application) if returned else ""
-    return Slide(
-        address, egid, name, steps, progress.done, progress.total, button, url, returned=returned, reason=reason,
-    )
+    return Slide(address, egid, name, steps, progress.done, progress.total, button, url)
 
 
 def _review_slide(application, operator):

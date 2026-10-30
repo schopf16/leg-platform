@@ -1,15 +1,14 @@
 {% extends "customer/base.html" %}
 {% load i18n %}{% comment %}
 The shell of the five steps (SCHRITT-TEMPLATE.md): the small label, the progress ("Step n of m: name"), the heading as a
-question, one sentence, the card of the step. A paused draft and a draft returned by the LEG get a banner; "Cancel" opens
+question, one sentence, the card of the step. A paused draft gets a banner; "Cancel" opens
 the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of the step views: ``step_number``,
-``step_total``, ``step_name``, ``application``, ``paused``, ``returned``, ``confirm_cancel``, ``operator``.
+``step_total``, ``step_name``, ``application``, ``paused``, ``confirm_cancel``, ``operator``.
 {% endcomment %}
 {% block title %}{{ step_name }} – {% translate "Application" %}{% endblock %}
 {% block content %}
   <div class="wizard">
     {% if paused %}<div class="alert alert-warning" role="status">{% include "customer/_paused_note.html" with paused_date=paused_date %}</div>{% endif %}
-    {% url 'customer:application_start' as overview_url %}{% include "customer/_returned_note.html" with reason=returned_reason returned=returned check_url=overview_url %}
     {% if confirm_cancel %}
       <section class="step-card cancel-card" aria-labelledby="cancel-title">
         <h2 id="cancel-title">{% translate "Cancel application?" %}</h2>
@@ -26,13 +25,8 @@ the confirmation card on this page (``?cancel=1``, ABBRECHEN.md). Contexts of th
     <div class="progress-block">
       <a class="back-link" href="{{ back_url }}">{% translate "Back" %}</a>
       <p class="page-label">{% translate "My participation · Application" %}</p>
-      {% if step == "metering_points" %}
-        <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
-        <p class="step-note">{% blocktranslate %}Step {{ step_number }}: {{ step_name }}{% endblocktranslate %}</p>
-      {% else %}
-        <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }} of {{ step_total }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
-        <p class="step-note">{% blocktranslate %}Step {{ step_number }} of {{ step_total }}: {{ step_name }}{% endblocktranslate %}</p>
-      {% endif %}
+      <progress class="path-bar" max="{{ step_total }}" value="{{ step_number }}" aria-label="{% blocktranslate %}Step {{ step_number }} of {{ step_total }}{% endblocktranslate %}">{{ step_number }}/{{ step_total }}</progress>
+      <p class="step-note">{% blocktranslate %}Step {{ step_number }} of {{ step_total }}: {{ step_name }}{% endblocktranslate %}</p>
     </div>
     <div>
       <h1 class="start-title">{% block heading %}{% endblock %}</h1>

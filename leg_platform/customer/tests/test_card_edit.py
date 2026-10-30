@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from leg_platform.accounts.tests.helpers import VerifiedClient
 from leg_platform.addresses.models import TransformerStation
-from leg_platform.community import application_staff, applications, buildings, contracts, own_iban
+from leg_platform.community import application_staff, applications, contracts, own_iban
 from leg_platform.community.history import HistoryEvent, entries_for
 from leg_platform.community.models import Application, ApplicationBuilding, ApplicationMeteringPoint, Direction, MeteringPoint
 from leg_platform.community.tests.helpers import (
@@ -24,7 +24,7 @@ from leg_platform.community.tests.helpers import (
     make_metering_point,
     staff_user,
 )
-from leg_platform.customer import card_edit, overview
+from leg_platform.customer import overview
 from leg_platform.customer.tests.helpers import (
     BUILDINGS,
     GOOD_IBAN,
@@ -45,6 +45,11 @@ LONG_AGO = date.today() - timedelta(days=400)
 
 def messages_of(response):
     return [str(message) for message in get_messages(response.wsgi_request)]
+
+
+def typed(last):
+    """The typed end of a metering point number: all 20 characters (a shorter entry is an error, D-128)."""
+    return str(last).zfill(20)
 
 
 def edit_ids(html):
@@ -149,9 +154,11 @@ class StoredCardEditTests(TestCase):
         self.assertIn('class="building-card is-editing"', html)
         self.assertIn("Speichern", html)
         self.assertIn("Abbrechen", html)
-        # The EGID and the numbers are plain, locked text, never inputs.
+        # The EGID and the numbers are plain text (D-128: no lock icon, no hint), never inputs.
         self.assertNotRegex(html, r'<input[^>]*name="[^"]*(egid|number)')
-        self.assertIn("nicht änderbar", html)
+        self.assertNotIn("nicht änderbar", html)
+        self.assertNotIn("i-lock", html)
+        self.assertRegex(html, r'<dt>EGID</dt><dd class="mono">90001234</dd>')
         # The other cards' / the own Ändern button is disabled while one card is edited.
         self.assertNotIn(f'href="{BUILDINGS}?edit=', html)
 
@@ -284,7 +291,7 @@ class StoredCardEditTests(TestCase):
         ids = edit_ids(self.client.get(BUILDINGS).content.decode())
         self.assertEqual(len(ids), 2)
         html = self.client.get(BUILDINGS, {"edit": ids[0]}).content.decode()
-        self.assertEqual(html.count('class="building-card is-editing"'), 1)
+        self.assertEqual(html.count('class="building-card is-editing is-fold"'), 1)
         self.assertRegex(html, r'<button type="button" class="btn btn-secondary-action" disabled>Ändern</button>')
 
 
@@ -473,20 +480,31 @@ class DirectEditPagesTests(TestCase):
 
     def test_the_point_page_saves_number_and_name(self):
         url = self.urls()["point"]
-        response = self.client.post(url, {"draw_number": "20", "draw_name": "Neu"})
+        response = self.client.post(url, {"draw_number": typed(20), "draw_name": "Neu"})
         self.assertRedirects(response, BUILDINGS, fetch_redirect_response=False)
         self.draw.refresh_from_db()
         self.assertEqual((self.draw.number, self.draw.name), (full_number(20), "Neu"))
 
     def test_the_point_page_refuses_a_number_of_the_same_application(self):
-        response = self.client.post(self.urls()["point"], {"draw_number": "11", "draw_name": "X"})
+        response = self.client.post(self.urls()["point"], {"draw_number": typed(11), "draw_name": "X"})
         self.assertEqual(response.status_code, 200)
         self.draw.refresh_from_db()
         self.assertEqual(self.draw.number, full_number(10))
 
+    def test_a_too_short_number_is_an_error_and_never_padded(self):
+        response = self.client.post(self.urls()["point"], {"draw_number": "20", "draw_name": "Neu"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Bitte geben Sie alle 20 Zeichen ein.", response.content.decode())
+        self.draw.refresh_from_db()
+        self.assertEqual((self.draw.number, self.draw.name), (full_number(10), "House"))
+
+    def test_the_start_page_has_no_prefilled_date(self):
+        html = self.client.get(self.urls()["start"]).content.decode()
+        self.assertNotRegex(html, r'type="date"[^>]*value="\d')
+
     def test_the_feed_in_page_saves_the_figures(self):
         url = self.urls(point=self.feed_in)["point"]
-        response = self.client.post(url, {"feed_in_number": "11", "feed_in_name": "Dach", "pv_power_kwp": "7.5"})
+        response = self.client.post(url, {"feed_in_number": typed(11), "feed_in_name": "Dach", "pv_power_kwp": "7.5"})
         self.assertRedirects(response, BUILDINGS, fetch_redirect_response=False)
         self.feed_in.refresh_from_db()
         self.assertEqual(self.feed_in.pv_power_kwp, Decimal("7.5"))
@@ -533,7 +551,7 @@ class DirectEditPagesTests(TestCase):
         )
         response = self.client.post(
             reverse("customer:application_edit_point", args=[self.application.pk, foreign_point.pk]),
-            {"draw_number": "88", "draw_name": "X"},
+            {"draw_number": typed(88), "draw_name": "X"},
         )
         self.assertEqual(response.status_code, 404)
         foreign_point.refresh_from_db()
@@ -595,7 +613,7 @@ class DirectEditPagesTests(TestCase):
 
         values = {
             "start": {"start": "asap"}, "bank": {"iban": OTHER_IBAN},
-            "point": {"draw_number": "20", "draw_name": "Neu"},
+            "point": {"draw_number": typed(20), "draw_name": "Neu"},
             "address": {"street": "Neuweg", "house_number": "1", "postal_code": "3000", "town": "Bern"},
         }
         with patch.object(limits, "allow_wizard", return_value=False):
@@ -608,5 +626,5 @@ class DirectEditPagesTests(TestCase):
 
     def test_a_changed_number_keeps_the_queue_position(self):
         before = Application.objects.get(pk=self.application.pk).submitted_at
-        self.client.post(self.urls()["point"], {"draw_number": "20", "draw_name": "Neu"})
+        self.client.post(self.urls()["point"], {"draw_number": typed(20), "draw_name": "Neu"})
         self.assertEqual(Application.objects.get(pk=self.application.pk).submitted_at, before)

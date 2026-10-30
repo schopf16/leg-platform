@@ -6,12 +6,24 @@ EGID is shown where an address is; the EGRID is left out (no verified source).
 Two states, both rendered by the server (no script): read (a button "Edit" in the footer links to ``?edit=<card id>``)
 and edit (``card.editing``): the tile is a form, every value the person may change is an input in place, the other values
 stay plain text (grey with a lock). One POST saves it (customer.card_edit); only one card is in edit mode at a time.
-{% endcomment %}{% with ed=card.editing %}
-{% if ed %}<form class="building-card is-editing" method="post" action="{% url 'customer:buildings' %}?edit={{ card.edit_id }}" aria-labelledby="building-{{ forloop.counter }}-edit">{% csrf_token %}{% else %}<section class="building-card" aria-labelledby="building-{{ forloop.counter }}">{% endif %}
+{% endcomment %}{% with ed=card.editing fold=overview.collapsible %}
+{% if ed %}<form class="building-card is-editing{% if fold %} is-fold{% endif %}" method="post" action="{% url 'customer:buildings' %}?edit={{ card.edit_id }}" aria-labelledby="building-{{ forloop.counter }}-edit"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% csrf_token %}{% else %}<section class="building-card{% if fold %} is-fold{% endif %}" aria-labelledby="building-{{ forloop.counter }}"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% endif %}
+  {% if fold %}
+    <details class="fold"{% if ed or overview.open_id == card.edit_id %} open{% endif %}>
+      <summary class="fold-summary">
+        <span class="building-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-home"/></svg></span>
+        <span class="fold-title">
+          <h2 id="building-{{ forloop.counter }}{% if ed %}-title{% endif %}">{{ card.title }}</h2>
+          {% if card.address %}<span class="sub-line">{{ card.address }}</span>{% endif %}
+        </span>
+        <span class="building-status"><span class="dotword"><span class="dot tone-{{ card.tone }}" aria-hidden="true"></span>{{ card.label }}</span></span>
+        <svg class="frame-icon fold-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </summary>
+      <div class="fold-body">
+  {% endif %}
   {% if ed %}
     <div class="edit-head">
       <h3 id="building-{{ forloop.counter }}-edit">{% translate "Edit building" %}</h3>
-      <p class="edit-hint"><svg class="frame-icon lock" aria-hidden="true"><use href="#i-lock"/></svg>{% translate "Greyed-out values cannot be changed here." %}</p>
       {% if ed.errors %}
         <div class="alert alert-danger error-summary" role="alert" tabindex="-1">
           <p class="error-summary-title">{% translate "Please check your entries" %}</p>
@@ -26,15 +38,15 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
     </div>
   {% endif %}
   <div class="card-part building-info">
-    <span class="building-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-home"/></svg></span>
+    {% if not fold %}<span class="building-icon" aria-hidden="true"><svg class="frame-icon"><use href="#i-home"/></svg></span>{% endif %}
     <div class="building-main">
-      <div class="building-top">
+      {% if not fold %}<div class="building-top">
         <div>
           <h2 id="building-{{ forloop.counter }}">{{ card.title }}</h2>
           {% if card.address %}<p class="sub-line">{{ card.address }}</p>{% endif %}
         </div>
         <span class="building-status"><span class="dotword"><span class="dot tone-{{ card.tone }}" aria-hidden="true"></span>{{ card.label }}</span></span>
-      </div>
+      </div>{% endif %}
       <section class="spec-section" aria-labelledby="spec-building-{{ forloop.counter }}">
         <h3 class="spec-title" id="spec-building-{{ forloop.counter }}">{% translate "Building" %}</h3>
         <dl class="spec">
@@ -47,12 +59,12 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
           {% elif ed.name %}
             {% translate "Building name" as label %}{% include "customer/_card_field.html" with field=ed.name.name label=label %}
           {% else %}
-            <div class="spec-row"><dt>{% translate "Building name" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{% if card.name %}{{ card.name }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
+            <div class="spec-row"><dt>{% translate "Building name" %}</dt><dd>{% if card.name %}{{ card.name }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
           {% endif %}
-          <div class="spec-row"><dt>{% translate "EGID" %}</dt><dd class="mono{% if ed %} spec-locked{% endif %}">{% if card.egid %}{{ card.egid }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
-          <div class="spec-row"><dt>{% translate "Transformer circuit" %}</dt><dd class="mono{% if ed %} spec-locked{% endif %}">{% if card.transformer %}{{ card.transformer }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
-          {% if overview.operator_name %}<div class="spec-row"><dt>{% translate "Grid operator" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{{ overview.operator_name }}{% include "customer/_card_lock.html" %}</dd></div>{% endif %}
-          {% if card.description %}<div class="spec-row"><dt>{% translate "Description" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{{ card.description }}{% include "customer/_card_lock.html" %}</dd></div>{% endif %}
+          <div class="spec-row"><dt>{% translate "EGID" %}</dt><dd class="mono">{% if card.egid %}{{ card.egid }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
+          <div class="spec-row"><dt>{% translate "Transformer circuit" %}</dt><dd class="mono">{% if card.transformer %}{{ card.transformer }}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
+          {% if overview.operator_name %}<div class="spec-row"><dt>{% translate "Grid operator" %}</dt><dd>{{ overview.operator_name }}</dd></div>{% endif %}
+          {% if card.description %}<div class="spec-row"><dt>{% translate "Description" %}</dt><dd>{{ card.description }}</dd></div>{% endif %}
         </dl>
       </section>
     </div>
@@ -69,16 +81,16 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
               <div class="spec-row">
                 <dt>{{ row.direction_label }}</dt>
                 {% if row.form %}
-                  <dd class="spec-point"><span class="mono spec-locked">{{ row.number|metering_point }}{% include "customer/_card_lock.html" %}</span>
+                  <dd class="spec-point"><span class="mono">{{ row.number|metering_point }}</span>
                     <span class="spec-input"><label class="visually-hidden" for="{{ row.form.name.id_for_label }}">{% translate "Name of the metering point" %} ({{ row.direction_label }})</label>{{ row.form.name }}</span>
                     {% for error in row.form.name.errors %}<p class="spec-error">{{ error }}</p>{% endfor %}
                   </dd>
                 {% else %}
-                  <dd class="mono{% if ed %} spec-locked{% endif %}">{{ row.number|metering_point }}{% if row.name %} <span class="muted">· {{ row.name }}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd>
+                  <dd class="mono">{{ row.number|metering_point }}{% if row.name %} <span class="muted">· {{ row.name }}</span>{% endif %}</dd>
                 {% endif %}
               </div>
             {% endfor %}
-            <div class="spec-row"><dt>{% translate "LEG name" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{% if card.leg_name %}{{ card.leg_name }}{% else %}<span class="muted">{% translate "Not assigned yet" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
+            <div class="spec-row"><dt>{% translate "LEG name" %}</dt><dd>{% if card.leg_name %}{{ card.leg_name }}{% else %}<span class="muted">{% translate "Not assigned yet" %}</span>{% endif %}</dd></div>
             {% if card.start_text %}
               {% if ed.start %}
                 <div class="spec-row">
@@ -92,7 +104,7 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
                   </dd>
                 </div>
               {% else %}
-                <div class="spec-row"><dt>{% translate "Start" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{{ card.start_text }}{% include "customer/_card_lock.html" %}</dd></div>
+                <div class="spec-row"><dt>{% translate "Start" %}</dt><dd>{{ card.start_text }}</dd></div>
               {% endif %}
             {% endif %}
           </dl>
@@ -106,21 +118,20 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
                 {% translate "Battery" as label %}{% translate "kWh" as unit %}{% include "customer/_card_field.html" with field=card.feed_in.form.battery_kwh label=label unit=unit %}
                 {% translate "Wallbox" as label %}{% translate "kW" as unit %}{% include "customer/_card_field.html" with field=card.feed_in.form.wallbox_kw label=label unit=unit %}
               {% else %}
-                <div class="spec-row"><dt>{% translate "PV system" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{% if card.feed_in.figures.pv_power_kwp %}{{ card.feed_in.figures.pv_power_kwp }} {% translate "kWp" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
-                <div class="spec-row"><dt>{% translate "Battery" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{% if card.feed_in.figures.battery_kwh %}{{ card.feed_in.figures.battery_kwh }} {% translate "kWh" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
-                <div class="spec-row"><dt>{% translate "Wallbox" %}</dt><dd{% if ed %} class="spec-locked"{% endif %}>{% if card.feed_in.figures.wallbox_kw %}{{ card.feed_in.figures.wallbox_kw }} {% translate "kW" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}{% include "customer/_card_lock.html" %}</dd></div>
+                <div class="spec-row"><dt>{% translate "PV system" %}</dt><dd>{% if card.feed_in.figures.pv_power_kwp %}{{ card.feed_in.figures.pv_power_kwp }} {% translate "kWp" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
+                <div class="spec-row"><dt>{% translate "Battery" %}</dt><dd>{% if card.feed_in.figures.battery_kwh %}{{ card.feed_in.figures.battery_kwh }} {% translate "kWh" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
+                <div class="spec-row"><dt>{% translate "Wallbox" %}</dt><dd>{% if card.feed_in.figures.wallbox_kw %}{{ card.feed_in.figures.wallbox_kw }} {% translate "kW" %}{% else %}<span aria-hidden="true">–</span><span class="visually-hidden">{% translate "Not recorded" %}</span>{% endif %}</dd></div>
               {% endif %}
             </dl>
           </section>
         {% endif %}
-        {% if not ed %}{% for row in card.rows %}{% if row.block and row.block.kind == "deregistration" %}{% include "customer/_progress_block.html" with block=row.block footer_withdraw=card.withdraw_in_footer %}{% endif %}{% endfor %}{% endif %}
       </div>
     </div>
   {% endif %}
 
   {% if not ed and card.has_status_blocks %}
     <div class="card-part card-status">
-      {% for row in card.rows %}{% if row.block and row.block.kind != "deregistration" %}{% include "customer/_progress_block.html" with block=row.block footer_withdraw=card.withdraw_in_footer %}{% endif %}{% endfor %}
+      {% for row in card.rows %}{% if row.block %}{% include "customer/_progress_block.html" with block=row.block footer_withdraw=card.withdraw_in_footer %}{% endif %}{% endfor %}
       {% for extra in card.extra_blocks %}{% include "customer/_progress_block.html" with block=extra footer_withdraw=card.withdraw_in_footer %}{% endfor %}
     </div>
   {% endif %}
@@ -139,7 +150,7 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
       {% if card.can_add_point %}<a class="btn btn-primary" href="{% url 'customer:application_start' %}?building={{ card.location.pk }}">{% translate "Add metering point" %}</a>{% endif %}
       {% if card.review_locked %}<span class="card-note">{% translate "The LEG administration is checking your details, so you can no longer change them. Until the registration at the grid operator starts, you can still withdraw the application." %}</span>{% endif %}
       {% if card.removal == "link" and deregistration_url %}
-        <a class="btn btn-danger-outline end-action" href="{{ deregistration_url }}{% if card.location %}?building={{ card.location.pk }}{% endif %}">{% translate "Remove metering point" %}</a>
+        <a class="btn btn-danger-outline end-action" href="{{ deregistration_url }}{{ card.deregistration_query }}">{% translate "Deregister metering points" %}</a>
       {% elif card.removal == "withdraw" %}
         <a class="btn btn-danger-outline end-action" href="{% url 'customer:application_withdraw' card.withdraw_pk %}">{% translate "Withdraw application" %}</a>
       {% elif card.removal == "blocked" %}
@@ -147,5 +158,6 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
       {% endif %}
     </div>
   {% endif %}
+{% if fold %}</div></details>{% endif %}
 {% if ed %}</form>{% else %}</section>{% endif %}
 {% endwith %}

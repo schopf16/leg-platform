@@ -60,11 +60,15 @@
     const summary = form.querySelector("[data-summary]");
     const update = () => {
       const count = form.querySelectorAll('input[name="metering_points"]:checked').length;
+      const withdrawn = form.querySelectorAll('input[name="withdraw_applications"]:checked').length;
       const proof = form.querySelector("[data-proof]");
       const termination = Array.from(form.querySelectorAll('input[name="termination"]')).find((radio) => radio.checked);
       const date = form.querySelector('input[name="desired_date"]');
-      const dateMissing = Boolean(termination && termination.value === "date" && date && !date.value);
-      button.disabled = count === 0 || !proof || proof.value.trim() === "" || dateMissing;
+      const dateMissing = Boolean(count > 0 && termination && termination.value === "date" && date && !date.value);
+      button.disabled = (count === 0 && withdrawn === 0) || !proof || proof.value.trim() === "" || dateMissing;
+      // The hint only while the proof is the missing piece (nothing to say when no proof is needed).
+      const hint = form.querySelector("[data-proof-hint]");
+      if (hint) hint.hidden = !(button.disabled && proof && proof.value.trim() === "");
       if (summary) {
         const text = count === 0 ? summary.dataset.none : count === 1 ? summary.dataset.one : summary.dataset.many;
         summary.textContent = (text || "").replace("%(count)s", String(count));
@@ -73,18 +77,6 @@
     form.addEventListener("change", update);
     form.addEventListener("input", update);
     update();
-  });
-
-  // Metering point numbers: zeros are put in front when the field is left, as the server does on submit (D-102).
-  // Display only; the server normalises the entry again.
-  document.querySelectorAll("input[data-pad-length]").forEach((input) => {
-    input.addEventListener("blur", () => {
-      const length = parseInt(input.dataset.padLength, 10);
-      const compact = input.value.replace(/\s+/g, "").toUpperCase();
-      if (compact && compact.length < length && /^[A-Z0-9]+$/.test(compact)) {
-        input.value = "0".repeat(length - compact.length) + compact;
-      }
-    });
   });
 
   // The IBAN in groups of four when the field is left; nothing is removed that is not white space or a hyphen.
