@@ -1508,12 +1508,6 @@ msgstr "Numéro de téléphone"
 msgid "Two-factor authentication"
 msgstr "Authentification à deux facteurs (2FA)"
 
-msgid "On"
-msgstr "Activée"
-
-msgid "Off"
-msgstr "Désactivée"
-
 msgid "Change password"
 msgstr "Modifier le mot de passe"
 
@@ -1853,9 +1847,6 @@ msgstr "ID de locataire"
 
 msgid "client ID"
 msgstr "ID client"
-
-msgid "Microsoft Graph configuration"
-msgstr "Configuration de Microsoft Graph"
 
 msgid "Microsoft Graph configuration changed"
 msgstr "Configuration de Microsoft Graph modifiée"
@@ -4056,9 +4047,6 @@ msgstr "Code postal, localité"
 msgid "Grid"
 msgstr "Réseau"
 
-msgid "Create new transformer circuit"
-msgstr "Créer un nouveau circuit de transformateur"
-
 msgid "Edit transformer circuit"
 msgstr "Modifier le circuit de transformateur"
 
@@ -6210,9 +6198,6 @@ msgstr "Donné par le client"
 msgid "Description"
 msgstr "Description"
 
-msgid "Number"
-msgstr "Numéro"
-
 msgid "Go to the metering point"
 msgstr "Aller au point de mesure"
 
@@ -8237,9 +8222,6 @@ msgstr ""
 "Conservez au moins le nombre de clés d’accès requis. Ajoutez d’abord une clé"
 " de remplacement."
 
-msgid "Last used"
-msgstr "Dernière utilisation"
-
 msgid "Recover sign-in method"
 msgstr "Récupérer l’accès"
 
@@ -8338,18 +8320,6 @@ msgstr ""
 "terminées. Une session restreinte vous permet de choisir et configurer une "
 "nouvelle méthode."
 
-msgctxt "Passkey setup step"
-msgid "Name"
-msgstr "Nommer"
-
-msgctxt "Passkey setup step"
-msgid "Create"
-msgstr "Créer"
-
-msgctxt "Passkey setup step"
-msgid "Save"
-msgstr "Enregistrer"
-
 msgid ""
 "Your previous sign-in methods no longer work. Save a new passkey to restore "
 "access."
@@ -8364,9 +8334,6 @@ msgstr ""
 "Le navigateur a indiqué cet appareil au lieu d’un autre. Le portail n’a pas "
 "enregistré la clé d’accès. Elle peut toutefois se trouver dans votre "
 "gestionnaire de mots de passe."
-
-msgid "Sign-in"
-msgstr "Connexion"
 
 msgid "Password and number code"
 msgstr "Mot de passe et code numérique"
@@ -8999,9 +8966,6 @@ msgstr ""
 "La LEG reçoit ici les messages du formulaire de contact. Sans cette adresse,"
 " le formulaire de contact n'est pas proposé."
 
-msgid "noreply@example.org"
-msgstr "noreply@example.org"
-
 msgid "Plant register"
 msgstr "Registre des installations"
 
@@ -9114,9 +9078,6 @@ msgstr "Entrées non reprises : contrôle non réussi"
 
 msgid "Plants skipped: no building number (EGID)"
 msgstr "Installations ignorées : sans numéro de bâtiment (EGID)"
-
-msgid "Statistic of the last successful import"
-msgstr "Chiffres de la dernière mise à jour réussie"
 
 msgid "Not run today"
 msgstr "Pas encore mis à jour aujourd’hui"
@@ -9384,12 +9345,6 @@ msgid "The address directory is being set up. Try again later."
 msgstr ""
 "Le répertoire d'adresses est en cours de configuration. Réessayez plus tard."
 
-msgid "Send an email on error"
-msgstr "Envoyer un e-mail en cas d'erreur"
-
-msgid "Email address for errors"
-msgstr "Adresse e-mail pour les erreurs"
-
 msgid "Housekeeping error"
 msgstr "Erreur de maintenance"
 
@@ -9438,9 +9393,6 @@ msgstr ""
 "Une erreur d'une maintenance précédente est ouverte. La maintenance "
 "hebdomadaire attend; lancez une maintenance ici."
 
-msgid "Housekeeping error notification changed"
-msgstr "E-mail d'erreur de la maintenance modifié"
-
 msgid "Housekeeping errors acknowledged"
 msgstr "Erreurs de maintenance acquittées"
 
@@ -9483,9 +9435,6 @@ msgstr "Notification du journal modifiée"
 
 msgid "Critical"
 msgstr "Critique"
-
-msgid "Minimum severity"
-msgstr "Gravité minimale"
 
 msgid "Send an email"
 msgstr "Envoyer un e-mail"
@@ -9868,9 +9817,6 @@ msgstr "Attribuez les points de mesure à votre bâtiment."
 msgid "You confirm the invitation in your account at the grid operator"
 msgstr "Vous confirmez l’invitation dans votre compte chez le gestionnaire de réseau"
 
-msgid "The LEG administration is checking your details, so you can no longer change them."
-msgstr "L’administration de la CEL vérifie actuellement vos indications. Vous ne pouvez donc plus modifier la demande."
-
 msgid "The LEG administration is checking your details, so you can no longer change them. Until the registration at the grid operator starts, you can still withdraw the application."
 msgstr "L’administration de la CEL vérifie actuellement vos indications. Vous ne pouvez donc plus modifier la demande. Tant que l’annonce auprès du gestionnaire de réseau n’a pas commencé, vous pouvez encore la retirer."
 
@@ -9892,9 +9838,6 @@ msgstr "Modifier les coordonnées bancaires ou postales"
 
 msgid "This building is already part of your application."
 msgstr "Ce bâtiment fait déjà partie de votre demande."
-
-msgid "Metering"
-msgstr "Mesure"
 
 msgid "Add another building"
 msgstr "Ajouter un autre bâtiment"
@@ -10081,40 +10024,12 @@ msgstr "Veuillez contacter la CEL. Nous vous aiderons volontiers."
 msgid "As early as possible. The LEG confirms the date."
 msgstr "Dès que possible. La CEL confirme la date."
 
-#. Verbose names that Django derives from the field names
-#. (privacy_accepted_at/url); the
-#. catalogue test requires a translation for every field of the account.
-msgid "privacy accepted at"
-msgstr "déclaration de protection des données acceptée le"
-
-msgid "privacy accepted url"
-msgstr "adresse de la déclaration de protection des données acceptée"
-
-msgid "Company name"
-msgstr "Nom de l’entreprise"
-
-msgid "Access to administration"
-msgstr "Accès à l’administration"
-
-msgid "Superuser status"
-msgstr "Administrateur système"
-
-msgid "Groups"
-msgstr "Groupes"
-
 #. Texts of Django 6.1 without a German translation in Django itself.
 msgid "- Select an option -"
 msgstr "- Sélectionnez une option -"
 
-#: leg_platform/accounts/admin.py
-msgid "account (internal number)"
-msgstr "compte (numéro interne)"
-
 msgid "Please correct"
 msgstr "Correction demandée"
-
-msgid "User permissions"
-msgstr "Permissions"
 
 #, python-format
 msgid "Search %(name)s"
@@ -10187,6 +10102,34 @@ msgstr "Vue de support (vue en tant que personne) terminée"
 
 msgid "Page shown in the support view (view as a person)"
 msgstr "Page affichée dans la vue de support (vue en tant que personne)"
+
+msgid "Request refused in the support view (view as a person)"
+msgstr "Requête refusée dans la vue de support (vue en tant que personne)"
+
+#. Verbose names that Django derives from the field names (privacy_accepted_at/url); the catalogue test requires a
+#. translation for every field of the account.
+msgid "privacy accepted at"
+msgstr "déclaration de protection des données acceptée le"
+
+msgid "privacy accepted url"
+msgstr "adresse de la déclaration de protection des données acceptée"
+
+#. Labels of the user and group forms of the administration (built from the field names; tested by
+#. ChangeMessageLabelTests).
+msgid "Company name"
+msgstr "Nom de l’entreprise"
+
+msgid "Access to administration"
+msgstr "Accès à l’administration"
+
+msgid "Superuser status"
+msgstr "Administrateur système"
+
+msgid "Groups"
+msgstr "Groupes"
+
+msgid "User permissions"
+msgstr "Permissions"
 
 #, python-format
 msgid "%(counter)s message pending, not shown."

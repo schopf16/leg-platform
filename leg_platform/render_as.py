@@ -10,7 +10,8 @@ in the mode.
 Deny by default, in this middleware: only GET/HEAD without a query string on ``ALLOWED_VIEWS`` are answered; POST only
 for "end view" and "log out"; everything else is a 403 page. Nothing is written for the person (no ``mark_seen``, no
 mail, no history, no counter); every response is no-store. Events (ids only, no names, no values): started, ended (with
-the reason) and page views (same page and person within 300 s: no new event).
+the reason), page views and refused requests (method, route name and integer route ids; no query string, no body; same
+page and person within 300 s: no new event).
 """
 
 import logging
@@ -39,8 +40,11 @@ END_REASONS = ("explicit", "timeout", "logout", "subject_changed", "staff_change
 ALLOWED_VIEWS = frozenset({"home", "customer:buildings", "customer:contract", "accounts:profile"})
 # POST allowed besides: the end of the view and the logout of the staff member.
 POST_VIEWS = frozenset({"accounts:render_as_end", "accounts:logout"})
-# Public presentation files and the language switch (no account data, no side effect on an account).
+# Public presentation files and the language switch (no account data, no side effect on an account): GET/HEAD, and
+# POST only for the language switch. Other methods are refused like any other request.
 PASSTHROUGH_VIEWS = SESSION_FREE_VIEWS | {"instance_stylesheet"}
+PASSTHROUGH_POST_VIEWS = frozenset({"set_language"})
+SAFE_METHODS = ("GET", "HEAD")
 
 
 def subject(request):
@@ -110,25 +114,52 @@ def _valid_subject(request, state):
     return person, ""
 
 
-def _record_page_view(request, name, person):
+def _seen_state(request):
     now = int(time.time())
     seen = request.session.get(SEEN_KEY)
     seen = (
         {key: value for key, value in seen.items() if isinstance(value, int) and 0 <= now - value < VIEW_EVENT_INTERVAL}
         if isinstance(seen, dict) else {}
     )
-    key = f"{name}:{person.pk}"
+    return seen, now
+
+
+def _first_in_interval(request, key):
+    """True (and remembered) if ``key`` was not seen in this session within ``VIEW_EVENT_INTERVAL`` seconds."""
+    seen, now = _seen_state(request)
     if key in seen:
-        return
+        return False
     seen[key] = now
     request.session[SEEN_KEY] = seen
+    return True
+
+
+def _record_page_view(request, name, person):
+    if _first_in_interval(request, f"{name}:{person.pk}"):
+        security_log.record(
+            SecurityEvent.Event.RENDER_AS_PAGE_VIEWED, account=person.pk, actor=request.user.pk, detail=f"page {name}"
+        )
+
+
+def _record_refused(request, name, person):
+    """Log a refused request: method, route name and the integer ids of the route only (never the query string, the
+    body or other route values). One event per method and route in the interval, so a loop cannot flood the log."""
+    if not _first_in_interval(request, f"refused:{request.method}:{name}"):
+        return
+    ids = sorted(value for value in request.resolver_match.kwargs.values() if isinstance(value, int))
+    detail = f"refused {request.method} {name}" + (f" ids {','.join(map(str, ids))}" if ids else "")
     security_log.record(
-        SecurityEvent.Event.RENDER_AS_PAGE_VIEWED, account=person.pk, actor=request.user.pk, detail=f"page {name}"
+        SecurityEvent.Event.RENDER_AS_REQUEST_REFUSED, account=person.pk, actor=request.user.pk, detail=detail
     )
 
 
 def refused(request):
     return render(request, "render_as_refused.html", status=403)
+
+
+def passthrough_allowed(name, method):
+    """Whether the public file or the language switch ``name`` is answered in the mode for this HTTP method."""
+    return name in PASSTHROUGH_VIEWS and (method in SAFE_METHODS or (method == "POST" and name in PASSTHROUGH_POST_VIEWS))
 
 
 class RenderAsMiddleware:
@@ -149,7 +180,7 @@ class RenderAsMiddleware:
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         name = request.resolver_match.view_name
-        if name in SESSION_FREE_VIEWS:
+        if name in SESSION_FREE_VIEWS and passthrough_allowed(name, request.method):
             return None  # before the session is read
         if not request.user.is_authenticated:
             return None
@@ -161,7 +192,7 @@ class RenderAsMiddleware:
             end(request, reason)
             return None
         request.subject = person
-        if name in PASSTHROUGH_VIEWS:
+        if passthrough_allowed(name, request.method):
             return None
         if request.method == "POST" and name in POST_VIEWS:
             return None
@@ -169,6 +200,7 @@ class RenderAsMiddleware:
             if request.method == "GET":
                 _record_page_view(request, name, person)
             return None
+        _record_refused(request, name, person)
         return refused(request)
 
 

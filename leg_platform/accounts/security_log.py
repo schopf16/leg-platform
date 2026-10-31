@@ -79,6 +79,7 @@ MESSAGES = {
     Event.RENDER_AS_STARTED: "A staff member started the support view of an account",
     Event.RENDER_AS_ENDED: "A staff member ended the support view of an account",
     Event.RENDER_AS_PAGE_VIEWED: "A page was shown in the support view of an account",
+    Event.RENDER_AS_REQUEST_REFUSED: "A request was refused in the support view of an account",
 }
 
 

@@ -211,8 +211,97 @@ class UrlWalkTests(ViewAsBase):
         self.assertEqual(self.client.head(PROFILE).status_code, 200)
         self.assertEqual(self.client.head(reverse("customer:application_start")).status_code, 403)
 
+    def test_the_passthrough_views_respect_the_http_method(self):
+        css, logo, favicon = reverse("instance_stylesheet"), reverse("instance_logo", args=["light"]), reverse("instance_favicon")
+        language = reverse("set_language")
+        for path in (css, logo, favicon):
+            for method in ("post", "put", "patch", "delete"):
+                with self.subTest(path=path, method=method):
+                    self.assertEqual(getattr(self.client, method)(path).status_code, 403)
+        self.assertEqual(self.client.get(css).status_code, 200)
+        self.assertEqual(self.client.head(css).status_code, 200)
+        # The language switch: POST reaches the view (a redirect), a GET reaches the view too (405 of the view itself).
+        self.assertNotEqual(self.client.post(language, {"language": "de-ch"}).status_code, 403)
+        self.assertEqual(self.client.get(language).status_code, 405)
+        for method in ("put", "patch", "delete"):
+            with self.subTest(path=language, method=method):
+                self.assertEqual(getattr(self.client, method)(language).status_code, 403)
+        self.assertTrue(self.session_state())
+
+    def test_the_passthrough_rule_by_method(self):
+        self.assertTrue(render_as.passthrough_allowed("instance_stylesheet", "GET"))
+        self.assertTrue(render_as.passthrough_allowed("instance_logo", "HEAD"))
+        self.assertFalse(render_as.passthrough_allowed("instance_stylesheet", "POST"))
+        self.assertFalse(render_as.passthrough_allowed("instance_favicon", "POST"))
+        self.assertTrue(render_as.passthrough_allowed("set_language", "POST"))
+        self.assertFalse(render_as.passthrough_allowed("set_language", "DELETE"))
+        self.assertFalse(render_as.passthrough_allowed("home", "GET"))
+
+
+class RefusedLoggingTests(ViewAsBase):
+    def setUp(self):
+        super().setUp()
+        self.start()
+
+    def test_a_refused_request_is_logged_with_method_route_and_ids_only(self):
+        url = reverse("management:persons_detail", args=[self.person.pk])
+        self.assertEqual(self.client.get(url, {"secret": "value"}).status_code, 403)
+        refused = events(Event.RENDER_AS_REQUEST_REFUSED)
+        self.assertEqual(len(refused), 1)
+        self.assertEqual((refused[0].account_id, refused[0].actor_id), (self.person.pk, self.staff.pk))
+        self.assertEqual(
+            self.details(Event.RENDER_AS_REQUEST_REFUSED),
+            [f"refused GET management:persons_detail ids {self.person.pk}"],
+        )
+
+    def test_a_query_string_on_an_allowed_page_is_logged_without_it(self):
+        self.client.get(PROFILE, {"token": "abc"})
+        self.assertEqual(self.details(Event.RENDER_AS_REQUEST_REFUSED), ["refused GET accounts:profile"])
+
+    def test_repeated_refusals_are_one_event_per_method_and_route(self):
+        url = reverse("management:persons_detail", args=[self.person.pk])
+        for _ in range(5):
+            self.client.get(url)
+            self.client.get(reverse("management:persons_detail", args=[self.person.pk + 1]))
+        self.client.post(url)
+        self.assertEqual(len(events(Event.RENDER_AS_REQUEST_REFUSED)), 2)
+
+    def test_a_refusal_is_logged_again_after_the_interval(self):
+        url = reverse("management:persons")
+        self.client.get(url)
+        session = self.client.session
+        session[render_as.SEEN_KEY] = {key: value - render_as.VIEW_EVENT_INTERVAL - 1 for key, value in session[render_as.SEEN_KEY].items()}
+        session.save()
+        self.client.get(url)
+        self.assertEqual(len(events(Event.RENDER_AS_REQUEST_REFUSED)), 2)
+
+    def test_allowed_and_passthrough_requests_are_not_logged_as_refused(self):
+        self.client.get(PROFILE)
+        self.client.get(reverse("instance_stylesheet"))
+        self.assertFalse(events(Event.RENDER_AS_REQUEST_REFUSED))
+
 
 class NothingWrittenTests(ViewAsBase):
+    def test_the_read_paths_of_the_pages_write_and_mail_nothing_with_data_present(self):
+        """stage_cards, participation.status_lines, own_iban_display and customer_messages.messages_for (D-131)."""
+        from leg_platform.community import customer_messages, own_iban, participation
+        from leg_platform.customer import stage_cards
+        from leg_platform.customer.tests.helpers import draft_with_points
+
+        draft_with_points(self.person, feed_in=True)
+        own_iban.set_own_iban(self.person, "CH93 0076 2011 6238 5295 7")
+        customer_messages.record(self.person, customer_messages.Kind.APPLICATION_REJECTED, "note")
+        mail.outbox.clear()
+        before = snapshot()
+        events_before = SecurityEvent.objects.count()
+        stage = stage_cards.for_account(self.person)
+        self.assertFalse(stage.empty)
+        participation.status_lines(self.person)
+        self.assertTrue(own_iban.own_iban_display(self.person))
+        self.assertEqual(len(customer_messages.messages_for(self.person)), 1)
+        self.assertEqual(snapshot(), before)
+        self.assertEqual(mail.outbox, [])
+        self.assertEqual(SecurityEvent.objects.count(), events_before)
     def test_a_walk_changes_only_the_security_log_and_the_sessions(self):
         self.start()
         before = snapshot()

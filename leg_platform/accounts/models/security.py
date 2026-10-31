@@ -249,6 +249,7 @@ class SecurityEvent(models.Model):
         RENDER_AS_STARTED = "render_as_started", _("Support view (view as a person) started")
         RENDER_AS_ENDED = "render_as_ended", _("Support view (view as a person) ended")
         RENDER_AS_PAGE_VIEWED = "render_as_page_viewed", _("Page shown in the support view (view as a person)")
+        RENDER_AS_REQUEST_REFUSED = "render_as_request_refused", _("Request refused in the support view (view as a person)")
 
     # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
@@ -276,6 +277,7 @@ class SecurityEvent(models.Model):
             Event.RENDER_AS_STARTED,
             Event.RENDER_AS_ENDED,
             Event.RENDER_AS_PAGE_VIEWED,
+            Event.RENDER_AS_REQUEST_REFUSED,
         }
     )
 
