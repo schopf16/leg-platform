@@ -742,6 +742,8 @@ def import_directory(*, repair=False, progress=None):
             if progress is not None:
                 progress.phase("catalogue")
             checksum, data_date = _metadata(session)
+            if progress is not None:
+                progress.set_figures(data_date=data_date)
             row_count = _published_row_count(checksum, repair=repair)
             if row_count is not None:
                 return row_count

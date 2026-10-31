@@ -14,7 +14,7 @@ from leg_platform.accounts.models import SecurityEvent
 
 from leg_platform.log_filters import redact_personal_data, redact_tokens
 
-from . import housekeeping, runner, status
+from . import housekeeping, jobs, runner, status
 from .limits import allow_request
 from .models import HousekeepingStatus, ImportLogEntry, ImportRequest, ServicePostalCode
 
@@ -93,6 +93,8 @@ class ImportRequestAdmin(admin.ModelAdmin):
                  name="addresses_importrequest_changelist"),
             path("status/", self.admin_site.admin_view(self.status_view),
                  name="addresses_importrequest_status"),
+            path("start/<str:source>/", self.admin_site.admin_view(self.start_view),
+                 name="addresses_importrequest_start"),
             path("log/", self.admin_site.admin_view(self.log_view), name="addresses_importrequest_log"),
             path("log/download/<str:source>/", self.admin_site.admin_view(self.log_download),
                  name="addresses_importrequest_log_download"),
@@ -131,41 +133,52 @@ class ImportRequestAdmin(admin.ModelAdmin):
         response["Cache-Control"] = "no-store"
         return response
 
+    def start_view(self, request, source):
+        """Start one import or the full sync (D-132): POST only, CSRF (middleware), the right of the page, the request
+        limit of the admin pages, one security event, then the durable queue. ``source`` is one of ``START_SOURCES``;
+        anything else is a 404. The answer is always a redirect to the page (post, redirect, get)."""
+        if not request.user.has_perm(PERMISSION):
+            raise PermissionDenied
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        if source not in START_SOURCES:
+            raise Http404
+        page = HttpResponseRedirect(reverse("admin:addresses_importrequest_changelist"))
+        if not allow_request(request, admin=True):
+            self.message_user(request, _("Too many import requests. Please try again later."), messages.WARNING)
+            return page
+        sources = jobs.QUEUE_SOURCES if source == FULL_SYNC else (source,)
+        # Every request is recorded with the account (D-041, D-076); a request that cannot be recorded is not queued.
+        with transaction.atomic():
+            security_log.record(SecurityEvent.Event.IMPORT_REQUESTED, actor=request.user, detail=source)
+            added = jobs.enqueue(sources, in_order=source == FULL_SYNC)
+        if not added:
+            self.message_user(request, _("This import is already running or waiting."), messages.WARNING)
+            return page
+        # The thread works off the queue one job after the other (D-090, D-132); with an import running, it waits.
+        runner.start_queue()
+        self.message_user(request, _("The import was started. This page shows the progress."), messages.SUCCESS)
+        return page
+
     def directory_view(self, request):
         if not request.user.has_perm(PERMISSION):
             raise PermissionDenied
-        if request.method == "POST":
-            if not allow_request(request, admin=True):
-                self.message_user(request, _("Too many import requests. Please try again later."), messages.WARNING)
-            else:
-                # Every request is recorded with the account (D-041, D-076); the import then starts in a
-                # thread of this process (D-090): one at a time over all web workers (the row of the job).
-                with transaction.atomic():
-                    security_log.record(SecurityEvent.Event.ADDRESS_IMPORT_REQUESTED, actor=request.user)
-                if runner.start_manual():
-                    self.message_user(
-                        request, _("The address directory import has started. This page shows the progress."),
-                        messages.SUCCESS,
-                    )
-                else:
-                    self.message_user(request, _("An import is already queued or running."), messages.WARNING)
-            return HttpResponseRedirect(reverse("admin:addresses_importrequest_changelist"))
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
         context = {
             **self.admin_site.each_context(request),
             "title": _("Data imports"),
             "opts": self.model._meta,
             "import_status": status.build(),
-            "plant_status": status.plant_status(),
-            "transformer_status": status.transformer_status(),
             "status_url": reverse("admin:addresses_importrequest_status"),
-            "import_log_url": reverse("admin:addresses_importrequest_changelist") + "#import-log",
+            "full_sync": FULL_SYNC,
             "poll_seconds": POLL_SECONDS,
             "import_log": self.import_log_section(request) if request.user.is_superuser else None,
         }
         return TemplateResponse(request, "admin/addresses/directory.html", context)
 
     def import_log_section(self, request):
-        """The import error log as text, at the bottom of the import page (superusers only; D-121, owner decision)."""
+        """The import error log as a table, at the bottom of the import page (superusers only; D-121, D-132)."""
         from leg_platform import log_views
         from leg_platform.log_menu import LINE_COUNTS, line_count
 
@@ -175,7 +188,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
             source = ""
         count = line_count(request)
         return {
-            "lines": import_log_text(source, count),
+            "entries": import_log_entries(source, count),
             "source": source,
             "sources": [("", _("All sources")), *[(key, label) for key, label in IMPORT_LOG_SOURCES.items()]],
             "line_counts": LINE_COUNTS,
@@ -197,11 +210,14 @@ class ImportRequestAdmin(admin.ModelAdmin):
 # The import error log (D-121): the sources and their labels, the row limit of the page and of the download.
 IMPORT_LOG_SOURCES = {
     ImportRequest.Source.ADDRESS: gettext_lazy("Address directory"),
-    ImportRequest.Source.PLANT: gettext_lazy("PV plants (BFE)"),
+    ImportRequest.Source.PLANT: gettext_lazy("PV plants"),
     # The key of the transformer source as a string: the label only, nothing here starts a scan (D-121).
     "transformer": gettext_lazy("Transformer stations"),
 }
 IMPORT_LOG_LIMIT = 500
+# What the start buttons may ask for (D-132): one source or all three in order (the full sync).
+FULL_SYNC = "all"
+START_SOURCES = frozenset({*jobs.QUEUE_SOURCES, FULL_SYNC})
 
 
 def import_log_queryset(source=""):
@@ -211,16 +227,17 @@ def import_log_queryset(source=""):
     return rows.order_by("-occurred_at", "-pk")[:IMPORT_LOG_LIMIT]
 
 
-def import_log_text(source, count):
-    """The newest ``count`` lines of the import error log as text, oldest first, redacted like the download (D-099)."""
-    rows = list(import_log_queryset(source))[:count]
-    rows.reverse()
+def import_log_entries(source, count):
+    """The newest ``count`` entries of the import error log for the table, newest first: time, source, step and the
+    fixed reason text, redacted like the download (D-099). Plain strings, no markup."""
     return [
-        redact_personal_data(redact_tokens(
-            f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}  {IMPORT_LOG_SOURCES[row.source]}  "
-            f"{row.step or '-'}  {_(row.reason)}"
-        ))
-        for row in rows
+        {
+            "time": f"{timezone.localtime(row.occurred_at):%d.%m.%Y %H:%M:%S}",
+            "source": str(IMPORT_LOG_SOURCES[row.source]),
+            "step": str(status.PHASES.get(row.step, "")) if row.step else "",
+            "reason": redact_personal_data(redact_tokens(str(_(row.reason)))),
+        }
+        for row in list(import_log_queryset(source))[:count]
     ]
 
 

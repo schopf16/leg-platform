@@ -18,8 +18,8 @@ Already queued requests (including setup imports) are consumed first, even with 
 before the time, or after today's daily check. Without a queued request the daily run is idempotent.
 
 ``run_daily`` then calls ``run_plant_daily`` (D-117) in the same process: the plant register, once per day, after the
-address run, with the same claim. It is not started when the address import of the day has failed; the next daily run
-tries again.
+address run, with the same claim. It also runs when the address import of the day has failed (owner decision of
+2026-10-25); the first failure is raised afterwards.
 
 ``run_daily`` then calls ``run_transformer_weekly`` (D-118): the transformer station scan, on Saturdays only, once per
 Saturday, after the plant register of that day, with the same claim. Each of the three steps runs even when an earlier
@@ -36,7 +36,7 @@ from django.utils import timezone
 from django.utils.connection import ConnectionDoesNotExist
 
 from . import jobs
-from .models import DEFAULT_RUN_TIME, Directory, ImportRequest
+from .models import DEFAULT_RUN_TIME, Directory, ImportQueueEntry, ImportRequest
 
 logger = logging.getLogger(__name__)
 
@@ -87,21 +87,45 @@ def refresh_is_due(job, now):
     return last is None or now >= last + interval
 
 
+def run_queue():
+    """Work off the durable queue of the data imports page (D-132), one job after the other, in this process.
+
+    The web process drains the queue itself (``runner``); this covers a queue that a restart left behind, and runs
+    first in every call of the scheduled tasks. A failed job does not stop the rest; it is recorded by ``jobs.execute``.
+    Returns the number of jobs that ran."""
+    ran = 0
+    while ImportQueueEntry.objects.exists():
+        # A legacy address request (state QUEUED) is the daily run's own business (``_run_address``): leave it.
+        if ImportRequest.objects.filter(pk=1, state=ImportRequest.State.QUEUED).exists():
+            return ran
+        claimed = jobs.claim(web=True, queued=True)
+        if claimed is None:
+            return ran
+        ran += 1
+        try:
+            _execute_with_heartbeat(claimed)
+        except Exception:  # noqa: BLE001 - recorded by jobs.execute; the next entry still runs
+            logger.warning("A queued import failed; the next one runs.")
+    return ran
+
+
 def run_daily(now=None):
     """The daily run (D-117, D-118): the address directory, the plant register, then the transformer scan (Saturdays).
 
-    Each step runs even when an earlier one failed (owner decision 2026-10-25; a failure stops nothing else). The address
+    The queue of the page runs first and again at the end (``run_queue``). Each step runs even when an earlier one failed
+    (owner decision 2026-10-25; a failure stops nothing else). The address
     part returns one of the words above. The first failure is raised afterwards (it is recorded in the job row and the
     logs by ``jobs.execute``), so the caller reports it.
     """
     now = timezone.localtime(now or timezone.now())
+    run_queue()
     outcome = None
     failure = None
     try:
         outcome = _run_address(now)
     except Exception as exc:  # noqa: BLE001 - recorded by jobs.execute; re-raised below
         failure = exc
-    for step in (lambda: run_plant_daily(now), lambda: run_transformer_weekly(now)):
+    for step in (lambda: run_plant_daily(now), lambda: run_transformer_weekly(now), run_queue):
         try:
             step()
         except Exception as exc:  # noqa: BLE001 - recorded by jobs.execute; re-raised below

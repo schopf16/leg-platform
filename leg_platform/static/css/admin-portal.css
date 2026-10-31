@@ -549,10 +549,15 @@ ol.breadcrumbs {
 
 .import-facts {
   display: grid;
-  grid-template-columns: 16em minmax(0, 1fr);
+  grid-template-columns: minmax(8em, 16em) minmax(0, 1fr);
   align-items: baseline;
   gap: 4px 12px;
   margin: 0 0 16px;
+}
+
+.import-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .import-facts dt {
@@ -864,5 +869,199 @@ ol.breadcrumbs {
 
   .form-row .address-notice:not(:empty) {
     margin-top: 8px;
+  }
+}
+
+/* Data imports (D-132): one table, one row per source; calm and compact. No horizontal scrolling from 320 to 1440 px:
+   the key figures move into the detail row up to 991 px, and a phone shows each source as one block (.phone-table). */
+.import-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.import-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+}
+
+.import-summary {
+  margin: 0;
+  min-height: 1.4em;
+}
+
+.import-toolbar form {
+  margin: 0;
+}
+
+.import-table,
+.import-figures,
+.import-log-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.import-table > thead th,
+.import-table .import-row > *,
+.import-log-table th,
+.import-log-table td {
+  padding: 8px 10px;
+  text-align: start;
+  vertical-align: middle;
+}
+
+.import-table .import-row > * {
+  border-top: 1px solid var(--hairline-color, #ccc);
+}
+
+.import-table .import-detail > td {
+  padding: 0 10px 8px;
+  border: 0;
+}
+
+.import-detail summary {
+  cursor: pointer;
+  width: max-content;
+}
+
+.import-figures {
+  width: auto;
+  max-width: 100%;
+  margin-top: 4px;
+}
+
+.import-figures th,
+.import-figures td {
+  padding: 3px 16px 3px 0;
+  text-align: start;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.import-figures thead th {
+  font-weight: 600;
+}
+
+.import-table progress {
+  width: 8em;
+  max-width: 100%;
+  height: 12px;
+  vertical-align: middle;
+}
+
+.import-error {
+  display: block;
+  color: var(--status-bad);
+}
+
+.import-stall {
+  display: block;
+  color: var(--status-warn);
+}
+
+.import-position {
+  color: var(--status-muted);
+}
+
+.import-table input[type="submit"] {
+  min-width: 9em;
+}
+
+.import-table form {
+  margin: 0;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .import-col-figures {
+    display: none;
+  }
+}
+
+.import-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 8px;
+}
+
+.import-log-scroll {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--hairline-color, #ccc);
+}
+
+.import-log-table {
+  table-layout: fixed;
+}
+
+.import-log-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--body-bg, #fff);
+  border-bottom: 1px solid var(--hairline-color, #ccc);
+}
+
+.import-log-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-log-table th:nth-child(1) {
+  width: 11em;
+}
+
+.import-log-table th:nth-child(2) {
+  width: 11em;
+}
+
+.import-log-table th:nth-child(3) {
+  width: 11em;
+}
+
+.import-log-reason summary {
+  display: block;
+  list-style: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-log-reason details[open] summary {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.import-log-reason details[open],
+.import-log-table td:has(details[open]) {
+  white-space: normal;
+}
+
+@media (max-width: 767px) {
+  .import-log-table th:nth-child(1),
+  .import-log-table th:nth-child(2),
+  .import-log-table th:nth-child(3) {
+    width: 7em;
+  }
+
+  .import-table input[type="submit"] {
+    min-height: 44px;
+  }
+
+  .import-table .import-row > * {
+    border-top: 0;
+  }
+
+  .import-table .import-detail > td {
+    padding: 0 0 8px;
   }
 }

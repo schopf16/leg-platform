@@ -59,6 +59,7 @@ MESSAGES = {
     Event.PV_IMPORT_FAILED: "A plant register import failed",
     Event.TRANSFORMER_SCAN_SUCCEEDED: "A transformer station scan completed",
     Event.TRANSFORMER_SCAN_FAILED: "A transformer station scan failed",
+    Event.IMPORT_REQUESTED: "A data import was requested",
     Event.SERVICE_AREA_CHANGED: "The postal codes of the service area were changed",
     Event.HOUSEKEEPING_RUN: "The housekeeping of the databases was run",
     Event.LOG_NOTIFICATION_CHANGED: "The log notification setting was changed",

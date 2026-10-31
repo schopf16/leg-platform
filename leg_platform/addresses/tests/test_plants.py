@@ -622,7 +622,7 @@ class PublicationTests(TestCase):
         self.publish_on(day, [plant_line(1)])
         for offset, shown in ((29, False), (30, False), (31, True)):
             with patch("django.utils.timezone.localdate", return_value=day + timedelta(days=offset)):
-                warning = status.plant_status()["content_warning"]
+                warning = status.build()["sources"][1]["warning"]
             self.assertEqual(bool(warning), shown, offset)
 
     def test_a_changed_file_removes_the_hint(self):
@@ -630,7 +630,7 @@ class PublicationTests(TestCase):
         self.publish_on(day, [plant_line(1)])
         self.publish_on(day + timedelta(days=31), [plant_line(2)], checksum="e" * 64)
         with patch("django.utils.timezone.localdate", return_value=day + timedelta(days=40)):
-            self.assertEqual(status.plant_status()["content_warning"], "")
+            self.assertEqual(status.build()["sources"][1]["warning"], "")
 
     def test_a_new_publication_replaces_the_previous_generation(self):
         self.publish([plant_line(1), plant_line(2)])

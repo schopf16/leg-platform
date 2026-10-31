@@ -395,7 +395,10 @@ class InPlaceMigrationTests(TransactionTestCase):
 
     def test_the_migrations_are_marked_as_additive_and_the_older_ones_are_not(self):
         loader = MigrationLoader(None, ignore_no_migrations=True)
-        for name in ("0020_lookup_tables_and_house_index", "0021_addressplace_centre"):
+        for name in (
+            "0020_lookup_tables_and_house_index", "0021_addressplace_centre",
+            "0022_import_queue_and_published_figures",
+        ):
             self.assertTrue(loader.get_migration("addresses", name).in_place, name)
         for name in ("0010_address_coordinates", "0019_importrequest_progress_units_and_more"):
             self.assertFalse(getattr(loader.get_migration("addresses", name), "in_place", False), name)
@@ -411,7 +414,7 @@ class InPlaceMigrationTests(TransactionTestCase):
 
             self.assertEqual(err, "")
             self.assertEqual(queued, False)
-            self.assertEqual(count, 2)
+            self.assertEqual(count, 3)
             with alias.cursor() as cursor:
                 cursor.execute("SELECT id, street, house_number, postal_code, locality FROM addresses_address ORDER BY id")
                 self.assertEqual(cursor.fetchall(), before)
@@ -523,7 +526,7 @@ class InPlaceMigrationTests(TransactionTestCase):
             with mock.patch.object(directory_setup.shutil, "disk_usage", return_value=types.SimpleNamespace(free=1024)):
                 (count, queued), _out, err = self.prepare()
 
-            self.assertEqual((count, queued), (2, False))
+            self.assertEqual((count, queued), (3, False))
             self.assertIn("migration was skipped", err)
             self.assertIn("free the space", err.lower())
             self.assertNotIn("addresses_addressstreet", self.tables(alias))

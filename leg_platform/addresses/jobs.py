@@ -18,7 +18,8 @@ from django.utils import timezone
 from leg_platform.accounts import security_log
 from leg_platform.accounts.models import SecurityEvent
 
-from .models import Directory, HousekeepingStatus, ImportLogEntry, ImportRequest
+from .models import Directory, HousekeepingStatus, ImportLogEntry, ImportQueueEntry, ImportRequest
+from .published import refresh as refresh_published
 from .storage import DIRECTORY_ALIAS, reset_marker
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,20 @@ def _transformer_result(state, finished, error=""):
     return {"last_transformer_state": state, "last_transformer_finished_at": finished, "last_transformer_error": error}
 
 
+def _address_result(state, finished, error=""):
+    """The fields of the last address directory run (D-132, ``ImportRequest.last_address_*``)."""
+    return {"last_address_state": state, "last_address_finished_at": finished, "last_address_error": error}
+
+
+def source_result(source, state, finished, error=""):
+    """The result fields of ``source`` for one run that ends now (the shared fields hold the job that ran last)."""
+    if source == ImportRequest.Source.PLANT:
+        return _plant_result(state, finished, error)
+    if source == ImportRequest.Source.TRANSFORMER:
+        return _transformer_result(state, finished, error)
+    return _address_result(state, finished, error)
+
+
 def directory_is_empty():
     """True when there is no published directory: no row, no addresses, or a file that cannot be read."""
     try:
@@ -150,6 +165,48 @@ def request_import():
         return True
 
 
+QUEUE_SOURCES = (ImportRequest.Source.ADDRESS, ImportRequest.Source.PLANT, ImportRequest.Source.TRANSFORMER)
+
+
+def enqueue(sources, *, in_order=False):
+    """Put the imports of ``sources`` into the durable queue (D-132); returns the sources that were added.
+
+    A source that runs now, or waits already (also as the legacy address request), is skipped: one entry per source at
+    most. ``in_order`` (the full sync): waiting entries of these sources are put behind the others again in the order
+    of ``sources``. Unknown sources raise ``ValueError``. The row lock is the one of the claim, so no claim runs between
+    the check and the insert.
+    """
+    sources = list(dict.fromkeys(sources))
+    if not sources or any(source not in QUEUE_SOURCES for source in sources):
+        raise ValueError("Unknown import source.")
+    now = timezone.now()
+    added = []
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        job = ImportRequest.objects.select_for_update().get(pk=1)
+        running = job.source if _is_running(job, now) else None
+        for source in sources:
+            if source == running:
+                continue
+            if source == ImportRequest.Source.ADDRESS and job.state == ImportRequest.State.QUEUED:
+                continue
+            if in_order:
+                ImportQueueEntry.objects.filter(source=source).delete()
+            _entry, created = ImportQueueEntry.objects.get_or_create(source=source)
+            if created:
+                added.append(source)
+    return added
+
+
+def queued_sources():
+    """The sources that wait, in the order they will run (the legacy address request first)."""
+    waiting = list(ImportQueueEntry.objects.order_by("id").values_list("source", flat=True))
+    job = ImportRequest.objects.filter(pk=1).first()
+    if job is not None and job.state == ImportRequest.State.QUEUED:
+        waiting = [ImportRequest.Source.ADDRESS] + [s for s in waiting if s != ImportRequest.Source.ADDRESS]
+    return waiting
+
+
 class Claim(NamedTuple):
     """The right to run the import: ``manual`` = also repairs, ``took_over`` = a dead job was found, ``source`` = the
     address directory or the plant register (D-117)."""
@@ -160,8 +217,11 @@ class Claim(NamedTuple):
     source: str = ImportRequest.Source.ADDRESS
 
 
-def claim(*, schedule_automatic=False, scheduled=False, web=False, source=ImportRequest.Source.ADDRESS):
+def claim(*, schedule_automatic=False, scheduled=False, web=False, source=ImportRequest.Source.ADDRESS, queued=False):
     """Claim the job for this process; None if nothing is queued or due, or a live import runs.
+
+    ``queued`` (D-132): take the oldest entry of the durable queue (``ImportQueueEntry``); its source decides what runs.
+    The claim is a manual one and leaves the schedule fields alone. A legacy address request (state QUEUED) goes first.
 
     A queued manual request wins. An expired RUNNING job counts as failed and is not repeated.
     ``web``: the caller writes heartbeats (the import thread of the web process, the daily run of ``schedule``): a
@@ -193,23 +253,30 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
             job.state = ImportRequest.State.FAILED
             job.finished_at = now
             job.last_error = INTERRUPTED
-            fields = ["state", "finished_at", "last_error"]
-            if job.source == ImportRequest.Source.PLANT:
-                # The plant run that held the claim is over: its result is kept apart from the shared fields (D-117).
-                for name, value in _plant_result(ImportRequest.State.FAILED, now, INTERRUPTED).items():
-                    setattr(job, name, value)
-                fields += ["last_plant_state", "last_plant_finished_at", "last_plant_error"]
-            if job.source == ImportRequest.Source.TRANSFORMER:
-                for name, value in _transformer_result(ImportRequest.State.FAILED, now, INTERRUPTED).items():
-                    setattr(job, name, value)
-                fields += ["last_transformer_state", "last_transformer_finished_at", "last_transformer_error"]
-            job.save(update_fields=fields)
+            result = source_result(job.source, ImportRequest.State.FAILED, now, INTERRUPTED)
+            for name, value in result.items():
+                setattr(job, name, value)
+            # The interrupted run is over: its result is kept apart from the shared fields (D-117, D-132).
+            job.save(update_fields=["state", "finished_at", "last_error", *result])
             # The interrupted run is a failure of its source too (D-121).
             _log_failure(job.source, INTERRUPTED, "", now)
+        # The queue (D-132): the oldest waiting entry decides the source; a legacy address request (state QUEUED) wins.
+        from_queue = False
+        if queued and job.state != ImportRequest.State.QUEUED:
+            entry = ImportQueueEntry.objects.order_by("id").first()
+            if entry is not None:
+                source = entry.source
+                from_queue = True
+            elif not (schedule_automatic or scheduled):
+                return None
         # The plant register and the transformer scan both run only as the scheduled run, never while an address request
         # is queued, and neither touches the address schedule (D-117, D-118).
         separate = source in (ImportRequest.Source.PLANT, ImportRequest.Source.TRANSFORMER)
-        if separate:
+        if from_queue:
+            ImportQueueEntry.objects.filter(source=source).delete()
+            job.is_automatic = False
+            job.requested_at = now
+        elif separate:
             if job.state == ImportRequest.State.QUEUED or not scheduled:
                 return None
             job.is_automatic = True
@@ -228,6 +295,8 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
             job.requested_at = now
         else:
             job.is_automatic = False
+            # The legacy request is the address entry of the queue (D-132): no second entry for it.
+            ImportQueueEntry.objects.filter(source=ImportRequest.Source.ADDRESS).delete()
         # A heartbeat that is still there while no import is alive marks a holder that died (a normal end
         # clears it): the new holder frees its lease on the directory.
         took_over = took_over or job.heartbeat_at is not None
@@ -239,6 +308,8 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
         job.heartbeat_at = now if web else None
         job.phase = "starting"
         job.bytes_done = job.bytes_total = job.rows_done = None
+        job.rows_total = job.progress_units = None
+        job.pending_data_date = job.pending_rejected = job.pending_skipped = None
         job.last_error = ""
         if job.is_automatic and not separate:
             # Commit before any download; a failure consumes this attempt.
@@ -281,16 +352,14 @@ def record_success(claimed, count, *, downloaded=None, transformer=None):
         "state": ImportRequest.State.SUCCEEDED, "finished_at": timezone.now(), "heartbeat_at": None,
         "phase": "unchanged" if downloaded is False else "", "last_error": "", "rows_done": count,
     }
-    if plant:
-        fields.update(_plant_result(ImportRequest.State.SUCCEEDED, fields["finished_at"]))
-    elif scan:
-        fields.update(_transformer_result(ImportRequest.State.SUCCEEDED, fields["finished_at"]))
+    fields.update(source_result(claimed.source, ImportRequest.State.SUCCEEDED, fields["finished_at"]))
+    if scan:
         fields.update({
             "last_transformer_postal_codes": ", ".join(transformer.postal_codes)[:255],
             "last_transformer_buildings": transformer.buildings,
             "last_transformer_with_name": transformer.with_name,
         })
-    else:
+    elif not plant:
         fields["columns_missing_at"] = None
     unchanged = downloaded is False and claimed.source == ImportRequest.Source.ADDRESS
     if claimed.source == ImportRequest.Source.ADDRESS:
@@ -303,6 +372,8 @@ def record_success(claimed, count, *, downloaded=None, transformer=None):
         return
     # The stale event stays open until the file changes again (D-122): an unchanged run does not clear it.
     _clear_failures(claimed.source, fields["finished_at"], keep_kinds=("stale",) if unchanged else ())
+    if not scan:
+        refresh_published(claimed.source)
     if unchanged:
         ImportLogEntry.objects.create(
             source=claimed.source, kind="unchanged", step="", reason=UNCHANGED_TEXT, count=fields["unchanged_runs"],
@@ -355,9 +426,7 @@ def record_failure(claimed, exc):
         phase="", last_error=reason[:255],
         # The file itself lacks a required column: the daily run waits (``schedule.COLUMNS_RETRY_INTERVAL``).
         **({"columns_missing_at": now} if not plant and not scan and reason in COLUMN_FAILURES else {}),
-        # The result of the plant run (D-117) or of the transformer scan (D-118), kept apart from the shared fields above.
-        **(_plant_result(ImportRequest.State.FAILED, now, reason[:255]) if plant else {}),
-        **(_transformer_result(ImportRequest.State.FAILED, now, reason[:255]) if scan else {}),
+        **source_result(claimed.source, ImportRequest.State.FAILED, now, reason[:255]),
     )
     if not finished:
         # Taken over meanwhile: the new holder owns the row.
@@ -414,7 +483,7 @@ def execute(claimed, progress=None):
 
 def process_one(*, schedule_automatic=False):
     """The worker's step: claim a queued or due job and run it (no heartbeat: its lease is six hours)."""
-    claimed = claim(schedule_automatic=schedule_automatic)
+    claimed = claim(schedule_automatic=schedule_automatic, queued=True)
     if claimed is None:
         return False
     return execute(claimed)

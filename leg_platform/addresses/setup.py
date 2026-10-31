@@ -11,7 +11,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.operations.models import AlterModelManagers, AlterModelOptions
 from django.db.migrations.operations.special import RunPython, RunSQL, SeparateDatabaseAndState
 
-from . import jobs
+from . import jobs, published
 from .models import (
     Address, AddressPlace, AddressStreet, Directory, ImportRequest, Plant, PlantRegister, TransformerStation,
 )
@@ -186,6 +186,7 @@ def prepare_directory(*, stdout, stderr):
                     raise OperationalError("The address directory reset marker is invalid.")
                 if rebuild:
                     _remove_catalogue(connection, path)
+                    published.clear()  # the snapshot of the published figures belongs to the removed generation (D-132)
                     executor = MigrationExecutor(connection)
                     plan = executor.migration_plan(executor.loader.graph.leaf_nodes("addresses"))
                 call_command("migrate", "addresses", database=DIRECTORY_ALIAS, interactive=False,

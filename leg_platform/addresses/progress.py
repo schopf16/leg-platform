@@ -29,7 +29,20 @@ class Progress:
         # Buildings per postal code: the total (the EGIDs with coordinates) and the done ones (transformer scan, D-122).
         self.buildings_total = {}
         self.buildings_done = {}
+        # In-progress figures of the run (D-132): the data date of the file and the rejected and skipped rows so far.
+        self.data_date = None
+        self.rejected = None
+        self.skipped = None
 
+    def set_figures(self, *, data_date=None, rejected=None, skipped=None):
+        """The in-progress figures the page shows next to the published ones; ``None`` leaves a value as it was."""
+        if data_date is not None:
+            self.data_date = data_date
+        if rejected is not None:
+            self.rejected = rejected
+        if skipped is not None:
+            self.skipped = skipped
+        self.changed_at = timezone.now()
     def phase(self, name):
         if self.check is not None:
             self.check()

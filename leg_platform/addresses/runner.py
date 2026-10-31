@@ -8,7 +8,8 @@ and the live directory stays as it was (a new generation is invisible until it i
 
 Only this thread writes the directory file (``storage.mark_thread_writer``); the request threads of
 the process stay read-only. The thread has its own database connections and closes them at the end.
-It is started only by the administrator's button (``start_manual``); the automatic refresh is the daily
+It is started only by the administrator's buttons (``start_queue``; ``start_manual`` for a legacy request) and drains
+the durable queue one job at a time (D-132); the automatic refresh is the daily
 run of ``schedule`` in the scheduled tasks (KONZEPT 3a), no longer a visit of a staff member.
 """
 
@@ -50,6 +51,8 @@ class Heartbeat(threading.Thread):
             bytes_done=self.progress.bytes_done, bytes_total=self.progress.bytes_total,
             rows_done=self.progress.rows_done, progress_at=self.progress.changed_at,
             rows_total=self.progress.rows_total, progress_units=self.progress.units(),
+            pending_data_date=self.progress.data_date, pending_rejected=self.progress.rejected,
+            pending_skipped=self.progress.skipped,
         )
 
     def run(self):
@@ -86,9 +89,8 @@ def _claim_check(token):
     return check
 
 
-def _run(claimed):
-    """The thread body: run, record the outcome, close the connections. Never raises."""
-    storage.mark_thread_writer()
+def _run_one(claimed):
+    """One claimed job: run it and record the outcome. Never raises."""
     progress = Progress(check=_claim_check(claimed.token))
     heartbeat = Heartbeat(claimed.token, progress)
     try:
@@ -98,8 +100,35 @@ def _run(claimed):
         logger.exception("The address directory import thread ended with an error.")
     finally:
         heartbeat.stop()
+
+
+def _next_queued():
+    """The next job of the durable queue (D-132), claimed; None when there is none or the claim is refused."""
+    try:
+        return jobs.claim(web=True, queued=True)
+    except DatabaseError:
+        logger.warning("The import queue could not be read.")
+        return None
+
+
+def _run(claimed):
+    """The thread body: run the claimed job, then the jobs that wait in the queue one after the other (a failed job
+    does not stop the rest, D-132). Never raises."""
+    storage.mark_thread_writer()
+    try:
+        while claimed is not None:
+            _run_one(claimed)
+            following = _next_queued()
+            with _lock:
+                if following is not None:
+                    _running[following.token] = threading.current_thread()
+                _running.pop(claimed.token, None)
+            claimed = following
+    finally:
         with _lock:
-            _running.pop(claimed.token, None)
+            for token, thread in list(_running.items()):
+                if thread is threading.current_thread():
+                    _running.pop(token, None)
         storage.unmark_thread_writer()
         connections.close_all()
 
@@ -119,10 +148,19 @@ def _start(claimed):
 
 
 def start_manual():
-    """Queue and start an import (the button): True if started, False if one is queued or running already."""
+    """Queue and start an address import (legacy entry, tests): True if started, False if one is queued or running."""
     if not jobs.request_import():
         return False
     claimed = jobs.claim(web=True)
+    if claimed is None:
+        return False
+    return _start(claimed)
+
+
+def start_queue():
+    """Start the import thread for the oldest waiting entry of the queue (D-132), if no import runs. The thread then
+    works off the rest of the queue. True if a thread was started."""
+    claimed = jobs.claim(web=True, queued=True)
     if claimed is None:
         return False
     return _start(claimed)
@@ -151,11 +189,14 @@ def _mark_interrupted():
         tokens = [token for token, thread in _running.items() if thread.is_alive() is True]
     for token in tokens:
         try:
+            source = ImportRequest.objects.filter(pk=1, claim_token=token).values_list("source", flat=True).first()
+            now = timezone.now()
             ImportRequest.objects.filter(
                 pk=1, claim_token=token, state=ImportRequest.State.RUNNING
             ).update(
-                state=ImportRequest.State.FAILED, finished_at=timezone.now(), phase="",
+                state=ImportRequest.State.FAILED, finished_at=now, phase="",
                 last_error=jobs.INTERRUPTED,
+                **jobs.source_result(source or ImportRequest.Source.ADDRESS, ImportRequest.State.FAILED, now, jobs.INTERRUPTED),
             )
         except Exception:  # noqa: BLE001 - the next claim finds the stale heartbeat anyway
             pass
