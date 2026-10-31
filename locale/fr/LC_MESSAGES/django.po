@@ -7451,9 +7451,6 @@ msgctxt "customer"
 msgid "optional"
 msgstr "facultatif"
 
-msgid "Your way into the LEG"
-msgstr "Votre chemin vers la CEL"
-
 msgid "only with feed-in"
 msgstr "uniquement avec injection"
 
@@ -10030,9 +10027,6 @@ msgstr "Dès que possible. La CEL confirme la date."
 #. Texts of Django 6.1 without a German translation in Django itself.
 msgid "- Select an option -"
 msgstr "- Sélectionnez une option -"
-
-msgid "Please correct"
-msgstr "Correction demandée"
 
 #, python-format
 msgid "Search %(name)s"

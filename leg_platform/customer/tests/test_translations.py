@@ -106,7 +106,6 @@ class CustomerTextsTests(SimpleTestCase):
             "Read the contract and agree": "Vertrag lesen und zustimmen",
             "When should your participation start?": "Ab wann soll Ihre Teilnahme beginnen?",
             "Your application was submitted": "Ihre Anmeldung ist abgeschickt",
-            "Your way into the LEG": "Ihr Weg in die LEG",
             "Cancel application?": "Anmeldung abbrechen?",
             "Continue application": "Weiter anmelden",
             "Cancel application": "Anmeldung abbrechen",
