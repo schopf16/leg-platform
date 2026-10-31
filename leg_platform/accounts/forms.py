@@ -94,29 +94,14 @@ def _minimum_password_length():
 
 
 def password_rules():
-    """The password rules as short lines for a list (D-058)."""
+    """The password rules as short lines for a list (D-058). A rule that cannot be broken unknowingly (no known or
+    similar password, not only digits) is not listed: the validator names it when it is broken."""
     minimum = _minimum_password_length()
     rules = []
     if minimum is not None:
         rules.append(gettext("At least %(min_length)d characters.") % {"min_length": minimum})
-    rules += [
-        gettext("A sentence of several words is easy to remember and hard to guess."),
-        gettext("All characters are allowed; upper-case letters, digits and special characters are not required."),
-        gettext("No known or easily guessed passwords, no number-only passwords."),
-        gettext("Not similar to your email address."),
-    ]
+    rules.append(gettext("A sentence of several words is easy to remember and hard to guess."))
     return rules
-
-
-def password_hint():
-    """The advice at the password field; replaces Django's validator help texts."""
-    minimum = _minimum_password_length()
-    if minimum is None:
-        return ""
-    return gettext(
-        "Choose at least %(min_length)d characters. A sentence of several words is easy to "
-        "remember and hard to guess."
-    ) % {"min_length": minimum}
 
 
 AUTOCOMPLETE = {
@@ -277,8 +262,8 @@ class PasswordResetRequestForm(BotCheckMixin, EmailAddressForm):
 
 
 def describe_password_fields(form, first, second):
-    """Advice at the first password field and a specific message when a field is empty."""
-    form.fields[first].help_text = password_hint()
+    """The rules list stands under the first password field; a specific message when a field is empty."""
+    form.fields[first].help_text = ""
     form.fields[first].described_by = ("rules",)
     form.fields[first].error_messages["required"] = _("Enter a password.")
     form.fields[second].error_messages["required"] = _("Enter the password again.")
@@ -845,8 +830,10 @@ class AccountDeleteForm(ReauthenticationForm):
         super().__init__(*args, **kwargs)
         # The box is never shown as ticked after an error: no confirmation by habit.
         self.fields["confirm"].widget = forms.CheckboxInput(
-            attrs=self.fields["confirm"].widget.attrs, check_test=lambda value: False
+            attrs={**self.fields["confirm"].widget.attrs, "data-error": self.fields["confirm"].error_messages["required"]},
+            check_test=lambda value: False,
         )
+        self.fields["confirm"].summary_label = _("Confirmation")
 
 
 class ChangePasswordForm(OneProofMixin, PortalFormMixin, SetPasswordForm):

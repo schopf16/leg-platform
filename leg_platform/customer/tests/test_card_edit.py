@@ -152,6 +152,7 @@ class StoredCardEditTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("csrfmiddlewaretoken", html)
         self.assertIn('class="building-card is-editing"', html)
+        self.assertRegex(html, r'<form class="building-card is-editing"[^>]*\bnovalidate\b')
         self.assertIn("Speichern", html)
         self.assertIn("Abbrechen", html)
         # The EGID and the numbers are plain text (D-128: no lock icon, no hint), never inputs.
@@ -281,7 +282,7 @@ class StoredCardEditTests(TestCase):
         self.feed_in.refresh_from_db()
         self.assertEqual(self.feed_in.name, "Dach")
 
-    def test_only_one_card_is_edited_and_the_other_buttons_are_disabled(self):
+    def test_only_one_card_is_edited_and_the_other_buttons_say_why_they_are_locked(self):
         second = make_location("Nebenweg", "5", "3063", "Ittigen", egid=90001999)
         extra = make_metering_point(
             9, Direction.CONSUMPTION, second, registered_with_operator_on=LONG_AGO, confirmed_on=LONG_AGO,
@@ -292,7 +293,8 @@ class StoredCardEditTests(TestCase):
         self.assertEqual(len(ids), 2)
         html = self.client.get(BUILDINGS, {"edit": ids[0]}).content.decode()
         self.assertEqual(html.count('class="building-card is-editing is-fold"'), 1)
-        self.assertRegex(html, r'<button type="button" class="btn btn-secondary-action" disabled>Ändern</button>')
+        self.assertRegex(html, r'<button type="button" class="btn btn-secondary-action" aria-disabled="true" aria-describedby="edit-locked-\d+">Ändern</button>')
+        self.assertRegex(html, r'id="edit-locked-\d+">Speichern oder verwerfen Sie zuerst die offene Änderung\.</span>')
 
 
 def CustomerBuildingNamed(person, location, name):

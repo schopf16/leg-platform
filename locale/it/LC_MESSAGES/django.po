@@ -1415,14 +1415,6 @@ msgstr "Password dimenticata?"
 msgid "Send link"
 msgstr "Invia collegamento"
 
-#, python-format
-msgid ""
-"Choose at least %(min_length)d characters. A sentence of several words is "
-"easy to remember and hard to guess."
-msgstr ""
-"Scelga almeno %(min_length)d caratteri. Una frase composta da più parole è "
-"facile da ricordare e difficile da indovinare."
-
 msgid "Save password"
 msgstr "Salva password"
 
@@ -2120,21 +2112,6 @@ msgid "A sentence of several words is easy to remember and hard to guess."
 msgstr ""
 "Una frase composta da più parole è facile da ricordare e difficile da "
 "indovinare."
-
-msgid ""
-"All characters are allowed; upper-case letters, digits and special "
-"characters are not required."
-msgstr ""
-"Sono consentiti tutti i caratteri; maiuscole, cifre e caratteri speciali non"
-" sono obbligatori."
-
-msgid "No known or easily guessed passwords, no number-only passwords."
-msgstr ""
-"Nessuna password nota o facile da indovinare, nessuna password composta solo"
-" da numeri."
-
-msgid "Not similar to your email address."
-msgstr "Non simile al Suo indirizzo e-mail."
 
 msgid "Email address (username)"
 msgstr "Indirizzo e-mail (nome utente)"
@@ -8322,13 +8299,6 @@ msgstr ""
 "Per sicurezza, inserisca il codice numerico che il telefono mostra in questo"
 " momento."
 
-msgid ""
-"For your safety, enter your password once more before you change your sign-"
-"in."
-msgstr ""
-"Per sicurezza, inserisca ancora una volta la password prima di modificare "
-"l’accesso."
-
 msgid "Number code from your phone"
 msgstr "Codice numerico dal telefono"
 
@@ -8788,9 +8758,6 @@ msgstr "Conto eliminato: ritirare la registrazione presso il gestore di rete"
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Conto eliminato: ritirare la registrazione presso %(operator)s"
 
-msgid "Tick the box to enable the deletion."
-msgstr "Spuntate la casella per attivare l’eliminazione."
-
 msgid "Here you find the current contract and all earlier versions."
 msgstr "Qui trovate il contratto attuale e tutte le versioni precedenti."
 
@@ -8808,9 +8775,6 @@ msgstr "Ho letto la versione attuale del %(date)s e vi acconsento."
 
 msgid "Accept this version"
 msgstr "Accettare"
-
-msgid "You have already agreed to this version."
-msgstr "Avete già accettato questa versione."
 
 msgid "Versions of the contract"
 msgstr "Versioni del contratto"
@@ -10016,9 +9980,6 @@ msgstr "Lei richiede l'uscita di 1 punto di misura."
 msgid "You are deregistering %(count)s metering points."
 msgstr "Lei richiede l'uscita di %(count)s punti di misura."
 
-msgid "The deregistration is binding."
-msgstr "L'uscita è vincolante."
-
 msgid "The LEG checks the date and confirms it by email. Until then the metering points stay active."
 msgstr "La CEL verifica la data e la conferma per e-mail. Fino ad allora i punti di misura restano attivi."
 
@@ -10077,9 +10038,6 @@ msgstr "Quando elimina il Suo conto, accade quanto segue:"
 
 msgid "Your metering points are deregistered on the earliest possible date (notice period: four months to the end of a month). Until then you receive invoices by email only."
 msgstr "I Suoi punti di misura escono alla prima data possibile (termine di disdetta: quattro mesi per la fine del mese). Fino ad allora riceve le fatture solo per e-mail."
-
-msgid "Enter your password to finish."
-msgstr "Per terminare, inserisca la password."
 
 #, python-format
 msgid "Withdraw registration: %(name)s"
@@ -10167,3 +10125,12 @@ msgstr "Cerca %(name)s"
 #, python-format
 msgid "Pagination %(name)s"
 msgstr "Paginazione %(name)s"
+
+msgid "Please tick the box once you have saved the codes."
+msgstr "Spunti la casella non appena ha salvato i codici."
+
+msgid "This browser does not support passkeys. Please log in with your password."
+msgstr "Questo browser non supporta le passkey. Acceda con la password."
+
+msgid "Save or discard the open change first."
+msgstr "Salvi o annulli prima la modifica aperta."

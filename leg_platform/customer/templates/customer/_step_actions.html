@@ -1,8 +1,7 @@
 {% load i18n %}{% comment %}
 The buttons under a step (SCHRITT-TEMPLATE.md, section 3): "Continue" left (blue), "Cancel" right (red outline; it opens the
-confirmation on the page). Context: ``label`` (the text of the first button), ``href`` (a link instead of a submit button),
-``gate`` (ids of boxes that must be ticked: the script keeps the button inactive until then).
+confirmation on the page). Context: ``label`` (the text of the first button), ``href`` (a link instead of a submit button).
 {% endcomment %}<div class="step-actions">
-  {% if href %}<a class="btn btn-primary" href="{{ href }}">{{ label|default:_("Continue") }}</a>{% else %}<button type="submit" class="btn btn-primary"{% if gate %} data-gate-all="{{ gate }}"{% endif %}>{{ label|default:_("Continue") }}</button>{% endif %}
+  {% if href %}<a class="btn btn-primary" href="{{ href }}">{{ label|default:_("Continue") }}</a>{% else %}<button type="submit" class="btn btn-primary">{{ label|default:_("Continue") }}</button>{% endif %}
   {% if not confirm_cancel %}<a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>{% endif %}
 </div>

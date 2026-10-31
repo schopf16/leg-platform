@@ -417,6 +417,16 @@ class PasskeyCeremonyTests(TestCase):
         self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
         self.assertEqual(self.client.session[second_factor.PASSKEY_SESSION_KEY], self.user.pk)
 
+    def test_http_a_form_post_without_the_script_goes_back_to_the_login_with_the_reason(self):
+        from django.urls import reverse
+
+        response = self.client.post("/passkeys/login/", {"x": "1"}, secure=True)
+
+        self.assertRedirects(response, reverse("accounts:login"), fetch_redirect_response=False)
+        page = self.client.get(reverse("accounts:login"), secure=True)
+        self.assertContains(page, "Dieser Browser unterstützt keine Passkeys. Melden Sie sich mit Ihrem Passwort an.")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_http_passkey_login_persists_only_the_explicit_stay_choice(self):
         from leg_platform.accounts import session_timeout
 

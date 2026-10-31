@@ -5,7 +5,7 @@
 {% block step %}
   <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Start date' %}">
     {% csrf_token %}
-    {% include "customer/_error_summary.html" %}
+    {% include "accounts/_error_summary.html" %}
     <fieldset class="question">
       <legend>{% translate "When should it start?" %}</legend>
       {% for radio in form.start %}
@@ -17,7 +17,7 @@
     </div>
     <p class="form-hint">{% blocktranslate %}{{ operator }} confirms the final date.{% endblocktranslate %}</p>
     <div class="step-actions">
-      <button type="submit" class="btn btn-primary" data-gate-date="id_desired_date">{% translate "Submit application" %}</button>
+      <button type="submit" class="btn btn-primary">{% translate "Submit application" %}</button>
       {% if not confirm_cancel %}<a class="btn btn-danger-outline" href="{{ request.path }}?cancel=1">{% translate "Cancel" %}</a>{% endif %}
     </div>
   </form>

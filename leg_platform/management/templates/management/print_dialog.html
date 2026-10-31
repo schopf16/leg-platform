@@ -14,9 +14,10 @@ is not too long), ``notice`` (a refusal), ``choices`` (the entries: ``pk``, ``la
     <fieldset class="mgmt-print-options">
       <legend class="visually-hidden">{{ page_title }}</legend>
       <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_list }}"{% if scope == scope_list %} checked{% endif %}> <span>{% translate "List only" %}</span></label>
-      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_all }}"{% if scope == scope_all %} checked{% endif %}{% if not all_allowed %} disabled{% endif %}> <span>{% translate "List and detail pages of all shown entries" %}</span></label>
-      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_selected }}"{% if scope == scope_selected %} checked{% endif %}{% if not selectable %} disabled{% endif %}> <span>{% translate "List and detail pages of selected entries" %}</span></label>
-      {% if select_hint %}<p class="mgmt-hint mgmt-print-hint">{{ select_hint }}</p>{% endif %}
+      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_all }}"{% if scope == scope_all %} checked{% endif %}{% if not all_allowed %} disabled aria-describedby="print-all-hint"{% endif %}> <span>{% translate "List and detail pages of all shown entries" %}</span></label>
+      {% if all_hint %}<p class="mgmt-hint mgmt-print-hint" id="print-all-hint">{{ all_hint }}</p>{% endif %}
+      <label class="mgmt-print-option"><input type="radio" name="scope" value="{{ scope_selected }}"{% if scope == scope_selected %} checked{% endif %}{% if not selectable %} disabled aria-describedby="print-select-hint"{% endif %}> <span>{% translate "List and detail pages of selected entries" %}</span></label>
+      {% if select_hint %}<p class="mgmt-hint mgmt-print-hint" id="print-select-hint">{{ select_hint }}</p>{% endif %}
       {% if choices %}<div class="mgmt-print-select">
         {% for choice in choices %}<label><input type="checkbox" name="ids" value="{{ choice.pk }}"{% if choice.checked %} checked{% endif %}> <span>{{ choice.label }}</span></label>
         {% endfor %}

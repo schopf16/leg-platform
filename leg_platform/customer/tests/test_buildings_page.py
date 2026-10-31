@@ -420,14 +420,17 @@ class CustomerPageTextsTests(TestCase):
         html = self.client.get(f"{PROFILE}?edit=bank").content.decode()
         self.assertIn("Nur nötig, wenn Sie Solarstrom einspeisen.", html)
 
-    def test_an_invalid_iban_shows_the_error_summary_with_a_link_and_changes_nothing(self):
+    def test_an_invalid_iban_shows_the_short_bar_without_a_list_and_changes_nothing(self):
         own_iban.set_own_iban(self.other, GOOD_IBAN)
         response = self.client.post(BANK, {"iban": "not an iban"})
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         self.assertIn('class="alert alert-danger error-summary"', html)
         self.assertIn("Bitte prüfen Sie Ihre Angaben", html)
-        self.assertRegex(html, r'<li><a href="#id_iban">[^<]+</a></li>')
+        # One field: the bar has only the title, the message stands under the field.
+        bar = html.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+        self.assertNotIn("<li>", bar)
+        self.assertIn("Die IBAN ist nicht gültig.", html)
         self.assertEqual(own_iban.own_iban(self.mine), "")
         self.assertEqual(own_iban.own_iban(self.other), GOOD_IBAN)
 

@@ -387,17 +387,30 @@ class StepPagesTests(TestCase):
         self.assertIn('<a href="https://leg.example.org/" target="_blank" rel="noopener noreferrer">LEG<span class="visually-hidden"> (öffnet in neuem Tab)</span></a>', html)
         self.assertIn("autofocus", html)
 
-    def test_the_error_summary_lists_the_short_name_of_the_field_not_the_message(self):
+    def test_the_error_summary_lists_the_short_names_of_several_fields_not_the_messages(self):
+        application, _building = draft_with_building(self.mine)
+        response = self.client.post(
+            step_url(application, "metering_points"), {"draw_number": "", "feed_in": "yes", "feed_in_number": ""}
+        )
+        html = text(response)
+        summary = html[html.index("error-summary") :]
+        summary = summary[: summary.index("</div>")]
+        # The summary names the short name of each field as a link, not the message.
+        self.assertIn("Bitte prüfen Sie Ihre Angaben", summary)
+        self.assertIn('<a href="#id_draw_number">Messpunkt-Nummer</a>', summary)
+        self.assertIn('<a href="#id_feed_in_number">Messpunktnummer der Einspeisung</a>', summary)
+        self.assertNotIn("Geben Sie die letzten Stellen der Nummer ein.", summary)
+        # The message stays under the field.
+        self.assertIn("Geben Sie die letzten Stellen der Nummer ein.", html)
+
+    def test_the_error_summary_of_one_field_has_only_the_title(self):
         application, _building = draft_with_building(self.mine)
         response = self.client.post(step_url(application, "metering_points"), {"draw_number": "", "feed_in": "no"})
         html = text(response)
         summary = html[html.index("error-summary") :]
         summary = summary[: summary.index("</div>")]
-        # The summary names the short name of the field as a link, not the message.
         self.assertIn("Bitte prüfen Sie Ihre Angaben", summary)
-        self.assertIn('<a href="#id_draw_number">Messpunkt-Nummer</a>', summary)
-        self.assertNotIn("Geben Sie die letzten Stellen der Nummer ein.", summary)
-        # The message stays under the field.
+        self.assertNotIn("<li>", summary)
         self.assertIn("Geben Sie die letzten Stellen der Nummer ein.", html)
 
     def test_a_feed_in_added_to_an_existing_draw_says_so(self):
@@ -516,10 +529,11 @@ class DeregistrationWalkthroughTests(TestCase):
         own_iban.set_own_iban(self.mine, GOOD_IBAN)
         self.client = login(self.mine)
 
-    def test_the_page_says_it_is_binding_names_no_computed_day_and_has_a_single_direction(self):
+    def test_the_button_says_it_is_binding_names_no_computed_day_and_has_a_single_direction(self):
         html = text(self.client.get(DEREGISTRATION))
         self.assertNotIn("Frühestens am", html)
-        self.assertIn("Die Abmeldung ist verbindlich.", html)
+        self.assertIn("Messpunkte verbindlich abmelden", html)
+        self.assertNotIn("Die Abmeldung ist verbindlich.", html)
         self.assertIn("Wunschdatum (letzter Tag eines Monats)", html)
         # A point without a name: the direction is the title and is not repeated in the line below it.
         label = html[html.index("point-check") :]

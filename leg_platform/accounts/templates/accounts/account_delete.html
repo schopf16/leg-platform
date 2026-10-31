@@ -10,7 +10,7 @@ has to act first), ``privacy_url``.
 {% block title %}{% translate "Delete account" %}{% endblock %}
 {% block inner_class %}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
-{% block scripts %}{{ block.super }}<script defer src="{% static 'js/confirm-gate.js' %}"></script>{% endblock %}
+{% block scripts %}{{ block.super }}<script defer src="{% static 'js/confirm-check.js' %}"></script>{% endblock %}
 {% block content %}
   <div class="wizard">
     <div>
@@ -48,9 +48,8 @@ has to act first), ``privacy_url``.
         {% include "accounts/_error_summary.html" %}
         {% include "accounts/profile/_proof_fields.html" %}
         {% include "accounts/_field.html" with field=form.confirm %}
-        <p class="form-hint" id="confirm-gate-hint">{% translate "Tick the box to enable the deletion." %}</p>
         <div class="step-actions">
-          <button type="submit" class="btn btn-danger" data-gate="id_confirm">{% translate "Delete account permanently" %}</button>
+          <button type="submit" class="btn btn-danger" data-confirm-check="id_confirm">{% translate "Delete account permanently" %}</button>
           {% if customer %}<a class="btn btn-secondary-action" href="{% url 'customer:deregistration_start' %}?from=delete">{% translate "Just deregister metering points instead" %}</a>{% endif %}
           <a class="btn btn-secondary-action" href="{% url 'accounts:profile' %}#card-delete">{% translate "Cancel" %}</a>
         </div>

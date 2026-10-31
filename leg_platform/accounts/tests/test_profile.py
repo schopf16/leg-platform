@@ -872,13 +872,33 @@ class DeleteCardTests(TestCase):
         self.assertContains(page, "Konto löschen")
         self.assertNotContains(page, 'name="confirm"')
 
-    def test_the_page_has_the_proof_the_box_and_the_button_that_waits_for_the_box(self):
+    def test_the_page_has_the_proof_the_box_and_an_active_button_with_the_error_text_for_the_script(self):
         page = self.client.get(self.url)
 
         self.assertContains(page, 'name="current_password"')
         self.assertContains(page, "Konto unwiderruflich löschen")
         self.assertContains(page, 'name="confirm"')
-        self.assertContains(page, 'data-gate="id_confirm"')
+        self.assertContains(page, 'data-confirm-check="id_confirm"')
+        self.assertContains(page, 'data-error="Bitte setzen Sie das Häkchen, um zu bestätigen, dass Sie Ihr Konto löschen möchten."')
+        self.assertNotContains(page, "data-gate")
+        self.assertNotRegex(page.content.decode(), r'<button[^>]*btn-danger"[^>]*\bdisabled\b')
+
+    def test_a_correct_password_without_the_box_deletes_nothing_and_shows_the_error_at_the_box_only(self):
+        response = self.client.post(self.url, {"current_password": PASSWORD})
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        self.assertIn('id="id_confirm_error">Bitte setzen Sie das Häkchen', html)
+        summary = html.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+        # One field with an error: the bar has only the title; with two it lists the short name "Bestätigung".
+        self.assertNotIn("<li>", summary)
+        self.assertNotIn("Bitte setzen Sie das Häkchen", summary)
+        self.assertNotIn("Ich weiss, dass mein Konto", summary)
+        both = self.client.post(self.url, {}).content.decode()
+        both_summary = both.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+        self.assertIn(">Bestätigung</a>", both_summary)
+        self.assertNotIn("Ich weiss, dass mein Konto", both_summary)
 
     def test_a_wrong_password_deletes_nothing(self):
         wrong = self.client.post(self.url, {"current_password": OTHER_PASSWORD})

@@ -84,8 +84,8 @@ class PageTests(DeregistrationCase):
         for text in (
             "<title>Messpunkte abmelden", "Welche Messpunkte sollen abgemeldet werden?",
             "Wann soll die Abmeldung gelten?", EARLIEST_TEXT, "Wunschdatum (letzter Tag eines Monats)", NOTICE,
-            "Messpunkte verbindlich abmelden", "Die Abmeldung ist verbindlich.", "Zum Abschluss Passwort eingeben.",
-            "data-proof-hint", "Abbrechen", "Sie melden 2 Messpunkte ab.", "Meine Teilnahme · Abmeldung",
+            "Messpunkte verbindlich abmelden",
+            "data-dereg-summary", "Abbrechen", "Sie melden 2 Messpunkte ab.", "Meine Teilnahme · Abmeldung",
         ):
             self.assertIn(text, html)
         # The heading names a building only for ?building=<id>; no computed date anywhere.
@@ -260,6 +260,20 @@ class PageTests(DeregistrationCase):
             html, rf'<input[^>]*name="withdraw_applications"[^>]*value="{application.pk}"(?![^>]*checked)[^>]*>'
         )
         self.assertIn("Anmeldung zurückziehen: ", html)
+
+    def test_withdrawal_selection_and_error_link_survive_an_invalid_submission(self):
+        person = customer("withdraw.only@example.org")
+        application, _building = submitted(person, feed_in=False, egid=90004271, number=12)
+        client = login(person)
+
+        html = client.post(START, {}).content.decode()
+        self.assertIn('href="#progress-title">Anmeldung in Bearbeitung</a>', html)
+        self.assertIn('id="id_withdraw_applications_error">Wählen Sie mindestens einen Eintrag aus.', html)
+        self.assertIn("Geben Sie Ihr aktuelles Passwort ein.", html)
+
+        html = client.post(START, {"withdraw_applications": [str(application.pk)]}).content.decode()
+        self.assertRegex(html, rf'name="withdraw_applications" value="{application.pk}" checked')
+        self.assertIn("Geben Sie Ihr aktuelles Passwort ein.", html)
 
     def test_the_proof_is_the_password_without_a_second_factor(self):
         html = self.client.get(START).content.decode()

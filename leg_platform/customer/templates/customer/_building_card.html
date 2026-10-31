@@ -7,7 +7,7 @@ Two states, both rendered by the server (no script): read (a button "Edit" in th
 and edit (``card.editing``): the tile is a form, every value the person may change is an input in place, the other values
 stay plain text (grey with a lock). One POST saves it (customer.card_edit); only one card is in edit mode at a time.
 {% endcomment %}{% with ed=card.editing fold=overview.collapsible %}
-{% if ed %}<form class="building-card is-editing{% if fold %} is-fold{% endif %}" method="post" action="{% url 'customer:buildings' %}?edit={{ card.edit_id }}" aria-labelledby="building-{{ forloop.counter }}-edit"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% csrf_token %}{% else %}<section class="building-card{% if fold %} is-fold{% endif %}" aria-labelledby="building-{{ forloop.counter }}"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% endif %}
+{% if ed %}<form class="building-card is-editing{% if fold %} is-fold{% endif %}" method="post" novalidate action="{% url 'customer:buildings' %}?edit={{ card.edit_id }}" aria-labelledby="building-{{ forloop.counter }}-edit"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% csrf_token %}{% else %}<section class="building-card{% if fold %} is-fold{% endif %}" aria-labelledby="building-{{ forloop.counter }}"{% if overview.searchable %} data-search="{{ card.search_text }}"{% endif %}>{% endif %}
   {% if fold %}
     <details class="fold"{% if ed or overview.open_id == card.edit_id %} open{% endif %}>
       <summary class="fold-summary">
@@ -144,7 +144,7 @@ stay plain text (grey with a lock). One POST saves it (customer.card_edit); only
   {% elif card.can_edit or card.can_add_point or card.removal or card.review_locked %}
     <div class="card-foot">
       {% if card.can_edit %}
-        {% if overview.editing_id %}<button type="button" class="btn btn-secondary-action" disabled>{% translate "Edit" context "building card" %}</button>
+        {% if overview.editing_id %}<button type="button" class="btn btn-secondary-action" aria-disabled="true" aria-describedby="edit-locked-{{ forloop.counter }}">{% translate "Edit" context "building card" %}</button><span class="card-note" id="edit-locked-{{ forloop.counter }}">{% translate "Save or discard the open change first." %}</span>
         {% else %}<a class="btn btn-secondary-action" href="{% url 'customer:buildings' %}?edit={{ card.edit_id }}">{% translate "Edit" context "building card" %}</a>{% endif %}
       {% endif %}
       {% if card.can_add_point %}<a class="btn btn-primary" href="{% url 'customer:application_start' %}?building={{ card.location.pk }}">{% translate "Add metering point" %}</a>{% endif %}

@@ -106,14 +106,15 @@ class ResendTests(TestCase):
         waiting = self.client.get(SENT_URL).content.decode()
         seconds = int(re.search(r'data-cooldown="(\d+)"', waiting).group(1))
         self.assertTrue(55 <= seconds <= 60)
-        self.assertRegex(waiting, r'<button type="submit" class="btn btn-secondary-action" data-resend-button disabled>')
+        self.assertRegex(waiting, r'<button type="submit" class="btn btn-secondary-action" data-resend-button aria-describedby="resend-note" disabled>')
+        self.assertIn('id="resend-note"', waiting)
         self.assertIn("js/resend-cooldown.js", waiting)
         self.assertNotRegex(waiting, r"<script(?![^>]*\ssrc=)")
 
         open_the_pause(self.client, resend.REGISTRATION)
         ready = self.client.get(SENT_URL).content.decode()
         self.assertIn('data-cooldown="0"', ready)
-        self.assertNotIn("data-resend-button disabled", ready)
+        self.assertNotIn("data-resend-button aria-describedby=\"resend-note\" disabled", ready)
         self.assertRegex(ready, r"data-resend-note hidden")
 
     def test_a_tampered_session_value_names_no_address_and_sends_nothing(self):

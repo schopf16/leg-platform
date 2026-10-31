@@ -23,15 +23,16 @@
   {% else %}
     <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Articles of association' %}">
       {% csrf_token %}
-      {% include "customer/_error_summary.html" %}
+      {% include "accounts/_error_summary.html" with title_only=True %}
       {{ form.version }}
       <p class="muted">{% blocktranslate with date=version_date|date:"j. F Y" %}Contract version of {{ date }}{% endblocktranslate %}</p>
       {% include "customer/_contract_viewer.html" %}
       <p class="muted">{% url 'customer:contract' as contract_url %}{% blocktranslate %}You can also find the contract under <a href="{{ contract_url }}">Information › Articles of association</a>.{% endblocktranslate %}</p>
       <div class="checks">
-        <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.value %} checked{% endif %}><span>{% blocktranslate with date=version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
+        <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.value %} checked{% endif %}{% if form.agrees_contract.errors %} aria-invalid="true" aria-describedby="id_agrees_contract_error"{% endif %}><span>{% blocktranslate with date=version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
+        {% if form.agrees_contract.errors %}<div class="invalid-feedback d-block" id="id_agrees_contract_error">{{ form.agrees_contract.errors.0 }}</div>{% endif %}
       </div>
-      {% include "customer/_step_actions.html" with gate="id_agrees_contract" %}
+      {% include "customer/_step_actions.html" %}
     </form>
   {% endif %}
 {% endblock %}

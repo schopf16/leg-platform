@@ -1033,14 +1033,14 @@ span.note-warn {
   max-width: 1100px;
 }
 
-/* The tick and the button for the current version, under the frame. */
+/* The tick and the button for the current version, under the frame; once agreed, a status line. */
 .contract-consent {
   display: grid;
   gap: 16px;
 }
 
-.contract-consent.is-accepted .entry-check span {
-  color: var(--muted);
+.contract-consent p {
+  margin: 0;
 }
 
 .contract-consent .step-actions {

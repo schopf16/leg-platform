@@ -74,7 +74,7 @@ form that made them; nothing about them is stored (D-059).
     {% with form=choose_form %}
       <form method="post" action="{% url 'accounts:login_method' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/_login_method_choice.html" %}
         <p class="profile-note">{% translate "Next: you may be asked for your password or code." %}</p>
         <div class="profile-actions">
@@ -96,7 +96,7 @@ form that made them; nothing about them is stored (D-059).
       {% with form=setup_form %}
         <form method="post" action="{% url 'accounts:two_factor_setup' %}" class="profile-form" novalidate>
           {% csrf_token %}
-          {% include "customer/_error_summary.html" %}
+          {% include "accounts/_error_summary.html" %}
           {% include "accounts/profile/_proof_fields.html" %}
           <div class="profile-actions">
             <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
@@ -115,7 +115,7 @@ form that made them; nothing about them is stored (D-059).
     {% with form=code_form %}
       <form method="post" action="{% url 'accounts:two_factor_confirm' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/_field.html" with field=form.otp_token %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>
@@ -135,7 +135,7 @@ form that made them; nothing about them is stored (D-059).
     {% with form=action_form %}
       <form method="post" action="{% url 'accounts:recovery_codes' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/profile/_proof_fields.html" %}
         <div class="profile-actions">
           <button type="submit" class="btn btn-primary">{% translate "Create new codes" %}</button>
@@ -150,7 +150,7 @@ form that made them; nothing about them is stored (D-059).
     {% with form=action_form %}
       <form method="post" action="{% url 'accounts:two_factor_disable' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/profile/_proof_fields.html" %}
         <p class="profile-text"><a href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=lost_phone#card-two-factor">{% translate "Phone lost?" %}</a></p>
         <div class="profile-actions">
@@ -167,7 +167,7 @@ form that made them; nothing about them is stored (D-059).
     {% with form=action_form %}
       <form method="post" action="{% url 'accounts:two_factor_lost_phone' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/_field.html" with field=form.current_password %}
         {% include "accounts/_field.html" with field=form.otp_token %}
         <div class="profile-actions">

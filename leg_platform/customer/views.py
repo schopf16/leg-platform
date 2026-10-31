@@ -289,12 +289,16 @@ class ContractView(CustomerAccessMixin, View):
     tick for the current version (the form posts to ``ContractAcceptView``)."""
 
     def get(self, request):
+        return self.show(request)
+
+    @staticmethod
+    def show(request, form=None):
         version = contracts.current_version()
         return render(request, "customer/contract.html", {
             "versions": contracts.customer_versions(request.user),
             "current": version,
             "acceptance": contracts.acceptance_of(request.user, version) if version else None,
-            "form": forms.ContractForm(initial={"version": version.pk if version else None}),
+            "form": form if form is not None else forms.ContractForm(initial={"version": version.pk if version else None}),
         })
 
 
@@ -320,6 +324,9 @@ class ContractAcceptView(CustomerAccessMixin, View):
                 request.user, form.cleaned_data["version"], agrees_contract=form.cleaned_data["agrees_contract"],
             )
         except ApplicationError as error:
+            if error.code == "agreement_required":
+                form.add_error("agrees_contract", texts.message(error.code))
+                return ContractView.show(request, form)
             if error.code != "already_accepted":
                 messages.error(request, texts.message(error.code))
         else:

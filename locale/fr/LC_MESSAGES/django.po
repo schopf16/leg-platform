@@ -1425,14 +1425,6 @@ msgstr "Mot de passe oublié ?"
 msgid "Send link"
 msgstr "Envoyer le lien"
 
-#, python-format
-msgid ""
-"Choose at least %(min_length)d characters. A sentence of several words is "
-"easy to remember and hard to guess."
-msgstr ""
-"Choisissez au moins %(min_length)d caractères. Une phrase de plusieurs mots "
-"est facile à retenir et difficile à deviner."
-
 msgid "Save password"
 msgstr "Enregistrer le mot de passe"
 
@@ -2146,21 +2138,6 @@ msgstr "Au moins %(min_length)d caractères."
 msgid "A sentence of several words is easy to remember and hard to guess."
 msgstr ""
 "Une phrase de plusieurs mots est facile à retenir et difficile à deviner."
-
-msgid ""
-"All characters are allowed; upper-case letters, digits and special "
-"characters are not required."
-msgstr ""
-"Tous les caractères sont autorisés ; les majuscules, les chiffres et les "
-"caractères spéciaux ne sont pas exigés."
-
-msgid "No known or easily guessed passwords, no number-only passwords."
-msgstr ""
-"Pas de mots de passe connus ou faciles à deviner, pas de mots de passe "
-"composés uniquement de chiffres."
-
-msgid "Not similar to your email address."
-msgstr "Sans ressemblance avec votre adresse e-mail."
 
 msgid "Email address (username)"
 msgstr "Adresse e-mail (nom d’utilisateur)"
@@ -8433,13 +8410,6 @@ msgstr ""
 "Pour votre sécurité, saisissez le code numérique que votre téléphone affiche"
 " en ce moment."
 
-msgid ""
-"For your safety, enter your password once more before you change your sign-"
-"in."
-msgstr ""
-"Pour votre sécurité, saisissez encore une fois votre mot de passe avant de "
-"modifier la connexion."
-
 msgid "Number code from your phone"
 msgstr "Code numérique du téléphone"
 
@@ -8914,9 +8884,6 @@ msgstr ""
 msgid "Account deleted: withdraw the registration at the %(operator)s"
 msgstr "Compte supprimé : retirer l’inscription auprès de %(operator)s"
 
-msgid "Tick the box to enable the deletion."
-msgstr "Cochez la case pour activer la suppression."
-
 msgid "Here you find the current contract and all earlier versions."
 msgstr ""
 "Vous trouvez ici le contrat actuel et toutes les versions précédentes."
@@ -8935,9 +8902,6 @@ msgstr "J'ai lu la version actuelle du %(date)s et j'y consens."
 
 msgid "Accept this version"
 msgstr "Accepter"
-
-msgid "You have already agreed to this version."
-msgstr "Vous avez déjà accepté cette version."
 
 msgid "Versions of the contract"
 msgstr "Versions du contrat"
@@ -10139,9 +10103,6 @@ msgstr "Vous désinscrivez 1 point de mesure."
 msgid "You are deregistering %(count)s metering points."
 msgstr "Vous désinscrivez %(count)s points de mesure."
 
-msgid "The deregistration is binding."
-msgstr "La désinscription est contraignante."
-
 msgid "The LEG checks the date and confirms it by email. Until then the metering points stay active."
 msgstr "La CEL vérifie la date et la confirme par e-mail. D’ici là, les points de mesure restent actifs."
 
@@ -10200,9 +10161,6 @@ msgstr "Lorsque vous supprimez votre compte, ceci se produit :"
 
 msgid "Your metering points are deregistered on the earliest possible date (notice period: four months to the end of a month). Until then you receive invoices by email only."
 msgstr "Vos points de mesure sont désinscrits à la première date possible (délai de résiliation : quatre mois pour la fin d’un mois). D’ici là, vous recevez les factures uniquement par e-mail."
-
-msgid "Enter your password to finish."
-msgstr "Pour terminer, saisissez votre mot de passe."
 
 #, python-format
 msgid "Withdraw registration: %(name)s"
@@ -10290,3 +10248,12 @@ msgstr "Rechercher dans %(name)s"
 #, python-format
 msgid "Pagination %(name)s"
 msgstr "Pagination %(name)s"
+
+msgid "Please tick the box once you have saved the codes."
+msgstr "Veuillez cocher la case dès que vous avez enregistré les codes."
+
+msgid "This browser does not support passkeys. Please log in with your password."
+msgstr "Ce navigateur ne prend pas en charge les clés d’accès. Veuillez vous connecter avec votre mot de passe."
+
+msgid "Save or discard the open change first."
+msgstr "Enregistrez ou annulez d’abord la modification en cours."

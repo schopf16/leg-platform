@@ -39,7 +39,7 @@
   {% else %}
     <form method="post" class="step-card step-card-building" novalidate data-submit-once aria-label="{% translate 'Address' %}">
       {% csrf_token %}
-      {% include "customer/_error_summary.html" %}
+      {% include "accounts/_error_summary.html" %}
       {% include "customer/_field.html" with field=form.name optional=True %}
       <div class="address-row address-row-street">
         {% include "customer/_field.html" with field=form.street after="addresses/widget.html" address_country_value="CH" %}

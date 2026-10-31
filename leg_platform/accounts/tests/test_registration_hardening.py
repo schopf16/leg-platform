@@ -19,7 +19,7 @@ from leg_platform.accounts import bot_check, mail_queue, rate_limits
 from leg_platform.accounts.forms import (
     NewPasswordForm,
     RegistrationPasswordForm,
-    password_hint,
+    password_rules,
 )
 from leg_platform.accounts.models import (
     MailJob,
@@ -411,15 +411,17 @@ class SessionHardeningTests(TestCase):
         self.assertContains(response, "new.person@example.org")
         self.assertNotContains(response, "evil@example.org")
 
-    def test_the_hint_has_no_example_password(self):
-        hint = password_hint()
+    def test_the_rules_have_no_example_password(self):
+        rules = " ".join(password_rules())
 
-        self.assertIn("15", hint)
+        self.assertIn("15", rules)
         for word in ("Beispiel", "example", "z. B.", "«", "\""):
-            self.assertNotIn(word, hint)
+            self.assertNotIn(word, rules)
         self.open_link()
         html = self.client.get(PASSWORD_URL).content.decode()
         self.assertNotIn("Beispiel", html)
+        # Only the rules that a person can break unknowingly are listed; the others appear as the error.
+        self.assertEqual(len(password_rules()), 2)
 
     def test_every_field_of_the_details_step_has_exactly_one_message(self):
         self.open_link()
@@ -440,7 +442,7 @@ class SessionHardeningTests(TestCase):
         for word in ("Firmenname", "Postfach", "zwingend erforderlich"):
             self.assertNotIn(word, html)
         # The summary names the box by a short word (the checkbox has a long sentence as label).
-        self.assertIn("Datenschutzerklärung:", html)
+        self.assertIn(">Datenschutzerklärung</a>", html)
 
     def test_no_address_directory_note_appears_on_any_step(self):
         # D-066: nothing is said about an unavailable directory, on no page of the registration.
@@ -500,7 +502,11 @@ class FormMarkupTests(TestCase):
                 self.assertIn('class="alert alert-danger error-summary"', html)
                 self.assertIn("autofocus", html)
                 self.assertIn("Bitte prüfen Sie Ihre Angaben", html)
-                self.assertRegex(html, r'href="#id_email"')
+                # One field: only the title in the bar; the message stands under the field.
+                bar = html.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+                self.assertNotIn("<li>", bar)
+                self.assertNotRegex(bar, r'href="#id_email"')
+                self.assertIn('id="id_email_error"', html)
 
     def test_the_css_has_the_red_border_the_hint_size_and_no_resting_shadow(self):
         css = (settings.BASE_DIR / "leg_platform" / "static" / "css" / "portal.css").read_text(encoding="utf-8")

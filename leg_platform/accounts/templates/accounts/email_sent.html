@@ -14,8 +14,8 @@
   <p class="entry-hint">{% translate "No email received? It is worth looking in the spam folder." %}</p>
   <form method="post" action="{{ resend_url }}" class="resend-form" data-resend data-cooldown="{{ wait_seconds }}">
     {% csrf_token %}
-    <button type="submit" class="btn btn-secondary-action" data-resend-button{% if wait_seconds %} disabled{% endif %}>{% translate "Send email again" %}</button>
-    <p class="entry-hint" data-resend-note{% if not wait_seconds %} hidden{% endif %}>{% blocktranslate with seconds=wait_seconds %}Sending again is possible after <span data-resend-seconds>{{ seconds }}</span> seconds.{% endblocktranslate %}</p>
+    <button type="submit" class="btn btn-secondary-action" data-resend-button aria-describedby="resend-note"{% if wait_seconds %} disabled{% endif %}>{% translate "Send email again" %}</button>
+    <p class="entry-hint" id="resend-note" data-resend-note{% if not wait_seconds %} hidden{% endif %}>{% blocktranslate with seconds=wait_seconds %}Sending again is possible after <span data-resend-seconds>{{ seconds }}</span> seconds.{% endblocktranslate %}</p>
   </form>
   <p class="entry-divider">{% translate "Wrong address?" %}</p>
   <p class="entry-center"><a href="{{ other_address_url }}">{% translate "Use another email address" %}</a></p>

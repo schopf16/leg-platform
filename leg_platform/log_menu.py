@@ -11,7 +11,7 @@ import itertools
 from datetime import datetime, timedelta
 
 from django import forms
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied
 from django.db import transaction
 from django.db.models import Max
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, StreamingHttpResponse
@@ -254,14 +254,19 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("enabled") and not cleaned.get("email"):
-            self.add_error("email", _("Enter an email address, or switch the email off."))
         changed = (
             cleaned.get("enabled") != self.instance.enabled or cleaned.get("email") != self.instance.email
         )
         if changed:
             self.check_proof(cleaned)
         return cleaned
+
+    def _post_clean(self):
+        super()._post_clean()
+        # The model's rule (address needed while on) and a field error say the same: one message per field.
+        for name in list(self._errors):
+            if name != NON_FIELD_ERRORS and len(self._errors[name]) > 1:
+                self._errors[name] = self.error_class(list(self._errors[name].data)[:1])
 
     def check_proof(self, cleaned):
         """One proof for a change of the switch or the address; without a request nothing is accepted (fails closed)."""

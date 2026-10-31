@@ -707,9 +707,9 @@ class ContractStepTests(WizardCase):
             "Wenn der Vertrag hier nicht angezeigt wird, laden Sie ihn bitte herunter.",
             "Den Vertrag finden Sie auch unter", 'href="/participation/contract/"', "Information › Gesellschaftsvertrag",
             "Ich habe die aktuelle Fassung vom 07.10.2026 gelesen und stimme ihr zu.",
-            'data-gate-all="id_agrees_contract"',
         ):
             self.assertIn(marker, html)
+        self.assertNotIn('data-gate-all="id_agrees_contract"', html)
         self.assertEqual(html.count('type="checkbox"'), 1)
         self.assertNotIn("checked", html.split("<main")[1])
 
@@ -726,7 +726,11 @@ class ContractStepTests(WizardCase):
     def test_without_the_tick_nothing_is_stored_and_the_page_says_so(self):
         response = self.post()
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Bitte setzen Sie das Häkchen, um zuzustimmen.", text(response))
+        html = text(response)
+        self.assertIn('id="id_agrees_contract_error">Bitte setzen Sie das Häkchen, um zuzustimmen.', html)
+        self.assertIn('aria-describedby="id_agrees_contract_error"', html)
+        summary = html.split('class="alert alert-danger error-summary"', 1)[1].split('</div>', 1)[0]
+        self.assertNotIn("Bitte setzen Sie das Häkchen, um zuzustimmen.", summary)
         self.assertFalse(ContractAcceptance.objects.exists())
 
     def test_a_version_that_was_replaced_meanwhile_shows_the_new_one_with_empty_boxes(self):
@@ -809,7 +813,11 @@ class StartDateStepTests(WizardCase):
         self.assertEqual(response.status_code, 200)
         self.assertRegex(text(response), r"Wählen Sie einen Tag ab dem \d\d\.\d\d\.\d{4}\.")
         missing = self.client.post(self.url, {"start": "date", "desired_date": ""})
-        self.assertIn("Wählen Sie ein Datum.", text(missing))
+        missing_html = text(missing)
+        self.assertIn('id="id_desired_date_error">Wählen Sie ein Datum.', missing_html)
+        self.assertNotIn('data-gate-date=', missing_html)
+        summary = missing_html.split('class="alert alert-danger error-summary"', 1)[1].split('</div>', 1)[0]
+        self.assertNotIn("Wählen Sie ein Datum.", summary)
         garbage = self.client.post(self.url, {"start": "date", "desired_date": "not a date"})
         self.assertEqual(garbage.status_code, 200)
         self.application.refresh_from_db()

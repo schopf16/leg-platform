@@ -9,7 +9,7 @@ the key stays inactive until step 3 activates the account.
 {% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
 {% block extra_head %}<script src="{% static 'vendor/simplewebauthn/index.umd.min.js' %}" defer></script><script src="{% static 'js/passkeys.js' %}" defer></script>{% endblock %}
 {% block form %}
-  <form id="passkey-create" method="post" action="{% url 'accounts:registration_passkey_create' %}" data-passkey-register data-options="{% url 'accounts:registration_passkey_options' %}" data-pending="{% translate 'Waiting for your confirmation …' %}" data-error="{% translate 'Did not work. Nothing was changed.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
+  <form id="passkey-create" method="post" novalidate action="{% url 'accounts:registration_passkey_create' %}" data-passkey-register data-options="{% url 'accounts:registration_passkey_options' %}" data-pending="{% translate 'Waiting for your confirmation …' %}" data-error="{% translate 'Did not work. Nothing was changed.' %}" data-device-error="{% translate 'The browser reported this device instead of another device. The portal did not save the passkey. It may still be in your password manager.' %}">
     {% csrf_token %}
     <input type="hidden" name="name" value="{% translate 'My passkey' %}">
     <section data-passkey-panel="device" aria-labelledby="flow-title">

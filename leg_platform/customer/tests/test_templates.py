@@ -125,5 +125,5 @@ class ScriptTests(SimpleTestCase):
         self.assertIn('"use strict"', SCRIPT)
 
     def test_the_script_only_helps_it_has_the_four_enhancements_and_nothing_else(self):
-        for hook in ("data-gate-all", "data-gate-date", "data-reveal-name", ".iban-input"):
+        for hook in ("data-reveal-name", ".iban-input"):
             self.assertIn(hook, SCRIPT)

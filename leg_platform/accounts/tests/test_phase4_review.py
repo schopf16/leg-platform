@@ -481,3 +481,18 @@ class RecoveryDoneBoxTests(TestCase):
         page = client.post(reverse("accounts:two_factor_confirm"), {"otp_token": code_for(device)})
 
         self.assertRegex(page.content.decode(), r'<input[^>]*name="saved"[^>]*\brequired\b')
+
+    def test_done_is_always_active_and_the_script_has_the_error_text(self):
+        user = create_active_user("holder.person@example.org")
+        client = Client()
+        client.force_login(user)
+        from leg_platform.accounts.models import AuthenticatorDevice
+
+        client.post(reverse("accounts:two_factor_setup"), {}, REMOTE_ADDR="10.82.1.1")
+        device = AuthenticatorDevice.objects.get(user=user)
+
+        html = client.post(reverse("accounts:two_factor_confirm"), {"otp_token": code_for(device)}).content.decode()
+
+        self.assertIn('data-confirm-check="id_saved">Fertig</button>', html)
+        self.assertIn('data-error="Bitte setzen Sie das Häkchen, sobald Sie die Codes gespeichert haben."', html)
+        self.assertNotIn("data-gate", html)

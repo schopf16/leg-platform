@@ -5,7 +5,7 @@
 {% block step %}
   <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Bank or postal connection' %}">
     {% csrf_token %}
-    {% include "customer/_error_summary.html" %}
+    {% include "accounts/_error_summary.html" %}
     {% include "customer/_field.html" with field=form.iban %}
     {% include "customer/_step_actions.html" %}
   </form>

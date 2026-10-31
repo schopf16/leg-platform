@@ -7,10 +7,11 @@ The block "Registration in progress" of the deregistration page. Context: ``in_p
   <div class="checks">
     {% for row in in_progress %}
       {% if editable and row.withdrawable %}
-        <label class="entry-check point-check" for="id_withdraw_applications_{{ row.pk }}"><input class="entry-check-input" type="checkbox" id="id_withdraw_applications_{{ row.pk }}" name="withdraw_applications" value="{{ row.pk }}"><span class="point-row"><span class="point-name">{% blocktranslate with name=row.title|default:registration_word %}Withdraw registration: {{ name }}{% endblocktranslate %}</span>{% if row.numbers %}<span class="point-line mp-num">{% for number in row.numbers %}{{ number|metering_point }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}</span></label>
+        <label class="entry-check point-check" for="id_withdraw_applications_{{ row.pk }}"><input class="entry-check-input" type="checkbox" id="id_withdraw_applications_{{ row.pk }}" name="withdraw_applications" value="{{ row.pk }}"{% if row.checked %} checked{% endif %}{% if form.withdraw_applications.errors %} aria-invalid="true" aria-describedby="id_withdraw_applications_error"{% endif %}><span class="point-row"><span class="point-name">{% blocktranslate with name=row.title|default:registration_word %}Withdraw registration: {{ name }}{% endblocktranslate %}</span>{% if row.numbers %}<span class="point-line mp-num">{% for number in row.numbers %}{{ number|metering_point }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}</span></label>
       {% else %}
         <div class="point-row"><span class="point-name">{{ row.title|default:_("Registration") }}</span>{% if row.numbers %}<span class="point-line mp-num">{% for number in row.numbers %}{{ number|metering_point }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% if not row.withdrawable %}<span class="point-line muted">{% translate "This registration can no longer be withdrawn here. Please contact the LEG." %}</span>{% endif %}</div>
       {% endif %}
     {% endfor %}
+    {% if editable and form.withdraw_applications.errors %}<div class="invalid-feedback d-block" id="id_withdraw_applications_error">{{ form.withdraw_applications.errors.0 }}</div>{% endif %}
   </div>
 </section>

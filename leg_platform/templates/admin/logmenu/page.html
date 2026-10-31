@@ -56,7 +56,8 @@
   {% if suppressed %}
   <ul>{% for source, count in suppressed.items %}<li>{{ source }}: {{ count }}</li>{% endfor %}</ul>
   {% endif %}
-  <form method="post" action="{% url 'admin:logmenu_settings' %}" class="import-form">{% csrf_token %}
+  <form method="post" action="{% url 'admin:logmenu_settings' %}" class="import-form" novalidate>{% csrf_token %}
+    {% if settings_form.errors %}<p class="errornote">{% blocktranslate count counter=settings_form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}</p>{% endif %}
     {{ settings_form.non_field_errors }}
     <fieldset>
       <legend>{% translate "Email notification" %}</legend>

@@ -221,11 +221,18 @@ class ContractAcceptPageTests(TestCase):
         acceptance = ContractAcceptance.objects.get(person=self.mine, version=self.version)
         self.assertTrue(acceptance.data_exchange_accepted)
         html = client.get(PAGE).content.decode()
-        self.assertIn("Sie haben dieser Fassung bereits zugestimmt.", html)
+        self.assertIn("Bereits zugestimmt", html)
+        self.assertIn("Sie haben dem Vertrag am", html)
+        self.assertNotIn("disabled", html.split('class="step-card contract-consent', 1)[1].split("</section>", 1)[0])
 
     def test_without_the_tick_nothing_is_stored(self):
         response = login(self.mine).post(self.url, {"version": self.version.pk})
-        self.assertRedirects(response, PAGE, fetch_redirect_response=False)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('id="id_agrees_contract_error">Bitte setzen Sie das Häkchen, um zuzustimmen.', html)
+        self.assertNotIn('data-gate-all="id_agrees_contract"', html)
+        summary = html.split('class="alert alert-danger error-summary"', 1)[1].split('</div>', 1)[0]
+        self.assertNotIn("Bitte setzen Sie das Häkchen, um zuzustimmen.", summary)
         self.assertFalse(ContractAcceptance.objects.exists())
 
     def test_a_replaced_version_is_refused(self):

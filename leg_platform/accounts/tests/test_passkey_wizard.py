@@ -150,9 +150,10 @@ class SetupWizardTests(WizardFixture, TestCase):
             with self.subTest(name=bad):
                 response = self.post(f"{SETUP}?step=name", {"name": bad})
                 self.assertEqual(response.status_code, 200)
-                # Only the inline error at the field, no summary box.
-                self.assertNotContains(response, "Please check your entries")
-                self.assertNotContains(response, "error-summary")
+                # The error at the field and the short bar with the title only (one field).
+                self.assertContains(response, "Please check your entries")
+                self.assertContains(response, "error-summary")
+                self.assertNotContains(response, '<a href="#id_name">')
                 self.assertContains(response, 'id="id_name_error"')
                 self.assertNotIn(passkey_views.NAME_KEY, self.client.session)
         response = self.post(f"{SETUP}?step=name", {"name": "  Mein Handy  "})

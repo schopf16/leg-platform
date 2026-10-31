@@ -720,7 +720,7 @@ class ContractStepView(StepView):
     def submit(self, request, application, current):
         form = forms.ContractForm(request.POST)
         if not form.is_valid():
-            return self.show(request, application, current)
+            return self.show(request, application, current, form=form)
         data = form.cleaned_data
         try:
             applications.accept_contract_step(
@@ -735,7 +735,7 @@ class ContractStepView(StepView):
                 # A replaced version: the page shows the new one with fresh boxes.
                 messages.error(request, texts.message(error.code))
                 return self.show(request, application, current)
-            form.add_error(None, texts.message(error.code))
+            form.add_error("agrees_contract" if error.code == "agreement_required" else None, texts.message(error.code))
             return self.show(request, application, current, form=form)
         return redirect(next_url(application))
 

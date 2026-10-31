@@ -444,6 +444,7 @@ class PrintViewTests(Fixture):
         with mock.patch.object(areas, "MAX_DETAIL_PAGES", 1):
             dialog = client.get(url)
             self.assertContains(dialog, 'value="all" disabled')  # "all" cannot be chosen
+            self.assertContains(dialog, 'id="print-all-hint">Es können höchstens 1 Detailseiten auf einmal gedruckt werden.')  # and says why
             self.assertEqual(client.post(url, {"scope": "list"})["Content-Type"], "application/pdf")
             for data in ({"scope": "all"}, {"scope": "selected", "ids": [str(self.leg.pk), str(self.fine.pk)]}):
                 refused = client.post(url, data)
