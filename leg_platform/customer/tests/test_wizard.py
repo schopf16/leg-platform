@@ -524,8 +524,10 @@ class MeteringPointStepTests(WizardCase):
         self.assertIn("Bitte geben Sie alle 20 Zeichen ein.", text(response))
         self.assertFalse(self.building.metering_points.exists())
 
-    def test_zeros_on_the_left_are_added_and_removed_by_the_rule(self):
-        self.client.post(self.url, {"draw_number": "0" * 25 + "7", "feed_in": "no"})
+    def test_the_server_expects_the_20_characters_the_page_script_prepares(self):
+        response = self.client.post(self.url, {"draw_number": "0" * 25 + "7", "feed_in": "no"})
+        self.assertIn("Die Messpunkt-Nummer ist zu lang.", text(response))
+        self.client.post(self.url, {"draw_number": typed(7).lower(), "feed_in": "no"})
         self.assertEqual(self.building.metering_points.get().number, full_number(7))
 
     def test_an_empty_or_forbidden_entry_is_a_message_at_the_field(self):

@@ -21,6 +21,7 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, TemplateView
 from django_otp import login as otp_login
 
+from leg_platform import render_as
 from leg_platform.accounts import (
     email_change,
     login_methods,
@@ -119,11 +120,11 @@ class HomeView(NeverCacheMixin, TemplateView):
             response.render()
             from leg_platform.customer import banners as customer_banners
 
-            customer_banners.mark_shown(request, request.user, pending)
+            customer_banners.mark_shown(request, render_as.subject(request), pending)
         return response
 
     def get_context_data(self, **kwargs):
-        user = self.request.user
+        user = render_as.subject(self.request)
         stage = None
         banners = []
         status_lines = []

@@ -35,9 +35,12 @@ def system_administration(context):
 def staff_area(context):
     """Whether the account may open the staff area (management and system administration, D-113): the entry "Staff
     area" of the menu of "My area" and the button of the start page. The same test as the management area itself
-    (``management.access.is_management_user``); the second factor and every request are checked by the views."""
+    (``management.access.is_management_user``); the second factor and every request are checked by the views.
+    Never in the support view "View as" (D-131): there the staff entries are not shown."""
     request = context.get("request")
     user = getattr(request, "user", None)
+    if getattr(request, "subject", None) is not None:
+        return False
     return bool(user is not None and is_management_user(user))
 
 

@@ -4,7 +4,7 @@ the active state, the entries that are "later", the unchanged menu of a staff ac
 import re
 
 from django.test import TestCase, tag
-from django.urls import reverse
+from django.urls import NoReverseMatch, Resolver404, resolve, reverse
 
 from leg_platform.community.tests.helpers import staff_user
 from leg_platform.customer.tests.helpers import (
@@ -46,26 +46,46 @@ class CustomerMenuTests(TestCase):
     def test_the_entries_and_their_order(self):
         menu = menu_of(self.client.get(HOME))
         order = [
-            "Mein Bereich", "Start", "Profil", "Teilnahme", "Gebäude", "Startdatum", "Nachbarschaft",
-            "Information", "Gesellschaftsvertrag", "Frage und Antwort", "Veranstaltung", "Demnächst", "Rechnung",
-            "Energie", "Mitteilung", "Ausloggen", "Datenschutz", "Impressum",
+            "Mein Bereich", "Start", "Gebäude", "Energie", "Rechnung", "Mitteilung", "Nachbarschaft", "Profil",
+            "Information", "Gesellschaftsvertrag", "Frage und Antwort", "Veranstaltung", "Ausloggen", "Datenschutz",
+            "Impressum",
         ]
         positions = [menu.index(label) for label in order]
         self.assertEqual(positions, sorted(positions))
-        # The names of the group "Coming next" are singular (owner, 2026-10-19).
-        for plural in ("Rechnungen", "Mitteilungen"):
-            self.assertNotIn(plural, menu)
+        # D-130: no group "Coming next" and no group "Participation" in the customer menu; the names are singular.
+        for gone in ("Demnächst", "Teilnahme", "Rechnungen", "Mitteilungen", "Für Mitarbeitende"):
+            self.assertNotIn(gone, menu)
 
     def test_entries_without_a_page_are_no_links_and_say_later(self):
         menu = menu_of(self.client.get(HOME))
         later = re.findall(r'<a class="frame-(?:item|sub-item) is-later"[^>]*>', menu)
-        # Start date, questions, event, invoice, energy, message (the contract page and the neighbourhood page are built).
+        # Energy, invoice, message, neighbourhood, questions, event; the contract page is built.
         self.assertEqual(len(later), 6)
         for tag_text in later:
             self.assertIn('aria-disabled="true"', tag_text)
             self.assertNotIn("href", tag_text)
         self.assertIn("später", menu)
         self.assertIn("noch nicht verfügbar", menu)
+
+    def test_the_neighbourhood_is_deferred_in_both_menus_and_its_route_is_removed(self):
+        html = self.client.get(HOME).content.decode()
+        entry = '<a class="frame-item is-later" role="link" aria-disabled="true">'
+        pattern = re.escape(entry) + r'\s*<svg[^>]*><use href="#i-persons"/></svg><span>Nachbarschaft</span>'
+        self.assertEqual(len(re.findall(pattern, html)), 2)
+        self.assertNotIn('href="/participation/neighbourhood/"', html)
+        self.assertNotIn("leaflet", html)
+        with self.assertRaises(NoReverseMatch):
+            reverse("customer:neighbourhood")
+        with self.assertRaises(Resolver404):
+            resolve("/participation/neighbourhood/")
+        for client in (self.client, login(self.staff), self.client_class()):
+            for method in ("get", "post"):
+                with self.subTest(client=client, method=method):
+                    response = getattr(client, method)("/participation/neighbourhood/")
+                    self.assertEqual(response.status_code, 404)
+                    self.assertIn("no-store", response["Cache-Control"])
+                    self.assertIn("img-src 'self'", response["Content-Security-Policy"])
+                    self.assertNotIn("wmts.geo.admin.ch", response["Content-Security-Policy"])
 
     def test_the_two_real_entries_are_links_to_the_pages(self):
         menu = menu_of(self.client.get(HOME))
@@ -76,9 +96,9 @@ class CustomerMenuTests(TestCase):
         self.assertRegex(
             menu, rf'<a class="frame-sub-item" href="{reverse("customer:contract")}">Gesellschaftsvertrag</a>'
         )
-        participation = menu[menu.index("Teilnahme"):menu.index("Information")]
+        participation = menu[menu.index("Gebäude"):menu.index("Information")]
         self.assertNotIn("Vertrag", participation)
-        self.assertIn('<form method="post" action="/logout/">', menu)
+        self.assertIn('<form method="post" action="/logout/" data-render-as-keep>', menu)
         self.assertNotIn("Verwaltung", menu)
 
     def test_exactly_one_entry_is_current_and_it_is_the_page_of_the_request(self):
@@ -95,15 +115,15 @@ class CustomerMenuTests(TestCase):
                 current = re.findall(r'<a class="frame-(?:item|sub-item)[^"]*" (href="[^"]+") aria-current="page"', menu)
                 self.assertEqual(current, [expected])
 
-    def test_the_wizard_marks_participation_as_current(self):
+    def test_the_wizard_marks_buildings_as_current(self):
         application, _building = draft_with_building(self.mine)
         menu = menu_of(self.client.get(reverse("customer:application_metering_points", args=[application.pk])))
-        self.assertIn(f'<a class="frame-sub-item is-active" href="{BUILDINGS}" aria-current="page">', menu)
-        self.assertIn('class="frame-item frame-parent is-active"', menu)
+        self.assertIn(f'<a class="frame-item is-active" href="{BUILDINGS}" aria-current="page">', menu)
+        self.assertNotIn("frame-parent is-active", menu)  # Information is not the current group
 
-    def test_the_bottom_bar_has_start_participation_information_and_profile(self):
+    def test_the_bottom_bar_has_start_buildings_information_and_profile(self):
         bar = bar_of(self.client.get(HOME))
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Teilnahme", "Information", "Profil"])
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Gebäude", "Information", "Profil"])
         self.assertIn('class="frame-tab is-active" href="/" aria-current="page"', bar)
         self.assertNotIn("is-later", bar)
         profile_bar = bar_of(self.client.get(reverse("accounts:profile")))
@@ -113,17 +133,24 @@ class CustomerMenuTests(TestCase):
 
     def test_the_menu_is_in_the_drawer_of_the_phone_too(self):
         html = self.client.get(BUILDINGS).content.decode()
-        self.assertEqual(html.count("frame-parent"), 4)  # two parents, desktop menu and drawer
+        self.assertEqual(html.count("frame-parent"), 2)  # one parent (Information), desktop menu and drawer
         self.assertEqual(html.count('action="/logout/"'), 2)
 
     def test_a_staff_account_has_the_menu_of_a_customer_in_my_area_and_its_own_menu_in_the_staff_area(self):
-        # D-113: two workspaces. Staff accounts with a customer number take part; the staff area has the menu it had.
+        # D-113, D-131: two workspaces. The menu of My area is the same for staff and customers; the way into the staff
+        # area is the button in the header.
         staff_client = login(self.staff)
-        menu = menu_of(staff_client.get(HOME))
-        for label in ("Teilnahme", "Gesellschaftsvertrag", "Für Mitarbeitende", "Mitarbeitenden-Bereich", "Rechnung"):
+        page = staff_client.get(HOME)
+        menu = menu_of(page)
+        for label in ("Gebäude", "Gesellschaftsvertrag", "Rechnung"):
             self.assertIn(label, menu)
-        for gone in ("Rechnungen", "Mitteilungen", 'frame-group">Verwaltung<'):
+        for gone in ("Rechnungen", "Mitteilungen", "Für Mitarbeitende", "Mitarbeitenden-Bereich", "Demnächst",
+                     'frame-group">Verwaltung<'):
             self.assertNotIn(gone, menu)
+        header = part(page.content.decode(), '<header class="frame-header', "</header>")
+        self.assertIn('class="btn btn-secondary-action frame-staff-btn"', header)
+        self.assertIn(f'href="{reverse("management:overview")}"', header)
+        self.assertNotIn("frame-staff-btn", part(self.client.get(HOME).content.decode(), '<header class="frame-header', "</header>"))
         staff_menu = menu_of(staff_client.get(reverse("management:overview")))
         for label in ("Rechnungen", "Energie", "Mitteilungen", "Verwaltung", "Zurück zu Mein Bereich"):
             self.assertIn(label, staff_menu)
@@ -132,7 +159,7 @@ class CustomerMenuTests(TestCase):
         # The bar follows the workspace: the one of a customer in My area, the staff bar in the staff area.
         self.assertEqual(
             re.findall(r"<span>([^<]+)</span>", bar_of(staff_client.get(HOME))),
-            ["Start", "Teilnahme", "Information", "Profil"],
+            ["Start", "Gebäude", "Information", "Profil"],
         )
         self.assertEqual(
             re.findall(r"<span>([^<]+)</span>", bar_of(staff_client.get(reverse("management:overview")))),

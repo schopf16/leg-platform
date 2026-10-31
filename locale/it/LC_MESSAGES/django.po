@@ -1494,12 +1494,6 @@ msgstr "Numero di telefono"
 msgid "Two-factor authentication"
 msgstr "Autenticazione a due fattori"
 
-msgid "On"
-msgstr "Attivata"
-
-msgid "Off"
-msgstr "Disattivata"
-
 msgid "Change password"
 msgstr "Cambia password"
 
@@ -1833,9 +1827,6 @@ msgstr "ID tenant"
 
 msgid "client ID"
 msgstr "ID client"
-
-msgid "Microsoft Graph configuration"
-msgstr "Configurazione di Microsoft Graph"
 
 msgid "Microsoft Graph configuration changed"
 msgstr "Configurazione di Microsoft Graph modificata"
@@ -4019,9 +4010,6 @@ msgstr "NPA, località"
 msgid "Grid"
 msgstr "Rete"
 
-msgid "Create new transformer circuit"
-msgstr "Crea nuovo circuito del trasformatore"
-
 msgid "Edit transformer circuit"
 msgstr "Modifica circuito del trasformatore"
 
@@ -6147,9 +6135,6 @@ msgstr "Assegnato dal cliente"
 msgid "Description"
 msgstr "Descrizione"
 
-msgid "Number"
-msgstr "Numero"
-
 msgid "Go to the metering point"
 msgstr "Vai al punto di misura"
 
@@ -7369,9 +7354,6 @@ msgctxt "customer"
 msgid "optional"
 msgstr "facoltativo"
 
-msgid "Your way into the LEG"
-msgstr "Il Suo percorso verso la CEL"
-
 msgid "only with feed-in"
 msgstr "solo con immissione"
 
@@ -7390,9 +7372,6 @@ msgid "Show details"
 msgstr "Mostra dettagli"
 
 # The customer menu (MENU-STANDARD.md): the names are singular.
-msgid "Participation"
-msgstr "Partecipazione"
-
 msgid "Neighbourhood"
 msgstr "Quartiere"
 
@@ -8135,9 +8114,6 @@ msgstr ""
 "Mantenga almeno il numero richiesto di passkey. Aggiunga prima una "
 "sostituzione."
 
-msgid "Last used"
-msgstr "Ultimo utilizzo"
-
 msgid "Recover sign-in method"
 msgstr "Ripristinare l’accesso"
 
@@ -8233,18 +8209,6 @@ msgstr ""
 "non funzionano più; tutte le sessioni sono terminate. Una sessione limitata "
 "permette di scegliere e configurare un nuovo metodo."
 
-msgctxt "Passkey setup step"
-msgid "Name"
-msgstr "Assegnare un nome"
-
-msgctxt "Passkey setup step"
-msgid "Create"
-msgstr "Creare"
-
-msgctxt "Passkey setup step"
-msgid "Save"
-msgstr "Salvare"
-
 msgid ""
 "Your previous sign-in methods no longer work. Save a new passkey to restore "
 "access."
@@ -8258,9 +8222,6 @@ msgid ""
 msgstr ""
 "Il browser ha segnalato questo dispositivo anziché un altro. Il portale non "
 "ha salvato la passkey. Potrebbe comunque trovarsi nel gestore di password."
-
-msgid "Sign-in"
-msgstr "Accesso"
 
 msgid "Password and number code"
 msgstr "Password e codice numerico"
@@ -8630,23 +8591,14 @@ msgstr "Area collaboratori"
 msgid "Staff area: %(page)s"
 msgstr "Area collaboratori: %(page)s"
 
-msgid "For staff"
-msgstr "Per i collaboratori"
-
-msgid "Management and system"
-msgstr "Gestione e sistema"
-
 msgid "Back to My area"
 msgstr "Torna a La mia area"
 
-msgid "Participation, information and profile"
-msgstr "Partecipazione, informazioni e profilo"
+msgid "Buildings, information and profile"
+msgstr "Edifici, informazioni e profilo"
 
 msgid "Start and profile"
 msgstr "Inizio e profilo"
-
-msgid "Open staff area"
-msgstr "Apri l’area collaboratori"
 
 msgid "Choose another sign-in method"
 msgstr "Scegliere un altro metodo di accesso"
@@ -8885,9 +8837,6 @@ msgstr ""
 "La LEG riceve qui i messaggi del modulo di contatto. Senza questo indirizzo "
 "il modulo di contatto non viene offerto."
 
-msgid "noreply@example.org"
-msgstr "noreply@example.org"
-
 msgid "Plant register"
 msgstr "Registro degli impianti"
 
@@ -9001,9 +8950,6 @@ msgstr "Voci non riprese: controllo non superato"
 
 msgid "Plants skipped: no building number (EGID)"
 msgstr "Impianti saltati: senza numero dell’edificio (EGID)"
-
-msgid "Statistic of the last successful import"
-msgstr "Dati dell’ultimo aggiornamento riuscito"
 
 msgid "Not run today"
 msgstr "Non ancora aggiornato oggi"
@@ -9273,12 +9219,6 @@ msgid "The address directory is being set up. Try again later."
 msgstr ""
 "La directory degli indirizzi è in fase di configurazione. Riprovi più tardi."
 
-msgid "Send an email on error"
-msgstr "Inviare un'e-mail in caso di errore"
-
-msgid "Email address for errors"
-msgstr "Indirizzo e-mail per gli errori"
-
 msgid "Housekeeping error"
 msgstr "Errore della manutenzione"
 
@@ -9327,9 +9267,6 @@ msgstr ""
 "È aperto un errore di una manutenzione precedente. La manutenzione "
 "settimanale attende; avvii qui una manutenzione."
 
-msgid "Housekeeping error notification changed"
-msgstr "E-mail di errore della manutenzione modificata"
-
 msgid "Housekeeping errors acknowledged"
 msgstr "Errori della manutenzione confermati"
 
@@ -9372,9 +9309,6 @@ msgstr "Notifica del registro modificata"
 
 msgid "Critical"
 msgstr "Critico"
-
-msgid "Minimum severity"
-msgstr "Gravità minima"
 
 msgid "Send an email"
 msgstr "Inviare un'e-mail"
@@ -9542,6 +9476,9 @@ msgstr "Nessun movimento da %(minutes)s minuti."
 msgid "Statistic"
 msgstr "Statistica"
 
+# Importer failure texts (addresses: importer.py, jobs.py, plants.py, status.py): the English sentence is stored as the
+# reason of an import log row and translated at display time by the dynamic gettext(row.reason) in addresses/admin.py
+# (import log page and download). makemessages cannot see these msgids; do not remove them.
 msgid "A repair was tried recently and did not succeed."
 msgstr "Una riparazione è stata tentata di recente senza successo."
 
@@ -9713,110 +9650,6 @@ msgstr "Accessi non riusciti"
 msgid "Lines"
 msgstr "Righe"
 
-msgid ""
-"Your transformer circuit and the buildings around it. Public data only."
-msgstr ""
-"Il vostro circuito di trasformazione e gli edifici circostanti. Solo dati "
-"pubblici."
-
-msgid "Your circuit: %(name)s"
-msgstr "Il vostro circuito: %(name)s"
-
-msgid "No circuit known for your building"
-msgstr "Nessun circuito noto per il vostro edificio"
-
-msgid "Map of the circuits around your building"
-msgstr "Mappa dei circuiti intorno al vostro edificio"
-
-msgid "Your building"
-msgstr "Il vostro edificio"
-
-msgid "Building with a PV plant"
-msgstr "Edificio con impianto fotovoltaico"
-
-msgid "Outline of a circuit (approximate)"
-msgstr "Contorno di un circuito (approssimativo)"
-
-msgid "The circuits of your postal code"
-msgstr "I circuiti del vostro codice postale"
-
-msgid "your circuit"
-msgstr "il vostro circuito"
-
-msgid "%(n)s building"
-msgid_plural "%(n)s buildings"
-msgstr[0] "%(n)s edificio"
-msgstr[1] "%(n)s edifici"
-
-msgid "%(pv)s with PV"
-msgstr "%(pv)s con FV"
-
-msgid "No circuit names are published for this postal code yet."
-msgstr "Per questo codice postale non è ancora pubblicato alcun circuito."
-
-msgid ""
-"Counts are buildings and PV plants only. Outlines are an approximation drawn"
-" from the building positions of the BKW map."
-msgstr ""
-"Sono conteggiati solo edifici e impianti fotovoltaici. I contorni sono "
-"un'approssimazione ricavata dalle posizioni degli edifici sulla mappa della "
-"BKW."
-
-msgid "The discount on grid usage"
-msgstr "Lo sconto sull'utilizzo della rete"
-
-msgid ""
-"The BKW grants a discount on the grid usage when all participants are on the"
-" same grid level. The discount is 40 percent when no transformation is "
-"needed for the exchange, and 20 percent when one is needed."
-msgstr ""
-"BKW concede uno sconto sull'utilizzo della rete se tutti i partecipanti si "
-"trovano sullo stesso livello di rete. Lo sconto è del 40 per cento se per lo"
-" scambio non è necessaria alcuna trasformazione e del 20 per cento se è "
-"necessaria."
-
-msgid "Source: BKW, page on the local electricity community."
-msgstr "Fonte: BKW, pagina sulla comunità locale di elettricità."
-
-msgid "Invite neighbours"
-msgstr "Invitare i vicini"
-
-msgid ""
-"The invitation opens your own mail program. The mail is sent from your "
-"address, not from the portal."
-msgstr ""
-"L'invito apre il vostro programma di posta elettronica. L'e-mail parte dal "
-"vostro indirizzo, non dal portale."
-
-msgid "Prepare invitation"
-msgstr "Preparare l'invito"
-
-msgid "PV plants: Federal Office of Energy (BFE), plant register"
-msgstr ""
-"Impianti fotovoltaici: Ufficio federale dell'energia (UFE), registro degli "
-"impianti"
-
-msgid "Local electricity community %(name)s"
-msgstr "Comunità locale di elettricità %(name)s"
-
-msgid ""
-"I take part in the local electricity community. Would you like to join as "
-"well?"
-msgstr "Partecipo alla comunità locale di elettricità. Interesse?"
-
-#: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid "The circuits of your area"
-msgstr "I circuiti di trasformazione della tua zona"
-
-#: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid ""
-"No building at your profile address is in the address directory yet. The map"
-" shows the circuits of your area."
-msgstr ""
-"All'indirizzo del tuo profilo non c'è ancora alcun edificio nel registro "
-"degli indirizzi. La mappa mostra i circuiti di trasformazione della tua "
-"zona."
-
 #: leg_platform/addresses/templates/addresses/widget_notice.html:0
 msgid "Checking the address …"
 msgstr "Verifica dell'indirizzo …"
@@ -9861,9 +9694,6 @@ msgstr "Assegni i punti di misura al suo edificio."
 msgid "You confirm the invitation in your account at the grid operator"
 msgstr "Conferma l'invito nel suo conto presso il gestore di rete"
 
-msgid "The LEG administration is checking your details, so you can no longer change them."
-msgstr "L'amministrazione della CEL sta verificando i suoi dati. Per questo non può più modificare la richiesta."
-
 msgid "The LEG administration is checking your details, so you can no longer change them. Until the registration at the grid operator starts, you can still withdraw the application."
 msgstr "L'amministrazione della CEL sta verificando i suoi dati. Per questo non può più modificare la richiesta. Finché la registrazione presso il gestore di rete non è iniziata, può ancora ritirarla."
 
@@ -9885,9 +9715,6 @@ msgstr "Modifica il collegamento bancario o postale"
 
 msgid "This building is already part of your application."
 msgstr "Questo edificio fa già parte della sua richiesta."
-
-msgid "Metering"
-msgstr "Misurazione"
 
 msgid "Add another building"
 msgstr "Aggiungi un altro edificio"
@@ -9955,15 +9782,6 @@ msgstr "Richiedi l'uscita dei punti di misura (vincolante)"
 
 msgid "Exempt are the details that we are legally obliged to keep, for example invoice data."
 msgstr "Sono esclusi i dati che dobbiamo conservare per legge (ad esempio i dati di fatturazione)."
-
-msgid "Buildings and transformer stations: BKW map of the area with the higher discount"
-msgstr "Edifici e cabine di trasformazione: mappa BKW della zona con lo sconto più alto"
-
-msgid "No data yet"
-msgstr "Ancora nessun dato"
-
-msgid "No data is available for your neighbourhood yet."
-msgstr "Per il Suo quartiere non sono ancora disponibili dati."
 
 msgid "We check the address for you. You do not need to do anything."
 msgstr "Verifichiamo l'indirizzo per Lei. Lei non deve fare nulla."
@@ -10083,40 +9901,9 @@ msgstr "Si rivolga alla CEL. Siamo volentieri a Sua disposizione."
 msgid "As early as possible. The LEG confirms the date."
 msgstr "Appena possibile. La CEL conferma la data."
 
-#. Verbose names that Django derives from the field names
-#. (privacy_accepted_at/url); the
-#. catalogue test requires a translation for every field of the account.
-msgid "privacy accepted at"
-msgstr "privacy accettata il"
-
-msgid "privacy accepted url"
-msgstr "URL della privacy accettata"
-
-msgid "Company name"
-msgstr "Nome dell'azienda"
-
-msgid "Access to administration"
-msgstr "Accesso all'amministrazione"
-
-msgid "Superuser status"
-msgstr "Stato di superutente"
-
-msgid "Groups"
-msgstr "Gruppi"
-
 #. Texts of Django 6.1 without a German translation in Django itself.
 msgid "- Select an option -"
 msgstr "- Selezionare un'opzione -"
-
-#: leg_platform/accounts/admin.py
-msgid "account (internal number)"
-msgstr "conto (numero interno)"
-
-msgid "Please correct"
-msgstr "Correzione richiesta"
-
-msgid "User permissions"
-msgstr "Autorizzazioni dell'utente"
 
 #, python-format
 msgid "Search %(name)s"
@@ -10134,3 +9921,92 @@ msgstr "Questo browser non supporta le passkey. Acceda con la password."
 
 msgid "Save or discard the open change first."
 msgstr "Salvi o annulli prima la modifica aperta."
+
+# ---- The support view "View as" (D-131)
+msgid "View as"
+msgstr "Visualizza come"
+
+msgid "View as this person"
+msgstr "Visualizza come questa persona"
+
+#, python-format
+msgid "View as: %(name)s (customer no. %(number)s) – read only"
+msgstr "Visualizza come: %(name)s (n. cliente %(number)s) – sola lettura"
+
+#, python-format
+msgid "Signed in as %(name)s"
+msgstr "Accesso come %(name)s"
+
+msgid "End view"
+msgstr "Termina la vista"
+
+msgctxt "support view"
+msgid "End"
+msgstr "Termina"
+
+msgid "Log out (staff account)"
+msgstr "Esci (account collaboratore)"
+
+msgid "Not possible in this view"
+msgstr "Non possibile in questa vista"
+
+msgid "Not visible in this view"
+msgstr "Non visibile in questa vista"
+
+msgid "Not visible in this view for security reasons."
+msgstr "Non visibile in questa vista per motivi di sicurezza."
+
+msgid "Back to the start page"
+msgstr "Torna alla pagina iniziale"
+
+msgid "Security settings are not visible in this view."
+msgstr "Le impostazioni di sicurezza non sono visibili in questa vista."
+
+msgid "The contract document is not shown in this view. Use the staff area to open it."
+msgstr "Il documento del contratto non è mostrato in questa vista. Lo apra dall’area collaboratori."
+
+msgid "You see the pages as this person sees them. Read only."
+msgstr "Vede le pagine come le vede questa persona. Sola lettura."
+
+msgid "Support view (view as a person) started"
+msgstr "Vista di supporto (visualizza come persona) avviata"
+
+msgid "Support view (view as a person) ended"
+msgstr "Vista di supporto (visualizza come persona) terminata"
+
+msgid "Page shown in the support view (view as a person)"
+msgstr "Pagina mostrata nella vista di supporto (visualizza come persona)"
+
+msgid "Request refused in the support view (view as a person)"
+msgstr "Richiesta rifiutata nella vista di supporto (visualizza come persona)"
+
+#. Verbose names that Django derives from the field names (privacy_accepted_at/url); the catalogue test requires a
+#. translation for every field of the account.
+msgid "privacy accepted at"
+msgstr "privacy accettata il"
+
+msgid "privacy accepted url"
+msgstr "URL della privacy accettata"
+
+#. Labels of the user and group forms of the administration (built from the field names; tested by
+#. ChangeMessageLabelTests).
+msgid "Company name"
+msgstr "Nome dell'azienda"
+
+msgid "Access to administration"
+msgstr "Accesso all'amministrazione"
+
+msgid "Superuser status"
+msgstr "Stato di superutente"
+
+msgid "Groups"
+msgstr "Gruppi"
+
+msgid "User permissions"
+msgstr "Autorizzazioni dell'utente"
+
+#, python-format
+msgid "%(counter)s message pending, not shown."
+msgid_plural "%(counter)s messages pending, not shown."
+msgstr[0] "%(counter)s messaggio in attesa, non mostrato."
+msgstr[1] "%(counter)s messaggi in attesa, non mostrati."

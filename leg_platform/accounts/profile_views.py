@@ -21,6 +21,7 @@ from django.views import View
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django_otp import login as otp_login
 
+from leg_platform import render_as
 from leg_platform.accounts import (
     email_change,
     login_methods,
@@ -152,6 +153,19 @@ def two_factor_state(user, edit, step, session):
     return "setup"
 
 
+def render_profile_view_as(request):
+    """The profile in the support view (D-131): master data and the IBAN of the person viewed, nothing else, nothing
+    consumed (no messages), no form."""
+    from leg_platform.community import own_iban
+
+    person = render_as.subject(request)
+    return render(request, "accounts/profile_view_as.html", {
+        "account": person,
+        "address_building": address_building(person),
+        "bank_iban": own_iban.own_iban_display(person),
+    })
+
+
 @sensitive_variables("codes")
 def render_profile(request, *, edit=None, step=None, forms=None, codes=None, enrolled=False, status=200):
     """The profile page with one card in an edit state (or none); ``forms`` holds bound forms."""
@@ -271,6 +285,8 @@ class ProfileView(ProfileCardView):
     """The profile; ``?edit=<card>&step=<step>`` opens one card in its edit state."""
 
     def get(self, request):
+        if render_as.is_active(request):
+            return render_profile_view_as(request)
         edit, step = request.GET.get("edit"), request.GET.get("step")
         if (edit, step) == ("two_factor", "choose") and sign_in_change.uses_flow(request.user):
             # The tile "Choose how you sign in" and old links: the choice is the second screen of the flow, which

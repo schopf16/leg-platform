@@ -321,6 +321,8 @@ class MatrixBase(TestCase):
             }, True),
             # Nobody to invite (an account that completed the registration): nothing is sent, nothing changes.
             Case("persons_invitation", pk(self.anna), {"next": "/management/persons/"}),
+            # The support view (D-131) starts: only the session and the security log change, never the domain.
+            Case("persons_view_as", pk(self.anna), {"x": "1"}),
             Case("persons_shares", pk(self.anna), {"quantity": "5", "valid_from": date(-1)}, True),
             # A token of a suggestion that does not exist: nothing to decide on, so nothing changes (no control).
             Case("persons_address_suggestion", pk(self.anna), {"action": "dismiss", "token": "x"}),

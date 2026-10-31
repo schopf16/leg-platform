@@ -8,5 +8,6 @@ customer pages and their one script (progressive enhancement only; every page wo
 {% block scripts %}
   {{ block.super }}
   <script defer src="{% static 'js/submit-once.js' %}"></script>
+  <script defer src="{% static 'js/metering-number.js' %}"></script>
   <script defer src="{% static 'customer/js/customer.js' %}"></script>
 {% endblock %}

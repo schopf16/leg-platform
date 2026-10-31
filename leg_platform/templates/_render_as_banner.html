@@ -1,0 +1,16 @@
+{% load i18n %}{% comment %}
+The bar of the support view "View as" (D-131): sticky on top of every page while a staff member sees the pages as a customer
+sees them, read only. ``render_as`` (leg_platform.render_as.RenderAs) holds the person; ``user`` is still the staff member.
+role="status", its own colour token (--view-as), hidden in print. "End view" is a POST with the CSRF token. The allowed
+paths are for ``static/js/render-as.js`` (it only disables what would be refused; the server refuses anyway).
+{% endcomment %}<div class="render-as-bar d-print-none" role="status" data-render-as-keep data-allowed="{{ render_as_paths }}" data-hint="{% translate 'Not possible in this view' %}">
+  <p class="render-as-text">
+    <svg class="frame-icon" aria-hidden="true"><use href="#i-eye"/></svg>
+    <span class="render-as-main">{% blocktranslate with name=frame_subject.display_name number=frame_subject.customer_number_display %}View as: {{ name }} (customer no. {{ number }}) – read only{% endblocktranslate %}</span>
+    <span class="render-as-staff">{% blocktranslate with name=user.display_name %}Signed in as {{ name }}{% endblocktranslate %}</span>
+  </p>
+  <form method="post" action="{% url 'accounts:render_as_end' %}" class="render-as-form">
+    {% csrf_token %}
+    <button type="submit" class="render-as-end" aria-label="{% translate 'End view' %}"><span class="render-as-end-long">{% translate "End view" %}</span><span class="render-as-end-short" aria-hidden="true">{% translate "End" context "support view" %}</span></button>
+  </form>
+</div>

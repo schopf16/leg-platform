@@ -7,22 +7,16 @@ through the logged-in account: the building of another account and a metering po
 404, the same answer as for a missing one. Nothing here writes a name, an address, a number or an IBAN to a log.
 """
 
-from urllib.parse import quote, urlencode
-
-from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.utils.csp import CSP
-from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views import View
-from django.views.decorators.csp import csp_override
 
+from leg_platform import render_as
 from leg_platform.accounts import profile_views
-from leg_platform.addresses import buildings as address_buildings, neighbourhood, transformers
 from leg_platform.community import applications, archived, buildings, contracts, own_iban
 from leg_platform.community.application_common import ApplicationError
 from leg_platform.community.models import Direction
@@ -39,23 +33,25 @@ class BuildingsView(CustomerAccessMixin, View):
     card as a form; its POST saves everything of the card (``customer.card_edit``)."""
 
     def _data(self, request):
-        data = overview.build(request.user)
+        data = overview.build(render_as.subject(request))
         card_edit.mark(data)
         return data
 
     def _render(self, request, data, status=200):
-        read = banners.pending(request.user)
+        person = render_as.subject(request)
+        read = banners.pending(person)
         response = render(request, "customer/buildings.html", {
             "overview": data, "deregistration_url": reverse("customer:deregistration_start"),
             "banners": read.banners,
         }, status=status)
-        # Only after the page was built, and only for a real visit (not HEAD, not a prefetch).
-        banners.mark_shown(request, request.user, read)
+        # Only after the page was built, and only for a real visit (not HEAD, not a prefetch); never in the support view.
+        banners.mark_shown(request, person, read)
         return response
 
     def get(self, request):
         data = self._data(request)
-        data.open_id = request.session.pop("buildings_open_id", "")
+        # The support view reads only: the session of the staff member keeps its key.
+        data.open_id = "" if render_as.is_active(request) else request.session.pop("buildings_open_id", "")
         edit_id = request.GET.get("edit", "")
         if edit_id:
             card = card_edit.find(data, edit_id)
@@ -86,113 +82,6 @@ class BuildingsView(CustomerAccessMixin, View):
                 return result
         state.focus()
         return self._render(request, data)
-
-
-# The swisstopo tiles of the map: the one external host the page's policy allows, for images only (D-123). Set for this
-# view alone (``csp_override``); every other page keeps ``img-src 'self'``.
-NEIGHBOURHOOD_TILES = "https://wmts.geo.admin.ch"
-
-
-@method_decorator(
-    csp_override({**settings.SECURE_CSP, "img-src": [CSP.SELF, NEIGHBOURHOOD_TILES]}), name="dispatch",
-)
-class NeighbourhoodView(CustomerAccessMixin, View):
-    """The page Nachbarschaft (D-123): the transformer circuits around the building of the profile address.
-
-    The map gets public building and plant data only (outlines, PV points, counts); no other participant is read."""
-
-    def get(self, request):
-        hood, own = _neighbourhood(request.user)
-        return render(request, "customer/neighbourhood.html", {
-            "neighbourhood": hood,
-            "legend": _legend(hood) if hood else [],
-            "map_data": _map_data(hood) if hood else None,
-            "profile_building": own,
-            "invite_url": _invite_url(),
-        })
-
-
-def _neighbourhood(person):
-    """``(neighbourhood, own)``: the circuits of the building at the profile address (``own`` True). Without such a
-    building: the circuits of the profile's postal code, then of the postal code where most of the LEG's buildings lie
-    (``own`` False). Only the public directory and counts are read. None only where the directory shows no circuit."""
-    egid = _profile_egid(person)
-    hood = neighbourhood.for_building(egid) if egid is not None else None
-    if hood is not None:
-        return hood, True
-    for postal_code in _area_postal_codes(person):
-        hood = neighbourhood.for_postal_code(postal_code)
-        if hood is not None:
-            return hood, False
-    return None, False
-
-
-def _profile_egid(person):
-    """The EGID of the building at the profile address, or None. It is read from the local address directory only
-    (no request outside, no assignment to the account needed): the circuit is public data, and the profile address is
-    the person's own. Several buildings at one address: the first by EGID."""
-    if not (person.street and person.swiss_postal_code and person.town):
-        return None
-    search = address_buildings.find_buildings(
-        person.street, person.house_number, str(person.swiss_postal_code), person.town,
-    )
-    return search.buildings[0].egid if search.buildings else None
-
-
-def _area_postal_codes(person):
-    """The postal codes to show without an own building, in order (D-123): the profile's postal code, then the postal
-    codes of the service area that the staff entered in the administration (``ServicePostalCode``)."""
-    codes = [str(person.swiss_postal_code)] if person.swiss_postal_code else []
-    return codes + [code for code in transformers.postal_codes() if code not in codes]
-
-
-# The four circuit colours of the map and the legend: the index of a colour (``.nb-swatch-0`` to ``-3`` in customer.css,
-# ``COLOURS`` in ``neighbourhood-map.js``). A fifth circuit reuses the first colour.
-COLOURS = 4
-
-
-def _colour(index):
-    return index % COLOURS
-
-
-def _legend(hood):
-    return [
-        {
-            "circuit": circuit,
-            "colour": _colour(index),
-            "own": circuit.name == hood.own_circuit,
-        }
-        for index, circuit in enumerate(hood.circuits)
-    ]
-
-
-def _map_data(hood):
-    """The data of the map as plain lists of (longitude, latitude); read by ``customer/js/neighbourhood-map.js``."""
-    return {
-        "own": list(hood.own_point) if hood.own_point else None,
-        "ownCircuit": hood.own_circuit,
-        "circuits": [
-            {
-                "name": circuit.name,
-                "buildings": circuit.building_count,
-                "pv": circuit.pv_count,
-                "colour": _colour(index),
-                "outline": [list(point) for point in circuit.outline],
-                "pvPoints": [list(point) for point in circuit.pv_points],
-            }
-            for index, circuit in enumerate(hood.circuits)
-        ],
-    }
-
-
-def _invite_url():
-    """A ``mailto:`` link with the text of an invitation; it opens the mail program of the member, so the mail leaves
-    from the member's own address and the portal sends nothing (D-123)."""
-    text = {
-        "subject": _("Local electricity community %(name)s") % {"name": settings.INSTANCE_NAME},
-        "body": _("I take part in the local electricity community. Would you like to join as well?"),
-    }
-    return "mailto:?" + urlencode(text, quote_via=quote)
 
 
 class BuildingDetailsView(CustomerAccessMixin, View):
@@ -294,10 +183,11 @@ class ContractView(CustomerAccessMixin, View):
     @staticmethod
     def show(request, form=None):
         version = contracts.current_version()
+        person = render_as.subject(request)
         return render(request, "customer/contract.html", {
-            "versions": contracts.customer_versions(request.user),
+            "versions": contracts.customer_versions(person),
             "current": version,
-            "acceptance": contracts.acceptance_of(request.user, version) if version else None,
+            "acceptance": contracts.acceptance_of(person, version) if version else None,
             "form": form if form is not None else forms.ContractForm(initial={"version": version.pk if version else None}),
         })
 

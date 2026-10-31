@@ -93,26 +93,16 @@
   };
 
   // ---- The typed last characters of a metering point number (D-102) ----
-  // The same rule as the server (``numbers.normalise_entered_number``): white space is ignored (a number copied from a
-  // page has no-break spaces between its blocks), letters A-Z (small ones become capitals), digits and the hyphen;
-  // shorter than the limit: zeros on the left; longer: only leading zeros are left out, and only as many as needed; if
-  // that is not enough the number is invalid. Nothing else is ever removed.
+  // The same rule as the server (``numbers.normalise_entered_number``), shared in ``js/metering-number.js``.
   const enteredNumber = (input) => {
-    const limit = Number(input.dataset.limit);
-    const value = input.value.replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9-]+$/.test(value)) {
+    const found = window.MeteringNumber.entered(input.value, Number(input.dataset.limit));
+    if (found.problem === "not_allowed") {
       return { problem: input.dataset.messageDigits };
     }
-    let result = value.toUpperCase();
-    if (result.length > limit) {
-      const extra = result.length - limit;
-      const zeros = result.length - result.replace(/^0+/, "").length;
-      if (zeros < extra) {
-        return { problem: input.dataset.messageMany.replace("%(count)s", String(value.length)) };
-      }
-      result = result.slice(extra);
+    if (found.problem === "too_long") {
+      return { problem: input.dataset.messageMany.replace("%(count)s", String(found.count)) };
     }
-    return { value: "0".repeat(limit - result.length) + result };
+    return found;
   };
 
   const digitsProblem = (input, leaving) => {

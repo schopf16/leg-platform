@@ -67,7 +67,7 @@ class FrameTests(TestCase):
         html = self.client.get(HOME_URL).content.decode()
         header = part(html, '<header class="frame-header', "</header>")
         self.assertIn('class="frame-logo"', header)
-        self.assertIn(f'<span class="frame-name">{self.user.display_name}</span>', header)
+        self.assertRegex(header, r'(?s)<a class="frame-name frame-name-link" href="/profile/"[^>]*>.*?' + re.escape(self.user.display_name) + "</span>")
         self.assertIn('id="lang-btn"', html)
         self.assertIn('id="theme-btn"', html)
 
@@ -75,12 +75,13 @@ class FrameTests(TestCase):
         html = self.client.get(HOME_URL).content.decode()
         menu = part(html, '<nav class="frame-menu', "</nav>")
         self.assertIn("Mein Bereich", menu)
-        self.assertIn("Demnächst", menu)
+        self.assertNotIn("Demnächst", menu)  # D-130: the group "Coming next" is gone from the customer menu
         self.assertLess(menu.index("Mein Bereich"), menu.index("Start"))
-        self.assertLess(menu.index("Start"), menu.index("Profil"))
-        self.assertLess(menu.index("Profil"), menu.index("Demnächst"))
+        self.assertLess(menu.index("Start"), menu.index("Gebäude"))
+        self.assertLess(menu.index("Nachbarschaft"), menu.index("Profil"))  # the neighbourhood stands above the profile
         for name in LATER:
             self.assertIn(name, menu)
+            self.assertLess(menu.index(name), menu.index("Profil"))
         self.assertRegex(menu, r'class="frame-item is-active" href="/" aria-current="page"')
         profile_menu = part(
             self.client.get(PROFILE_URL).content.decode(), '<nav class="frame-menu', "</nav>"
@@ -114,7 +115,7 @@ class FrameTests(TestCase):
     def test_the_menu_logs_out_with_a_post_form_and_has_the_legal_links(self):
         html = self.client.get(HOME_URL).content.decode()
         menu = part(html, '<nav class="frame-menu', "</nav>")
-        self.assertRegex(menu, r'<form method="post" action="/logout/">')
+        self.assertRegex(menu, r'<form method="post" action="/logout/" data-render-as-keep>')
         self.assertIn("csrfmiddlewaretoken", menu)
         self.assertIn("Ausloggen", menu)
         self.assertNotRegex(menu, r'<a[^>]*href="/logout/')
@@ -139,12 +140,12 @@ class FrameTests(TestCase):
         self.assertNotIn("<a ", menu)
         self.assertIn("<span>Datenschutz</span>", menu)
 
-    def test_the_bottom_bar_of_a_customer_has_start_participation_information_and_profile(self):
-        # START-SEITE.md, section 7 (the owner, 2026-10-19); the bar of a staff account is another one (below, W5-11).
+    def test_the_bottom_bar_of_a_customer_has_start_buildings_information_and_profile(self):
+        # START-SEITE.md, section 7 (the owner, 2026-10-19; D-130: Buildings); the bar of a staff account is another one (below, W5-11).
         html = self.client.get(HOME_URL).content.decode()
         bar = part(html, '<nav class="frame-bottombar', "</nav>")
         labels = re.findall(r"<span>([^<]+)</span>", bar)
-        self.assertEqual(labels, ["Start", "Teilnahme", "Information", "Profil"])
+        self.assertEqual(labels, ["Start", "Gebäude", "Information", "Profil"])
         self.assertIn('class="frame-tab is-active"', bar)
 
     def test_the_bottom_bar_of_the_staff_area_has_my_area_overview_processes_and_the_menu(self):
@@ -172,7 +173,7 @@ class FrameTests(TestCase):
         client = VerifiedClient()
         client.force_login(staff)
         bar = part(client.get(HOME_URL).content.decode(), '<nav class="frame-bottombar', "</nav>")
-        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Teilnahme", "Information", "Profil"])
+        self.assertEqual(re.findall(r"<span>([^<]+)</span>", bar), ["Start", "Gebäude", "Information", "Profil"])
         self.assertNotIn("/management/", bar)
 
     def test_the_bottom_bar_of_an_account_that_does_not_take_part_has_no_link_to_a_404(self):
@@ -187,7 +188,8 @@ class FrameTests(TestCase):
         self.assertNotIn("/participation/", bar)
         menu = part(html, '<nav class="frame-menu', "</nav>")
         self.assertNotIn("/participation/", menu)
-        self.assertIn('href="/management/"', menu)  # the way to the staff area stays
+        # The way to the staff area stays: the button of the header (D-131), not the menu.
+        self.assertIn('href="/management/"', part(html, '<header class="frame-header', "</header>"))
 
     def test_the_active_page_of_the_bottom_bar_of_a_staff_account_is_marked(self):
         staff = create_active_user("bar.active@example.org")
@@ -414,7 +416,7 @@ class StartPageTests(TestCase):
         company = create_active_user("company@example.org", first_name="", last_name="", organisation_name="Beispiel AG")
         client, _user = login(company)
         self.assertIn("Guten Tag, Beispiel AG", client.get(HOME_URL).content.decode())
-        header = part(client.get(HOME_URL).content.decode(), '<span class="frame-name">', "</span>")
+        header = part(client.get(HOME_URL).content.decode(), '<a class="frame-name frame-name-link"', "</a>")
         self.assertIn("Beispiel AG", header)
 
     def test_a_complete_account_without_a_second_factor_has_the_one_tile(self):

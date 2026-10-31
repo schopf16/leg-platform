@@ -6,16 +6,16 @@ steps of ``applications.post_submit_progress`` (``post_submit_steps``).
 """
 
 from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy as _lazy
+from django.utils.translation import gettext_lazy
 
 from leg_platform.community import applications
 
 STEP_NAMES = {
-    applications.BUILDING: _lazy("Building"),
-    applications.METERING_POINTS: _lazy("Metering points"),
-    applications.BANK_CONNECTION: _lazy("Bank or postal connection"),
-    applications.CONTRACT: _lazy("Contract"),
-    applications.START: _lazy("Start date"),
+    applications.BUILDING: gettext_lazy("Building"),
+    applications.METERING_POINTS: gettext_lazy("Metering points"),
+    applications.BANK_CONNECTION: gettext_lazy("Bank or postal connection"),
+    applications.CONTRACT: gettext_lazy("Contract"),
+    applications.START: gettext_lazy("Start date"),
 }
 
 

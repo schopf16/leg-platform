@@ -86,6 +86,7 @@ urlpatterns = [
     path("persons/new/", person_views.PersonCreateView.as_view(), name="persons_new"),
     path("persons/<int:pk>/", person_views.PersonDetailView.as_view(), name="persons_detail"),
     path("persons/<int:pk>/note/", person_views.PersonNoteView.as_view(), name="persons_note"),
+    path("persons/<int:pk>/view-as/", person_views.PersonViewAsView.as_view(), name="persons_view_as"),
     path("persons/<int:pk>/details/", person_views.PersonDetailsView.as_view(), name="persons_details"),
     path("persons/<int:pk>/contact/", person_views.PersonContactView.as_view(), name="persons_contact"),
     path("persons/<int:pk>/billing-address/", person_views.PersonAddressView.as_view(), name="persons_address"),

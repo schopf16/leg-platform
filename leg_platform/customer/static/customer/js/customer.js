@@ -48,4 +48,15 @@
       }
     });
   });
+
+  // The typed end of a metering point number (rule D-102, ``js/metering-number.js``, as in the management dialogs): when
+  // the field is left, shorter gets zeros on the left, longer loses only as many leading zeros as needed. Anything else
+  // stays untouched; the server demands exactly the length and shows the message.
+  document.querySelectorAll("input[data-pad-limit]").forEach((input) => {
+    input.addEventListener("blur", () => {
+      if (!input.value.trim() || !window.MeteringNumber) return;
+      const found = window.MeteringNumber.entered(input.value, Number(input.dataset.padLimit));
+      if (found.value) input.value = found.value;
+    });
+  });
 })();

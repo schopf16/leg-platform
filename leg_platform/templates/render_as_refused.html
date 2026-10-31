@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load i18n %}{% comment %}
+The answer (403) for everything that the support view "View as" does not render (D-131): a write, a security page, a
+download, the wizard, the management area. It names no reason beyond the fixed sentence.
+{% endcomment %}
+{% block title %}{% translate "Not visible in this view" %}{% endblock %}
+{% block content %}
+  <div class="narrow-page">
+    <h1 class="start-title">{% translate "Not visible in this view" %}</h1>
+    <p>{% translate "Not visible in this view for security reasons." %}</p>
+    <p><a class="btn btn-secondary-action" href="{% url 'home' %}">{% translate "Back to the start page" %}</a></p>
+  </div>
+{% endblock %}

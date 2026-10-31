@@ -22,7 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.connection import ConnectionDoesNotExist
 from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy as _lazy
+from django.utils.translation import gettext_lazy
 from django.views import View
 
 from leg_platform.addresses import plant_lookup
@@ -50,23 +50,25 @@ STEP_URLS = {
 }
 # One sentence per step on the page "Start application" (the owner's words from the mockup).
 STEP_SENTENCES = {
-    applications.BUILDING: _lazy("The address where the metering point is located."),
-    applications.METERING_POINTS: _lazy(
+    applications.BUILDING: gettext_lazy("The address where the metering point is located."),
+    applications.METERING_POINTS: gettext_lazy(
         "You enter the metering point for the draw. If you also feed in electricity, you add the metering point "
         "for the feed-in."
     ),
-    applications.BANK_CONNECTION: _lazy("This is how we pay you the compensation for the electricity you feed in."),
-    applications.CONTRACT: _lazy("You have to agree to the articles of association."),
-    applications.START: _lazy("You choose when your participation starts."),
+    applications.BANK_CONNECTION: gettext_lazy(
+        "This is how we pay you the compensation for the electricity you feed in."
+    ),
+    applications.CONTRACT: gettext_lazy("You have to agree to the articles of association."),
+    applications.START: gettext_lazy("You choose when your participation starts."),
 }
 # The sentence of the metering point row when a metering point is added and only the feed-in is missing (W2-06).
-FEED_IN_ADD_SENTENCE = _lazy("You enter the feed-in metering point.")
+FEED_IN_ADD_SENTENCE = gettext_lazy("You enter the feed-in metering point.")
 NEXT_STEP_NAMES = {
-    applications.BUILDING: _lazy("Enter building"),
-    applications.METERING_POINTS: _lazy("Enter metering points"),
-    applications.BANK_CONNECTION: _lazy("Enter bank or postal connection"),
-    applications.CONTRACT: _lazy("Agree to the contract"),
-    applications.START: _lazy("Choose the start date"),
+    applications.BUILDING: gettext_lazy("Enter building"),
+    applications.METERING_POINTS: gettext_lazy("Enter metering points"),
+    applications.BANK_CONNECTION: gettext_lazy("Enter bank or postal connection"),
+    applications.CONTRACT: gettext_lazy("Agree to the contract"),
+    applications.START: gettext_lazy("Choose the start date"),
 }
 
 # Number group in the prefix field: the typed part of a number starts after country and identifier.

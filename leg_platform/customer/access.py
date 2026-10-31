@@ -33,6 +33,7 @@ from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 
+from leg_platform import render_as
 from leg_platform.accounts.second_factor import is_second_factor_complete, requires_second_factor
 from leg_platform.community.application_common import ApplicationError
 
@@ -61,7 +62,8 @@ def check_access(request):
             return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
         # A POST target is no page to return to.
         return redirect(settings.LOGIN_URL)
-    if not is_customer(user):
+    # In the support view "View as" (D-131) the person viewed must be a customer; the second factor is the staff member's.
+    if not is_customer(render_as.subject(request)):
         raise Http404
     # The second line of the second factor, as in the management area and the administration (D-004, D-042): the
     # middleware (``accounts.second_factor``) is the first line and redirects; this makes the pages refuse an account

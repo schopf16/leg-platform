@@ -29,7 +29,7 @@ ADMIN_INDEX = reverse("admin:index")
 PROFILE = reverse("accounts:profile")
 BUILDINGS = reverse("customer:buildings")
 CHIP = '<span class="frame-workspace">Mitarbeitenden-Bereich</span>'
-ENTRY = re.compile(r'<a class="frame-item frame-item-two-line" href="/management/" target="_blank" rel="noopener noreferrer">.*?</a>', re.S)
+BUTTON = re.compile(r'<a class="btn btn-secondary-action frame-staff-btn".*?</a>', re.S)
 BACK = re.compile(r'<div class="frame-back">\s*<a class="frame-item frame-item-two-line" href="/">.*?</a>\s*</div>', re.S)
 
 
@@ -122,51 +122,74 @@ class MenuTests(TestCase):
                 # The groups of the staff workspace are not here for anybody.
                 self.assertNotIn('<p class="frame-group">Verwaltung</p>', menu)
                 self.assertNotIn('<p class="frame-group">System</p>', menu)
-                self.assertIn("Teilnahme", menu)
+                self.assertIn("Gebäude", menu)
                 self.assertIn("Information", menu)
+                self.assertNotIn("frame-staff-btn", response.content.decode())
                 self.assertNotIn("Mitarbeitenden-Bereich", response.content.decode())
 
-    def test_the_menu_of_my_area_has_the_staff_entry_for_every_management_user_in_a_new_tab(self):
-        for user, sub_line in ((self.staff, "Verwaltung"), (self.administrator, "Verwaltung und System")):
+    def test_my_area_has_the_staff_button_in_the_header_for_every_management_user_in_a_new_tab(self):
+        # D-131: the block "For staff" is gone from the menu; the way into the staff area is a button in the header.
+        for user in (self.staff, self.administrator):
             for url in (HOME, PROFILE, BUILDINGS, reverse("customer:contract")):
                 with self.subTest(user=user.pk, url=url):
+                    html = client_of(user).get(url).content.decode()
+                    header = part(html, '<header class="frame-header', "</header>")
+                    button = BUTTON.findall(header)
+                    self.assertEqual(len(button), 1, "the button of the header")
+                    button = button[0]
+                    self.assertIn('target="_blank" rel="noopener noreferrer"', button)
+                    self.assertIn('aria-label="Mitarbeitenden-Bereich (öffnet in neuem Tab)"', button)
+                    self.assertIn('<span class="frame-staff-text">Mitarbeitenden-Bereich</span>', button)
+                    self.assertIn('href="#i-overview"', button)
+                    self.assertIn('href="#i-external"', button)
+                    # Before the profile link, which shows the name of the account.
+                    self.assertLess(header.index("frame-staff-btn"), header.index("frame-name-link"))
+                    # Not in the menu, the drawer or the bottom bar: the menu is the one of a customer.
                     menu = menu_of(client_of(user).get(url))
-                    entry = ENTRY.findall(menu)
-                    self.assertEqual(len(entry), 1, "the entry of the menu")
-                    entry = entry[0]
-                    self.assertIn('target="_blank" rel="noopener noreferrer"', entry)
-                    self.assertIn("<span>Mitarbeitenden-Bereich</span>", entry)
-                    # DA-4: the sign of a new tab stands at the end of the second line (the title gets the width).
-                    self.assertRegex(
-                        entry,
-                        rf'<span class="frame-item-sub">{sub_line}<svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg>',
-                    )
-                    self.assertNotRegex(entry, r"</span></span>\s*<svg")
-                    self.assertIn('href="#i-external"', entry)
-                    self.assertIn('class="frame-icon frame-external" aria-hidden="true"', entry)
-                    self.assertIn('<span class="visually-hidden"> (öffnet in neuem Tab)</span>', entry)
-                    self.assertIn('<p class="frame-group">Für Mitarbeitende</p>', menu)
-                    # DA-1: directly after "Profil" and before "Teilnahme" (the sticky foot never hides it), in its own block.
-                    self.assertLess(menu.index('href="/profile/"'), menu.index("Für Mitarbeitende"))
-                    self.assertLess(menu.index("Für Mitarbeitende"), menu.index("frame-parent"))
-                    self.assertRegex(menu, r'(?s)<div class="frame-staff-block">\s*<p class="frame-group">Für Mitarbeitende</p>.*?</a>\s*</div>')
+                    for gone in ("Für Mitarbeitende", "Mitarbeitenden-Bereich", "frame-staff-block", "/management/"):
+                        self.assertNotIn(gone, menu)
+                    self.assertEqual(html.count("frame-staff-btn"), 1)
+                    self.assertNotIn("/management/", bar_of(client_of(user).get(url)))
 
-    def test_the_drawer_has_the_entry_too_and_the_page_no_other_staff_link(self):
-        html = client_of(self.staff).get(HOME).content.decode()
-        self.assertEqual(len(ENTRY.findall(html)), 2)  # the left menu and the drawer
-        self.assertNotIn("Systemverwaltung", menu_of(client_of(self.administrator).get(HOME)))
-        self.assertNotIn('href="/admin/"', menu_of(client_of(self.administrator).get(HOME)))
+    def test_the_header_of_my_area_links_to_the_profile_with_the_name(self):
+        for user in (self.customer, self.staff):
+            with self.subTest(user=user.pk):
+                html = client_of(user).get(HOME).content.decode()
+                header = part(html, '<header class="frame-header', "</header>")
+                link = re.search(r'<a class="frame-name frame-name-link" href="/profile/"[^>]*>(.*?)</a>', header, re.S)
+                self.assertIsNotNone(link)
+                self.assertIn('<span class="visually-hidden">Profil: </span>', link.group(1))
+                self.assertIn(user.display_name, link.group(1))
+        # On the profile page the link is the current page.
+        profile = part(client_of(self.customer).get(PROFILE).content.decode(), '<header class="frame-header', "</header>")
+        self.assertIn('href="/profile/" aria-current="page"', profile)
+        # In the staff area the name is plain text (the chip names the workspace).
+        staff_header = part(client_of(self.staff).get(OVERVIEW).content.decode(), '<header class="frame-header', "</header>")
+        self.assertNotIn("frame-name-link", staff_header)
+        self.assertNotIn("frame-staff-btn", staff_header)
+        self.assertIn('<span class="frame-name">', staff_header)
 
-    def test_the_menu_of_my_area_is_the_same_for_staff_and_customer_except_for_the_staff_entry(self):
-        def without_staff_entry(menu):
-            menu = re.sub(r'<div class="frame-staff-block">.*?</div>', "", menu, flags=re.S)
+    def test_the_menu_of_my_area_is_the_same_for_staff_and_customer(self):
+        def flat(menu):
             return re.sub(r"\s+", " ", re.sub(r"<form.*?</form>", "", menu, flags=re.S)).strip()
 
-        mine = without_staff_entry(menu_of(client_of(self.customer).get(HOME)))
+        mine = flat(menu_of(client_of(self.customer).get(HOME)))
         for user in (self.staff, self.administrator):
             with self.subTest(user=user.pk):
-                theirs = without_staff_entry(menu_of(client_of(user).get(HOME)))
-                self.assertEqual(theirs, mine)
+                self.assertEqual(flat(menu_of(client_of(user).get(HOME))), mine)
+
+    def test_the_menu_of_my_area_has_no_group_coming_next_and_the_neighbourhood_above_the_profile(self):
+        menu = menu_of(client_of(self.customer).get(HOME))
+        self.assertNotIn("Demnächst", menu)
+        self.assertNotIn("Teilnahme", menu)
+        self.assertLess(menu.index("<span>Nachbarschaft</span>"), menu.index('href="/profile/"'))
+        self.assertLess(menu.index('href="/profile/"'), menu.index("frame-parent"))
+
+    def test_the_drawer_has_the_same_menu_and_the_page_no_other_staff_link(self):
+        html = client_of(self.staff).get(HOME).content.decode()
+        self.assertEqual(html.count('href="/management/"'), 1)  # the button of the header only
+        self.assertNotIn("Systemverwaltung", menu_of(client_of(self.administrator).get(HOME)))
+        self.assertNotIn('href="/admin/"', menu_of(client_of(self.administrator).get(HOME)))
 
     def test_the_placeholders_of_my_area_are_singular_for_everybody(self):
         for user in (self.customer, self.staff):
@@ -209,7 +232,7 @@ class MenuTests(TestCase):
                     self.assertNotIn("rel=", back[0])
                     self.assertIn('href="#i-arrow-left"', back[0])
                     self.assertIn("<span>Zurück zu Mein Bereich</span>", back[0])
-                    self.assertIn('<span class="frame-item-sub">Teilnahme, Information und Profil</span>', back[0])
+                    self.assertIn('<span class="frame-item-sub">Gebäude, Information und Profil</span>', back[0])
                     # The first entry, then the groups in the agreed order.
                     self.assertLess(menu.index("frame-back"), menu.index('<p class="frame-group">Verwaltung</p>'))
                     self.assertLess(menu.index('<p class="frame-group">Verwaltung</p>'), menu.index('<p class="frame-group">Demnächst</p>'))
@@ -232,12 +255,12 @@ class MenuTests(TestCase):
 
     def test_the_menu_of_the_staff_area_has_no_participant_entries(self):
         menu = menu_of(client_of(self.administrator).get(OVERVIEW))
-        for absent in ("<span>Start</span>", "<span>Profil</span>", "Teilnahme</span>", "<span>Information</span>",
+        for absent in ("<span>Start</span>", "<span>Profil</span>", "Gebäude</span>", "<span>Information</span>",
                        "/participation/", 'href="/profile/"', "Für Mitarbeitende", "frame-parent", "Kontakt zur LEG"):
             with self.subTest(absent=absent):
                 self.assertNotIn(absent, menu)
         self.assertNotIn("Mein Bereich</p>", menu)
-        self.assertEqual(len(re.findall(r'target="_blank"', ENTRY.sub("", BACK.sub("", part(menu, 'class="frame-menu', "frame-menu-foot"))))), 0)
+        self.assertNotIn('target="_blank"', BACK.sub("", part(menu, 'class="frame-menu', "frame-menu-foot")))
 
     def test_the_way_back_for_an_account_that_does_not_take_part_names_what_exists(self):
         with patch("leg_platform.customer.access.is_customer", return_value=False):
@@ -315,7 +338,7 @@ class MenuTests(TestCase):
     def test_the_bottom_bar_follows_the_workspace_not_the_account(self):
         for user in (self.customer, self.staff, self.administrator):
             with self.subTest(user=user.pk, area="my area"):
-                self.assertEqual(labels(bar_of(client_of(user).get(HOME))), ["Start", "Teilnahme", "Information", "Profil"])
+                self.assertEqual(labels(bar_of(client_of(user).get(HOME))), ["Start", "Gebäude", "Information", "Profil"])
         for user in (self.staff, self.administrator):
             with self.subTest(user=user.pk, area="staff"):
                 bar = bar_of(client_of(user).get(PERSONS))
@@ -337,27 +360,27 @@ class MenuTests(TestCase):
 
     # ---- The start page ------------------------------------------------------------------------------------------
 
-    def test_the_start_page_of_a_management_user_has_the_button_for_the_phone(self):
+    def test_the_start_page_of_a_management_user_has_no_staff_button_of_its_own(self):
+        # D-131: the button of the start page (phone) is gone; the button of the header is on every page of My area.
         for user in (self.staff, self.administrator):
             with self.subTest(user=user.pk):
                 html = client_of(user).get(HOME).content.decode()
-                button = re.search(r'<a class="btn btn-secondary-action start-staff-link"[^>]*>.*?</a>', html, re.S).group(0)
-                self.assertIn('href="/management/" target="_blank" rel="noopener noreferrer"', button)
-                self.assertIn("Mitarbeitenden-Bereich öffnen", button)
-                self.assertIn('<span class="visually-hidden"> (öffnet in neuem Tab)</span>', button)
-                self.assertIn('href="#i-external"', button)
-                self.assertIn('aria-hidden="true"', button)
+                self.assertNotIn("start-staff-link", html)
+                self.assertNotIn("Mitarbeitenden-Bereich öffnen", html)
+                self.assertEqual(len(BUTTON.findall(html)), 1)
 
     def test_the_start_page_of_a_customer_and_the_staff_pages_have_no_such_button(self):
-        self.assertNotIn("start-staff-link", client_of(self.customer).get(HOME).content.decode())
-        self.assertNotIn("Mitarbeitenden-Bereich öffnen", client_of(self.customer).get(HOME).content.decode())
-        self.assertNotIn("start-staff-link", client_of(self.staff).get(OVERVIEW).content.decode())
+        self.assertNotIn("frame-staff-btn", client_of(self.customer).get(HOME).content.decode())
+        self.assertNotIn("frame-staff-btn", client_of(self.staff).get(OVERVIEW).content.decode())
 
-    def test_the_button_is_hidden_above_the_phone_width(self):
+    def test_the_button_of_the_header_is_an_icon_on_the_phone(self):
         css = (STATIC / "css" / "frame.css").read_text(encoding="utf-8")
-        self.assertRegex(css, r"\.start-staff-link \{\s*display: none;")
-        self.assertRegex(css, r"@media \(max-width: 760px\) \{\s*\.start-staff-link \{\s*display: inline-flex;[^}]*width: 100%;[^}]*min-height: 48px")
-
+        self.assertNotIn("start-staff-link", css)
+        self.assertRegex(
+            css,
+            r"@media \(max-width: 760px\) \{\s*\.frame-staff-btn \{[^}]*width: 44px;[^}]*height: 44px;[^}]*border-radius: 50%;",
+        )
+        self.assertRegex(css, r"\.frame-staff-btn \.frame-staff-text \{\s*position: absolute;")  # text for screen readers
     def test_a_staff_account_with_a_customer_number_sees_the_whole_start_page_of_a_participant(self):
         for user in (self.staff, self.administrator):
             with self.subTest(user=user.pk):
@@ -399,7 +422,7 @@ class WorkspaceStyleTests(SimpleTestCase):
     CSS = (STATIC / "css" / "frame.css").read_text(encoding="utf-8")
 
     def block(self, selector):
-        found = re.search(re.escape(selector) + r" \{(.*?)\}", self.CSS, re.S)
+        found = re.search(r"(?m)^" + re.escape(selector) + r" \{(.*?)\}", self.CSS, re.S)
         self.assertIsNotNone(found, selector)
         return found.group(1)
 
@@ -459,14 +482,13 @@ class WorkspaceStyleTests(SimpleTestCase):
         self.assertIn("min-height: 52px;", self.block(".frame-item.frame-item-two-line"))
         self.assertIn("font-size: 12px;", self.block(".frame-item-sub"))
         self.assertIn("color: var(--muted);", self.block(".frame-item-sub"))
-        back = re.search(r"\.frame-back,\s*\.frame-staff-block \{(.*?)\}", self.CSS, re.S).group(1)
+        back = re.search(r"(?m)^\.frame-back \{(.*?)\}", self.CSS, re.S).group(1)
         self.assertIn("border-bottom: 1px solid var(--line);", back)
         self.assertIn("padding-bottom: 12px;", back)
         # DA-5: the first line of the way back breaks in balance, not after "Mein".
         self.assertIn("text-wrap: balance;", self.block(".frame-back .frame-item-text > span:first-child"))
-        # DA-8: the phone button has room below it.
-        phone = re.search(r"@media \(max-width: 760px\) \{\s*\.start-staff-link \{(.*?)\}", self.CSS, re.S).group(1)
-        self.assertIn("margin-bottom: 16px;", phone)
+        # DA-8 (the phone button below the start title) is gone with the button (D-131).
+        self.assertNotIn("start-staff-link", self.CSS)
 
     def test_no_new_colour_shadow_or_gradient(self):
         start = self.CSS.index("/* ---- Two workspaces")
@@ -605,13 +627,11 @@ class CatalogueTests(SimpleTestCase):
     """The new texts exist in every language (the three catalogues are also compared by ``LanguageCatalogueTests``)."""
 
     EXPECTED = {
-        "de-ch": {"Staff area": "Mitarbeitenden-Bereich", "For staff": "Für Mitarbeitende",
-                  "Management and system": "Verwaltung und System", "Back to My area": "Zurück zu Mein Bereich",
-                  "Open staff area": "Mitarbeitenden-Bereich öffnen",
-                  "Participation, information and profile": "Teilnahme, Information und Profil",
+        "de-ch": {"Staff area": "Mitarbeitenden-Bereich", "Back to My area": "Zurück zu Mein Bereich",
+                  "Buildings, information and profile": "Gebäude, Information und Profil",
                   "Start and profile": "Start und Profil"},
-        "fr": {"Staff area": "Espace collaborateurs", "For staff": "Pour les collaborateurs"},
-        "it": {"Staff area": "Area collaboratori", "For staff": "Per i collaboratori"},
+        "fr": {"Staff area": "Espace collaborateurs"},
+        "it": {"Staff area": "Area collaboratori"},
     }
 
     def test_the_texts_are_translated_and_never_use_the_forbidden_letter(self):

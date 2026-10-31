@@ -76,6 +76,10 @@ MESSAGES = {
     Event.MANAGEMENT_DATA_EDITED: "Management data was edited in the administration",
     Event.IBAN_CHANGED: "The IBAN of an account was changed by the account",
     Event.CONTRACT_VERSION_CHANGED: "A contract version was uploaded, made current or deleted",
+    Event.RENDER_AS_STARTED: "A staff member started the support view of an account",
+    Event.RENDER_AS_ENDED: "A staff member ended the support view of an account",
+    Event.RENDER_AS_PAGE_VIEWED: "A page was shown in the support view of an account",
+    Event.RENDER_AS_REQUEST_REFUSED: "A request was refused in the support view of an account",
 }
 
 

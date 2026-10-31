@@ -394,12 +394,11 @@ class NamePagesTests(TestCase):
 
 PROFILE = reverse("accounts:profile")
 BANK = reverse("customer:bank_connection")
-NEIGHBOURHOOD = reverse("customer:neighbourhood")
 
 
 @tag("mariadb")
 class CustomerPageTextsTests(TestCase):
-    """The words of D-128 on the pages next to the buildings: the empty neighbourhood, the bank hint of the profile and
+    """The words of D-128 on the pages next to the buildings: the bank hint of the profile and
     the error summary of the profile cards (the account's own data only)."""
 
     databases = {"default", "addresses"}
@@ -408,13 +407,6 @@ class CustomerPageTextsTests(TestCase):
         self.mine = customer("texts.mine@example.org")
         self.other = customer("texts.other@example.org")
         self.client = login(self.mine)
-
-    def test_a_neighbourhood_without_data_says_so(self):
-        response = self.client.get(NEIGHBOURHOOD)
-        self.assertEqual(response.status_code, 200)
-        html = response.content.decode()
-        self.assertIn("Noch keine Daten", html)
-        self.assertNotIn("nb-circuit", html)
 
     def test_the_bank_card_starts_its_hint_with_the_condition(self):
         html = self.client.get(f"{PROFILE}?edit=bank").content.decode()

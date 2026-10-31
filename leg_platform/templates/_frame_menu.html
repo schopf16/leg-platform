@@ -3,10 +3,9 @@ The entries of the menu, shared by the left menu of the desktop and the menu of 
 (LEG-Design-Vorgaben/navigation/VORGABEN.md, section 2.2). Two workspaces (D-113), chosen by ``frame_workspace``
 (``context_processors.frame_workspace``, from the resolved view name):
 
-* "My area" (every page that is not management or administration): My area (Start, Profile), the group "For staff"
-  with the entry "Staff area" (a new tab) for an account that may use the management area, Participation and
-  Information for an account that takes part (``participates``), "Coming next" (singular names). The staff group stands
-  before Participation so that the sticky foot never hides it at a low window (designer review, D-113).
+* "My area" (every page that is not management or administration): My area (Start, Buildings, Profile), Information
+  for an account that takes part (``participates``), "Coming next" (singular names). The menu is the same for staff
+  and customers; the way into the staff area is the button in the header (``base.html``, D-131).
 * "Staff area" (``management:*`` and ``admin:*``): the way back to "My area" (same tab), the group "Management"
   (leg_platform.management.navigation.MENU), the group "System" with "System administration" (the Django
   administration) only to an active staff account for which the administration lists at least one thing
@@ -21,7 +20,7 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
 <div class="frame-back">
   <a class="frame-item frame-item-two-line" href="{% url 'home' %}">
     <svg class="frame-icon" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-    <span class="frame-item-text"><span>{% translate "Back to My area" %}</span><span class="frame-item-sub">{% if is_participant %}{% translate "Participation, information and profile" %}{% else %}{% translate "Start and profile" %}{% endif %}</span></span>
+    <span class="frame-item-text"><span>{% translate "Back to My area" %}</span><span class="frame-item-sub">{% if is_participant %}{% translate "Buildings, information and profile" %}{% else %}{% translate "Start and profile" %}{% endif %}</span></span>
   </a>
 </div>
 {% management_menu as management_entries %}{% if management_entries %}
@@ -55,31 +54,36 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
 <a class="frame-item{% if view == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if view == 'home' %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg><span>{% translate "Start" %}</span>
 </a>
+{% participates as is_participant %}{% customer_menu as customer_state %}
+{# Buildings is a flat entry of My area after Start (D-124); only for an account that takes part. #}
+{% if is_participant %}
+<a class="frame-item{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-building"/></svg><span>{% translate "Buildings" %}</span>
+</a>
+{% endif %}
+{# The names of the customer menu are singular (MENU-STANDARD.md). #}
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg><span>{% translate "Energy" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoice" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-bell"/></svg><span>{% translate "Message" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
+<a class="frame-item is-later" role="link" aria-disabled="true">
+  <svg class="frame-icon" aria-hidden="true"><use href="#i-persons"/></svg><span>{% translate "Neighbourhood" %}</span>
+  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
+</a>
 <a class="frame-item{% if frame_profile_active %} is-active{% endif %}" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
   <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span>{% translate "Profile" %}</span>
 </a>
-{# The group "For staff" stands directly under "My area", before Participation (D-113, designer review): at a low window the sticky foot of the menu would hide it at the bottom. #}
-{% staff_area as can_open_staff_area %}{% if can_open_staff_area %}
-<div class="frame-staff-block">
-<p class="frame-group">{% translate "For staff" %}</p>
-{# The staff area opens in a new tab (D-113): the person switches between two tabs. No named target. #}
-{% system_administration as has_system %}
-<a class="frame-item frame-item-two-line" href="{% url 'management:overview' %}" target="_blank" rel="noopener noreferrer">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-overview"/></svg>
-  <span class="frame-item-text"><span>{% translate "Staff area" %}</span><span class="frame-item-sub">{% if has_system %}{% translate "Management and system" %}{% else %}{% translate "Management" %}{% endif %}<svg class="frame-icon frame-external" aria-hidden="true"><use href="#i-external"/></svg><span class="visually-hidden"> ({% translate "opens in a new tab" %})</span></span></span>
-</a>
-</div>
-{% endif %}
-{% participates as is_participant %}{% if is_participant %}{% customer_menu as customer_state %}
-{# A customer (MENU-STANDARD.md): Participation and Information with their entries always open. Entries whose page does not exist yet are marked "later" (no link). #}
-<p class="frame-item frame-parent{% if customer_state.participation %} is-active{% endif %}">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg><span>{% translate "Participation" %}</span>
-</p>
-<ul class="frame-sub">
-  <li><a class="frame-sub-item{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>{% translate "Buildings" %}</a></li>
-  <li><a class="frame-sub-item is-later" role="link" aria-disabled="true"><span>{% translate "Start date" %}</span><span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span></a></li>
-  <li><a class="frame-sub-item{% if customer_state.neighbourhood %} is-active{% endif %}" href="{% url 'customer:neighbourhood' %}"{% if customer_state.neighbourhood %} aria-current="page"{% endif %}>{% translate "Neighbourhood" %}</a></li>
-</ul>
+{# The way into the staff area is the button in the header (base.html, D-131); the menu is the same for staff and customers. #}
+{% if is_participant %}
+{# A customer (MENU-STANDARD.md): Information with its entries always open. Entries whose page does not exist yet are marked "later" (no link). #}
 <p class="frame-item frame-parent{% if customer_state.information %} is-active{% endif %}">
   <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg><span>{% translate "Information" %}</span>
 </p>
@@ -90,26 +94,12 @@ is marked with aria-current. Log out is a real POST form. Showing an entry is no
   <li><a class="frame-sub-item{% if customer_state.contact %} is-active{% endif %}" href="{% url 'customer:contact' %}"{% if customer_state.contact %} aria-current="page"{% endif %}>{% translate "Contact the LEG" %}</a></li>
 </ul>
 {% endif %}
-<p class="frame-group">{% translate "Coming next" %}</p>
-{# The names of the customer menu are singular (MENU-STANDARD.md). #}
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-document"/></svg><span>{% translate "Invoice" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-bolt"/></svg><span>{% translate "Energy" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
-<a class="frame-item is-later" role="link" aria-disabled="true">
-  <svg class="frame-icon" aria-hidden="true"><use href="#i-bell"/></svg><span>{% translate "Message" %}</span>
-  <span class="frame-later">{% translate "later" %}<span class="visually-hidden"> ({% translate "not yet available" %})</span></span>
-</a>
 {% endif %}
 <div class="frame-menu-foot">
-  <form method="post" action="{% url 'accounts:logout' %}">
+  <form method="post" action="{% url 'accounts:logout' %}" data-render-as-keep>
     {% csrf_token %}
     <button type="submit" class="frame-item">
-      <svg class="frame-icon" aria-hidden="true"><use href="#i-logout"/></svg><span>{% translate "Log out" %}</span>
+      <svg class="frame-icon" aria-hidden="true"><use href="#i-logout"/></svg><span>{% if render_as %}{% translate "Log out (staff account)" %}{% else %}{% translate "Log out" %}{% endif %}</span>
     </button>
   </form>
   <div class="frame-legal">

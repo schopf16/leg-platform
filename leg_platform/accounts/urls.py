@@ -2,6 +2,7 @@
 
 from django.urls import path
 
+from leg_platform import render_as
 from leg_platform.accounts import method_views, passkey_views, profile_views, registration_views, views
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
@@ -31,6 +32,8 @@ urlpatterns = [
         name="login_second_factor",
     ),
     path("logout/", views.PortalLogoutView.as_view(), name="logout"),
+    # End of the support view "View as" (D-131): POST only.
+    path("view-as/end/", render_as.EndView.as_view(), name="render_as_end"),
     path("register/", views.RegistrationView.as_view(), name="registration"),
     path(
         "register/sent/",

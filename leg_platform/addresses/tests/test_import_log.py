@@ -128,6 +128,23 @@ class ImportErrorStateTests(ImportLogBase):
         self.assertIsNone(ImportLogEntry.objects.get(source=ImportRequest.Source.PLANT).cleared_at)
 
 
+class ImportReasonTranslationTests(TestCase):
+    """Every stored reason is translated by the dynamic ``gettext(row.reason)`` of the log page (``admin.py``): the msgids
+    cannot be found by makemessages and must stay in the catalogues (locale notes, D-101)."""
+
+    def test_every_storable_reason_has_a_translation_in_every_language(self):
+        from django.utils import translation
+
+        reasons = (
+            set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
+            | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED, jobs.UNCHANGED_TEXT}
+        )
+        for language in ("de-ch", "fr", "it"):
+            with translation.override(language):
+                missing = sorted(text for text in reasons if translation.gettext(text) == text)
+            self.assertEqual(missing, [], language)
+
+
 class ImportNoticeTests(ImportLogBase):
     def setUp(self):
         super().setUp()
