@@ -227,6 +227,14 @@ body {
   color: var(--fg);
 }
 
+/* Locked by a cause outside the form; the reason stands next to it (docs/DESIGN.md, buttons and errors). */
+.btn-secondary-action[aria-disabled="true"] {
+  background: transparent;
+  border-color: var(--muted);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 /* Disabled while waiting ("send again"): keeps the look of the enabled button. */
 .btn-secondary-action:disabled {
   background: transparent;

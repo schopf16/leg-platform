@@ -1,14 +1,17 @@
 {% load i18n %}{% if form.errors %}
-  {# An error summary at the top of an invalid form. It is part of the page the server sends, so #}
-  {# no script is needed: the browser focuses it (autofocus on an element with tabindex -1) and #}
-  {# every entry links to the field. #}
+  {# The red bar at the top of an invalid form (docs/DESIGN.md, buttons and errors). It is part of the page the server sends, so #}
+  {# no script is needed: the browser focuses it (autofocus on an element with tabindex -1). It never repeats the message of a #}
+  {# field, which stands under the field: with several fields it lists their short names as links, with one it has only the #}
+  {# title. An error that belongs to no field stands only here. ``title_only`` leaves the list out (the fields are inline). #}
   <div class="alert alert-danger error-summary" role="alert" tabindex="-1" autofocus>
     <p class="error-summary-title">{% translate "Please check your entries" %}</p>
+    {% if form.non_field_errors or not title_only and form.errors|length > 1 %}
     <ul class="mb-0">
       {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
-      {% for field in form.visible_fields %}{% if field.errors %}
-        <li><a href="#{{ field.field.summary_anchor|default:field.id_for_label }}">{{ field.field.summary_label|default:field.label }}: {{ field.errors.0 }}</a></li>
-      {% endif %}{% endfor %}
+      {% if not title_only %}{% for field in form.visible_fields %}{% if field.errors %}
+        <li><a href="#{{ field.field.summary_anchor|default:field.id_for_label }}">{{ field.field.summary_label|default:field.label }}</a></li>
+      {% endif %}{% endfor %}{% endif %}
     </ul>
+    {% endif %}
   </div>
 {% endif %}

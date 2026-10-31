@@ -8,7 +8,7 @@
     <p class="start-sub">{% translate "This is how we pay you the compensation for the electricity you feed in." %}</p>
     <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Bank or postal connection' %}">
       {% csrf_token %}
-      {% include "customer/_error_summary.html" %}
+      {% include "accounts/_error_summary.html" %}
       {% include "customer/_field.html" with field=form.iban %}
       <div class="step-actions">
         <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>

@@ -3,11 +3,7 @@
  */
 (() => {
   "use strict";
-  if (typeof PublicKeyCredential !== "undefined" && typeof SimpleWebAuthnBrowser !== "undefined") {
-    document.querySelectorAll("[data-passkey-login] [data-passkey-submit]").forEach(button => {
-      button.disabled = false;
-    });
-  }
+  const supported = () => typeof PublicKeyCredential !== "undefined" && typeof SimpleWebAuthnBrowser !== "undefined";
   async function post(url, data, form) {
     const response = await fetch(url, {
       method: "POST", credentials: "same-origin",
@@ -31,6 +27,13 @@
     event.preventDefault();
     const control = proof || form;
     const status = control.querySelector("[data-passkey-status]");
+    if (login && !supported()) {
+      if (status) {
+        status.setAttribute("role", "alert");
+        status.textContent = control.dataset.unsupported || control.dataset.error;
+      }
+      return;
+    }
     const button = event.submitter;
     const mode = register ? button?.value : null;
     if (form.dataset.passkeyBusy) return;

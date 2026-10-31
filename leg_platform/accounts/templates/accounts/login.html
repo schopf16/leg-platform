@@ -31,9 +31,9 @@
   </form>
   <div class="login-actions">
     <button type="submit" form="login-password" class="btn btn-primary">{% translate "Log in" %}</button>
-    <form method="post" action="{% url 'accounts:passkey_login' %}" data-passkey-login data-remember-me="{{ form.remember_me.id_for_label }}" data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}">
+    <form method="post" action="{% url 'accounts:passkey_login' %}" data-passkey-login data-remember-me="{{ form.remember_me.id_for_label }}" data-options="{% url 'accounts:passkey_options' %}" data-error="{% translate 'The passkey could not be verified. Please try again.' %}" data-unsupported="{% translate 'This browser does not support passkeys. Please log in with your password.' %}">
       {% csrf_token %}
-      <button type="submit" class="btn btn-secondary-action" data-passkey-submit disabled>{% translate "Sign in with a passkey" %}</button>
+      <button type="submit" class="btn btn-secondary-action" data-passkey-submit>{% translate "Sign in with a passkey" %}</button>
       <p role="status" data-passkey-status></p>
     </form>
     <a class="btn btn-secondary-action" href="{% url 'accounts:registration' %}">{% translate "Register as a new user" %}</a>

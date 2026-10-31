@@ -12,20 +12,25 @@
         <p class="contract-reader-note muted contract-reader-wide">{% translate "If the contract is not shown here, download the current version below." %}</p>
         <p class="contract-reader-note contract-reader-phone">{% translate "Please download the current version below to read it." %}</p>
       </div>
-      <form class="step-card contract-consent{% if acceptance %} is-accepted{% endif %}" method="post" action="{% url 'customer:contract_accept' %}" data-submit-once aria-label="{% translate 'Articles of association' %}">
+      {% if acceptance %}
+        <section class="step-card contract-consent is-accepted" aria-label="{% translate 'Articles of association' %}">
+          <p class="dotword"><span class="dot tone-ok" aria-hidden="true"></span>{% translate "Already agreed" %}</p>
+          <p>{% blocktranslate with date=acceptance.accepted_at|date:"d.m.Y" %}You agreed to the contract on {{ date }}.{% endblocktranslate %}</p>
+        </section>
+      {% else %}
+      <form class="step-card contract-consent" method="post" action="{% url 'customer:contract_accept' %}" novalidate data-submit-once aria-label="{% translate 'Articles of association' %}">
         {% csrf_token %}
+        {% include "accounts/_error_summary.html" with title_only=True %}
         {{ form.version }}
         <div class="checks">
-          <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if acceptance %} checked disabled{% endif %}><span>{% blocktranslate with date=current.version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
+          <label class="entry-check" for="id_agrees_contract"><input class="entry-check-input" type="checkbox" id="id_agrees_contract" name="agrees_contract"{% if form.agrees_contract.errors %} aria-invalid="true" aria-describedby="id_agrees_contract_error"{% endif %}><span>{% blocktranslate with date=current.version_date|date:"d.m.Y" %}I have read the current version of {{ date }} and agree to it.{% endblocktranslate %}</span></label>
+          {% if form.agrees_contract.errors %}<div class="invalid-feedback d-block" id="id_agrees_contract_error">{{ form.agrees_contract.errors.0 }}</div>{% endif %}
         </div>
         <div class="step-actions">
-          {% if acceptance %}
-            <button class="btn btn-primary" type="button" disabled>{% translate "You have already agreed to this version." %}</button>
-          {% else %}
-            <button type="submit" class="btn btn-primary" data-gate-all="id_agrees_contract">{% translate "Accept this version" %}</button>
-          {% endif %}
+          <button type="submit" class="btn btn-primary">{% translate "Accept this version" %}</button>
         </div>
       </form>
+      {% endif %}
     {% endif %}
     {% if versions %}
       <section class="step-card contract-list-card" aria-label="{% translate 'Versions of the contract' %}">

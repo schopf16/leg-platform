@@ -124,6 +124,19 @@ class ContactTests(TestCase):
         self.assertIn("Bitte geben Sie eine E-Mail-Adresse ein.", response.content.decode())
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_an_invalid_email_shows_only_the_format_error(self):
+        response = self.post(email="invalid")
+        html = response.content.decode()
+        self.assertIn("Geben Sie eine gültige E-Mail-Adresse ein.", html)
+        self.assertNotIn("Bitte geben Sie eine E-Mail-Adresse ein.", html)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_a_phone_answer_ignores_an_invalid_hidden_email(self):
+        response = self.post(reply_by="phone", phone="079 123 45 67", email="invalid")
+        self.assertRedirects(response, PAGE, fetch_redirect_response=False)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].reply_to, [self.mine.email])
+
     def test_a_failed_delivery_is_shown_and_the_number_is_not_saved(self):
         with patch.object(EmailMessage, "send", side_effect=GraphEmailError("refused")):
             response = self.post(reply_by="phone", phone="079 123 45 67")

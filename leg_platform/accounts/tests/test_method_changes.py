@@ -592,8 +592,9 @@ class LoginHelpPresentationTests(TestCase):
         self.assertLess(actions.index('data-passkey-submit'), actions.index(f'href="{reverse("accounts:registration")}"'))
         self.assertContains(response, 'id="login-password"')
         self.assertFalse(response.context["form"]["remember_me"].value())
-        # Disabled until the self-hosted helper detects browser support; password needs no JS.
-        self.assertContains(response, "data-passkey-submit disabled")
+        # Always active: without script or browser support a click says why it cannot work (owner decision 2026-10-31).
+        self.assertNotContains(response, "data-passkey-submit disabled")
+        self.assertContains(response, 'data-unsupported="')
 
     def test_checked_preference_survives_password_validation_failure(self):
         response = self.client.post(reverse("accounts:login"), {

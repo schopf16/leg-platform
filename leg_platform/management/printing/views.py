@@ -126,6 +126,7 @@ class PrintView(ManagementAccessMixin, View):
             "scope_all": SCOPE_ALL,
             "scope_selected": SCOPE_SELECTED,
             "all_allowed": prepared.total <= areas.MAX_DETAIL_PAGES,
+            "all_hint": "" if prepared.total <= areas.MAX_DETAIL_PAGES else self.too_many_details(),
             "selectable": selectable,
             "select_hint": "" if selectable else self.too_many_to_select(),
             "can_print": not too_long,

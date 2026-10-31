@@ -224,11 +224,12 @@ class CodeAsTheOnlyProofTests(TestCase):
         self.assertNotIn("id_otp_token_helptext", html)
         self.assertIn("Neue Adressen bestätigen Sie mit einem Link.", html)
 
-    def test_the_error_summary_names_the_field(self):
+    def test_the_error_summary_of_one_field_has_only_the_title_and_the_message_stands_at_the_field(self):
         html = self.email(otp_token="123456").content.decode()
 
-        # The summary on the profile cards lists the short name as a link; the message stays under the field.
-        self.assertRegex(html, r'(?s)error-summary.*<a href="#[^"]*">2FA-Authentifizierungscode</a>')
+        bar = html.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+        self.assertIn("Bitte prüfen Sie Ihre Angaben", bar)
+        self.assertNotIn("<li>", bar)
         self.assertRegex(html, r"Der 2FA-Authentifizierungscode ist falsch")
 
     def test_the_delete_form_has_the_same_field_and_no_note_about_a_link(self):

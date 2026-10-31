@@ -283,6 +283,9 @@ class DeregistrationForm(ReauthenticationForm):
         self.points = {str(point.pk): point for point in points}
         self.fields["metering_points"].choices = [(key, key) for key in self.points]
         self.fields["withdraw_applications"].choices = [(str(row["pk"]), str(row["pk"])) for row in withdrawable]
+        self.fields["metering_points"].summary_anchor = "points-title"
+        self.fields["withdraw_applications"].summary_label = _("Registration in progress")
+        self.fields["withdraw_applications"].summary_anchor = "progress-title"
         self.fields["termination"].widget.attrs["class"] = "form-check-input"
         first = deregistrations.earliest_termination_date()
         dates = [month_end(add_months(first, number)) for number in range(DESIRED_DATE_CHOICES)]
@@ -290,18 +293,18 @@ class DeregistrationForm(ReauthenticationForm):
         self.fields["desired_date"].initial = first
         for name in ("current_password", "otp_token"):
             if name in self.fields:
-                # The script keeps the button inactive until the proof is typed; no field takes the focus on arrival.
-                attrs = self.fields[name].widget.attrs
-                attrs.pop("autofocus", None)
-                attrs["data-proof"] = "1"
+                self.fields[name].widget.attrs.pop("autofocus", None)
 
     def clean(self):
         data = self.cleaned_data
         if "metering_points" in data and not data["metering_points"] and not data.get("withdraw_applications"):
             if "withdraw_applications" not in self.errors:
                 self.add_error(
-                    "metering_points" if self.points else None,
-                    forms.ValidationError(_("Choose at least one metering point."), code="required"),
+                    "metering_points" if self.points else "withdraw_applications",
+                    forms.ValidationError(
+                        _("Select at least one entry.") if self.fields["withdraw_applications"].choices
+                        else _("Choose at least one metering point."), code="required"
+                    ),
                 )
         # The date matters whenever points are deregistered (the notice period is the same for every point).
         if data.get("metering_points"):
@@ -360,9 +363,10 @@ class ContactForm(CustomerForm):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("reply_by") == contact.REPLY_EMAIL and not cleaned.get("email"):
+        if cleaned.get("reply_by") == contact.REPLY_EMAIL and not cleaned.get("email") and "email" not in self.errors:
             self.add_error("email", _("Please enter an email address."))
         if cleaned.get("reply_by") == contact.REPLY_PHONE:
+            self.errors.pop("email", None)
             try:
                 cleaned["phone"] = contact.swiss_phone(cleaned.get("phone") or "")
             except ValueError:

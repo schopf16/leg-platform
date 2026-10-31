@@ -14,8 +14,9 @@
 {% block content %}
 <div id="content-main">
   <p>{{ description }}</p>
-  <form method="post">
+  <form method="post" novalidate>
     {% csrf_token %}
+    {% if form.errors %}<p class="errornote">{% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}</p>{% endif %}
     {{ form.as_p }}
     <input type="submit" class="default" value="{{ title }}">
   </form>

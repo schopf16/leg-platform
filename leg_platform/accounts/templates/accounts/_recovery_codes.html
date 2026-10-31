@@ -1,7 +1,8 @@
 {% load i18n %}{% comment %}
 The recovery codes, shown once (D-059; nothing about them is stored): the sentence, the list, "Copy codes", the box and "Done". Used by
-the card "Sign-in" (state codes) and by the flow "Change sign-in" (screen codes). "Done" is gated by the box in the script
-(``confirm-gate.js``) and checked on the server (``RecoveryCodesDoneView``). Context: ``codes`` (formatted).
+the card "Sign-in" (state codes) and by the flow "Change sign-in" (screen codes). "Done" is always active: the script
+(``confirm-check.js``) shows the error under the box before sending, so that no round trip loses the codes (shown once); the
+server checks the box again (``RecoveryCodesDoneView``). Context: ``codes`` (formatted).
 {% endcomment %}<p>{% translate "You need these codes if you have no access to your number code from your phone." %} {% translate "Each code works only once. They are shown only now." %}</p>
 <ol class="recovery-codes" id="recovery-codes-list">
   {% for code in codes %}<li>{{ code }}</li>{% endfor %}
@@ -13,6 +14,6 @@ the card "Sign-in" (state codes) and by the flow "Change sign-in" (screen codes)
 <p class="profile-note d-print-none" role="status" data-codes-status></p>
 <form method="post" action="{% url 'accounts:recovery_codes_done' %}" class="profile-done-form d-print-none" data-codes-done-form>
   {% csrf_token %}
-  <label class="entry-check" for="id_saved"><input class="entry-check-input" type="checkbox" name="saved" id="id_saved" required><span>{% translate "I saved the codes." %}</span></label>
-  <div class="profile-actions"><button type="submit" class="btn btn-primary" data-codes-done data-gate="id_saved">{% translate "Done" %}</button></div>
+  <label class="entry-check" for="id_saved"><input class="entry-check-input" type="checkbox" name="saved" id="id_saved" required data-error="{% translate 'Please tick the box once you have saved the codes.' %}"><span>{% translate "I saved the codes." %}</span></label>
+  <div class="profile-actions"><button type="submit" class="btn btn-primary" data-codes-done data-confirm-check="id_saved">{% translate "Done" %}</button></div>
 </form>

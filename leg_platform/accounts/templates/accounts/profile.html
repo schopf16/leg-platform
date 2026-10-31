@@ -38,6 +38,6 @@
   {% endif %}
   {% if edit == "bank" and not only_two_factor %}<script defer src="{% static 'customer/js/customer.js' %}"></script>{% endif %}
   {% if tf_state == "codes" %}<script defer src="{% static 'js/recovery-codes.js' %}"></script>{% endif %}
-  <script defer src="{% static 'js/confirm-gate.js' %}"></script>
+  <script defer src="{% static 'js/confirm-check.js' %}"></script>
   <script defer src="{% static 'js/profile-focus.js' %}"></script>
 {% endblock %}

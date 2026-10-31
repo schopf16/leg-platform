@@ -24,12 +24,12 @@ recovery codes, rendered once in the answer to the confirmation of the number co
         {% if form.proof == "code" %}{% translate "Confirm number code" as step_name %}{% else %}{% translate "Confirm password" as step_name %}{% endif %}
         {% include "accounts/_flow_progress.html" with number=1 total=3 name=step_name %}
         <h2 id="flow-title">{% translate "Please confirm it is you" %}</h2>
+        {% include "accounts/_error_summary.html" %}
         {% if form.proof == "code" %}
           <p>{% translate "For your safety, enter the number code that your phone shows right now." %}</p>
           {% include "accounts/_field.html" with field=form.otp_token %}
           <p class="card-note"><a href="{% url 'accounts:profile' %}?edit=two_factor&amp;step=lost_phone#card-two-factor">{% translate "Phone lost?" %}</a></p>
         {% else %}
-          <p>{% translate "For your safety, enter your password once more before you change your sign-in." %}</p>
           {% include "accounts/_field.html" with field=form.current_password %}
         {% endif %}
         <div class="step-actions">
@@ -99,6 +99,7 @@ recovery codes, rendered once in the answer to the confirmation of the number co
         {% csrf_token %}
         {% include "accounts/_flow_progress.html" with number=2 total=2 setup=True %}
         <h2 id="flow-title">{% translate "Enter the number" %}</h2>
+        {% include "accounts/_error_summary.html" %}
         <p>{% translate "Enter the number that the program shows right now." %}</p>
         {% include "accounts/_field.html" with field=form.otp_token %}
         <div class="step-actions">
@@ -120,6 +121,6 @@ recovery codes, rendered once in the answer to the confirmation of the number co
 {% endblock %}
 {% block scripts %}
   {{ block.super }}
-  {% if flow == "codes" %}<script defer src="{% static 'js/recovery-codes.js' %}"></script><script defer src="{% static 'js/confirm-gate.js' %}"></script>{% endif %}
+  {% if flow == "codes" %}<script defer src="{% static 'js/recovery-codes.js' %}"></script><script defer src="{% static 'js/confirm-check.js' %}"></script>{% endif %}
   <script defer src="{% static 'js/submit-once.js' %}"></script>
 {% endblock %}

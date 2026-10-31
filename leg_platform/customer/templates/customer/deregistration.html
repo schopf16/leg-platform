@@ -4,8 +4,8 @@ The deregistration (ABMELDUNG.md): one page with three cards, the metering point
 proof. Context: ``form`` (customer.forms.DeregistrationForm), ``groups`` (the points by building), ``empty``,
 ``already_deregistered`` (nothing to choose because a deregistration runs), ``already`` (points in a deregistration: read only),
 ``in_progress`` (registrations in progress: withdrawable ones have a box, not chosen), ``has_points``,
-``heading``, ``summary``, ``cancel_url``. No computed date is shown (owner decision). A script only keeps the button inactive until a point is chosen and the proof is typed and updates the
-count; the server checks everything again.
+``heading``, ``summary``, ``cancel_url``. No computed date is shown (owner decision). A script updates the count;
+the server checks the selection, date and proof.
 {% endcomment %}
 {% block title %}{% translate "Deregister metering points" %}{% endblock %}
 {% block content %}
@@ -37,7 +37,7 @@ count; the server checks everything again.
     {% else %}
       <form method="post" class="dereg-form" novalidate data-submit-once aria-label="{% translate 'Deregister metering points' %}">
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         {% if has_points %}
         <section class="step-card{% if form.metering_points.errors %} is-error{% endif %}" aria-labelledby="points-title">
           <h2 id="points-title">{% translate "Which metering points should be deregistered?" %}</h2>
@@ -71,16 +71,14 @@ count; the server checks everything again.
           </div>
           {% blocktranslate asvar summary_many with count='%(count)s' %}You are deregistering {{ count }} metering points.{% endblocktranslate %}{% comment %}The percent sign of the placeholder must not go through the translate tag (it doubles it and the catalogue entry is not found): the script replaces the placeholder.{% endcomment %}
           <p class="dereg-summary" aria-live="polite" data-summary data-one="{% translate 'You are deregistering 1 metering point.' %}" data-many="{{ summary_many }}" data-none="">{{ summary }}</p>
-          <p class="form-hint">{% translate "The deregistration is binding." %}</p>
           {% else %}
           <h2 id="date-title">{% translate "Confirm" %}</h2>
           {% endif %}
           {% include "accounts/profile/_proof_fields.html" %}
           <div class="step-actions">
-            <button type="submit" class="btn btn-danger-outline" data-gate-dereg>{% if has_points %}{% translate "Deregister metering points (binding)" %}{% else %}{% translate "Withdraw registration" %}{% endif %}</button>
+            <button type="submit" class="btn btn-danger-outline" data-dereg-summary>{% if has_points %}{% translate "Deregister metering points (binding)" %}{% else %}{% translate "Withdraw registration" %}{% endif %}</button>
             <a class="btn btn-secondary-action end-action" href="{{ cancel_url }}">{% translate "Cancel" %}</a>
           </div>
-          <p class="form-hint" data-proof-hint hidden>{% translate "Enter your password to finish." %}</p>
         </section>
       </form>
     {% endif %}

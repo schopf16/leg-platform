@@ -14,7 +14,7 @@ under the address fields (W4-01) and names the LEG as a link where the instance 
     {% with form=personal_form %}
       <form method="post" action="{% url 'accounts:profile_edit' %}" class="profile-form" novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         <div class="field-pair">
           {% include "accounts/_field.html" with field=form.first_name %}
           {% include "accounts/_field.html" with field=form.last_name %}

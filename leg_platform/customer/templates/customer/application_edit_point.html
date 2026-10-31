@@ -7,7 +7,7 @@
     <h1 class="start-title">{% translate "Edit metering point" %}</h1>
     <form method="post" class="step-card" novalidate data-submit-once aria-label="{% translate 'Metering points' %}">
       {% csrf_token %}
-      {% include "customer/_error_summary.html" with title_only=True %}
+      {% include "accounts/_error_summary.html" with title_only=True %}
       {% if not numbers_ready %}<div class="alert alert-warning" role="alert">{% translate "Metering point numbers cannot be entered yet. Please contact the LEG." %}</div>{% endif %}
       {% if is_feed_in %}
         <div class="mb-3">

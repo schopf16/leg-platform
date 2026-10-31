@@ -262,6 +262,9 @@ class DeregistrationStartView(DeregistrationBase):
         rows = self.rows(request.user, points, shown, today)
         groups = self.groups(request.user, rows)
         in_progress = in_progress_applications(request.user, location)
+        chosen_applications = set(request.POST.getlist("withdraw_applications")) if form.is_bound else set()
+        for row in in_progress:
+            row["checked"] = str(row["pk"]) in chosen_applications
         already = deregistering_points(request.user, location)
         context = {
             "form": form, "groups": groups, "has_points": bool(points),

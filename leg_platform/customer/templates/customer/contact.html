@@ -14,7 +14,7 @@ shown with the reveal of customer.js; without a script both are shown.
       <p class="start-sub">{% translate "Have a question? Write to us." %}</p>
       <form class="step-card contact-form" method="post" action="{% url 'customer:contact' %}" data-submit-once novalidate>
         {% csrf_token %}
-        {% include "customer/_error_summary.html" %}
+        {% include "accounts/_error_summary.html" %}
         <div class="contact-field">
           <label class="contact-label" for="{{ form.message.id_for_label }}">{{ form.message.label }}</label>
           {{ form.message }}

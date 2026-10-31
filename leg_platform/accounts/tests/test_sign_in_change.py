@@ -157,7 +157,7 @@ class ProofStepTests(TestCase):
         self.assertIn("Schritt 1 von 3: Passwort bestätigen", html)
         self.assertIn('<progress class="path-bar" max="3" value="1"', html)
         self.assertIn("Bitte bestätigen Sie sich", html)
-        self.assertIn("Geben Sie zur Sicherheit noch einmal Ihr Passwort ein, bevor Sie die Anmeldung ändern.", html)
+        self.assertNotIn("Geben Sie zur Sicherheit noch einmal Ihr Passwort ein", html)
         self.assertIn('name="current_password"', html)
         self.assertNotIn('name="otp_token"', html)
         self.assertNotIn("Handy verloren?", html)
@@ -185,8 +185,9 @@ class ProofStepTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Das Passwort stimmt nicht.")
         body = response.content.decode()
-        # The error stands inline at the field (described by it, focus on it), without a summary box.
-        self.assertNotIn("error-summary", body)
+        # The error stands at the field (described by it, focus on it); the bar has only the title (one field).
+        self.assertIn("error-summary", body)
+        self.assertNotIn("<li>", body.split("error-summary", 1)[1].split("</div>", 1)[0])
         field = re.search(r'<input[^>]*name="current_password"[^>]*>', body).group(0)
         self.assertIn("id_current_password_error", field)
         self.assertIn("autofocus", field)
@@ -497,8 +498,9 @@ class PathsOfStepThreeTests(TestCase):
                 response = client.post(NUMBER, {"otp_token": token})
                 self.assertEqual(response.status_code, 200)
                 body = response.content.decode()
-                # The error stands at the field (described by it, focus on it), without a summary box.
-                self.assertNotIn("error-summary", body)
+                # The error stands at the field (described by it, focus on it); the bar has only the title.
+                self.assertIn("error-summary", body)
+                self.assertNotIn("<li>", body.split("error-summary", 1)[1].split("</div>", 1)[0])
                 self.assertIn('id="id_otp_token_error"', body)
                 field = re.search(r'<input[^>]*name="otp_token"[^>]*>', body).group(0)
                 self.assertIn("id_otp_token_error", field)

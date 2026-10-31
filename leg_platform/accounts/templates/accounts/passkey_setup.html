@@ -35,7 +35,6 @@ session that were never activated. The screens "Confirm in the window" and "Did 
           {% include "accounts/_field.html" with field=form.otp_token %}
         {% else %}
           {% include "accounts/_error_summary.html" %}
-          <p>{% translate "For your safety, enter your password once more before you change your sign-in." %}</p>
           {% include "accounts/_field.html" with field=form.current_password %}
         {% endif %}
         <div class="step-actions">
@@ -50,6 +49,7 @@ session that were never activated. The screens "Confirm in the window" and "Did 
         {% translate "Name" as step_name %}
         {% include "accounts/_flow_progress.html" with number=1 total=3 name=step_name %}
         <h2 id="flow-title">{% translate "What should the passkey be called?" %}</h2>
+        {% include "accounts/_error_summary.html" %}
         {% include "accounts/_field.html" with field=form.name %}
         <div class="step-actions">
           <button type="submit" class="btn btn-primary">{% translate "Continue" %}</button>

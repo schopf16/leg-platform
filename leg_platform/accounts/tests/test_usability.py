@@ -159,6 +159,7 @@ class CompletionFormTests(TestCase):
             self.assertIn(f'href="#{field_id}"', html)
         for text in ("Geben Sie einen Ort ein.", "Geben Sie eine Postleitzahl ein."):
             self.assertIn(text, html)
+            self.assertNotIn(text, html[html.index('class="alert alert-danger error-summary"'):].split('</div>', 1)[0])
         self.assertNotIn("Dieses Feld ist zwingend erforderlich", html)
         # The error is tied to its field for assistive technology.
         self.assertIn('aria-describedby="id_town_error"', element(html, "id_town"))

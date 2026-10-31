@@ -72,8 +72,9 @@ class CardLayoutTests(TestCase):
         delete = client.get(reverse("accounts:account_delete")).content.decode()
 
         self.assertIn('class="btn btn-danger-outline">2FA deaktivieren</button>', disable)
-        # The page "Delete account" has the filled red button that waits for the box (owner decision 2026-10-24).
-        self.assertIn('class="btn btn-danger" data-gate="id_confirm">Konto unwiderruflich löschen</button>', delete)
+        # The page "Delete account" has the filled red button, always active; the script checks the box (owner decision 2026-10-31).
+        self.assertIn('class="btn btn-danger" data-confirm-check="id_confirm">Konto unwiderruflich löschen</button>', delete)
+        self.assertNotIn("Kästchen anklicken, um die Löschung freizugeben.", delete)
         self.assertIn('name="confirm"', delete)
         self.assertNotIn("btn btn-danger\"", disable)
 

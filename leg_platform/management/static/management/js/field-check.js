@@ -1,6 +1,6 @@
 /* Checks while typing, for the fields of the dialogs that carry data-check (D-094). The server checks everything
    again and has the last word; this script only says it sooner, with the same messages (they come from the
-   server in data attributes, in the language of the page).
+   server in data attributes, in the language of the page). It never disables the save button.
 
    - data-check="digits": the typed last characters of a metering point number (D-102): letters A-Z (small letters
      become capitals), digits 0-9 and the hyphen, as the standard allows. On leaving the field the entry is made
@@ -49,25 +49,6 @@
     return element;
   };
 
-  const forms = new Map(); // form -> set of inputs that block saving
-  const blocking = (input, blocked) => {
-    const form = input.form;
-    if (!form) {
-      return;
-    }
-    const set = forms.get(form) || new Set();
-    forms.set(form, set);
-    if (blocked) {
-      set.add(input);
-    } else {
-      set.delete(input);
-    }
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) {
-      submit.disabled = set.size > 0;
-    }
-  };
-
   const slotOf = (input) => {
     let slot = document.getElementById(input.id + "_error");
     if (!slot) {
@@ -89,7 +70,6 @@
     } else {
       input.removeAttribute("aria-invalid");
     }
-    blocking(input, Boolean(message));
   };
 
   // ---- Decimal numbers ----
@@ -186,7 +166,6 @@
             box.appendChild(linkLine);
           }
           feedback.appendChild(box);
-          blocking(input, true);
         }
       })
       .catch(() => {});

@@ -27,6 +27,7 @@ from leg_platform.accounts.login_protection import axes_client_ip
 from leg_platform.accounts.models import Passkey, User
 
 ERROR = gettext_lazy("The passkey could not be verified. Please try again.")
+UNSUPPORTED = gettext_lazy("This browser does not support passkeys. Please log in with your password.")
 
 
 def payload(request):
@@ -87,6 +88,10 @@ class LoginView(View):
     def post(self, request):
         if limited(request):
             return JsonResponse({"error": str(ERROR)}, status=429)
+        if request.content_type != "application/json":
+            # The button of the login page was used without the script (or the browser has no passkeys).
+            messages.error(request, UNSUPPORTED)
+            return redirect("accounts:login")
         try:
             data = payload(request)
             # Resolve the account only from a stored credential, never a posted username/user id.

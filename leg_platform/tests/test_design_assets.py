@@ -208,3 +208,53 @@ class ScriptTests(SimpleTestCase):
         text = (STATIC / "js" / "recovery-codes.js").read_text(encoding="utf-8")
         for forbidden in ("fetch", "sendBeacon", "XMLHttpRequest", "WebSocket", "console", "location"):
             self.assertNotIn(forbidden, text)
+
+
+TEMPLATES = Path(settings.BASE_DIR) / "leg_platform"
+POST_FORM = re.compile(r'<form\b[^>]*method="post"[^>]*>(.*?)</form>', re.S)
+VISIBLE_FIELD = re.compile(
+    r'<(?:select|textarea)\b|<input\b(?![^>]*type="(?:hidden|submit|button|image)")'
+    r'|_field\.html|\.as_p\b|\{\{\s*\w*form\.\w+\s*\}\}'
+)
+# Locked by a cause outside the form; the reason is visible text next to it (docs/DESIGN.md, buttons and errors).
+LOCKED_SUBMITS = {
+    "accounts/templates/accounts/email_sent.html",
+    "addresses/templates/admin/addresses/directory.html",
+    "addresses/templates/admin/addresses/housekeeping.html",
+}
+
+
+def page_templates():
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        if "tests" not in path.parts:
+            yield path, path.read_text(encoding="utf-8")
+
+
+class FormRuleTests(SimpleTestCase):
+    """Buttons and errors (docs/DESIGN.md): the browser bubble never replaces the portal's error display and no
+    submit button is locked for an error inside its own form."""
+
+    def test_every_post_form_with_a_field_is_novalidate_or_checks_its_box_in_the_script(self):
+        for path, text in page_templates():
+            for match in POST_FORM.finditer(text):
+                whole = match.group(0)
+                opening = whole[: whole.index(">") + 1]
+                if not VISIBLE_FIELD.search(match.group(1)):
+                    continue
+                with self.subTest(template=str(path.relative_to(TEMPLATES))):
+                    self.assertTrue("novalidate" in opening or "data-confirm-check" in match.group(1), opening)
+
+    def test_no_submit_button_is_disabled_except_by_a_cause_outside_the_form(self):
+        locked = re.compile(r'<(?:button|input)\b[^>]*type="submit"[^>]*\bdisabled\b[^>]*>|<(?:button|input)\b[^>]*\bdisabled\b[^>]*type="submit"[^>]*>', re.S)
+        for path, text in page_templates():
+            relative = path.relative_to(TEMPLATES).as_posix()
+            with self.subTest(template=relative):
+                found = locked.search(re.sub(r"\{%.*?%\}", "", text, flags=re.S))
+                self.assertTrue(found is None or relative in LOCKED_SUBMITS, found and found.group(0))
+
+    def test_the_scripts_never_lock_a_submit_button_for_missing_input(self):
+        for name in ("customer/static/customer/js/customer.js", "management/static/management/js/field-check.js",
+                     "static/js/confirm-check.js"):
+            with self.subTest(script=name):
+                text = (TEMPLATES / name).read_text(encoding="utf-8")
+                self.assertNotRegex(text, r"(button|submit)\.disabled\s*=\s*(?!false)")

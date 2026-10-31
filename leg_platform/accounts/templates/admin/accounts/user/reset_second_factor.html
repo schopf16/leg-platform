@@ -17,8 +17,9 @@
   {% else %}
     <p>{% if original.customer_number_display %}{% blocktranslate with number=original.customer_number_display %}Customer number {{ number }}{% endblocktranslate %} — {% endif %}{{ original.display_name }}</p>
     <p>{% translate "Send a single-use recovery link valid for 24 hours. Only the account owner's confirmation removes the old password, passkeys, app and recovery codes and ends all sessions. The owner then chooses a new sign-in method." %}</p>
-    <form method="post">
+    <form method="post" novalidate>
       {% csrf_token %}
+      {% if form.errors %}<p class="errornote">{% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}</p>{% endif %}
       {{ form.as_p }}
       <button type="submit" class="button recovery-action">{% translate "Send the link" %}</button>
     </form>

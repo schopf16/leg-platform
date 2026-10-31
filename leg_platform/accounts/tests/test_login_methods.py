@@ -237,7 +237,7 @@ class LoginMethodRoutingTests(TestCase):
                 response = self.client.post(CHOOSE_URL, {"method": method})
 
                 self.assertEqual(response.status_code, 200)
-                self.assertNotContains(response, "Bitte prüfen Sie Ihre Angaben")
+                self.assertContains(response, "Bitte prüfen Sie Ihre Angaben")
                 self.assertContains(response, "id_current_password_error")
         self.assertFalse(AuthenticatorDevice.objects.exists())
         self.assertFalse(self.user.passkeys.exists())
@@ -345,12 +345,14 @@ class ForgedRequestTests(TestCase):
     def failures(self):
         return SessionCodeFailure.objects.get(account=self.user).failures
 
-    def test_the_error_summary_links_to_an_existing_field(self):
+    def test_the_error_of_the_choice_stands_at_the_field_and_the_bar_has_only_the_title(self):
         self.client.post(CHOOSE_URL, {"current_password": PASSWORD})
 
         html = self.client.post(f"{CHOOSE_URL}?step=choose", {"method": "unknown"}).content.decode()
 
-        self.assertIn('<a href="#id_method_0">', html)
+        bar = html.split('class="alert alert-danger error-summary"', 1)[1].split("</div>", 1)[0]
+        self.assertIn("Bitte prüfen Sie Ihre Angaben", bar)
+        self.assertNotIn("<li>", bar)
         self.assertIn('id="id_method_0"', html)
         self.assertNotIn('<a href="#">', html)
 
