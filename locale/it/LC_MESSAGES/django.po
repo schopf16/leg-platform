@@ -9479,6 +9479,9 @@ msgstr "Nessun movimento da %(minutes)s minuti."
 msgid "Statistic"
 msgstr "Statistica"
 
+# Importer failure texts (addresses: importer.py, jobs.py, plants.py, status.py): the English sentence is stored as the
+# reason of an import log row and translated at display time by the dynamic gettext(row.reason) in addresses/admin.py
+# (import log page and download). makemessages cannot see these msgids; do not remove them.
 msgid "A repair was tried recently and did not succeed."
 msgstr "Una riparazione è stata tentata di recente senza successo."
 
