@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n static management_ui %}
+{% load i18n static %}
 {% block title %}{% translate "Start" %}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'customer/css/customer.css' %}">{% endblock %}
 {% block scripts %}{{ block.super }}<script defer src="{% static 'customer/js/stage-cards.js' %}"></script>{% endblock %}
@@ -7,13 +7,6 @@
 {% block content %}
   <h1 class="start-title">{% blocktranslate with name=account.display_name %}Hello, {{ name }}{% endblocktranslate %}</h1>
   <p class="start-sub">{% translate "Customer number" %} {{ account.customer_number_display }}{% if address_line %} · {{ address_line }}{% endif %}</p>
-  {% staff_area as can_open_staff_area %}{% if can_open_staff_area %}
-    {# On a phone the menu is behind a button: the staff area (D-113) gets its own button here. A new tab, like the menu entry. #}
-    <a class="btn btn-secondary-action start-staff-link" href="{% url 'management:overview' %}" target="_blank" rel="noopener noreferrer">
-      <span>{% translate "Open staff area" %}<span class="visually-hidden"> ({% translate "opens in a new tab" %})</span></span>
-      <svg class="frame-icon" aria-hidden="true"><use href="#i-external"/></svg>
-    </a>
-  {% endif %}
   {% include "customer/_banners.html" %}
   {% include "customer/_status_lines.html" %}
   {% if stage and not stage.empty %}{% include "customer/_stage_cards.html" %}{% endif %}

@@ -239,12 +239,12 @@ class AccessTests(TestCase):
             for link in links:
                 self.assertNotIn(f'href="{link}"', part)
             self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
-        # D-113: the menu of "My area" has the entry "Staff area" (one link to the overview, a new tab), no group.
+        # D-113/D-131: the menu of "My area" has no staff entry any more (the header button has it), no group.
         for user in (self.staff, self.administrator):
             for part in self.menu_parts(user, reverse("home")):
                 with self.subTest(user=user.email, area="my area"):
                     self.assertNotIn('<p class="frame-group">Verwaltung</p>', part)
-                    self.assertEqual([link for link in links if f'href="{link}"' in part], [reverse("management:overview")])
+                    self.assertEqual([link for link in links if f'href="{link}"' in part], [])
 
     def test_the_active_entry_is_marked_in_the_menu(self):
         html = self.login(self.staff).get(reverse("management:settings")).content.decode()

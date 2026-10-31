@@ -13,7 +13,6 @@ app_name = "customer"
 
 urlpatterns = [
     path("buildings/", views.BuildingsView.as_view(), name="buildings"),
-    path("neighbourhood/", views.NeighbourhoodView.as_view(), name="neighbourhood"),
     path("buildings/<int:pk>/details/", views.BuildingDetailsView.as_view(), name="building_details"),
     path("metering-points/<int:pk>/name/", views.MeteringPointNameView.as_view(), name="metering_point_name"),
     path("application/", wizard.ApplicationStartView.as_view(), name="application_start"),

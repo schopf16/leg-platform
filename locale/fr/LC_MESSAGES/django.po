@@ -7487,9 +7487,6 @@ msgid "Show details"
 msgstr "Afficher les détails"
 
 # The customer menu (MENU-STANDARD.md): the names are singular.
-msgid "Participation"
-msgstr "Participation"
-
 msgid "Neighbourhood"
 msgstr "Voisinage"
 
@@ -8750,23 +8747,14 @@ msgstr "Espace collaborateurs"
 msgid "Staff area: %(page)s"
 msgstr "Espace collaborateurs : %(page)s"
 
-msgid "For staff"
-msgstr "Pour les collaborateurs"
-
-msgid "Management and system"
-msgstr "Gestion et système"
-
 msgid "Back to My area"
 msgstr "Retour à Mon espace"
 
-msgid "Participation, information and profile"
-msgstr "Participation, information et profil"
+msgid "Buildings, information and profile"
+msgstr "Bâtiments, information et profil"
 
 msgid "Start and profile"
 msgstr "Accueil et profil"
-
-msgid "Open staff area"
-msgstr "Ouvrir l’espace collaborateurs"
 
 msgid "Choose another sign-in method"
 msgstr "Choisir une autre méthode de connexion"
@@ -9836,110 +9824,6 @@ msgstr "Connexions échouées"
 msgid "Lines"
 msgstr "Lignes"
 
-msgid ""
-"Your transformer circuit and the buildings around it. Public data only."
-msgstr ""
-"Votre circuit de transformateur et les bâtiments alentour. Données publiques"
-" uniquement."
-
-msgid "Your circuit: %(name)s"
-msgstr "Votre circuit : %(name)s"
-
-msgid "No circuit known for your building"
-msgstr "Aucun circuit connu pour votre bâtiment"
-
-msgid "Map of the circuits around your building"
-msgstr "Carte des circuits autour de votre bâtiment"
-
-msgid "Your building"
-msgstr "Votre bâtiment"
-
-msgid "Building with a PV plant"
-msgstr "Bâtiment avec installation photovoltaïque"
-
-msgid "Outline of a circuit (approximate)"
-msgstr "Contour d'un circuit (approximatif)"
-
-msgid "The circuits of your postal code"
-msgstr "Les circuits de votre code postal"
-
-msgid "your circuit"
-msgstr "votre circuit"
-
-msgid "%(n)s building"
-msgid_plural "%(n)s buildings"
-msgstr[0] "%(n)s bâtiment"
-msgstr[1] "%(n)s bâtiments"
-msgstr[2] "%(n)s bâtiments"
-
-msgid "%(pv)s with PV"
-msgstr "%(pv)s avec PV"
-
-msgid "No circuit names are published for this postal code yet."
-msgstr "Aucun circuit n'est encore publié pour ce code postal."
-
-msgid ""
-"Counts are buildings and PV plants only. Outlines are an approximation drawn"
-" from the building positions of the BKW map."
-msgstr ""
-"Seuls les bâtiments et les installations photovoltaïques sont comptés. Les "
-"contours sont une approximation tirée des positions des bâtiments sur la "
-"carte de BKW."
-
-msgid "The discount on grid usage"
-msgstr "La réduction sur l'utilisation du réseau"
-
-msgid ""
-"The BKW grants a discount on the grid usage when all participants are on the"
-" same grid level. The discount is 40 percent when no transformation is "
-"needed for the exchange, and 20 percent when one is needed."
-msgstr ""
-"BKW accorde une réduction sur l'utilisation du réseau lorsque tous les "
-"participants se trouvent sur le même niveau de réseau. La réduction est de "
-"40 pour cent si aucune transformation n'est nécessaire pour l'échange, et de"
-" 20 pour cent si une transformation est nécessaire."
-
-msgid "Source: BKW, page on the local electricity community."
-msgstr "Source : BKW, page sur la communauté locale d'électricité."
-
-msgid "Invite neighbours"
-msgstr "Inviter des voisins"
-
-msgid ""
-"The invitation opens your own mail program. The mail is sent from your "
-"address, not from the portal."
-msgstr ""
-"L'invitation ouvre votre propre programme de messagerie. Le courriel part de"
-" votre adresse, pas du portail."
-
-msgid "Prepare invitation"
-msgstr "Préparer l'invitation"
-
-msgid "PV plants: Federal Office of Energy (BFE), plant register"
-msgstr ""
-"Installations photovoltaïques : Office fédéral de l'énergie (OFEN), registre"
-" des installations"
-
-msgid "Local electricity community %(name)s"
-msgstr "Communauté locale d'électricité %(name)s"
-
-msgid ""
-"I take part in the local electricity community. Would you like to join as "
-"well?"
-msgstr "Je participe à la communauté locale d'électricité. Intéressé ?"
-
-#: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid "The circuits of your area"
-msgstr "Les cercles de transformateurs de votre région"
-
-#: leg_platform/customer/templates/customer/neighbourhood.html:0
-msgid ""
-"No building at your profile address is in the address directory yet. The map"
-" shows the circuits of your area."
-msgstr ""
-"Aucun bâtiment à votre adresse de profil n'est encore dans le répertoire "
-"d'adresses. La carte montre les cercles de transformateurs de votre région."
-
 #: leg_platform/addresses/templates/addresses/widget_notice.html:0
 msgid "Checking the address …"
 msgstr "Vérification de l'adresse …"
@@ -10078,15 +9962,6 @@ msgstr "Désinscrire les points de mesure de manière contraignante"
 
 msgid "Exempt are the details that we are legally obliged to keep, for example invoice data."
 msgstr "Font exception les données que nous devons conserver en vertu de la loi (par exemple les données de facturation)."
-
-msgid "Buildings and transformer stations: BKW map of the area with the higher discount"
-msgstr "Bâtiments et stations transformatrices : carte BKW de la zone avec le rabais plus élevé"
-
-msgid "No data yet"
-msgstr "Pas encore de données"
-
-msgid "No data is available for your neighbourhood yet."
-msgstr "Aucune donnée n’est encore disponible pour votre quartier."
 
 msgid "We check the address for you. You do not need to do anything."
 msgstr "Nous vérifions l’adresse pour vous. Vous n’avez rien à faire."
@@ -10257,3 +10132,65 @@ msgstr "Ce navigateur ne prend pas en charge les clés d’accès. Veuillez vous
 
 msgid "Save or discard the open change first."
 msgstr "Enregistrez ou annulez d’abord la modification en cours."
+
+# ---- The support view "View as" (D-131)
+msgid "View as"
+msgstr "Vue en tant que"
+
+msgid "View as this person"
+msgstr "Voir en tant que cette personne"
+
+#, python-format
+msgid "View as: %(name)s (customer no. %(number)s) – read only"
+msgstr "Vue en tant que : %(name)s (n° de client %(number)s) – lecture seule"
+
+#, python-format
+msgid "Signed in as %(name)s"
+msgstr "Connecté en tant que %(name)s"
+
+msgid "End view"
+msgstr "Terminer la vue"
+
+msgctxt "support view"
+msgid "End"
+msgstr "Terminer"
+
+msgid "Log out (staff account)"
+msgstr "Se déconnecter (compte collaborateur)"
+
+msgid "Not possible in this view"
+msgstr "Impossible dans cette vue"
+
+msgid "Not visible in this view"
+msgstr "Non visible dans cette vue"
+
+msgid "Not visible in this view for security reasons."
+msgstr "Non visible dans cette vue pour des raisons de sécurité."
+
+msgid "Back to the start page"
+msgstr "Retour à la page d’accueil"
+
+msgid "Security settings are not visible in this view."
+msgstr "Les paramètres de sécurité ne sont pas visibles dans cette vue."
+
+msgid "The contract document is not shown in this view. Use the staff area to open it."
+msgstr "Le document du contrat n’est pas affiché dans cette vue. Ouvrez-le via l’espace collaborateurs."
+
+msgid "You see the pages as this person sees them. Read only."
+msgstr "Vous voyez les pages comme cette personne les voit. Lecture seule."
+
+msgid "Support view (view as a person) started"
+msgstr "Vue de support (vue en tant que personne) démarrée"
+
+msgid "Support view (view as a person) ended"
+msgstr "Vue de support (vue en tant que personne) terminée"
+
+msgid "Page shown in the support view (view as a person)"
+msgstr "Page affichée dans la vue de support (vue en tant que personne)"
+
+#, python-format
+msgid "%(counter)s message pending, not shown."
+msgid_plural "%(counter)s messages pending, not shown."
+msgstr[0] "%(counter)s message en attente, non affiché."
+msgstr[1] "%(counter)s messages en attente, non affichés."
+msgstr[2] "%(counter)s messages en attente, non affichés."

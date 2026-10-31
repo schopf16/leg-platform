@@ -21,6 +21,7 @@ from leg_platform.community.tests.helpers import make_circuit, make_location, ma
 
 ROOT = Path(settings.BASE_DIR) / "leg_platform"
 SCRIPTS = ROOT / "management" / "static" / "management" / "js"
+SHARED_SCRIPTS = ROOT / "static" / "js"
 NEW_SCRIPTS = ("field-check.js", "combobox.js", "circuit-field.js", "option-note.js", "dialog-focus.js")
 
 
@@ -79,7 +80,8 @@ class ScriptBehaviourTests(SimpleTestCase):
             '<input id="n" data-check="digits" data-limit="20" data-prefix="CH1A2B3C4D5E6" '
             'data-message-digits="NOT_ALLOWED" data-message-many="TOO_LONG %(count)s" data-message-empty="EMPTY">'
             '<div id="n_error" hidden></div><div data-number-complete hidden></div><div data-number-feedback></div>'
-            f'</div><pre id="out"></pre><script src="{(SCRIPTS / "field-check.js").as_uri()}"></script>'
+            f'</div><pre id="out"></pre><script src="{(SHARED_SCRIPTS / "metering-number.js").as_uri()}"></script>'
+            f'<script src="{(SCRIPTS / "field-check.js").as_uri()}"></script>'
             "<script>const n=document.getElementById('n');const rows=[];"
             f"for (const [typed, expected, error] of {cases}) {{"
             "n.value=typed;n.dispatchEvent(new Event('input'));n.dispatchEvent(new Event('blur'));"
@@ -178,8 +180,9 @@ class ScriptSourceTests(TestCase):
                        "dataset.messageMany", "dataset.messageEmpty", 'aria-live", "polite"', "aria-invalid", "AbortController"):
             self.assertIn(needle, text, needle)
         self.assertNotIn('role", "alert"', text)  # never an alert per key
-        self.assertIn('"0".repeat(limit - result.length)', text)  # zeros are put in front by hand (not with padStart on a hyphen)
-        self.assertNotIn("[0-9]+$/.test(value)", text)  # the digits-only rule is gone (D-102)
+        shared = (SHARED_SCRIPTS / "metering-number.js").read_text(encoding="utf-8")
+        self.assertIn('"0".repeat(limit - result.length)', shared)  # zeros are put in front by hand (not with padStart on a hyphen)
+        self.assertNotIn("[0-9]+$/.test(value)", text + shared)  # the digits-only rule is gone (D-102)
 
     def test_every_suggest_widget_has_a_delay_that_the_rate_budget_allows(self):
         # The address lookup: 60 requests per minute and address (addresses/limits.py); 200 ms with the cancellation of

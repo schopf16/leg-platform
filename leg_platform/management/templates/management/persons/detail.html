@@ -27,13 +27,23 @@ invited and who has not completed the registration has no customer number yet; t
         <p class="mgmt-subtitle mgmt-person-line">{% if invitation.expires_at %}{% blocktranslate with deadline=invitation.expires_at|date:"d.m.Y H:i" %}The invitation link is valid until {{ deadline }}.{% endblocktranslate %}{% elif not invitation.sending %}{% translate "The invitation link has expired." %}{% endif %}</p>
       {% endif %}
     </div>
-    {% if invitation %}
+    {% if invitation or can_view_as %}
       <div class="mgmt-header-actions">
+        {% if invitation %}
         <form method="post" action="{% url 'management:persons_invitation' person.pk %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ current_url }}">
           <button type="submit" class="btn btn-primary">{% translate "Resend invitation" %}</button>
         </form>
+        {% endif %}
+        {% if can_view_as %}
+        {# The read-only support view (D-131): a POST with the CSRF token, same tab. #}
+        <form method="post" action="{% url 'management:persons_view_as' person.pk %}" class="view-as-start">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary-action" aria-describedby="view-as-help"><svg class="frame-icon" aria-hidden="true"><use href="#i-eye"/></svg> {% translate "View as this person" %}</button>
+          <p class="mgmt-subtitle" id="view-as-help">{% translate "You see the pages as this person sees them. Read only." %}</p>
+        </form>
+        {% endif %}
       </div>
     {% endif %}
   </div>

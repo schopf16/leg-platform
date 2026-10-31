@@ -19,7 +19,9 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy, pgettext
 from django.views import View
 
+from leg_platform import render_as
 from leg_platform.accounts.models import PendingEmailChange
+from leg_platform.customer.access import is_customer
 from leg_platform.community import addressing, grid_operator, history, person_list, persons
 from leg_platform.community import iban as iban_module
 from leg_platform.community.status import MeteringPointStatus
@@ -314,6 +316,8 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
             "account_label": account.label,
             "account_tone": STATE_TONES[account],
             "can_edit": persons.may_change_customer_data(request.user, person),
+            # "View as this person" (D-131): not oneself, only a person who takes part as a customer.
+            "can_view_as": person.pk != request.user.pk and is_customer(person),
             "invitation": persons.invitation_state(person),
             "second_pending": PendingEmailChange.objects.filter(
                 user=person, kind=PendingEmailChange.Kind.SECONDARY, expires_at__gt=timezone.now()
@@ -576,6 +580,22 @@ class PersonCreateView(DialogView):
             request, list_view, back, reverse("management:persons_detail", args=[created[0].pk]),
             _("The person was created and the invitation was sent."),
         )
+
+
+class PersonViewAsView(PersonObjectMixin, ManagementAccessMixin, View):
+    """"View as this person": starts the read-only support view (D-131). POST with CSRF only. Any person the staff member
+    sees here may be viewed, not oneself (the normal pages exist) and only a person who takes part as a customer (else the
+    pages would be a 404). The state is in the staff member's own session (``leg_platform.render_as``); nobody is logged
+    in as the person, no mail is sent, nothing of the person is written."""
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        person = self.person(pk)
+        if person.pk == request.user.pk or not is_customer(person):
+            raise Http404
+        render_as.start(request, person)
+        return redirect("home")
 
 
 class PersonInvitationView(PersonObjectMixin, ManagementAccessMixin, View):

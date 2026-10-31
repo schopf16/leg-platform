@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {# The portal is not a public page (docs/PROJECT.md, "Instances"). #}
   <meta name="robots" content="noindex, nofollow">
-  <title>{% with workspace=frame_workspace|default:"participant" %}{% filter staff_page_title:workspace %}{% block title %}{% endblock %}{% endfilter %}{% endwith %} – {{ instance_name }}</title>
+  <title>{% if render_as %}{% translate "View as" %}: {% endif %}{% with workspace=frame_workspace|default:"participant" %}{% filter staff_page_title:workspace %}{% block title %}{% endblock %}{% endfilter %}{% endwith %} – {{ instance_name }}</title>
   {% include "_favicon.html" with address=instance_favicon kind=instance_favicon_type %}
   {# Not deferred: sets the colour mode of this tab before the page is painted (D-056). #}
   <script src="{% static 'js/theme-init.js' %}"></script>
@@ -15,8 +15,9 @@
   {% block extra_head %}{% endblock %}
   <link rel="stylesheet" href="{% url 'instance_stylesheet' %}">
 </head>
-<body class="register-clear">
+<body class="register-clear{% if render_as %} has-render-as{% endif %}">
   {% if user.is_authenticated %}<a class="skip-link" href="#main-content">{% translate "Skip to content" %}</a>{% endif %}
+  {% if render_as %}{% include "_render_as_banner.html" %}{% endif %}
   {% include "_corner_controls.html" %}
   <div class="print-heading">{{ instance_name }} — {{ print_date|date:"d.m.Y" }}</div>
   {% block body %}
@@ -38,7 +39,23 @@
         <a class="frame-logo" href="{% url 'home' %}"><span class="logo-plate">{% include "_brand.html" %}</span></a>
         {% if frame_workspace == "staff" and user.is_authenticated and not frame_restricted %}<span class="frame-workspace">{% translate "Staff area" %}</span>{% endif %}
         {% if user.is_authenticated %}
-          <span class="frame-name">{{ user.display_name }}</span>
+          {% staff_area as can_open_staff_area %}
+          {% if can_open_staff_area and not frame_restricted and frame_workspace != "staff" %}
+            {# The way into the staff area (D-131): a new tab, no named window; it authorises nothing (every request is checked on the server). On a phone only the icon shows. #}
+            <a class="btn btn-secondary-action frame-staff-btn" href="{% url 'management:overview' %}" target="_blank" rel="noopener noreferrer" aria-label="{% translate 'Staff area' %} ({% translate 'opens in a new tab' %})">
+              <svg class="frame-icon" aria-hidden="true"><use href="#i-overview"/></svg>
+              <span class="frame-staff-text">{% translate "Staff area" %}</span>
+              <svg class="frame-icon frame-staff-external" aria-hidden="true"><use href="#i-external"/></svg>
+            </a>
+          {% endif %}
+          {% if frame_restricted or frame_workspace == "staff" %}
+            <span class="frame-name">{{ user.display_name }}</span>
+          {% else %}
+            {# Shortcut to the profile; "Profile" stays in the menu and the bottom bar. In the support view it names the person who is viewed. #}
+            <a class="frame-name frame-name-link" href="{% url 'accounts:profile' %}"{% if frame_profile_active %} aria-current="page"{% endif %}>
+              <svg class="frame-icon" aria-hidden="true"><use href="#i-user"/></svg><span><span class="visually-hidden">{% translate "Profile" %}: </span>{% firstof frame_subject.display_name user.display_name %}</span>
+            </a>
+          {% endif %}
           {% if frame_restricted %}
             <form method="post" action="{% url 'accounts:logout' %}" class="frame-logout">
               {% csrf_token %}
@@ -88,15 +105,15 @@
             <span>{% translate "Menu" %}</span>
           </a>
           {% else %}{% customer_menu as customer_state %}{% participates as is_participant %}
-          {# My area for everybody, staff included (START-SEITE.md, section 7): Start, Participation, Information, Profile. An account that does not take part (no customer number) has no page behind Participation and Information: Start, Profile and the menu (the way to the staff area). #}
+          {# My area for everybody, staff included (START-SEITE.md, section 7): Start, Buildings, Information, Profile. An account that does not take part (no customer number) has no page behind Buildings and Information: Start, Profile and the menu (the way to the staff area). #}
           <a class="frame-tab{% if request.resolver_match.view_name == 'home' %} is-active{% endif %}" href="{% url 'home' %}"{% if request.resolver_match.view_name == 'home' %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-home"/></svg>
             <span>{% translate "Start" %}</span>
           </a>
           {% if is_participant %}
           <a class="frame-tab{% if customer_state.participation %} is-active{% endif %}" href="{% url 'customer:buildings' %}"{% if customer_state.participation %} aria-current="page"{% endif %}>
-            <svg class="frame-icon" aria-hidden="true"><use href="#i-participation"/></svg>
-            <span>{% translate "Participation" %}</span>
+            <svg class="frame-icon" aria-hidden="true">            <use href="#i-building"/></svg>
+                        <span>{% translate "Buildings" %}</span>
           </a>
           <a class="frame-tab{% if customer_state.information %} is-active{% endif %}" href="{% url 'customer:contract' %}"{% if customer_state.information %} aria-current="page"{% endif %}>
             <svg class="frame-icon" aria-hidden="true"><use href="#i-info"/></svg>
@@ -132,6 +149,7 @@
   <script defer src="{% static 'js/corner-controls.js' %}"></script>
   <script defer src="{% static 'js/frame-menu.js' %}"></script>
   <script defer src="{% static 'js/password-toggle.js' %}"></script>
+  {% if render_as %}<script defer src="{% static 'js/render-as.js' %}"></script>{% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

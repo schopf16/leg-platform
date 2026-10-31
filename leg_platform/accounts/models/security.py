@@ -245,6 +245,10 @@ class SecurityEvent(models.Model):
         MANAGEMENT_DATA_EDITED = "management_data_edited", _("Management data edited in the administration")
         IBAN_CHANGED = "iban_changed", _("IBAN changed by the account")
         CONTRACT_VERSION_CHANGED = "contract_version_changed", _("Contract version uploaded, made current or deleted")
+        # The read-only support view "View as" (D-131): actor = the staff member, account = the person viewed.
+        RENDER_AS_STARTED = "render_as_started", _("Support view (view as a person) started")
+        RENDER_AS_ENDED = "render_as_ended", _("Support view (view as a person) ended")
+        RENDER_AS_PAGE_VIEWED = "render_as_page_viewed", _("Page shown in the support view (view as a person)")
 
     # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
@@ -269,6 +273,9 @@ class SecurityEvent(models.Model):
             Event.PERSISTENT_SESSION_STARTED,
             Event.ACCOUNT_SESSIONS_ENDED_BY_ADMIN,
             Event.MANAGEMENT_DATA_EDITED,
+            Event.RENDER_AS_STARTED,
+            Event.RENDER_AS_ENDED,
+            Event.RENDER_AS_PAGE_VIEWED,
         }
     )
 

@@ -9,6 +9,7 @@ from django import template
 from django.utils.html import format_html
 from django.utils.translation import gettext
 
+from leg_platform import render_as
 from leg_platform.customer import access
 
 register = template.Library()
@@ -35,15 +36,25 @@ def leg_link(context):
 @register.simple_tag(takes_context=True)
 def participates(context):
     """Whether the account takes part as a customer (``customer.access.is_customer``: active, a customer number; staff
-    and system administrators too, D-113): ``{% participates as is_participant %}``. Participation, Information and the
+    and system administrators too, D-113): ``{% participates as is_participant %}``. Buildings (flat entry, key ``participation``), Information and the
     matching tabs are shown only then, so no link leads to a 404."""
-    user = getattr(context.get("request"), "user", None)
+    user = render_as.subject(context.get("request"))
     return bool(user is not None and access.is_customer(user))
 
 
 @register.simple_tag(takes_context=True)
+def render_as_pending(context):
+    """In the support view (D-131): the number of unseen messages of the person viewed. They are only counted, never shown
+    and never marked as seen."""
+    from leg_platform.community import customer_messages
+
+    person = render_as.subject(context.get("request"))
+    return len(customer_messages.messages_for(person)) if person is not None else 0
+
+
+@register.simple_tag(takes_context=True)
 def customer_menu(context):
-    """``{"participation": bool, "information": bool}``: which of the two parent entries holds the current page."""
+    """``{"participation": bool, "information": bool}``: which holds the current page: ``participation`` (the buildings entry: wizard, deregistration, building edit) or ``information``."""
     match = getattr(context.get("request"), "resolver_match", None)
     name = getattr(match, "view_name", "") or ""
     in_area = name.startswith("customer:")
@@ -52,5 +63,4 @@ def customer_menu(context):
         "information": name in INFORMATION_VIEWS,
         "contract": name == "customer:contract",
         "contact": name == "customer:contact",
-        "neighbourhood": name == "customer:neighbourhood",
     }

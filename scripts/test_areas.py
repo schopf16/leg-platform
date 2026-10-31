@@ -266,7 +266,10 @@ AREAS: dict[str, Area] = {
     "customer": Area(
         "The customer's participation (D-103): the pages Buildings and the registration wizard, the contract download, "
         "the card on the start page and the customer menu; the route walk of the access check.",
-        paths=("leg_platform/customer/", "leg_platform/accounts/tasks.py", "leg_platform/downloads.py"),
+        paths=(
+            "leg_platform/customer/", "leg_platform/accounts/tasks.py", "leg_platform/downloads.py",
+            "leg_platform/render_as.py",
+        ),
         tests=(
             "leg_platform.customer.tests",
             A + "test_frame",

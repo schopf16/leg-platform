@@ -2,7 +2,9 @@
 The one-time banners (W2-03): shown once on the next visit of the start page or the page Buildings after the LEG rejected an
 application or the grid operator's confirmation did not arrive in time. One sentence per kind; the optional note of the staff
 is plain text (escaped). Context: ``banners`` (customer.banners.Banner list; may be empty or missing).
-{% endcomment %}{% if banners %}{% leg_link as leg %}
+{% endcomment %}{% if render_as %}{% render_as_pending as pending_count %}{% if pending_count %}
+  <p class="render-as-pending" role="status">{% blocktranslate count counter=pending_count %}{{ counter }} message pending, not shown.{% plural %}{{ counter }} messages pending, not shown.{% endblocktranslate %}</p>
+{% endif %}{% elif banners %}{% leg_link as leg %}
   <div class="banner-list">
     {% for banner in banners %}
       <div class="alert alert-warning one-time-banner" role="status">

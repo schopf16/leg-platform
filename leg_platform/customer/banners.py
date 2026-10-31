@@ -49,6 +49,9 @@ def is_page_view(request):
 
 
 def mark_shown(request, person, read):
-    """Mark what ``pending`` read, after the response was built, for a real page view only."""
+    """Mark what ``pending`` read, after the response was built, for a real page view only. Never in the support view
+    "View as" (D-131): that reads without consuming."""
+    if getattr(request, "subject", None) is not None:
+        return
     if read.ids and is_page_view(request):
         customer_messages.mark_seen(person, read.ids)

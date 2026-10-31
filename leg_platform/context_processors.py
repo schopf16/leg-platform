@@ -3,6 +3,7 @@
 from django.utils import timezone
 from django.utils.functional import SimpleLazyObject
 
+from leg_platform import render_as
 from leg_platform.accounts.login_protection import LOGIN_COOLOFF
 from leg_platform.accounts.portal_settings import portal_values
 from leg_platform.accounts.second_factor import is_second_factor_complete, requires_second_factor
@@ -72,7 +73,13 @@ def instance(request):
     # page is rendered without this processor, and if it fails for a 403 or 404 page, Django
     # answers with the 500 page.
     values = SimpleLazyObject(lambda: portal_values(request))
+    in_view_as = render_as.is_active(request)
     return {
+        # The support view "View as" (D-131): ``frame_subject`` is the person whose pages are shown (the logged-in
+        # account otherwise); the header, the banner and the menu use it, ``user`` stays the staff member.
+        "render_as": in_view_as,
+        "frame_subject": render_as.subject(request),
+        "render_as_paths": render_as.allowed_paths() if in_view_as else "",
         "frame_restricted": frame_restricted(request),
         "frame_workspace": frame_workspace(request),
         # The "Profile" entry of the menu is active on the profile pages only (review N-/E-4).

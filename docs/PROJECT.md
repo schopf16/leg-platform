@@ -63,6 +63,8 @@ English for all software and documentation; user interface Swiss German (`de-ch`
 
 The user model keeps all fields of the eCH-0010 structure (D-032); unused fields are stored but not shown (D-036). Only necessary data is collected; the purposes are communicated in the privacy notice (DSG Art. 6 para. 3 and Art. 19; D-022). Invoicing is not part of the first phase.
 
+**Support view (D-131).** Staff may open a customer's pages read only ("View as <person>") to answer questions about what the customer sees. This is a further purpose of the data already stored (customer support); it reads personal data of the customer, including the IBAN, without a reason and without telling the customer (owner decision), and every start, end and page is written to the security log (ids only). The privacy notice of the instance should name this purpose.
+
 ## Registration
 
 * The form asks only for the email address and links to the privacy notice (owner, 2026-10-13); until verified only the address is stored. The response is always the same generic message.

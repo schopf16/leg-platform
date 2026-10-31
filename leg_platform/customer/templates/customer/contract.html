@@ -7,11 +7,15 @@
     <h1 class="start-title">{% translate "Articles of association" %}</h1>
     <p class="start-sub">{% translate "Here you find the current contract and all earlier versions." %}</p>
     {% if current %}
+      {% if render_as %}
+        <p class="render-as-note">{% translate "The contract document is not shown in this view. Use the staff area to open it." %}</p>
+      {% else %}
       <div class="contract-reader">
         <iframe class="contract-frame" src="{% url 'customer:contract_read' %}#view=FitH&amp;navpanes=0" title="{% translate 'Articles of association' %}" loading="lazy" referrerpolicy="no-referrer"></iframe>
         <p class="contract-reader-note muted contract-reader-wide">{% translate "If the contract is not shown here, download the current version below." %}</p>
         <p class="contract-reader-note contract-reader-phone">{% translate "Please download the current version below to read it." %}</p>
       </div>
+      {% endif %}
       {% if acceptance %}
         <section class="step-card contract-consent is-accepted" aria-label="{% translate 'Articles of association' %}">
           <p class="dotword"><span class="dot tone-ok" aria-hidden="true"></span>{% translate "Already agreed" %}</p>

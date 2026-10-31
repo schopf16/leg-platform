@@ -112,6 +112,8 @@ class SessionTimeoutMiddleware:
         if not is_session_free(request) and request.user.is_authenticated:
             expired = self._check(request, passive=is_passive(request))
             if expired:
+                # The support view "View as" ends with this reason (leg_platform.render_as, D-131).
+                request.render_as_end_reason = "timeout"
                 logout(request)
                 if is_passive(request):
                     # A polling script: no redirect to the login page, no message left for the next page.

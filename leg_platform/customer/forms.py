@@ -131,21 +131,29 @@ class MeteringPointsForm(CustomerForm):
         for name in ("draw_number", "feed_in_number"):
             self.fields[name].help_text = str(self.fields[name].help_text) % {"prefix": prefix_text, "length": numbers.SUFFIX_LENGTH}
         for name in ("draw_number", "feed_in_number"):
-            self.fields[name].widget.attrs.update({"autocapitalize": "characters", "spellcheck": "false"})
+            self.fields[name].widget.attrs.update(
+                {"autocapitalize": "characters", "spellcheck": "false", "data-pad-limit": numbers.SUFFIX_LENGTH}
+            )
         self.fields["draw_number"].summary_label = _("Metering point number")
         self.fields["feed_in_number"].summary_label = _("Feed-in metering point number")
         for name in ("draw_number", "draw_name", "feed_in_number", "feed_in_name"):
             self.fields[name].widget.attrs["autocomplete"] = "off"
 
     def _complete_number(self, name):
-        """The typed part is never padded for the customer: fewer than ``SUFFIX_LENGTH`` characters is an error here
-        (a padded number would be a number the customer did not type)."""
-        value = self.cleaned_data.get(name) or ""
-        if 0 < len(numbers.compact_number(value)) < numbers.SUFFIX_LENGTH:
+        """The server demands exactly ``SUFFIX_LENGTH`` valid characters (white space ignored, small letters taken as
+        capitals). Padding and cutting leading zeros is the job of the page script (``js/metering-number.js``)."""
+        value = numbers.compact_number(self.cleaned_data.get(name))
+        if not value:
+            return value
+        if numbers.ENTERED_CHARACTERS.fullmatch(value) is None:
+            raise forms.ValidationError(numbers.NOT_DIGITS_MESSAGE, code="not_allowed")
+        if len(value) > numbers.SUFFIX_LENGTH:
+            raise forms.ValidationError(texts.NUMBER_TOO_LONG, code="too_long")
+        if len(value) < numbers.SUFFIX_LENGTH:
             raise forms.ValidationError(
                 _("Please enter all %(length)s characters."), code="too_short", params={"length": numbers.SUFFIX_LENGTH}
             )
-        return value
+        return value.upper()
 
     def clean_draw_number(self):
         return self._complete_number("draw_number") if self.draw_needed else self.cleaned_data.get("draw_number")

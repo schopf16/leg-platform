@@ -135,6 +135,8 @@ MIDDLEWARE = [
     "leg_platform.accounts.session_timeout.SessionTimeoutMiddleware",
     # After OTPMiddleware and MessageMiddleware: no privileges without the second factor.
     "leg_platform.accounts.second_factor.SecondFactorMiddleware",
+    # The read-only support view "View as" (D-131): after the second factor, deny by default.
+    "leg_platform.render_as.RenderAsMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
 ]

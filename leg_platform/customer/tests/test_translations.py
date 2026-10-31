@@ -118,7 +118,6 @@ class CustomerTextsTests(SimpleTestCase):
             "Participating": "Teilnehmend",
             "Deregistration running": "In Abmeldung",
             "Registration running": "In Anmeldung",
-            "Participation": "Teilnahme",
             "Questions and answers": "Frage und Antwort",
             "Invoice": "Rechnung",
             "Message": "Mitteilung",

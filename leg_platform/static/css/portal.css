@@ -58,6 +58,9 @@ html { scrollbar-gutter: stable; }
   /* The warning triangle only; text in the warning colour keeps --warn. */
   --warn-icon: #b45309;
   --warm: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  /* The bar of the support view "View as" (D-131): its own colour, white on #5b2a86 is 10.6:1. */
+  --view-as: #5b2a86;
+  --on-view-as: #ffffff;
   --logo-plate: transparent;
 }
 
@@ -77,6 +80,9 @@ html { scrollbar-gutter: stable; }
   --ok-text: #5dbb86;
   --warn: #e8b34a;
   --warn-icon: #f5a623;
+  /* Dark: #1a0e2b on #cdb8f2 is 10.3:1. */
+  --view-as: #cdb8f2;
+  --on-view-as: #1a0e2b;
   --logo-plate: color-mix(in srgb, var(--fg) 8%, var(--warm));
 }
 

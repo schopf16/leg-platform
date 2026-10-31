@@ -1,30 +1,49 @@
-# Neighbourhood Page
+# Neighbourhood: Record of a Reverted Attempt
 
-Status: built and merged to `main` (view `leg_platform/customer/views.py`, `NeighbourhoodView`). The fallback to the circuits of a postal code (`neighbourhood.for_postal_code`, profile without own building) is on the branch `feature/address-suggestions`. Decision: D-123 in `docs/DECISIONS.md`. Owner decisions of 2026-10-26: `CLAUDE.md`, "Owner Decisions for the Neighbourhood Page". Code map: `docs/CODEMAP.md`, `neighbourhood`.
+**Status: deferred ("later"), reverted at the owner's request on 2026-10-31. The page did not work correctly. The owner reported that opening it repeatedly showed nothing.**
 
-## Goal
+**This document is historical learning material, not an assignment, specification, acceptance checklist or approval to implement the feature. Do not resume work from it. A future attempt needs a new, explicit owner request and fresh requirements and security decisions.**
 
-Participants talk to their neighbours and invite them. The page shows the transformer circuit of the profile building, the public counts of the circuits of the postal code, and the discount on grid usage. It is for logged-in participants only (`CustomerAccessMixin`) and shows no names or addresses of other people.
+Source: owner requests of 2026-10-26 and 2026-10-31; implementation inspected before removal. D-123 in [DECISIONS.md](DECISIONS.md) records the withdrawal.
 
-## What the page shows
+## What was attempted
 
-* The circuits of the postal code of the profile building, on the swisstopo colour base map.
-* Per circuit: the number of buildings and of buildings with a PV plant. No participant counts.
-* The discount of the BKW: 40 percent without transformation, 20 percent with one.
-* An invitation as a `mailto:` link. The mail leaves from the member's own address; the portal sends nothing.
+* A page for signed-in participants showing transformer circuits around the profile building and helping them invite neighbours.
+* Local address lookup of the profile building; where several buildings matched, the first by EGID was chosen.
+* Fallbacks without a profile building: circuits of the profile postal code, then postal codes of the configured service area. These attempts did not establish a working page for the owner.
+* Self-hosted Leaflet 1.9.4 with the swisstopo colour base map (`ch.swisstopo.pixelkarte-farbe`), browser tile requests to `wmts.geo.admin.ch` and attribution "© Data: swisstopo".
+* LV95 positions converted to WGS84 with the approximate formulas of swisstopo, December 2016, section 2. A synthetic test checked the document's example.
+* Buildings grouped by transformer station name within one postal code. Buildings without a name were assigned to the nearest named building. Convex hulls formed circuit outlines.
+* Red dot for the own building, yellow dots for buildings with PV plants, a legend and public building/PV-building counts. No participant counts, names or addresses of other persons.
+* Informational discount wording: 40 percent without transformation, 20 percent with one. Historical wording only; not a verified current tariff or a rule for a future implementation.
+* Invitations through `mailto:` in the participant's own mail program, not sent by the portal.
 
-## Data
+## Data sources investigated
 
-| Data | Source | Where |
+| Data | Source used by the attempt | Existing independent component |
 |---|---|---|
-| Transformer station per building | BKW high-discount map, scanned weekly (D-118) | address directory file, `TransformerStation` |
-| Building positions (LV95) | address directory | `Address.easting`, `Address.northing` |
-| PV plants per building | BFE plant register, daily (D-117) | `Plant` in the address directory file |
-| Map background | swisstopo, `ch.swisstopo.pixelkarte-farbe` | tiles from `wmts.geo.admin.ch` (N-10 in `docs/SERVICES.md`) |
+| Transformer station names | Public BKW high-discount map, read by OCR | `TransformerStation`, weekly scan (D-118) |
+| Building positions | Local address directory, LV95 coordinates | `Address.easting`, `Address.northing` |
+| PV plants | BFE plant register | `Plant`, daily import (D-117), also used for wizard prefill |
+| Map background | swisstopo WMTS | Removed with the page; no browser tile requests remain |
 
-## Open
+The independent address directory, plant import and transformer scan are not removed by this rollback. No database migration or deletion of stored data is part of it.
 
-* Commissioning year of PV plants for a chart "Zubau pro Jahr": the import must also store the date of each plant (column `Date` of `PlantDetail.csv`, same ZIP as the plant file). Not built; needs its own decision (amends D-117) and a developer task.
-* Cadastral view of single installations: not decided.
-* Zoom threshold for the circuit view: not built.
-* Verification: a browser check of the map (CSP reports, Leaflet, phone width) and the read-only security review have not been run.
+## Problems and limits
+
+* **Observed by the owner:** the page repeatedly displayed nothing. A usable end-to-end result was not achieved.
+* **Root cause unverified:** no single cause was established before removal. Do not present a missing import, coordinates, profile match, CSP or Leaflet as the confirmed cause.
+* The implementation depended on published address and plant generations, usable coordinates, station names and a matching profile or service-area postal code.
+* Missing data led to empty states. A render response or passing synthetic tests did not prove that the real page displayed a useful map.
+* Circuit outlines were approximations and could overlap. OCR station names were not confirmed by the BKW; nearest-building assignment was not verified as an electrical-grid boundary.
+* The earlier document left real-browser checks (CSP, Leaflet, phone width) and a security review unverified.
+* Browser tile requests exposed the visitor's IP address and headers to the external map host. The page-specific CSP exception and active service entry have been removed.
+* Not implemented: zoom threshold, commissioning-year chart, cadastral view. A `Date` column in `PlantDetail.csv` was noted as a possible lead for a chart, not verified or approved for implementation.
+
+## Rollback and lessons
+
+* Removed: page and route, view helpers, circuit/coordinate code, map script and styles, Leaflet assets including its licence file and checksums, page-specific translations and tests.
+* The menu entry remains disabled and marked "later" (since D-130 in COMING NEXT, no longer in a group). The former page URL has no route.
+* Active implementation claims, feature instructions, map security exception and dependency/service documentation were removed or corrected. This file is the single historical record.
+* A future attempt must establish data availability and visible browser output before claiming success. Synthetic unit tests alone are insufficient.
+* Investigate empty output explicitly rather than layering fallbacks over an unverified cause. Reassess source reliability, geometry, accessibility and data protection from scratch.
