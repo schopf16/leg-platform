@@ -95,7 +95,7 @@ The second command creates the tables of the address directory (own SQLite file,
 * Without the bootstrap variables it creates no administrator (design review accounts: section 9).
 * To also create the first administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`.
 * Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
-* The queued address import needs the optional worker or a `run_scheduled_tasks` run. No consumer means no import. Until an import succeeds, address validation and suggestions are unavailable.
+* The queued data imports need the optional worker or a `run_scheduled_tasks` run (the web process runs a started queue itself). No consumer after a restart means no import. Until an import succeeds, address validation and suggestions are unavailable.
 * Busy-file and rebuild errors are nonfatal; run setup again later. Never bypass a `.reset` marker.
 
 ## 6. Start the development server and the mail worker
@@ -214,7 +214,7 @@ foreach ($name in 'runserver', 'worker') {
   A code works **once**. A second login within 30 seconds needs a newer code: wait, run the command again. 15 wrong codes pause code entry for the account for 24 hours (D-040); the only ways out are a password reset or the emergency command, which would remove the seeded second factor.
 * Session timeouts and "Stay signed in": D-041, D-100.
 * Logs (D-099): `$HOME\.leg-platform-dev\logs\` (`application.log`, `security.log`; also in the administration, "Protokolldateien"); the dev server and mail worker write `.err.log` files.
-* Address directory import (D-090): the administration page "Adressverzeichnis" starts it. **It downloads the real file (about 143 MB; the resulting file is about 1.7 GB for 3.3 million addresses; needs 4 GB free): do not press it casually.** The daily run is off in the tests and in the start block of section 6 (`ADDRESS_IMPORT_AUTOMATIC=False`). Details: `docs/INSTALLATION.md`, "Address Directory". `seed_local_address_directory` loads invented addresses (section 10).
+* Data imports (D-090, D-132): the administration page "Datenimporte" has a start button per source and "Alles aktualisieren" (durable queue, one job at a time). **The address and PV buttons download the real files (the address file is about 143 MB; the resulting file is about 1.7 GB for 3.3 million addresses; needs 4 GB free): do not press them casually.** The daily run is off in the tests and in the start block of section 6 (`ADDRESS_IMPORT_AUTOMATIC=False`). Details: `docs/INSTALLATION.md`, "Address Directory". `seed_local_address_directory` loads invented addresses (section 10).
 
 ### 9.2 A self-registered test account
 

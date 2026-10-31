@@ -27,9 +27,13 @@ PAGE_URL = reverse("admin:addresses_importrequest_changelist")
 
 
 def english_build():
-    """The status in English: the texts of these tests are the source texts (the German ones are tested through the pages)."""
+    """The status in English: the texts of these tests are the source texts (the German ones are tested through the pages).
+    The address source row plus the ``active`` flag of the page."""
     with translation.override("en"):
-        return status.build()
+        page = status.build()
+    row = dict(page["sources"][0])
+    row["active"] = page["active"]
+    return row
 
 
 def make_staff(email, *, permission=True):
@@ -203,7 +207,7 @@ class RunnerTests(TransactionTestCase):
         with patch("leg_platform.addresses.importer.import_directory", return_value=5):
             job = self.start_and_wait()
         self.assertEqual((job.state, job.phase), (State.SUCCEEDED, "unchanged"))
-        self.assertIn("already up to date", english_build()["message"])
+        self.assertEqual(english_build()["state"], "succeeded")
 
     def test_a_failure_is_visible_with_its_reason_in_the_log_and_the_security_log(self):
         with patch(
@@ -271,8 +275,8 @@ class RunnerTests(TransactionTestCase):
             release.set()
             self.assertTrue(runner.wait_for_end(30))
         self.assertEqual((job.phase, job.bytes_done, job.bytes_total), ("downloading", 25 * 1024 * 1024, 100 * 1024 * 1024))
-        self.assertEqual((page["state"], page["percent"]), ("running", 25))
-        self.assertIn("25.0 of 100.0 MB downloaded", page["detail"])
+        # The download covers 2 to 45 percent of the whole run (D-132): a quarter of it is 12 percent.
+        self.assertEqual((page["state"], page["percent"]), ("running", 12))
 
     def test_only_the_import_thread_may_write_the_directory_file(self):
         seen = {}
@@ -389,9 +393,11 @@ class StatusEndpointTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/json")
         self.assertIn("no-store", response["Cache-Control"])
         body = response.json()
-        for key in ("state", "state_label", "active", "message", "percent", "error", "directory", "automatic_text"):
+        for key in ("active", "all_busy", "summary", "sources", "automatic_text", "server_time"):
             self.assertIn(key, body)
-        self.assertEqual(body["state"], "idle")
+        self.assertEqual([row["key"] for row in body["sources"]], ["address", "plant", "transformer"])
+        self.assertEqual(body["sources"][0]["state"], "idle")
+        self.assertFalse(body["active"])
         self.assertEqual(client.post(STATUS_URL).status_code, 405)
         self.assertEqual(client.delete(STATUS_URL).status_code, 405)
 
@@ -402,15 +408,18 @@ class StatusEndpointTests(TestCase):
         start.assert_not_called()
         self.assertFalse(ImportRequest.objects.exists())
 
-    def test_the_answer_shows_the_counts_and_the_file_of_the_directory(self):
+    def test_the_answer_shows_the_published_counts_of_the_directory(self):
         client, _person = make_staff("status.three@example.org")
+        from leg_platform.addresses import published
+
         Directory.objects.create(
             pk=1, data_date=timezone.localdate(), imported_at=timezone.now(), row_count=2400000, checksum="a" * 64
         )
-        body = client.get(STATUS_URL).json()
+        published.refresh(ImportRequest.Source.ADDRESS)
+        row = client.get(STATUS_URL).json()["sources"][0]
+        figures = {figure["key"]: figure for figure in row["figures"]}
         # The count is the Swiss text of count_text (DESIGN section 8), the same as in the page.
-        self.assertEqual(body["directory"]["row_count"], "2’400’000")
-        self.assertTrue(body["directory"]["available"])
+        self.assertEqual(figures["rows"]["published"], "2’400’000")
 
     def test_a_running_job_without_a_heartbeat_is_reported_as_interrupted_with_a_reason(self):
         client, _person = make_staff("status.four@example.org")
@@ -420,8 +429,9 @@ class StatusEndpointTests(TestCase):
             heartbeat_at=now - timedelta(minutes=5),
         )
         body = client.get(STATUS_URL).json()
-        self.assertEqual((body["state"], body["active"]), ("interrupted", False))
-        self.assertIn("unterbrochen", body["error"])
+        row = body["sources"][0]
+        self.assertEqual((row["state"], body["active"]), ("interrupted", False))
+        self.assertIn("unterbrochen", row["error"])
 
     def test_the_page_shows_the_status_and_the_polling_script_and_not_the_old_sentence(self):
         client, _person = make_staff("status.five@example.org")
@@ -436,30 +446,36 @@ class StatusEndpointTests(TestCase):
         self.assertNotIn("<script>", html)
         self.assertNotIn(" onclick=", html)
 
-    def test_the_page_uses_the_admin_button_an_alert_for_failures_numeric_dates_and_no_worker_text(self):
+    def test_the_page_is_one_table_with_a_start_button_per_source_and_update_all(self):
         client, _person = make_staff("status.seven@example.org")
-        idle = client.get(PAGE_URL).content.decode()
-        # UX-003, UX-013: the filled admin button; the idle state does not repeat itself; no "Import-Worker".
-        self.assertIn('<input type="submit" class="default" id="import-start"', idle)
-        self.assertIn('value="Aktualisierung des Verzeichnisses anfordern"', idle)
-        self.assertNotIn('<button type="submit" id="import-start"', idle)
-        self.assertNotIn("Es wurde noch kein Import angefordert", idle)
-        self.assertNotIn("Import-Worker", idle)
-        self.assertIn("Sie können diese Seite verlassen", idle)
-        self.assertIn('id="import-leave" hidden>', idle)  # only while an import is queued or running
-        # UX-006: the reason of a failure is an alert.
+        html = client.get(PAGE_URL).content.decode()
+        self.assertEqual(html.count('class="import-source"'), 3)
+        for source in ("address", "plant", "transformer", "all"):
+            self.assertIn(reverse("admin:addresses_importrequest_start", kwargs={"source": source}), html)
+        self.assertIn('id="import-start-all"', html)
+        self.assertIn('value="Alles aktualisieren"', html)
+        self.assertNotIn("BFE", html)
+        self.assertNotIn("BKW", html)
+        self.assertNotIn("swisstopo", html)
+        for dead in ("directory-imported-at", "directory-file-size", "import-leave"):
+            self.assertNotIn(dead, html)
+        # Cards of the old page are gone from this page.
+        self.assertNotIn("import-box", html)
+
+    def test_the_page_shows_a_failure_as_an_alert_with_numeric_dates(self):
+        client, _person = make_staff("status.nine@example.org")
         from datetime import datetime
 
         failed_at = timezone.make_aware(datetime(2026, 10, 17, 2, 44))
         ImportRequest.objects.create(
             pk=1, state=State.FAILED, last_error="Incomplete download.", requested_at=failed_at, finished_at=failed_at,
+            last_address_state="failed", last_address_finished_at=failed_at, last_address_error="Incomplete download.",
         )
         failed = client.get(PAGE_URL).content.decode()
-        self.assertIn('id="import-error" role="alert"', failed)
-        self.assertIn('value="Erneut versuchen"', failed)  # UX-013
+        self.assertIn('role="alert"', failed)
+        self.assertIn('value="Erneut versuchen"', failed)
         self.assertIn("17.10.2026 02:44", failed)  # DESIGN section 8: numeric dates
         self.assertNotIn("Oktober", failed)
-        self.assertIn('id="import-leave" hidden>', failed)
 
     def test_an_interrupted_import_does_not_say_the_same_sentence_twice(self):
         client, _person = make_staff("status.eight@example.org")
@@ -468,10 +484,10 @@ class StatusEndpointTests(TestCase):
             pk=1, state=State.RUNNING, started_at=now - timedelta(hours=1), claim_token=uuid.uuid4(),
             heartbeat_at=now - timedelta(minutes=5),
         )
-        body = client.get(STATUS_URL).json()
-        self.assertEqual(body["message"], "Der Import wurde nicht abgeschlossen.")
+        body = client.get(STATUS_URL).json()["sources"][0]
+        self.assertEqual(body["state_label"], "Unterbrochen")
         self.assertIn("unterbrochen", body["error"])
-        self.assertNotEqual(body["message"], body["error"])
+        self.assertEqual(body["error"].count("unterbrochen"), 1)
 
     def test_the_stylesheet_has_no_motion_under_reduced_motion_and_44_px_targets_on_touch(self):
         from pathlib import Path
@@ -480,16 +496,10 @@ class StatusEndpointTests(TestCase):
 
         css = (Path(settings.BASE_DIR) / "leg_platform" / "static" / "css" / "admin-portal.css").read_text(encoding="utf-8")
         self.assertRegex(css, r"@media \(prefers-reduced-motion: reduce\) \{[^{}]*\{[^{}]*animation: none;")  # UX-006
-        # The block that holds the buttons of the import and the logs: found by its content, not by its place (the
-        # file has more than one media query for touch screens, e.g. the links of the header, D-113).
-        touch_blocks = [
-            block for block in css.split("@media (pointer: coarse), (max-width: 767px)")[1:]
-            if ".import-form input[type=\"submit\"]" in block.split("\n}\n", 1)[0]
-        ]
-        self.assertEqual(len(touch_blocks), 1, "exactly one touch block holds the buttons of the import and the logs")
-        touch = touch_blocks[0].split("\n}\n", 1)[0]
-        for needle in (".import-form input[type=\"submit\"]", ".log-controls .button", ".log-files a", "min-height: 44px"):
-            self.assertIn(needle, touch, needle)  # UX-003
+        self.assertIn(".import-table input[type=\"submit\"]", css)
+        self.assertIn("min-height: 44px", css)
+        self.assertIn(".import-log-scroll", css)
+        self.assertIn("minmax(8em, 16em)", css)  # the facts grid no longer overflows at 820 px
         self.assertIn(".log-files thead", css)  # UX-002: the phone shows each file as a block
         self.assertIn("align-items: baseline;", css)  # UX-015
 
@@ -497,7 +507,8 @@ class StatusEndpointTests(TestCase):
         client, _person = make_staff("status.six@example.org")
         ImportRequest.objects.create(
             pk=1, state=State.FAILED, last_error="Official archive checksum mismatch.",
-            requested_at=timezone.now(), finished_at=timezone.now(),
+            requested_at=timezone.now(), finished_at=timezone.now(), last_address_state="failed",
+            last_address_finished_at=timezone.now(), last_address_error="Official archive checksum mismatch.",
         )
         response = client.get(PAGE_URL)
         self.assertContains(response, "Fehlgeschlagen")

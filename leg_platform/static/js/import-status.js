@@ -1,6 +1,10 @@
-/* The address directory page (D-090): while an import is queued or running, ask the status address every
-   few seconds and write the answer into the elements of the page. Only textContent is set (never markup);
-   the texts come from the server. Without this script the page shows the status of the last load. */
+/* The data imports page (D-090, D-132): while an import is waiting or running, ask the status address every few seconds
+   and write the answer into the elements of the page. Only textContent and attributes are set (never markup); the
+   texts come from the server. Without this script the page shows the status of the last load.
+
+   Rules: a published figure that is filled is never overwritten by a dash or an empty value (only the "In progress"
+   column may show a dash); the percent of a run never goes back; the remaining time is smoothed, counted down every
+   second and hidden while the server cannot tell it. */
 (function () {
   "use strict";
 
@@ -10,75 +14,224 @@
   }
   var url = box.dataset.statusUrl;
   var seconds = parseInt(box.dataset.pollSeconds, 10) || 2;
+  var DASH = "\u2013";
   var failures = 0;
+  var memory = {}; // per source: run, percent, remaining (seconds, counted down here), state, announced step
+  var timer = null;
 
-  function byId(id) {
-    return document.getElementById(id);
+  function find(root, field) {
+    return root.querySelector('[data-field="' + field + '"]');
   }
 
-  function setText(id, text) {
-    var element = byId(id);
-    if (element) {
+  function setText(element, text) {
+    if (element && element.textContent !== text) {
       element.textContent = text;
     }
   }
 
-  function setHidden(id, hidden) {
-    var element = byId(id);
-    if (element) {
-      element.hidden = hidden;
+  function keepFilled(element, value) {
+    // The value of the server replaces the text unless it is empty and the text is filled.
+    if (!element) {
+      return;
     }
+    var empty = value === "" || value === null || value === undefined || value === DASH;
+    var current = element.textContent.trim();
+    if (empty && current !== "" && current !== DASH) {
+      return;
+    }
+    setText(element, empty ? DASH : value);
   }
 
   function note(text) {
-    setText("import-script-note", text || "");
-    setHidden("import-script-note", !text);
+    var element = document.getElementById("import-script-note");
+    if (element) {
+      element.textContent = text || "";
+      element.hidden = !text;
+    }
   }
 
-  function dash(text) {
-    return text ? text : "\u2013";
+  function announce(text) {
+    var live = document.getElementById("import-live");
+    if (live) {
+      live.textContent = text;
+    }
+  }
+
+  function clock(total) {
+    var s = Math.max(0, Math.round(total));
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var r = s % 60;
+    var tail = (r < 10 ? "0" : "") + r;
+    if (h > 0) {
+      return h + ":" + (m < 10 ? "0" : "") + m + ":" + tail;
+    }
+    return (m < 10 ? "0" : "") + m + ":" + tail;
+  }
+
+  function showRemaining(root, mem) {
+    var element = find(root, "remaining");
+    if (!element) {
+      return;
+    }
+    if (mem.remaining === null) {
+      element.hidden = true;
+      element.textContent = "";
+      return;
+    }
+    element.hidden = false;
+    setText(element, clock(mem.remaining));
+  }
+
+  function renderButton(root, source) {
+    var button = root.querySelector("input.import-start");
+    if (!button) {
+      return;
+    }
+    var label = {
+      running: box.dataset.textRunning,
+      queued: box.dataset.textWaiting,
+      failed: box.dataset.textRetryRun,
+      interrupted: box.dataset.textRetryRun
+    }[source.state] || box.dataset.textUpdate;
+    if (label) {
+      button.value = label;
+    }
+    if (source.busy) {
+      button.setAttribute("disabled", "");
+    } else {
+      button.removeAttribute("disabled");
+    }
+  }
+
+  function renderSource(source) {
+    var root = box.querySelector('tbody[data-source="' + source.key + '"]');
+    if (!root) {
+      return;
+    }
+    var mem = memory[source.key] || (memory[source.key] = { run: "", percent: 0, remaining: null, state: "", step: -1 });
+    var running = source.state === "running";
+    var started = running && mem.state !== "running";
+    if (!running || mem.run !== source.started_at) {
+      mem.run = running ? source.started_at : "";
+      mem.percent = 0;
+      mem.remaining = null;
+      mem.step = -1;
+    }
+    root.dataset.state = source.state;
+    var dot = find(root, "dot");
+    if (dot) {
+      dot.className = "status-dot status-" + source.tone;
+    }
+    setText(find(root, "state"), source.state_label);
+    var position = find(root, "position");
+    if (position) {
+      position.hidden = !source.position;
+      setText(position, source.position ? "(" + source.position + ")" : "");
+    }
+
+    var progress = find(root, "progress");
+    if (progress) {
+      progress.hidden = !running || source.percent === null || source.percent === undefined;
+      if (running && source.percent !== null && source.percent !== undefined) {
+        mem.percent = Math.max(mem.percent, source.percent);
+        var bar = find(root, "bar");
+        if (bar) {
+          bar.value = mem.percent;
+        }
+        setText(find(root, "percent"), mem.percent + " %");
+      }
+    }
+    if (running && source.remaining_seconds !== null && source.remaining_seconds !== undefined) {
+      mem.remaining = mem.remaining === null ? source.remaining_seconds : 0.7 * mem.remaining + 0.3 * source.remaining_seconds;
+    } else {
+      mem.remaining = null;
+    }
+    showRemaining(root, mem);
+
+    var error = find(root, "error");
+    if (error) {
+      setText(error, source.error);
+      error.hidden = !source.error;
+      if (source.error) {
+        error.setAttribute("role", "alert");
+      } else {
+        error.removeAttribute("role");
+      }
+    }
+    var stall = find(root, "stall");
+    if (stall) {
+      setText(stall, source.stall);
+      stall.hidden = !source.stall;
+    }
+    keepFilled(find(root, "last_run"), source.last_run);
+    keepFilled(find(root, "key_figures"), source.key_figures);
+    var warning = find(root, "warning");
+    if (warning) {
+      setText(warning, source.warning);
+      warning.hidden = !source.warning;
+    }
+
+    // The figures: the published value never turns into a dash; the in-progress column exists while it runs.
+    root.querySelectorAll(".import-pending").forEach(function (cell) {
+      cell.hidden = !source.pending;
+    });
+    (source.figures || []).forEach(function (figure) {
+      var row = root.querySelector('tr[data-figure="' + figure.key + '"]');
+      if (!row) {
+        return;
+      }
+      keepFilled(row.querySelector("[data-published]"), figure.published);
+      var pending = row.querySelector("[data-pending]");
+      if (pending) {
+        setText(pending, figure.pending === null || figure.pending === undefined || figure.pending === "" ? DASH : figure.pending);
+      }
+    });
+    if (started) {
+      var details = root.querySelector("details");
+      if (details) {
+        details.open = true;
+      }
+    }
+    renderButton(root, source);
+
+    // The live region says the state words and every 25 percent, not every number.
+    if (mem.state !== source.state) {
+      announce(source.name + ": " + source.state_label);
+    } else if (running && Math.floor(mem.percent / 25) > mem.step && mem.step >= 0) {
+      announce(source.name + ": " + mem.percent + " %");
+    }
+    if (running) {
+      mem.step = Math.max(mem.step, Math.floor(mem.percent / 25));
+    }
+    mem.state = source.state;
   }
 
   function render(status) {
-    var panel = byId("import-box");
-    if (panel) {
-      panel.className = "import-box import-" + status.state;
-    }
-    setText("import-state", status.state_label);
-    setText("import-message", status.message);
-    setHidden("import-spinner", !status.active);
-    var hasPercent = status.percent !== null && status.percent !== undefined;
-    setHidden("import-progress-row", !hasPercent);
-    if (hasPercent) {
-      byId("import-progress").value = status.percent;
-      setText("import-percent", status.percent + " %");
-    }
-    setText("import-detail", status.detail);
-    setHidden("import-detail", !status.detail);
-    setText("import-error-text", status.error);
-    setHidden("import-error", !status.error);
-    setText("import-requested-at", dash(status.requested_at));
-    setText("import-started-at", dash(status.started_at));
-    setText("import-finished-at", dash(status.finished_at));
-    setText("import-last-automatic", dash(status.last_automatic_attempt_at));
-    var directory = status.directory;
-    setText("directory-data-date", dash(directory.data_date));
-    setText("directory-imported-at", dash(directory.imported_at));
-    setText("directory-row-count", directory.available ? directory.row_count : "\u2013");
-    setText("directory-file-size", directory.file_megabytes ? directory.file_megabytes + " MB" : "\u2013");
-    setText("directory-warning", directory.warning);
-    setHidden("directory-warning", !directory.warning);
-    setText("import-automatic", status.automatic_text);
-    setHidden("import-leave", !status.active);
-    var start = byId("import-start");
-    if (start) {
-      start.disabled = status.active;
-      var retry = status.state === "failed" || status.state === "interrupted";
-      var label = retry ? start.dataset.labelRetry : start.dataset.labelStart;
-      if (label) {
-        start.value = label;
+    setText(document.getElementById("import-summary"), status.summary || "");
+    var all = document.getElementById("import-start-all");
+    if (all) {
+      if (status.all_busy) {
+        all.setAttribute("disabled", "");
+      } else {
+        all.removeAttribute("disabled");
       }
     }
+    (status.sources || []).forEach(renderSource);
+  }
+
+  function tick() {
+    // Once a second: count the remaining time down without asking the server.
+    Object.keys(memory).forEach(function (key) {
+      var mem = memory[key];
+      if (mem.remaining !== null && mem.remaining > 0) {
+        mem.remaining -= 1;
+        var root = box.querySelector('tbody[data-source="' + key + '"]');
+        if (root) {
+          showRemaining(root, mem);
+        }
+      }
+    });
   }
 
   function poll() {
@@ -103,12 +256,14 @@
         render(status);
         if (status.active) {
           window.setTimeout(poll, seconds * 1000);
+        } else if (timer !== null) {
+          window.clearInterval(timer);
+          timer = null;
         }
       })
       .catch(function (error) {
         if (error && error.ended) {
           note(box.dataset.textEnded);
-          setHidden("import-spinner", true);
           return;
         }
         failures += 1;
@@ -118,6 +273,7 @@
   }
 
   if (box.dataset.active === "1") {
-    window.setTimeout(poll, seconds * 1000);
+    timer = window.setInterval(tick, 1000);
+    window.setTimeout(poll, 0);
   }
 })();

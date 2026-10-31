@@ -302,6 +302,16 @@ class ImportRequest(models.Model):
     last_transformer_postal_codes = models.CharField(max_length=255, blank=True, default="", editable=False)
     last_transformer_buildings = models.PositiveIntegerField(null=True, editable=False)
     last_transformer_with_name = models.PositiveIntegerField(null=True, editable=False)
+    # The result of the last address directory run (D-132): like ``last_plant_*``, so that the page shows one row per
+    # source whichever source ran last (the shared fields above hold the job that ran last).
+    last_address_state = models.CharField(max_length=12, blank=True, default="", editable=False)
+    last_address_finished_at = models.DateTimeField(null=True, editable=False)
+    last_address_error = models.CharField(max_length=255, blank=True, default="", editable=False)
+    # In-progress figures of the running job (D-132): the data date and the rejected and skipped rows, copied by the
+    # runner's heartbeat; cleared when a job is claimed.
+    pending_data_date = models.DateField(null=True, editable=False)
+    pending_rejected = models.PositiveIntegerField(null=True, editable=False)
+    pending_skipped = models.PositiveIntegerField(null=True, editable=False)
 
     class Meta:
         default_permissions = ()
@@ -311,6 +321,36 @@ class ImportRequest(models.Model):
 
     def __str__(self):
         return str(_("Data import"))
+
+
+class ImportQueueEntry(models.Model):
+    """One waiting import (D-132): the durable queue of the data imports page. At most one entry per source; the order
+    is the id. Holds no personal data; the actor is in the security event. Consumed by ``jobs.claim(queued=True)``."""
+
+    source = models.CharField(max_length=12, choices=ImportRequest.Source, unique=True, editable=False)
+    requested_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        default_permissions = ()
+        ordering = ["id"]
+
+
+class PublishedFigures(models.Model):
+    """Snapshot of the published figures of one source (D-132), in the application database. The status page reads this
+    snapshot, so a directory file that is busy during an import never blanks the page. Written after a successful run
+    (``jobs``); holds public data only."""
+
+    source = models.CharField(max_length=12, choices=ImportRequest.Source, unique=True, editable=False)
+    data_date = models.DateField(null=True, editable=False)
+    imported_at = models.DateTimeField(null=True, editable=False)
+    rows = models.PositiveIntegerField(default=0, editable=False)
+    rejected = models.PositiveIntegerField(null=True, editable=False)
+    skipped = models.PositiveIntegerField(null=True, editable=False)
+    content_changed_at = models.DateField(null=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
 
 
 class ServicePostalCode(models.Model):

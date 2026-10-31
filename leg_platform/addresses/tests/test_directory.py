@@ -2160,9 +2160,10 @@ class DirectoryDatabaseTests(TestCase):
     def test_admin_dedicated_permission_required(self):
         client = self._staff_client(False)
         url = reverse("admin:addresses_importrequest_changelist")
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         self.assertEqual(client.get(url).status_code, 403)
         with patch("leg_platform.addresses.admin.allow_request", return_value=True):
-            self.assertEqual(client.post(url).status_code, 403)
+            self.assertEqual(client.post(start).status_code, 403)
         self.assertFalse(ImportRequest.objects.exists())
 
     def test_the_admin_shell_renders_under_this_url_configuration(self):
@@ -2175,55 +2176,58 @@ class DirectoryDatabaseTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, 'class="admin-workspace"')
 
-    def test_admin_status_and_enqueue_never_download(self):
+    def test_admin_status_and_start_never_download(self):
         client = self._staff_client(True)
         url = reverse("admin:addresses_importrequest_changelist")
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         with patch("leg_platform.addresses.importer.import_directory") as download, \
                 patch("leg_platform.addresses.runner.threading.Thread") as thread:
             response = client.get(url)
             self.assertNotContains(response, "swisstopo")
             self.assertContains(response, "Data date")
             with patch("leg_platform.addresses.admin.allow_request", return_value=True):
-                self.assertEqual(client.post(url).status_code, 302)
-            # The request itself never downloads: it claims the job and starts the import thread (D-090).
+                self.assertEqual(client.post(start).status_code, 302)
+            # The request itself never downloads: it queues the job and starts the import thread (D-090, D-132).
             download.assert_not_called()
             thread.assert_called_once()
             self.assertIs(thread.call_args.kwargs["daemon"], True)
             thread.return_value.start.assert_called_once_with()
         self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
 
-    def test_admin_enqueue_requires_csrf(self):
+    def test_admin_start_requires_csrf(self):
         self._staff_client(True)
         client = Client(enforce_csrf_checks=True)
         client.cookies = self.client.cookies
-        self.assertEqual(client.post(reverse("admin:addresses_importrequest_changelist")).status_code, 403)
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
+        self.assertEqual(client.post(start).status_code, 403)
 
-    def test_admin_enqueue_rate_limited(self):
+    def test_admin_start_rate_limited(self):
         client = self._staff_client(True)
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         with patch("leg_platform.addresses.admin.allow_request", return_value=False):
-            self.assertEqual(client.post(reverse("admin:addresses_importrequest_changelist")).status_code, 302)
+            self.assertEqual(client.post(start).status_code, 302)
         self.assertFalse(ImportRequest.objects.exists())
         # A refused request is not an import request: nothing is logged.
-        self.assertFalse(SecurityEvent.objects.filter(event="address_import_requested").exists())
+        self.assertFalse(SecurityEvent.objects.filter(event="import_requested").exists())
 
-    def test_every_manual_import_request_is_a_security_event_with_the_account_number_only(self):
+    def test_every_manual_import_request_is_a_security_event_with_the_account_number_and_the_source_only(self):
         client = self._staff_client(True)
         user = get_user_model().objects.get(email="directory-staff@example.org")
-        url = reverse("admin:addresses_importrequest_changelist")
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         with patch("leg_platform.addresses.admin.allow_request", return_value=True), \
                 patch("leg_platform.addresses.runner.threading.Thread"):
             with self.assertLogs("leg_platform.security", level="WARNING") as logs:
                 with self.captureOnCommitCallbacks(execute=True):
-                    self.assertEqual(client.post(url).status_code, 302)
+                    self.assertEqual(client.post(start).status_code, 302)
                     # The second request finds the import running, but it is a request too.
-                    self.assertEqual(client.post(url).status_code, 302)
-        entries = list(SecurityEvent.objects.filter(event="address_import_requested"))
+                    self.assertEqual(client.post(start).status_code, 302)
+        entries = list(SecurityEvent.objects.filter(event="import_requested"))
         self.assertEqual(len(entries), 2)
         for entry in entries:
             self.assertEqual((entry.actor_id, entry.account_id, entry.long_retention), (user.pk, None, False))
         self.assertEqual(
             logs.output,
-            [f"WARNING:leg_platform.security:An address directory import was requested (actor {user.pk})."] * 2,
+            [f"WARNING:leg_platform.security:A data import was requested (actor {user.pk}, address)."] * 2,
         )
         self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
 
@@ -2231,17 +2235,15 @@ class DirectoryDatabaseTests(TestCase):
         from django.utils import translation
 
         with translation.override("de-ch"):
-            self.assertEqual(
-                str(SecurityEvent.Event.ADDRESS_IMPORT_REQUESTED.label),
-                "Import des Adressverzeichnisses angefordert",
-            )
+            self.assertEqual(str(SecurityEvent.Event.IMPORT_REQUESTED.label), "Datenimport angefordert")
 
     def test_a_request_is_not_queued_when_its_security_event_cannot_be_written(self):
         client = self._staff_client(True)
+        start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         with patch("leg_platform.addresses.admin.allow_request", return_value=True):
             with patch("leg_platform.addresses.admin.security_log.record", side_effect=DatabaseError("x")):
                 with self.assertRaises(DatabaseError):
-                    client.post(reverse("admin:addresses_importrequest_changelist"))
+                    client.post(start)
         self.assertFalse(ImportRequest.objects.exists())
 
 
@@ -2296,49 +2298,38 @@ class PlantBlockAdminTests(TestCase):
             last_plant_scheduled_run_on=timezone.localdate() if today else timezone.localdate() - timedelta(days=1),
         )
 
-    def test_the_block_shows_the_statistic_of_the_last_import_and_the_source_line(self):
+    def test_the_row_shows_the_published_figures_of_the_last_import_without_provider_names(self):
         self._plant_register()
         self._last_run("succeeded")
         response = self._client().get(self.page)
         self.assertEqual(response.status_code, 200)
-        for text in (
-            "Data imports", "PV plants (BFE)", "341’981", "8’299",
-            "Source: Federal Office of Energy (BFE), open use (Open Use)",
-        ):
+        for text in ("Data imports", "PV plants", "341’981", "8’299", "Up to date"):
             self.assertContains(response, text)
-        self.assertContains(
-            response, '<strong id="plant-result">Completed</strong>',
-        )
-        self.assertContains(response, '<dd id="plant-rejected-count">12</dd>')
+        for forbidden in ("BFE", "Federal Office of Energy", "Open Use"):
+            self.assertNotContains(response, forbidden)
+        self.assertContains(response, '<tr data-figure="rejected">')
 
-    def test_the_block_has_the_german_texts_and_the_exact_german_source_line(self):
+    def test_the_row_has_the_german_texts_and_no_provider_name(self):
         self._plant_register()
         self._last_run("succeeded")
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Quelle: Bundesamt für Energie (BFE), Nutzung frei (Open Use)")
-        self.assertContains(response, "PV-Anlagen (BFE)")
+        self.assertContains(response, "PV-Anlagen")
         self.assertContains(response, "Datenimporte")
         self.assertContains(response, "341’981")
-        for text in (
-            "Letzte Aktualisierung der Anlagen", "Nicht übernommene Einträge: Prüfung nicht bestanden",
-            "Übersprungene Anlagen: ohne Gebäudenummer (EGID)", "Statistik",
-        ):
+        for text in ("Veröffentlicht", "Abgelehnte Zeilen", "Zeilen ohne Gebäude", "Letzter Lauf"):
             self.assertContains(response, text)
-        self.assertNotContains(response, "Letzter Lauf")
-        self.assertNotContains(response, "Ignorierte Zeilen")
+        self.assertNotContains(response, "Bundesamt für Energie")
         self.assertNotContains(response, "ß")
 
-    def test_a_never_imported_plant_register_shows_the_empty_state(self):
+    def test_a_never_imported_plant_register_shows_dashes_and_not_run_yet(self):
         response = self._client().get(self.page)
-        self.assertContains(response, '<dd id="plant-not-imported">Not imported yet</dd>')
-        self.assertNotContains(response, 'id="plant-imported-at"')
-        self.assertContains(
-            response, '<strong id="plant-result">Not run today</strong>',
-        )
+        row = response.content.decode().split('data-source="plant"')[1].split("</tbody>")[0]
+        self.assertIn("Not run yet", row)
+        self.assertIn('<td data-published>–</td>', row)
+        self.assertNotIn("341’981", row)
 
     def _hint(self, page_html, identifier):
-        match = re.search(rf'<p role="status" class="help" id="{identifier}"><span [^>]*></span>(.*?)</p>', page_html)
-        return match
+        return re.search(rf'<p class="import-stall" data-field="{identifier}">(.*?)</p>', page_html)
 
     def test_a_file_unchanged_for_thirty_one_days_shows_the_hint_of_both_sources(self):
         day = timezone.localdate() - timedelta(days=31)
@@ -2347,12 +2338,9 @@ class PlantBlockAdminTests(TestCase):
         Directory.objects.filter(pk=1).update(content_changed_at=day)
         text = f"The file has not changed since {day.strftime('%d.%m.%Y')}. Check whether the source is still updated."
         html = self._client().get(self.page).content.decode()
-        for identifier in ("plant-content-warning", "directory-content-warning"):
-            match = self._hint(html, identifier)
-            self.assertIsNotNone(match, identifier)
-            self.assertEqual(match.group(1), text)
-            # The hint names no address of the source and no checksum.
-            self.assertNotIn("http", match.group(0))
+        self.assertEqual(html.count(text), 2)  # one warning line per source
+        # The hint names no address of the source and no checksum.
+        self.assertNotIn("http", text)
         self.assertNotIn("1" * 64, html)
         self.assertNotIn("0" * 64, html)
 
@@ -2373,61 +2361,37 @@ class PlantBlockAdminTests(TestCase):
         PlantRegister.objects.filter(pk=1).update(content_changed_at=day)
         Directory.objects.filter(pk=1).update(content_changed_at=day)
         html = self._client().get(self.page).content.decode()
-        self.assertNotIn('id="plant-content-warning"', html)
-        self.assertNotIn('id="directory-content-warning"', html)
+        self.assertNotIn("has not changed since", html)
 
     def test_no_hint_when_the_source_was_never_imported(self):
         # The setUp directory has no content day, and no plant register exists.
         Directory.objects.filter(pk=1).update(content_changed_at=None)
         html = self._client().get(self.page).content.decode()
-        self.assertNotIn('id="plant-content-warning"', html)
-        self.assertNotIn('id="directory-content-warning"', html)
+        self.assertNotIn("has not changed since", html)
 
-    def test_the_empty_state_and_the_run_of_today_have_the_german_texts(self):
+    def test_the_empty_state_has_the_german_texts(self):
         response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Noch keine Anlagen geladen. Die tägliche Aktualisierung lädt sie.")
-        self.assertContains(response, "Noch nicht aktualisiert")
-        self.assertNotContains(response, "Noch nicht importiert")
+        self.assertContains(response, "Noch nicht ausgeführt")
         self.assertNotContains(response, "Heute nicht ausgeführt")
 
-    def test_a_failed_run_names_its_reason_and_keeps_the_values_of_the_last_success(self):
+    def test_a_failed_run_names_its_reason_and_keeps_the_published_figures(self):
         self._plant_register()
         self._last_run("failed", error=plants.UNREADABLE_FAILURE)
         response = self._client().get(self.page)
+        self.assertContains(response, 'role="alert"')
         self.assertContains(
-            response, '<strong id="plant-result">Failed</strong>',
-        )
-        self.assertContains(
-            response,
-            '<p class="import-error" id="plant-error" role="alert"><strong>Reason:</strong> '
-            '<span id="plant-error-text">The plant register could not be downloaded or read. '
-            'Check the network connection and try again.</span></p>',
+            response, "The plant register could not be downloaded or read. Check the network connection and try again.",
         )
         self.assertContains(response, "341’981")
-        self.assertContains(response, 'id="plant-data-date"')
-        older =(timezone.localdate() - timedelta(days=3)).strftime("%d.%m.%Y")
-        self.assertContains(response, f"The data from {older} stays valid.")
+        self.assertContains(response, 'value="Try again"')
 
-    def test_a_run_of_another_day_is_not_shown_as_the_result_of_today(self):
-        self._plant_register()
-        self._last_run("succeeded", today=False)
-        response = self._client().get(self.page)
-        self.assertContains(
-            response, '<strong id="plant-result">Not run today</strong>',
-        )
-        self.assertNotContains(response, '<strong id="plant-result">Completed')
-
-    def test_a_failure_of_yesterday_is_still_shown_today_with_its_time_and_the_alert(self):
+    def test_a_failure_of_yesterday_is_still_shown_with_its_time_and_the_alert(self):
         self._plant_register()
         self._last_run("failed", error=plants.UNREADABLE_FAILURE, today=False)
         finished = timezone.localtime(ImportRequest.objects.get(pk=1).last_plant_finished_at)
         response = self._client().get(self.page)
-        self.assertContains(response, f'<dd id="plant-run-at">{finished.strftime("%d.%m.%Y %H:%M")}</dd>')
-        self.assertContains(
-            response, '<strong id="plant-result">Failed</strong>',
-        )
-        self.assertContains(response, '<p class="import-error" id="plant-error" role="alert">')
-        self.assertNotContains(response, "Not run today")
+        self.assertContains(response, finished.strftime("%d.%m.%Y %H:%M"))
+        self.assertContains(response, 'role="alert"')
 
     def test_a_later_success_replaces_the_failure(self):
         self._plant_register()
@@ -2437,16 +2401,8 @@ class PlantBlockAdminTests(TestCase):
             last_plant_scheduled_run_on=timezone.localdate(),
         )
         response = self._client().get(self.page)
-        self.assertContains(response, '<strong id="plant-result">Completed</strong>')
-        self.assertNotContains(response, 'id="plant-error"')
+        self.assertNotContains(response, 'role="alert"')
         self.assertNotContains(response, "could not be downloaded or read")
-
-    def test_a_success_of_an_earlier_day_says_not_updated_today_and_raises_no_alert(self):
-        self._plant_register()
-        self._last_run("succeeded", today=False)
-        response = self._client(language="de-ch").get(self.page)
-        self.assertContains(response, "Noch nicht aktualisiert")
-        self.assertNotContains(response, 'id="plant-error"')
 
     def test_a_failure_shows_only_its_fixed_reason_and_no_path_url_or_trace(self):
         self._plant_register()
@@ -3066,6 +3022,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0019_importrequest_progress_units_and_more"),
                 ("addresses", "0020_lookup_tables_and_house_index"),
                 ("addresses", "0021_addressplace_centre"),
+                ("addresses", "0022_import_queue_and_published_figures"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

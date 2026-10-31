@@ -475,7 +475,7 @@ class StoreTests(TestCase):
         self.assertEqual(self.rows("3063"), [(1001, "Ittigen_TRA12", "exact")])
         job = ImportRequest.objects.get(pk=1)
         self.assertEqual((job.last_transformer_state, job.last_transformer_error), ("failed", jobs.MAP_UNREACHABLE))
-        self.assertEqual(status.transformer_status()["result_reason"], str(status.REASONS[jobs.MAP_UNREACHABLE]))
+        self.assertEqual(status.build()["sources"][2]["error"], str(status.REASONS[jobs.MAP_UNREACHABLE]))
 
     def test_a_later_success_replaces_the_failure_and_sets_the_statistic(self):
         jobs.record_failure(running_scan(self.claim.token), transformers.ScanFailure(jobs.MAP_UNREACHABLE))
@@ -626,12 +626,12 @@ class StatusPageTests(TestCase):
                       transformers.Station(1002, "3063", "", "none")),
         )
         jobs.record_success(claimed, 2, transformer=result)
-        page = status.transformer_status()
-        text = " ".join(str(value) for value in page.values())
+        row = status.build()["sources"][2]
+        text = " ".join(str(value) for value in row.values())
         for forbidden in ("http", "qgisserver", "bkw.ch", "TRA12", "/ogc/"):
             self.assertNotIn(forbidden, text)
-        self.assertEqual((page["buildings"], page["with_name"], page["without_name"]), ("2", "1", "1"))
-        self.assertEqual(page["postal_codes"], "3063")
+        figures = {figure["key"]: figure["published"] for figure in row["figures"]}
+        self.assertEqual((figures["rows"], figures["with_name"], figures["postal_codes"]), ("2", "1", "3063"))
 
 
 class MigrationAndRoutingTests(SimpleTestCase):
@@ -667,21 +667,26 @@ class NoWebStartTests(TestCase):
                 patch.object(schedule, "run_transformer_weekly") as weekly, \
                 patch.object(schedule, "run_transformer_now") as now, \
                 patch.object(jobs, "claim", wraps=jobs.claim) as claim, \
-                patch.object(runner, "start_manual", return_value=True) as start, \
+                patch.object(runner, "start_queue", return_value=True) as start, \
                 patch("leg_platform.addresses.admin.allow_request", return_value=True):
             self.assertEqual(self.client.get(directory).status_code, 200)
             self.assertEqual(self.client.get(reverse("admin:addresses_importrequest_status")).status_code, 200)
-            self.assertEqual(self.client.post(directory).status_code, 302)
+            self.assertEqual(self.client.post(directory).status_code, 405)  # the page itself starts nothing
+            start_address = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
+            self.assertEqual(self.client.get(start_address).status_code, 405)
+            self.assertEqual(self.client.post(start_address).status_code, 302)
             self.assertEqual(self.client.get(postal).status_code, 200)
             self.client.post(reverse("admin:addresses_servicepostalcode_add"), {"postal_code": "3048"})
             self.client.post(
                 reverse("admin:addresses_servicepostalcode_change", args=[code.pk]), {"postal_code": "3049"},
             )
             self.client.post(postal, {"action": "delete_selected", "_selected_action": [code.pk], "post": "yes"})
+        # Since D-132 the transformer row has its own start button; only that explicit POST queues a scan, and it runs
+        # through the queue (jobs.claim), never directly through these calls.
         scan.assert_not_called()
         weekly.assert_not_called()
         now.assert_not_called()
-        start.assert_called_once_with()  # the address import button starts its own job only
+        start.assert_called_once_with()  # the address start button queues its own job only
         for call in claim.call_args_list:
             self.assertNotEqual(call.kwargs.get("source"), ImportRequest.Source.TRANSFORMER)
 

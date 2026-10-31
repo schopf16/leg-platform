@@ -10010,3 +10010,83 @@ msgid "%(counter)s message pending, not shown."
 msgid_plural "%(counter)s messages pending, not shown."
 msgstr[0] "%(counter)s messaggio in attesa, non mostrato."
 msgstr[1] "%(counter)s messaggi in attesa, non mostrati."
+
+msgid "PV plants"
+msgstr "Impianti FV"
+
+msgid "Waiting"
+msgstr "In attesa"
+
+msgid "Up to date"
+msgstr "Aggiornato"
+
+msgid "Update"
+msgstr "Aggiorna"
+
+msgid "Update all"
+msgstr "Aggiorna tutto"
+
+#, python-format
+msgid "Update %(name)s"
+msgstr "Aggiorna: %(name)s"
+
+msgid "Figure"
+msgstr "Indicatore"
+
+msgid "Published"
+msgstr "Pubblicato"
+
+msgid "In progress"
+msgstr "In corso"
+
+msgid "Time"
+msgstr "Ora"
+
+msgid "No entries."
+msgstr "Nessuna voce."
+
+msgid "Key figures"
+msgstr "Cifre chiave"
+
+msgid "Last run"
+msgstr "Ultima esecuzione"
+
+msgid "Addresses"
+msgstr "Indirizzi"
+
+msgid "Plants"
+msgstr "Impianti"
+
+msgid "Rejected rows"
+msgstr "Righe rifiutate"
+
+msgid "Rows without a building"
+msgstr "Righe senza edificio"
+
+msgid "buildings"
+msgstr "edifici"
+
+msgid "plants"
+msgstr "impianti"
+
+msgid "addresses"
+msgstr "indirizzi"
+
+#, python-format
+msgid "%(running)s running, %(waiting)s waiting"
+msgstr "%(running)s in corso, %(waiting)s in attesa"
+
+msgid "This import is already running or waiting."
+msgstr "Questa importazione è già in corso o in attesa."
+
+msgid "The import was started. This page shows the progress."
+msgstr "L’importazione è stata avviata. Questa pagina mostra l’avanzamento."
+
+msgid "Every import is running or waiting."
+msgstr "Ogni importazione è in corso o in attesa."
+
+msgid "Data import requested"
+msgstr "Importazione di dati richiesta"
+
+msgid "A data import was requested"
+msgstr "È stata richiesta un’importazione di dati"

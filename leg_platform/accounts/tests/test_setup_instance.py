@@ -24,11 +24,12 @@ from django.db import OperationalError, connection, connections
 from django.db import migrations, models
 from django.test import Client, SimpleTestCase, TransactionTestCase, tag
 from django.urls import reverse
+from django.utils import timezone
 
 from leg_platform.accounts.management.commands import setup_instance
 from leg_platform.accounts.models import SecurityEvent, User
 from leg_platform.accounts.tests.helpers import create_active_user
-from leg_platform.addresses.models import Directory, ImportRequest
+from leg_platform.addresses.models import Directory, ImportRequest, TransformerStation
 from leg_platform.addresses import setup as directory_setup
 from leg_platform.addresses.storage import DIRECTORY_ALIAS, directory_open_guard, reset_marker
 from leg_platform.environment import parse_bootstrap_administrator
@@ -529,6 +530,10 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
             with directory_file(path):
                 self.run_command()
                 Directory.objects.create(pk=1, row_count=7, checksum="a" * 64)
+                # Scanned data lives in the same file and must survive every start without a schema change.
+                TransformerStation.objects.create(
+                    egid=1, postal_code="3063", name="Station 1", match="exact", scanned_at=timezone.now(),
+                )
                 ImportRequest.objects.filter(pk=1).update(state=ImportRequest.State.SUCCEEDED)
                 before = ImportRequest.objects.values().get(pk=1)
 
@@ -536,6 +541,7 @@ class SetupInstanceDirectoryTests(TransactionTestCase):
                     output, errors = self.run_command()
 
                 remove.assert_not_called()
+                self.assertEqual(TransformerStation.objects.get(egid=1).name, "Station 1")
                 self.assertEqual(errors, "")
                 self.assertIn("Address directory: file ready, none pending.", output)
                 self.assertEqual(Directory.objects.get(pk=1).row_count, 7)

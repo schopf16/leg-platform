@@ -69,12 +69,13 @@ class ImportLogAccessTests(ImportLogBase):
         self.failed_run()
         response = self.client_for(self.superuser).get(reverse("admin:addresses_importrequest_changelist"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="import-log-box"')
-        self.assertContains(response, 'class="log-line"')
+        self.assertContains(response, 'id="import-log-table"')
+        self.assertContains(response, 'class="import-log-reason"')
 
         section = response.content.decode("utf-8")
         section = section[section.index('id="import-log"'):]
-        self.assertNotIn("<table", section)
+        self.assertEqual(section.count('class="import-log-time"'), 1)  # one line per entry
+        self.assertNotIn("<h3", section)
         self.assertEqual(ImportLogEntry.objects.count(), 1)
 
     def test_the_old_log_url_redirects_to_the_section_for_superusers(self):
@@ -184,15 +185,14 @@ class ImportNoticeTests(ImportLogBase):
 
 
 class ImportPageLayoutTests(ImportLogBase):
-    def test_the_action_button_appears_once_and_only_in_the_address_block(self):
+    def test_one_start_button_per_source_plus_update_all(self):
         response = self.client_for(self.staff).get(reverse("admin:addresses_importrequest_changelist"))
         html = response.content.decode("utf-8")
-        self.assertEqual(html.count('id="import-start"'), 1)
-        self.assertEqual(html.count('<input type="submit"'), 1)
-        plant = html[html.index('id="plant-status"'):html.index('id="transformer-status"')]
-        transformer = html[html.index('id="transformer-status"'):]
-        self.assertNotIn("<input", plant)
-        self.assertNotIn("<input", transformer)
+        self.assertEqual(html.count('class="import-start"'), 3)
+        self.assertEqual(html.count('id="import-start-all"'), 1)
+        # Only the forms of the start buttons post; the page has no other action.
+        self.assertEqual(html.count('method="post"'), 4 + html.count('id="logout-form"'))
+        self.assertEqual(html.count('<table class="import-table'), 1)
 
 
 class ImportProgressTests(ImportLogBase):
@@ -211,30 +211,27 @@ class ImportProgressTests(ImportLogBase):
         self.assertIn("11", late["stall_text"])
         self.assertIn("11", late["progress_text"])
 
-    def test_no_percentage_when_the_total_is_unknown(self):
+    def test_an_unknown_total_shows_the_row_count_and_no_remaining_time(self):
         ImportRequest.objects.update_or_create(pk=1, defaults={
             "claim_token": TOKEN, "state": ImportRequest.State.RUNNING, "source": ImportRequest.Source.ADDRESS,
             "started_at": timezone.now(), "heartbeat_at": timezone.now(), "phase": "downloading",
             "bytes_done": 5_000, "bytes_total": None, "rows_done": 7, "progress_at": timezone.now(),
         })
-        payload = status.build()
-        self.assertIsNone(payload["percent"])
-        self.assertEqual(payload["progress_rows"], 7)
-        self.assertEqual(payload["progress_bytes_total"], None)
-        self.assertNotEqual(payload["progress_at"], "")
+        payload = status.build()["sources"][0]
+        self.assertEqual(payload["state"], "running")
+        self.assertEqual(payload["rows_text"], "7 Zeilen")
+        self.assertIsNone(payload["remaining_seconds"])
 
-    def test_the_status_holds_the_counts_and_the_last_update(self):
+    def test_the_status_holds_the_percent_of_the_download(self):
         last = timezone.now()
         ImportRequest.objects.update_or_create(pk=1, defaults={
             "claim_token": TOKEN, "state": ImportRequest.State.RUNNING, "source": ImportRequest.Source.ADDRESS,
             "started_at": last, "heartbeat_at": last, "phase": "downloading",
             "bytes_done": 500, "bytes_total": 1000, "rows_done": 0, "progress_at": last,
         })
-        payload = status.build()
-        self.assertEqual(payload["percent"], 50)
-        self.assertEqual(payload["progress_bytes_done"], 500)
-        self.assertEqual(payload["progress_bytes_total"], 1000)
-        self.assertIn(":", payload["progress_at"])
+        payload = status.build()["sources"][0]
+        self.assertEqual(payload["percent"], 23)  # 2 + 43 * 0.5
+        self.assertEqual(payload["phase"], "Die offizielle Datei wird heruntergeladen")
 
 
 class CountProgressTests(TestCase):

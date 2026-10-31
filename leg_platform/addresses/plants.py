@@ -251,10 +251,12 @@ def _load_generation(archive, generation, progress):
             chunk = []
             if progress is not None:
                 progress.rows(stored)
+                progress.set_figures(rejected=counts["rejected"], skipped=counts["skipped"])
     if chunk:
         stored += _insert(chunk, progress)
     if progress is not None:
         progress.rows(stored)
+        progress.set_figures(rejected=counts["rejected"], skipped=counts["skipped"])
     return stored, counts
 
 
@@ -329,6 +331,7 @@ def _publish(archive, checksum, data_date, progress, claim_token):
     generation = uuid.uuid4()
     if progress is not None:
         progress.phase("importing")
+        progress.set_figures(data_date=data_date)
     try:
         stored, counts = _load_generation(archive, generation, progress)
         _require_plausible(stored, previous_count)

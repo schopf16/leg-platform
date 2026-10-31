@@ -1,23 +1,19 @@
-"""The status of the address directory import for the operator page and its polling endpoint (D-090).
+"""The status of the data imports for the operator page and its polling endpoint (D-090, D-132).
 
 One function builds everything the page shows (texts already translated), so that the page rendered
 by the server and the JSON that the script polls say the same. Nothing here writes.
 """
 
-import os
-
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import DatabaseError
 from django.utils import timezone
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
-from . import jobs
-from .models import ImportRequest, PlantRegister, ServicePostalCode
-from .services import directory_status
+from . import jobs, published
+from .models import ImportRequest
 
 # The fixed texts of ``importer.ImportFailure`` and of the jobs, in words for the page. A text that is
 # not listed (it should not happen) is shown as "unexpected".
@@ -132,18 +128,6 @@ def megabytes_text(size):
     return f"{size / (1024 * 1024):,.1f}".replace(",", "’")
 
 
-def _megabytes(size):
-    return megabytes_text(size)
-
-
-def file_size():
-    """The size of the directory file in bytes, or None if it cannot be read."""
-    try:
-        return os.stat(str(settings.DATABASES["addresses"]["NAME"])).st_size
-    except OSError:
-        return None
-
-
 def effective_state(job, now=None):
     """The state the person should see: a "running" job without a sign of life is "interrupted"."""
     if job is None:
@@ -171,127 +155,6 @@ def next_automatic_text(job):
     if due <= timezone.now():
         return gettext("The next refresh is due now.")
     return gettext("The next refresh is due after %(date)s.") % {"date": _when(due)}
-
-
-def _transformer_status_base(now=None):
-    """The block "Trafostationen" of the data imports page (D-118): the postal codes of the service area, the last scan
-    with its date and result, and the statistic of the last successful scan. Read only; the scan runs in the weekly run.
-
-    The result is shown with its date whatever day it happened on, until a later scan replaces it (as for the plant
-    register). The statistic keeps the values of the last success.
-    """
-    now = now or timezone.now()
-    try:
-        codes = list(ServicePostalCode.objects.order_by("postal_code").values_list("postal_code", flat=True))
-    except DatabaseError:
-        codes = []
-    job = ImportRequest.objects.filter(pk=1).first()
-    result_state = ""
-    result_reason = ""
-    run_at = ""
-    if job is not None and job.source == ImportRequest.Source.TRANSFORMER and effective_state(job, now) in (
-        "running", "interrupted",
-    ):
-        run_at = _when(job.started_at)
-        if effective_state(job, now) == "running":
-            result_state = "running"
-        else:
-            result_state, result_reason = "failed", reason_text(jobs.INTERRUPTED)
-    elif job is not None and job.last_transformer_finished_at is not None:
-        run_at = _when(job.last_transformer_finished_at)
-        if job.last_transformer_state == "failed":
-            result_state = "failed"
-            result_reason = reason_text(job.last_transformer_error) or reason_text(jobs.UNEXPECTED_FAILURE)
-        elif job.last_transformer_state == "succeeded":
-            result_state = "succeeded"
-    labels = {
-        "running": ImportRequest.State.RUNNING.label,
-        "succeeded": ImportRequest.State.SUCCEEDED.label,
-        "failed": ImportRequest.State.FAILED.label,
-        "": _("Not scanned yet"),
-    }
-    tones = {"running": "warn", "succeeded": "ok", "failed": "bad", "": "muted"}
-    has_stats = job is not None and job.last_transformer_buildings is not None
-    buildings = job.last_transformer_buildings if has_stats else 0
-    with_name = (job.last_transformer_with_name or 0) if has_stats else 0
-    return {
-        "postal_codes": ", ".join(codes),
-        "run_at": run_at,
-        "result_label": str(labels[result_state]),
-        "result_tone": tones[result_state],
-        "result_reason": result_reason,
-        "has_stats": has_stats,
-        "scanned_postal_codes": job.last_transformer_postal_codes if has_stats else "",
-        "buildings": count_text(buildings) if has_stats else "",
-        "with_name": count_text(with_name) if has_stats else "",
-        "without_name": count_text(buildings - with_name) if has_stats else "",
-    }
-
-
-def _plant_status_base(now=None):
-    """The block "PV-Anlagen (BFE)" of the address page (D-117): the statistic of the last successful plant import and
-    the last result of the plant run with its date and time. Read only: the plant import runs only in the daily run.
-
-    A failure is shown whatever day it happened on, until a later run replaces it (owner decision 2026-10-25). A success
-    is the result only on the day of its run (``last_plant_scheduled_run_on``); an earlier success, or no run at all,
-    gives "not run today" (the time of the success stays visible). The statistic keeps the values of the last success
-    (``PlantRegister``).
-    """
-    now = now or timezone.now()
-    today = timezone.localdate(now)
-    try:
-        register = PlantRegister.objects.filter(pk=1).first()
-    except DatabaseError:
-        register = None
-    job = ImportRequest.objects.filter(pk=1).first()
-    imported = register is not None and register.imported_at is not None
-    result_state = ""
-    result_reason = ""
-    run_at = ""
-    if job is not None and job.source == ImportRequest.Source.PLANT and effective_state(job, now) in ("running", "interrupted"):
-        # A plant run that is running, or whose process is gone (it is taken over by the next claim).
-        run_at = _when(job.started_at)
-        if effective_state(job, now) == "running":
-            result_state = "running"
-        else:
-            result_state, result_reason = "failed", reason_text(jobs.INTERRUPTED)
-    elif job is not None and job.last_plant_finished_at is not None:
-        run_at = _when(job.last_plant_finished_at)
-        if job.last_plant_state == "failed":
-            result_state = "failed"
-            result_reason = reason_text(job.last_plant_error) or reason_text(jobs.UNEXPECTED_FAILURE)
-        elif job.last_plant_state == "succeeded" and job.last_plant_scheduled_run_on == today:
-            result_state = "succeeded"
-    labels = {
-        "running": ImportRequest.State.RUNNING.label,
-        "succeeded": ImportRequest.State.SUCCEEDED.label,
-        "failed": ImportRequest.State.FAILED.label,
-        "": _("Not run today"),
-    }
-    # The dot of the result (DESIGN section 3.5): a status is a dot plus a word.
-    tones = {"running": "warn", "succeeded": "ok", "failed": "bad", "": "muted"}
-    older = ""
-    if imported:
-        older_date = register.data_date or timezone.localtime(register.imported_at).date()
-        older = _day(older_date)
-    return {
-        "imported": imported,
-        "imported_at": _when(register.imported_at) if imported else "",
-        "data_date": _day(register.data_date) if imported else "",
-        "address_count": count_text(register.address_count) if imported else "",
-        "file_row_count": count_text(register.file_row_count) if imported else "",
-        "row_count": count_text(register.row_count) if imported else "",
-        "rejected_count": count_text(register.rejected_count) if imported else "",
-        "skipped_count": count_text(register.skipped_count) if imported else "",
-        "run_at": run_at,
-        "result_state": result_state,
-        "result_label": str(labels[result_state]),
-        "result_tone": tones[result_state],
-        "result_reason": result_reason,
-        # After a failed run the values of the last success stay valid; the date names their data.
-        "older_data_date": older if result_state == "failed" and imported else "",
-        "content_warning": content_warning(register.content_changed_at, today) if imported else "",
-    }
 
 
 # A running import without progress for this long is shown as stalled (D-121). Every step has a longer time-out
@@ -352,98 +215,211 @@ def _current_job():
     return ImportRequest.objects.filter(pk=1).first()
 
 
-def plant_status(now=None):
-    now = now or timezone.now()
-    return {**_plant_status_base(now), **progress_lines(_current_job(), ImportRequest.Source.PLANT, now)}
+SOURCE_ORDER = (ImportRequest.Source.ADDRESS, ImportRequest.Source.PLANT, ImportRequest.Source.TRANSFORMER)
+
+# The names of the sources on the page (D-132): plain, no provider names.
+SOURCE_NAMES = {
+    ImportRequest.Source.ADDRESS: _("Address directory"),
+    ImportRequest.Source.PLANT: _("PV plants"),
+    ImportRequest.Source.TRANSFORMER: _("Transformer stations"),
+}
+STATE_LABELS = {
+    "idle": _("Not run yet"),
+    "queued": _("Waiting"),
+    "running": _("Running"),
+    "succeeded": _("Up to date"),
+    "failed": _("Failed"),
+    "interrupted": _("Interrupted"),
+}
+# A status is a dot plus a word (DESIGN section 3.5).
+STATE_TONES = {
+    "idle": "muted", "queued": "muted", "running": "warn", "succeeded": "ok", "failed": "bad", "interrupted": "bad",
+}
+# The share of the whole run that each phase covers (D-132): the percent is the start of the phase plus the part of the
+# phase that is done. The bounds only ever grow, so the percent never goes back within a run.
+PHASE_START = {"starting": 0, "catalogue": 0, "downloading": 2, "importing": 45, "publishing": 95, "finishing": 98}
+PHASE_END = {"starting": 0, "catalogue": 2, "downloading": 45, "importing": 95, "publishing": 98, "finishing": 100}
+SCAN_END = 95  # the transformer scan has no import phase: its map tiles take the whole span up to publishing
+# The remaining time is not computed before the run has some progress and some time behind it.
+ETA_MIN_PERCENT = 3
+ETA_MIN_SECONDS = 5
 
 
-def transformer_status(now=None):
-    now = now or timezone.now()
-    return {**_transformer_status_base(now), **progress_lines(_current_job(), ImportRequest.Source.TRANSFORMER, now)}
+def _ratio(done, total):
+    if not total or done is None:
+        return 0.0
+    return max(0.0, min(1.0, done / total))
+
+
+def _building_totals(job):
+    units = job.progress_units or {}
+    done = sum(int(value) for value in (units.get("done") or {}).values())
+    total = sum(int(value) for value in (units.get("total") or {}).values())
+    return done, total
+
+
+def percent_of(job):
+    """The percent of a running job, 0 to 100, from the phase and the counters; ``None`` when ``job`` is not running."""
+    if job is None or job.state != ImportRequest.State.RUNNING:
+        return None
+    phase = job.phase if job.phase in PHASE_START else "starting"
+    start, end = PHASE_START[phase], PHASE_END[phase]
+    if job.source == ImportRequest.Source.TRANSFORMER and phase == "downloading":
+        done, total = _building_totals(job)
+        end = SCAN_END
+        return int(start + (end - start) * _ratio(done, total))
+    if phase == "downloading":
+        return int(start + (end - start) * _ratio(job.bytes_done, job.bytes_total))
+    if phase == "importing":
+        return int(start + (end - start) * _ratio(job.rows_done, job.rows_total))
+    return start
+
+
+def remaining_seconds(job, percent, now):
+    """The seconds left, from the time spent and the percent; ``None`` while it cannot be told (too early, no progress)."""
+    if job is None or percent is None or job.started_at is None or percent < ETA_MIN_PERCENT or percent >= 100:
+        return None
+    elapsed = (now - job.started_at).total_seconds()
+    if elapsed < ETA_MIN_SECONDS:
+        return None
+    return int(elapsed * (100 - percent) / percent)
+
+
+def _result_of(job, source):
+    """The last finished run of ``source``: ``(state, finished_at, error)``; the state is "" when it never ran."""
+    if source == ImportRequest.Source.PLANT:
+        return job.last_plant_state, job.last_plant_finished_at, job.last_plant_error
+    if source == ImportRequest.Source.TRANSFORMER:
+        return job.last_transformer_state, job.last_transformer_finished_at, job.last_transformer_error
+    return job.last_address_state, job.last_address_finished_at, job.last_address_error
+
+
+def _figure(key, label, published, pending=None):
+    """One line of the detail table. ``published`` is never empty (a dash when nothing was ever published)."""
+    return {"key": key, "label": str(label), "published": published or "–", "pending": pending}
+
+
+def _published_figures(source, job, running, now):
+    """The figures of the published data of ``source`` and, while it runs, the in-progress ones (D-132).
+
+    ``running``: the job of this source is running now (the in-progress column is shown). Returns
+    ``(figures, key text, content warning)``."""
+    pending_rows = count_text(job.rows_done) if running and job.rows_done is not None else "–"
+    pending_date = _day(job.pending_data_date) if running and job.pending_data_date else "–"
+    if source == ImportRequest.Source.TRANSFORMER:
+        has_stats = job is not None and job.last_transformer_buildings is not None
+        buildings = job.last_transformer_buildings if has_stats else 0
+        done, _total = _building_totals(job) if running else (0, 0)
+        codes_pending = ", ".join(sorted((job.progress_units or {}).get("total") or {})) if running else ""
+        figures = [
+            _figure("finished_at", _("Last scan"), _when(job.last_transformer_finished_at) if has_stats else ""),
+            _figure("postal_codes", _("Postal codes"), job.last_transformer_postal_codes if has_stats else "",
+                    (codes_pending or "–") if running else None),
+            _figure("rows", _("Buildings"), count_text(buildings) if has_stats else "",
+                    count_text(done) if running and done else ("–" if running else None)),
+            # Only known after the stations are matched at the end of the scan.
+            _figure("with_name", _("With a transformer station"),
+                    count_text(job.last_transformer_with_name or 0) if has_stats else "", "–" if running else None),
+        ]
+        return figures, count_text(buildings) + " " + gettext("buildings") if has_stats else "", ""
+    snapshot = published.get(source)
+    plant = source == ImportRequest.Source.PLANT
+    data_date = _day(snapshot.data_date) if snapshot and snapshot.data_date else ""
+    stored = bool(snapshot and snapshot.imported_at)
+    figures = [
+        _figure("data_date", _("Data date"), data_date, pending_date if running else None),
+        _figure("imported_at", _("Imported at"), _when(snapshot.imported_at) if stored else "", "–" if running else None),
+        _figure("rows", _("Plants") if plant else _("Addresses"), count_text(snapshot.rows) if stored else "",
+                pending_rows if running else None),
+    ]
+    if plant:
+        figures.append(_figure(
+            "rejected", _("Rejected rows"),
+            count_text(snapshot.rejected) if stored and snapshot.rejected is not None else "",
+            count_text(job.pending_rejected) if running and job.pending_rejected is not None else ("–" if running else None),
+        ))
+        figures.append(_figure(
+            "skipped", _("Rows without a building"),
+            count_text(snapshot.skipped) if stored and snapshot.skipped is not None else "",
+            count_text(job.pending_skipped) if running and job.pending_skipped is not None else ("–" if running else None),
+        ))
+    warning = ""
+    if stored:
+        warning = content_warning(snapshot.content_changed_at)
+        if not warning and not plant and snapshot.data_date and snapshot.data_date < timezone.localdate() - timedelta(days=92):
+            warning = gettext("The address directory is more than 92 days old.")
+    key_text = ""
+    if stored:
+        key_text = count_text(snapshot.rows) + " " + (gettext("plants") if plant else gettext("addresses"))
+    return figures, key_text, warning
+
+
+def _source_status(source, job, now, waiting):
+    """One row of the page: state, progress, last run and the figures of one source."""
+    held = job.source == source and job.state == ImportRequest.State.RUNNING
+    state = effective_state(job, now) if held else ""
+    if state not in ("running", "interrupted"):
+        state = ""
+    position = None
+    last_state, finished, error_text = _result_of(job, source)
+    if not state and source in waiting:
+        state, position = "queued", waiting.index(source) + 1
+    if not state:
+        state = {"succeeded": "succeeded", "failed": "failed"}.get(last_state, "idle")
+    running = state == "running"
+    percent = percent_of(job) if running else None
+    lines = progress_lines(job, source, now) if running else {}
+    if state == "interrupted":
+        error = reason_text(jobs.INTERRUPTED)
+        finished = job.finished_at or job.heartbeat_at
+    elif state == "failed":
+        error = reason_text(error_text) or reason_text(jobs.UNEXPECTED_FAILURE)
+    else:
+        error = ""
+    figures, key_text, warning = _published_figures(source, job, running, now)
+    return {
+        "key": str(source),
+        "name": str(SOURCE_NAMES[source]),
+        "state": state,
+        "state_label": str(STATE_LABELS[state]),
+        "tone": STATE_TONES[state],
+        "position": position,
+        "percent": percent,
+        "remaining_seconds": remaining_seconds(job, percent, now) if running else None,
+        "started_at": job.started_at.isoformat() if running and job.started_at else "",
+        "phase": str(PHASES.get(job.phase, "")) if running else "",
+        "stall": lines.get("stall_text", ""),
+        "rows_text": lines.get("rows_text", ""),
+        "buildings_lines": lines.get("buildings_lines", []),
+        "error": error,
+        "last_run": _when(finished) if finished else "",
+        "key_figures": key_text,
+        "warning": warning,
+        "figures": figures,
+        "pending": running,
+        "busy": state in ("queued", "running"),
+    }
 
 
 def build():
-    """Everything the page and the polling endpoint show, as plain values (texts translated)."""
-    job = ImportRequest.objects.filter(pk=1).first()
+    """Everything the page and the polling endpoint show, as plain values (texts translated): one entry per source, the
+    queue and the state of the whole page (D-132). Nothing here writes."""
+    job = ImportRequest.objects.filter(pk=1).first() or ImportRequest(pk=1)
     now = timezone.now()
-    state = effective_state(job, now)
-    status, directory = directory_status()
-    active = state in ("queued", "running")
-    percent = None
-    message = ""
-    phase = ""
-    if job is not None:
-        phase = str(PHASES.get(job.phase, "")) if state == "running" else ""
-        if state == "running" and job.phase == "downloading" and job.bytes_total:
-            percent = min(100, (job.bytes_done or 0) * 100 // job.bytes_total)
-    if state == "idle":
-        # The state label already says "no import requested": the message tells what to do (UX-013).
-        message = gettext("Use the button below to load or update the directory.")
-    elif state == "queued":
-        message = gettext("The import is queued and waits to be started.")
-    elif state == "running":
-        message = phase or gettext("The import is running.")
-    elif state == "interrupted":
-        # The reason follows in its own line ("Reason"): the headline does not repeat it.
-        message = gettext("The import did not finish.")
-    elif state == "succeeded":
-        message = (
-            gettext("The directory was already up to date. Nothing was downloaded.")
-            if job.phase == "unchanged"
-            else gettext("The import completed.")
-        )
-    elif state == "failed":
-        message = gettext("The import failed.")
-    detail = ""
-    if job is not None and state == "running":
-        parts = []
-        if job.bytes_done is not None:
-            parts.append(
-                gettext("%(done)s of %(total)s MB downloaded")
-                % {"done": _megabytes(job.bytes_done), "total": _megabytes(job.bytes_total) or "?"}
-            )
-        if job.rows_done is not None:
-            parts.append(gettext("%(count)s addresses read") % {"count": count_text(job.rows_done)})
-        detail = ", ".join(parts)
-    error = reason_text(job.last_error) if job is not None and state in ("failed", "interrupted") else ""
-    if state == "interrupted" and not error:
-        error = reason_text(jobs.INTERRUPTED)
-    size = file_size()
-    labels = {
-        "idle": _("No import requested"),
-        "queued": _("Queued"),
-        "running": _("Running"),
-        "succeeded": _("Completed"),
-        "failed": _("Failed"),
-        "interrupted": _("Interrupted"),
-    }
+    waiting = jobs.queued_sources()
+    sources = [_source_status(source, job, now, waiting) for source in SOURCE_ORDER]
+    running = [row for row in sources if row["state"] == "running"]
+    queued = [row for row in sources if row["state"] == "queued"]
+    summary = ""
+    if running or queued:
+        summary = gettext("%(running)s running, %(waiting)s waiting") % {
+            "running": len(running), "waiting": len(queued),
+        }
     return {
-        "state": state,
-        "state_label": str(labels[state]),
-        "active": active,
-        "message": message,
-        "detail": detail,
-        "percent": percent,
-        # The counts of the running job, the same numbers as the detail line: a percentage only where the total is known.
-        "progress_rows": job.rows_done if job is not None else None,
-        "progress_bytes_done": job.bytes_done if job is not None else None,
-        "progress_bytes_total": job.bytes_total if job is not None else None,
-        "progress_at": _when(job.progress_at) if job is not None else "",
-        **progress_lines(job, ImportRequest.Source.ADDRESS, now),
-        "error": error,
-        "requested_at": _when(job.requested_at) if job else "",
-        "started_at": _when(job.started_at) if job else "",
-        "finished_at": _when(job.finished_at) if job else "",
-        "last_automatic_attempt_at": _when(job.last_automatic_attempt_at) if job else "",
+        "active": bool(running or queued),
+        "all_busy": all(row["busy"] for row in sources),
+        "summary": summary,
+        "sources": sources,
         "automatic_text": next_automatic_text(job),
-        "directory": {
-            "available": directory is not None,
-            "data_date": date_format(directory.data_date, "d.m.Y") if directory and directory.data_date else "",
-            "imported_at": _when(directory.imported_at) if directory else "",
-            "row_count": count_text(directory.row_count) if directory else "",
-            "file_megabytes": _megabytes(size),
-            "warning": str(status["warning"]) if status["warning"] else "",
-            "content_warning": content_warning(directory.content_changed_at) if directory else "",
-        },
         "server_time": _when(now),
     }
