@@ -843,10 +843,14 @@ span.note-warn {
   display: flex;
   align-items: center;
   flex: none;
-  padding: 0 4px 0 12px;
+  padding: 0 8px 0 12px;
+  border-right: 1.5px solid var(--muted);
+  border-radius: 6.5px 0 0 6.5px;
+  background: color-mix(in srgb, var(--muted) 16%, var(--panel));
   font-family: var(--tblr-font-monospace);
   font-size: 14px;
   color: var(--muted);
+  user-select: none;
 }
 
 .prefix-input .form-control {
@@ -854,7 +858,7 @@ span.note-warn {
   min-width: 0;
   padding-inline: 8px;
   border: 0;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 6.5px 6.5px 0;
   box-shadow: none;
   font-family: var(--tblr-font-monospace);
   font-size: 14px;

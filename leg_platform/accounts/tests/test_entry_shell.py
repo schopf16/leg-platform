@@ -22,7 +22,7 @@ ENTRY_PAGES = {
     "password reset sent": reverse("accounts:password_reset_sent"),
 }
 LOGIN_PANEL = (
-    "Willkommen im Portal der LEG",
+    "Willkommen im Portal der Lokalen Elektrizitätsgemeinschaft",
     "Hier verwalten Sie Ihr Konto und später Ihre Standorte, Energiedaten und Rechnungen.",
     "Solarstrom aus der Nachbarschaft",
     "Lokal erzeugt, gemeinsam genutzt",
@@ -71,6 +71,12 @@ class EntryShellTests(TestCase):
                      "Angemeldet bleiben", "Mit Passkey anmelden", "Neu registrieren"):
             self.assertIn(text, html)
 
+    @override_settings(INSTANCE_NAME="LEG Ittigen")
+    def test_the_welcome_text_names_the_configured_instance(self):
+        html = self.client.get(LOGIN_URL).content.decode()
+        self.assertIn("Willkommen im Portal der LEG Ittigen", html)
+        self.assertNotIn("Lokalen Elektrizitätsgemeinschaft", html)
+
     def test_the_registration_pages_have_the_registration_panel(self):
         for name in ("registration", "registration sent"):
             with self.subTest(page=name):
@@ -81,7 +87,7 @@ class EntryShellTests(TestCase):
                     self.assertIn(text, html)
         # The same page after a password reset request shows the login texts instead.
         html = self.client.get(ENTRY_PAGES["password reset sent"]).content.decode()
-        self.assertIn("Willkommen im Portal der LEG", html)
+        self.assertIn("Willkommen im Portal der Lokalen Elektrizitätsgemeinschaft", html)
         self.assertNotIn("Konto erstellen", html)
 
     def test_an_invalid_registration_link_uses_the_shell_and_the_registration_panel(self):

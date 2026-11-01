@@ -7,6 +7,7 @@ from leg_platform import render_as
 from leg_platform.accounts.login_protection import LOGIN_COOLOFF
 from leg_platform.accounts.portal_settings import portal_values
 from leg_platform.accounts.second_factor import is_second_factor_complete, requires_second_factor
+from leg_platform.environment import DEFAULT_INSTANCE_NAME
 
 
 PROFILE_VIEWS = frozenset(
@@ -88,6 +89,8 @@ def instance(request):
         )
         in PROFILE_VIEWS,
         "instance_name": SimpleLazyObject(lambda: values.name),
+        # The built-in name stands for "not set": the welcome text then spells out the community instead.
+        "instance_name_is_default": SimpleLazyObject(lambda: values.name == DEFAULT_INSTANCE_NAME),
         # The addresses of the footer: maintained in the portal settings (the privacy address
         # falls back to the instance configuration), D-056, D-073.
         "instance_privacy_url": SimpleLazyObject(lambda: values.privacy_url),

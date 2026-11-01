@@ -89,6 +89,7 @@ class MeteringPointsForm(CustomerForm):
             _("Which metering point number does %(operator)s use to measure your electricity consumption?")
         ),
         required=False, max_length=250,
+        widget=forms.TextInput(attrs={"placeholder": "0" * numbers.SUFFIX_LENGTH}),
         help_text=_(
             "On your electricity bill, with the details of your supply point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
         ),
@@ -106,6 +107,7 @@ class MeteringPointsForm(CustomerForm):
             _("Which metering point number does %(operator)s use to measure your solar power feed-in?")
         ),
         required=False, max_length=250,
+        widget=forms.TextInput(attrs={"placeholder": "0" * numbers.SUFFIX_LENGTH}),
         help_text=_(
             "In the documents of your grid operator, with the details of your feed-in point, also called metering point ID (not the shorter meter number). It starts with %(prefix)s, which is already filled in. Add the remaining %(length)s characters."
         ),
