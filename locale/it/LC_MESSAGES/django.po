@@ -10149,3 +10149,15 @@ msgstr "Il servizio di importazione non è in esecuzione. Le importazioni in att
 
 msgid "Building identifier (EGID) changed"
 msgstr "Identificativo dell’edificio (EGID) modificato"
+
+msgid "Website"
+msgstr "Sito web"
+
+msgid "This is an automatic message. Replies are not read."
+msgstr "Questo è un messaggio automatico. Le risposte non vengono lette."
+
+msgid "You are receiving this email because it concerns your account or an address you entered at %(name)s."
+msgstr "Riceve questa e-mail perché riguarda il Suo conto o un indirizzo che ha inserito presso %(name)s."
+
+msgid "The email is sent in the fixed frame of the portal: the logo or name above the text, the links and two notes below. A test email shows the result."
+msgstr "L'e-mail viene inviata nella cornice fissa del portale: sopra il testo il logo o il nome, sotto i link e due avvisi. Un'e-mail di prova mostra il risultato."

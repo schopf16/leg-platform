@@ -18,6 +18,7 @@
   <p><strong>{{ subject }}</strong></p>
   <h2>{% translate "Text" %}</h2>
   <pre>{{ body }}</pre>
+  <p>{% translate "The email is sent in the fixed frame of the portal: the logo or name above the text, the links and two notes below. A test email shows the result." %}</p>
   <form method="post" action="{{ change_url }}">
     {% csrf_token %}
     {% for name, value in posted %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}

@@ -388,6 +388,7 @@ AREAS: dict[str, Area] = {
             "leg_platform/mail.py", "leg_platform/accounts/mail_queue.py",
             "leg_platform/accounts/mail_addresses.py",
             "leg_platform/accounts/emails.py", "leg_platform/accounts/email_texts.py",
+            "leg_platform/accounts/mail_frame.py",
             "leg_platform/accounts/greeting.py", "leg_platform/accounts/rate_limits.py",
             "leg_platform/accounts/invitations.py",
             "leg_platform/accounts/tasks.py",
@@ -399,7 +400,7 @@ AREAS: dict[str, Area] = {
         ),
         tests=(
             _labels(A, "test_mail_queue", "test_mail_addresses", "test_email_texts", "test_greeting", "test_scheduled_tasks",
-                    "test_graph_test_email_limits", "test_invalid_link_redirect", "test_invitations")
+                    "test_graph_test_email_limits", "test_invalid_link_redirect", "test_invitations", "test_mail_frame")
             + _labels(T, "test_mail_graph", "test_instance_configuration")
             + _labels(C, "test_application_mail", "test_application_deadlines", "test_own_iban")
         ),

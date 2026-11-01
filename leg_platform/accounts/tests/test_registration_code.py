@@ -473,7 +473,8 @@ class CodeMailTests(TestCase):
         ask(Client(), user.email)
         self.assertEqual(len(mail.outbox), 1)
         self.assertFalse(re.search(r"\b\d{6}\b", mail.outbox[0].subject + mail.outbox[0].body))
-        self.assertEqual(getattr(mail.outbox[0], "alternatives", []), [])
+        # The information mail uses the common frame (D-137), which carries no code either.
+        self.assertFalse(re.search(r"(?<![#\w])\d{6}(?!\w)", mail.outbox[0].alternatives[0][0]))
 
     def test_the_graph_backend_sends_the_html_variant_as_html_without_attachments(self):
         from leg_platform.mail import _payload

@@ -75,6 +75,9 @@ class PortalValues(NamedTuple):
     # The uploaded favicon: its address and content type; "" = none, the pages use the built-in icon.
     favicon: str = ""
     favicon_type: str = ""
+    # The format of the light logo ("png", "svg" or ""), derived from the file (not a setting): a mail shows only a PNG.
+    logo_light_type: str = ""
+
     @property
     def website_host(self):
         """The host of the website (the footer link text), "" without a website."""
@@ -147,7 +150,14 @@ def environment_values():
         logo_light=_static_url(branding.logo_light),
         logo_dark=_static_url(branding.logo_dark),
         uploaded_logos=False,
+        logo_light_type=_path_type(branding.logo_light),
     )
+
+
+def _path_type(path):
+    """The logo format by the file extension of a static path, "" if it is neither png nor svg."""
+    suffix = str(path or "").rsplit(".", 1)[-1].lower()
+    return suffix if suffix in _LOGO_TYPES else ""
 
 
 def _stored_logos(row):
@@ -206,7 +216,9 @@ def _resolve(row):
             changes.update(colours)
     logos = _stored_logos(row)
     if logos is not None:
-        changes.update(logo_light=logos[0], logo_dark=logos[1], uploaded_logos=True)
+        changes.update(
+            logo_light=logos[0], logo_dark=logos[1], uploaded_logos=True, logo_light_type=row["logo_light_type"]
+        )
     favicon = _stored_favicon(row)
     if favicon is not None:
         changes.update(favicon=favicon[0], favicon_type=favicon[1])
