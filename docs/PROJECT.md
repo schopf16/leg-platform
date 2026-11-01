@@ -4,6 +4,8 @@
 
 Build a secure, maintainable foundation for the later administration of an LEG, initiated by the LEG Ittigen and first operated for it. The software is neutral; other municipalities run their own, independent instance from the same code base (D-013, D-014).
 
+**The guiding aim of the management area is simple administration of the LEG.** Whoever administers must be able to see, find and correct everything where they expect it (an address at the address, a metering point at the metering point), with as few steps and as little new to learn as possible. Every proposal and every design is measured against this aim: a feature that makes the administration more complicated needs a reason.
+
 ## Terminology
 
 These terms are binding for all project documents and for naming in code.

@@ -33,6 +33,7 @@ What is wanted vs how to do it:
 * **How (the way to reach a clear goal):** decide it yourself and do it in the same change. Choose the cleanest solution, record a decision that others must know in `docs/DECISIONS.md`, and report what you decided. Do not ask permission for it, and do not list it as an open point.
 * **Maintenance is yours:** dead code, unused fields and imports (with their migration), stale or wrong documentation, version statements inside the supported range, code structure, tidiness and test runner mappings are fixed in the same change, also when the defect predates it.
 * **Defects are fixed, not only reported:** those found in your own change, in code you touch, and by reviews and tests. **The goal of the project is a website where customers register and sign up for a LEG.** As long as a fix or a technical choice does not change this goal, you decide freely. Only a change of the goal itself (new functions, other user groups, other domains) is the owner's decision.
+* **Keep the aim in view:** the aim of the management area is simple administration of the LEG (`docs/PROJECT.md`, "Goal"). Check every proposal against it: data is shown and corrected where the administrator looks for it, without detours through other pages, and without making the administration more complicated than it is.
 * **Always ask** before a decision that significantly affects security, data protection, data migration or external services, and before an irreversible data change.
 * Do not claim a requirement is fulfilled unless it was verified.
 

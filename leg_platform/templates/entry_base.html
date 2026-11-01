@@ -14,7 +14,7 @@ column, max. 400 px).
     <aside class="entry-warm">
       <span class="logo-plate">{% include "_brand.html" %}</span>
       {% block panel %}
-        {% block panel_title %}<p class="entry-title">{% translate "Welcome to the LEG portal" %}</p>{% endblock %}
+        {% block panel_title %}<p class="entry-title">{% if instance_name_is_default %}{% translate "Welcome to the portal of the local electricity community" %}{% else %}{% blocktranslate %}Welcome to the portal of {{ instance_name }}{% endblocktranslate %}{% endif %}</p>{% endblock %}
                 {% block panel_lead %}<p class="entry-lead">{% translate "Here you manage your account and, later, your locations, energy data and invoices." %}</p>{% endblock %}
         {% block panel_benefits %}
           <ul class="entry-benefits">

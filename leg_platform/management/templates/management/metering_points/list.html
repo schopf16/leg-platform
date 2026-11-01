@@ -32,6 +32,8 @@ the form on change.
     <noscript><button type="submit" class="btn btn-secondary-action">{% translate "Apply" %}</button></noscript>
   </form>
 
+  {% include "management/_pending_points.html" %}
+
   <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view mgmt-list-card">
       <table class="mgmt-table mgmt-table-fixed">

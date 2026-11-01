@@ -35,8 +35,11 @@ msgstr "Aspetto: scuro. Passa a chiaro."
 
 # Entry shell: panel texts of the login and of the registration (LEG-Design-
 # Vorgaben)
-msgid "Welcome to the LEG portal"
+msgid "Welcome to the portal of the local electricity community"
 msgstr "Benvenuti nel portale della comunità elettrica locale"
+
+msgid "Welcome to the portal of %(instance_name)s"
+msgstr "Benvenuti nel portale di %(instance_name)s"
 
 msgid "Solar power from the neighbourhood"
 msgstr "Energia solare dal quartiere"
@@ -10161,3 +10164,15 @@ msgstr "Riceve questa e-mail perché riguarda il Suo conto o un indirizzo che ha
 
 msgid "The email is sent in the fixed frame of the portal: the logo or name above the text, the links and two notes below. A test email shows the result."
 msgstr "L'e-mail viene inviata nella cornice fissa del portale: sopra il testo il logo o il nome, sotto i link e due avvisi. Un'e-mail di prova mostra il risultato."
+
+msgid "In registration"
+msgstr "In fase di registrazione"
+
+msgid "New buildings of submitted registrations. You correct the address and the metering points here; the location is created when the registration is completed."
+msgstr "Nuovi edifici delle registrazioni inviate. Qui correggete l'indirizzo e i punti di misura; l'ubicazione viene creata al termine della registrazione."
+
+msgid "Metering points of submitted registrations. You correct them here; the metering point is created when the registration is completed."
+msgstr "Punti di misura delle registrazioni inviate. Qui li correggete; il punto di misura viene creato al termine della registrazione."
+
+msgid "Go to the registration"
+msgstr "Alla registrazione"
