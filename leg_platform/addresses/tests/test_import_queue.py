@@ -4,19 +4,23 @@ Synthetic data only: nothing is downloaded, the importers are replaced by stand-
 
 import uuid
 from datetime import timedelta
+import threading
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
-from django.db import DatabaseError
+from django.db import DatabaseError, connections
 from django.test import Client, TestCase, TransactionTestCase, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.addresses import jobs, published, runner, schedule, status
-from leg_platform.addresses.models import Directory, ImportQueueEntry, ImportRequest, PlantRegister, PublishedFigures
+from leg_platform.addresses import jobs, published, runner, schedule, status, worker
+from leg_platform.addresses.models import (
+    Directory, ImportLogEntry, ImportQueueEntry, ImportRequest, PlantRegister, PublishedFigures,
+)
 
 Source = ImportRequest.Source
 State = ImportRequest.State
@@ -124,37 +128,242 @@ class QueueTests(TestCase):
         self.assertEqual(queue_order(), [])
 
 
+def succeed(claimed):
+    jobs.record_success(claimed, 1, transformer=SimpleNamespace(postal_codes=["8000"], buildings=1, with_name=0))
+
+
 @tag("mariadb")
-class QueueRunnerTests(TransactionTestCase):
+class ImportWorkerTests(TransactionTestCase):
+    """The import worker (D-133): the queue is worked off in order, outside the web process."""
+
     databases = {"default", "addresses"}
 
-    def tearDown(self):
-        self.assertTrue(runner.wait_for_end(30))
+    def setUp(self):
+        worker.stop_requested.clear()
+        self.addCleanup(worker.stop_requested.clear)
 
-    def test_the_thread_runs_the_jobs_strictly_one_after_the_other_and_a_failure_does_not_stop_it(self):
+    def test_the_worker_runs_the_queue_strictly_one_after_the_other_in_order_and_a_failure_does_not_stop_it(self):
         jobs.enqueue(jobs.QUEUE_SOURCES, in_order=True)
         seen = []
 
         def fake(claimed, progress=None):
             # The claim is the single writer lock: at this moment nobody else is running.
             self.assertEqual(ImportRequest.objects.get(pk=1).state, State.RUNNING)
+            self.assertIsNotNone(progress)  # run with a heartbeat
             seen.append(claimed.source)
             if claimed.source == Source.PLANT:
                 jobs.record_failure(claimed, RuntimeError("synthetic"))
                 raise RuntimeError("synthetic")
-            jobs.record_success(claimed, 1, transformer=SimpleNamespace(postal_codes=["8000"], buildings=1, with_name=0))
+            succeed(claimed)
 
         with patch.object(jobs, "execute", side_effect=fake):
-            self.assertTrue(runner.start_queue())
-            self.assertTrue(runner.wait_for_end(30))
+            self.assertEqual(worker.drain(), 3)
         self.assertEqual(seen, [Source.ADDRESS, Source.PLANT, Source.TRANSFORMER])
         self.assertEqual(queue_order(), [])
         job = ImportRequest.objects.get(pk=1)
         self.assertEqual(job.last_plant_state, "failed")
         self.assertEqual(job.last_transformer_state, "succeeded")
 
-    def test_start_queue_without_entries_starts_nothing(self):
-        self.assertFalse(runner.start_queue())
+    def test_the_worker_notes_that_it_looks_at_the_queue(self):
+        self.assertIsNone(ImportRequest.objects.filter(pk=1).values_list("worker_seen_at", flat=True).first())
+        worker.drain()
+        self.assertIsNotNone(ImportRequest.objects.get(pk=1).worker_seen_at)
+
+    def test_a_database_error_while_noting_does_not_stop_the_worker(self):
+        with patch.object(ImportRequest.objects, "get_or_create", side_effect=DatabaseError):
+            jobs.mark_worker_seen()
+
+    def test_an_empty_queue_runs_nothing_and_claims_nothing(self):
+        with patch.object(jobs, "claim") as claim:
+            self.assertEqual(worker.drain(), 0)
+        claim.assert_not_called()
+
+    def test_a_legacy_address_request_runs_first(self):
+        jobs.request_import()
+        jobs.enqueue([Source.PLANT])
+        seen = []
+
+        def fake(claimed, progress=None):
+            seen.append(claimed.source)
+            succeed(claimed)
+
+        with patch.object(jobs, "execute", side_effect=fake):
+            worker.drain()
+        self.assertEqual(seen, [Source.ADDRESS, Source.PLANT])
+
+    def test_the_web_process_never_runs_a_job(self):
+        client, _person = make_staff("web.person@example.org")
+        with patch.object(jobs, "execute") as execute, patch.object(jobs, "claim", wraps=jobs.claim) as claim, \
+                patch("leg_platform.addresses.runner.threading.Thread") as thread:
+            client.post(start_url("all"))
+            client.get(PAGE_URL)
+            client.get(reverse("admin:addresses_importrequest_status"))
+        execute.assert_not_called()
+        claim.assert_not_called()
+        thread.assert_not_called()
+        self.assertEqual(queue_order(), [Source.ADDRESS, Source.PLANT, Source.TRANSFORMER])
+        self.assertNotEqual(ImportRequest.objects.get(pk=1).state, State.RUNNING)
+        self.assertFalse(hasattr(runner, "start_queue"))
+
+    def test_two_workers_never_run_the_same_job(self):
+        jobs.enqueue([Source.ADDRESS])
+        entered = threading.Event()
+        release = threading.Event()
+        runs = []
+
+        def slow(claimed, progress=None):
+            runs.append(claimed.source)
+            entered.set()
+            release.wait(20)
+            succeed(claimed)
+
+        def first_worker():
+            try:
+                worker.drain()
+            finally:
+                connections.close_all()
+
+        with patch.object(jobs, "execute", side_effect=slow):
+            thread = threading.Thread(target=first_worker)
+            thread.start()
+            self.assertTrue(entered.wait(20))
+            # A second worker finds the claim refused while the first one runs: the job runs once.
+            jobs.enqueue([Source.PLANT])
+            self.assertEqual(worker.drain(), 0)
+            self.assertEqual(runs, [Source.ADDRESS])
+            release.set()
+            thread.join(30)
+        # The first worker went on with the entry that was added meanwhile; each job ran exactly once.
+        self.assertEqual(runs, [Source.ADDRESS, Source.PLANT])
+
+    def test_a_stop_while_a_job_runs_records_the_reason_and_queues_it_again_first(self):
+        jobs.enqueue(jobs.QUEUE_SOURCES, in_order=True)
+
+        def stopped(**_kwargs):
+            # What the signal handler does in the main thread while the import runs.
+            worker.request_stop()
+
+        with patch("leg_platform.addresses.importer.import_directory", side_effect=stopped), \
+                self.assertLogs("leg_platform.addresses.jobs", "WARNING") as logs:
+            self.assertEqual(worker.drain(), 1)
+        # The stopped worker ran nothing else; the interrupted job is first again, the others keep their order.
+        self.assertEqual(queue_order(), [Source.ADDRESS, Source.PLANT, Source.TRANSFORMER])
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.state, job.last_address_state, job.last_address_error), (State.FAILED, "failed", jobs.STOPPED))
+        self.assertIsNotNone(job.last_address_finished_at)
+        self.assertIsNone(job.heartbeat_at)
+        self.assertTrue(any("address import was interrupted" in line and jobs.STOPPED in line for line in logs.output))
+        entry = ImportLogEntry.objects.get(source=Source.ADDRESS)
+        self.assertEqual(entry.reason, jobs.STOPPED)
+        # The page names the reason while the job waits for the service.
+        row = english_status()["sources"][0]
+        self.assertEqual(row["state"], "queued")
+        self.assertIn("stopped", row["error"])
+        self.assertTrue(row["last_run"])
+
+    def test_the_restarted_worker_runs_the_job_that_was_put_back(self):
+        jobs.enqueue([Source.PLANT, Source.ADDRESS], in_order=True)
+        first = jobs.claim(web=True, queued=True)
+        self.assertEqual(first.source, Source.PLANT)
+        jobs.record_interruption(first, jobs.STOPPED, requeue=True)
+        self.assertEqual(queue_order(), [Source.PLANT, Source.ADDRESS])
+        seen = []
+
+        def fake(claimed, progress=None):
+            seen.append(claimed.source)
+            succeed(claimed)
+
+        with patch.object(jobs, "execute", side_effect=fake):
+            worker.drain()
+        self.assertEqual(seen, [Source.PLANT, Source.ADDRESS])
+        # A success clears the open interruption of the source in the log.
+        self.assertFalse(ImportLogEntry.objects.filter(source=Source.PLANT, cleared_at__isnull=True).exists())
+
+    def test_a_stop_between_the_claim_and_the_start_queues_the_job_again_without_running_it(self):
+        jobs.enqueue([Source.TRANSFORMER])
+        claimed = jobs.claim(web=True, queued=True)
+        worker.stop_requested.set()
+        with patch.object(jobs, "execute") as execute:
+            worker.run_job(claimed)
+        execute.assert_not_called()
+        self.assertEqual(queue_order(), [Source.TRANSFORMER])
+        self.assertEqual(ImportRequest.objects.get(pk=1).last_transformer_error, jobs.STOPPED)
+
+    def test_a_stopped_worker_takes_no_new_job(self):
+        jobs.enqueue([Source.PLANT])
+        worker.stop_requested.set()
+        with patch.object(jobs, "claim") as claim:
+            self.assertEqual(worker.drain(), 0)
+        claim.assert_not_called()
+        self.assertEqual(queue_order(), [Source.PLANT])
+
+    def test_a_signal_outside_a_job_only_ends_the_loop(self):
+        worker.request_stop()  # no job runs: nothing is raised
+        self.assertTrue(worker.stop_requested.is_set())
+
+    def test_a_job_of_a_killed_worker_is_reported_with_its_reason_and_taken_over(self):
+        now = timezone.now()
+        ImportRequest.objects.create(
+            pk=1, state=State.RUNNING, source=Source.PLANT, started_at=now - timedelta(hours=1), claim_token=uuid.uuid4(),
+            heartbeat_at=now - jobs.HEARTBEAT_STALE_AFTER - timedelta(seconds=1), phase="importing",
+        )
+        jobs.enqueue([Source.ADDRESS])
+        with self.assertLogs("leg_platform.addresses.jobs", "WARNING") as logs:
+            claimed = jobs.claim(web=True, queued=True)
+        self.assertEqual(claimed.source, Source.ADDRESS)
+        self.assertTrue(claimed.took_over)
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.last_plant_state, job.last_plant_error), ("failed", jobs.LEASE_EXPIRED))
+        self.assertTrue(any("plant import was interrupted" in line for line in logs.output))
+        entry = ImportLogEntry.objects.get(source=Source.PLANT)
+        self.assertEqual((entry.reason, entry.step), (jobs.LEASE_EXPIRED, "importing"))
+        # A hard kill is not queued again by itself (it could loop).
+        self.assertEqual(queue_order(), [])
+
+
+@tag("mariadb")
+class ImportWorkerCommandTests(TransactionTestCase):
+    databases = {"default", "addresses"}
+
+    def setUp(self):
+        worker.stop_requested.clear()
+        self.addCleanup(worker.stop_requested.clear)
+
+    def test_the_command_runs_the_queue_once_and_declares_itself_the_writer(self):
+        from django.core.management import call_command
+
+        from leg_platform.addresses import storage
+
+        jobs.enqueue([Source.PLANT])
+        seen = {}
+
+        def fake(claimed, progress=None):
+            seen["writer"] = storage.is_writer()
+            succeed(claimed)
+
+        out = StringIO()
+        with patch.object(storage, "_writer", False), patch.object(jobs, "execute", side_effect=fake), \
+                patch.object(worker, "install_signal_handlers"):
+            call_command("process_import_queue", stdout=out)
+        self.assertTrue(seen["writer"])
+        self.assertIn("Ran 1 queued import", out.getvalue())
+
+    def test_the_loop_waits_for_new_entries_until_it_is_stopped(self):
+        from django.core.management import call_command
+
+        calls = []
+
+        def fake_drain():
+            calls.append(1)
+            if len(calls) == 3:
+                worker.stop_requested.set()
+            return 0
+
+        with patch.object(worker, "drain", side_effect=fake_drain), patch.object(worker, "install_signal_handlers"), \
+                patch.object(worker.stop_requested, "wait") as wait:
+            call_command("process_import_queue", loop=True, stdout=StringIO())
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(wait.call_count, 3)
 
 
 @tag("mariadb")
@@ -183,7 +392,7 @@ class StartEndpointTests(TestCase):
 
     def test_a_get_never_starts_anything(self):
         client, _person = make_staff("get.person@example.org")
-        with patch.object(runner, "start_queue") as start:
+        with patch.object(jobs, "execute") as start:
             response = client.get(start_url("plant"))
         self.assertEqual(response.status_code, 405)
         start.assert_not_called()
@@ -198,7 +407,7 @@ class StartEndpointTests(TestCase):
         client, _person = make_staff("csrf.person@example.org")
         strict = VerifiedClient(enforce_csrf_checks=True)
         strict.force_login(_person)
-        with patch.object(runner, "start_queue") as start:
+        with patch.object(jobs, "execute") as start:
             response = strict.post(start_url("plant"))
         self.assertEqual(response.status_code, 403)
         start.assert_not_called()
@@ -206,19 +415,19 @@ class StartEndpointTests(TestCase):
 
     def test_an_unknown_source_is_a_404(self):
         client, _person = make_staff("unknown.person@example.org")
-        with patch.object(runner, "start_queue") as start:
+        with patch.object(jobs, "execute") as start:
             self.assertEqual(client.post(start_url("bogus")).status_code, 404)
         start.assert_not_called()
         self.assertEqual(queue_order(), [])
 
-    def test_a_start_queues_the_source_logs_one_security_event_and_starts_the_thread(self):
+    def test_a_start_queues_the_source_and_logs_one_security_event_and_runs_nothing(self):
         client, person = make_staff("start.person@example.org")
-        with patch.object(runner, "start_queue") as start, \
+        with patch.object(jobs, "execute") as start, \
                 self.assertLogs("leg_platform.security", level="WARNING") as logs, \
                 self.captureOnCommitCallbacks(execute=True):
             response = client.post(start_url("transformer"))
         self.assertRedirects(response, PAGE_URL, fetch_redirect_response=False)
-        start.assert_called_once()
+        start.assert_not_called()  # the web process only queues (D-133)
         self.assertEqual(queue_order(), [Source.TRANSFORMER])
         event = SecurityEvent.objects.get(event=SecurityEvent.Event.IMPORT_REQUESTED)
         self.assertEqual((event.actor_id, event.account_id), (person.pk, None))
@@ -226,14 +435,14 @@ class StartEndpointTests(TestCase):
 
     def test_the_full_sync_queues_the_three_sources_in_order(self):
         client, _person = make_staff("full.person@example.org")
-        with patch.object(runner, "start_queue"):
+        with patch.object(jobs, "execute"):
             client.post(start_url("all"))
         self.assertEqual(queue_order(), [Source.ADDRESS, Source.PLANT, Source.TRANSFORMER])
         self.assertEqual(SecurityEvent.objects.filter(event=SecurityEvent.Event.IMPORT_REQUESTED).count(), 1)
 
     def test_a_second_start_of_a_waiting_source_adds_no_entry(self):
         client, _person = make_staff("twice.person@example.org")
-        with patch.object(runner, "start_queue"):
+        with patch.object(jobs, "execute"):
             client.post(start_url("plant"))
             response = client.post(start_url("plant"), follow=True)
         self.assertEqual(queue_order(), [Source.PLANT])
@@ -242,7 +451,7 @@ class StartEndpointTests(TestCase):
     def test_the_request_limit_applies(self):
         client, _person = make_staff("limit.person@example.org")
         with patch("leg_platform.addresses.admin.allow_request", return_value=False), \
-                patch.object(runner, "start_queue") as start:
+                patch.object(jobs, "execute") as start:
             response = client.post(start_url("plant"))
         self.assertEqual(response.status_code, 302)
         start.assert_not_called()
@@ -286,6 +495,29 @@ class StatusPayloadTests(TestCase):
                          [("queued", 1), ("queued", 2), ("queued", 3)])
         self.assertTrue(page["all_busy"])
         self.assertEqual(page["summary"], "0 running, 3 waiting")
+
+    def test_the_page_says_when_imports_wait_and_no_worker_looks_at_the_queue(self):
+        self.assertEqual(english_status()["worker_notice"], "")
+        jobs.enqueue([Source.PLANT])
+        self.assertIn("The import service is not running", english_status()["worker_notice"])
+        jobs.mark_worker_seen()
+        self.assertEqual(english_status()["worker_notice"], "")
+        ImportRequest.objects.filter(pk=1).update(
+            worker_seen_at=timezone.now() - jobs.WORKER_STALE_AFTER - timedelta(seconds=1)
+        )
+        self.assertIn("The import service is not running", english_status()["worker_notice"])
+
+    def test_nothing_is_said_when_nothing_waits_or_a_live_job_runs(self):
+        self.assertEqual(english_status()["worker_notice"], "")
+        self.running(Source.ADDRESS)
+        jobs.enqueue([Source.PLANT])
+        self.assertEqual(english_status()["worker_notice"], "")
+
+    def test_a_dead_job_does_not_hide_the_missing_worker(self):
+        self.running(Source.ADDRESS)
+        ImportRequest.objects.filter(pk=1).update(heartbeat_at=timezone.now() - jobs.HEARTBEAT_STALE_AFTER * 2)
+        jobs.enqueue([Source.PLANT])
+        self.assertIn("The import service is not running", english_status()["worker_notice"])
 
     def test_the_percent_follows_the_phase_and_never_goes_back_across_phases(self):
         values = []
@@ -429,6 +661,9 @@ class ScriptAssetTests(TestCase):
         self.assertNotIn("estimate", script.lower())
         for dead in ("directory-imported-at", "directory-file-size", "import-leave"):
             self.assertNotIn(dead, script)
+
+    def test_the_script_shows_and_hides_the_worker_notice(self):
+        self.assertIn("import-worker-notice", self.source())
 
     def test_the_script_formats_the_remaining_time_as_minutes_and_seconds(self):
         self.assertIn("function clock(", self.source())

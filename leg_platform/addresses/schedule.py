@@ -11,7 +11,7 @@ or the published directory has no building identifiers yet; or the regular refre
 there is no directory; D-090). A successful import clears the flag (``jobs.record_success``). The administrator's
 button starts immediately and does not depend on this run. ``ADDRESS_IMPORT_AUTOMATIC=False`` turns the run off.
 
-The run writes heartbeats like the web thread (``_execute_with_heartbeat``). When the official file lacks a required
+The run writes heartbeats like the import worker (``_execute_with_heartbeat``). When the official file lacks a required
 column the run waits a week before it downloads again (``COLUMNS_RETRY_INTERVAL``, ``ImportRequest.columns_missing_at``).
 
 Already queued requests (including setup imports) are consumed first, even with automatic refresh off,
@@ -90,9 +90,9 @@ def refresh_is_due(job, now):
 def run_queue():
     """Work off the durable queue of the data imports page (D-132), one job after the other, in this process.
 
-    The web process drains the queue itself (``runner``); this covers a queue that a restart left behind, and runs
-    first in every call of the scheduled tasks. A failed job does not stop the rest; it is recorded by ``jobs.execute``.
-    Returns the number of jobs that ran."""
+    The import worker drains the queue (``worker``, D-133); this is the fallback when that service is not running, and
+    runs first in every call of the scheduled tasks. A failed job does not stop the rest; it is recorded by
+    ``jobs.execute``. Returns the number of jobs that ran."""
     ran = 0
     while ImportQueueEntry.objects.exists():
         # A legacy address request (state QUEUED) is the daily run's own business (``_run_address``): leave it.
@@ -244,15 +244,8 @@ def run_transformer_now():
 
 
 def _execute_with_heartbeat(claimed):
-    """Run the claimed import with a heartbeat like the web thread, so that a killed run is seen as dead after about
-    90 seconds (``jobs.HEARTBEAT_STALE_AFTER``) and the button is not blocked for the six hours of the lease."""
+    """Run the claimed import with a heartbeat, so that a killed run is seen as dead after about 90 seconds
+    (``jobs.HEARTBEAT_STALE_AFTER``) and the button is not blocked for the six hours of the lease."""
     from . import runner
-    from .progress import Progress
 
-    progress = Progress(check=runner._claim_check(claimed.token))
-    heartbeat = runner.Heartbeat(claimed.token, progress)
-    heartbeat.start()
-    try:
-        jobs.execute(claimed, progress)
-    finally:
-        heartbeat.stop()
+    runner.execute_with_heartbeat(claimed)

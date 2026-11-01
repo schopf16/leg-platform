@@ -92,6 +92,10 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 local.sqlite3
+# A copy of the address directory file or a stage dump in the repository root is never committed (the file belongs outside
+# the repository, D-075; ADDRESS_DIRECTORY_FILE must point elsewhere).
+/address-directory.sqlite3*
+/leg-stage-dummy-logins-*.zip
 staticfiles/
 media/
 

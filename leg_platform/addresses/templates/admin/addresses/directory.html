@@ -10,6 +10,7 @@
   <h2 id="import-status-heading" class="import-sr">{% translate "Data imports" %}</h2>
   <p class="import-sr" id="import-live" role="status" aria-live="polite" aria-atomic="true"></p>
   <p class="import-error" id="import-script-note" role="status" hidden></p>
+  <p class="import-warning" id="import-worker-notice" role="status"{% if not import_status.worker_notice %} hidden{% endif %}>{{ import_status.worker_notice }}</p>
 
   <div class="import-toolbar">
     <p class="import-summary" id="import-summary">{{ import_status.summary }}</p>
@@ -37,7 +38,7 @@
         <td data-label="{% translate 'Status' %}">
           <span class="status-dot status-{{ row.tone }}" data-field="dot" aria-hidden="true"></span>
           <span data-field="state">{{ row.state_label }}</span>
-          <span class="import-position" data-field="position"{% if not row.position %} hidden{% endif %}>{% if row.position %}{{ row.position }}{% endif %}</span>
+          <span class="import-position" data-field="position"{% if not row.position %} hidden{% endif %}>{% if row.position %}({{ row.position }}){% endif %}</span>
         </td>
         <td data-label="{% translate 'Progress' %}">
           <span data-field="progress"{% if row.percent is None %} hidden{% endif %}>

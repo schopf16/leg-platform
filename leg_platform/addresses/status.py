@@ -69,7 +69,14 @@ REASONS = {
     "The official directory could not be imported.": _("The official directory could not be downloaded or read. Check the network connection and try again."),
     jobs.UNEXPECTED_FAILURE: _("The import failed unexpectedly. Details in the import log."),
     jobs.INTERRUPTED: _("The import was interrupted because the application stopped or restarted. Request it again."),
+    jobs.LEASE_EXPIRED: _(
+        "The import was interrupted because the import service stopped responding or was restarted. Request it again."
+    ),
+    jobs.STOPPED: _("The import was interrupted because the import service was stopped. It runs again when the service starts."),
 }
+
+# Shown when imports wait and no import worker looks at the queue (``jobs.worker_is_missing``, D-133).
+WORKER_MISSING = _("The import service is not running. Waiting imports start with the next run of the scheduled tasks.")
 
 PHASES = {
     "starting": _("Starting"),
@@ -370,10 +377,13 @@ def _source_status(source, job, now, waiting):
     percent = percent_of(job) if running else None
     lines = progress_lines(job, source, now) if running else {}
     if state == "interrupted":
-        error = reason_text(jobs.INTERRUPTED)
+        error = reason_text(jobs.LEASE_EXPIRED)
         finished = job.finished_at or job.heartbeat_at
     elif state == "failed":
         error = reason_text(error_text) or reason_text(jobs.UNEXPECTED_FAILURE)
+    elif state == "queued" and last_state == "failed" and error_text in jobs.INTERRUPTIONS:
+        # A run that the stopped import service left behind waits at the front of the queue: say why it runs again (D-133).
+        error = reason_text(error_text)
     else:
         error = ""
     figures, key_text, warning = _published_figures(source, job, running, now)
@@ -418,6 +428,7 @@ def build():
     return {
         "active": bool(running or queued),
         "all_busy": all(row["busy"] for row in sources),
+        "worker_notice": str(WORKER_MISSING) if jobs.worker_is_missing(job, now) else "",
         "summary": summary,
         "sources": sources,
         "automatic_text": next_automatic_text(job),

@@ -36,19 +36,21 @@ Profile addresses never leave the application; suggestions query only a local co
   * Refused while an import is alive. An incomplete schema afterwards is an error; the file is not wiped.
   * By hand before a deployment: `python manage.py migrate addresses --database=addresses` (stop the import first).
   * Migrations of application-side job/lookup models only do not touch the file.
-* **Availability:** the optional worker processes the queued request on its next poll; otherwise `run_scheduled_tasks` consumes it at its next tick (every 15 minutes on the server), independent of the daily refresh time and `ADDRESS_IMPORT_AUTOMATIC`. Without a consumer it stays queued. Until an import succeeds, address validation and suggestions are unavailable; stored data remains. A busy file, live import or rebuild failure is reported non-fatally; run setup again later, preferably with address consumers stopped. Never delete the `.reset` marker to bypass a failed rebuild. Corruption repair: `docs/DEPLOYMENT.md`, section 10.2.
+* **Availability:** the import worker (`process_import_queue --loop`) processes the queued request on its next poll; otherwise `run_scheduled_tasks` consumes it at its next tick (every 15 minutes on the server), independent of the daily refresh time and `ADDRESS_IMPORT_AUTOMATIC`. Without a consumer it stays queued. Until an import succeeds, address validation and suggestions are unavailable; stored data remains. A busy file, live import or rebuild failure is reported non-fatally; run setup again later, preferably with address consumers stopped. Never delete the `.reset` marker to bypass a failed rebuild. Corruption repair: `docs/DEPLOYMENT.md`, section 10.2.
 
-**The button needs no extra service (D-090); the automatic refresh is the daily run of `run_scheduled_tasks`.** Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.3, 8.4 and 10.2.
+**A prebuilt file** (built elsewhere, uploaded over SSH) is installed with `install_address_directory` (D-134; `docs/DEPLOYMENT.md`, 10.3).
+
+**The buttons need the import worker `process_import_queue --loop` (D-133); the automatic refresh is the daily run of `run_scheduled_tasks`.** Procedure, limits, recovery: `docs/DEPLOYMENT.md`, sections 8.3, 8.4 and 10.2.
 
 * Triggers: an administrator with the right `addresses.request_directory_import` presses "Request directory update" (administration, "Adressverzeichnis"; at once, in a thread of the web process); or the daily run (`scheduled_address_import`, once per day from the configured time, default 03:00) finds an update due: the update flag is set (an address was found neither locally nor at swisstopo), the directory has no building numbers (EGID) yet, the regular refresh is due (every 90 days) or the directory is missing or empty (every 24 hours). At most one download per day. A visit of a staff member starts nothing. `ADDRESS_IMPORT_AUTOMATIC=False` turns the daily run off.
 * Needs: outbound HTTPS to `data.geo.admin.ch` (import; web and tasks unit) and `api3.geo.admin.ch` (building search of signed-in persons; web unit). At least 4 GiB free on the disk of the directory file at the start of an import (the archive is written there as a temporary file, not to the system temporary folder). The file is about 1.7 GB per generation and holds up to three while importing (about 5.1 GB): reserve 10 GB for the folder. The tasks unit needs the state directory like the web unit (`docs/DEPLOYMENT.md`, 8.3).
 * Verifies the official SHA-256 multihash before parsing. One import at a time (the job row is the claim; the lease expires after 6 hours). A web job without a sign of life for about 90 seconds counts as dead. A hard-killed worker job (state stays `running`) is taken over only after its lease: never reset its state blindly.
 * Start, end and failure go to the application log (`leg_platform.addresses`) and the security log. If the published directory is the official file and passes the integrity check, a manual request ends without a download (D-076).
 
-Optional supervised worker (same environment as the web application; claims the same job). It handles queued manual imports and makes the automatic attempt (D-052). It refuses to run with less than 4 GB free where the file lives:
+Supervised import worker (same environment as the web application; claims the same job). It runs the queued imports one after the other, never in the web process, and refuses to run with less than 4 GB free where the file lives. A stop queues a running import again:
 
 ```powershell
-python manage.py process_address_imports
+python manage.py process_import_queue --loop
 ```
 
 Manual import:

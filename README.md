@@ -98,4 +98,4 @@ BSD 3-Clause License (`LICENSE`), the same as Django (D-029). Dependencies are i
 2. The owner's human review of the second-factor, reset, lifecycle and administration changes (D-019) and a passed CI run of the current code on both jobs.
 3. HTTPS, secure cookies, HSTS and a request body size limit of the web server are confirmed on the real host (`docs/INSTALLATION.md`, D-052).
 4. Token-bearing URLs stay redacted from request logs (`leg_platform/log_filters.py` covers the registration, password reset, second factor removal and email change links); repeat for every further token URL (`docs/SECURITY.md`, section 10).
-5. The worker `process_mail_queue --loop` and the address worker `process_address_imports` run as supervised services (both with the settings of the application, D-075), and `run_scheduled_tasks` is scheduled (D-008, D-037, D-038, D-041, D-052).
+5. The worker `process_mail_queue --loop` and the import worker `process_import_queue --loop` run as supervised services (both with the settings of the application, D-075), and `run_scheduled_tasks` is scheduled (D-008, D-037, D-038, D-041, D-052).

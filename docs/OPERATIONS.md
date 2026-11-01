@@ -92,7 +92,7 @@ Names follow `leg_platform/environment.py` and `leg_platform/settings.py`; not c
 
 ## 5. Address register (Swiss building address directory)
 
-Postal addresses are checked against a local copy of the official swisstopo directory (D-033, D-049, D-050, D-075; `docs/ARCHITECTURE.md`, "Data Storage"; `docs/DEPLOYMENT.md`, sections 3.5, 8.4 and 10.2). No address leaves the server. Triggers, limits, disk needs, schema changes and in-place migrations: `docs/INSTALLATION.md`, "Address Directory".
+Postal addresses are checked against a local copy of the official swisstopo directory (D-033, D-049, D-050, D-075; `docs/ARCHITECTURE.md`, "Data Storage"; `docs/DEPLOYMENT.md`, sections 3.5, 8.4 (import worker) and 10.2). No address leaves the server. Triggers, limits, disk needs, schema changes and in-place migrations: `docs/INSTALLATION.md`, "Address Directory".
 
 * **Terms (D-049):** free use, source named (the STAC record says "proprietary"; recorded as a difference). No attribution in the software (D-066). The source reference belongs in the operator's privacy notice and imprint (D-074).
 * **Update (D-050, D-090):** import button in the administration, or the daily run of the scheduled tasks. Needs outbound HTTPS to `data.geo.admin.ch` (import) and `api3.geo.admin.ch` (building search, `docs/SERVICES.md` S-4). SHA-256 compared with the catalogue; a difference rejects the file. Warning after 92 days. The security review of option C is open.

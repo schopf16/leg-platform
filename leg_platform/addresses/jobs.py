@@ -1,9 +1,9 @@
 """Queue and claim of the address directory import (D-075, D-090).
 
 The one ``ImportRequest`` row is the claim: only the holder of ``claim_token`` runs the import, in
-the import thread of the web process (``runner``) or in the worker (``process_address_imports``).
-Several web workers share it through the row lock. This module never imports the importer at the
-top (web requests reach it).
+the import worker (``process_import_queue``, ``worker``) or in the scheduled tasks (``schedule``). The web
+process never runs an import (D-133): it only queues and shows the status. Several processes share the
+claim through the row lock. This module never imports the importer at the top (web requests reach it).
 """
 
 import logging
@@ -29,12 +29,21 @@ EMPTY_DIRECTORY_INTERVAL = timedelta(hours=24)
 # A RUNNING job older than this is taken over (D-076, hard-killed worker). Keep equal to
 # ``importer.IMPORT_LEASE`` (a test checks); this module must not import the importer.
 RUNNING_JOB_LEASE = timedelta(hours=6)
-# A RUNNING job of the web process writes a heartbeat every few seconds (``runner``); without one for
-# this long its process is gone and the job is taken over (D-090).
+# A RUNNING job writes a heartbeat every few seconds (``runner.Heartbeat``); without one for this long its
+# process is gone and the job is taken over (D-090).
 HEARTBEAT_STALE_AFTER = timedelta(seconds=90)
+# The import worker notes every look at the queue (``mark_worker_seen``); without a note for this long the page says that no
+# worker runs (D-133). The worker looks every few seconds, so this leaves room for a slow database.
+WORKER_STALE_AFTER = timedelta(seconds=60)
 # Shown when the importer raised something it did not describe (nothing of the exception is stored).
 UNEXPECTED_FAILURE = "The import failed unexpectedly."
+# The old text of an interrupted run (D-090): kept for rows that were stored with it.
 INTERRUPTED = "The import was interrupted because the application stopped or restarted."
+# Why a run was interrupted (D-133), stored in ``last_*_error`` and the import log: the import service was stopped
+# (the run is queued again), or the holder gave no sign of life until the heartbeat or lease ran out.
+STOPPED = "The import was interrupted because the import service was stopped. It runs again when the service starts."
+LEASE_EXPIRED = "The import was interrupted because the import service stopped responding or was restarted. Request it again."
+INTERRUPTIONS = frozenset({INTERRUPTED, STOPPED, LEASE_EXPIRED})
 # The only failure texts that are stored, logged and shown: the fixed sentences of ``importer.ImportFailure``
 # (a test compares them with the importer). Any other text counts as unexpected, so that no upstream data
 # can reach the page, the log or the security log through a message.
@@ -127,6 +136,26 @@ def is_alive(job, now=None):
     return _is_running(job, now or timezone.now())
 
 
+def mark_worker_seen():
+    """The import worker notes that it is alive (D-133); a database that does not answer is not a reason to stop."""
+    try:
+        ImportRequest.objects.get_or_create(pk=1)
+        ImportRequest.objects.filter(pk=1).update(worker_seen_at=timezone.now())
+    except DatabaseError:
+        logger.warning("The import worker could not note that it is running.")
+
+
+def worker_is_missing(job, now=None):
+    """True when imports wait and nobody takes them: no live job, and the worker has not looked at the queue lately.
+
+    The scheduled tasks work the queue off as a fallback (``schedule.run_queue``), so a waiting import still runs at their
+    next tick; the page says so."""
+    now = now or timezone.now()
+    if not queued_sources() or _is_running(job, now):
+        return False
+    return job.worker_seen_at is None or now >= job.worker_seen_at + WORKER_STALE_AFTER
+
+
 def set_update_flag():
     """Note that an address was found neither in the directory nor at swisstopo (the update flag, KONZEPT 3a).
 
@@ -198,6 +227,21 @@ def enqueue(sources, *, in_order=False):
     return added
 
 
+def requeue_first(source):
+    """Put ``source`` at the front of the queue again (D-133): the run that the stopped import service left behind runs
+    first when the service starts, before the entries that waited behind it. Same row lock as the claim."""
+    with transaction.atomic():
+        ImportRequest.objects.get_or_create(pk=1)
+        ImportRequest.objects.select_for_update().get(pk=1)
+        waiting = [
+            entry for entry in ImportQueueEntry.objects.order_by("id").values_list("source", flat=True)
+            if entry != source
+        ]
+        ImportQueueEntry.objects.all().delete()
+        for entry in [source, *waiting]:
+            ImportQueueEntry.objects.create(source=entry)
+
+
 def queued_sources():
     """The sources that wait, in the order they will run (the legacy address request first)."""
     waiting = list(ImportQueueEntry.objects.order_by("id").values_list("source", flat=True))
@@ -205,6 +249,11 @@ def queued_sources():
     if job is not None and job.state == ImportRequest.State.QUEUED:
         waiting = [ImportRequest.Source.ADDRESS] + [s for s in waiting if s != ImportRequest.Source.ADDRESS]
     return waiting
+
+
+class WorkerStopped(BaseException):
+    """The import service was asked to stop while a job ran (D-133). A ``BaseException``, so that no ``except Exception`` of
+    an importer turns it into a failure of the file: ``execute`` records the interruption and queues the job again."""
 
 
 class Claim(NamedTuple):
@@ -248,18 +297,18 @@ def claim(*, schedule_automatic=False, scheduled=False, web=False, source=Import
         if job.state == ImportRequest.State.RUNNING:
             if _is_running(job, now):
                 return None
-            logger.warning("An address directory import job exceeded its lease and was taken over.")
+            logger.warning("The %s import was interrupted and its job was taken over: %s", job.source, LEASE_EXPIRED)
             took_over = True
             job.state = ImportRequest.State.FAILED
             job.finished_at = now
-            job.last_error = INTERRUPTED
-            result = source_result(job.source, ImportRequest.State.FAILED, now, INTERRUPTED)
+            job.last_error = LEASE_EXPIRED
+            result = source_result(job.source, ImportRequest.State.FAILED, now, LEASE_EXPIRED)
             for name, value in result.items():
                 setattr(job, name, value)
             # The interrupted run is over: its result is kept apart from the shared fields (D-117, D-132).
             job.save(update_fields=["state", "finished_at", "last_error", *result])
             # The interrupted run is a failure of its source too (D-121).
-            _log_failure(job.source, INTERRUPTED, "", now)
+            _log_failure(job.source, LEASE_EXPIRED, job.phase, now)
         # The queue (D-132): the oldest waiting entry decides the source; a legacy address request (state QUEUED) wins.
         from_queue = False
         if queued and job.state != ImportRequest.State.QUEUED:
@@ -446,6 +495,29 @@ def record_failure(claimed, exc):
         )
 
 
+def record_interruption(claimed, reason, *, requeue=False):
+    """Store and log an interrupted run (D-133): the fixed reason and the time in the result of its source and in the
+    import log, a WARNING with the source. ``requeue``: the source runs again first (the service was stopped)."""
+    now = timezone.now()
+    step = ImportRequest.objects.filter(pk=1).values_list("phase", flat=True).first() or ""
+    finished = ImportRequest.objects.filter(
+        pk=1, claim_token=claimed.token, state=ImportRequest.State.RUNNING
+    ).update(
+        state=ImportRequest.State.FAILED, finished_at=now, heartbeat_at=None, phase="", last_error=reason,
+        **source_result(claimed.source, ImportRequest.State.FAILED, now, reason),
+    )
+    if not finished:
+        logger.warning("The %s import was interrupted, but its job was taken over meanwhile.", claimed.source)
+        return
+    _log_failure(claimed.source, reason, step, now)
+    logger.warning(
+        "The %s import was interrupted (%s): %s%s", claimed.source, _kind(claimed), reason,
+        " It is queued again." if requeue else "",
+    )
+    if requeue:
+        requeue_first(claimed.source)
+
+
 def execute(claimed, progress=None):
     """Run the claimed import and record the outcome; re-raises a failure (after recording it)."""
     # Imported locally so web requests never load the downloader.
@@ -471,19 +543,15 @@ def execute(claimed, progress=None):
                 count = import_directory(repair=True, **options)
             else:
                 count = import_directory(**options)
+    except WorkerStopped:
+        # The service is stopping: the run is queued again and starts first with the service (D-133).
+        record_interruption(claimed, STOPPED, requeue=True)
+        raise
     except Exception as exc:
         record_failure(claimed, exc)
-        # Only a generic failure is stored; the exception goes to the caller (the command or the runner's log).
+        # Only a generic failure is stored; the exception goes to the caller (the command or the worker's log).
         raise
     record_success(
         claimed, count, downloaded=None if progress is None else progress.downloaded, transformer=transformer,
     )
     return True
-
-
-def process_one(*, schedule_automatic=False):
-    """The worker's step: claim a queued or due job and run it (no heartbeat: its lease is six hours)."""
-    claimed = claim(schedule_automatic=schedule_automatic, queued=True)
-    if claimed is None:
-        return False
-    return execute(claimed)

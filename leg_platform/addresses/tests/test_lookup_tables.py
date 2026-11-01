@@ -393,11 +393,17 @@ class InPlaceMigrationTests(TransactionTestCase):
         with alias.cursor() as cursor:
             return set(alias.introspection.get_constraints(cursor, table))
 
+    @staticmethod
+    def migrations_after_0019():
+        """How many migrations a file at 0019 still has to apply (every later one is additive and in place)."""
+        loader = MigrationLoader(None, ignore_no_migrations=True)
+        return len([name for app, name in loader.disk_migrations if app == "addresses" and name[:4] > "0019"])
+
     def test_the_migrations_are_marked_as_additive_and_the_older_ones_are_not(self):
         loader = MigrationLoader(None, ignore_no_migrations=True)
         for name in (
             "0020_lookup_tables_and_house_index", "0021_addressplace_centre",
-            "0022_import_queue_and_published_figures",
+            "0022_import_queue_and_published_figures", "0023_importrequest_worker_seen_at",
         ):
             self.assertTrue(loader.get_migration("addresses", name).in_place, name)
         for name in ("0010_address_coordinates", "0019_importrequest_progress_units_and_more"):
@@ -414,7 +420,7 @@ class InPlaceMigrationTests(TransactionTestCase):
 
             self.assertEqual(err, "")
             self.assertEqual(queued, False)
-            self.assertEqual(count, 3)
+            self.assertEqual(count, self.migrations_after_0019())
             with alias.cursor() as cursor:
                 cursor.execute("SELECT id, street, house_number, postal_code, locality FROM addresses_address ORDER BY id")
                 self.assertEqual(cursor.fetchall(), before)
@@ -526,7 +532,7 @@ class InPlaceMigrationTests(TransactionTestCase):
             with mock.patch.object(directory_setup.shutil, "disk_usage", return_value=types.SimpleNamespace(free=1024)):
                 (count, queued), _out, err = self.prepare()
 
-            self.assertEqual((count, queued), (3, False))
+            self.assertEqual((count, queued), (self.migrations_after_0019(), False))
             self.assertIn("migration was skipped", err)
             self.assertIn("free the space", err.lower())
             self.assertNotIn("addresses_addressstreet", self.tables(alias))

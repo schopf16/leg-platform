@@ -1,9 +1,10 @@
-"""The import of the address directory in a thread of the web process (D-090): the claim in the database,
+"""The import of the address directory in the import worker (D-090, D-133): the claim in the database,
 the heartbeat, the outcome in the row, the logs and the security log, the status page and its JSON.
 
-The thread uses its own database connections, so the tests that run it are transaction tests."""
+The heartbeat thread uses its own database connections, so the tests that run it are transaction tests."""
 
 import ast
+import io
 import threading
 import uuid
 from datetime import time, timedelta
@@ -11,13 +12,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
+from django.db import connections
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase, override_settings, tag
 from django.urls import reverse
 from django.utils import timezone, translation
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.addresses import importer, jobs, runner, status, storage
+from leg_platform.addresses import importer, jobs, runner, status, storage, worker
 from leg_platform.addresses.models import Directory, ImportRequest
 from leg_platform.addresses.progress import Progress
 
@@ -67,7 +69,7 @@ class FailureTextTests(SimpleTestCase):
         self.assertEqual(
             set(status.REASONS),
             set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
-            | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED},
+            | {jobs.UNEXPECTED_FAILURE, *jobs.INTERRUPTIONS},
         )
 
     def test_every_reason_has_a_swiss_german_text_without_the_sharp_s(self):
@@ -171,16 +173,17 @@ class ClaimTests(TestCase):
 
 @tag("mariadb")
 class RunnerTests(TransactionTestCase):
-    """The thread, with a stand-in for the importer (nothing is downloaded)."""
+    """The import worker, with a stand-in for the importer (nothing is downloaded)."""
 
     databases = {"default", "addresses"}
 
-    def tearDown(self):
-        self.assertTrue(runner.wait_for_end(30))
+    def setUp(self):
+        worker.stop_requested.clear()
+        self.addCleanup(worker.stop_requested.clear)
 
     def start_and_wait(self):
-        self.assertTrue(runner.start_manual())
-        self.assertTrue(runner.wait_for_end(30))
+        self.assertTrue(jobs.request_import())
+        self.assertEqual(worker.drain(), 1)
         return ImportRequest.objects.get(pk=1)
 
     def test_a_successful_import_is_recorded_logged_and_written_to_the_security_log(self):
@@ -242,13 +245,22 @@ class RunnerTests(TransactionTestCase):
             release.wait(20)
             return 1
 
+        def run_worker():
+            try:
+                worker.drain()
+            finally:
+                connections.close_all()
+
         with patch("leg_platform.addresses.importer.import_directory", side_effect=slow):
-            self.assertTrue(runner.start_manual())
+            self.assertTrue(jobs.request_import())
+            thread = threading.Thread(target=run_worker)
+            thread.start()
             self.assertTrue(entered.wait(20))
-            self.assertFalse(runner.start_manual())
+            self.assertFalse(jobs.request_import())
+            self.assertEqual(worker.drain(), 0)
             self.assertTrue(status.build()["active"])
             release.set()
-            self.assertTrue(runner.wait_for_end(30))
+            thread.join(30)
         self.assertEqual(ImportRequest.objects.get(pk=1).state, State.SUCCEEDED)
 
     def test_the_heartbeat_writes_the_progress_while_the_import_runs(self):
@@ -262,9 +274,17 @@ class RunnerTests(TransactionTestCase):
             release.wait(20)
             return 1
 
+        def run_worker():
+            try:
+                worker.drain()
+            finally:
+                connections.close_all()
+
         with patch("leg_platform.addresses.importer.import_directory", side_effect=slow), \
                 patch.object(runner, "HEARTBEAT_INTERVAL", 0.05):
-            self.assertTrue(runner.start_manual())
+            self.assertTrue(jobs.request_import())
+            thread = threading.Thread(target=run_worker)
+            thread.start()
             self.assertTrue(entered.wait(20))
             for _ in range(200):
                 job = ImportRequest.objects.get(pk=1)
@@ -273,25 +293,26 @@ class RunnerTests(TransactionTestCase):
                 threading.Event().wait(0.05)
             page = english_build()
             release.set()
-            self.assertTrue(runner.wait_for_end(30))
+            thread.join(30)
         self.assertEqual((job.phase, job.bytes_done, job.bytes_total), ("downloading", 25 * 1024 * 1024, 100 * 1024 * 1024))
         # The download covers 2 to 45 percent of the whole run (D-132): a quarter of it is 12 percent.
         self.assertEqual((page["state"], page["percent"]), ("running", 12))
 
-    def test_only_the_import_thread_may_write_the_directory_file(self):
+    def test_the_worker_command_is_the_writer_and_the_web_process_stays_read_only(self):
+        from django.core.management import call_command
+
         seen = {}
 
         def fake(*, repair=False, progress=None):
-            seen["thread"] = storage.is_writer()
+            seen["worker"] = storage.is_writer()
             return 1
 
-        with patch.object(storage, "_writer", False), \
+        jobs.request_import()
+        with patch.object(storage, "_writer", False), patch.object(worker, "install_signal_handlers"), \
                 patch("leg_platform.addresses.importer.import_directory", side_effect=fake):
-            self.assertFalse(storage.is_writer())
-            self.start_and_wait()
-            # The request threads of the process stay read-only; the flag of the thread is gone again.
-            self.assertFalse(storage.is_writer())
-        self.assertTrue(seen["thread"])
+            self.assertFalse(storage.is_writer())  # the web process of these tests
+            call_command("process_import_queue", stdout=io.StringIO())
+        self.assertTrue(seen["worker"])
 
     def test_the_lease_of_a_dead_import_is_freed_when_a_new_one_takes_over(self):
         now = timezone.now()
@@ -318,13 +339,6 @@ class RunnerTests(TransactionTestCase):
         with patch("leg_platform.addresses.importer.import_directory", return_value=1):
             self.start_and_wait()
         self.assertEqual(Directory.objects.get(pk=1).import_token, token)
-
-    def test_a_thread_that_cannot_start_marks_the_job_failed(self):
-        with patch("leg_platform.addresses.runner.threading.Thread") as thread:
-            thread.return_value.start.side_effect = RuntimeError("can't start new thread")
-            self.assertFalse(runner.start_manual())
-        job = ImportRequest.objects.get(pk=1)
-        self.assertEqual((job.state, job.last_error), (State.FAILED, jobs.UNEXPECTED_FAILURE))
 
 
 @tag("mariadb")
@@ -359,11 +373,11 @@ class AutomaticRefreshTextTests(TestCase):
         self.assertFalse(hasattr(runner, "maybe_start_automatic"))
         client, person = make_staff("visit.person@example.org")
         person.set_privileges(is_staff=True, is_superuser=True)
-        with override_settings(ADDRESS_IMPORT_AUTOMATIC=True), patch.object(runner, "_start") as start, \
+        with override_settings(ADDRESS_IMPORT_AUTOMATIC=True), patch.object(jobs, "execute") as execute, \
                 patch.object(jobs, "claim") as claim:
             self.assertEqual(client.get(reverse("admin:index")).status_code, 200)
             client.get(reverse("management:overview"))
-        start.assert_not_called()
+        execute.assert_not_called()
         claim.assert_not_called()
 
 
@@ -403,9 +417,10 @@ class StatusEndpointTests(TestCase):
 
     def test_a_post_to_the_status_address_cannot_start_an_import(self):
         client, _person = make_staff("status.two@example.org")
-        with patch.object(runner, "_start") as start:
+        with patch.object(jobs, "execute") as execute, patch.object(jobs, "claim") as claim:
             client.post(STATUS_URL)
-        start.assert_not_called()
+        execute.assert_not_called()
+        claim.assert_not_called()
         self.assertFalse(ImportRequest.objects.exists())
 
     def test_the_answer_shows_the_published_counts_of_the_directory(self):

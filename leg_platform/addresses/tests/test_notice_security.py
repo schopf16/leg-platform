@@ -26,17 +26,6 @@ REASON = "Missing EGID column."
 DELIVER = "leg_platform.accounts.emails._deliver"
 
 
-def app_proof(user):
-    """The proof of identity of a superuser who has the second factor: the code of the device now (D-062)."""
-    from leg_platform.accounts.models import AuthenticatorDevice
-    from leg_platform.accounts.tests.helpers import code_for
-
-    device = AuthenticatorDevice.objects.filter(user=user, confirmed=True).first()
-    if device is None:
-        device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
-    return {"otp_token": code_for(device)}
-
-
 class NoticeSecurityBase(TestCase):
     databases = {"default", "addresses"}
 
@@ -82,14 +71,9 @@ class ProofTests(NoticeSecurityBase):
         values = {"enabled": "on", "email": "new.target@example.org", **data}
         return client.post(reverse("admin:logmenu_settings"), values)
 
-    def test_a_change_of_the_address_without_the_proof_writes_nothing(self):
+    def test_a_change_needs_no_further_proof_and_is_recorded_once_without_the_address(self):
+        # Owner decision 2026-10-26: no proof in the administration.
         response = self.post(self.client_for(self.superuser))
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(LogNotificationSettings.objects.get(pk=1).email, TARGET)
-        self.assertFalse(SecurityEvent.objects.filter(event=SecurityEvent.Event.LOG_NOTIFICATION_CHANGED).exists())
-
-    def test_a_change_with_the_proof_is_saved_and_recorded_once_without_the_address(self):
-        response = self.post(self.client_for(self.superuser), **app_proof(self.superuser))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(LogNotificationSettings.objects.get(pk=1).email, "new.target@example.org")
         events = SecurityEvent.objects.filter(event=SecurityEvent.Event.LOG_NOTIFICATION_CHANGED)
@@ -101,7 +85,7 @@ class CsrfTests(NoticeSecurityBase):
     def test_the_settings_post_without_a_token_is_refused(self):
         client = self.client_for(self.superuser, enforce_csrf=True)
         response = client.post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "new.target@example.org", **app_proof(self.superuser),
+            "enabled": "on", "email": "new.target@example.org",
         })
         self.assertEqual(response.status_code, 403)
         self.assertEqual(LogNotificationSettings.objects.get(pk=1).email, TARGET)
@@ -124,7 +108,6 @@ class SwitchOnTests(NoticeSecurityBase):
         client = self.client_for(self.superuser)
         response = client.post(reverse("admin:logmenu_settings"), {
             "enabled": "on", "email": TARGET, "notify_error": "on", "failures": log_menu.failure_texts(),
-            **app_proof(self.superuser),
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(log_menu.notify_log_events(NOW), 0)

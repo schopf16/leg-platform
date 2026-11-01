@@ -35,12 +35,21 @@ from leg_platform.accounts.digests import keyed_digest
 from leg_platform.accounts.models import RateLimitBucket, RateLimitEvent, SecurityEvent
 from leg_platform.accounts.rate_limits import RATE_LIMIT_PURPOSE
 from leg_platform.addresses import importer, jobs, plants, status, storage
-from leg_platform.addresses.jobs import process_one, request_import
+from leg_platform.addresses.jobs import request_import
 from leg_platform.addresses.keys import fold, key, prefix_range
 from leg_platform.addresses.limits import allow_request
-from leg_platform.addresses.models import Address, Directory, ImportRequest, PlantRegister
+from leg_platform.addresses.models import Address, Directory, ImportQueueEntry, ImportRequest, PlantRegister
 from leg_platform.addresses.router import AddressRouter
 from leg_platform.addresses.services import approximate_matches, clean_input, directory_status, lookup
+
+def process_one(*, schedule_automatic=False):
+    """Claim a queued or due job and run it in this process, without a heartbeat: one synchronous step for the tests of
+    the claim and the automatic policy (the import worker and the scheduled tasks run jobs with a heartbeat)."""
+    claimed = jobs.claim(schedule_automatic=schedule_automatic, queued=True)
+    if claimed is None:
+        return False
+    return jobs.execute(claimed)
+
 
 HEADER = "STN_LABEL;ADR_NUMBER;ZIP_LABEL;BDG_NAME;COM_NAME\n"
 EGID_HEADER = HEADER.rstrip("\n") + ";BDG_EGID;ADR_EDID;ADR_EASTING;ADR_NORTHING\n"
@@ -368,8 +377,8 @@ class DirectoryFileSettingsTests(SimpleTestCase):
     def test_web_modules_never_import_the_importer_or_the_downloader(self):
         # A web request never downloads (D-075, D-090): the modules that a request reaches must not import
         # the importer or the HTTP client, neither at the top nor inside a function. The one door is the
-        # import thread of ``runner.py`` (and ``jobs.py`` for the failure text), which import the
-        # importer only inside a function that runs in that thread or in the worker.
+        # import worker (``jobs.py`` runs it, ``runner.py`` and ``worker.py`` only call ``jobs``), which import the
+        # importer only inside a function that runs in the worker (D-133).
         directory = Path(importer.__file__).parent
         for name in ("admin.py", "views.py", "urls.py", "services.py", "fixes.py", "matching.py", "limits.py", "models.py",
                      "apps.py", "router.py", "storage.py", "keys.py", "status.py", "progress.py"):
@@ -385,7 +394,7 @@ class DirectoryFileSettingsTests(SimpleTestCase):
                     with self.subTest(file=name, module=module):
                         self.assertFalse(module.split(".")[0] == "requests", module)
                         self.assertNotIn("importer", module.split("."))
-        for name in ("jobs.py", "runner.py"):
+        for name in ("jobs.py", "runner.py", "worker.py"):
             tree = ast.parse((directory / name).read_text(encoding="utf-8"))
             top_level = [
                 node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))
@@ -401,7 +410,6 @@ class DirectoryFileSettingsTests(SimpleTestCase):
         )
         self.assertEqual(callers, [
             "addresses/management/commands/import_address_directory.py",
-            "addresses/management/commands/process_address_imports.py",
         ])
         # The one outbound door of a request (KONZEPT 3a, D-066): only ``swisstopo.py`` talks to a third party
         # about an address, and only ``buildings.py`` (signed-in accounts, rate limits) calls it.
@@ -423,10 +431,15 @@ class DirectoryFileSettingsTests(SimpleTestCase):
             sorted(name for name, text in sources.items() if re.search(r"^\s*(from \. import .*\bswisstopo\b|from \.swisstopo)", text, re.M)),
             ["buildings.py"],
         )
-        # The running thread is the only web-side code that may write the file, and only its own connection.
-        runner_text = (directory / "runner.py").read_text(encoding="utf-8")
-        self.assertIn("mark_thread_writer", runner_text)
-        self.assertNotIn("mark_writer()", runner_text)
+        # No import runs in the web process any more (D-133): the web-side modules start no thread and never mark a writer;
+        # the one command of the import worker declares itself the writer.
+        for name in ("runner.py", "worker.py", "admin.py"):
+            text = (directory / name).read_text(encoding="utf-8")
+            self.assertNotIn("mark_thread_writer", text, name)
+            self.assertNotIn("mark_writer()", text, name)
+            self.assertNotIn("threading.Thread(", text, name)
+        command = (directory / "management" / "commands" / "process_import_queue.py").read_text(encoding="utf-8")
+        self.assertIn("mark_writer()", command)
 
 
 class RateLimitAdapterTests(SimpleTestCase):
@@ -1891,7 +1904,7 @@ class DirectoryDatabaseTests(TestCase):
                 download.assert_called_once_with()
                 self.assertEqual(
                     logs.output,
-                    ["WARNING:leg_platform.addresses.jobs:An address directory import job exceeded its lease and was taken over."],
+                    [f"WARNING:leg_platform.addresses.jobs:The address import was interrupted and its job was taken over: {jobs.LEASE_EXPIRED}"],
                 )
                 job = ImportRequest.objects.get(pk=1)
                 self.assertEqual(job.state, ImportRequest.State.SUCCEEDED)
@@ -1921,23 +1934,6 @@ class DirectoryDatabaseTests(TestCase):
             self.assertTrue(process_one())
         download.assert_called_once_with(repair=True)
 
-    def test_long_worker_continues_after_expected_failure(self):
-        module = "leg_platform.addresses.management.commands.process_address_imports"
-        with patch(module + ".process_one", side_effect=[importer.ImportFailure("private detail"), False]) as process:
-            with patch(module + ".time.sleep", side_effect=[None, KeyboardInterrupt]):
-                with self.assertRaises(KeyboardInterrupt):
-                    call_command("process_address_imports", stdout=io.StringIO())
-        self.assertEqual(process.call_count, 2)
-        self.assertEqual(process.call_args.kwargs, {"schedule_automatic": True})
-
-    def test_once_failure_has_safe_nonzero_output_and_does_not_schedule(self):
-        module = "leg_platform.addresses.management.commands.process_address_imports"
-        with patch(module + ".process_one", side_effect=importer.ImportFailure("private detail")) as process:
-            with self.assertRaises(CommandError) as error:
-                call_command("process_address_imports", once=True, stdout=io.StringIO())
-        self.assertNotIn("private detail", str(error.exception))
-        process.assert_called_once_with(schedule_automatic=False)
-
     def test_worker_claims_and_processes_once(self):
         request_import()
         with patch("leg_platform.addresses.importer.import_directory", return_value=1) as download:
@@ -1961,9 +1957,9 @@ class DirectoryDatabaseTests(TestCase):
                 call_command("import_address_directory", stdout=io.StringIO())
         self.assertNotIn("private detail", str(error.exception))
 
-    def test_worker_command_once_does_not_download_without_a_job(self):
+    def test_worker_command_without_a_job_does_not_download(self):
         with patch("leg_platform.addresses.importer.import_directory") as download:
-            call_command("process_address_imports", once=True, stdout=io.StringIO())
+            call_command("process_import_queue", stdout=io.StringIO())
             download.assert_not_called()
 
     def test_public_endpoint_post_and_no_store(self):
@@ -2181,18 +2177,17 @@ class DirectoryDatabaseTests(TestCase):
         url = reverse("admin:addresses_importrequest_changelist")
         start = reverse("admin:addresses_importrequest_start", kwargs={"source": "address"})
         with patch("leg_platform.addresses.importer.import_directory") as download, \
-                patch("leg_platform.addresses.runner.threading.Thread") as thread:
+                patch("leg_platform.addresses.jobs.execute") as execute:
             response = client.get(url)
             self.assertNotContains(response, "swisstopo")
             self.assertContains(response, "Data date")
             with patch("leg_platform.addresses.admin.allow_request", return_value=True):
                 self.assertEqual(client.post(start).status_code, 302)
-            # The request itself never downloads: it queues the job and starts the import thread (D-090, D-132).
+            # The request itself never downloads and never runs a job: it only queues it; the import worker runs it (D-133).
             download.assert_not_called()
-            thread.assert_called_once()
-            self.assertIs(thread.call_args.kwargs["daemon"], True)
-            thread.return_value.start.assert_called_once_with()
-        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
+            execute.assert_not_called()
+        self.assertEqual(list(ImportQueueEntry.objects.values_list("source", flat=True)), ["address"])
+        self.assertFalse(ImportRequest.objects.filter(state=ImportRequest.State.RUNNING).exists())
 
     def test_admin_start_requires_csrf(self):
         self._staff_client(True)
@@ -2229,7 +2224,7 @@ class DirectoryDatabaseTests(TestCase):
             logs.output,
             [f"WARNING:leg_platform.security:A data import was requested (actor {user.pk}, address)."] * 2,
         )
-        self.assertEqual(ImportRequest.objects.get(pk=1).state, ImportRequest.State.RUNNING)
+        self.assertEqual(ImportQueueEntry.objects.count(), 1)
 
     def test_the_event_has_a_swiss_german_label_in_the_security_log(self):
         from django.utils import translation
@@ -2690,8 +2685,9 @@ class ReadOnlyDefaultTests(TransactionTestCase):
     databases = {"default", "addresses"}
     # The modules whose command writes the file (or creates it): each one must declare itself.
     WRITER_COMMANDS = {
-        "addresses/management/commands/process_address_imports.py",
+        "addresses/management/commands/process_import_queue.py",
         "addresses/management/commands/import_address_directory.py",
+        "addresses/management/commands/install_address_directory.py",
         "addresses/management/commands/scheduled_address_import.py",
         "addresses/management/commands/seed_local_address_directory.py",
         "addresses/management/commands/scan_transformer_stations.py",
@@ -3023,6 +3019,7 @@ class MigrateTests(SimpleTestCase):
                 ("addresses", "0020_lookup_tables_and_house_index"),
                 ("addresses", "0021_addressplace_centre"),
                 ("addresses", "0022_import_queue_and_published_figures"),
+                ("addresses", "0023_importrequest_worker_seen_at"),
                 ("addresses", "0014_housekeepingerror_housekeepingstatus_notify_email_and_more"),
                 ("addresses", "0013_housekeepingstatus"),
             })

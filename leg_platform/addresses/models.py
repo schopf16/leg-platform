@@ -258,6 +258,8 @@ class ImportRequest(models.Model):
     # RUNNING job whose heartbeat is old belongs to a process that is gone (restart, kill) and is taken over.
     claim_token = models.UUIDField(null=True, editable=False)
     heartbeat_at = models.DateTimeField(null=True, editable=False)
+    # The last time the import worker looked at the queue (D-133): the data imports page says when none is running.
+    worker_seen_at = models.DateTimeField(null=True, editable=False)
     # One of ``progress.PHASES`` while running; "unchanged" after a success without a download.
     phase = models.CharField(max_length=16, blank=True, default="", editable=False)
     bytes_done = models.PositiveBigIntegerField(null=True, editable=False)
