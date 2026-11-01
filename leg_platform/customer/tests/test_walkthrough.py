@@ -581,8 +581,8 @@ class ProfileWalkthroughTests(TestCase):
 
     def test_the_password_card_has_no_lead_sentence_above_the_rules(self):
         html = text(self.client.get(self.profile, {"edit": "password"}))
-        self.assertNotIn("Wählen Sie mindestens 15 Zeichen.", html)
-        self.assertIn("Mindestens 15 Zeichen.", html)
+        self.assertNotIn("Wählen Sie mindestens 8 Zeichen.", html)
+        self.assertIn("Mindestens 8 Zeichen.", html)
 
     def test_the_delete_card_of_a_retained_account_says_it_is_deactivated(self):
         staff = staff_user("profile.staff@example.org")

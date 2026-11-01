@@ -12,17 +12,18 @@ from django.test import Client, RequestFactory, TestCase, override_settings, tag
 from django.urls import reverse
 
 from leg_platform.accounts import resend
-from leg_platform.accounts.models import MailJob, User, VerificationToken
+from leg_platform.accounts.models import MailJob, RegistrationChallenge, User, VerificationToken
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     choose_method,
     code_for,
+    confirm_code_of,
+    confirmation_code,
     create_active_user,
     run_mail_queue,
-    verification_path,
 )
 from leg_platform.accounts.tests.test_password_reset import NEW_PASSWORD, request_reset, reset_path
-from leg_platform.accounts.tests.test_registration import register
+from leg_platform.accounts.tests.test_registration import register, register_and_confirm
 from leg_platform.accounts.tests.test_second_factor import (
     CODE_URL,
     create_user_with_totp,
@@ -68,14 +69,19 @@ class ResendTests(TestCase):
         self.assertRedirects(response, SENT_URL, fetch_redirect_response=False)
         self.assertEqual(len(mail.outbox), 2)
         self.assertEqual(mail.outbox[1].to, ["new.person@example.org"])
-        verification_path(mail.outbox[1])
-        # The new link replaces the first one (D-037) and a new pause starts.
-        self.assertEqual(VerificationToken.objects.count(), 1)
+        first_code, second_code = (confirmation_code(message) for message in mail.outbox)
+        # The new code replaces the first one (D-136): one challenge is left and a new pause starts.
+        self.assertEqual(RegistrationChallenge.objects.count(), 1)
+        self.assertEqual(VerificationToken.objects.count(), 0)
         self.assertGreater(resend.pending(self.client, resend.REGISTRATION).wait, 50)
         again = self.client.post(RESEND_URL)
         run_mail_queue()
         self.assertEqual(len(mail.outbox), 2)
         self.assertRedirects(again, SENT_URL, fetch_redirect_response=False)
+        if first_code != second_code:
+            self.assertEqual(confirm_code_of(self.client, mail.outbox[0]).status_code, 200)
+            self.assertFalse(User.objects.exists())
+        self.assertEqual(confirm_code_of(self.client, mail.outbox[1]).status_code, 302)
 
     def test_the_address_cannot_be_chosen_in_the_request(self):
         register(self.client)
@@ -126,7 +132,8 @@ class ResendTests(TestCase):
                 session["mail_request_registration"] = bad
                 session.save()
                 page = self.client.get(SENT_URL)
-                self.assertContains(page, "Wir haben eine E-Mail gesendet.")
+                # Nothing usable in the session: no page, no address, back to the start.
+                self.assertRedirects(page, START_URL, fetch_redirect_response=False)
                 self.assertRedirects(self.client.post(RESEND_URL), START_URL, fetch_redirect_response=False)
         self.assertEqual(len(mail.outbox), 1)
 
@@ -171,8 +178,8 @@ class StepBarTests(TestCase):
         pages = [self.client.get(START_URL)]
         register(self.client)
         pages.append(self.client.get(SENT_URL))
-        self.client.get(verification_path(mail.outbox[0]))
-        token = VerificationToken.objects.get()
+        confirm_code_of(self.client, mail.outbox[0])
+        token = RegistrationChallenge.objects.get()
         # Step 2 has two screens: the choice of the method and the password.
         pages.append(self.client.get(reverse("accounts:registration_method")))
         choose_method(self.client, "password", token.pk)
@@ -227,7 +234,7 @@ class PasswordResetPagesTests(TestCase):
         self.assertRegex(html, r'<input[^>]*name="username"[^>]*autocomplete="username"|<input[^>]*autocomplete="username"[^>]*name="username"')
         self.assertIn("known.person@example.org", html)
         self.assertIn('class="password-rules"', html)
-        self.assertIn("Mindestens 15 Zeichen.", html)
+        self.assertIn("Mindestens 8 Zeichen.", html)
         self.assertIn("Passwort wiederholen", html)
         self.assertNotIn("Bitte das selbe Passwort", html)
         self.assertNotIn("Schritt", html)
@@ -343,10 +350,9 @@ class AccountNameOnPasswordPagesTests(TestCase):
         self.assertFalse(other.check_password(NEW_PASSWORD))
 
     def test_the_password_step_of_the_registration_has_the_same_pattern_and_ignores_a_posted_name(self):
-        register(self.client)
-        self.client.get(verification_path(mail.outbox[0]))
+        register_and_confirm(self.client)
         user = User.objects.get()
-        choose_method(self.client, "password", VerificationToken.objects.get().pk)
+        choose_method(self.client, "password", RegistrationChallenge.objects.get().pk)
         url = reverse("accounts:registration_password")
         page = self.client.get(url)
         html = page.content.decode()
@@ -462,13 +468,15 @@ class ResultPagesTests(TestCase):
 @tag("mariadb")
 class RegistrationEmailTests(TestCase):
     @override_settings(INSTANCE_NAME="LEG-Portal")
-    def test_a_new_address_gets_the_text_of_the_package_with_the_link(self):
+    def test_a_new_address_gets_a_code_without_a_link(self):
         register(self.client)
 
         message = mail.outbox[0]
-        self.assertEqual(message.subject, "Ihre Registrierung beim LEG-Portal")
-        self.assertIn("Bitte bestätigen Sie Ihre E-Mail-Adresse mit diesem Link. Der Link ist 24 Stunden gültig.", message.body)
-        self.assertRegex(message.body, r"Registrierung fortsetzen:\n\nhttps?://\S+/register/verify/\S+")
+        code = confirmation_code(message)
+        # The code stands in the subject (the preview of a phone shows it) and alone in a paragraph of the body.
+        self.assertIn("LEG-Portal", message.subject)
+        self.assertIn(f"\n\n{code}\n\n", f"\n\n{message.body}\n\n")
+        self.assertNotRegex(message.body, r"https?://\S+/register/verify/")
         self.assertNotIn("ß", message.subject + message.body)
 
     @override_settings(INSTANCE_NAME="LEG-Portal")

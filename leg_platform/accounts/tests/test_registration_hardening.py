@@ -24,6 +24,7 @@ from leg_platform.accounts.forms import (
 from leg_platform.accounts.models import (
     MailJob,
     RateLimitBucket,
+    RegistrationChallenge,
     SecurityEvent,
     User,
     VerificationToken,
@@ -31,6 +32,8 @@ from leg_platform.accounts.models import (
 from leg_platform.accounts.tests.helpers import (
     choose_method,
     completion_data,
+    confirm_code_of,
+    confirmation_code,
     create_active_user,
     password_data,
     registration_data,
@@ -39,6 +42,7 @@ from leg_platform.accounts.tests.helpers import (
     verification_path,
 )
 from leg_platform.accounts.views import (
+    REGISTRATION_CHALLENGE_SESSION_KEY,
     REGISTRATION_PASSWORD_SESSION_KEY,
     REGISTRATION_PRIVACY_SESSION_KEY,
     REGISTRATION_SESSION_KEY,
@@ -227,12 +231,15 @@ class BotCheckTests(TestCase):
         self.assertEqual(MailJob.objects.count(), 0)
 
     def test_a_hit_is_never_shown_as_a_refusal(self):
+        client = Client()
         response = post_form(
-            REGISTRATION_URL, registration_data("a.person@example.org", contact_fax_number="x")
+            REGISTRATION_URL, registration_data("a.person@example.org", contact_fax_number="x"), client
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertNotContains(self.client.get(response["Location"]), "Zu viele Anfragen")
+        page = client.get(response["Location"])
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, "Zu viele Anfragen")
 
     def test_the_pages_after_a_hit_and_after_a_request_are_the_same(self):
         pages = []
@@ -262,13 +269,13 @@ class SessionHardeningTests(TestCase):
         self.client = Client()
         post_form(REGISTRATION_URL, registration_data("new.person@example.org"), self.client)
         run_mail_queue()
-        self.path = verification_path(mail.outbox[-1])
-        self.token = VerificationToken.objects.get()
+        self.message = mail.outbox[-1]
+        confirm_code_of(self.client, self.message)
+        self.token = RegistrationChallenge.objects.get()
 
     def open_link(self):
-        response = self.client.get(self.path)
-        choose_method(self.client, "password", self.token.pk)
-        return response
+        """After the code: choose the method (there is no link for a new registration, D-136)."""
+        return choose_method(self.client, "password", self.token.pk)
 
     def set_password(self):
         return self.client.post(PASSWORD_URL, password_data(registration=self.token.pk))
@@ -278,15 +285,20 @@ class SessionHardeningTests(TestCase):
             COMPLETE_URL, completion_data(registration=self.token.pk, **overrides)
         )
 
-    def test_opening_the_link_renews_the_session_id_and_keeps_the_data(self):
-        before = self.client.session.session_key
-        self.assertIn("mail_request_registration", self.client.session)
+    def test_confirming_the_code_renews_the_session_id_and_keeps_the_challenge(self):
+        client = Client()
+        post_form(REGISTRATION_URL, registration_data("second.person@example.org"), client, "10.71.0.2")
+        run_mail_queue()
+        before = client.session.session_key
+        self.assertIn("mail_request_registration", client.session)
+        self.assertIn(REGISTRATION_CHALLENGE_SESSION_KEY, client.session)
 
-        self.open_link()
+        confirm_code_of(client, mail.outbox[-1])
 
-        self.assertNotEqual(self.client.session.session_key, before)
-        self.assertIn("mail_request_registration", self.client.session)
-        self.assertIn(REGISTRATION_SESSION_KEY, self.client.session)
+        self.assertNotEqual(client.session.session_key, before)
+        self.assertIn(REGISTRATION_CHALLENGE_SESSION_KEY, client.session)
+        # The request is answered: the pause and the address of the page "Enter code" are gone.
+        self.assertNotIn("mail_request_registration", client.session)
 
     def test_opening_the_link_of_a_reset_renews_the_session_id_too(self):
         create_active_user("known.person@example.org")
@@ -314,22 +326,28 @@ class SessionHardeningTests(TestCase):
         session = self.client.session
         for key in (
             REGISTRATION_SESSION_KEY,
+            REGISTRATION_CHALLENGE_SESSION_KEY,
             REGISTRATION_PASSWORD_SESSION_KEY,
             REGISTRATION_PRIVACY_SESSION_KEY,
             "mail_request_registration",
         ):
             self.assertNotIn(key, session)
 
-    def test_the_keys_leave_the_session_when_the_link_is_invalid(self):
+    def test_the_keys_leave_the_session_when_the_proof_is_invalid(self):
         self.open_link()
         self.set_password()
-        VerificationToken.objects.all().delete()
+        RegistrationChallenge.objects.all().delete()
 
         response = self.client.get(COMPLETE_URL)
 
-        self.assertRedirects(response, reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        self.assertRedirects(response, REGISTRATION_URL, fetch_redirect_response=False)
         session = self.client.session
-        for key in (REGISTRATION_SESSION_KEY, REGISTRATION_PASSWORD_SESSION_KEY, "mail_request_registration"):
+        for key in (
+            REGISTRATION_SESSION_KEY,
+            REGISTRATION_CHALLENGE_SESSION_KEY,
+            REGISTRATION_PASSWORD_SESSION_KEY,
+            "mail_request_registration",
+        ):
             self.assertNotIn(key, session)
 
     def test_a_person_who_is_logged_in_goes_to_the_start_page_from_every_step(self):
@@ -414,7 +432,7 @@ class SessionHardeningTests(TestCase):
     def test_the_rules_have_no_example_password(self):
         rules = " ".join(password_rules())
 
-        self.assertIn("15", rules)
+        self.assertIn("8", rules)
         for word in ("Beispiel", "example", "z. B.", "«", "\""):
             self.assertNotIn(word, rules)
         self.open_link()
@@ -520,15 +538,18 @@ class FormMarkupTests(TestCase):
 
 @tag("mariadb")
 class RegistrationMailTextTests(TestCase):
-    def test_the_mail_has_exactly_the_text_of_the_package_and_claims_no_single_use(self):
+    def test_the_mail_carries_the_code_alone_in_a_paragraph_and_no_link(self):
         with override_settings(INSTANCE_NAME="LEG-Portal"):
             post_form(REGISTRATION_URL, registration_data("new.person@example.org"))
             run_mail_queue()
 
-        body = mail.outbox[0].body
-        self.assertIn("Bitte bestätigen Sie Ihre E-Mail-Adresse mit diesem Link. Der Link ist 24 Stunden gültig.", body)
-        for word in ("einmal", "Einmal", "once"):
-            self.assertNotIn(word, body)
+        message = mail.outbox[0]
+        code = confirmation_code(message)
+        self.assertIn("LEG-Portal", message.subject)
+        self.assertIn(f"\n\n{code}\n\n", f"\n\n{message.body}\n\n")
+        self.assertIn("15", message.body)
+        self.assertNotIn("http", message.body)
+        self.assertNotIn("/register/verify/", message.body)
 
     def test_no_page_of_the_registration_claims_a_single_use_link(self):
         client = Client()

@@ -1,10 +1,10 @@
-{% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
+{% load i18n %}{% autoescape off %}{% translate "Your code to create your account" %}
 
-Please confirm your email address with this link. The link is valid for {{ lifetime_hours }} hours.
+{{ code }}
 
-Continue registration:
+{% blocktranslate %}Confirmation code · valid for {{ lifetime_minutes }} minutes{% endblocktranslate %}
 
-{{ verification_url }}{% endblocktranslate %}{% if contact_url %}
+{% translate "If you did not request this, ignore this email." %}
 
-{% blocktranslate %}Questions or problems: {{ contact_url }}{% endblocktranslate %}{% endif %}
+{% translate "Never share this code. Enter it only on the page where you requested it." %}
 {% endautoescape %}

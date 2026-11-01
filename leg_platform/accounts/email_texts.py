@@ -60,6 +60,17 @@ LIFETIME_DAYS = Placeholder(
 STOP_URL = Placeholder(
     "stop_url", _("Personal link that stops the requested change of an email address.")
 )
+# Only in the email of the registration (D-136).
+CODE = Placeholder(
+    "code",
+    _(
+        "The six-digit confirmation code. In the text it must stand alone in a paragraph (a line of its own "
+        "with an empty line before and after): the email shows that paragraph as the large code."
+    ),
+)
+LIFETIME_MINUTES = Placeholder(
+    "lifetime_minutes", _("Number of minutes for which the confirmation code can be used.")
+)
 # Only in the reminder "application not completed yet": the day the paused application is deleted.
 DELETION_DATE = Placeholder(
     "deletion_date",
@@ -96,6 +107,9 @@ class Definition:
     default_subject: Callable[[], str]
     placeholders: tuple[Placeholder, ...]
     required: tuple[Placeholder, ...]
+    # The subject of the registration email carries the code (D-136).
+    subject_placeholders: tuple[Placeholder, ...] = SUBJECT_PLACEHOLDERS
+    subject_required: tuple[Placeholder, ...] = ()
 
 
 DEFINITIONS = {
@@ -107,9 +121,11 @@ DEFINITIONS = {
     ),
     Key.REGISTRATION_VERIFICATION: Definition(
         "accounts/email/registration_verification.txt",
-        lambda: gettext("Your registration at %(instance_name)s"),
-        (VERIFICATION_URL, LIFETIME_HOURS),
-        (VERIFICATION_URL,),
+        lambda: gettext("%(code)s is your %(instance_name)s code"),
+        (CODE, LIFETIME_MINUTES),
+        (CODE,),
+        subject_placeholders=(INSTANCE_NAME, CODE),
+        subject_required=(CODE,),
     ),
     Key.INVITATION: Definition(
         "accounts/email/invitation.txt",
@@ -421,9 +437,15 @@ def validate_subject(key, subject):
     if looks_like_an_address(subject):
         errors.append(_address_message())
     _used, marker_errors = _check_placeholders(
-        subject, {placeholder.name for placeholder in SUBJECT_PLACEHOLDERS}
+        subject, {placeholder.name for placeholder in DEFINITIONS[key].subject_placeholders}
     )
     errors += marker_errors
+    for placeholder in DEFINITIONS[key].subject_required:
+        if placeholder.name not in _used:
+            errors.append(
+                gettext("The placeholder {%(name)s} is required, otherwise the email is useless.")
+                % {"name": placeholder.name}
+            )
     if errors:
         raise ValidationError(errors)
 
@@ -452,8 +474,17 @@ def validate_body(key, body):
                 gettext("The placeholder {%(name)s} is required, otherwise the email is useless.")
                 % {"name": placeholder.name}
             )
+    if key == Key.REGISTRATION_VERIFICATION and CODE.name in used and not code_paragraph(body):
+        errors.append(
+            gettext("The placeholder {code} must stand alone in a paragraph: a line of its own with an empty line before and after.")
+        )
     if errors:
         raise ValidationError(errors)
+
+
+def code_paragraph(text):
+    """Return whether a paragraph of the text (separated by empty lines) consists only of ``{code}``."""
+    return any(part.strip() == "{" + CODE.name + "}" for part in re.split(r"\n[ \t]*\n", text.replace("\r\n", "\n")))
 
 
 def _substitute(text, values):

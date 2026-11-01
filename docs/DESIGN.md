@@ -297,6 +297,10 @@ Fixed meaning, independent of the instance accent; used by the later energy page
   * First line "Guten Tag Vorname Nachname" for an account of a person with a first and last name, otherwise the neutral "Guten Tag". No comma, no Herr/Frau/Familie, no title.
   * Neutral also for: a company-only account; a name with a character a name does not have; a name that looks like an address; an address that does not currently belong to the account (former login address, removed second address, deleted account).
   * The start page keeps "Guten Tag, Name".
+* **A one-time code is displayed as ONE element that contains only the digits** (no spaces, hyphens, grouping, words or icons inside), so a double click selects exactly the code. In the page it is one text field (`autocomplete="one-time-code"`, `inputmode="numeric"`, no maxlength or pattern; no six boxes).
+* **Code mail** (D-136): purpose line, code box, small print. The instance name small and grey at the top, the line "Your code to create your account", the box (about 40 px, bold, monospace, centred, grey background with a 2 px edge), the validity line, then the small print and the footer. No other large number, button, link (but the privacy notice), image or script; inline CSS; dark-mode safe contrast.
+* **Single-field forms.** A single-field form (the code page) needs no error-summary link: the field error is linked to the field by `aria-describedby` (D-054).
+* **Registration steps.** "Step 2 of 3" covers the choice of the sign-in method and its setup page (password, app, passkey): sub-steps of one step, the number stays.
 
 ## 9. Implementation in Tabler
 

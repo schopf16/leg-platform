@@ -39,11 +39,11 @@ from leg_platform.accounts.tests.helpers import (
     VerifiedClient,
     age_authentication,
     code_for,
+    confirm_code_of,
     create_active_user,
     password_data,
     registration_data,
     run_mail_queue,
-    verification_path,
 )
 from leg_platform.accounts.tests.test_second_factor import (
     CODE_URL,
@@ -898,7 +898,12 @@ class NoSharpSInRenderedPagesTests(TestCase):
         client = Client()
         client.post(reverse("accounts:registration"), registration_data("sharp.s.new@example.org"))
         run_mail_queue()
-        client.get(verification_path(mail.outbox[-1]))
+        self.assert_clean(
+            client.get(reverse("accounts:registration_sent")).content.decode(), "registration, code step"
+        )
+        refused = client.post(reverse("accounts:registration_sent"), {"otp_token": "000000"})
+        self.assert_clean(refused.content.decode(), "registration, code step with an error")
+        confirm_code_of(client, mail.outbox[-1])
         method = client.get(reverse("accounts:registration_method"))
         self.assert_clean(method.content.decode(), "registration, method step")
         reference = re.search(r'name="registration" value="(\d+)"', method.content.decode()).group(1)

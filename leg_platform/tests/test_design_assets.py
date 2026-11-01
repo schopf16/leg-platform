@@ -219,6 +219,7 @@ VISIBLE_FIELD = re.compile(
 # Locked by a cause outside the form; the reason is visible text next to it (docs/DESIGN.md, buttons and errors).
 LOCKED_SUBMITS = {
     "accounts/templates/accounts/email_sent.html",
+    "accounts/templates/accounts/registration_code.html",
     "addresses/templates/admin/addresses/directory.html",
     "addresses/templates/admin/addresses/housekeeping.html",
 }

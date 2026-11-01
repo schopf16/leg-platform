@@ -9,9 +9,9 @@
   <form method="post" novalidate>
     {% csrf_token %}
     {% include "accounts/_bot_check.html" %}
-    {% blocktranslate count counter=lifetime_hours asvar link_hint %}We send you a link. It is valid for {{ counter }} hour.{% plural %}We send you a link. It is valid for {{ counter }} hours.{% endblocktranslate %}
-    {% include "accounts/_field.html" with field=form.email hint=link_hint %}
-    <button type="submit" class="btn btn-primary">{% translate "Send link" %}</button>
+    {% translate "We send you a 6-digit code." as code_hint %}
+    {% include "accounts/_field.html" with field=form.email hint=code_hint %}
+    <button type="submit" class="btn btn-primary">{% translate "Send code" %}</button>
   </form>
   <p class="entry-divider">{% translate "Already have an account?" %}</p>
   <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>

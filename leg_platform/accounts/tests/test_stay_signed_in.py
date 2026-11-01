@@ -25,7 +25,7 @@ from leg_platform.accounts.tests.helpers import (
     create_active_user,
     finish_registration,
     run_mail_queue,
-    verification_path,
+    confirmation_code,
 )
 from leg_platform.accounts.tests.test_registration import register
 from leg_platform.accounts.tests.test_second_factor import (
@@ -504,8 +504,7 @@ class AbandonedSecondStepTests(TestCase):
         log_in(self.client, user.email, remember=True)
         # The code step is never completed; the same browser completes a registration.
         register(self.client)
-        link = verification_path(mail.outbox[0])
-        response = finish_registration(self.client, link)
+        response = finish_registration(self.client, confirmation_code(mail.outbox[0]))
         self.assertEqual(response.status_code, 302)
         session = self.client.session
         self.assertIn("_auth_user_id", session)

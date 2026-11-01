@@ -10,7 +10,7 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 from django.urls import reverse
 from django.utils import translation
 
-from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
+from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user, registration_data
 
 STATIC = Path(settings.BASE_DIR) / "leg_platform" / "static"
 LOGIN_URL = reverse("accounts:login")
@@ -44,6 +44,9 @@ class EntryShellTests(TestCase):
     def test_every_page_without_a_session_uses_the_shell_with_logo_corner_buttons_and_footer(self):
         for name, url in ENTRY_PAGES.items():
             with self.subTest(page=name):
+                if name == "registration sent":
+                    # The page "Enter code" belongs to the session that asked for a code (D-136).
+                    self.client.post(reverse("accounts:registration"), registration_data())
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
                 html = response.content.decode()
@@ -71,6 +74,8 @@ class EntryShellTests(TestCase):
     def test_the_registration_pages_have_the_registration_panel(self):
         for name in ("registration", "registration sent"):
             with self.subTest(page=name):
+                if name == "registration sent":
+                    self.client.post(reverse("accounts:registration"), registration_data())
                 html = self.client.get(ENTRY_PAGES[name]).content.decode()
                 for text in REGISTER_PANEL:
                     self.assertIn(text, html)

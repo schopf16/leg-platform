@@ -28,6 +28,7 @@ from leg_platform.accounts.tests.helpers import (
     VerifiedClient,
     age_authentication,
     code_for,
+    confirm_code_of,
     create_active_user,
     reset_request_data,
     run_mail_queue,
@@ -470,15 +471,19 @@ class SecondAddressTests(TestCase):
     def test_an_address_of_another_account_cannot_be_registered_with_the_second_address(self):
         self.add_second()
 
-        register = Client().post(
+        client = Client()
+        register = client.post(
             reverse("accounts:registration"),
             {"email": SECOND, "form_started": bot_check.new_stamp()},
             REMOTE_ADDR="10.61.0.4",
         )
         run_mail_queue()
 
-        # The second address is no login address of anybody: it can register an account of its own.
+        # The second address is no login address of anybody: it gets a code and can register an account of its own.
         self.assertEqual(register.status_code, 302)
+        self.assertEqual(mail.outbox[-1].to, [SECOND])
+        confirmed = confirm_code_of(client, mail.outbox[-1])
+        self.assertEqual(confirmed.status_code, 302)
         self.assertTrue(User.objects.filter(email=SECOND).exists())
 
     def test_every_notification_goes_to_both_addresses(self):

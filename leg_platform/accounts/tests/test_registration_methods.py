@@ -4,9 +4,13 @@ The account stays unverified until step 3. Everything the setup creates is stage
 session; step 3 activates it together with the account.
 """
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.core import mail
 from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
+from django.utils import timezone
 
 from leg_platform.accounts import login_methods, passkeys, registration_methods, totp
 from leg_platform.accounts.models import (
@@ -15,20 +19,20 @@ from leg_platform.accounts.models import (
     Passkey,
     PasskeyIdentity,
     RecoveryCodeDevice,
+    RegistrationChallenge,
     User,
-    VerificationToken,
 )
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     choose_method,
     code_for,
     completion_data,
+    confirm_code_of,
     password_data,
-    verification_path,
 )
 from leg_platform.accounts.tests.test_passkeys import CeremonyFixture
-from leg_platform.accounts.tests.test_registration import register
-from leg_platform.accounts.views import REGISTRATION_PASSWORD_SESSION_KEY
+from leg_platform.accounts.tests.test_registration import register_and_confirm
+from leg_platform.accounts.views import REGISTRATION_CHALLENGE_SESSION_KEY, REGISTRATION_PASSWORD_SESSION_KEY
 
 METHOD_URL = reverse("accounts:registration_method")
 PASSWORD_URL = reverse("accounts:registration_password")
@@ -48,12 +52,24 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
     databases = {"default", "addresses"}
 
     def open(self):
-        """Register, open the link; ``self.pending`` is the unverified account, ``self.token`` its link."""
-        register(self.client)
-        self.path = verification_path(mail.outbox[-1])
-        self.client.get(self.path)
-        self.token = VerificationToken.objects.get(purpose=VerificationToken.Purpose.REGISTRATION)
+        """Register and enter the code; ``self.pending`` is the unverified account, ``self.token`` the proof of the session."""
+        register_and_confirm(self.client, EMAIL)
+        self.token = RegistrationChallenge.objects.get(address=EMAIL)
         self.pending = User.objects.get(email=EMAIL)
+
+    def second_proof(self):
+        """A second session with its own proof of the same unverified account (another tab that entered a code)."""
+        row, raw = RegistrationChallenge.begin(EMAIL, timedelta(minutes=15))
+        row.user = self.pending
+        row.consumed = True
+        row.proven_until = timezone.now() + timedelta(hours=1)
+        row.save()
+        client = Client()
+        session = client.session
+        session[REGISTRATION_CHALLENGE_SESSION_KEY] = raw
+        session.save()
+        client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        return client, row
 
     def choose(self, method):
         return choose_method(self.client, method, self.token.pk)
@@ -69,10 +85,9 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
 
     # The choice
 
-    def test_the_link_leads_to_the_choice_of_the_method(self):
-        register(self.client)
-        opened = self.client.get(verification_path(mail.outbox[-1]))
-        self.assertRedirects(opened, METHOD_URL, fetch_redirect_response=False)
+    def test_the_code_leads_to_the_choice_of_the_method(self):
+        confirmed = register_and_confirm(self.client, EMAIL)
+        self.assertRedirects(confirmed, METHOD_URL, fetch_redirect_response=False)
 
         page = self.client.get(METHOD_URL)
 
@@ -81,7 +96,7 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
             self.assertContains(page, f'value="{key}"')
         # The note of the card ("your password is deleted") speaks of an existing account.
         self.assertNotContains(page, "choice-passkey-note")
-        self.assertContains(page, f'name="registration" value="{VerificationToken.objects.get().pk}"')
+        self.assertContains(page, f'name="registration" value="{RegistrationChallenge.objects.get().pk}"')
 
     def test_the_next_steps_need_a_chosen_method(self):
         self.open()
@@ -105,33 +120,31 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertNotIn(registration_methods.SESSION_KEY, self.client.session)
 
-    def test_the_choice_belongs_to_the_link_of_the_form(self):
+    def test_the_choice_belongs_to_the_proof_of_the_form(self):
         self.open()
 
         response = self.client.post(METHOD_URL, {"method": "password", "registration": self.token.pk + 1})
 
-        self.assertRedirects(response, reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("accounts:registration"), fetch_redirect_response=False)
         self.assertNotIn(registration_methods.SESSION_KEY, self.client.session)
 
-    def test_opening_the_link_again_starts_step_two_again_without_deleting_anything(self):
+    def test_entering_the_spent_code_again_changes_nothing_that_was_staged(self):
         self.open()
         self.choose("passkey")
         self.assertEqual(self.staged_passkey().status_code, 200)
 
-        again = self.client.get(self.path)
+        again = confirm_code_of(self.client, mail.outbox[-1])
 
-        self.assertRedirects(again, METHOD_URL, fetch_redirect_response=False)
-        self.assertNotIn(registration_methods.SESSION_KEY, self.client.session)
-        # A mail scanner that opens the link must not wipe what the person staged.
+        self.assertEqual(again.status_code, 200)
+        self.assertIn(registration_methods.SESSION_KEY, self.client.session)
         self.assertEqual(Passkey.objects.filter(user=self.pending).count(), 1)
 
     def test_step_three_keeps_only_what_belongs_to_the_chosen_method(self):
-        # Two tabs of the same link: tab B completes with a password while tab A had confirmed an app and a passkey.
+        # Two tabs of the same account: tab B completes with a password while tab A had confirmed an app and a passkey.
         self.open()
-        other = Client()
-        other.get(self.path)
-        choose_method(other, "password", self.token.pk)
-        other.post(PASSWORD_URL, password_data(registration=self.token.pk))
+        other, other_proof = self.second_proof()
+        choose_method(other, "password", other_proof.pk)
+        other.post(PASSWORD_URL, password_data(registration=other_proof.pk))
         self.choose("app")
         self.client.post(PASSWORD_URL, password_data(registration=self.token.pk))
         self.client.get(APP_URL)
@@ -143,7 +156,7 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
             name="Left over", setup_binding="another session", backup_eligible=False, backed_up=False,
         )
 
-        done = other.post(COMPLETE_URL, completion_data(registration=self.token.pk))
+        done = other.post(COMPLETE_URL, completion_data(registration=other_proof.pk))
 
         self.assertRedirects(done, reverse("home"), fetch_redirect_response=False)
         self.pending.refresh_from_db()
@@ -320,17 +333,16 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
         self.assertFalse(self.pending.is_staff or self.pending.is_superuser)
         self.assertEqual(self.client.get(reverse("accounts:profile")).status_code, 200)
 
-    def test_the_passkey_entry_points_need_the_link_and_the_method(self):
-        register(self.client)
-        self.client.get(verification_path(mail.outbox[-1]))
-        token = VerificationToken.objects.get()
+    def test_the_passkey_entry_points_need_the_proof_and_the_method(self):
+        register_and_confirm(self.client, EMAIL)
+        token = RegistrationChallenge.objects.get()
         data = {"purpose": "register", "mode": "this_device"}
 
-        # Anonymous, no link in the session.
+        # Anonymous, no proof in the session.
         anonymous = Client()
         for url in (OPTIONS_URL, CREATE_URL):
             self.assertEqual(self.json_post(url, data, client=anonymous).status_code, 400)
-        # The link, but the method password.
+        # The proof, but the method password.
         choose_method(self.client, "password", token.pk)
         for url in (OPTIONS_URL, CREATE_URL):
             self.assertEqual(self.json_post(url, data).status_code, 400)
@@ -353,9 +365,8 @@ class RegistrationMethodTests(CeremonyFixture, TestCase):
         self.choose("passkey")
         options = self.json_post(OPTIONS_URL, {"purpose": "register", "mode": "this_device"}).json()
         stranger = Client()
-        register(stranger, "other.person@example.org")
-        stranger.get(verification_path(mail.outbox[-1]))
-        other_token = VerificationToken.objects.get(user__email="other.person@example.org")
+        register_and_confirm(stranger, "other.person@example.org")
+        other_token = RegistrationChallenge.objects.get(address="other.person@example.org")
         choose_method(stranger, "passkey", other_token.pk)
 
         response = self.json_post(

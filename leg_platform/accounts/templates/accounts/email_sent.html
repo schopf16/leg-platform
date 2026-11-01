@@ -1,11 +1,9 @@
 {% extends "entry_base.html" %}
 {% load i18n static %}
 {% block title %}{% translate "Check your email" %}{% endblock %}
-{% block panel %}{% if purpose == "registration" %}{% include "accounts/_panel_register.html" %}{% else %}{{ block.super }}{% endif %}{% endblock %}
 {% block form %}
-  {% if purpose == "registration" %}{% include "accounts/_progress.html" %}{% endif %}
   <h1>{% translate "Check your email" %}</h1>
-  {# The same text for a new address and for an address with an account (docs/PROJECT.md, "Registration"). #}
+  {# The same text for a known and an unknown address (docs/PROJECT.md, "Registration"). #}
   {% if address %}
     <p>{% blocktranslate with address=address %}We have sent an email to <strong class="address-text">{{ address }}</strong>. Please check your mailbox.{% endblocktranslate %}</p>
   {% else %}

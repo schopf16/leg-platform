@@ -392,14 +392,13 @@ class PlaceholderOfferTests(SimpleTestCase):
         self.assertEqual(catalogue["Hello"], "Guten Tag")
         self.assertEqual(catalogue["Hello %(name)s"], "Guten Tag %(name)s")
         # The remaining texts that start with "Hello" are the emails to unverified or foreign
-        # addresses (registration, existing account, password reset, new address, second address).
+        # addresses (invitation, existing account, password reset, new address, second address; the registration code has its own text, D-136).
         self.assertEqual(
             sorted(msgid.split("\n")[2][:30] for msgid in catalogue if msgid.startswith("Hello\n\n")),
             sorted(
                 [
                     "A new password was requested f",
                     "An account was created for you",
-                    "Please confirm your email addr",
                     "Someone asked at %(instance_na",
                     "Someone requested a change to ",
                     "Someone tried to change an acc",
@@ -792,7 +791,7 @@ class NotificationGreetingTests(TestCase):
     def test_the_requests_of_persons_without_an_account_never_get_a_name(self):
         rename(self.user, "Maria", "Muster")
         emails.send_registration_existing_account("person@example.org")
-        emails.send_registration_verification("person@example.org", "T" * 43, timedelta(hours=24))
+        emails.send_registration_code("person@example.org", "123456", timedelta(minutes=30))
         emails.send_password_reset("person@example.org", "T" * 43, timedelta(hours=24))
         emails.send_email_change_existing_account("person@example.org")
         emails.send_email_change_verification("person@example.org", "T" * 43, timedelta(hours=24))

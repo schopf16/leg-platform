@@ -46,6 +46,10 @@ INVITATION_ACCOUNT_LIMITS = ((1, timedelta(seconds=60)),)
 # about 8 requests per second only while typing without a pause, far below this budget in use.
 SCOPE_PERSON_SEARCH = "person-search"
 PERSON_SEARCH_LIMITS = ((300, timedelta(minutes=1)),)
+# Entries of the registration code (D-136), counted per client address: far above what a person needs (a code has
+# five tries), far below what guessing needs. Above the limit the page answers with HTTP 429, as for the mail requests.
+SCOPE_REGISTRATION_CODE_IP = "registration-code-ip"
+REGISTRATION_CODE_IP_LIMITS = ((30, timedelta(minutes=10)), (100, timedelta(hours=1)))
 
 # Buckets that were not used for longer than the longest window are deleted by the cleanup.
 LONGEST_WINDOW = timedelta(hours=24)

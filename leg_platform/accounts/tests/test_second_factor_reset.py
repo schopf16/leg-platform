@@ -863,9 +863,9 @@ class InitialAdministratorTests(TransactionTestCase):
         with self.assertRaisesMessage(CommandError, "do not match"):
             self.run_command(passwords=(INITIAL_PASSWORD, "something else entirely here"))
         with self.assertRaises(CommandError) as raised:
-            self.run_command(passwords=("pw-sentinel-1", "pw-sentinel-1"))
+            self.run_command(passwords=("sentry7", "sentry7"))
         self.assertIn("not accepted", str(raised.exception))
-        self.assertNotIn("pw-sentinel-1", str(raised.exception))
+        self.assertNotIn("sentry7", str(raised.exception))
         with self.assertRaises(CommandError):
             self.run_command(email="not an address")
         self.assertFalse(User.objects.exists())

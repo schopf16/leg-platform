@@ -389,7 +389,7 @@ The reader package is installed with `--no-deps` because it declares `opencv-pyt
 * `DJANGO_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https`: only because nginx sets `X-Forwarded-Proto https` on every forwarded request (section 7).
 * `AXES_IPWARE_PROXY_COUNT=1` with the header format of 7.4 (O-16). `0` groups all visitors under `127.0.0.1`.
 * `DJANGO_SECURE_HSTS_SECONDS=3600` during verification, then unset (one-year default, O-20). `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=False` unless O-20 decides otherwise.
-* **`BOOTSTRAP_SYSTEM_ADMIN_EMAIL`** (personal data) and **`BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`** (secret, at least 15 characters): written by the human before the first start (section 9). Remove the password line after the first login. Both are ignored once a system administrator exists.
+* **`BOOTSTRAP_SYSTEM_ADMIN_EMAIL`** (personal data) and **`BOOTSTRAP_SYSTEM_ADMIN_PASSWORD`** (secret, at least 8 characters): written by the human before the first start (section 9). Remove the password line after the first login. Both are ignored once a system administrator exists.
 * Optional (O-10): `INSTANCE_NAME` (at most 100 characters), `INSTANCE_WEBSITE_URL`, `INSTANCE_ACCENT_LIGHT`, `INSTANCE_ACCENT_TEXT_LIGHT`, `INSTANCE_ACCENT_DARK`, `INSTANCE_ACCENT_TEXT_DARK`, `INSTANCE_HIGHLIGHT` (`#RRGGBB`, contrast checked at start), `INSTANCE_LOGO_LIGHT`, `INSTANCE_LOGO_DARK` (relative static paths such as `instance/logo.svg`, both or neither), `INSTANCE_STATIC_DIRECTORY=/opt/leg-platform/instance-static`.
 * Optional: `ADDRESS_DIRECTORY_FILE` (default `/var/lib/leg-platform/address-directory.sqlite3`, inside the `StateDirectory` of the units, so nothing else is needed; a path elsewhere is not writable under `ProtectSystem=strict` until **every** unit that touches the file (setup, web, scheduled tasks, optional importer, and the `web` profile of `leg-manage`) names its folder in `ReadWritePaths=` and the folder belongs to the service user: do not set it without the owner's decision, D-075); `SECURITY_LOG_RETENTION_DAYS`, `SECURITY_LOG_LONG_RETENTION_DAYS` (unset: 30 and 365, also the minimum).
 
@@ -932,7 +932,7 @@ Starting web runs `leg-setup.service` first. Expected: both services `active`; `
 
 `leg-setup.service` (8.0) creates the first system administrator **automatically** at the first start (D-076) from `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` of `/etc/leg-platform/app.env`, **only while the account table is completely empty**.
 
-* The password must pass the project's validators (at least 15 characters). A missing, weak or invalid value fails the unit with a message that does not contain it.
+* The password must pass the project's validators (at least 8 characters), weak or invalid value fails the unit with a message that does not contain it.
 * The account has a forced password change and must set up the second factor at its first login (D-041).
 
 **Risk (D-076, accepted by the owner):** the initial password sits in the environment file (`600 root:root`, which also holds `DB_PASSWORD` and `DJANGO_SECRET_KEY`) and has no expiry. Whoever knows it and reaches the login page first can lock the owner out. **Remove `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` after the first login and restart the services that read the file** (running processes keep the value).
@@ -950,7 +950,7 @@ Starting web runs `leg-setup.service` first. Expected: both services `active`; `
 
 **Take-over.** The instance is compromised if the owner's first login **fails** although the password was typed correctly, or the security log (`docs/SECURITY.md` section 10) shows a `PASSWORD_CHANGED` or `TWO_FACTOR_ENABLED` entry the owner did not cause. Stop the services, tell the owner (0.3), do not continue with that database. A failed first login on a **new instance without data** is otherwise fixed only by a new empty database, with the owner's explicit approval (0.2 rule 6). Never edit the database by hand.
 
-**Who does what.** The person who will administer the instance (O-18) chooses the password and writes the two lines **themselves**. The executing AI does not choose, see, print or transmit it. It never appears in a command-line argument, shell history, log or chat. Use at least 15 characters and only letters, digits and `-`, `_`, `.` (`systemd.exec(5)` treats quotes and backslashes in `EnvironmentFile=` specially). At a hidden prompt:
+**Who does what.** The person who will administer the instance (O-18) chooses the password and writes the two lines **themselves**. The executing AI does not choose, see, print or transmit it. It never appears in a command-line argument, shell history, log or chat. Use a long one (at least 8 characters are required) and only letters, digits and `-`, `_`, `.` (`systemd.exec(5)` treats quotes and backslashes in `EnvironmentFile=` specially). At a hidden prompt:
 
 ```bash
 # Make sure the file ends with a newline, so that the first appended line does not join the last one.

@@ -22,6 +22,7 @@
       button.disabled = false;
       if (note) {
         note.hidden = true;
+        note.setAttribute("aria-hidden", "true");
       }
       return;
     }

@@ -16,7 +16,7 @@ from leg_platform.accounts.models import EmailText, EmailTextVersion
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
 
 Key = EmailText.Key
-BODY_WITH_LINK = "Guten Tag\n\nHier: {verification_url}\n\nGültig: {lifetime_hours} Stunden."
+BODY_WITH_CODE = "Guten Tag\n\n{code}\n\nGültig: {lifetime_minutes} Minuten."
 
 
 def messages(validate, key, text):
@@ -34,7 +34,7 @@ class ValidationTests(SimpleTestCase):
 
     def test_a_valid_body_passes(self):
         self.assertEqual(
-            messages(email_texts.validate_body, Key.REGISTRATION_VERIFICATION, BODY_WITH_LINK), []
+            messages(email_texts.validate_body, Key.REGISTRATION_VERIFICATION, BODY_WITH_CODE), []
         )
 
     def test_an_unknown_placeholder_is_rejected_by_name(self):
@@ -160,8 +160,8 @@ class RenderTests(TestCase):
         "contact_url": "",
         "privacy_url": "",
         "login_url": "https://portal.example.org/login/",
-        "verification_url": "https://portal.example.org/register/verify/abc/",
-        "lifetime_hours": "24",
+        "code": "123456",
+        "lifetime_minutes": "30",
     }
 
     def store(self, key, **fields):
@@ -171,49 +171,45 @@ class RenderTests(TestCase):
         with translation.override("de-ch"):
             subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
-        self.assertEqual(subject, "Ihre Registrierung beim Portal")
-        self.assertIn(self.VALUES["verification_url"], body)
-        self.assertIn("24 Stunden", body)
+        self.assertEqual(subject, "123456 ist Ihr Code für Portal")
+        self.assertIn(self.VALUES["code"], body)
+        self.assertIn("30 Minuten", body)
 
     def test_a_stored_text_replaces_the_placeholders(self):
-        self.store(Key.REGISTRATION_VERIFICATION, subject="Willkommen bei {instance_name}", body=BODY_WITH_LINK)
+        self.store(Key.REGISTRATION_VERIFICATION, subject="{code} Willkommen bei {instance_name}", body=BODY_WITH_CODE)
 
         subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
-        self.assertEqual(subject, "Willkommen bei Portal")
-        self.assertEqual(
-            body,
-            "Guten Tag\n\nHier: https://portal.example.org/register/verify/abc/\n\n"
-            "Gültig: 24 Stunden.\n",
-        )
+        self.assertEqual(subject, "123456 Willkommen bei Portal")
+        self.assertEqual(body, "Guten Tag\n\n123456\n\nGültig: 30 Minuten.\n")
 
     def test_subject_and_body_are_independent(self):
-        self.store(Key.REGISTRATION_VERIFICATION, subject="", body=BODY_WITH_LINK)
+        self.store(Key.REGISTRATION_VERIFICATION, subject="", body=BODY_WITH_CODE)
 
         with translation.override("de-ch"):
             subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
-        self.assertEqual(subject, "Ihre Registrierung beim Portal")
-        self.assertTrue(body.startswith("Guten Tag\n\nHier:"))
+        self.assertEqual(subject, "123456 ist Ihr Code für Portal")
+        self.assertTrue(body.startswith("Guten Tag\n\n123456"))
 
     def test_values_are_not_searched_for_further_placeholders(self):
-        self.store(Key.REGISTRATION_VERIFICATION, body=BODY_WITH_LINK)
-        values = {**self.VALUES, "lifetime_hours": "{verification_url}"}
+        self.store(Key.REGISTRATION_VERIFICATION, body=BODY_WITH_CODE)
+        values = {**self.VALUES, "lifetime_minutes": "{code}"}
 
         _subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, values)
 
-        self.assertIn("Gültig: {verification_url} Stunden.", body)
+        self.assertIn("Gültig: {code} Minuten.", body)
 
     def test_an_invalid_stored_text_falls_back_to_the_default_and_is_logged(self):
-        # Saved before a placeholder disappeared: the link is missing now.
-        self.store(Key.REGISTRATION_VERIFICATION, subject="{reset_url}", body="Kein Link hier")
+        # Saved before a placeholder disappeared: the code is missing now.
+        self.store(Key.REGISTRATION_VERIFICATION, subject="{reset_url}", body="Kein Code hier")
 
         with self.assertLogs("leg_platform.accounts.email_texts", "WARNING") as logs:
             subject, body = email_texts.render(Key.REGISTRATION_VERIFICATION, self.VALUES)
 
         self.assertNotIn("{", subject)
-        self.assertIn(self.VALUES["verification_url"], body)
-        self.assertNotIn("Kein Link hier", "\n".join(logs.output))
+        self.assertIn(self.VALUES["code"], body)
+        self.assertNotIn("Kein Code hier", "\n".join(logs.output))
 
     def test_template_syntax_in_a_stored_text_is_not_executed(self):
         # Written around the validation, e.g. directly in the database.

@@ -38,6 +38,7 @@ from leg_platform.accounts.models import (
     MailJob,
     PendingEmailChange,
     RecoveryCode,
+    RegistrationChallenge,
     SecurityEvent,
     User,
     VerificationToken,
@@ -54,8 +55,9 @@ from leg_platform.accounts.tests.helpers import (
     password_data,
     registration_data,
     reset_request_data,
+    confirm_code_of,
+    confirmation_code,
     run_mail_queue,
-    verification_path,
 )
 from leg_platform.accounts.tests.test_second_factor import (
     create_user_with_totp,
@@ -158,11 +160,13 @@ def pending(user, kind, address, hours=24):
     )
 
 
-def request_link(client, email, address):
-    """Step 1 of the registration and the worker; returns the path of the link of the mail."""
+def request_proof(client, email, address):
+    """Step 1 of the registration, the worker and the entry of the code; returns the code."""
     client.post(REGISTRATION_URL, registration_data(email), REMOTE_ADDR=address)
     run_mail_queue()
-    return verification_path(mail.outbox[-1])
+    code = confirmation_code(mail.outbox[-1])
+    assert confirm_code_of(client, mail.outbox[-1]).status_code == 302
+    return code
 
 
 class LoginRedirectMixin:
@@ -1058,40 +1062,37 @@ class CsrfAndMethodTests(TestCase):
 
 @tag("mariadb")
 class RegistrationNegativeTests(TestCase):
-    """The steps of the registration need the state of a valid link; abuse changes nothing."""
+    """The steps of the registration need the proof of a confirmed code; abuse changes nothing."""
 
     databases = ADDRESS_DATABASES
 
-    def test_steps_two_and_three_without_a_link_lead_to_the_page_of_an_invalid_link(self):
+    def test_steps_two_and_three_without_a_proof_lead_back_to_the_registration(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.1")
+        request_proof(client, "new.person@example.org", "10.85.0.1")
         user = User.objects.get(email="new.person@example.org")
-        token = VerificationToken.objects.get(user=user)
+        token = RegistrationChallenge.objects.get(user=user)
         fresh = Client()
         before = snapshot()
-        invalid = reverse("accounts:registration_invalid")
+        start = reverse("accounts:registration")
 
         for url in (PASSWORD_URL, COMPLETE_URL):
             with self.subTest(url=url):
-                self.assertRedirects(fresh.get(url), invalid, fetch_redirect_response=False)
+                self.assertRedirects(fresh.get(url), start, fetch_redirect_response=False)
                 self.assertRedirects(
                     fresh.post(url, {**password_data(registration=token.pk), **completion_data(registration=token.pk)}),
-                    invalid,
+                    start,
                     fetch_redirect_response=False,
                 )
         self.assertEqual(snapshot(), before)
         self.assertEqual(User.objects.get(pk=user.pk).status, User.Status.UNVERIFIED)
         self.assertNotIn("_auth_user_id", fresh.session)
-        # The link itself still works for the person who has it: it leads to the choice of the method.
-        self.assertRedirects(
-            Client().get(path), reverse("accounts:registration_method"), fetch_redirect_response=False
-        )
+        # The browser that entered the code still has its proof: it leads to the choice of the method.
+        self.assertEqual(client.get(reverse("accounts:registration_method")).status_code, 200)
 
-    def test_the_details_step_needs_the_password_step_of_the_same_link(self):
+    def test_the_details_step_needs_the_password_step_of_the_same_proof(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.2")
-        client.get(path)
-        token = VerificationToken.objects.get()
+        request_proof(client, "new.person@example.org", "10.85.0.2")
+        token = RegistrationChallenge.objects.get()
         user = token.user
 
         # Without a method the details step leads to the choice, with one to its setup.
@@ -1106,20 +1107,23 @@ class RegistrationNegativeTests(TestCase):
         self.assertFalse(user.has_usable_password())
         self.assertNotIn("_auth_user_id", client.session)
 
-    def test_an_expired_link_cannot_complete_a_registration_that_was_started(self):
+    def test_an_expired_proof_cannot_complete_a_registration_that_was_started(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.3")
-        client.get(path)
-        token = VerificationToken.objects.get()
+        request_proof(client, "new.person@example.org", "10.85.0.3")
+        token = RegistrationChallenge.objects.get()
         choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
-        VerificationToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+        RegistrationChallenge.objects.filter(pk=token.pk).update(proven_until=timezone.now() - timedelta(seconds=1))
 
         response = client.post(COMPLETE_URL, completion_data(registration=token.pk))
 
-        self.assertRedirects(response, reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        self.assertRedirects(response, reverse("accounts:registration"), fetch_redirect_response=False)
         self.assertEqual(User.objects.get(pk=token.user_id).status, User.Status.UNVERIFIED)
-        self.assertRedirects(Client().get(path), reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        self.assertRedirects(
+            client.get(reverse("accounts:registration_method")),
+            reverse("accounts:registration"),
+            fetch_redirect_response=False,
+        )
 
     def test_a_registration_link_of_an_active_account_opens_nothing(self):
         user = create_active_user("active.person@example.org")
@@ -1134,9 +1138,8 @@ class RegistrationNegativeTests(TestCase):
 
     def test_a_second_submit_and_a_copy_of_the_session_complete_nothing_twice(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.4")
-        client.get(path)
-        token = VerificationToken.objects.get()
+        request_proof(client, "new.person@example.org", "10.85.0.4")
+        token = RegistrationChallenge.objects.get()
         choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
         clone = Client()
@@ -1150,7 +1153,7 @@ class RegistrationNegativeTests(TestCase):
 
         self.assertRedirects(first, HOME_URL, fetch_redirect_response=False)
         self.assertRedirects(again, HOME_URL, fetch_redirect_response=False)
-        self.assertRedirects(copied, reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        self.assertRedirects(copied, reverse("accounts:registration"), fetch_redirect_response=False)
         user.refresh_from_db()
         self.assertEqual((user.first_name, user.customer_number_id), ("First", number))
         self.assertEqual(
@@ -1158,17 +1161,17 @@ class RegistrationNegativeTests(TestCase):
         )
         self.assertNotIn("_auth_user_id", clone.session)
         self.assertEqual(clone.get(PROFILE_URL).status_code, 302)
-        self.assertFalse(VerificationToken.objects.filter(pk=token.pk).exists())
-        # The link is used up: it cannot log in again.
-        self.assertRedirects(Client().get(path), reverse("accounts:registration_invalid"), fetch_redirect_response=False)
+        # The proof is used up and the spent code cannot be entered again.
+        self.assertFalse(RegistrationChallenge.objects.filter(pk=token.pk).exists())
+        self.assertEqual(Client().get(reverse("accounts:registration_method")).status_code, 302)
 
     def test_a_forged_username_neither_changes_the_address_nor_touches_another_account(self):
         victim = create_active_user("victim.person@example.org")
         victim_hash = victim.password
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.5")
-        client.get(path)
-        token = VerificationToken.objects.get()
+        request_proof(client, "new.person@example.org", "10.85.0.5")
+        token = RegistrationChallenge.objects.get()
+        user_pk = token.user_id
         choose_method(client, "password", token.pk)
 
         client.post(
@@ -1180,7 +1183,7 @@ class RegistrationNegativeTests(TestCase):
             completion_data(registration=token.pk, username="victim.person@example.org", email="victim.person@example.org"),
         )
 
-        user = User.objects.get(pk=token.user_id)
+        user = User.objects.get(pk=user_pk)
         self.assertEqual(user.email, "new.person@example.org")
         self.assertEqual(user.status, User.Status.ACTIVE)
         self.assertTrue(user.check_password(OTHER_PASSWORD))
@@ -1192,9 +1195,9 @@ class RegistrationNegativeTests(TestCase):
 
     def test_extra_fields_of_the_details_step_cannot_make_the_new_account_privileged(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.85.0.6")
-        client.get(path)
-        token = VerificationToken.objects.get()
+        request_proof(client, "new.person@example.org", "10.85.0.6")
+        token = RegistrationChallenge.objects.get()
+        user_pk = token.user_id
         choose_method(client, "password", token.pk)
         client.post(PASSWORD_URL, password_data(registration=token.pk))
 
@@ -1215,7 +1218,7 @@ class RegistrationNegativeTests(TestCase):
             ),
         )
 
-        user = User.objects.get(pk=token.user_id)
+        user = User.objects.get(pk=user_pk)
         self.assertEqual(user.status, User.Status.ACTIVE)
         self.assertFalse(user.is_staff or user.is_superuser)
         self.assertEqual(user.email, "new.person@example.org")
@@ -1320,12 +1323,13 @@ class NoStoreTests(TestCase):
 
     def test_the_pages_of_the_registration_and_of_the_links_say_no_store(self):
         client = Client()
-        path = request_link(client, "new.person@example.org", "10.86.1.1")
-        token = VerificationToken.objects.get()
+        client.post(REGISTRATION_URL, registration_data("new.person@example.org"), REMOTE_ADDR="10.86.1.1")
+        run_mail_queue()
         self.assert_no_store(client.get(REGISTRATION_URL), REGISTRATION_URL)
         self.assert_no_store(client.get(reverse("accounts:registration_sent")), "sent")
-        self.assert_no_store(client.get(path), path)
-        client.get(path)
+        confirmed = confirm_code_of(client, mail.outbox[-1])
+        self.assert_no_store(confirmed, "code confirmed")
+        token = RegistrationChallenge.objects.get()
         choose_method(client, "password", token.pk)
         self.assert_no_store(client.get(reverse("accounts:registration_method")), "method")
         self.assert_no_store(client.get(PASSWORD_URL), PASSWORD_URL)

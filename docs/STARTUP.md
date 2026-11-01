@@ -147,7 +147,7 @@ if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyCon
 
 * `--insecure` serves `/static/` with debug off; `--noreload` avoids a watcher process.
 * The venv `python.exe` is a launcher with the real interpreter as child: each process appears twice. The PID file holds the parent; section 11 stops both.
-* The console email in `worker.out.log` holds the **complete link** (hence `EMAIL_MODE=console` is refused in stage and production).
+* The console email in `worker.out.log` holds the **complete link** or, for a registration, the **code** (also in the subject; hence `EMAIL_MODE=console` is refused in stage and production).
 * Server does not come up: read `runserver.err.log` (section 14), wait about five seconds, run section 7.
 * After CSS/JavaScript changes, hard-reload the browser (static cache). Restarting refreshes Python and templates only. Do not add duplicate CSS overrides to compensate for a cached file.
 
@@ -218,9 +218,9 @@ foreach ($name in 'runserver', 'worker') {
 
 ### 9.2 A self-registered test account
 
-1. Open `http://127.0.0.1:8000/register/`, enter an address such as `test.user1@example.org`, submit. The response is always the page "email sent".
-2. Extract the link from the worker output with the helper below (it prints recipient and complete link; the last line for the address is the newest).
-3. Open the link: password step, then `/register/complete/`; "Konto erstellen" creates the account and logs you in (D-058). The password needs **at least 15 characters** (`docs/SECURITY.md`, section 3).
+1. Open `http://127.0.0.1:8000/register/`, enter an address such as `test.user1@example.org`, submit ("Send code"). The response is always the page "Enter code".
+2. Read the code from the worker output with the helper below (it prints recipient and the six-digit code, or the link for the other mails; the last line for the address is the newest). The code is also the start of the mail subject.
+3. Enter the code on the page "Enter code" (same browser tab, D-136): password step, then `/register/complete/`; "Konto erstellen" creates the account and logs you in (D-058). The password needs **at least 8 characters** (`docs/SECURITY.md`, section 3).
 4. Limits (D-038): all local requests come from `127.0.0.1`. After about 20 registrations or resets in one hour the page answers "Zu viele Anfragen" (HTTP 429). Clear the counters with the snippet of section 14. A script (curl) must send the form field `form_started` of the page, at least two seconds old, and leave `contact_fax_number` empty, otherwise it gets the normal page without a mail (D-058).
 5. Password reset and email change work the same way.
 
@@ -229,7 +229,7 @@ Helper for step 2 (the here-string lines start in column 0, as PowerShell requir
 ```powershell
 $log = Join-Path $HOME '.leg-platform-dev\worker.out.log'
 $helper = @'
-import email, re, sys
+import email, email.header, re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
 LINK = re.compile(r"https?://\S+?/(?:register|password-reset|two-factor-reset|email-change)/(?:verify|stop)/[A-Za-z0-9_-]+/")
 for block in re.split(r"(?m)^-{79}$", text):
@@ -237,6 +237,11 @@ for block in re.split(r"(?m)^-{79}$", text):
     if start < 0:
         continue
     message = email.message_from_string(block[start:])
+    subject = str(email.header.make_header(email.header.decode_header(message["Subject"] or "")))
+    code = re.match(r"(\d{6}) is your ", subject)
+    if code:
+        print(message["To"], code.group(1))
+        continue
     body = message.get_payload(decode=True)
     body = body.decode(message.get_content_charset() or "utf-8", errors="replace") if isinstance(body, bytes) else str(body)
     for link in LINK.findall(body):
@@ -312,7 +317,7 @@ Test database:
   Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'manage\.py"?\s+test\b' } | Select-Object ProcessId, CommandLine
   ```
 
-  It must print nothing (each run appears twice, parent and child). If it lists a process, wait; never stop it. `scripts/test.ps1` also holds a machine-wide named mutex (`Global\LegPlatformTestRun`) but does not see a run started by hand or on another machine (D-072).
+  It must print nothing (each run appears twice, parent and child). If it lists a process, wait for it, or stop it only if you started it yourself (hung, superseded or no longer needed; the next run recreates the test database); never stop a run someone else started. `scripts/test.ps1` also holds a machine-wide named mutex (`Global\LegPlatformTestRun`) but does not see a run started by hand or on another machine (D-072).
 * Exit codes: 0 passed; 1 a test or check failed; 2 wrong usage or missing virtual environment; 3 another run is active.
 
 Scenario runner (D-071): test the area a change touches, not the whole suite. `scripts/test_areas.py` maps source paths to test labels; `scripts/test.ps1` runs `manage.py test` like CI (`--noinput`, deprecation warnings as errors). Area table and core files: `docs/CODEMAP.md`, section 9.

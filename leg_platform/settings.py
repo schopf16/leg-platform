@@ -204,16 +204,17 @@ DATABASE_ROUTERS = ["leg_platform.addresses.router.AddressRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Password validation: minimum length 15, no composition rules (docs/SECURITY.md, section 3).
+# Password validation: minimum length 8, no composition rules, for every account (owner decision
+# 2026-11-01, docs/DECISIONS.md D-004; docs/SECURITY.md, section 3).
 # Hashing uses Django's default hasher and work factor (D-023), so PASSWORD_HASHERS is not set.
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 15},
+        "OPTIONS": {"min_length": 8},
     },
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "leg_platform.accounts.password_validators.PlainCommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 

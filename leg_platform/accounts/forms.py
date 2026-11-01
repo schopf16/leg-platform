@@ -447,6 +447,34 @@ class CodeForm(PortalFormMixin, forms.Form):
     )
 
 
+class RegistrationCodeForm(PortalFormMixin, forms.Form):
+    """The six-digit code of the registration (D-136): one plain text field.
+
+    No ``maxlength`` and no ``pattern`` (a pasted code with spaces or hyphens must work; the server removes them),
+    the keyboard for digits, and the one-time-code hint for the autofill of mail and phone. The name
+    ``otp_token`` is masked by the abuse protection (``AXES_SENSITIVE_PARAMETERS``).
+    """
+
+    otp_token = forms.CharField(
+        label=_("Code"),
+        help_text=_("6 digits from the email"),
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+                "autofocus": True,
+                "autocapitalize": "off",
+                "autocorrect": "off",
+                "spellcheck": "false",
+                "class": "code-input",
+            }
+        ),
+        error_messages={"required": _("Enter the code.")},
+    )
+    wrong_code_message = _("This code is not correct. Please check it and try again.")
+    expired_code_message = _("This code is no longer valid. Request a new code.")
+
+
 class SetupCodeForm(CodeForm):
     """The first code of the authenticator app at setup; only six digits, never a recovery code.
 

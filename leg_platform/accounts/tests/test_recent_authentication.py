@@ -10,7 +10,7 @@ from django.core import mail
 from django.test import Client, SimpleTestCase, TestCase, tag
 from django.urls import reverse
 
-from leg_platform.accounts.models import AuthenticatorDevice, LoginIpAttempt, User, VerificationToken
+from leg_platform.accounts.models import AuthenticatorDevice, LoginIpAttempt, RegistrationChallenge, User
 from leg_platform.accounts.second_factor import (
     AUTHENTICATED_AT_KEY,
     RECENT_AUTHENTICATION_WINDOW,
@@ -24,11 +24,12 @@ from leg_platform.accounts.tests.helpers import (
     choose_method,
     code_for,
     completion_data,
+    confirm_code_of,
+    confirmation_code,
     create_active_user,
     password_data,
-    verification_path,
 )
-from leg_platform.accounts.tests.test_registration import register
+from leg_platform.accounts.tests.test_registration import register, register_and_confirm
 from leg_platform.accounts.tests.test_second_factor import (
     CODE_URL,
     create_user_with_totp,
@@ -36,7 +37,7 @@ from leg_platform.accounts.tests.test_second_factor import (
     promote,
     send_code,
 )
-from leg_platform.accounts.views import REGISTRATION_SESSION_KEY
+from leg_platform.accounts.views import REGISTRATION_CHALLENGE_SESSION_KEY
 
 SETUP_URL = reverse("accounts:two_factor_setup")
 CONFIRM_URL = reverse("accounts:two_factor_confirm")
@@ -44,7 +45,8 @@ HOME_URL = reverse("home")
 PROFILE_URL = reverse("accounts:profile")
 COMPLETE_URL = reverse("accounts:registration_complete")
 PASSWORD_URL = reverse("accounts:registration_password")
-INVALID_URL = reverse("accounts:registration_invalid")
+# Steps without a proof lead to the start of the registration (D-136).
+INVALID_URL = reverse("accounts:registration")
 ADDRESS_DATABASES = {"default", "addresses"}
 
 
@@ -288,10 +290,8 @@ class RegistrationLoginTests(TestCase):
     databases = ADDRESS_DATABASES
 
     def setUp(self):
-        register(self.client)
-        self.path = verification_path(mail.outbox[0])
-        self.token = VerificationToken.objects.get()
-        self.client.get(self.path)
+        register_and_confirm(self.client)
+        self.token = RegistrationChallenge.objects.get()
         choose_method(self.client, "password", self.token.pk)
 
     def complete(self, client=None, **overrides):
@@ -326,7 +326,7 @@ class RegistrationLoginTests(TestCase):
         number = user.customer_number_id
         self.assertRegex(number, r"\A[0-9]{6}\Z")
         self.assertNotEqual(self.client.get("/admin/").status_code, 200)
-        # A second submission with the used link changes nothing; the person is logged in, so
+        # A second submission with the used proof changes nothing; the person is logged in, so
         # the answer is the start page (B3).
         again = self.complete()
         self.assertRedirects(again, HOME_URL, fetch_redirect_response=False)
@@ -345,20 +345,19 @@ class RegistrationLoginTests(TestCase):
 
         self.assertEqual(self.client.session["_auth_user_hash"], user.get_session_auth_hash())
 
-    def test_a_used_link_cannot_log_anyone_in(self):
+    def test_a_used_code_cannot_log_anyone_in(self):
         self.complete()
         other = Client()
-        opened = other.get(self.path)
+        opened = confirm_code_of(other, mail.outbox[0])
 
-        self.assertRedirects(opened, INVALID_URL, fetch_redirect_response=False)
+        self.assertEqual(opened.status_code, 200)
         posted = self.complete(other)
         self.assertRedirects(posted, INVALID_URL, fetch_redirect_response=False)
         self.assertNotIn("_auth_user_id", other.session)
 
-    def test_a_replaced_link_cannot_log_anyone_in(self):
-        stranger = Client()
-        register(stranger, "new.person@example.org")  # replaces the pending registration
-        self.assertFalse(VerificationToken.objects.filter(pk=self.token.pk).exists())
+    def test_a_replaced_challenge_cannot_log_anyone_in(self):
+        # A new request of the session replaces its challenge; the new code is not entered yet.
+        register(self.client, "new.person@example.org")
 
         response = self.complete()
 
@@ -371,7 +370,7 @@ class RegistrationLoginTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("_auth_user_id", self.client.session)
-        self.assertIn(REGISTRATION_SESSION_KEY, self.client.session)
+        self.assertIn(REGISTRATION_CHALLENGE_SESSION_KEY, self.client.session)
 
     def test_the_start_page_after_the_registration_offers_the_setup_as_a_task(self):
         self.complete()
@@ -522,13 +521,12 @@ class RegistrationInABrowserOfAnotherAccountTests(TestCase):
 
     def test_the_completion_starts_a_new_session_and_a_new_time(self):
         first = create_active_user("first.person@example.org")
-        register(Client(), "new.person@example.org")
-        token = VerificationToken.objects.get()
         browser = Client()
         log_in(browser, first.email, address="10.22.0.1")
         mark = mark_session_of_other_account(browser)
 
-        browser.get(verification_path(mail.outbox[0]))
+        register_and_confirm(browser, "new.person@example.org")
+        token = RegistrationChallenge.objects.get()
         choose_method(browser, "password", token.pk)
         browser.post(PASSWORD_URL, password_data(registration=token.pk))
         before = time.time()

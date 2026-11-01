@@ -4,13 +4,13 @@
 {% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
 {% block form %}
   <h1>{% translate "Link no longer valid" %}</h1>
-  <p>{% translate "The link has expired or was already used. If you have already registered, go to the login. Otherwise request a new link." %}</p>
+  <p>{% translate "The link has expired or was already used. If you have already registered, go to the login. Otherwise request a new code." %}</p>
   {% include "accounts/_error_summary.html" %}
   <form method="post" action="{% url 'accounts:registration' %}" novalidate>
     {% csrf_token %}
     {% include "accounts/_bot_check.html" %}
     {% include "accounts/_field.html" with field=form.email %}
-    <button type="submit" class="btn btn-primary">{% translate "Send new link" %}</button>
+    <button type="submit" class="btn btn-primary">{% translate "Send code" %}</button>
   </form>
   <p class="entry-divider">{% translate "Already have an account?" %}</p>
   <a class="btn btn-secondary-action" href="{% url 'accounts:login' %}">{% translate "To the login" %}</a>
