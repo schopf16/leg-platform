@@ -1,0 +1,23 @@
+{% load i18n management_ui metering_points %}{% comment %}
+Metering points of applications in flight, above the list of metering points (management.pending). Context: ``pending``.
+{% endcomment %}{% if pending %}
+  <section class="mgmt-list-card mgmt-pending" aria-labelledby="pending-title">
+    <h2 class="block-title" id="pending-title">{% translate "In registration" %}</h2>
+    <p class="mgmt-muted">{% translate "Metering points of submitted registrations. You correct them here; the metering point is created when the registration is completed." %}</p>
+    <table class="mgmt-table">
+      <tbody>
+        {% for row in pending %}
+          <tr>
+            <td><div class="mgmt-nr-row"><span class="mgmt-nr">{{ row.number|metering_point }}</span>{% include "management/_direction.html" with direction=row.direction %}</div></td>
+            <td>{{ row.address }}</td>
+            <td><a href="{{ row.applicant_url }}">{{ row.applicant }}</a><br>{% include "management/_status.html" with tone="accent" label=row.state %}</td>
+            <td>
+              <a class="btn btn-secondary-action btn-xs" href="{{ row.edit_url }}">{% translate "Edit" %}<span class="visually-hidden"> {{ row.number|metering_point_text }}</span></a>
+              {% translate "Go to the registration" as goto_label %}{% include "management/_goto.html" with url=row.application_url label=goto_label %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}

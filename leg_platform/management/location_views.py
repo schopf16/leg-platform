@@ -27,7 +27,7 @@ from leg_platform.community import (
 )
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Location, PersonAssignment, TransformerCircuit
-from leg_platform.management import lists
+from leg_platform.management import lists, pending
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_forms import (
     AddressEditForm,
@@ -185,6 +185,7 @@ class LocationListView(ManagementAccessMixin, View):
             page_title=_("Locations"),
             page_subtitle=_("All locations of the LEG with their metering points."),
             entries=entries,
+            pending=pending.new_buildings(request, state.query),
             print_url=state.url_to(reverse("management:locations_print")),
             all_open=all_open,
             expand_ids=[entry["location"].pk for entry in openable],

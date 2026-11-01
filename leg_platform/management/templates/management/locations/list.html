@@ -44,6 +44,8 @@ the way to the detail page is the link at the right, DESIGN section 6) and the s
 
   <form id="expand-form" method="post" action="{{ expand_url }}">{% csrf_token %}<input type="hidden" name="next" value="{{ current_url }}"></form>
 
+  {% include "management/_pending_locations.html" %}
+
   <div class="mgmt-list" data-list data-list-key="{{ list_key }}" data-widths-url="{{ list_widths_url }}" data-expand-url="{{ expand_url }}" data-csrf="{{ csrf_token }}" data-min-width="90">
     <div class="mgmt-table-view mgmt-list-card">
       <table class="mgmt-table mgmt-table-fixed">

@@ -35,8 +35,11 @@ msgstr "Darstellung: dunkel. Zu hell wechseln."
 
 # Entry shell: panel texts of the login and of the registration (LEG-Design-
 # Vorgaben)
-msgid "Welcome to the LEG portal"
-msgstr "Willkommen im Portal der LEG"
+msgid "Welcome to the portal of the local electricity community"
+msgstr "Willkommen im Portal der Lokalen Elektrizitätsgemeinschaft"
+
+msgid "Welcome to the portal of %(instance_name)s"
+msgstr "Willkommen im Portal der %(instance_name)s"
 
 msgid "Solar power from the neighbourhood"
 msgstr "Solarstrom aus der Nachbarschaft"
@@ -10200,3 +10203,15 @@ msgstr "Sie erhalten diese E-Mail, weil sie Ihr Konto oder eine von Ihnen eingeg
 
 msgid "The email is sent in the fixed frame of the portal: the logo or name above the text, the links and two notes below. A test email shows the result."
 msgstr "Die E-Mail wird im festen Rahmen des Portals versendet: oberhalb des Textes das Logo oder der Name, unterhalb die Links und zwei Hinweise. Eine Test-E-Mail zeigt das Ergebnis."
+
+msgid "In registration"
+msgstr "In Anmeldung"
+
+msgid "New buildings of submitted registrations. You correct the address and the metering points here; the location is created when the registration is completed."
+msgstr "Neue Gebäude eingereichter Anmeldungen. Adresse und Messpunkte korrigieren Sie hier; der Standort wird beim Abschluss der Anmeldung angelegt."
+
+msgid "Metering points of submitted registrations. You correct them here; the metering point is created when the registration is completed."
+msgstr "Messpunkte eingereichter Anmeldungen. Sie korrigieren sie hier; der Messpunkt wird beim Abschluss der Anmeldung angelegt."
+
+msgid "Go to the registration"
+msgstr "Zur Anmeldung"

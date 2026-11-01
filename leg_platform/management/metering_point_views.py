@@ -33,7 +33,7 @@ from leg_platform.community import (
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Direction, Leg, Location, MeteringPoint, PersonAssignment
 from leg_platform.community.status import MeteringPointStatus
-from leg_platform.management import lists
+from leg_platform.management import lists, pending
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_views import DialogView, LocationObjectDialog, archived_redirect, event_label
 from leg_platform.management.metering_point_forms import (
@@ -183,6 +183,7 @@ class MeteringPointListView(ManagementAccessMixin, View):
             page_title=_("Metering points"),
             page_subtitle=_("All metering points with their state. Here you see what is still to do at the %(operator)s.") % operator,
             entries=entries,
+            pending=pending.points(request, state.query),
             print_url=state.url_to(reverse("management:metering_points_print")),
             show_steps=show_steps,
             quick_filters=[

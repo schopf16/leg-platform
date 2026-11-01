@@ -1,0 +1,26 @@
+{% load i18n management_ui metering_points %}{% comment %}
+New buildings of applications in flight, above the list of locations (management.pending). Context: ``pending`` (rows).
+Each row has its dialog "Edit address" and its metering points with their own "Edit".
+{% endcomment %}{% if pending %}
+  <section class="mgmt-list-card mgmt-pending" aria-labelledby="pending-title">
+    <h2 class="block-title" id="pending-title">{% translate "In registration" %}</h2>
+    <p class="mgmt-muted">{% translate "New buildings of submitted registrations. You correct the address and the metering points here; the location is created when the registration is completed." %}</p>
+    <table class="mgmt-table">
+      <tbody>
+        {% for row in pending %}
+          <tr>
+            <td>
+              <span class="mgmt-addr-name">{{ row.address }}</span> <span class="mgmt-muted">{{ row.town }}{% if row.egid %} · {% blocktranslate with egid=row.egid %}EGID {{ egid }}{% endblocktranslate %}{% endif %}</span>
+              {% for point in row.points %}<div class="mgmt-nr-row"><span class="mgmt-nr">{{ point.number|metering_point }}</span>{% include "management/_direction.html" with direction=point.direction %} <a class="btn btn-secondary-action btn-xs" href="{{ point.edit_url }}">{% translate "Edit" %}<span class="visually-hidden"> {{ point.number|metering_point_text }}</span></a></div>{% endfor %}
+            </td>
+            <td><a href="{{ row.applicant_url }}">{{ row.applicant }}</a><br>{% include "management/_status.html" with tone="accent" label=row.state %}</td>
+            <td>
+              <a class="btn btn-secondary-action btn-xs" href="{{ row.edit_url }}">{% translate "Edit address" %}<span class="visually-hidden"> {{ row.address }}</span></a>
+              {% translate "Go to the registration" as goto_label %}{% include "management/_goto.html" with url=row.application_url label=goto_label %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
