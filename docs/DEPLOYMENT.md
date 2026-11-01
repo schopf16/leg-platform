@@ -34,7 +34,7 @@ Initial installation of a fresh VPS (sections 2 to 10) and updates of an existin
 * A command would affect a server, host name or account other than the one named by the owner.
 * A package source, key fingerprint or checksum does not match this runbook.
 * A step fails twice for an unexplained reason, or any check of section 11 fails.
-* The address import stays `running` (page "Adressverzeichnis", or the optional importer, 8.4) beyond the agreed window, or is stalled (no heartbeat: the page says "Interrupted").
+* The address import stays `running` (page "Adressverzeichnis", import worker 8.4) beyond the agreed window, or is stalled (no heartbeat: the page says "Interrupted").
 * A secret is in a wrong place (log, wrong file mode, shell history): report it, do not copy it, ask for the replacement procedure (`docs/OPERATIONS.md` section 2 rule 8).
 * A change outside this runbook would be needed (destructive migration, secret rotation, change of host or mail recipients, weakening of security).
 
@@ -708,7 +708,7 @@ Rebuild of a changed address schema: setup takes the exclusive opening lock (`.o
 Description=LEG-Platform setup (migrations, first administrator, address directory file)
 After=mariadb.service
 Wants=mariadb.service
-Before=leg-platform-web.service leg-platform-mail.service leg-platform-addresses.service leg-platform-tasks.service
+Before=leg-platform-web.service leg-platform-mail.service leg-platform-imports.service leg-platform-tasks.service
 StartLimitIntervalSec=15min
 StartLimitBurst=5
 
@@ -804,9 +804,8 @@ WantedBy=multi-user.target
 * No Gunicorn access log (it would log token URLs).
 * `LogsDirectory=leg-platform` with `LogsDirectoryMode=0700` creates `/var/log/leg-platform`. The portal writes `application.log` and `security.log` there (`LOG_DIRECTORY`, default outside local; D-099). Units 8.2 to 8.4 keep both lines, so several processes write one file.
 * `LOG_DIRECTORY=off` in `app.env`: journald only (`sudo journalctl -u leg-platform-web -u leg-platform-mail --since today`).
-* The unit also runs the **address directory import for the administrator's button in a thread of a web worker** (D-090; the automatic refresh is the daily run of 8.3). It needs outbound HTTPS, the writable `StateDirectory` and at least 4 GiB free in `/var/lib/leg-platform` (`/tmp` is not used).
+* The web unit **runs no import** (D-133): the administrator's button only queues it; the import worker (8.4) runs it and the automatic refresh is the daily run of 8.3. `--max-requests` may stay: a recycled or restarted web worker no longer touches an import.
 * The web unit also needs outbound HTTPS to **`api3.geo.admin.ch`**: the building search for signed-in persons (`addresses/swisstopo.py`, `docs/SERVICES.md` S-4) sends postal code, house number and street of an address the local directory does not know. Neither the units nor `ufw` (2.4) filter destination hosts; the allowed hosts are in 0.2, rule 5. An operator who filters egress by host adds `api3.geo.admin.ch` (web unit) and `data.geo.admin.ch` (web and tasks unit). A blocked host makes the building search "unavailable"; the import fails with a fixed sentence.
-* A worker recycle (`--max-requests`) or a restart during an import interrupts it. The page says so; the button starts it again; the directory in use stays.
 * **UNVERIFIED:** the memory and CPU effect of an import on the three workers. Measure at the first import and report.
 * After the first start measure the time of one password hash on this CPU (D-008, D-023) and report it.
 * A service that cannot resolve host names: add `AF_NETLINK` to `RestrictAddressFamilies=` and record it (**UNVERIFIED** need).
@@ -867,21 +866,24 @@ WantedBy=timers.target
 
 Check with `systemd-analyze calendar '*:0/15'`.
 
-### 8.4 Address importer (OPTIONAL worker alternative, D-075, D-090)
+### 8.4 Import worker (required, D-133)
 
-* **Not needed: the web service imports the directory itself for the button, and the scheduled tasks run the daily import (8.3, D-090).** Create this unit only for a separate supervised import process (e.g. to keep the CPU load out of the web workers).
-* It uses `app.env` and claims the same job row as the web application and the scheduled tasks, so they never import at the same time.
-* It handles queued manual imports and one automatic attempt every 90 days (D-052). **Its first start triggers the first automatic import** (10.2). The daily run of 8.3 does the same: whichever process asks first runs the import (one claim), so there is no double download.
+* **Required for the buttons of the page "Data imports".** The web service only queues an import; this service claims the queue (`ImportQueueEntry`, one claim over all processes, D-090) and runs the address directory, the PV plants and the transformer scan one after the other, with a heartbeat. Without it a queued import waits for the next tick of the scheduled tasks (8.3, at most 15 minutes), which works the queue off as a fallback.
+* It uses `app.env`. The daily run of 8.3 uses the same claim, so they never import at the same time.
+* **Stop and restart (D-133):** on `SIGTERM` the running job is interrupted at once, stored with the reason and the time ("The import was interrupted because the import service was stopped" on the page and in the import log, WARNING with the source in `application.log`) and put at the front of the queue; it runs again when the service starts. The directory in use stays. A killed process (`SIGKILL`, crash) is found by its stale heartbeat after about 90 seconds and reported as "stopped responding or was restarted"; that job is not queued again by itself.
+* **Deployment script (`leg-deploy` or equivalent):** after a code update it must `systemctl enable --now leg-platform-imports` once and `systemctl restart leg-platform-imports` on every deployment (a restart requeues a running import, it does not lose it). It must run the new code before the web service serves the new button text.
 
-`/etc/systemd/system/leg-platform-addresses.service` differs from 8.1 in:
+`/etc/systemd/system/leg-platform-imports.service` differs from 8.1 in:
 
-* `Description=LEG-Platform address directory importer`
+* `Description=LEG-Platform import worker (process_import_queue)`
 * `[Unit]`: `Wants=network-online.target mariadb.service leg-setup.service` (instead of the `Wants=` of 8.1); delete `Requires=leg-setup.service`; `After=` stays as in 8.1
 * `Type=simple` (instead of `Type=notify`)
-* delete: `NotifyAccess=main`, `RuntimeDirectory=leg-platform`, `ExecReload=...`, `KillMode=mixed`, `TimeoutStopSec=40`
-* `StateDirectory=leg-platform` stays
-* `ExecStart=/opt/leg-platform/venv/bin/python manage.py process_address_imports` (one line)
-* `Restart=on-failure`, `RestartSec=300` (instead of `Restart=always`, `RestartSec=5`)
+* delete: `NotifyAccess=main`, `RuntimeDirectory=leg-platform`, `ExecReload=...`, `KillMode=mixed`
+* `StateDirectory=leg-platform` stays (outbound HTTPS and at least 4 GiB free there, as in 8.1 before D-133)
+* `ExecStart=/opt/leg-platform/venv/bin/python manage.py process_import_queue --loop` (one line)
+* `TimeoutStopSec=60` (instead of deleting it: time to record an interrupted job)
+* `Restart=always`, `RestartSec=10` (instead of `RestartSec=5`)
+* `User=`, `Group=`, `EnvironmentFile=` and block H stay as in 8.1, in particular `ProtectSystem`, `PrivateTmp=yes` (the address SQLite import needs it: without it the import fails with "disk I/O error") and the writable `StateDirectory`
 * `[Install]` stays as in 8.1
 
 After creating the files, both commands must print nothing:
@@ -898,11 +900,11 @@ Import runtime rules:
 * Before the download the importer checks the free space of **that one disk** against 4 GiB (`MIN_FREE_DISK_BYTES`) and refuses with a log line (`df /var/lib/leg-platform`). `/tmp` is not checked.
 * Outbound HTTPS to `data.geo.admin.ch` must work directly (proxy variables and `.netrc` are ignored).
 
-**Do not stop or restart this service while an import runs.** The worker has no signal handling: a hard-killed worker job (out-of-memory kill, power loss, stop) leaves the state `running`.
+**Stop and failure (D-133).** A stop is safe (above). A hard-killed worker (out-of-memory kill, power loss) leaves the state `running`, but its heartbeat stops: the next claim takes the job over after about 90 seconds (`HEARTBEAT_STALE_AFTER`) and stores "stopped responding or was restarted". That job is not queued again by itself.
 
-* A worker job whose lease has not expired (`RUNNING_JOB_LEASE`, 6 hours) is never taken over: **the operator has to act**. (A web job has a heartbeat and is taken over after about 90 seconds, D-090.)
-* No import process runs and the job is `running` (10.2): wait until `started_at` is 6 hours old (the worker then sets it `failed`), then press the button again. The lost request is not repeated; the automatic attempt has consumed its interval (24 hours while the directory is empty, otherwise 90 days). Never reset the state by hand (`docs/INSTALLATION.md`).
-* Before `systemctl stop|restart leg-platform-web` (the web import runs in it), `leg-platform-addresses` or a reboot, the state must not be `running`. Wait while an import progresses; ask only if it is stalled. Prevent new import requests during maintenance, recheck immediately before stopping. An interrupted import is only a lost attempt (press the button again).
+* The page "Data imports" says "The import service is not running" while imports wait and the worker has not looked at the queue for a minute (`ImportRequest.worker_seen_at`). Start the service (8.4); until then the next tick of the scheduled tasks works the queue off.
+* Press the button again for a job that was taken over. Never reset the state by hand (`docs/INSTALLATION.md`).
+* A restart of `leg-platform-web` does not touch an import (D-133). Before `systemctl stop|restart leg-platform-imports` or a reboot, prefer a state that is not `running`; a stop is safe, though: the running job is stored as interrupted and runs again at the next start of the service (8.4). Prevent new import requests during maintenance.
 * Never stop or restart `leg-setup.service`.
 
 ### 8.5 Enable and start (in this order)
@@ -967,7 +969,7 @@ The check prints `2`. Then start the services (8.5).
 
 1. The administrator logs in at `https://<HOST>/login/` (from the permitted address), replaces the password and sets up the authenticator app (D-041, D-042).
 2. **The human removes the password line:** `sudo sed -i '/^BOOTSTRAP_SYSTEM_ADMIN_PASSWORD=/d' /etc/leg-platform/app.env`. `sudo stat -c '%a %U:%G' /etc/leg-platform/app.env` prints `600 root:root`. The email variable may stay.
-3. **Restart the services:** `sudo systemctl restart leg-platform-web leg-platform-mail` (and `leg-platform-addresses` when you run the optional worker and no import is in progress, 8.4).
+3. **Restart the services:** `sudo systemctl restart leg-platform-web leg-platform-mail` and `leg-platform-imports` (8.4; a running import is queued again and restarts from the beginning).
 4. Only then remove the address restriction.
 5. Check: `sudo leg-manage web shell -c "from leg_platform.accounts.models import User; print(User.objects.filter(is_superuser=True).count())"` prints `1`.
 
@@ -1000,7 +1002,7 @@ Steps: `docs/INSTALLATION.md`, "Microsoft Graph sender" (Entra ID app registrati
 
 ### 10.2 Address directory: first import
 
-The importer (`leg_platform/addresses/importer.py`; started by the administrator's button in a thread of the web service, or by the daily run of the scheduled tasks in their own process, D-090) fetches the swisstopo address directory from `https://data.geo.admin.ch/` over HTTPS only, verifies the official SHA-256 multihash before parsing and publishes a new generation in one short transaction (D-075). It also reads the building number and the entrance number (columns `BDG_EGID`, `ADR_EDID`); a file without one of them is refused and the directory in use stays. Limits: archive 256 MiB, CSV 1 GiB, 5,000,000 rows, 30 minutes download.
+The importer (`leg_platform/addresses/importer.py`; run by the import worker (8.4) for the buttons of the page "Data imports", or by the daily run of the scheduled tasks in their own process, D-090, D-133) fetches the swisstopo address directory from `https://data.geo.admin.ch/` over HTTPS only, verifies the official SHA-256 multihash before parsing and publishes a new generation in one short transaction (D-075). It also reads the building number and the entrance number (columns `BDG_EGID`, `ADR_EDID`); a file without one of them is refused and the directory in use stays. Limits: archive 256 MiB, CSV 1 GiB, 5,000,000 rows, 30 minutes download.
 
 **Update that changes the address schema:** the first start rebuilds the disposable file (`setup.prepare_directory`) and queues an address import (item 1 below), unless the migration is additive and runs in place (below). The plant register (D-117) loads at the first daily run after that. Check both imports.
 
@@ -1013,7 +1015,7 @@ The importer (`leg_platform/addresses/importer.py`; started by the administrator
 
 **Observe the first import** (no extra service needed if the scheduled-task timer runs):
 
-1. Setup queues the first (or replacement) import after preparing the schema. The task tick (8.3) or the optional worker claims it without waiting for the daily time. Open the address-directory administration page to observe it. A visit starts nothing.
+1. Setup queues the first (or replacement) import after preparing the schema. The import worker (8.4) or the task tick (8.3) claims it without waiting for the daily time. Open the address-directory administration page to observe it. A visit starts nothing.
 2. The page shows phase, download progress and result. The status is also written to the application log and the security log (`address_import_succeeded` / `address_import_failed`).
 3. Afterwards the automatic refresh follows the daily policy (8.3); a failed attempt is recorded as failed, not requeued at each start. The button can retry a failed or completed job. A still-queued job needs its consumer; the button does not duplicate it. Until a successful import, address validation and suggestions are unavailable; the rest of the application stays.
 4. Watch it:
@@ -1034,21 +1036,49 @@ sudo ls -l /var/lib/leg-platform/
 
 * Success: state `succeeded`; `row_count` about 3.3 million; `True` (no import holds the lease); at most two generations; a recent `data_date`; `address-directory.sqlite3` `-rw-------` (`-wal`/`-shm` exist while a process has the file open).
 * Failure: state `failed`; `last_error` names the fixed reason (also on the page). The next **automatic** attempt waits for the next day's run (the update flag stays set) or, without a flag, 90 days while a directory exists and 24 hours while it is missing or empty. Manual attempts can be repeated (D-052, D-076). The administration warns when the data date is older than 92 days (D-050).
-* Page says "Interrupted": the web service was stopped or restarted during the import. Press the button again (a dead job is found by its missing heartbeat after about 90 seconds).
+* Page says "Interrupted": read the reason. A stopped import service queues the job again and runs it at the next start; for a killed one press the button again (a dead job is found by its missing heartbeat after about 90 seconds).
 
 **Recovery of a corrupted directory file** (L-12; e.g. `file is not a database`, or `PRAGMA quick_check` reports errors). The file is public and rebuildable; the application database is not touched.
 
-1. Quiesce address consumers as in 12.3: stop the task timer, wait for any active task/import, stop web and the optional importer (8.4). Never stop `leg-setup`. No manual reader/writer may remain.
+1. Quiesce address consumers as in 12.3: stop the task timer, wait for any active task/import, stop web and the import worker (8.4). Never stop `leg-setup`. No manual reader/writer may remain.
 2. `sudo rm -f /var/lib/leg-platform/address-directory.sqlite3 /var/lib/leg-platform/address-directory.sqlite3-wal /var/lib/leg-platform/address-directory.sqlite3-shm /var/lib/leg-platform/address-directory.sqlite3-journal` (use only the exact configured `ADDRESS_DIRECTORY_FILE` and its three sidecars if set). Do not remove coordination files or any application database. Suggestions are missing until the rebuild.
 3. `sudo systemctl start leg-setup.service`. Check `sudo journalctl -u leg-setup -n 20 --no-pager` for `Address directory: file prepared`. Then `sudo systemctl start leg-platform-web`.
-4. Restore the timer/optional worker's recorded service states. Setup has queued the import; the next task tick or worker poll processes it independently of the daily time. Check as above.
+4. Restore the timer/optional worker's recorded service states. Setup has queued the import; the next worker poll or task tick processes it independently of the daily time. Check as above.
 
 **Repair: `no such table: addresses_directory`** (the import or the page fails). The file exists but has no tables: the setup unit never ran (missing, or the units differ from 8.0 to 8.3). Any process that opens the directory may create an empty file (`INSTALLATION.md`, "Address Directory"). There is no separate importer migration step and no manual `migrate addresses` on a server.
 
 1. Compare the units with 8.0 to 8.3 (`systemctl cat <unit>`; do not dump files with inline credentials). Create `leg-setup.service` as in 8.0 with the **same** `User=`, `Group=`, `EnvironmentFile=` and `WorkingDirectory=` as the web unit. Add `StateDirectory=leg-platform` to the web unit and to the scheduled-tasks unit (and the optional importer). **Remove** any hand-added `ReadWritePaths=` for `/var/lib/leg-platform`. Web and mail name the setup unit with `Requires=` and `After=` (8.1, 8.2).
 2. `sudo systemctl daemon-reload`, `sudo systemctl enable leg-setup.service`. Check `ls -ld /var/lib/leg-platform /var/lib/leg-platform/*`: directory and file must belong to the service user and group. If the file is owned by someone else (for example a hand-run `migrate` as root) or holds no tables and no import ran, treat it as rebuildable: stop the web service when no import runs (state not `running`; never stop `leg-setup`), delete the file and its `-wal`/`-shm` as in the recovery above.
 3. `sudo systemctl start leg-setup.service`, then `sudo journalctl -u leg-setup -n 20 --no-pager` must show `Address directory: file prepared, N migration(s) applied.` (or `file ready`), no `NOT set up`. Start the web service again and run V3 and V3a.
-4. Setup has queued the import; the next scheduled-task tick or optional worker processes it (8.3). If no consumer runs it remains queued. Do not reset the MariaDB job/account database to repair the catalogue.
+4. Setup has queued the import; the import worker (8.4) or the next scheduled-task tick (8.3) processes it. If no consumer runs it remains queued. Do not reset the MariaDB job/account database to repair the catalogue.
+
+### 10.3 Install a prebuilt address directory (D-134)
+
+The full import takes hours on a one-core server (the transformer scan most of it). Build the file on another machine and upload it over SSH, never through GitHub: the file is not part of the repository (`.gitignore`).
+
+**Build** (development machine, checkout of the commit that is deployed: a file of another schema version is refused). Use a file outside the repository and never the file of the running development environment:
+
+1. `ADDRESS_DIRECTORY_FILE=<new file>`; `python manage.py migrate addresses --database=addresses`.
+2. Queue the three sources in this order: `python manage.py shell -c "from leg_platform.addresses import jobs; from leg_platform.addresses.models import ImportRequest as R; jobs.enqueue([R.Source.ADDRESS, R.Source.PLANT, R.Source.TRANSFORMER], in_order=True)"`, then `python manage.py process_import_queue` (runs until the queue is empty). The queue, the results and the postal codes of the transformer scan (`ServicePostalCode`) are those of the local application database; the scan needs `requirements/transformers.txt` and the postal codes of the instance.
+3. One single file: `python -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()" <file>`; delete `<file>-wal` and `<file>-shm` if left; record `Get-FileHash -Algorithm SHA256 <file>`.
+
+**Upload.** Room in `/var/lib/leg-platform` for the upload next to the file in use (about 3.5 GB; the install needs no other copy). `rsync -avP --partial <file> <user>@<host>:address-directory.sqlite3.upload`, then on the server:
+
+```bash
+sudo mv ~/address-directory.sqlite3.upload /var/lib/leg-platform/address-directory.sqlite3.upload
+sudo chown leg-platform:leg-platform /var/lib/leg-platform/address-directory.sqlite3.upload
+sudo chmod 0600 /var/lib/leg-platform/address-directory.sqlite3.upload
+```
+
+**Install** with web, import worker and the scheduled tasks stopped (12.3, step 3), and in an update after the setup unit has run (12.3, step 7: a schema change would otherwise rebuild the installed file), before anything starts:
+
+```bash
+sudo leg-manage web install_address_directory /var/lib/leg-platform/address-directory.sqlite3.upload --sha256 <SHA256>
+```
+
+* The command refuses (nothing changed): a checksum that differs, an upload outside the folder, a link, a journal file with data, a live import, a housekeeping run, a reset marker left by an unfinished rebuild (run `setup_instance` first). It then swaps the file with the reset marker in place, runs the checks of the import (same migrations, same tables, the lookup tables, `quick_check`, the address count of the published generation) and puts the old file back when one fails. On success the old file is deleted (public and rebuildable, D-075), the figures of the page are refreshed, the imports that setup had queued for the sources the file holds are removed and the next regular refresh counts from now.
+* An exit that is not 0 prints one sentence. The reset marker stays only when the old file could not be put back; `setup_instance` then rebuilds the file and queues the import (10.2).
+* Verify as in 10.2 and: `sudo leg-manage web shell -c "from leg_platform.addresses.models import Plant, TransformerStation; print(Plant.objects.count(), TransformerStation.objects.count())"`. Start the services and check the page "Data imports".
 
 **Open operator step (D-065, D-075, UNVERIFIED):** after the first import run `EXPLAIN QUERY PLAN` (`leg-manage web shell`, connection `addresses`) for the two lookup queries of `PrefixSearchTests` (`leg_platform/addresses/tests/test_directory.py`) on the largest postal code.
 
@@ -1134,7 +1164,7 @@ unset token
 | V50 | `sudo systemctl start leg-platform-tasks.service; systemctl show -p Result,ExecMainStatus leg-platform-tasks.service; journalctl -u leg-platform-tasks -n 20 --no-pager`; `systemctl list-timers leg-platform-tasks.timer` | `Result=success`, `ExecMainStatus=0`; next timer run within 15 minutes |
 | V52 | after the Graph test send: `sudo leg-manage web shell -c "from leg_platform.accounts.models import MailJob; print(MailJob.objects.count())"`; `journalctl -u leg-platform-mail -n 30` | `0`, no repeated errors |
 | V53 | the real test send of 10.1 | receipt confirmed by the administrator; sender and links use `<HOST>` |
-| V54 | the state query of 10.2 and the page "Adressverzeichnis" | state `succeeded` after the first import (the import runs in the web service; with the optional worker of 8.4: `sudo systemctl is-active leg-platform-addresses` is `active`) |
+| V54 | the state query of 10.2 and the page "Adressverzeichnis" | state `succeeded` after the first import (the import worker of 8.4 runs it: `sudo systemctl is-active leg-platform-imports` is `active`) |
 
 ### 11.6 After the verification
 
@@ -1193,7 +1223,7 @@ Use the paths, profiles and unit names of the instance record (0.6). Do the step
 2. **Recovery readiness.** Record the previous full SHA and the package inventory outside the checkout. Verify a way to restore the previous package environment, not just the code. Check disk space. Verify backup command, destination, retention and restore evidence (production needs a tested restore before first use).
 3. **Quiesce.**
    * Announce the interruption per the maintenance policy. Block new requests with the instance's maintenance mechanism.
-   * Stop web, mail and the cleanup timer (wait for an active cleanup job). Wait for a running import (page "Adressverzeichnis"; the optional worker of 8.4, then stop it when idle). Prevent new jobs and recheck. Note the enabled/active states.
+   * Stop web, mail and the cleanup timer (wait for an active cleanup job). Wait for a running import (page "Adressverzeichnis"; then stop the import worker of 8.4 when idle). Prevent new jobs and recheck. Note the enabled/active states.
    * No old application, worker or task may run while checkout, packages or schema change. Keep nginx and MariaDB running.
    * No safe way to quiesce: report the missing mechanism. Do not kill.
 4. **Pre-update backup, stage as well.** With writers stopped run the recorded backup command (e.g. `sudo /usr/local/sbin/leg-backup`). Check its exit status and `sudo gzip -t <BACKUP_FILE>`. Record file name and timestamp. Recovery secrets must already be in the owner's secret store. No valid backup means no migration.
@@ -1223,6 +1253,7 @@ Use the paths, profiles and unit names of the instance record (0.6). Do the step
    * Expected: `Result=success`, `ExecMainStatus=0`, `Database migrations: N applied.` (or `none pending.`), `System administrator: exists; no account was created.`, `Address directory: file ready ...`; `migrate --check` exits 0; `No planned migration operations.`.
    * **STOP** if the unit failed (never `--fake`, `flush` or manual table changes). Only *start* (never restart) `leg-setup.service` (8.0).
    * Collect and publish static files as in 6.2.
+   * A prebuilt address directory file is installed now, before step 8 (10.3).
    * During an update do not run the bootstrap administrator command, change the administrator variables or force a full address import.
 8. **Restart all changed processes** (web, mail, importer, cleanup timer, as recorded; each start runs `leg-setup.service` first, a no-op after step 7). Check active state, timer next run, failures and the sanitised journal. Keep maintenance enabled until the basic application, database and static-file checks pass, then reopen traffic.
 9. **Verify:** section 11 against the target (trusted HTTPS without `-k`) with test accounts. Never send to arbitrary real users. Report a missing test; never assume it passed. Fault-injection or load probes (V41, V43) need the maintenance window and must not expose users or real security links. Confirm the checkout still resolves to `<NEW_COMMIT_SHA>`.
@@ -1263,7 +1294,7 @@ sudo leg-manage web shell -c "from leg_platform.addresses.models import ImportRe
 
 * **Customer number warning:** from 90 % of the six-digit numbers issued, each issue logs "N of 1000000 customer numbers have been issued". The owner decides how it becomes an alarm.
 * **Setup unit (alert on both):** `leg-setup.service` not `failed` (start limit or refused migration) **and** no `NONE EXISTS` in its journal (**STOP**, tell the owner, section 9).
-* **Importer:** state `running` for more than an hour, or `failed` (the page names the reason): tell the owner. "Interrupted" = the web service was restarted during the import: request it again (8.4 for the optional worker).
+* **Importer:** state `running` for more than an hour, or `failed` (the page names the reason): tell the owner. "Interrupted" with the reason "stopped responding or was restarted" = the import worker was killed during the import: request it again; a job stored as "stopped" waits in the queue and runs by itself when the worker runs (8.4).
 * **Mail:** `MailJob` count near 0 (V52). `leg-platform-tasks.service` not in `systemctl --failed`.
 * **Certificates:** TLS renews through Certbot (`sudo certbot renew --dry-run` every quarter). The **Graph certificate** expiry is warned in the administration (D-006, D-048); the owner renews it with the person of O-11 before it lapses (otherwise all email stops).
 * **Journald:** `journalctl --disk-usage`. A persistent journal needs `/var/log/journal` (**UNVERIFIED** default). Access logs contain IP addresses; rotation and deletion follow O-15.
@@ -1351,7 +1382,7 @@ No secret values. Contents:
 | 2. Human review of second-factor, reset, lifecycle and administration changes (D-019); CI passed on both jobs | O-8 |
 | 3. HTTPS, secure cookies, HSTS, request body limit confirmed on the real host (D-052) | V10 to V14, V30 to V34 |
 | 4. Token URLs stay redacted from request logs, also every further token URL | 7.5, V42, V43 |
-| 5. `process_mail_queue --loop` supervised; `run_scheduled_tasks` scheduled (D-008, D-037, D-038, D-041, D-052). The address import runs in the web service (D-075, D-090) | section 8, V50 to V54 |
+| 5. `process_mail_queue --loop` supervised; `run_scheduled_tasks` scheduled (D-008, D-037, D-038, D-041, D-052). `process_import_queue --loop` supervised (8.4, D-133) | section 8, V50 to V54 |
 
 ### 13.3 Findings and open points
 
@@ -1360,7 +1391,7 @@ No secret values. Contents:
 * **F-3 (owner accepts or not):** newest compatible PyPI releases without hash pinning (D-015).
 * **F-4 (risk):** the address directory file keeps its peak size (up to three generations while importing; about 1.7 GB per generation for 3.3 million addresses, 5.1 GB at the peak at the first and second import.
 * **F-5 (residual):** the nginx error log can contain token request lines, not redacted (V43).
-* **F-6:** a killed import of the web service (or of the optional worker) leaves its job `running` until the heartbeat is 90 seconds old (web) or its 6-hour lease expires (worker, N-3). The page then says "Interrupted"; the button starts a new one (8.4).
+* **F-6:** a killed import worker leaves its job `running` until the heartbeat is 90 seconds old (a run of the scheduled tasks writes one too; only a process without heartbeat keeps the 6-hour lease, N-3). The page then says "Interrupted" with the reason; the button starts a new one (8.4).
 * **F-7:** MariaDB transport encryption is not applicable on loopback; owner confirms (O-23).
 * **F-8:** Infomaniak guides contradict each other on VPS Lite snapshots. Own backups with an off-server copy are the baseline.
 * The security-relevant parts (hardening, proxy headers, secrets handling) are reviewed by the `security-reviewer` and by a human before use (D-019, D-074).

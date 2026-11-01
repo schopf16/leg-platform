@@ -95,7 +95,7 @@ The second command creates the tables of the address directory (own SQLite file,
 * Without the bootstrap variables it creates no administrator (design review accounts: section 9).
 * To also create the first administrator on an empty local database: set `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` and `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` (read with `Read-Host -MaskInput`) **in this PowerShell session only** for that one run, then `Remove-Item Env:...`.
 * Do not run this against the local database as a test of "empty database"; `scripts/test.ps1 -Area second-factor` uses its own test database.
-* The queued data imports need the optional worker or a `run_scheduled_tasks` run (the web process runs a started queue itself). No consumer after a restart means no import. Until an import succeeds, address validation and suggestions are unavailable.
+* The queued data imports need the worker `manage.py process_import_queue --loop` (D-133) or a `run_scheduled_tasks` run; the web process runs no import. No consumer means no import. Until an import succeeds, address validation and suggestions are unavailable.
 * Busy-file and rebuild errors are nonfatal; run setup again later. Never bypass a `.reset` marker.
 
 ## 6. Start the development server and the mail worker

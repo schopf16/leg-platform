@@ -138,7 +138,7 @@ class ImportReasonTranslationTests(TestCase):
 
         reasons = (
             set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
-            | {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED, jobs.UNCHANGED_TEXT}
+            | {jobs.UNEXPECTED_FAILURE, *jobs.INTERRUPTIONS, jobs.UNCHANGED_TEXT}
         )
         for language in ("de-ch", "fr", "it"):
             with translation.override(language):

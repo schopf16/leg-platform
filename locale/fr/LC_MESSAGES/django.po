@@ -9514,9 +9514,6 @@ msgstr ""
 msgid "Not run yet"
 msgstr "Pas encore exécuté"
 
-msgid "Changing needs a code from the app."
-msgstr "Une modification nécessite un code de l'application."
-
 msgid "Event type"
 msgstr "Type d'événement"
 
@@ -9534,9 +9531,6 @@ msgstr "Autres"
 
 msgid "Sources"
 msgstr "Sources"
-
-msgid "Confirmation required"
-msgstr "Confirmation requise"
 
 msgid ""
 "The notice holds no log line, no text of an entry and no file name; at most "
@@ -10203,8 +10197,8 @@ msgstr "%(running)s en cours, %(waiting)s en attente"
 msgid "This import is already running or waiting."
 msgstr "Cet import est déjà en cours ou en attente."
 
-msgid "The import was started. This page shows the progress."
-msgstr "L’import a été lancé. Cette page affiche la progression."
+msgid "The import was queued. This page shows the progress."
+msgstr "L’import a été mis en file d’attente. Cette page affiche la progression."
 
 msgid "Every import is running or waiting."
 msgstr "Chaque import est en cours ou en attente."
@@ -10214,3 +10208,12 @@ msgstr "Import de données demandé"
 
 msgid "A data import was requested"
 msgstr "Un import de données a été demandé"
+
+msgid "The import was interrupted because the import service was stopped. It runs again when the service starts."
+msgstr "L’importation a été interrompue parce que le service d’importation a été arrêté. Elle reprendra au démarrage du service."
+
+msgid "The import was interrupted because the import service stopped responding or was restarted. Request it again."
+msgstr "L’importation a été interrompue parce que le service d’importation ne répondait plus ou a été redémarré. Demandez-la à nouveau."
+
+msgid "The import service is not running. Waiting imports start with the next run of the scheduled tasks."
+msgstr "Le service d’importation ne fonctionne pas. Les importations en attente démarrent à la prochaine exécution des tâches planifiées."

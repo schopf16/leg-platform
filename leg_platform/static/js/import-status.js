@@ -1,5 +1,6 @@
-/* The data imports page (D-090, D-132): while an import is waiting or running, ask the status address every few seconds
-   and write the answer into the elements of the page. Only textContent and attributes are set (never markup); the
+/* The data imports page (D-090, D-132, D-133): while an import is waiting or running, ask the status address every few
+   seconds (not while the tab is hidden: the first look after it is shown is at once) and write the answer into the
+   elements of the page. Only textContent and attributes are set (never markup); the
    texts come from the server. Without this script the page shows the status of the last load.
 
    Rules: a published figure that is filled is never overwritten by a dash or an empty value (only the "In progress"
@@ -13,11 +14,13 @@
     return;
   }
   var url = box.dataset.statusUrl;
-  var seconds = parseInt(box.dataset.pollSeconds, 10) || 2;
+  var seconds = parseInt(box.dataset.pollSeconds, 10) || 5;
   var DASH = "\u2013";
   var failures = 0;
   var memory = {}; // per source: run, percent, remaining (seconds, counted down here), state, announced step
   var timer = null;
+  var next = null; // the timer of the next poll
+  var inflight = false;
 
   function find(root, field) {
     return root.querySelector('[data-field="' + field + '"]');
@@ -209,6 +212,11 @@
 
   function render(status) {
     setText(document.getElementById("import-summary"), status.summary || "");
+    var notice = document.getElementById("import-worker-notice");
+    if (notice) {
+      setText(notice, status.worker_notice || "");
+      notice.hidden = !status.worker_notice;
+    }
     var all = document.getElementById("import-start-all");
     if (all) {
       if (status.all_busy) {
@@ -234,7 +242,20 @@
     });
   }
 
+  function later(delay) {
+    if (next !== null) {
+      window.clearTimeout(next);
+    }
+    next = window.setTimeout(poll, delay);
+  }
+
   function poll() {
+    next = null;
+    if (document.visibilityState === "hidden") {
+      // A hidden tab asks nothing; the change to visible asks at once (see below).
+      return;
+    }
+    inflight = true;
     fetch(url, {
       credentials: "same-origin",
       cache: "no-store",
@@ -251,26 +272,34 @@
         return response.json();
       })
       .then(function (status) {
+        inflight = false;
         failures = 0;
         note("");
         render(status);
         if (status.active) {
-          window.setTimeout(poll, seconds * 1000);
+          later(seconds * 1000);
         } else if (timer !== null) {
           window.clearInterval(timer);
           timer = null;
         }
       })
       .catch(function (error) {
+        inflight = false;
         if (error && error.ended) {
           note(box.dataset.textEnded);
           return;
         }
         failures += 1;
         note(box.dataset.textRetry);
-        window.setTimeout(poll, seconds * 1000 * Math.min(failures + 1, 5));
+        later(seconds * 1000 * Math.min(failures + 1, 5));
       });
   }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && timer !== null && !inflight && next === null) {
+      poll();
+    }
+  });
 
   if (box.dataset.active === "1") {
     timer = window.setInterval(tick, 1000);

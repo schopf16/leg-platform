@@ -27,7 +27,7 @@ from django.utils import timezone
 
 from leg_platform.accounts.models import SecurityEvent
 from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_user
-from leg_platform.addresses import importer, jobs, runner, schedule, setup, status, transformers
+from leg_platform.addresses import importer, jobs, schedule, setup, status, transformers
 from leg_platform.addresses.admin import SERVICE_AREA_PERMISSION, ServicePostalCodeAdmin
 from leg_platform.addresses.models import Address, Directory, ImportRequest, ServicePostalCode, TransformerStation
 from leg_platform.addresses.router import AddressRouter
@@ -667,7 +667,7 @@ class NoWebStartTests(TestCase):
                 patch.object(schedule, "run_transformer_weekly") as weekly, \
                 patch.object(schedule, "run_transformer_now") as now, \
                 patch.object(jobs, "claim", wraps=jobs.claim) as claim, \
-                patch.object(runner, "start_queue", return_value=True) as start, \
+                patch.object(jobs, "execute") as execute, \
                 patch("leg_platform.addresses.admin.allow_request", return_value=True):
             self.assertEqual(self.client.get(directory).status_code, 200)
             self.assertEqual(self.client.get(reverse("admin:addresses_importrequest_status")).status_code, 200)
@@ -686,7 +686,7 @@ class NoWebStartTests(TestCase):
         scan.assert_not_called()
         weekly.assert_not_called()
         now.assert_not_called()
-        start.assert_called_once_with()  # the address start button queues its own job only
+        execute.assert_not_called()  # the address start button only queues its job; the import worker runs it
         for call in claim.call_args_list:
             self.assertNotEqual(call.kwargs.get("source"), ImportRequest.Source.TRANSFORMER)
 
@@ -706,6 +706,7 @@ class NoWebStartTests(TestCase):
             if pattern.search(path.read_text(encoding="utf-8")):
                 named.add(relative)
         self.assertEqual(sorted(named), [
+            "addresses/install.py",
             "addresses/jobs.py",
             "addresses/management/commands/scan_transformer_stations.py",
             "addresses/models.py",

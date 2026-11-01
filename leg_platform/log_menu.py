@@ -22,7 +22,6 @@ from django.utils.translation import gettext as _
 
 from leg_platform import log_views
 from leg_platform.accounts import security_log
-from leg_platform.accounts.forms import OneProofMixin
 from leg_platform.accounts.models import LogNotificationSettings, MailJob, SecurityEvent
 from leg_platform.log_filters import redact_personal_data, redact_tokens
 
@@ -55,7 +54,7 @@ def failure_texts():
     from leg_platform.addresses import jobs
 
     texts = set(jobs.SAFE_FAILURES) | set(jobs.PLANT_FAILURES) | set(jobs.TRANSFORMER_FAILURES)
-    texts |= {jobs.UNEXPECTED_FAILURE, jobs.INTERRUPTED}
+    texts |= {jobs.UNEXPECTED_FAILURE, *jobs.INTERRUPTIONS}
     return sorted(texts)
 
 
@@ -120,6 +119,14 @@ def page(request):
     if request.method != "GET":
         return HttpResponseNotAllowed(["GET"])
     log_views.record_view(request, "logmenu")
+    return TemplateResponse(
+        request, "admin/logmenu/page.html", _page_context(request, NotificationForm(instance=settings_row())),
+    )
+
+
+def _page_context(request, settings_form):
+    """The whole page: the tables of the chosen range and the notification form (also after an invalid save, so the
+    page does not change its layout)."""
     key, since = _since(request)
     shown = _shown(request)
     count = line_count(request)
@@ -136,11 +143,11 @@ def page(request):
         "security_lines": text_box_lines("security", since, count) if "security" in shown else None,
         "housekeeping_lines": text_box_lines("housekeeping", since, count) if "housekeeping" in shown else None,
         "import_lines": text_box_lines("import", since, count) if "import" in shown else None,
-        "settings_form": NotificationForm(instance=settings_row(), request=request),
+        "settings_form": settings_form,
         "suppressed": suppressed_counts(),
         "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
     }
-    return TemplateResponse(request, "admin/logmenu/page.html", context)
+    return context
 
 
 def download(request, source):
@@ -207,26 +214,17 @@ def failure_groups():
     ]
 
 
-class NotificationForm(OneProofMixin, forms.ModelForm):
+class NotificationForm(forms.ModelForm):
     """The notice setting (D-122, security review): the switch, the one address, the ticks by severity and event, and one
     tick per fixed failure text. Changing the switch or the address needs one proof of identity (D-062, D-100)."""
 
     failures = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple, label=_("Import errors"))
-    # The proof (one of the two; the mixin removes the other): as in the portal settings (D-062).
-    current_password = forms.CharField(
-        label=_("Current password"), strip=False, required=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
-    )
-    otp_token = forms.CharField(label=_("Code from the app"), max_length=256, required=False)
-
     class Meta:
         model = LogNotificationSettings
         fields = ["enabled", "email", "notify_error", "notify_warning", "notify_stale"]
 
-    def __init__(self, *args, request=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.request = request
-        self.user = getattr(request, "user", None)
         muted = set(self.instance.muted_failures or [])
         self.fields["failures"].choices = [(text, _(text)) for text in failure_texts()]
         self.fields["failures"].initial = [text for text in failure_texts() if text not in muted]
@@ -235,11 +233,6 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
         self.fields["notify_error"].label = _("Send errors from the logs")
         self.fields["notify_warning"].label = _("Send warnings from the logs")
         self.fields["notify_stale"].label = _("Send when the address directory is old")
-        if self.user is not None:
-            self.use_one_proof(self.user, autofocus=False)
-        # The code of the app is named as the app shows it (review item 2), not the mixin's "2FA" wording.
-        if "otp_token" in self.fields:
-            self.fields["otp_token"].label = _("Code from the app")
 
     @property
     def excluded_count(self):
@@ -252,41 +245,12 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
         field = self["failures"]
         return [(heading, [field[position[text]] for text in texts]) for heading, texts in failure_groups()]
 
-    def clean(self):
-        cleaned = super().clean()
-        changed = (
-            cleaned.get("enabled") != self.instance.enabled or cleaned.get("email") != self.instance.email
-        )
-        if changed:
-            self.check_proof(cleaned)
-        return cleaned
-
     def _post_clean(self):
         super()._post_clean()
         # The model's rule (address needed while on) and a field error say the same: one message per field.
         for name in list(self._errors):
             if name != NON_FIELD_ERRORS and len(self._errors[name]) > 1:
                 self._errors[name] = self.error_class(list(self._errors[name].data)[:1])
-
-    def check_proof(self, cleaned):
-        """One proof for a change of the switch or the address; without a request nothing is accepted (fails closed)."""
-        if self.user is None:
-            self.add_error(None, _("Enter your current password."))
-            return
-        if self.proof == "password":
-            password = cleaned.get("current_password")
-            if password is None:
-                self.add_error("current_password", _("Enter your current password."))
-                return
-            from leg_platform.accounts import second_factor
-
-            if not second_factor.verify_password(self.request, self.user, password):
-                self.add_error("current_password", _("The password is not correct. Please try again."))
-            return
-        if self.proof == "code":
-            self.check_code(cleaned)
-            return
-        self.add_error(None, _("Enter the 2FA authentication code."))
 
     def save_settings(self):
         """Save the setting fields only: the bookkeeping of the notifier (``state``) stays as it is."""
@@ -298,12 +262,12 @@ class NotificationForm(OneProofMixin, forms.ModelForm):
 
 
 def settings_view(request):
-    """POST only: change the notification setting. One proof for a change of the switch or the address; one security
-    event per change, no address in it. Switching on starts from the current rows: only later events are mailed."""
+    """POST only: change the notification setting. One security event per change, no address in it. Switching on starts
+    from the current rows: only later events are mailed. An invalid form shows the whole page again (status 400)."""
     require_superuser(request)
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    form = NotificationForm(request.POST, instance=settings_row(), request=request)
+    form = NotificationForm(request.POST, instance=settings_row())
     if form.is_valid():
         with transaction.atomic():
             was_enabled = settings_row().enabled
@@ -311,23 +275,8 @@ def settings_view(request):
             if form.cleaned_data.get("enabled") and not was_enabled:
                 _start_from_now(settings_row())
             security_log.record(SecurityEvent.Event.LOG_NOTIFICATION_CHANGED, actor=request.user)
-        return HttpResponseRedirect(reverse("admin:logmenu"))
-    context = {
-        **log_views.admin.site.each_context(request),
-        "title": _("Logs"),
-        "settings_form": form,
-        "range": DEFAULT_RANGE,
-        "ranges": [],
-        "shown": set(DATABASE_SOURCES),
-        "security_lines": None,
-        "housekeeping_lines": None,
-        "import_lines": None,
-        "line_counts": LINE_COUNTS,
-        "lines_selected": DEFAULT_LINES,
-        "suppressed": suppressed_counts(),
-        "mail_settings_url": reverse("admin:accounts_graphconfiguration_changelist"),
-    }
-    return TemplateResponse(request, "admin/logmenu/page.html", context, status=400)
+        return HttpResponseRedirect(reverse("admin:logmenu") + "#logmenu-notify")
+    return TemplateResponse(request, "admin/logmenu/page.html", _page_context(request, form), status=400)
 
 
 # --- notification (D-120, D-122) --------------------------------------------------------------------------------

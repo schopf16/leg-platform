@@ -78,12 +78,6 @@
       <p>{{ settings_form.notify_warning.errors }}<label><input type="checkbox" name="{{ settings_form.notify_warning.html_name }}" id="{{ settings_form.notify_warning.auto_id }}"{% if settings_form.notify_warning.value %} checked{% endif %}> {{ settings_form.notify_warning.label }}</label></p>
       <p>{{ settings_form.notify_stale.errors }}<label><input type="checkbox" name="{{ settings_form.notify_stale.html_name }}" id="{{ settings_form.notify_stale.auto_id }}"{% if settings_form.notify_stale.value %} checked{% endif %}> {{ settings_form.notify_stale.label }}</label></p>
     </fieldset>
-    <fieldset>
-      <legend>{% translate "Confirmation required" %}</legend>
-      <p class="help">{% translate "Changing needs a code from the app." %}</p>
-      {% if settings_form.otp_token %}<p>{{ settings_form.otp_token.errors }}<label for="{{ settings_form.otp_token.id_for_label }}">{{ settings_form.otp_token.label }}</label><br>{{ settings_form.otp_token }}</p>{% endif %}
-      {% if settings_form.current_password %}<p>{{ settings_form.current_password.errors }}<label for="{{ settings_form.current_password.id_for_label }}">{{ settings_form.current_password.label }}</label><br>{{ settings_form.current_password }}</p>{% endif %}
-    </fieldset>
     <button type="submit" class="button default">{% translate "Save notification" %}</button>
   </form>
 </section>

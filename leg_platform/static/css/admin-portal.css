@@ -366,6 +366,15 @@ input.portal-colour {
   color: var(--error-fg, #ba2121);
 }
 
+.import-warning {
+  margin: 0 0 12px;
+  color: var(--status-warn);
+}
+
+.import-warning[hidden] {
+  display: none;
+}
+
 /* A status is a dot plus a word, never colour alone (DESIGN section 3.5); the colours of the tokens, dark too. */
 :root {
   --status-muted: #5A6068;
@@ -945,7 +954,17 @@ ol.breadcrumbs {
   overflow-wrap: anywhere;
 }
 
-.import-figures thead th {
+.import-table .import-figures th,
+.import-table .import-figures td {
+  padding: 3px 16px 3px 0;
+  background: none;
+  border: 0;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.import-table .import-figures thead th {
   font-weight: 600;
 }
 

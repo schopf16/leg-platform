@@ -29,17 +29,6 @@ PLANTED_TOKEN = "tok_PLANTEDSECRET123"
 SENDER = "leg_platform.accounts.emails._deliver"
 
 
-def app_proof(user):
-    """The proof of identity of a superuser who has the second factor: the code of the device now (D-062)."""
-    from leg_platform.accounts.models import AuthenticatorDevice
-    from leg_platform.accounts.tests.helpers import code_for
-
-    device = AuthenticatorDevice.objects.filter(user=user, confirmed=True).first()
-    if device is None:
-        device = AuthenticatorDevice.objects.create_device(user, confirmed=True)
-    return {"otp_token": code_for(device)}
-
-
 class LogMenuBase(TestCase):
     databases = {"default", "addresses"}
 
@@ -124,7 +113,7 @@ class SettingTests(LogMenuBase):
 
     def test_a_change_is_one_security_event_without_the_address(self):
         response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {
-            "enabled": "on", "email": "notice.target@example.org", **app_proof(self.superuser),
+            "enabled": "on", "email": "notice.target@example.org",
         })
         self.assertEqual(response.status_code, 302)
         events = SecurityEvent.objects.filter(event=SecurityEvent.Event.LOG_NOTIFICATION_CHANGED)
@@ -420,13 +409,25 @@ class PageLayoutTests(LogMenuBase):
         self.assertIn("(2 Texte ausgeschlossen)", html)
         self.assertIn("Gilt für alle Fehler, auch für Importfehler.", html)
 
-    def test_the_proof_block_has_a_plain_title_and_one_sentence(self):
-        html = self.client_for(self.superuser).get(reverse("admin:logmenu")).content.decode()
-        self.assertIn("Bestätigung erforderlich", html)
-        self.assertIn("Zum Ändern ist ein Code aus der App nötig", html)
-        self.assertIn('for="id_otp_token">Code aus der App</label>', html)
-        self.assertNotIn("2FA", html)
-        self.assertNotIn("Proof of identity", html)
+    def test_saving_asks_for_no_proof_also_with_a_passkey(self):
+        # Owner decision 2026-10-26: no further proof in the administration; a passkey account must not meet a code field.
+        from leg_platform.accounts.models import User
+
+        self.superuser.authentication_method = User.AuthenticationMethod.PASSKEY
+        client = self.client_for(self.superuser)
+        with patch("leg_platform.accounts.second_factor.has_second_factor", return_value=False):
+            html = client.get(reverse("admin:logmenu")).content.decode()
+        for text in ("Bestätigung erforderlich", "Code aus der App", "2FA", "id_otp_token", "id_current_password"):
+            self.assertNotIn(text, html)
+        response = client.post(reverse("admin:logmenu_settings"), {"enabled": "on", "email": "passkey.target@example.org"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(LogNotificationSettings.objects.get(pk=1).enabled)
+
+    def test_an_invalid_save_shows_the_whole_page_with_the_error(self):
+        response = self.client_for(self.superuser).post(reverse("admin:logmenu_settings"), {"enabled": "on", "email": ""})
+        self.assertEqual(response.status_code, 400)
+        for anchor in ('id="logmenu-filter"', 'id="logmenu-security"', 'id="logmenu-notify"'):
+            self.assertContains(response, anchor, status_code=400)
 
 
 class SidebarEntryTests(LogMenuBase):

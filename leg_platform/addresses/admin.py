@@ -14,15 +14,16 @@ from leg_platform.accounts.models import SecurityEvent
 
 from leg_platform.log_filters import redact_personal_data, redact_tokens
 
-from . import housekeeping, jobs, runner, status
+from . import housekeeping, jobs, status
 from .limits import allow_request
 from .models import HousekeepingStatus, ImportLogEntry, ImportRequest, ServicePostalCode
 
 PERMISSION = "addresses.request_directory_import"
 # The postal codes of the service area of the transformer station scan (D-118); its own right, like the one above.
 SERVICE_AREA_PERMISSION = "addresses.manage_service_areas"
-# How often the page asks for the status while an import is queued or running (seconds).
-POLL_SECONDS = 2
+# How often the page asks for the status while an import is queued or running (seconds); a hidden tab asks not at all
+# (D-133).
+POLL_SECONDS = 5
 
 
 @admin.register(ServicePostalCode)
@@ -135,7 +136,7 @@ class ImportRequestAdmin(admin.ModelAdmin):
 
     def start_view(self, request, source):
         """Start one import or the full sync (D-132): POST only, CSRF (middleware), the right of the page, the request
-        limit of the admin pages, one security event, then the durable queue. ``source`` is one of ``START_SOURCES``;
+        limit of the admin pages, one security event, then the durable queue (the import worker runs it, D-133). ``source`` is one of ``START_SOURCES``;
         anything else is a 404. The answer is always a redirect to the page (post, redirect, get)."""
         if not request.user.has_perm(PERMISSION):
             raise PermissionDenied
@@ -155,9 +156,8 @@ class ImportRequestAdmin(admin.ModelAdmin):
         if not added:
             self.message_user(request, _("This import is already running or waiting."), messages.WARNING)
             return page
-        # The thread works off the queue one job after the other (D-090, D-132); with an import running, it waits.
-        runner.start_queue()
-        self.message_user(request, _("The import was started. This page shows the progress."), messages.SUCCESS)
+        # The import worker works off the queue one job after the other (D-133); the web process never runs an import.
+        self.message_user(request, _("The import was queued. This page shows the progress."), messages.SUCCESS)
         return page
 
     def directory_view(self, request):
