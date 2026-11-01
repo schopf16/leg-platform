@@ -55,6 +55,15 @@ from leg_platform.accounts.models.tokens import (
     VerificationTokenManager,
     verification_token_digest,
 )
+from leg_platform.accounts.models.registration_codes import (
+    CHALLENGE_LENGTH,
+    CODE_DIGITS,
+    CODE_PURPOSE,
+    RegistrationChallenge,
+    challenge_digest,
+    code_digest,
+    new_code,
+)
 from leg_platform.accounts.models.mail import (
     CERTIFICATE_EXPIRED,
     CERTIFICATE_EXPIRING,

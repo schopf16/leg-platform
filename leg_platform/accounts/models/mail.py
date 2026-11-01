@@ -147,7 +147,7 @@ class EmailText(models.Model):
 
     class Key(models.TextChoices):
         REGISTRATION_VERIFICATION = "registration_verification", _(
-            "Registration: link to confirm the address"
+            "Registration: confirmation code"
         )
         REGISTRATION_EXISTING_ACCOUNT = "registration_existing_account", _(
             "Registration: the address already has an account"

@@ -14,16 +14,16 @@ from django.core import mail
 from django.test import Client, TestCase, tag
 from django.urls import reverse
 
-from leg_platform.accounts.models import MailJob, SecurityEvent, User, VerificationToken
+from leg_platform.accounts.models import MailJob, RegistrationChallenge, SecurityEvent, User
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
     completion_data,
+    confirmation_code,
     create_active_user,
     password_data,
     registration_data,
     run_mail_queue,
-    verification_path,
 )
 from leg_platform.accounts.tests.test_password_reset import (
     NEW_PASSWORD,
@@ -114,25 +114,38 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
             self.client, reverse("accounts:registration"), registration_data("new.person@example.org")
         )
         run_mail_queue()
-        self.link = verification_path(mail.outbox[-1])
+        self.message = mail.outbox[-1]
+        self.sent_url = reverse("accounts:registration_sent")
         self.method_url = reverse("accounts:registration_method")
         self.password_url = reverse("accounts:registration_password")
         self.url = reverse("accounts:registration_complete")
 
+    def enter_the_code(self):
+        """The code form as a browser posts it (origin of the page); the next screen is the choice of the method."""
+        confirmed = submit_like_a_browser(
+            self.client, self.sent_url, {"otp_token": confirmation_code(self.message)}
+        )
+        self.assertEqual(confirmed["Location"], self.method_url)
+
     def choose_password_method(self):
         """Step 2, first screen, as a browser posts it (token and origin); the next screen is the password."""
-        reference = VerificationToken.objects.get().pk
+        reference = RegistrationChallenge.objects.get().pk
         chosen = submit_like_a_browser(
             self.client, self.method_url, {"method": "password", "registration": str(reference)}
         )
         self.assertEqual(chosen["Location"], self.password_url)
         return reference
 
-    def test_the_link_sends_no_referrer_and_the_form_pages_do_not(self):
-        opened = self.client.get(self.link)
-
-        self.assertEqual(opened.status_code, 302)
-        self.assertEqual(opened["Referrer-Policy"], "no-referrer")
+    def test_the_code_page_and_the_form_pages_do_not_send_no_referrer(self):
+        # The code form is a form like the others (D-054): its page must not be "no-referrer".
+        self.assert_the_page_does_not_send_no_referrer(self.client, self.sent_url)
+        with self.assertLogs("django.security.csrf", "WARNING"):
+            refused = submit_like_a_browser(
+                self.client, self.sent_url, {"otp_token": confirmation_code(self.message)}, origin="null"
+            )
+        self.assertEqual(refused.status_code, 403)
+        self.assertFalse(User.objects.exists())
+        self.enter_the_code()
         self.assert_the_page_does_not_send_no_referrer(self.client, self.method_url)
         self.choose_password_method()
         self.assert_the_page_does_not_send_no_referrer(self.client, self.password_url)
@@ -141,7 +154,7 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         # D-066: the script posts the lookup from the details step with the token of the page in
         # the header and, in a browser, the origin of the page; "null" would come from a page with
         # the policy "no-referrer" (D-054, R-01) and is refused.
-        self.client.get(self.link)
+        self.enter_the_code()
         reference = self.choose_password_method()
         submit_like_a_browser(self.client, self.password_url, password_data(registration=reference))
         page = self.client.get(self.url)
@@ -165,12 +178,12 @@ class RegistrationCompletionOriginTests(BrowserOriginMixin, TestCase):
         self.assertEqual(accepted.json()["status"], "not_checked")
 
     def test_the_forms_are_accepted_with_the_origin_of_a_browser(self):
-        self.client.get(self.link)
+        self.enter_the_code()
         # The choice of the method is a form like the others: refused with the origin "null", accepted with the page's.
         with self.assertLogs("django.security.csrf", "WARNING"):
             refused = submit_like_a_browser(
                 self.client, self.method_url,
-                {"method": "password", "registration": str(VerificationToken.objects.get().pk)}, origin="null",
+                {"method": "password", "registration": str(RegistrationChallenge.objects.get().pk)}, origin="null",
             )
         self.assertEqual(refused.status_code, 403)
         reference = self.choose_password_method()

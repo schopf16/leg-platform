@@ -34,7 +34,6 @@ from leg_platform.accounts.tests.helpers import (
     registration_data,
     reset_request_data,
     run_mail_queue,
-    verification_path,
 )
 
 REQUEST_URL = reverse("accounts:password_reset")
@@ -348,7 +347,7 @@ class ResetFlowTests(TestCase):
 
     def test_the_password_policy_applies(self):
         weak = {
-            "too short": "kettle orchard",
+            "too short": "orchard",
             "numeric": "1234567890123456",
             "common": "1q2w3e4r5t6y7u8i9o0p",
             "similar to the address": "active.person@example.org",
@@ -379,22 +378,19 @@ class ResetFlowTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(passphrase))
 
-    def test_a_registration_link_does_not_open_a_reset_and_the_reverse(self):
+    def test_a_reset_link_does_not_open_a_registration_and_the_registration_email_has_no_link(self):
         client = Client()
         client.post(reverse("accounts:registration"), registration_data("new.person@example.org"))
         run_mail_queue()
-        registration_path = verification_path(mail.outbox[-1])
 
         self.assertRedirects(
             client.get(self.path.replace("password-reset", "register")),
             reverse("accounts:registration_invalid"),
             fetch_redirect_response=False,
         )
-        self.assertRedirects(
-            client.get(registration_path.replace("register", "password-reset")),
-            INVALID_URL,
-            fetch_redirect_response=False,
-        )
+        # The registration email carries a code, no link that could be tried here (D-136).
+        self.assertNotIn("/password-reset/", mail.outbox[-1].body)
+        self.assertNotIn("/register/verify/", mail.outbox[-1].body)
 
     def test_the_token_pages_send_no_referrer_and_are_not_cached(self):
         # Only the pages whose URL contains the token send no referrer.

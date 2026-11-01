@@ -1051,8 +1051,8 @@ msgid "phone number"
 msgstr "numéro de téléphone"
 
 #: leg_platform/accounts/models.py
-msgid "Registration: link to confirm the address"
-msgstr "Inscription : lien de confirmation de l’adresse"
+msgid "Registration: confirmation code"
+msgstr "Inscription : code de confirmation"
 
 msgid "Registration: the address already has an account"
 msgstr "Inscription : l’adresse a déjà un compte"
@@ -2120,8 +2120,8 @@ msgstr ""
 " adresse e-mail redevient disponible pour une nouvelle inscription."
 
 # Registration in three steps, result pages and the entry pages (D-058)
-msgid "Your registration at %(instance_name)s"
-msgstr "Votre inscription chez %(instance_name)s"
+msgid "%(code)s is your %(instance_name)s code"
+msgstr "%(code)s est votre code pour %(instance_name)s"
 
 msgid "At least %(min_length)d characters."
 msgstr "Au moins %(min_length)d caractères."
@@ -2175,22 +2175,75 @@ msgstr "Règles pour les mots de passe"
 msgid "Step %(step)s of 3"
 msgstr "Étape %(step)s sur 3"
 
+msgid "Confirmation code · valid for %(lifetime_minutes)s minutes"
+msgstr "Code de confirmation · valable %(lifetime_minutes)s minutes"
+
+msgid "If you did not request this, ignore this email."
+msgstr "Si vous n’avez pas fait cette demande, ignorez cet e-mail."
+
+msgid "Never share this code. Enter it only on the page where you requested it."
+msgstr "Ne communiquez jamais ce code. Saisissez-le uniquement sur la page où vous l’avez demandé."
+
+msgid "Privacy notice:"
+msgstr "Protection des données :"
+
+msgid "Questions or problems:"
+msgstr "Questions ou problèmes :"
+
+msgid "Enter code"
+msgstr "Saisir le code"
+
+msgid "We sent an email to <strong class=\"address-text\">%(address)s</strong>. It contains a 6-digit code. If you received a link instead, open that link."
+msgstr "Nous avons envoyé un e-mail à <strong class=\"address-text\">%(address)s</strong>. Il contient un code à 6 chiffres. Si vous avez reçu un lien à la place, ouvrez ce lien."
+
+msgid "The code is valid for %(minutes)s minutes."
+msgstr "Le code est valable %(minutes)s minutes."
+
+msgid "We sent a new code. The old code no longer works."
+msgstr "Nous avons envoyé un nouveau code. L’ancien code ne fonctionne plus."
+
+msgid "6 digits from the email"
+msgstr "6 chiffres figurant dans l’e-mail"
+
+msgid "Your code to create your account"
+msgstr "Votre code pour créer votre compte"
+
+msgid "This password is used very often. Please choose another one, for example a sentence of several words."
+msgstr "Ce mot de passe est très souvent utilisé. Veuillez en choisir un autre, par exemple une phrase de plusieurs mots."
+
+msgid "Send new code"
+msgstr "Envoyer un nouveau code"
+
+msgid "A new code is possible after <span data-resend-seconds>%(seconds)s</span> seconds."
+msgstr "Un nouveau code est possible dans <span data-resend-seconds>%(seconds)s</span> secondes."
+
+msgid "Change address"
+msgstr "Modifier l’adresse"
+
+msgid "Send code"
+msgstr "Envoyer le code"
+
+msgid "We send you a 6-digit code."
+msgstr "Nous vous envoyons un code à 6 chiffres."
+
+msgid "This code is not correct. Please check it and try again."
+msgstr "Ce code n’est pas correct. Veuillez le vérifier et réessayer."
+
+msgid "This code is no longer valid. Request a new code."
+msgstr "Ce code n’est plus valable. Demandez un nouveau code."
+
+msgid "The placeholder {code} must stand alone in a paragraph: a line of its own with an empty line before and after."
+msgstr "Le champ {code} doit figurer seul dans un paragraphe : sur une ligne à part, avec une ligne vide avant et après."
+
+msgid "Number of minutes for which the confirmation code can be used."
+msgstr "Nombre de minutes pendant lesquelles le code de confirmation peut être utilisé."
+
 msgid ""
-"Hello\n"
-"\n"
-"Please confirm your email address with this link. The link is valid for %(lifetime_hours)s hours.\n"
-"\n"
-"Continue registration:\n"
-"\n"
-"%(verification_url)s"
+"The six-digit confirmation code. In the text it must stand alone in a paragraph (a line of its own with an empty "
+"line before and after): the email shows that paragraph as the large code."
 msgstr ""
-"Bonjour\n"
-"\n"
-"Veuillez confirmer votre adresse e-mail avec ce lien. Le lien est valable %(lifetime_hours)s heures.\n"
-"\n"
-"Poursuivre l’inscription :\n"
-"\n"
-"%(verification_url)s"
+"Le code de confirmation à six chiffres. Dans le texte, il doit figurer seul dans un paragraphe (une ligne à part, "
+"avec une ligne vide avant et après) : l’e-mail affiche ce paragraphe sous forme de grand code."
 
 msgid ""
 "Hello\n"
@@ -2333,10 +2386,10 @@ msgstr[2] "Nous vous envoyons un lien. Il est valable %(counter)s heures."
 
 msgid ""
 "The link has expired or was already used. If you have already registered, go"
-" to the login. Otherwise request a new link."
+" to the login. Otherwise request a new code."
 msgstr ""
 "Le lien a expiré ou a déjà été utilisé. Si vous êtes déjà inscrit, "
-"connectez-vous. Sinon, demandez un nouveau lien."
+"connectez-vous. Sinon, demandez un nouveau code."
 
 msgid ""
 "The link has expired or was already used. If you have already chosen a new "
@@ -5234,7 +5287,7 @@ msgstr "Nombre de jours pendant lesquels le lien personnel peut être utilisé."
 msgid ""
 "Hello\n"
 "\n"
-"An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for %(lifetime_days)s days.\n"
+"An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for %(lifetime_days)s days. You do not need to enter a code. Open the link.\n"
 "\n"
 "Continue:\n"
 "\n"
@@ -5244,7 +5297,7 @@ msgid ""
 msgstr ""
 "Bonjour\n"
 "\n"
-"Un compte a été créé pour vous. Veuillez confirmer votre adresse e-mail avec ce lien et choisir un mot de passe. Le lien est valable %(lifetime_days)s jours.\n"
+"Un compte a été créé pour vous. Veuillez confirmer votre adresse e-mail avec ce lien et choisir un mot de passe. Le lien est valable %(lifetime_days)s jours. Vous n’avez pas besoin de saisir de code. Ouvrez le lien.\n"
 "\n"
 "Continuer :\n"
 "\n"

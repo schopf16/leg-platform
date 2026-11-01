@@ -47,7 +47,7 @@ EMAIL = "admin@example.org"
 # Test values only; not secrets of any environment.
 INITIAL_PASSWORD = "initial passphrase of the first start"
 NEW_PASSWORD = "paper lantern rests under silver rain"
-WEAK_PASSWORD = "short-sentinel"  # 14 characters: below the minimum of 15
+WEAK_PASSWORD = "sentinl"  # 7 characters: below the minimum of 8
 LOGIN_URL = reverse("accounts:login")
 PROFILE_URL = reverse("accounts:profile")
 
@@ -196,12 +196,12 @@ class SetupInstanceTests(TransactionTestCase):
         self.assertFalse(User.objects.exists())
         self.assertFalse(SecurityEvent.objects.exists())
 
-    def test_the_minimum_length_of_fifteen_characters_applies(self):
-        with self.assertRaisesMessage(CommandError, "at least 15 characters"):
-            self.run_command(password="quartz-lantern")  # 14 characters
+    def test_the_minimum_length_of_eight_characters_applies(self):
+        with self.assertRaisesMessage(CommandError, "at least 8 characters"):
+            self.run_command(password="quartz-")  # 7 characters
         self.assertFalse(User.objects.exists())
-        self.run_command(password="quartz-lantern1")  # 15 characters
-        self.assertTrue(User.objects.get().check_password("quartz-lantern1"))
+        self.run_command(password="quartzla")  # 8 characters, letters only
+        self.assertTrue(User.objects.get().check_password("quartzla"))
 
     def test_a_database_that_ran_the_old_directory_migration_needs_nothing_and_gets_no_directory_tables(self):
         # The old router kept the directory tables out of the application database: it ran

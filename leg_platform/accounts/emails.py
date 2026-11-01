@@ -10,12 +10,12 @@ import math
 from datetime import date, timedelta
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.urls import reverse
 from django.utils import formats, translation
 from django.utils.translation import gettext
 
-from leg_platform.accounts import email_texts, greeting, mail_addresses
+from leg_platform.accounts import code_mail, email_texts, greeting, mail_addresses
 from leg_platform.accounts.models import EmailText
 from leg_platform.accounts.portal_settings import portal_values
 
@@ -71,15 +71,19 @@ def _send(address, key, values, greeting_name=""):
     _deliver(address, subject, body)
 
 
-def _deliver(address, subject, body):
+def _deliver(address, subject, body, html=None):
     # An automatic message that answers no email (RFC 3834, section 5.2).
-    EmailMessage(
+    message_class = EmailMultiAlternatives if html else EmailMessage
+    message = message_class(
         subject=subject,
         body=body,
         from_email=mail_addresses.sender(),
         to=[address],
         headers={"Auto-Submitted": "auto-generated"},
-    ).send(fail_silently=False)
+    )
+    if html:
+        message.attach_alternative(html, "text/html")
+    message.send(fail_silently=False)
 
 
 # The personal links of a preview and of a test email carry a token that does not exist.
@@ -100,6 +104,10 @@ def _sample_values(key, greeting_name=""):
             specific[placeholder.name] = "24"
         elif placeholder is email_texts.LIFETIME_DAYS:
             specific[placeholder.name] = "7"
+        elif placeholder is email_texts.CODE:
+            specific[placeholder.name] = "123456"
+        elif placeholder is email_texts.LIFETIME_MINUTES:
+            specific[placeholder.name] = "15"
         elif placeholder is email_texts.DELETION_DATE:
             with translation.override(settings.LANGUAGE_CODE):
                 specific[placeholder.name] = formats.date_format(date(2026, 12, 31), "SHORT_DATE_FORMAT")
@@ -161,18 +169,30 @@ def graph_test_message(address, sender_address):
     return EmailMessage(subject=subject, body=body, from_email=sender_address, to=[address])
 
 
-def send_registration_verification(address, raw_token, lifetime: timedelta):
-    """Send the link with which the person verifies the address and sets the password."""
-    _send(
-        address,
-        Key.REGISTRATION_VERIFICATION,
-        {
-            "verification_url": absolute_url(
-                reverse("accounts:registration_verify", kwargs={"token": raw_token})
-            ),
-            "lifetime_hours": str(math.ceil(lifetime.total_seconds() / 3600)),
-        },
-    )
+def send_registration_code(address, code, lifetime: timedelta):
+    """Send the confirmation code of a registration (D-136): HTML with a plain text variant, the code also in the subject.
+
+    The code reaches this function only from the worker's memory; it is stored and logged nowhere.
+    """
+    key = Key.REGISTRATION_VERIFICATION
+    with translation.override(settings.LANGUAGE_CODE):
+        values = _values({"code": code, "lifetime_minutes": str(int(lifetime.total_seconds() // 60))}, key)
+        subject, body = email_texts.render(key, values)
+        privacy_label = gettext("Privacy notice:")
+        contact_label = gettext("Questions or problems:")
+        html = code_mail.build_html(
+            language=settings.LANGUAGE_CODE,
+            instance_name=values["instance_name"],
+            code=code,
+            body=body,
+            privacy_url=values["privacy_url"],
+            contact_url=values["contact_url"],
+            privacy_label=privacy_label,
+            contact_label=contact_label,
+        )
+        footer = code_mail.footer_lines(values["privacy_url"], values["contact_url"], privacy_label, contact_label)
+    text = body.rstrip() + ("\n\n" + "\n".join(footer) if footer else "") + "\n"
+    _deliver(address, subject, text, html=html)
 
 
 def send_invitation(address, raw_token, lifetime: timedelta):

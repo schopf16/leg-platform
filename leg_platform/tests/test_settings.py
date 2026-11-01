@@ -17,12 +17,30 @@ from leg_platform.tests.test_responses import EXPECTED_CSP
 
 
 class PasswordValidationTests(SimpleTestCase):
-    def test_minimum_length_is_15(self):
+    def test_minimum_length_is_8(self):
         with self.assertRaises(ValidationError) as context:
-            validate_password("vq7#Lm2!pX9zR4")  # 14 characters
+            validate_password("vq7#Lm2")  # 7 characters
         codes = [error.code for error in context.exception.error_list]
         self.assertIn("password_too_short", codes)
-        validate_password("vq7#Lm2!pX9zR4w")  # 15 characters
+        validate_password("vq7#Lm2!")  # 8 characters
+
+    def test_8_characters_without_digits_or_specials_are_accepted(self):
+        validate_password("sunlight")
+
+    def test_common_numeric_and_similar_passwords_are_refused(self):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model()(username="kettle", email="kettle@example.org")
+        for weak in ("password", "12345678", "kettle99", "qwertyui"):
+            with self.subTest(weak), self.assertRaises(ValidationError):
+                validate_password(weak, user)
+
+    def test_a_common_password_gets_a_message_that_says_what_to_do(self):
+        with self.assertRaises(ValidationError) as context:
+            validate_password("password")
+        message = " ".join(context.exception.messages)
+        self.assertIn("sehr oft", message)
+        self.assertIn("Satz aus mehreren Wörtern", message)
 
     def test_64_character_passphrase_is_accepted(self):
         passphrase = "copper kettle hums beside quiet orchard lanterns at dawn, twelve"

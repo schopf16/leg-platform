@@ -20,11 +20,14 @@ from leg_platform.accounts.models import (
     MailJob,
     RateLimitBucket,
     RateLimitEvent,
+    RegistrationChallenge,
     User,
     VerificationToken,
 )
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
+    confirm_code_of,
+    confirmation_code,
     create_active_user,
     hour_and_day_limits,
     registration_data,
@@ -198,9 +201,11 @@ class MailRequestTests(TestCase):
 
         # The same statements for every address. Their order depends on the keyed digests of the
         # buckets, which are locked in digest order, so it is compared as a multiset.
-        first = next(iter(shapes.values()))
+        # (Registration and reset are different requests, each compared within its kind.)
+        first = shapes["new"]
         for name, shape in shapes.items():
-            self.assertEqual(shape, first, name)
+            if not name.endswith("reset"):
+                self.assertEqual(shape, first, name)
 
     def test_variants_of_an_address_share_one_budget(self):
         for variant in ("New.Person@EXAMPLE.org", " new.person@example.org", "NEW.PERSON@example.org"):
@@ -230,22 +235,27 @@ class MailRequestTests(TestCase):
         self.assertEqual(len(mail.outbox), HOURLY)
         self.assertEqual(MailJob.objects.count(), 0)
 
-    def test_a_suppressed_request_replaces_no_pending_registration(self):
-        post_registration("new.person@example.org")
-        run_mail_queue()
-        pending = User.objects.get()
-        for _ in range(HOURLY - 1):
-            post_registration("new.person@example.org")
+    def test_a_suppressed_request_creates_no_account_and_leaves_the_last_code_valid(self):
+        clients = []
+        for _ in range(HOURLY):
+            client = Client()
+            client.post(reverse("accounts:registration"), registration_data("new.person@example.org"))
             run_mail_queue()
-        post_registration("new.person@example.org")  # above the limit
+            clients.append(client)
+        suppressed = Client()
+        suppressed.post(reverse("accounts:registration"), registration_data("new.person@example.org"))  # above the limit
         run_mail_queue()
 
         self.assertEqual(len(mail.outbox), HOURLY)
+        # Nothing is created before a code was proven, and a suppressed request sends no code.
+        self.assertEqual(User.objects.count(), 0)
+        # The code of the last allowed email still works in the session that asked for it.
+        response = confirm_code_of(clients[-1], mail.outbox[-1])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(User.objects.get().email, "new.person@example.org")
+        # The suppressed session has no code that could work.
         self.assertEqual(User.objects.count(), 1)
-        self.assertNotEqual(User.objects.get().pk, pending.pk)
-        # The link of the last allowed email still works, because the next request changed nothing.
-        token = VerificationToken.objects.get()
-        self.assertEqual(token.user_id, User.objects.get().pk)
+        self.assertEqual(confirm_code_of(suppressed, mail.outbox[-1]).status_code, 200)
 
     def test_one_client_address_is_limited_across_different_email_addresses(self):
         limit = rate_limits.MAIL_IP_LIMITS[0][0]
@@ -374,8 +384,8 @@ class MailWorkerTests(TestCase):
 
         self.assertEqual(MailJob.objects.count(), 0)
         self.assertIn("given up", "\n".join(logs.output))
-        # Only the pending registration of the last attempt is left; it expires like any other.
-        self.assertEqual(list(User.objects.values_list("status", flat=True)), ["unverified"])
+        # No account exists before a code was proven.
+        self.assertEqual(User.objects.count(), 0)
 
     def test_a_job_that_is_being_processed_is_not_taken_by_another_worker(self):
         post_registration("new.person@example.org")
@@ -471,5 +481,6 @@ class MailWorkerTests(TestCase):
         run_mail_queue()
 
         self.assertEqual(MailJob.objects.count(), 0)
-        self.assertEqual(VerificationToken.objects.count(), 1)
+        self.assertEqual(VerificationToken.objects.count(), 0)
+        self.assertNotIn(confirmation_code(mail.outbox[0]), RegistrationChallenge.objects.get().code_digest)
         self.assertNotIn(PASSWORD, mail.outbox[0].body)

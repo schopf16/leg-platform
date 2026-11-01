@@ -185,14 +185,16 @@ class InvitationFlowTests(TestCase):
         self.assertEqual(person.status, "active")
 
     def test_a_registration_of_somebody_else_keeps_working_as_before(self):
-        """The ordinary registration is not changed: the address of a plain pending registration is replaced."""
-        from leg_platform.accounts import registration
+        """The ordinary registration is not changed: the plain pending registration of an address is replaced
+        when the code of the new request is confirmed (D-136); an invited account is never touched."""
+        from leg_platform.accounts.tests.test_registration import register_and_confirm
 
         pending = User.objects.create_user("plain.registration@example.org")
-        send = registration.process_registration("plain.registration@example.org")
-        send()
+        register_and_confirm(self.client, "plain.registration@example.org")
         self.assertFalse(User.objects.filter(pk=pending.pk).exists())
-        self.assertEqual(mail.outbox[-1].to, ["plain.registration@example.org"])
+        replacement = User.objects.get(email="plain.registration@example.org")
+        self.assertEqual(replacement.status, User.Status.UNVERIFIED)
+        self.assertIsNone(replacement.invited_at)
 
 
 @tag("mariadb")

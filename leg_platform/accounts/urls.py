@@ -6,7 +6,6 @@ from leg_platform import render_as
 from leg_platform.accounts import method_views, passkey_views, profile_views, registration_views, views
 from leg_platform.accounts.models import MailJob
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
-from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 
 app_name = "accounts"
 
@@ -35,14 +34,10 @@ urlpatterns = [
     # End of the support view "View as" (D-131): POST only.
     path("view-as/end/", render_as.EndView.as_view(), name="render_as_end"),
     path("register/", views.RegistrationView.as_view(), name="registration"),
-    path(
-        "register/sent/",
-        views.EmailSentView.as_view(purpose="registration", lifetime=REGISTRATION_LINK_LIFETIME),
-        name="registration_sent",
-    ),
+    path("register/code/", views.RegistrationCodeView.as_view(), name="registration_sent"),
     path(
         "register/resend/",
-        views.ResendView.as_view(
+        views.RegistrationResendView.as_view(
             purpose="registration",
             kind=MailJob.Kind.REGISTRATION,
             start_url="accounts:registration",
@@ -50,6 +45,7 @@ urlpatterns = [
         ),
         name="registration_resend",
     ),
+    path("register/change-address/", views.RegistrationChangeAddressView.as_view(), name="registration_change_address"),
     path("register/expired/", views.RegistrationInvalidView.as_view(), name="registration_invalid"),
     path("register/method/", registration_views.RegistrationMethodView.as_view(), name="registration_method"),
     path("register/password/", views.RegistrationPasswordView.as_view(), name="registration_password"),

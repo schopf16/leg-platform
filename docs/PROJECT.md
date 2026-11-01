@@ -67,10 +67,10 @@ The user model keeps all fields of the eCH-0010 structure (D-032); unused fields
 
 ## Registration
 
-* The form asks only for the email address and links to the privacy notice (owner, 2026-10-13); until verified only the address is stored. The response is always the same generic message.
-* If the address does not belong to an active, temporarily locked or blocked account, an unverified account without a customer number is created and a time-limited (proposal: 24 hours), single-use link is sent, replacing an earlier pending registration; otherwise no account is created and an email to that address points to login and password reset.
-* Via the link the person chooses the sign-in method (password, password and app, or passkey), sets it up and enters the profile data; the link stays valid after an unsuccessful submission and is consumed only by the successful last step, which activates the account and assigns the customer number (D-021). Verification never activates a sign-in method the clicking person did not choose. Completing logs the person in (D-055) and offers two-factor setup as the one recommended next step.
-* Unverified accounts are deleted when the link expires; registration and its emails are rate-limited.
+* The form asks only for the email address and links to the privacy notice (owner, 2026-10-13); until verified only the address is stored. The next page ("Enter code") is always the same.
+* If the address does not belong to an active, temporarily locked or blocked account, a six-digit code (valid 15 minutes, single use, at most 5 wrong entries, bound to the browser session that asked, D-136) is sent and entered on the next page in the same tab; otherwise no code is made and an email to that address points to login and password reset. An address staff invited still gets the link of the invitation (D-087).
+* After the code the person chooses the sign-in method (password, password and app, or passkey), sets it up and enters the profile data; the proof of the address lasts 2 hours and is consumed only by the successful last step, which activates the account and assigns the customer number (D-021). Confirming the code never activates a sign-in method the person did not choose. Completing logs the person in (D-055) and offers two-factor setup as the one recommended next step.
+* Unverified accounts are deleted when the proof ends; registration and its emails are rate-limited.
 
 ## Changing the Email Address
 

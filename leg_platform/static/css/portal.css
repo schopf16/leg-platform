@@ -589,6 +589,20 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* The one input of the registration code (D-136): large, monospaced, spaced digits; a plain text field. */
+.entry-card input.code-input {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-align: center;
+  padding: 12px 8px;
+}
+
+.entry-card .entry-center .btn-link {
+  font-weight: 600;
+}
+
 /* Step bar; the share filled is a class because the CSP allows no style attribute. */
 .step-progress {
   display: grid;

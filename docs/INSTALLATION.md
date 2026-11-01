@@ -176,7 +176,7 @@ D-005, D-041, D-076. `python manage.py setup_instance` is idempotent and runs on
 
 An installation needs only an **empty** database with its one account ("Database privileges") and the environment file.
 
-`BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` is a secret: the file must be readable only by its owner (mode 0600). It is ignored once a system administrator exists. A missing password or one failing the validators (at least 15 characters) makes the command refuse, without printing it. At the first login the password must be replaced and two-factor authentication set up. **Remove `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` from the environment file after the first login.** Alternative without a password in a file: leave it unset and run `python manage.py setup_initial_administrator` with `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` set for that command. It asks twice for the password with hidden input, runs only while no system administrator exists and logs its use.
+`BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` is a secret: the file must be readable only by its owner (mode 0600). It is ignored once a system administrator exists. A missing password or one failing the validators (at least 8 characters) makes the command refuse, without printing it. At the first login the password must be replaced and two-factor authentication set up. **Remove `BOOTSTRAP_SYSTEM_ADMIN_PASSWORD` from the environment file after the first login.** Alternative without a password in a file: leave it unset and run `python manage.py setup_initial_administrator` with `BOOTSTRAP_SYSTEM_ADMIN_EMAIL` set for that command. It asks twice for the password with hidden input, runs only while no system administrator exists and logs its use.
 
 ### Emergency commands
 

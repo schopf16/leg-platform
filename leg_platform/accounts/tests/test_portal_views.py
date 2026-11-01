@@ -7,18 +7,18 @@ from django.test import Client, TestCase, override_settings, tag
 from django.urls import reverse
 
 from leg_platform.accounts.login_protection import LOGIN_FAILURE_LIMIT
-from leg_platform.accounts.models import AuthenticatorDevice, User, VerificationToken
+from leg_platform.accounts.models import AuthenticatorDevice, RegistrationChallenge, User
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     age_authentication,
     choose_method,
     code_for,
     completion_data,
+    confirm_code_of,
     create_active_user,
     password_data,
     registration_data,
     run_mail_queue,
-    verification_path,
 )
 
 SHARP_S = "\u00df"
@@ -209,14 +209,16 @@ class PageSecurityAndLanguageTests(TestCase):
     def pages(self):
         user = create_active_user("active.person@example.org")
         anonymous = Client()
-        anonymous.post(
+        pending = Client()
+        pending.post(
             reverse("accounts:registration"), registration_data("pending.person@example.org")
         )
         run_mail_queue()
-        path = verification_path(mail.outbox[-1])
-        reference = VerificationToken.objects.get().pk
-        pending = Client()
-        pending.get(path)
+        confirm_code_of(pending, mail.outbox[-1])
+        reference = RegistrationChallenge.objects.get().pk
+        # The page "Enter code" belongs to the session that asked for a code (D-136).
+        asked = Client()
+        asked.post(reverse("accounts:registration"), registration_data("asked.person@example.org"))
         choose_method(pending, "password", reference)
         member = Client()
         member.force_login(user)
@@ -250,7 +252,7 @@ class PageSecurityAndLanguageTests(TestCase):
         }
         for name, password in (
             ("numeric", "1234567890123456"),
-            ("short", "kettle orchard"),
+            ("short", "orchard"),
             ("common", "1q2w3e4r5t6y7u8i9o0p"),
             ("similar", "pending.person@example.org"),
         ):
@@ -270,7 +272,7 @@ class PageSecurityAndLanguageTests(TestCase):
             "password reset expired": anonymous.get(reverse("accounts:password_reset_invalid")),
             "login failed": login(Client(), "unknown.person@example.org", "wrong", address="10.0.5.1"),
             "registration": anonymous.get(reverse("accounts:registration")),
-            "registration sent": anonymous.get(reverse("accounts:registration_sent")),
+            "registration sent": asked.get(reverse("accounts:registration_sent")),
             "registration password": pending.get(password_url),
             "complete": pending.get(complete_url),
             "link invalid": anonymous.get(

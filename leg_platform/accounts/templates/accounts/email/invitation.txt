@@ -1,6 +1,6 @@
 {% load i18n %}{% autoescape off %}{% blocktranslate %}Hello
 
-An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for {{ lifetime_days }} days.
+An account was created for you. Please confirm your email address with this link and choose a password. The link is valid for {{ lifetime_days }} days. You do not need to enter a code. Open the link.
 
 Continue:
 

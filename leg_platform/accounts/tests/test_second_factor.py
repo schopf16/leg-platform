@@ -974,7 +974,7 @@ class PasswordChangeTests(TestCase):
 
     def test_the_rules_for_passwords_apply(self):
         for name, overrides in (
-            ("short", {"new_password1": "kettle orchard", "new_password2": "kettle orchard"}),
+            ("short", {"new_password1": "orchard", "new_password2": "orchard"}),
             ("numeric", {"new_password1": "1234567890123456", "new_password2": "1234567890123456"}),
             ("different", {"new_password2": "another lantern rests under silver rain"}),
             ("similar to the address", {"new_password1": self.user.email, "new_password2": self.user.email}),

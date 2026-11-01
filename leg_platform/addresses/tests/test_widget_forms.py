@@ -10,11 +10,10 @@ the rules of its source in ``accounts.tests.test_address_notice``."""
 
 import re
 
-from django.core import mail
 from django.test import Client, SimpleTestCase, tag
 from django.urls import reverse
 
-from leg_platform.accounts.models import VerificationToken
+from leg_platform.accounts.models import RegistrationChallenge
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
     VerifiedClient,
@@ -22,8 +21,7 @@ from leg_platform.accounts.tests.helpers import (
     create_active_user,
     password_data,
 )
-from leg_platform.accounts.tests.helpers import verification_path
-from leg_platform.accounts.tests.test_registration import register
+from leg_platform.accounts.tests.test_registration import register_and_confirm
 from leg_platform.community import applications
 from leg_platform.community.tests.helpers import make_location
 from leg_platform.customer.tests.helpers import login as customer_login
@@ -51,17 +49,8 @@ class EveryAddressFormTests(ProcessBase):
 
     def registration_page(self):
         client = Client()
-        register(client)
-        # The mail of the registration among the notices that the fixtures of the page queued.
-        paths = []
-        for message in mail.outbox:
-            try:
-                paths.append(verification_path(message))
-            except AssertionError:
-                continue
-        self.assertEqual(len(paths), 1)
-        client.get(paths[0])
-        token = VerificationToken.objects.get()
+        register_and_confirm(client)
+        token = RegistrationChallenge.objects.get(address="new.person@example.org")
         choose_method(client, "password", token.pk)
         client.post(reverse("accounts:registration_password"), password_data(PASSWORD, registration=token.pk))
         return client.get(reverse("accounts:registration_complete")).content.decode()

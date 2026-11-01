@@ -285,6 +285,11 @@ def _claim():
         if job.suppressed:
             job.delete()
             return DONE
+        if job.kind == MailJob.Kind.REGISTRATION and job.created_at < now - registration.JOB_MAX_AGE:
+            # A code that arrives nearly expired helps nobody; the person asks for a new one (D-136).
+            logger.warning("A registration request waited too long in the queue and was dropped.")
+            job.delete()
+            return DONE
         if job.attempts >= MAX_ATTEMPTS:
             logger.error("A mail job (%s) was given up after %d attempts.", job.kind, job.attempts)
             job.delete()

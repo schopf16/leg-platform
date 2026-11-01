@@ -1,5 +1,7 @@
 """Views of the portal accounts. Logged-in views use only ``request.user``; no account id comes from the request."""
 
+import secrets
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
@@ -28,6 +30,7 @@ from leg_platform.accounts import (
     passkeys,
     password_reset,
     rate_limits,
+    registration,
     registration_methods,
     resend,
     second_factor,
@@ -43,6 +46,7 @@ from leg_platform.accounts.forms import (
     LoginForm,
     NewPasswordForm,
     PasswordResetRequestForm,
+    RegistrationCodeForm,
     RegistrationDetailsForm,
     RegistrationForm,
     RegistrationPasswordForm,
@@ -53,17 +57,24 @@ from leg_platform.accounts.mail_queue import submit_mail_request
 from leg_platform.accounts.normalization import normalize_email_address
 from leg_platform.accounts.password_reset import PASSWORD_RESET_LIFETIME
 from leg_platform.accounts.portal_settings import legal_links
-from leg_platform.accounts.registration import REGISTRATION_LINK_LIFETIME
 from leg_platform.accounts.models import (
     AuthenticatorDevice,
     MailJob,
+    RegistrationChallenge,
     SecurityEvent,
     User,
     VerificationToken,
 )
 
 # The token digest is kept in the session between the link and the form, so the token is not in the page URL.
+# Only a person invited by staff gets a link now (D-087, D-136).
 REGISTRATION_SESSION_KEY = "registration_token_digest"
+# The challenge of a registration by code (D-136): its random id, held by this browser only. The table keeps its digest.
+REGISTRATION_CHALLENGE_SESSION_KEY = "registration_challenge"
+# The address of "Change address", offered again on step 1 (shown once, D-136).
+REGISTRATION_PREFILL_SESSION_KEY = "registration_prefill"
+# The longest entry that is compared; a code has six digits.
+CODE_INPUT_LIMIT = 200
 # The password hash chosen on step 2, bound to the link, until the last step creates the account (D-058).
 REGISTRATION_PASSWORD_SESSION_KEY = "registration_password_hash"
 # The privacy notice address shown on the details page: the consent is stored with it, not the current one.
@@ -271,6 +282,19 @@ class MailRequestView(NeverCacheMixin, FormView):
     kind = None
     purpose = None
 
+    def prepare(self, address, automated=False):
+        """Make what the request needs before the job exists (the registration: its challenge); nothing is session data yet.
+
+        ``automated``: the honeypot or the form timer caught the request: it gets the same answer, but no row.
+        """
+        return None
+
+    def undo(self, prepared):
+        """Take back ``prepare`` when the request is refused."""
+
+    def accept(self, prepared):
+        """Keep ``prepare`` in the session once the request is accepted."""
+
     def form_valid(self, form):
         address = form.cleaned_data["email"]
         pending = resend.pending(self.request, self.purpose)
@@ -280,6 +304,7 @@ class MailRequestView(NeverCacheMixin, FormView):
             and pending.wait > 0
             and normalize_email_address(pending.address) == normalize_email_address(address)
         )
+        prepared = None
         if form.automated or within_pause:
             # The answer writes the session, so count per client address: above the limit, refuse without a session.
             if not rate_limits.consume(
@@ -290,8 +315,14 @@ class MailRequestView(NeverCacheMixin, FormView):
                 return self.refused(form)
             if within_pause:
                 return super().form_valid(form)
-        elif not submit_mail_request(self.request, self.kind, address):
-            return self.refused(form)
+            prepared = self.prepare(address, automated=True)
+        else:
+            # The challenge exists before the job, so the worker finds it.
+            prepared = self.prepare(address)
+            if not submit_mail_request(self.request, self.kind, address):
+                self.undo(prepared)
+                return self.refused(form)
+        self.accept(prepared)
         resend.remember(self.request, self.purpose, address)
         return super().form_valid(form)
 
@@ -300,8 +331,28 @@ class MailRequestView(NeverCacheMixin, FormView):
         return self.render_to_response(self.get_context_data(form=form), status=429)
 
 
-class RegistrationView(MailRequestView):
-    """Step 1 of the registration: the address (D-058)."""
+class ChallengeMixin:
+    """The challenge of a registration by code for the views of step 1 (D-136): a row for every address entered."""
+
+    def prepare(self, address, automated=False):
+        if automated:
+            # The same session state as for a person, but no row: a bot costs the database nothing.
+            return None, registration.DECOY_PREFIX + secrets.token_urlsafe(32)
+        return RegistrationChallenge.begin(normalize_email_address(address), registration.CODE_LIFETIME)
+
+    def undo(self, prepared):
+        if prepared[0] is not None:
+            prepared[0].delete()
+
+    def accept(self, prepared):
+        _row, raw = prepared
+        registration.discard(self.request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY))
+        clear_registration_session(self.request)
+        self.request.session[REGISTRATION_CHALLENGE_SESSION_KEY] = raw
+
+
+class RegistrationView(ChallengeMixin, MailRequestView):
+    """Step 1 of the registration: the address (D-058, D-136)."""
 
     template_name = "accounts/registration.html"
     form_class = RegistrationForm
@@ -309,10 +360,13 @@ class RegistrationView(MailRequestView):
     kind = MailJob.Kind.REGISTRATION
     purpose = resend.REGISTRATION
 
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(
-            lifetime_hours=int(REGISTRATION_LINK_LIFETIME.total_seconds() // 3600), **kwargs
-        )
+    def get_initial(self):
+        """The address of "Change address" is offered again (from the session; never in the URL)."""
+        initial = super().get_initial()
+        previous = self.request.session.pop(REGISTRATION_PREFILL_SESSION_KEY, "")
+        if isinstance(previous, str) and previous:
+            initial["email"] = previous
+        return initial
 
 
 class RegistrationInvalidView(NeverCacheMixin, FormView):
@@ -325,8 +379,81 @@ class RegistrationInvalidView(NeverCacheMixin, FormView):
     form_class = RegistrationForm
 
 
+class RegistrationCodeView(NeverCacheMixin, FormView):
+    """"Enter code" (D-136): the page after step 1, the same for every address; confirms the code of the mail.
+
+    The answer to a wrong or an unusable code does not depend on the address: a challenge exists for every address
+    entered. An entry is counted per client address (HTTP 429 above the limit, as for the requests of mails).
+    """
+
+    template_name = "accounts/registration_code.html"
+    form_class = RegistrationCodeForm
+
+    def get(self, request, *args, **kwargs):
+        if resend.pending(request, resend.REGISTRATION) is None:
+            return redirect("accounts:registration")
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        state = resend.pending(self.request, resend.REGISTRATION)
+        # A code that is dead (five wrong entries, or expired) is replaced at once; the pause protects a live one (D-136).
+        live = registration.code_is_live(self.request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY))
+        return super().get_context_data(
+            address=state.address if state else "",
+            wait_seconds=state.wait if state and live else 0,
+            cooldown_seconds=resend.RESEND_COOLDOWN_SECONDS,
+            lifetime_minutes=int(registration.CODE_LIFETIME.total_seconds() // 60),
+            progress_step=1,
+            **kwargs,
+        )
+
+    @method_decorator(sensitive_post_parameters("otp_token"))
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        if not rate_limits.consume(
+            rate_limits.SCOPE_REGISTRATION_CODE_IP,
+            rate_limits.ip_key(axes_client_ip(self.request)),
+            rate_limits.REGISTRATION_CODE_IP_LIMITS,
+        ):
+            form.add_error(None, _("Too many requests, please try again later."))
+            return self.render_to_response(self.get_context_data(form=form), status=429)
+        result = registration.confirm_code(
+            self.request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY),
+            form.cleaned_data["otp_token"][:CODE_INPUT_LIMIT],
+        )
+        if result is registration.CodeResult.CONFIRMED:
+            # New session ID, the session data (the challenge, which proves the address now) stays (D-136).
+            self.request.session.cycle_key()
+            for key in (REGISTRATION_SESSION_KEY, REGISTRATION_PASSWORD_SESSION_KEY, REGISTRATION_PRIVACY_SESSION_KEY):
+                self.request.session.pop(key, None)
+            registration_methods.forget(self.request)
+            resend.forget(self.request, resend.REGISTRATION)
+            return redirect("accounts:registration_method")
+        form.add_error(
+            "otp_token",
+            form.wrong_code_message if result is registration.CodeResult.WRONG else form.expired_code_message,
+        )
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class RegistrationChangeAddressView(NeverCacheMixin, View):
+    """"Change address": drops the challenge and what was staged, back to step 1 with the address filled in (POST with CSRF check, D-136)."""
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        state = resend.pending(request, resend.REGISTRATION)
+        registration.discard(request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY))
+        clear_registration_session(request)
+        if state is not None:
+            request.session[REGISTRATION_PREFILL_SESSION_KEY] = state.address
+        return redirect("accounts:registration")
+
+
 class EmailSentView(NeverCacheMixin, TemplateView):
-    """The same page for every address (registration and password reset); reveals nothing about the account.
+    """The same page for every address (password reset); reveals nothing about the account.
 
     Shows the address this browser entered and offers "send again" after a pause (``resend``).
     ``purpose`` and ``lifetime`` are set in the URL configuration.
@@ -338,16 +465,15 @@ class EmailSentView(NeverCacheMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         state = resend.pending(self.request, self.purpose)
-        registration = self.purpose == resend.REGISTRATION
         return super().get_context_data(
             purpose=self.purpose,
             lifetime_hours=int(self.lifetime.total_seconds() // 3600),
             address=state.address if state else "",
             wait_seconds=state.wait if state else 0,
             cooldown_seconds=resend.RESEND_COOLDOWN_SECONDS,
-            resend_url=reverse("accounts:registration_resend" if registration else "accounts:password_reset_resend"),
-            other_address_url=reverse("accounts:registration" if registration else "accounts:password_reset"),
-            progress_step=1 if registration else 0,
+            resend_url=reverse("accounts:password_reset_resend"),
+            other_address_url=reverse("accounts:password_reset"),
+            progress_step=0,
             **kwargs,
         )
 
@@ -361,20 +487,54 @@ class ResendView(NeverCacheMixin, View):
     start_url = None
     sent_url = None
 
+    def prepare(self, address, automated=False):
+        return None
+
+    def undo(self, prepared):
+        """Take back ``prepare`` when the request is refused."""
+
+    def accept(self, prepared):
+        """Keep ``prepare`` in the session once the request is accepted."""
+
+    def pause(self, request, state):
+        """Seconds the server still holds back a new email; ``state`` is the pending request of this browser."""
+        return state.wait
+
     def post(self, request):
         state = resend.pending(request, self.purpose)
         if state is None:
             return redirect(self.start_url)
-        if state.wait > 0:
+        if self.pause(request, state) > 0:
             return redirect(self.sent_url)
+        prepared = self.prepare(state.address)
         if submit_mail_request(request, self.kind, state.address):
+            self.accept(prepared)
             resend.remember(request, self.purpose, state.address)
+        else:
+            self.undo(prepared)
         return redirect(self.sent_url)
 
 
+class RegistrationResendView(ChallengeMixin, ResendView):
+    """"Send new code": a new challenge replaces the old one, so the earlier code dies (D-136).
+
+    The pause of 60 seconds protects a live code only; once it is dead (five wrong entries, expired) a new one may
+    be requested at once. The limits of the requests (D-038) apply in both cases.
+    """
+
+    def pause(self, request, state):
+        if registration.code_is_live(request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY)):
+            return state.wait
+        return 0
+
+    def accept(self, prepared):
+        super().accept(prepared)
+        messages.success(self.request, _("We sent a new code. The old code no longer works."))
+
+
 class RegistrationVerifyView(TokenPageMixin, View):
-    """Opening the link changes no account data: it remembers the token, starts step 2 again for this session and
-    leaves the URL (D-058).
+    """Opening the link of an invitation (D-087) changes no account data: it remembers the token, starts step 2 again
+    for this session and leaves the URL (D-058). A new registration has no link (D-136).
 
     Mail scanners open links; the registration completes only with the last form, and the link
     stays valid until then. What step 2 staged for the account is not deleted here (a scanner must not
@@ -388,6 +548,7 @@ class RegistrationVerifyView(TokenPageMixin, View):
             return redirect("accounts:registration_invalid")
         # New session ID, the session data stays.
         request.session.cycle_key()
+        request.session.pop(REGISTRATION_CHALLENGE_SESSION_KEY, None)
         request.session[REGISTRATION_SESSION_KEY] = found.digest
         # A new link starts the steps again.
         request.session.pop(REGISTRATION_PASSWORD_SESSION_KEY, None)
@@ -400,6 +561,7 @@ def clear_registration_session(request):
     """Remove everything of a registration from the session."""
     for key in (
         REGISTRATION_SESSION_KEY,
+        REGISTRATION_CHALLENGE_SESSION_KEY,
         REGISTRATION_PASSWORD_SESSION_KEY,
         REGISTRATION_PRIVACY_SESSION_KEY,
     ):
@@ -409,9 +571,9 @@ def clear_registration_session(request):
 
 
 class RegistrationStepMixin(NeverCacheMixin):
-    """Steps 2 and 3: they belong to the verified link in the session.
+    """Steps 2 and 3: they belong to the address proven in this session, by the code (D-136) or by the link of an invitation.
 
-    A form rendered for an earlier link must not be saved into the account of a later link opened in the same browser.
+    A form rendered for an earlier proof must not be saved into the account of a later one opened in the same browser.
     """
 
     @method_decorator(never_cache)
@@ -426,14 +588,20 @@ class RegistrationStepMixin(NeverCacheMixin):
 
     @staticmethod
     def invalid(request):
-        """A logged-in person (account just created, reload, "back") goes home; anybody else to "link no longer valid"."""
+        """A logged-in person (account just created, reload, "back") goes home; the one who came by a link to "link no
+        longer valid"; anybody else to the start of the registration."""
         if request.user.is_authenticated:
             return redirect("home")
+        by_link = REGISTRATION_SESSION_KEY in request.session
         clear_registration_session(request)
-        return redirect("accounts:registration_invalid")
+        return redirect("accounts:registration_invalid" if by_link else "accounts:registration")
 
     @staticmethod
     def find_token(request):
+        """The proof of this session: the confirmed code (a ``RegistrationChallenge``) or the link token; None if none is valid."""
+        proof = registration.find_proof(request.session.get(REGISTRATION_CHALLENGE_SESSION_KEY))
+        if proof is not None:
+            return proof
         digest = request.session.get(REGISTRATION_SESSION_KEY)
         if not digest:
             return None
@@ -569,11 +737,18 @@ class RegistrationCompleteView(RegistrationStepMixin, FormView):
                 .filter(pk=self.token.user_id, status=User.Status.UNVERIFIED)
                 .first()
             )
-            token = (
-                VerificationToken.objects.select_for_update()
-                .filter(pk=self.token.pk, expires_at__gt=timezone.now())
-                .first()
-            )
+            if isinstance(self.token, RegistrationChallenge):
+                token = (
+                    RegistrationChallenge.objects.select_for_update()
+                    .filter(pk=self.token.pk, consumed=True, proven_until__gt=timezone.now())
+                    .first()
+                )
+            else:
+                token = (
+                    VerificationToken.objects.select_for_update()
+                    .filter(pk=self.token.pk, expires_at__gt=timezone.now())
+                    .first()
+                )
             if user is None or token is None:
                 return self.invalid(self.request)
             # What step 2 staged is checked again under the lock of the account (a second tab may have changed it).

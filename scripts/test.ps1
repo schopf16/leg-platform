@@ -171,7 +171,7 @@ catch {
 }
 if (-not $lockHeld) {
     $mutex.Dispose()
-    Stop-Script 'Another test run of this script is active on this machine; wait for it, never stop it (D-046).' 3
+    Stop-Script 'Another test run of this script is active on this machine; wait for it, or stop it if you started it yourself (D-046).' 3
 }
 
 $exitCode = 1
@@ -184,7 +184,7 @@ try {
     }
     if ($active.Count -gt 0) {
         $exitCode = 3
-        [Console]::Error.WriteLine(('Another test run is active (process {0}); wait for it, never stop it (D-046).' -f $active[0].ProcessId))
+        [Console]::Error.WriteLine(('Another test run is active (process {0}); wait for it, or stop it if you started it yourself (D-046).' -f $active[0].ProcessId))
     }
     else {
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()

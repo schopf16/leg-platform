@@ -1,0 +1,35 @@
+{% extends "entry_base.html" %}
+{% load i18n static %}{% comment %}
+The page after step 1 of the registration (``views.RegistrationCodeView``, D-136): the same for every address. One text input for the
+code (no pattern, no maxlength: a pasted code with spaces works), the pause before a new code is enforced by the server.
+{% endcomment %}
+{% block title %}{% translate "Enter code" %}{% endblock %}
+{% block panel %}{% include "accounts/_panel_register.html" %}{% endblock %}
+{% block form %}
+  {% include "accounts/_progress.html" %}
+  <h1>{% translate "Enter code" %}</h1>
+  <p>{% blocktranslate with address=address %}We sent an email to <strong class="address-text">{{ address }}</strong>. It contains a 6-digit code. If you received a link instead, open that link.{% endblocktranslate %}</p>
+  <p class="entry-hint">{% blocktranslate with minutes=lifetime_minutes %}The code is valid for {{ minutes }} minutes.{% endblocktranslate %}</p>
+  {% include "accounts/_error_summary.html" %}
+  <form method="post" novalidate data-submit-once>
+    {% csrf_token %}
+    {% include "accounts/_field.html" with field=form.otp_token %}
+    <button type="submit" class="btn btn-primary">{% translate "Confirm" %}</button>
+  </form>
+  <p class="entry-hint">{% translate "No email received? It is worth looking in the spam folder." %}</p>
+  <form method="post" action="{% url 'accounts:registration_resend' %}" class="resend-form" data-resend data-cooldown="{{ wait_seconds }}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary-action" data-resend-button aria-describedby="resend-note"{% if wait_seconds %} disabled{% endif %}>{% translate "Send new code" %}</button>
+    <p class="entry-hint" id="resend-note" data-resend-note{% if not wait_seconds %} hidden aria-hidden="true"{% endif %}>{% blocktranslate with seconds=wait_seconds %}A new code is possible after <span data-resend-seconds>{{ seconds }}</span> seconds.{% endblocktranslate %}</p>
+  </form>
+  <p class="entry-divider">{% translate "Wrong address?" %}</p>
+  <form method="post" action="{% url 'accounts:registration_change_address' %}" class="entry-center">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-link">{% translate "Change address" %}</button>
+  </form>
+{% endblock %}
+{% block scripts %}
+  {{ block.super }}
+  <script defer src="{% static 'js/submit-once.js' %}"></script>
+  <script defer src="{% static 'js/resend-cooldown.js' %}"></script>
+{% endblock %}

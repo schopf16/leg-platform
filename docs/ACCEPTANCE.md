@@ -9,7 +9,7 @@ The security criteria are defined only in `docs/SECURITY.md`, section 11; they a
 ## 2. Login Page, Registration and Login
 
 * [x] The login page is the entry point (login, password reset, registration, links to the privacy notice and the instance's website); every page accessible without login links to the privacy notice (D-022, D-025). No public home page: the root URL leads to the login page or, when logged in, to the start page (D-057), subject to the central second-factor check.
-* [x] Registration with the email address only, verification link, sign-in method chosen and set up (password, password and app, or passkey; step 2 of 3), required profile data (step 3 of 3) activates the account; the customer number is assigned only when the last step succeeds (D-021, D-058). Login with the email address (not the customer number); logout; password change and reset.
+* [x] Registration with the email address only, six-digit code from the email (D-136), sign-in method chosen and set up (password, password and app, or passkey; step 2 of 3), required profile data (step 3 of 3) activates the account; the customer number is assigned only when the last step succeeds (D-021, D-058). Login with the email address (not the customer number); logout; password change and reset.
 
 ## 3. Two-Factor Authentication
 

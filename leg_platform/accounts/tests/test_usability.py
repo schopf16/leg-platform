@@ -15,9 +15,9 @@ from leg_platform.accounts.models import (
     AuthenticatorDevice,
     EmailText,
     RecoveryCode,
+    RegistrationChallenge,
     SecurityEvent,
     User,
-    VerificationToken,
 )
 from leg_platform.accounts.tests.helpers import (
     PASSWORD,
@@ -30,9 +30,8 @@ from leg_platform.accounts.tests.helpers import (
     password_data,
     reset_request_data,
     run_mail_queue,
-    verification_path,
 )
-from leg_platform.accounts.tests.test_registration import register
+from leg_platform.accounts.tests.test_registration import register, register_and_confirm
 from leg_platform.accounts.tests.test_second_factor import (
     CODE_URL,
     RECOVERY_CODES,
@@ -74,9 +73,8 @@ class CompletionFormTests(TestCase):
     databases = ADDRESS_DATABASES
 
     def setUp(self):
-        register(self.client)
-        self.client.get(verification_path(mail.outbox[0]))
-        self.token = VerificationToken.objects.get()
+        register_and_confirm(self.client)
+        self.token = RegistrationChallenge.objects.get()
         choose_method(self.client, "password", self.token.pk)
         self.password_url = reverse("accounts:registration_password")
         self.password_page = self.client.get(self.password_url)
@@ -118,7 +116,7 @@ class CompletionFormTests(TestCase):
         self.assertIn("E-Mail-Adresse (Benutzername)", html)
         self.assertRegex(element(html, "id_username"), r"\breadonly\b")
         # The rules are a list of the policy; Django's list of the validators is not shown.
-        self.assertIn("Mindestens 15 Zeichen.", html)
+        self.assertIn("Mindestens 8 Zeichen.", html)
         with translation.override("de-ch"):
             for text in password_validation.password_validators_help_texts():
                 self.assertNotIn(text, html)
@@ -646,15 +644,20 @@ class SentAndInvalidPageTests(TestCase):
 
         response = self.client.get(reverse("accounts:registration_sent"))
 
-        self.assertContains(response, "Prüfen Sie Ihre E-Mails")
+        self.assertContains(response, "Code eingeben")
+        self.assertContains(response, "Wir haben eine E-Mail an")
+        self.assertContains(response, "Sie enthält einen 6-stelligen Code.")
+        self.assertContains(response, "Der Code ist 15 Minuten gültig.")
         self.assertContains(response, "someone.else@example.org")
         self.assertContains(response, "Keine E-Mail erhalten? Ein Blick in den Spam-Ordner lohnt sich.")
-        self.assertContains(response, "E-Mail erneut senden")
-        self.assertContains(response, "Erneut senden ist nach")
+        self.assertContains(response, "Neuen Code senden")
+        self.assertContains(response, "Ein neuer Code ist in")
         self.assertContains(response, "Falsche Adresse?")
         self.assertContains(
-            response, f'href="{reverse("accounts:registration")}">Andere E-Mail-Adresse verwenden'
+            response,
+            f'action="{reverse("accounts:registration_change_address")}" class="entry-center">',
         )
+        self.assertContains(response, "Adresse ändern")
         self.assertContains(response, "Schritt 1 von 3")
         # The page does not say whether the address has an account.
         self.assertNotContains(response, "besteht bereits")
@@ -708,23 +711,25 @@ class SentAndInvalidPageTests(TestCase):
         registration = self.client.get(reverse("accounts:registration_verify", args=["x"]), follow=True)
         reset = self.client.get(reverse("accounts:password_reset_verify", args=["x"]), follow=True)
 
-        for response, target, lead in (
+        for response, target, lead, button in (
             (
                 registration,
                 "accounts:registration",
                 "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie sich bereits registriert haben, "
-                "melden Sie sich an. Andernfalls fordern Sie einen neuen Link an.",
+                "melden Sie sich an. Andernfalls fordern Sie einen neuen Code an.",
+                "Code senden",
             ),
             (
                 reset,
                 "accounts:password_reset",
                 "Der Link ist abgelaufen oder wurde schon verwendet. Falls Sie bereits ein neues Passwort "
                 "gewählt haben, melden Sie sich an. Andernfalls fordern Sie einen neuen Link an.",
+                "Neuen Link senden",
             ),
         ):
             self.assertContains(response, "Link nicht mehr gültig")
             self.assertContains(response, lead)
-            self.assertContains(response, "Neuen Link senden")
+            self.assertContains(response, button)
             self.assertContains(response, f'<form method="post" action="{reverse(target)}"')
             self.assertContains(response, f'href="{LOGIN_URL}">Zur Anmeldung</a>')
             self.assertNotContains(response, "Dieser Link ist ungültig")

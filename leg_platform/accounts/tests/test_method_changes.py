@@ -328,7 +328,7 @@ class MethodTransitionTests(TestCase):
         self.client.post(reverse("accounts:login_method"), {"method": "password"})
         response = self.client.get(reverse("accounts:method_password"))
         self.assertContains(response, 'id="id_new_password1_rules"')
-        self.assertContains(response, "At least 15 characters.")
+        self.assertContains(response, "At least 8 characters.")
         self.assertIn("id_new_password1_rules", response.context["form"]["new_password1"].build_widget_attrs({})["aria-describedby"])
 
     def promotion_client(self):

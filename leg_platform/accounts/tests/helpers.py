@@ -125,11 +125,17 @@ def completion_data(registration=None, **overrides):
 
 
 def finish_registration(client, path, password=PASSWORD, details=None, **overrides):
-    """Open the link at ``path`` and go through the choice of the method, the password and the details step.
+    """Prove the address and go through the choice of the method, the password and the details step.
 
-    Returns the response of the last step. Extra keywords replace fields of the details form.
+    ``path`` is the six-digit code of the registration email (entered on the page "Enter code" of the session that
+    asked for it, D-136) or the path of the link of an invitation (D-087). Returns the response of the last step.
+    Extra keywords replace fields of the details form.
     """
-    client.get(path)
+    if path.startswith("/"):
+        client.get(path)
+    else:
+        response = client.post(reverse("accounts:registration_sent"), {"otp_token": path})
+        assert response.status_code == 302, "The code was not accepted."
     reference = registration_reference(client)
     choose_method(client, "password", reference)
     client.post(
@@ -158,12 +164,33 @@ def create_active_user(email="active.person@example.org", **profile):
 
 
 def verification_path(message):
-    """Return the path of the verification link in an email, checking its origin."""
+    """Return the path of the verification link in an email, checking its origin (invitations, D-087)."""
     match = re.search(r"^(https?://\S+/register/verify/\S+)$", message.body, re.MULTILINE)
     assert match, "The email contains no verification link."
     link = match.group(1)
     assert link.startswith(settings.INSTANCE_BASE_URL + "/"), "The link is not built from the base URL."
     return urlsplit(link).path
+
+
+def confirmation_code(message):
+    """Return the six-digit code of a registration email (D-136): from the subject, which carries it."""
+    match = re.match(r"^(\d{6}) ", message.subject)
+    assert match, "The email carries no confirmation code."
+    return match.group(1)
+
+
+def confirm_code_of(client, message):
+    """Enter the code of a registration email on the page "Enter code" of this client; return the response."""
+    return client.post(reverse("accounts:registration_sent"), {"otp_token": confirmation_code(message)})
+
+
+def request_code(client, email="new.person@example.org", **overrides):
+    """Ask for the code of a registration, let the worker send it and return the code of the newest email."""
+    from django.core import mail
+
+    client.post(reverse("accounts:registration"), registration_data(email, **overrides))
+    run_mail_queue()
+    return confirmation_code(mail.outbox[-1])
 
 
 def run_mail_queue():

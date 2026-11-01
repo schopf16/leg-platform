@@ -283,7 +283,8 @@ AREAS: dict[str, Area] = {
         "Registration, verification links, entry pages and the abuse protection of the forms.",
         paths=(
             "leg_platform/accounts/registration.py", "leg_platform/accounts/resend.py",
-            "leg_platform/accounts/invitations.py",
+            "leg_platform/accounts/code_mail.py", "leg_platform/accounts/invitations.py",
+            "leg_platform/accounts/password_validators.py",
             "leg_platform/accounts/bot_check.py", "leg_platform/accounts/normalization.py",
             "leg_platform/accounts/views.py", "leg_platform/accounts/forms.py",
             "leg_platform/accounts/registration_methods.py", "leg_platform/accounts/registration_views.py",
@@ -292,7 +293,7 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_registration", "test_registration_hardening", "test_entry_pages",
                     "test_invalid_link_redirect", "test_token_page_forms", "test_browser_origin",
-                    "test_invitations", "test_registration_methods")
+                    "test_invitations", "test_registration_methods", "test_registration_code")
             + _FLOW_REVIEWS
         ),
     ),
