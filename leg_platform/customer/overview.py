@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from leg_platform.addresses.buildings import station_name
 from leg_platform.addresses.models import TransformerStation
 from leg_platform.community import applications, buildings, grid_operator, labels, own_iban
 from leg_platform.community.models import (
@@ -459,7 +460,13 @@ def build(person, today=None):
         TransformerStation.objects.filter(egid__in=[card.egid for card in result if card.egid]).values_list("egid", "name")
     )
     for card in result:
-        card.transformer = transformers.get(card.egid, "") if card.egid else ""
+        if card.egid:
+            card.transformer = transformers.get(card.egid, "")
+            continue
+        # No EGID (the address is ambiguous or unknown to the directory): the station is shown when every building the
+        # directory lists at the address belongs to the same one.
+        owner = card.location or card.building
+        card.transformer = station_name(*owner.current_address()[:3]) if owner is not None else ""
     # Not yet participating first, participating last; each group by name, otherwise address.
     result.sort(key=lambda card: (
         card.state == "participating",

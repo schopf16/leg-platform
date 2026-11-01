@@ -10217,3 +10217,6 @@ msgstr "L’importation a été interrompue parce que le service d’importation
 
 msgid "The import service is not running. Waiting imports start with the next run of the scheduled tasks."
 msgstr "Le service d’importation ne fonctionne pas. Les importations en attente démarrent à la prochaine exécution des tâches planifiées."
+
+msgid "Building identifier (EGID) changed"
+msgstr "Identifiant du bâtiment (EGID) modifié"

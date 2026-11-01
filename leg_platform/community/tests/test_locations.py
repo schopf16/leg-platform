@@ -40,6 +40,9 @@ def events(subject):
 
 @tag("mariadb")
 class LocationServiceTests(TestCase):
+    # The services look the EGID up in the address directory (D-135).
+    databases = {"default", "addresses"}
+
     @classmethod
     def setUpTestData(cls):
         cls.actor = create_active_user("actor.person@example.org")
@@ -199,6 +202,8 @@ class LocationServiceTests(TestCase):
 @tag("mariadb")
 class SuggestionServiceTests(TestCase):
     """The directory suggestion of a location that has one (patched: no directory data needed)."""
+
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):
