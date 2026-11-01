@@ -25,12 +25,12 @@ class PasswordValidationTests(SimpleTestCase):
         validate_password("vq7#Lm2!")  # 8 characters
 
     def test_8_characters_without_digits_or_specials_are_accepted(self):
-        validate_password("sunlight")
+        validate_password("ibexmoss")
 
     def test_common_numeric_and_similar_passwords_are_refused(self):
         from django.contrib.auth import get_user_model
 
-        user = get_user_model()(username="kettle", email="kettle@example.org")
+        user = get_user_model()(first_name="kettle", email="kettle@example.org")
         for weak in ("password", "12345678", "kettle99", "qwertyui"):
             with self.subTest(weak), self.assertRaises(ValidationError):
                 validate_password(weak, user)
