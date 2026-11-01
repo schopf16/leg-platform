@@ -26,6 +26,7 @@ from pathlib import Path
 
 from django.core.management import call_command
 from django.db import DatabaseError, OperationalError, connections, transaction
+from django.db.models import Count, Max, Q
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
@@ -147,17 +148,36 @@ def _put_back(path, kept):
 
 
 def _record(now):
-    """What the page and the schedule know about the new file; called under the lock of the claim row."""
+    """What the page and the schedule know about the file in place; called under the lock of the claim row.
+
+    The results of the sources the file holds are taken from the file itself (times of its own rows), so the page shows
+    them instead of an older failure; the open failures of these sources in the import log are closed."""
     published.clear()
     for source in (ImportRequest.Source.ADDRESS, ImportRequest.Source.PLANT):
         published.refresh(source)
-    covered = [ImportRequest.Source.ADDRESS]
-    if PlantRegister.objects.filter(pk=1, row_count__gt=0).exists() and Plant.objects.exists():
-        covered.append(ImportRequest.Source.PLANT)
-    if TransformerStation.objects.exists():
-        covered.append(ImportRequest.Source.TRANSFORMER)
-    cleared = ImportQueueEntry.objects.filter(source__in=covered).delete()[0]
     job = ImportRequest.objects.get(pk=1)
+    results = {}
+    directory = Directory.objects.filter(pk=1).first()
+    if directory is not None and directory.imported_at:
+        results[ImportRequest.Source.ADDRESS] = directory.imported_at
+    register = PlantRegister.objects.filter(pk=1, row_count__gt=0).first()
+    if register is not None and register.imported_at and Plant.objects.exists():
+        results[ImportRequest.Source.PLANT] = register.imported_at
+    stations = TransformerStation.objects.aggregate(
+        finished=Max("scanned_at"), count=Count("id"), named=Count("id", filter=~Q(name="")),
+    )
+    if stations["count"]:
+        results[ImportRequest.Source.TRANSFORMER] = stations["finished"]
+        job.last_transformer_postal_codes = ", ".join(
+            sorted(TransformerStation.objects.values_list("postal_code", flat=True).distinct())
+        )[:255]
+        job.last_transformer_buildings = stations["count"]
+        job.last_transformer_with_name = stations["named"]
+    for source, finished in results.items():
+        for name, value in jobs.source_result(source, ImportRequest.State.SUCCEEDED, finished).items():
+            setattr(job, name, value)
+        jobs._clear_failures(source, now)
+    cleared = ImportQueueEntry.objects.filter(source__in=results).delete()[0]
     if job.state == ImportRequest.State.QUEUED:
         # The import that setup queued for the empty file is not needed any more.
         job.state = ImportRequest.State.SUCCEEDED
@@ -165,13 +185,21 @@ def _record(now):
         job.finished_at = now
         job.last_error = ""
         job.phase = ""
-        for name, value in jobs.source_result(ImportRequest.Source.ADDRESS, ImportRequest.State.SUCCEEDED, now).items():
-            setattr(job, name, value)
         cleared += 1
     # The next regular refresh counts from the installation, not from "never".
     job.last_automatic_attempt_at = now
     job.save()
     return cleared
+
+
+def record_results(stdout=None):
+    """Take over the results of the file in place without installing a file (the file was installed by an earlier
+    version of this command). Refused while an import is alive."""
+    with transaction.atomic(using="default"):
+        _require_no_live_import()
+        cleared = _record(timezone.now())
+    if stdout is not None:
+        stdout.write(f"Waiting imports cleared: {cleared}.\n")
 
 
 def install(source, *, sha256=None, stdout=None):

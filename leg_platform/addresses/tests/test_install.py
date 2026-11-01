@@ -24,7 +24,8 @@ from django.utils import timezone
 
 from leg_platform.addresses import importer, install, jobs, storage
 from leg_platform.addresses.models import (
-    DIRECTORY_ALIAS, Directory, HousekeepingStatus, ImportQueueEntry, ImportRequest, PublishedFigures,
+    DIRECTORY_ALIAS, Directory, HousekeepingStatus, ImportLogEntry, ImportQueueEntry, ImportRequest,
+    PublishedFigures, TransformerStation,
 )
 from leg_platform.addresses.tests.test_directory import HEADER, archive_bytes
 
@@ -278,3 +279,67 @@ class InstallTests(TransactionTestCase):
 
         self.assertIn("Installed the address directory: 3 addresses.", out.getvalue())
         self.assertEqual(self.published(), (NEW_CHECKSUM, 3))
+
+    def add_stations(self):
+        """Two scanned buildings in the upload, one with a transformer name; returns the time of the latest scan."""
+        first = timezone.now() - timedelta(days=2)
+        latest = timezone.now() - timedelta(days=1)
+        with directory_file(self.upload):
+            TransformerStation.objects.create(egid=1, postal_code="9999", name="Test_TRA 1", match="exact", scanned_at=first)
+            TransformerStation.objects.create(egid=2, postal_code="9998", name="", match="none", scanned_at=latest)
+        return latest
+
+    def fail_transformer_scan(self):
+        ImportRequest.objects.update_or_create(pk=1, defaults={
+            "last_transformer_state": "failed", "last_transformer_error": jobs.INTERRUPTED,
+            "last_transformer_finished_at": timezone.now(),
+        })
+        return ImportLogEntry.objects.create(
+            source=Source.TRANSFORMER, reason=jobs.INTERRUPTED, occurred_at=timezone.now(),
+        )
+
+    def assertTransformerResultIsTheFiles(self, latest):
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual(job.last_transformer_state, "succeeded")
+        self.assertEqual(job.last_transformer_error, "")
+        self.assertEqual(job.last_transformer_finished_at, latest)
+        self.assertEqual(
+            (job.last_transformer_postal_codes, job.last_transformer_buildings, job.last_transformer_with_name),
+            ("9998, 9999", 2, 1),
+        )
+
+    def test_the_result_of_the_scan_in_the_file_replaces_an_older_failure(self):
+        self.build_old_target()
+        self.build_upload()
+        latest = self.add_stations()
+        entry = self.fail_transformer_scan()
+
+        self.run_install()
+
+        self.assertTransformerResultIsTheFiles(latest)
+        entry.refresh_from_db()
+        self.assertIsNotNone(entry.cleared_at)
+
+    def test_record_only_takes_over_the_results_of_the_file_in_place(self):
+        self.build_old_target()
+        self.build_upload()
+        latest = self.add_stations()
+        self.run_install()
+        self.fail_transformer_scan()
+
+        with directory_file(self.target):
+            call_command("install_address_directory", "--record-only", stdout=io.StringIO())
+
+        self.assertTransformerResultIsTheFiles(latest)
+        self.assertEqual(self.published(), (NEW_CHECKSUM, 3))
+
+    def test_record_only_is_refused_while_an_import_is_alive_and_needs_no_file(self):
+        now = timezone.now()
+        ImportRequest.objects.create(
+            pk=1, state=State.RUNNING, source=Source.ADDRESS, started_at=now, heartbeat_at=now, claim_token=uuid.uuid4(),
+        )
+        with self.assertRaisesMessage(CommandError, "still running"):
+            call_command("install_address_directory", "--record-only", stdout=io.StringIO())
+        for arguments in ((), ("--record-only", "upload.sqlite3")):
+            with self.assertRaisesMessage(CommandError, "either a file or --record-only"):
+                call_command("install_address_directory", *arguments, stdout=io.StringIO())
