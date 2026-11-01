@@ -6,7 +6,7 @@ asking the directory per row. "Not accept" is remembered for the address as it i
 
 from django.db import transaction
 
-from leg_platform.community import addressing, archived, history, transformer_circuits
+from leg_platform.community import addressing, archived, history, location_egid, transformer_circuits
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import HistoryEntry, Location, MeteringPoint
 
@@ -74,6 +74,7 @@ def accept_suggestion(location, actor):
         fresh.clear_suggestion()
         fresh.save()
         history.record(fresh, HistoryEvent.ADDRESS_CORRECTION_ACCEPTED, actor)
+        location_egid.resolve(fresh, actor)
     return fresh
 
 
@@ -112,6 +113,7 @@ def create_location(
             location.transformer_circuit = transformer_circuits.create(*new_circuit)
         location.save()
         history.record(location, HistoryEvent.CREATED, actor)
+        location_egid.resolve(location, actor)
     refresh_suggestion(location)
     return location
 
@@ -150,6 +152,8 @@ def update_address(
         fresh.save()
         if changed:
             history.record(fresh, HistoryEvent.ADDRESS_CHANGED, actor)
+        # Also when only the EGID is missing (a location saved before the directory knew the address).
+        location_egid.resolve(fresh, actor)
     refresh_suggestion(fresh)
     return fresh
 

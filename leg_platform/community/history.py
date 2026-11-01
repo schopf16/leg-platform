@@ -27,6 +27,7 @@ class HistoryEvent(models.TextChoices):
 
     CREATED = "created", _("Created")
     ADDRESS_CHANGED = "address_changed", _("Address changed")
+    EGID_CHANGED = "egid_changed", _("Building identifier (EGID) changed")
     TRANSFORMER_CIRCUIT_CHANGED = "transformer_circuit_changed", _("Transformer circuit changed")
     LOCATION_CONFIRMED = "location_confirmed", _("Address confirmed")
     ARCHIVED = "archived", _("Archived")

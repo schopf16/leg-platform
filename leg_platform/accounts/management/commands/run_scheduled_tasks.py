@@ -12,6 +12,8 @@ TASKS = (
     "delete_expired_registrations",
     # The reminders and deadlines of the customers' applications (community app, D-103).
     "process_application_deadlines",
+    # The EGID of a location follows its address (community app, D-135).
+    "fill_location_egids",
     "cleanup_mail_requests",
     "cleanup_login_ip_attempts",
     "cleanup_security_log",

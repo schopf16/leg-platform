@@ -37,6 +37,8 @@ HOSTILE = (
 
 @tag("mariadb")
 class LocationPageTests(TestCase):
+    databases = {"default", "addresses"}
+
     @classmethod
     def setUpTestData(cls):
         cls.plain = create_active_user("plain.person@example.org")

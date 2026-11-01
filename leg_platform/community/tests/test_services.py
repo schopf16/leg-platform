@@ -365,7 +365,7 @@ class LegFigureTests(TestCase):
 
 @tag("mariadb")
 class LocationDecisionTests(TestCase):
-    databases = {"default"}
+    databases = {"default", "addresses"}
 
     @classmethod
     def setUpTestData(cls):
