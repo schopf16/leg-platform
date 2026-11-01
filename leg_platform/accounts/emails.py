@@ -1,7 +1,7 @@
 """Emails of the account functions (docs/ARCHITECTURE.md, "Email").
 
 Sent through Django's email framework (the configured backend decides about delivery, D-006, D-028),
-as plain text, in the instance's default language. Links are built from the canonical base URL of
+as plain text with the fixed HTML frame as alternative (D-137, ``mail_frame``), in the instance's default language. Links are built from the canonical base URL of
 the instance configuration, never from the request (docs/SECURITY.md, section 4). Neither messages
 nor tokens are logged.
 """
@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import formats, translation
 from django.utils.translation import gettext
 
-from leg_platform.accounts import code_mail, email_texts, greeting, mail_addresses
+from leg_platform.accounts import code_mail, email_texts, greeting, mail_addresses, mail_frame
 from leg_platform.accounts.models import EmailText
 from leg_platform.accounts.portal_settings import portal_values
 
@@ -71,7 +71,11 @@ def _send(address, key, values, greeting_name=""):
     _deliver(address, subject, body)
 
 
-def _deliver(address, subject, body, html=None):
+def _deliver(address, subject, body, html=None, framed=True):
+    """Send one email. ``body`` is the plain text; unless ``html`` is given or ``framed`` is False, the text is
+    embedded into the HTML frame of the system emails (D-137) and sent as the HTML alternative."""
+    if html is None and framed:
+        html = mail_frame.build_html(subject, body)
     # An automatic message that answers no email (RFC 3834, section 5.2).
     message_class = EmailMultiAlternatives if html else EmailMessage
     message = message_class(

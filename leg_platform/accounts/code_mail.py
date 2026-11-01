@@ -54,9 +54,13 @@ def build_html(*, language, instance_name, code, body, privacy_url, contact_url,
             f'<tr><td style="padding:0 0 16px 0;font-family:{_FONT};font-size:15px;color:#1f2937;">{_text(part)}</td></tr>'
         )
     cells.append(
+        # Box and spacing also as HTML attributes: a viewer that strips inline CSS still shows the box.
         '<tr><td style="padding:0;">'
-        f'<div style="background-color:#e5e7eb;border:2px solid #9ca3af;color:#111111;font-family:{_MONO};font-size:40px;'
-        f'font-weight:bold;line-height:48px;text-align:center;padding:20px 8px;">{escape(code)}</div></td></tr>'
+        '<table role="presentation" width="100%" cellpadding="20" cellspacing="0" border="2" bgcolor="#e5e7eb" '
+        'style="background-color:#e5e7eb;border:2px solid #9ca3af;border-collapse:collapse;">'
+        '<tr><td align="center" style="padding:20px 8px;">'
+        f'<div style="color:#111111;font-family:{_MONO};font-size:40px;letter-spacing:3px;'
+        f'font-weight:bold;line-height:48px;text-align:center;">{escape(code)}</div></td></tr></table></td></tr>'
     )
     for index, part in enumerate(after):
         padding = "10px 0 0 0" if index == 0 else "14px 0 0 0"
@@ -88,8 +92,8 @@ def build_html(*, language, instance_name, code, body, privacy_url, contact_url,
         # The hidden preheader: the preview of a mail list starts with the code (not visible in the mail itself).
         '<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;'
         f'color:#ffffff;opacity:0;">{escape(code)} {_text(before[0]) if before else ""}</div>'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+        '<table role="presentation" width="100%" cellpadding="24" cellspacing="0" border="0" '
         'style="background-color:#ffffff;"><tr><td align="center" style="padding:24px 12px;">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                '<table role="presentation" width="100%" cellpadding="8" cellspacing="0" border="0" '
         f'style="max-width:520px;">{rows}</table></td></tr></table></body></html>'
     )

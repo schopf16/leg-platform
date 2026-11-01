@@ -359,6 +359,7 @@ Sources: Django 6.0 docs (`SECURE_REFERRER_POLICY`, CSRF "Limitations", CSP refe
   * The private key is write-only in the admin and stored encrypted. Only the public certificate and its expiry are displayed. The admin warns before expiry.
   * The configuration is accessible only to system administrators. Every change is logged.
   * The test send never displays secrets. Email logs contain no tokens, passwords or complete security links.
+  * System emails are plain text embedded in a fixed HTML frame (D-137): all text and operator values are escaped, only clean https addresses are linked, no script, tracking, button or per-mail image address; the logo address is the public logo route without a token. Nothing of the body or HTML is logged.
 * **Delivery by environment (D-070, approved deviation from the stage allow-list of D-006 and D-028; risks and mitigations there).**
   * Locally: console output (default) or Microsoft Graph restricted to allowed recipients.
   * Stage and production allow only unrestricted Graph delivery. Security links never reach console or server logs, and stage does not differ from production.

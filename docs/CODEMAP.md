@@ -61,7 +61,7 @@ Passkeys (D-106, D-112):
 | `password_reset.py`, `email_change.py`, `invitations.py`, `recovery.py` | Reset, email change, invitation and recovery flows (`process_*`); `delete_expired_reset_tokens` also removes method-return tokens, WebAuthn challenges and staged credentials. |
 | `second_factor.py`, `totp.py`, `second_factor_reset.py` | `SecondFactorMiddleware`, `UNRESTRICTED_VIEWS` / `PASSWORD_CHANGE_VIEWS` / `SESSION_FREE_VIEWS`; TOTP enrolment; reset links; `may_recover_by_mail` (token purpose `self_recovery`, rechecked when issued, sent, opened and confirmed). |
 | `login_methods.py`, `sign_in_change.py` | The choice of sign-in method (`cards`, `available`; D-106) and the flow "Change sign-in" (D-062): `?step=`, `uses_flow`, the grant of the proof (session key `sign_in_change`, five minutes, used up by the step that acts). The choice "Passkey" redirects to `passkey_views.SetupView`. Tests `A.test_sign_in_change`, `A.test_login_methods`. |
-| `mail_queue.py`, `rate_limits.py`, `emails.py`, `email_texts.py`, `mail_addresses.py` | Outbox (`enqueue`, `process_pending`, `HANDLERS`), budgets (`consume`, `*_LIMITS`), one `send_*` per email, `absolute_url`, `DEFINITIONS`, sender and contact address (D-116). |
+| `mail_queue.py`, `rate_limits.py`, `emails.py`, `email_texts.py`, `mail_frame.py`, `mail_addresses.py` | Outbox (`enqueue`, `process_pending`, `HANDLERS`), budgets (`consume`, `*_LIMITS`), one `send_*` per email, `absolute_url`, `DEFINITIONS`, sender and contact address (D-116). `mail_frame.build_html(subject, body)` is the HTML frame of all system emails except the code mail (D-137; `emails._deliver` adds it as the alternative; tests `test_mail_frame.py`). |
 | `security_log.py` | `record(event, ...)`, `MESSAGES`. |
 | `login_protection.py`, `axes_handler.py`, `backends.py`, `session_timeout.py` | Lockout, `EmailModelBackend`, `SessionTimeoutMiddleware` (D-100). |
 | `encryption.py`, `digests.py` | `encrypt` / `decrypt` / `reencrypt` (key from `SECRET_KEY`, fallbacks for rotation); `keyed_digest`. |
@@ -201,7 +201,7 @@ Pages of the customer's participation under `/participation/`, namespace `custom
 | `second-factor` | `second_factor.py`, `second_factor_reset.py`, `recovery.py`, `totp.py`, `encryption.py`, `digests.py`, setup and emergency commands |
 | `profile` | `profile_views.py`, `email_change.py`, `login_methods.py`, `sign_in_change.py` and its templates (also runs `customer.tests.test_profile_cards`, `C.test_profile_address`, `A.test_login_methods`, `A.test_sign_in_change`) |
 | `admin` | `accounts/admin/`, `admin_site.py`, `community/admin.py`, `community/raw_tables.py`, `community/templatetags/`, `log_views.py`, `logfiles.py`, `addresses/admin.py`, admin templates |
-| `mail` | `mail.py`, `mail_queue.py`, `emails.py`, `email_texts.py`, `greeting.py`, `rate_limits.py`, `tasks.py`, email templates, mail commands, `community/management/commands/process_application_deadlines.py` |
+| `mail` | `mail.py`, `mail_queue.py`, `emails.py`, `email_texts.py`, `mail_frame.py`, `greeting.py`, `rate_limits.py`, `tasks.py`, email templates, mail commands, `community/management/commands/process_application_deadlines.py` |
 | `logs-menu` | `log_menu.py`, `accounts/models/log_notice.py`, `notify_log_events.py` |
 | `migrations` | `*/migrations/` (fresh database) |
 | `accounts-support` | `accounts/management/` (rarely changed files) |
