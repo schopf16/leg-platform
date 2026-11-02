@@ -3638,10 +3638,10 @@ msgid "checked on"
 msgstr "Geprüft am"
 
 msgid "valid from"
-msgstr "Gilt ab"
+msgstr "Gültig ab"
 
 msgid "valid to"
-msgstr "Gilt bis"
+msgstr "Gültig bis"
 
 msgid "person assignment"
 msgstr "Personenzuordnung"
@@ -4242,8 +4242,8 @@ msgstr "Geben Sie den letzten Tag eines Monats ein."
 msgid "Search name, customer number or e-mail address"
 msgstr "Name, Kundennummer oder E-Mail suchen"
 
-msgid "Applies from"
-msgstr "Gilt ab"
+msgid "Valid from"
+msgstr "Gültig ab"
 
 msgid "Several persons match. Type more of the name or the customer number."
 msgstr ""
@@ -4437,8 +4437,8 @@ msgstr "Person zuweisen"
 
 msgid ""
 "If the metering point already has a person, the person ends on the day "
-"before \"Applies from\"."
-msgstr "Hat der Messpunkt schon eine Person, endet diese am Tag vor \"Gilt ab\"."
+"before \"Valid from\"."
+msgstr "Hat der Messpunkt schon eine Person, endet diese am Tag vor \"Gültig ab\"."
 
 #, python-format
 msgid "Metering point %(number)s (%(direction)s)."
@@ -4549,8 +4549,8 @@ msgstr "Erfasst, noch nicht bei %(operator)s angemeldet."
 msgid "Terminate"
 msgstr "Kündigen"
 
-msgid "The assignment is entered with a date \"Applies from\"."
-msgstr "Die Zuordnung wird mit einem Datum \"Gilt ab\" eingetragen."
+msgid "The assignment is entered with a date \"Valid from\"."
+msgstr "Die Zuordnung wird mit einem Datum \"Gültig ab\" eingetragen."
 
 msgid "Archive metering point"
 msgstr "Messpunkt archivieren"
@@ -4930,7 +4930,7 @@ msgid "from:"
 msgstr "ab:"
 
 msgid "The assignment is valid from this date."
-msgstr "Die Zuordnung gilt ab diesem Datum."
+msgstr "Die Zuordnung ist ab diesem Datum gültig."
 
 msgid "until:"
 msgstr "bis:"

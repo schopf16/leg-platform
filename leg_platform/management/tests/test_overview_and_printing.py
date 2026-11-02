@@ -326,7 +326,7 @@ class PrintDocumentTests(Fixture):
         _prepared, document = self.document("persons", "q=Anna")
         section = next(section for section in document.details[0].sections if section.title == "Genossenschaft")
         self.assertEqual(list(section.facts), [("Anteile", "8")])
-        self.assertEqual([column.label for column in section.table.columns], ["Gilt ab", "Anzahl Anteile"])
+        self.assertEqual([column.label for column in section.table.columns], ["Gültig ab", "Anzahl Anteile"])
         self.assertEqual(
             [list(row) for row in section.table.rows],
             [

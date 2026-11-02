@@ -261,7 +261,7 @@ class PersonAssignForm(DialogForm):
             "placeholder": _("Search name, customer number or e-mail address"),
         }),
     )
-    valid_from = date_field(_("Applies from"), initial="today")
+    valid_from = date_field(_("Valid from"), initial="today")
     layout = [("single", ["person"]), ("single", ["valid_from"])]
 
     def __init__(self, *args, **kwargs):
@@ -317,7 +317,7 @@ class LegAssignForm(DialogForm):
     """A metering point without a LEG."""
 
     leg = leg_field(_("LEG"))
-    valid_from = date_field(_("Applies from"), initial="today")
+    valid_from = date_field(_("Valid from"), initial="today")
     layout = [("single", ["leg"]), ("single", ["valid_from"])]
 
     def __init__(self, *args, **kwargs):
@@ -329,7 +329,7 @@ class LegSwitchForm(DialogForm):
     """The new LEG, the date and the related metering points to move along (none preselected)."""
 
     leg = leg_field(_("New LEG"))
-    valid_from = date_field(_("Applies from"), initial="today")
+    valid_from = date_field(_("Valid from"), initial="today")
     also = forms.ModelMultipleChoiceField(
         queryset=MeteringPoint.objects.none(), required=False, widget=forms.CheckboxSelectMultiple
     )

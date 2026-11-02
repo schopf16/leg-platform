@@ -296,7 +296,7 @@ class SharesForm(forms.Form):
         widget=forms.NumberInput(attrs={**CONTROL, "inputmode": "numeric"}),
     )
     valid_from = forms.DateField(
-        label=_("Applies from"), initial=timezone.localdate,
+        label=_("Valid from"), initial=timezone.localdate,
         widget=forms.DateInput(attrs={**CONTROL, "type": "date"}, format="%Y-%m-%d"),
     )
     layout = [("single", ["quantity"]), ("single", ["valid_from"])]

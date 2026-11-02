@@ -110,12 +110,12 @@ class MasterDataForm(NameMixin, forms.Form):
 
 class LegPointForm(forms.Form):
     """"Assign metering point" on the page of a LEG (D-095): one drop-down of the metering points that have no LEG (also
-    none planned) and the day it applies from. A metering point of another LEG is moved with "Change LEG", which
+    none planned) and the day it is valid from. A metering point of another LEG is moved with "Change LEG", which
     knows the related points. The choices are built from the database for every request; the service checks again
     under the locks."""
 
     metering_point = forms.ChoiceField(label=_("Metering point"), widget=forms.Select(attrs={"class": "form-select tnum"}))
-    valid_from = date_field(_("Applies from"), initial="today")
+    valid_from = date_field(_("Valid from"), initial="today")
     layout = [("single", ["metering_point"]), ("single", ["valid_from"])]
     optional = ()
     hint = _("From this day the metering point belongs to this LEG. This can change the discount tier of the LEG.")

@@ -112,7 +112,7 @@ invited and who has not completed the registration has no customer number yet; t
             <div class="mgmt-fact"><dt>{% translate "Shares" %}</dt><dd class="tnum">{% if shares is not None %}{{ shares }}{% else %}–{% endif %}</dd></div>
           </dl>
           <table class="mgmt-table mgmt-history">
-            <thead><tr><th>{% translate "Applies from" %}</th><th>{% translate "Number of shares" %}</th></tr></thead>
+            <thead><tr><th>{% translate "Valid from" %}</th><th>{% translate "Number of shares" %}</th></tr></thead>
             <tbody>
               {% for entry in share_entries %}
                 <tr><td>{{ entry.date|date:"d.m.Y" }}</td><td class="tnum">{{ entry.quantity }}</td></tr>

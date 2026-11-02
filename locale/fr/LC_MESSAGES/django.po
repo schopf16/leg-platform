@@ -4280,7 +4280,7 @@ msgstr "Saisissez le dernier jour d’un mois."
 msgid "Search name, customer number or e-mail address"
 msgstr "Rechercher un nom, un numéro de client ou une adresse e-mail"
 
-msgid "Applies from"
+msgid "Valid from"
 msgstr "Valable dès le"
 
 msgid "Several persons match. Type more of the name or the customer number."
@@ -4475,7 +4475,7 @@ msgstr "Affecter une personne"
 
 msgid ""
 "If the metering point already has a person, the person ends on the day "
-"before \"Applies from\"."
+"before \"Valid from\"."
 msgstr ""
 "Si le point de mesure a déjà une personne, celle-ci prend fin la veille de «"
 " Valable dès le »."
@@ -4591,7 +4591,7 @@ msgstr "Enregistré, pas encore annoncé à %(operator)s."
 msgid "Terminate"
 msgstr "Résilier"
 
-msgid "The assignment is entered with a date \"Applies from\"."
+msgid "The assignment is entered with a date \"Valid from\"."
 msgstr "L’affectation est saisie avec une date « Valable dès le »."
 
 msgid "Archive metering point"
