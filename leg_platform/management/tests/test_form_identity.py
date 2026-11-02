@@ -152,7 +152,7 @@ class EntryPointsOfOtherSubjectsTests(TestCase):
             str(form.base_fields["valid_from"].label)
             for form in (PersonAssignForm, LegAssignForm, LegSwitchForm, LegPointForm)
         }
-        self.assertEqual(labels, {"Gilt ab"})
+        self.assertEqual(labels, {"Gültig ab"})
         for field in (LegAssignForm.base_fields["leg"], LegSwitchForm.base_fields["leg"]):
             # Nothing is chosen in advance and the empty option says what it means.
             self.assertTrue(field.required)

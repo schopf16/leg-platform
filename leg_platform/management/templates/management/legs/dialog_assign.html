@@ -1,7 +1,7 @@
 {% extends "management/dialog_form.html" %}
 {% load i18n %}{% comment %}
 The dialog "Assign metering point" on the page of a LEG (D-095): one drop-down of the metering points without a LEG
-and the day it applies from. Without such a metering point the notice says so.
+and the day it is valid from. Without such a metering point the notice says so.
 {% endcomment %}
 {% block dialog_notice %}
   {% if empty %}

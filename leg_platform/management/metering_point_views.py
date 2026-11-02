@@ -460,7 +460,7 @@ class AssignmentDialog(PointDialog):
 
 
 class PersonView(AssignmentDialog):
-    """Assign a person or, with a person, change it (the former person ends the day before "Applies from")."""
+    """Assign a person or, with a person, change it (the former person ends the day before "Valid from")."""
 
     form_class = PersonAssignForm
 
@@ -477,7 +477,7 @@ class PersonView(AssignmentDialog):
     def get_form(self, data=None):
         form = PersonAssignForm(data)
         if self.has_person():
-            form.hint = _("If the metering point already has a person, the person ends on the day before \"Applies from\".")
+            form.hint = _("If the metering point already has a person, the person ends on the day before \"Valid from\".")
         return form
 
     def get_lead(self):

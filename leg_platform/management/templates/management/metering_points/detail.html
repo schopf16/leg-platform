@@ -70,7 +70,7 @@ on a phone it stands at the end of the page.
         <dl class="mgmt-facts">
           {% for row in leg_rows %}
             <div class="mgmt-fact"><dt>{{ row.label }}</dt><dd>{{ row.name }}{% if row.url %}{% translate "Go to the LEG page" as leg_label %}{% include "management/_goto.html" with url=row.url label=leg_label %}{% endif %}{% if row.note %} <span class="mgmt-note-inline">{{ row.note }}</span>{% endif %}</dd></div>
-            {% if row.single %}<div class="mgmt-fact"><dt>{% translate "Applies from" %}</dt><dd class="tnum">{{ row.valid_from|date:"d.m.Y" }}</dd></div>{% endif %}
+            {% if row.single %}<div class="mgmt-fact"><dt>{% translate "Valid from" %}</dt><dd class="tnum">{{ row.valid_from|date:"d.m.Y" }}</dd></div>{% endif %}
           {% empty %}
             {% translate "no LEG" as missing_leg %}
             <div class="mgmt-fact"><dt>{% translate "Assigned" %}</dt><dd>{% include "management/_missing.html" with text=missing_leg %}</dd></div>
@@ -91,13 +91,13 @@ on a phone it stands at the end of the page.
         <dl class="mgmt-facts">
           {% for row in person_rows %}
             <div class="mgmt-fact"><dt>{{ row.label }}</dt><dd>{{ row.name }}{% if row.url %}{% translate "Go to the person" as person_label %}{% include "management/_goto.html" with url=row.url label=person_label %}{% endif %}{% if row.note %} <span class="mgmt-note-inline">{{ row.note }}</span>{% endif %}</dd></div>
-            {% if row.single %}<div class="mgmt-fact"><dt>{% translate "Applies from" %}</dt><dd class="tnum">{{ row.valid_from|date:"d.m.Y" }}</dd></div>{% endif %}
+            {% if row.single %}<div class="mgmt-fact"><dt>{% translate "Valid from" %}</dt><dd class="tnum">{{ row.valid_from|date:"d.m.Y" }}</dd></div>{% endif %}
           {% empty %}
             {% translate "no person" as missing_person %}
             <div class="mgmt-fact"><dt>{% translate "Occupied by" %}</dt><dd>{% include "management/_missing.html" with text=missing_person %}</dd></div>
           {% endfor %}
         </dl>
-        {% if not has_person and can_change %}<p class="mgmt-note mgmt-phone-only">{% translate 'The assignment is entered with a date "Applies from".' %}</p>{% endif %}
+        {% if not has_person and can_change %}<p class="mgmt-note mgmt-phone-only">{% translate 'The assignment is entered with a date "Valid from".' %}</p>{% endif %}
       </section>
     </div>
   </div>

@@ -4239,7 +4239,7 @@ msgstr "Inserisca l'ultimo giorno di un mese."
 msgid "Search name, customer number or e-mail address"
 msgstr "Cerca nome, numero cliente o indirizzo e-mail"
 
-msgid "Applies from"
+msgid "Valid from"
 msgstr "Valido dal"
 
 msgid "Several persons match. Type more of the name or the customer number."
@@ -4435,7 +4435,7 @@ msgstr "Assegna persona"
 
 msgid ""
 "If the metering point already has a person, the person ends on the day "
-"before \"Applies from\"."
+"before \"Valid from\"."
 msgstr ""
 "Se il punto di misura ha già una persona, la persona termina il giorno prima"
 " di «Valido dal»."
@@ -4550,7 +4550,7 @@ msgstr "Registrato, non ancora notificato a %(operator)s."
 msgid "Terminate"
 msgstr "Disdici"
 
-msgid "The assignment is entered with a date \"Applies from\"."
+msgid "The assignment is entered with a date \"Valid from\"."
 msgstr "L'assegnazione viene inserita con una data «Valido dal»."
 
 msgid "Archive metering point"

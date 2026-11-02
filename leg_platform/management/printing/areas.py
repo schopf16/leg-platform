@@ -316,7 +316,7 @@ class PersonArea(Area):
                     _("Cooperative"),
                     [(_("Shares"), str(current) if current is not None else DASH)],
                     table=Table(
-                        [Column(_("Applies from"), 1.5), Column(_("Number of shares"), 1.5)],
+                        [Column(_("Valid from"), 1.5), Column(_("Number of shares"), 1.5)],
                         [[format_date(entry.valid_from), str(entry.quantity)] for entry in share_entries],
                     ),
                 )
@@ -611,7 +611,7 @@ class MeteringPointArea(Area):
         for row in rows:
             facts.append((row["label"], f"{row['name']} {row['note']}".strip()))
             if row["single"]:
-                facts.append((_("Applies from"), format_date(row["valid_from"])))
+                facts.append((_("Valid from"), format_date(row["valid_from"])))
         return facts
 
 

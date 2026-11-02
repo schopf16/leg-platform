@@ -233,7 +233,7 @@ class LegPageTests(TestCase):
         # UX-013: the lead names the LEG in words that read well; UX-011: a point without a location says so.
         self.assertContains(page, "Er wird der LEG «%s» zugeordnet." % self.neuland.name)
         self.assertNotContains(page, "Er kommt zur LEG")
-        self.assertContains(page, "Gilt ab")
+        self.assertContains(page, "Gültig ab")
         bare = make_metering_point(23)  # no location at all
         page = self.client.get(url)
         self.assertRegex(page.content.decode(), rf'<option value="{bare.pk}">[^<]* · [^<]* · kein Standort</option>')
