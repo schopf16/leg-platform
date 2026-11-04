@@ -8,7 +8,13 @@ from django.db import transaction
 
 from leg_platform.community import addressing, archived, history, location_egid, transformer_circuits
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import HistoryEntry, Location, MeteringPoint
+from leg_platform.community.models import (
+    ApplicationBuilding,
+    CustomerBuilding,
+    HistoryEntry,
+    Location,
+    MeteringPoint,
+)
 
 Archived = archived.Archived
 
@@ -35,7 +41,12 @@ class NotDeletable(Exception):
 
 
 class MergeRefused(Exception):
-    """The address belongs to an archived location: nothing is moved to it."""
+    """Nothing is moved. ``code``: ``archived`` (the address belongs to an archived location) or
+    ``application_conflict`` (one application names both locations)."""
+
+    def __init__(self, code="archived"):
+        super().__init__(code)
+        self.code = code
 
 
 def _lock_open(location):
@@ -159,7 +170,27 @@ def update_address(
 
 
 def _merge(source, target, actor):
-    """Move the metering points of ``source`` to ``target`` (history entry each), log the merge, delete ``source``."""
+    """Move the metering points (history entry each), application buildings and customer labels of ``source`` to
+    ``target``, log the merge, delete ``source``. ``MergeRefused("application_conflict")`` if one application names
+    both; an account's own label of ``target`` wins over its label of ``source``."""
+    drafts = list(ApplicationBuilding.objects.select_for_update().filter(location=source).order_by("pk"))
+    if ApplicationBuilding.objects.filter(
+        location=target, application_id__in=[row.application_id for row in drafts]
+    ).exists():
+        raise MergeRefused("application_conflict")
+    for row in drafts:
+        row.location = target
+        row.save(update_fields=["location", "updated_at"])
+    labels = CustomerBuilding.objects.select_for_update().filter(location__in=[source, target]).order_by("pk")
+    kept = {row.person_id for row in labels if row.location_id == target.pk}
+    for row in labels:
+        if row.location_id != source.pk:
+            continue
+        if row.person_id in kept:
+            row.delete()
+        else:
+            row.location = target
+            row.save(update_fields=["location", "updated_at"])
     points = list(MeteringPoint.objects.select_for_update().filter(location=source).order_by("pk"))
     for point in points:
         point.location = target

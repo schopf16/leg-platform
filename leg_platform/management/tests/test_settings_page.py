@@ -67,7 +67,7 @@ class SettingsPageTests(TestCase):
             ">Land</label>", ">Identifikator</label>", "Warnschwelle",
             f"Gilt für alle Messpunkte. Die {OPERATOR} vergibt den Identifikator.",
             "Gilt für alle LEGs. Gesetzlich nötig sind mindestens 5 %.",
-            ">Speichern</button>",
+            ">Absender, Messpunkte und Quote speichern</button>",
         ):
             with self.subTest(text=text):
                 self.assertIn(text, html)
@@ -75,10 +75,11 @@ class SettingsPageTests(TestCase):
         # The sections are in the order of the specification.
         self.assertLess(html.index("Absender der Rechnungen"), html.index(">Messpunkte</h2>"))
         self.assertLess(html.index(">Messpunkte</h2>"), html.index(">Produktionsquote</h2>"))
-        # One button saves everything; the first button of the form is that one (key Enter).
+        # The button of the three cards names what it saves; it is the first button of the form (key Enter).
         form = html[html.index('<form method="post" novalidate'):]
         self.assertIn('value="save"', re.search(r"<button[^>]*>", form).group(0))
-        self.assertEqual(html.count(">Speichern</button>"), 1)
+        self.assertEqual(html.count(">Absender, Messpunkte und Quote speichern</button>"), 1)
+        self.assertNotIn(">Speichern</button>", html)
         # Every field can be typed in (no account sees a disabled form).
         self.assertEqual(len(re.findall(r"<input[^>]* disabled", html)), 0)
 

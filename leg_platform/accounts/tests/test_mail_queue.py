@@ -135,6 +135,27 @@ class IpKeyTests(SimpleTestCase):
         self.assertEqual(rate_limits.ip_key(""), "unknown")
 
 
+class MailDispatchTests(SimpleTestCase):
+    # Dispatched by ``_process_next`` itself, before the handler tables.
+    EMAIL_CHANGE_KINDS = {
+        MailJob.Kind.EMAIL_CHANGE_REQUEST, MailJob.Kind.SECONDARY_EMAIL_REQUEST, MailJob.Kind.EMAIL_CHANGE_NOTICE,
+    }
+
+    def test_every_kind_has_a_handler_or_is_retired(self):
+        handled = (
+            self.EMAIL_CHANGE_KINDS | set(mail_queue.ACCOUNT_HANDLERS) | set(mail_queue.HANDLERS)
+            | mail_queue.RETIRED_KINDS
+        )
+        self.assertEqual(set(MailJob.Kind) - handled, set())
+
+    def test_no_kind_is_handled_twice(self):
+        tables = [
+            self.EMAIL_CHANGE_KINDS, set(mail_queue.ACCOUNT_HANDLERS), set(mail_queue.HANDLERS),
+            set(mail_queue.RETIRED_KINDS),
+        ]
+        self.assertEqual(sum(len(table) for table in tables), len(set().union(*tables)))
+
+
 @tag("mariadb")
 class ConcurrentRateLimitTests(TransactionTestCase):
     def test_parallel_requests_cannot_exceed_the_limit(self):
@@ -441,6 +462,34 @@ class MailWorkerTests(TestCase):
 
         MailJob.objects.update(created_at=timezone.now() - timedelta(hours=25))
         self.assertEqual(mail_queue.delete_stale_jobs(), 1)
+
+    def test_a_notification_is_retried_with_a_capped_delay_through_a_mail_outage(self):
+        mail_queue.enqueue(MailJob.Kind.TWO_FACTOR_DISABLED, "taken.person@example.org")
+
+        with patch("leg_platform.accounts.emails.EmailMessage.send", side_effect=OSError("x")):
+            with self.assertLogs("leg_platform.accounts.mail_queue", "ERROR") as logs:
+                for _attempt in range(mail_queue.MAX_ATTEMPTS + 5):
+                    MailJob.objects.update(next_attempt_at=timezone.now())
+                    self.assertEqual(mail_queue.process_pending(), (0, 1))
+
+        job = MailJob.objects.get()
+        self.assertEqual(job.attempts, mail_queue.MAX_ATTEMPTS + 5)
+        self.assertLessEqual(job.next_attempt_at - timezone.now(), mail_queue.MAX_RETRY_DELAY)
+        self.assertNotIn("given up", "\n".join(logs.output))
+        # The outage ends: the notification still goes out.
+        MailJob.objects.update(next_attempt_at=timezone.now())
+        self.assertEqual(run_mail_queue(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_a_job_of_a_retired_kind_is_dropped_quietly(self):
+        for kind in mail_queue.RETIRED_KINDS:
+            MailJob.objects.create(kind=kind, address="taken.person@example.org", next_attempt_at=timezone.now())
+
+        with self.assertNoLogs("leg_platform.accounts.mail_queue", "ERROR"):
+            self.assertEqual(mail_queue.process_pending(), (len(mail_queue.RETIRED_KINDS), 0))
+
+        self.assertEqual(MailJob.objects.count(), 0)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_the_instance_wide_cap_of_one_kind_does_not_block_the_other(self):
         caps = ((2, timedelta(hours=1)),)

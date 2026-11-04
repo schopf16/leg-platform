@@ -6,7 +6,7 @@ from datetime import date
 from django.test import SimpleTestCase, TestCase, tag
 
 from leg_platform.accounts.models import MailJob
-from leg_platform.community import application_deadlines, deregistrations, history, own_iban
+from leg_platform.community import application_deadlines, deregistrations, history, metering_points, own_iban
 from leg_platform.community.application_common import ApplicationError, add_months, month_end
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import Deregistration, Direction, MeteringPoint
@@ -240,6 +240,32 @@ class ConfirmAndEffectTests(TestCase):
         self.assertTrue(all(point.terminated_on is None for point in MeteringPoint.objects.all()))
         self.dereg.refresh_from_db()
         self.assertEqual(self.dereg.state, State.SUBMITTED)
+
+    def test_a_point_already_ended_on_the_confirmed_date_counts_as_done(self):
+        MeteringPoint.objects.filter(pk=self.feed_in.pk).update(terminated_on=date(2027, 3, 31))
+        deregistrations.confirm(self.dereg, self.staff, date(2027, 3, 31), today=TODAY)
+        self.dereg.refresh_from_db()
+        self.assertEqual(self.dereg.state, State.CONFIRMED)
+        self.assertEqual(set(MeteringPoint.objects.values_list("terminated_on", flat=True)), {date(2027, 3, 31)})
+
+    def test_a_point_ended_on_another_date_still_stops_the_confirmation(self):
+        MeteringPoint.objects.filter(pk=self.feed_in.pk).update(terminated_on=date(2027, 4, 30))
+        self.assertEqual(code_of(lambda: deregistrations.confirm(self.dereg, self.staff, date(2027, 3, 31), TODAY)),
+                         "cannot_terminate")
+
+    def test_the_point_of_a_waiting_deregistration_is_not_terminated_or_archived_on_its_own(self):
+        for step in (
+            lambda: metering_points.terminate(self.draw, date(2027, 3, 31), self.staff, TODAY),
+            lambda: metering_points.set_archived(self.draw, True, self.staff),
+        ):
+            with self.assertRaises(metering_points.StatusError) as caught:
+                step()
+            self.assertEqual(caught.exception.code, "in_deregistration")
+        self.draw.refresh_from_db()
+        self.assertEqual((self.draw.terminated_on, self.draw.is_archived), (None, False))
+        # Once confirmed, the point is free for the staff's other steps again.
+        deregistrations.confirm(self.dereg, self.staff, date(2027, 3, 31), today=TODAY)
+        self.assertTrue(metering_points.set_archived(self.draw, True, self.staff).is_archived)
 
     def test_only_active_staff_confirm(self):
         other = customer("effect.other@example.org")

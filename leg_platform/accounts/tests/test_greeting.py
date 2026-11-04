@@ -616,7 +616,7 @@ class NotificationGreetingTests(TestCase):
         self.assertFalse(MailJob.objects.filter(greeting_name__gt="").exists())
         self.assertEqual(MailJob.objects.count(), 0)
 
-    def test_the_name_goes_with_the_job_when_it_is_given_up(self):
+    def test_the_name_is_never_logged_while_a_failing_job_is_retried_and_goes_when_it_is_stale(self):
         password_reset.notify_password_changed(self.user)
 
         with patch("leg_platform.accounts.emails.EmailMessage.send", side_effect=OSError("x")):
@@ -625,7 +625,10 @@ class NotificationGreetingTests(TestCase):
                     MailJob.objects.update(next_attempt_at=timezone.now())
                     mail_queue.process_pending()
 
-        self.assertEqual(MailJob.objects.count(), 0)
+        # A notification is retried until its stale age (D-138), then purged with its name.
+        self.assertEqual(MailJob.objects.get().attempts, mail_queue.MAX_ATTEMPTS + 1)
+        MailJob.objects.update(created_at=timezone.now() - timedelta(hours=25))
+        self.assertEqual(mail_queue.delete_stale_jobs(), 1)
         self.assertNotIn("Maria", "\n".join(logs.output))
         self.assertNotIn("Muster", "\n".join(logs.output))
 

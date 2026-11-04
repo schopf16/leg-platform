@@ -9,7 +9,8 @@ a staff user or a system administrator, unless the actor is a system administrat
 the password, the second factor, the status, the rights and the customer number are shown only. A person whom staff
 invited and who has not completed the registration has no customer number yet; the head shows "Invited" and the button
 "Resend invitation". No button "Start registration" (no specified effect; never a dead button), no "block" or "deactivate"
-(not decided).
+(not decided). The card "Processes" lists the person's applications and deregistrations (``process_views.person_entries``);
+the header links to the account in the administration for a viewer with the user permission (``account_admin_url``).
 {% endcomment %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'management/css/management.css' %}">{% endblock %}
@@ -27,8 +28,9 @@ invited and who has not completed the registration has no customer number yet; t
         <p class="mgmt-subtitle mgmt-person-line">{% if invitation.expires_at %}{% blocktranslate with deadline=invitation.expires_at|date:"d.m.Y H:i" %}The invitation link is valid until {{ deadline }}.{% endblocktranslate %}{% elif not invitation.sending %}{% translate "The invitation link has expired." %}{% endif %}</p>
       {% endif %}
     </div>
-    {% if invitation or can_view_as %}
+    {% if invitation or can_view_as or admin_url %}
       <div class="mgmt-header-actions">
+        {% if admin_url %}<a class="btn btn-secondary-action" href="{{ admin_url }}">{% translate "Account in the system administration" %}</a>{% endif %}
         {% if invitation %}
         <form method="post" action="{% url 'management:persons_invitation' person.pk %}">
           {% csrf_token %}
@@ -81,7 +83,7 @@ invited and who has not completed the registration has no customer number yet; t
           <div class="mgmt-fact"><dt>{% translate "Second email" %}</dt><dd>{% if person.secondary_email %}{{ person.secondary_email }}{% elif second_pending %}{% translate "Pending" %}{% else %}–{% endif %}</dd></div>
           <div class="mgmt-fact"><dt>{% translate "Phone" %}</dt><dd>{% if phone %}{{ phone }}{% else %}–{% endif %}</dd></div>
         </dl>
-        {% if person.is_active %}<a class="btn btn-danger-outline" href="{% url 'admin:accounts_user_reset_second_factor' person.pk %}">{% translate "Recover sign-in method" %}</a>{% endif %}
+        {% if person.is_active %}<a class="btn btn-danger-outline" href="{% url 'admin:accounts_user_reset_second_factor' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Recover sign-in method" %}</a>{% endif %}
       </section>
 
       <section class="mgmt-card" data-order="3">
@@ -127,6 +129,27 @@ invited and who has not completed the registration has no customer number yet; t
       <section class="mgmt-card" data-order="7">
         <div class="mgmt-card-head"><h2>{% translate "Note" %}</h2><a class="btn btn-secondary-action btn-xs" href="{% url 'management:persons_note' person.pk %}?next={{ current_url|urlencode:'' }}">{% translate "Edit" %}</a></div>
         <div class="mgmt-remark">{% if note %}{{ note|linebreaksbr }}{% else %}–{% endif %}</div>
+      </section>
+
+      <section class="mgmt-card" data-order="7">
+        <div class="mgmt-card-head"><h2>{% translate "Processes" %}</h2></div>
+        {% if processes %}
+          <table class="mgmt-table mgmt-history">
+            <thead><tr><th>{% translate "Kind" %}</th><th>{% translate "Status" %}</th><th>{% translate "Last change" %}</th><th class="mgmt-link-col"><span class="visually-hidden">{% translate "Details" %}</span></th></tr></thead>
+            <tbody>
+              {% for entry in processes %}
+                <tr>
+                  <td>{{ entry.kind_label }}</td>
+                  <td>{% include "management/_status.html" with tone=entry.state_tone label=entry.state_label %}</td>
+                  <td class="tnum">{{ entry.changed_text }}</td>
+                  <td class="mgmt-link-col">{% translate "Go to the process" as goto_label %}{% include "management/_goto.html" with url=entry.detail_url label=goto_label subject=entry.subject %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="mgmt-muted mgmt-person-empty">{% translate "No processes." %}</p>
+        {% endif %}
       </section>
     </div>
 

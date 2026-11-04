@@ -20,8 +20,8 @@ MAX_UNRESOLVED_NOTICES_PER_PERSON = 20
 class ApplicationError(Exception):
     """A step that the rules refuse. ``code`` names the reason; ``details`` carries facts the customer may see.
 
-    Customer codes: ``not_allowed``, ``not_found``, ``not_editable``, ``too_many_applications``, ``too_many_drafts``,
-    ``too_many_buildings``, ``already_in_progress``, ``building_complete``, ``building_unavailable`` (neutral: nothing
+    Customer codes: ``not_allowed``, ``not_found``, ``not_editable``, ``draft_exists`` (``details["draft"]``),
+    ``too_many_applications``, ``too_many_drafts``, ``too_many_buildings``, ``already_in_progress``, ``building_complete``, ``building_unavailable`` (neutral: nothing
     about another account), ``directory_unavailable``, ``egid_invalid``, ``building_not_found``, ``ambiguous``,
     ``egid_not_offered``, ``already_added``, ``building_fixed``, ``direction_taken``, ``number_own``,
     ``number_in_application``, ``number_unavailable`` (neutral), ``prefix_not_configured``, ``contract_missing``,

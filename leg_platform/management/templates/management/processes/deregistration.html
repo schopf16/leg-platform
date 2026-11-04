@@ -12,7 +12,7 @@ step is done by the system on the confirmed date (the scheduled tasks mark it ef
 {% block inner_class %}mgmt-page mgmt-wide mgmt-process{% endblock %}
 {% block content %}
   {% include "management/_icons.html" %}
-  <a class="mgmt-back" href="{{ back_url }}">← {% translate "Back to processes" %}</a>
+  <a class="mgmt-back" href="{{ back_url }}">← {% if back_is_origin %}{% translate "Back" %}{% else %}{% translate "Back to processes" %}{% endif %}</a>
 
   <div class="mgmt-header mgmt-detail-header">
     <div>

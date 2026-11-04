@@ -410,6 +410,25 @@ class LocationPageTests(TestCase):
         taken = client.post(reverse("management:circuits_edit", args=[other.pk]), {"grid_number": "TRA21359", "name": ""})
         self.assertContains(taken, "Diesen Trafokreis gibt es schon.")
 
+    def test_a_number_taken_in_parallel_shows_the_dialog_with_the_error(self):
+        from django.core.exceptions import ValidationError
+        from django.db import IntegrityError
+
+        url = reverse("management:circuits_edit", args=[self.circuit.pk])
+        raised = (
+            ValidationError({"grid_number": [ValidationError("taken", code="unique")]}),
+            IntegrityError("duplicate"),
+        )
+        for error in raised:
+            with self.subTest(error=type(error).__name__), mock.patch(
+                "leg_platform.community.transformer_circuits.update", side_effect=error
+            ):
+                response = self.client.post(url, {"grid_number": "TRA777", "name": ""})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "Diesen Trafokreis gibt es schon.")
+        self.circuit.refresh_from_db()
+        self.assertEqual(self.circuit.grid_number, "TRA21359")
+
     def test_creating_a_metering_point_at_the_location(self):
         client = self.client
         url = reverse("management:locations_metering_point_new", args=[self.fresh.pk])

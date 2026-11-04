@@ -43,13 +43,18 @@ def affected_locations(circuit):
 
 
 def update(circuit, number, name):
-    """Change number and name; raises ``ValidationError`` (wrong or taken number)."""
-    with transaction.atomic():
-        fresh = TransformerCircuit.objects.select_for_update().get(pk=circuit.pk)
-        fresh.grid_number = numbers.normalise_transformer_circuit_number(number)
-        fresh.name = name
-        fresh.full_clean()
-        fresh.save()
+    """Change number and name; raises ``ValidationError`` (wrong or taken number, also when a parallel request took the
+    number between the check and the save: the database constraint decides, as in ``create``)."""
+    try:
+        with transaction.atomic():
+            fresh = TransformerCircuit.objects.select_for_update().get(pk=circuit.pk)
+            fresh.grid_number = numbers.normalise_transformer_circuit_number(number)
+            fresh.name = name
+            fresh.full_clean()
+            fresh.save()
+    except IntegrityError:
+        fresh.validate_unique()  # now finds the other one and raises the same message as full_clean
+        raise
     return fresh
 
 

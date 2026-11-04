@@ -3557,6 +3557,13 @@ msgstr "Geben Sie die %(operator)s-Nummer ein: TRA und Ziffern."
 msgid "This address already exists."
 msgstr "Diese Adresse gibt es schon."
 
+msgid ""
+"One application names both locations. Settle that application first, then "
+"merge the locations."
+msgstr ""
+"Eine Anmeldung enthält beide Standorte. Erledigen Sie zuerst diese Anmeldung "
+"und führen Sie dann die Standorte zusammen."
+
 # Field names and names of the models (they appear in forms and in the lists
 # of rights)
 msgid "created"
@@ -4291,6 +4298,9 @@ msgstr "Diese Änderung ist nicht möglich."
 msgid "This metering point is archived."
 msgstr "Dieser Messpunkt ist archiviert."
 
+msgid "This metering point is in a deregistration. Confirm the deregistration instead."
+msgstr "Dieser Messpunkt wird gerade abgemeldet. Bestätigen Sie stattdessen die Abmeldung."
+
 msgid "This step is not possible in the current status of the metering point."
 msgstr "Dieser Schritt ist im jetzigen Status des Messpunkts nicht möglich."
 
@@ -5015,12 +5025,8 @@ msgid_plural "%(count)d metering points with a problem"
 msgstr[0] "%(count)d Messpunkt mit Problem"
 msgstr[1] "%(count)d Messpunkte mit Problem"
 
-msgid ""
-"The button \"Filter problems\" appears only when a list has a problem. It "
-"shows only the entries with a problem in each list."
-msgstr ""
-"Der Knopf „Probleme filtern“ erscheint nur, wenn eine Liste ein Problem hat."
-" Er zeigt in jeder Liste nur die Einträge mit Problem."
+msgid "Back to the person"
+msgstr "Zurück zur Person"
 
 msgid "No problems."
 msgstr "Keine Probleme."
@@ -6090,10 +6096,14 @@ msgstr "Hinweise (%(notice_count)s)"
 msgid "Notices"
 msgstr "Hinweise"
 
-msgid "Customers who were refused something without being told why."
+msgid ""
+"What the LEG has to act on: refusals the customer was not told the reason "
+"for, and registrations at the grid operator that must be withdrawn or "
+"checked."
 msgstr ""
-"Kunden, denen etwas verweigert wurde, ohne dass ihnen der Grund genannt "
-"wurde."
+"Was die LEG erledigen muss: Ablehnungen, deren Grund der Kunde nicht "
+"erfährt, und Anmeldungen beim Netzbetreiber, die zurückzuziehen oder zu "
+"prüfen sind."
 
 msgid "No open notices."
 msgstr "Keine offenen Hinweise."
@@ -10215,3 +10225,27 @@ msgstr "Messpunkte eingereichter Anmeldungen. Sie korrigieren sie hier; der Mess
 
 msgid "Go to the registration"
 msgstr "Zur Anmeldung"
+
+#, python-format
+msgid "%(count)d more building in registration: see the processes"
+msgid_plural "%(count)d more buildings in registration: see the processes"
+msgstr[0] "%(count)d weiteres Gebäude in Anmeldung: siehe Vorgänge"
+msgstr[1] "%(count)d weitere Gebäude in Anmeldung: siehe Vorgänge"
+
+#, python-format
+msgid "%(count)d more metering point in registration: see the processes"
+msgid_plural "%(count)d more metering points in registration: see the processes"
+msgstr[0] "%(count)d weiterer Messpunkt in Anmeldung: siehe Vorgänge"
+msgstr[1] "%(count)d weitere Messpunkte in Anmeldung: siehe Vorgänge"
+
+msgid "Save sender, metering points and quota"
+msgstr "Absender, Messpunkte und Quote speichern"
+
+msgid "No processes."
+msgstr "Keine Vorgänge."
+
+msgid "Account in the system administration"
+msgstr "Konto in der Systemverwaltung"
+
+msgid "Open in the management area"
+msgstr "In der Verwaltung öffnen"

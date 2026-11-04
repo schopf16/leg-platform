@@ -126,6 +126,14 @@ class StartPageTests(WizardCase):
         self.client.post(START)
         self.assertEqual(Application.objects.filter(person=self.mine).count(), 1)
 
+    def test_a_second_tab_past_the_page_check_gets_the_existing_draft(self):
+        # The second request read "no draft" before the first one was saved: the service refuses under the lock.
+        self.client.post(START)
+        with patch("leg_platform.customer.wizard.ApplicationStartView.drafts", return_value=[]):
+            response = self.client.post(START)
+        self.assertRedirects(response, START)
+        self.assertEqual(Application.objects.filter(person=self.mine).count(), 1)
+
     def test_start_again_deletes_the_draft_only_and_shows_the_start_page(self):
         draft, _building = draft_with_points(self.mine)
         response = self.client.post(reverse("customer:application_cancel", args=[draft.pk]), {"restart": "1"})

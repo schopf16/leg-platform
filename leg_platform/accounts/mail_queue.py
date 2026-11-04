@@ -8,7 +8,8 @@ the worker and sent at once, never stored.
 Worker steps (no lock is held while sending): 1. claim under a lock (attempt counter raised, next
 due time moved forward: a lease and the retry delay); 2. decide: the handler stores what it needs
 in one transaction and returns the send function or nothing; 3. send, outside any transaction;
-4. delete the job. A crash before 4 repeats the job (at least once); after ``MAX_ATTEMPTS`` it is given up.
+4. delete the job. A crash before 4 repeats the job (at least once). A request job is given up after ``MAX_ATTEMPTS``; a
+notification, an invitation and the log notice keep being retried until ``delete_stale_jobs`` removes them (D-138).
 """
 
 import logging
@@ -35,11 +36,21 @@ from leg_platform.accounts.normalization import normalize_email_address
 logger = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 3
-# The retry delay is this value times the attempts so far; it also keeps the job from other workers meanwhile.
+# The retry delay is this value times the attempts so far, at most ``MAX_RETRY_DELAY``; it also keeps the job from other
+# workers meanwhile.
 RETRY_DELAY = timedelta(minutes=2)
+MAX_RETRY_DELAY = timedelta(minutes=15)
 # Jobs never processed are deleted after this time; they hold addresses.
 STALE_AFTER = timedelta(hours=1)
 NOTIFICATION_STALE_AFTER = timedelta(hours=24)
+# Not given up after ``MAX_ATTEMPTS`` (D-138): an outage of the mail service must not lose them before their stale age.
+RETRY_UNTIL_STALE_KINDS = frozenset(
+    {*MailJob.NOTIFICATION_KINDS, MailJob.Kind.INVITATION, MailJob.Kind.LOG_NOTIFICATION}
+)
+# Kinds that are no longer queued; a job left from an older version is dropped without a send.
+RETIRED_KINDS = frozenset(
+    {MailJob.Kind.EMAIL_CHANGE, MailJob.Kind.EMAIL_CHANGE_EXISTING_ACCOUNT, MailJob.Kind.APPLICATION_RETURNED}
+)
 
 
 def _notification(sender, greets=True):
@@ -89,7 +100,6 @@ HANDLERS = {
     MailJob.Kind.ACCOUNT_DELETED: _notification(emails.send_account_deleted, greets=False),
     # Onboarding of customers (D-103).
     MailJob.Kind.APPLICATION_SUBMITTED: _notification(emails.send_application_submitted),
-    MailJob.Kind.APPLICATION_REMINDER: _notification(emails.send_application_reminder),
     MailJob.Kind.APPLICATION_ROLLED_BACK: _notification(emails.send_application_rolled_back),
     MailJob.Kind.CONTRACT_REMINDER: _notification(emails.send_contract_reminder),
     MailJob.Kind.CONTRACT_ROLLED_BACK: _notification(emails.send_contract_rolled_back),
@@ -282,7 +292,7 @@ def _claim():
         )
         if job is None:
             return None
-        if job.suppressed:
+        if job.suppressed or job.kind in RETIRED_KINDS:
             job.delete()
             return DONE
         if job.kind == MailJob.Kind.REGISTRATION and job.created_at < now - registration.JOB_MAX_AGE:
@@ -290,12 +300,12 @@ def _claim():
             logger.warning("A registration request waited too long in the queue and was dropped.")
             job.delete()
             return DONE
-        if job.attempts >= MAX_ATTEMPTS:
+        if job.attempts >= MAX_ATTEMPTS and job.kind not in RETRY_UNTIL_STALE_KINDS:
             logger.error("A mail job (%s) was given up after %d attempts.", job.kind, job.attempts)
             job.delete()
             return FAILED
         job.attempts += 1
-        job.next_attempt_at = now + RETRY_DELAY * job.attempts
+        job.next_attempt_at = now + min(RETRY_DELAY * job.attempts, MAX_RETRY_DELAY)
         job.save(update_fields=["attempts", "next_attempt_at"])
         return job.pk, job.kind, job.address, job.account_id, job.greeting_name
 

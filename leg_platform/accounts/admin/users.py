@@ -1,6 +1,7 @@
 """Administration of accounts: privileges, lifecycle actions, second-factor reset, neutral log."""
 
 import json
+from urllib.parse import urlsplit
 
 from django import forms
 from django.conf import settings
@@ -41,6 +42,30 @@ SECOND_FACTOR_REQUIRED_MESSAGE = _(
 def privileges_granted(account, is_staff, is_superuser):
     """Whether the new values give the account access or rights it does not have yet."""
     return (is_staff and not account.is_staff) or (is_superuser and not account.is_superuser)
+
+
+def management_url(request, account):
+    """The person page of the account in the management area, if the account is a person there and the viewer may enter
+    the area; else "". A link only: the page checks access itself (D-086)."""
+    from leg_platform.community import persons
+    from leg_platform.management.access import may_enter
+
+    if not may_enter(request.user) or not persons.person_queryset().filter(pk=account.pk).exists():
+        return ""
+    return reverse("management:persons_detail", args=[account.pk])
+
+
+def person_return_url(request, account):
+    """``?next=`` if it is exactly the person page of ``account`` and the viewer may enter the management area; else "".
+    An allowlist, never a free redirect: the recovery flow returns only there."""
+    from leg_platform.management.access import may_enter
+    from leg_platform.management.returns import is_safe_return_url
+
+    value = request.GET.get("next", "")
+    if not may_enter(request.user) or not is_safe_return_url(value, request):
+        return ""
+    target = reverse("management:persons_detail", args=[account.pk])
+    return target if urlsplit(value).path == target else ""
 
 
 class UserAdminForm(forms.ModelForm):
@@ -407,6 +432,7 @@ class UserAdmin(AddressSuggestionsMixin, PermissionLabelsMixin, admin.ModelAdmin
         privileged = obj.is_staff or obj.is_superuser
         recovery_eligible = obj.is_active
         change_url = reverse("admin:accounts_user_change", args=(obj.pk,))
+        person_url = person_return_url(request, obj)
         form = ResetSecondFactorForm(
             request.POST if request.method == "POST" else None, privileged=privileged
         )
@@ -419,7 +445,7 @@ class UserAdmin(AddressSuggestionsMixin, PermissionLabelsMixin, admin.ModelAdmin
                 note = gettext("The sign-in recovery link was requested.")
                 self.log_change(request, obj, note)
                 self.message_user(request, note, messages.SUCCESS)
-            return HttpResponseRedirect(change_url)
+            return HttpResponseRedirect(person_url or change_url)
         context = {
             **self.admin_site.each_context(request),
             "title": gettext("Recover sign-in method"),
@@ -429,6 +455,7 @@ class UserAdmin(AddressSuggestionsMixin, PermissionLabelsMixin, admin.ModelAdmin
             "privileged": privileged,
             "recovery_eligible": recovery_eligible,
             "change_url": change_url,
+            "person_url": person_url,
         }
         return TemplateResponse(request, "admin/accounts/user/reset_second_factor.html", context)
 
@@ -438,7 +465,9 @@ class UserAdmin(AddressSuggestionsMixin, PermissionLabelsMixin, admin.ModelAdmin
             raise PermissionDenied
         obj = self.get_object(request, object_id)
         if obj is not None and self.has_view_or_change_permission(request, obj):
-            return super().change_view(request, object_id, form_url, extra_context)
+            return super().change_view(
+                request, object_id, form_url, {"management_url": management_url(request, obj), **(extra_context or {})}
+            )
         try:
             target = User.objects.filter(pk=unquote(object_id)).first()
         except (ValueError, TypeError):

@@ -56,6 +56,11 @@ class ListState:
     problems: bool = False
     focus: str = ""
 
+    @property
+    def filtered(self):
+        """Whether a filter or the problem filter differs from its default (the search words are no filter)."""
+        return self.problems or any(value != self.defaults.get(name, "") for name, value in self.values.items())
+
     def params(self, **changes):
         """Query parameters of this state with ``changes`` applied, defaults left out; a change of
         anything but the page goes back to page 1."""

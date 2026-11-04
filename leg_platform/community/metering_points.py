@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from leg_platform.community import archived, assignments, history
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import HistoryEntry, Leg, Location, MeteringPoint
+from leg_platform.community.models import Deregistration, DeregistrationItem, HistoryEntry, Leg, Location, MeteringPoint
 from leg_platform.community.status import MeteringPointStatus
 
 
@@ -120,7 +120,7 @@ LEG_MISSING = "leg_missing"
 
 class StatusError(Exception):
     """A refused step; ``code``: ``archived``, ``missing`` (deleted meanwhile), ``wrong_status``, ``date_in_future``,
-    ``date_before_previous`` or ``not_month_end``."""
+    ``date_before_previous``, ``not_month_end`` or ``in_deregistration`` (the staff confirms the deregistration instead)."""
 
     def __init__(self, code):
         super().__init__(code)
@@ -204,15 +204,28 @@ def is_month_end(day):
     return day.day == calendar.monthrange(day.year, day.month)[1]
 
 
-def terminate(metering_point, terminated_on, actor=None, today=None, *, allow_not_active=False):
+def _in_deregistration(metering_point, deregistration=None):
+    """Whether a deregistration that waits for its date (other than ``deregistration``) names the point."""
+    rows = DeregistrationItem.objects.filter(
+        metering_point=metering_point, deregistration__state=Deregistration.State.SUBMITTED
+    )
+    if deregistration is not None:
+        rows = rows.exclude(deregistration_id=deregistration.pk)
+    return rows.exists()
+
+
+def terminate(metering_point, terminated_on, actor=None, today=None, *, allow_not_active=False, deregistration=None):
     """Record the termination date: a month end, not before the start. A future date keeps the status "active".
     ``allow_not_active`` (a deregistration that the customer asked for, owner decision 2026-10-29) also terminates a
-    point that is registered, notified or confirmed with a later start; there is no start to compare the date with then."""
+    point that is registered, notified or confirmed with a later start; there is no start to compare the date with then.
+    A point of a deregistration that waits for its date is ended only by confirming that ``deregistration``."""
     today = today or timezone.localdate()
     with transaction.atomic():
         fresh = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
         if fresh.is_archived:
             raise StatusError("archived")
+        if _in_deregistration(fresh, deregistration):
+            raise StatusError("in_deregistration")
         not_active = fresh.status(today) in (
             MeteringPointStatus.REGISTERED, MeteringPointStatus.NOTIFIED, MeteringPointStatus.CONFIRMED
         )
@@ -235,9 +248,12 @@ class NotDeletable(Exception):
 
 
 def set_archived(metering_point, archived, actor=None):
+    """Archive or restore; archiving a point of a deregistration that waits for its date is ``in_deregistration``."""
     with transaction.atomic():
         fresh = MeteringPoint.objects.select_for_update().get(pk=metering_point.pk)
         if fresh.is_archived != archived:
+            if archived and _in_deregistration(fresh):
+                raise StatusError("in_deregistration")
             fresh.is_archived = archived
             fresh.save(update_fields=["is_archived", "updated_at"])
             history.record(fresh, HistoryEvent.ARCHIVED if archived else HistoryEvent.UNARCHIVED, actor)

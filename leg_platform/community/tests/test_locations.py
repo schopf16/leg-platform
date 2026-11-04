@@ -20,7 +20,16 @@ from leg_platform.community import (
 )
 from leg_platform.community.addressing import AddressSuggestion
 from leg_platform.community.history import HistoryEvent
-from leg_platform.community.models import Direction, HistoryEntry, Location, MeteringPoint, PersonRecord
+from leg_platform.community.models import (
+    Application,
+    ApplicationBuilding,
+    CustomerBuilding,
+    Direction,
+    HistoryEntry,
+    Location,
+    MeteringPoint,
+    PersonRecord,
+)
 from leg_platform.community.tests.helpers import (
     assign_leg,
     assign_person,
@@ -137,6 +146,45 @@ class LocationServiceTests(TestCase):
             with self.assertRaises(locations.MergeRefused):
                 locations.update_address(source, **new, merge=confirmed, merge_target_id=target.pk)
         self.assertTrue(Location.objects.filter(pk=source.pk).exists())
+
+    def test_a_merge_moves_application_buildings_and_customer_labels(self):
+        source = make_location("Neuweg", "24", "3000", "Bern")
+        target = make_location("Neuweg", "26", "3000", "Bern")
+        customer = create_active_user("merge.customer@example.org")
+        other = create_active_user("merge.other@example.org")
+        application = Application.objects.create(person=customer)
+        building = ApplicationBuilding.objects.create(application=application, location=source)
+        moved_label = CustomerBuilding.objects.create(person=customer, location=source, name="Moved")
+        CustomerBuilding.objects.create(person=other, location=source, name="Dropped")
+        kept_label = CustomerBuilding.objects.create(person=other, location=target, name="Kept")
+        locations.update_address(
+            source, street="Neuweg", house_number="26", postal_code="3000", town="Bern", actor=self.actor,
+            merge=True, merge_target_id=target.pk,
+        )
+        self.assertFalse(Location.objects.filter(pk=source.pk).exists())
+        building.refresh_from_db()
+        self.assertEqual(building.location, target)
+        self.assertEqual(
+            set(CustomerBuilding.objects.filter(location=target).values_list("pk", "name")),
+            {(moved_label.pk, "Moved"), (kept_label.pk, "Kept")},
+        )
+
+    def test_a_merge_is_refused_when_one_application_names_both_locations(self):
+        source = make_location("Neuweg", "34", "3000", "Bern")
+        target = make_location("Neuweg", "36", "3000", "Bern")
+        point = make_metering_point(3, location=source)
+        application = Application.objects.create(person=create_active_user("merge.both@example.org"))
+        ApplicationBuilding.objects.create(application=application, location=source)
+        ApplicationBuilding.objects.create(application=application, location=target)
+        with self.assertRaises(locations.MergeRefused) as raised:
+            locations.update_address(
+                source, street="Neuweg", house_number="36", postal_code="3000", town="Bern", actor=self.actor,
+                merge=True, merge_target_id=target.pk,
+            )
+        self.assertEqual(raised.exception.code, "application_conflict")
+        self.assertTrue(Location.objects.filter(pk=source.pk).exists())
+        point.refresh_from_db()
+        self.assertEqual(point.location, source)
 
     def test_the_circuit_is_set_logged_and_removed(self):
         location = make_location()

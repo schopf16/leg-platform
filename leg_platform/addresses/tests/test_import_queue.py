@@ -301,6 +301,39 @@ class ImportWorkerTests(TransactionTestCase):
         worker.request_stop()  # no job runs: nothing is raised
         self.assertTrue(worker.stop_requested.is_set())
 
+    def test_a_signal_while_the_outcome_is_recorded_does_not_cut_the_bookkeeping(self):
+        jobs.enqueue([Source.ADDRESS])
+        real = jobs.record_success
+
+        def signalled(claimed, count, **kwargs):
+            worker.request_stop()  # the signal arrives after the import, while the result is written
+            real(claimed, count, **kwargs)
+
+        with patch("leg_platform.addresses.importer.import_directory", return_value=1), \
+                patch.object(jobs, "record_success", side_effect=signalled):
+            self.assertEqual(worker.drain(), 1)
+        job = ImportRequest.objects.get(pk=1)
+        self.assertEqual((job.state, job.last_address_state), (State.SUCCEEDED, "succeeded"))
+        self.assertFalse(worker._interruptible.is_set())
+        self.assertEqual(queue_order(), [])
+
+    def test_the_worker_replaces_closed_connections_before_each_claim_and_each_round(self):
+        jobs.enqueue([Source.PLANT, Source.TRANSFORMER])
+        with patch.object(jobs, "execute", side_effect=lambda claimed, progress=None: succeed(claimed)), \
+                patch.object(worker, "close_old_connections") as close:
+            self.assertEqual(worker.drain(), 2)
+        # Two claims and the final look at the empty queue.
+        self.assertEqual(close.call_count, 3)
+
+        def stop_after_one_round(_seconds):
+            worker.stop_requested.set()
+
+        with patch.object(worker, "close_old_connections") as close, \
+                patch.object(worker.stop_requested, "wait", side_effect=stop_after_one_round):
+            worker.run_loop()
+        # The round itself and the look of ``drain``.
+        self.assertEqual(close.call_count, 2)
+
     def test_a_job_of_a_killed_worker_is_reported_with_its_reason_and_taken_over(self):
         now = timezone.now()
         ImportRequest.objects.create(

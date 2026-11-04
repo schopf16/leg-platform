@@ -413,4 +413,5 @@ STATUS_ERRORS = {
     "date_in_future": _("The date must not be in the future."),
     "date_before_previous": _("The date must not be before the earlier step."),
     "not_month_end": _("Enter the last day of a month."),
+    "in_deregistration": _("This metering point is in a deregistration. Confirm the deregistration instead."),
 }

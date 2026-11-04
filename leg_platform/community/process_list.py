@@ -34,9 +34,11 @@ STATE_ALL = "all"
 # model's values are ``submitted`` and ``confirmed``, which would clash with the application state ``submitted``).
 STATE_DEREGISTRATION_SUBMITTED = "deregistration_submitted"
 STATE_DEREGISTRATION_CONFIRMED = "deregistration_confirmed"
+# The finished states appear only in the processes of one person (``person_rows``), never in the list.
+STATE_DEREGISTRATION_EFFECTIVE = "deregistration_effective"
 ROW_STATES = (
-    *Application.DRAFT_STATES, *Application.IN_FLIGHT_STATES, STATE_DEREGISTRATION_SUBMITTED,
-    STATE_DEREGISTRATION_CONFIRMED,
+    *Application.DRAFT_STATES, *Application.IN_FLIGHT_STATES, Application.State.COMPLETED,
+    STATE_DEREGISTRATION_SUBMITTED, STATE_DEREGISTRATION_CONFIRMED, STATE_DEREGISTRATION_EFFECTIVE,
 )
 # The state FILTER: the two states at the grid operator are one choice (the overview counts them together), and so are
 # the two draft states (a paused draft is a draft that nobody touched for a while).
@@ -60,7 +62,14 @@ MAX_ROWS = 2000
 
 STATE_RANK = {str(getattr(state, "value", state)): rank for rank, state in enumerate(ROW_STATES)}
 DEREGISTRATION_STEPS = 3
-DEREGISTRATION_PROGRESS = {Deregistration.State.SUBMITTED: 1, Deregistration.State.CONFIRMED: 2}
+DEREGISTRATION_PROGRESS = {
+    Deregistration.State.SUBMITTED: 1, Deregistration.State.CONFIRMED: 2, Deregistration.State.EFFECTIVE: 3,
+}
+DEREGISTRATION_ROW_STATES = {
+    Deregistration.State.SUBMITTED: STATE_DEREGISTRATION_SUBMITTED,
+    Deregistration.State.CONFIRMED: STATE_DEREGISTRATION_CONFIRMED,
+    Deregistration.State.EFFECTIVE: STATE_DEREGISTRATION_EFFECTIVE,
+}
 
 
 @dataclass(frozen=True)
@@ -174,10 +183,7 @@ def _deregistration_row(deregistration):
             locations.append(location)
     first = locations[0] if locations else None
     name, contact = person_list.display_names(deregistration.person)
-    state = (
-        STATE_DEREGISTRATION_CONFIRMED if deregistration.state == Deregistration.State.CONFIRMED
-        else STATE_DEREGISTRATION_SUBMITTED
-    )
+    state = DEREGISTRATION_ROW_STATES[deregistration.state]
     return ProcessRow(
         kind=KIND_DEREGISTRATION, pk=deregistration.pk, person_id=deregistration.person_id, person_name=name,
         person_contact=contact, person_number=deregistration.person.customer_number_display,
@@ -185,14 +191,12 @@ def _deregistration_row(deregistration):
         more_buildings=max(len(locations) - 1, 0), egid=first.egid if first is not None else None,
         points=len(items), state=state, progress_done=DEREGISTRATION_PROGRESS[deregistration.state],
         progress_total=DEREGISTRATION_STEPS, date=deregistration.confirmed_date, start_choice="",
-        changed=deregistration.confirmed_at or deregistration.submitted_at,
+        changed=deregistration.effective_at or deregistration.confirmed_at or deregistration.submitted_at,
     )
 
 
-def application_queryset(text="", state=STATE_ALL):
-    """The applications that are not completed (drafts included, D-107), narrowed by the state filter and the search."""
-    states = tuple(Application.OPEN_STATES) if state == STATE_ALL else APPLICATION_FILTER[state]
-    queryset = (
+def _applications(states):
+    return (
         Application.objects.filter(state__in=states)
         .select_related("person")
         .prefetch_related(
@@ -202,20 +206,38 @@ def application_queryset(text="", state=STATE_ALL):
             )
         )
     )
-    return _application_search(queryset, text)
 
 
-def deregistration_queryset(text="", state=STATE_ALL):
-    """The running deregistrations, narrowed by the state filter and the search."""
-    states = deregistrations.OPEN_STATES if state == STATE_ALL else DEREGISTRATION_FILTER[state]
-    queryset = (
+def _deregistrations(states):
+    return (
         Deregistration.objects.filter(state__in=states)
         .select_related("person")
         .prefetch_related(
             Prefetch("items", queryset=DeregistrationItem.objects.select_related("metering_point__location"))
         )
     )
-    return _deregistration_search(queryset, text)
+
+
+def application_queryset(text="", state=STATE_ALL):
+    """The applications that are not completed (drafts included, D-107), narrowed by the state filter and the search."""
+    states = tuple(Application.OPEN_STATES) if state == STATE_ALL else APPLICATION_FILTER[state]
+    return _application_search(_applications(states), text)
+
+
+def deregistration_queryset(text="", state=STATE_ALL):
+    """The running deregistrations, narrowed by the state filter and the search."""
+    states = deregistrations.OPEN_STATES if state == STATE_ALL else DEREGISTRATION_FILTER[state]
+    return _deregistration_search(_deregistrations(states), text)
+
+
+def person_rows(person_id, application_states):
+    """The processes of one person, the most recently changed first: the applications in ``application_states`` and
+    every deregistration, also a finished one (the person page, uncapped: one person has few)."""
+    listed = list(_applications(application_states).filter(person_id=person_id))
+    progress = applications.progress_many(row for row in listed if row.state in Application.DRAFT_STATES)
+    found = [_application_row(row, progress) for row in listed]
+    found += [_deregistration_row(row) for row in _deregistrations(Deregistration.State.values).filter(person_id=person_id)]
+    return sort_rows(found, "changed", descending=True)
 
 
 class RowList(list):

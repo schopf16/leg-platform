@@ -154,21 +154,22 @@ class Fixture(TestCase):
 class OverviewTests(Fixture):
     URL = reverse("management:overview")
 
-    def test_the_button_and_the_rows_count_the_lists_with_problems(self):
+    def test_the_rows_count_the_lists_with_problems_and_link_to_the_filtered_lists(self):
         page = self.client.get(self.URL)
         # One location (address correction), one LEG (quota), two metering points (one without a person,
-        # one without anything): 1 + 1 + 2; the persons have no problems and no row.
+        # one without anything); the persons have no problems and no row.
         for text in (
-            "Probleme filtern (4)", "1 Standort mit Problem", "1 LEG mit Problem", "2 Messpunkte mit Problem",
-            "Zur Liste Standorte", "Zur Liste LEGs", "Zur Liste Messpunkte", "erscheint nur, wenn eine Liste ein Problem hat",
+            "1 Standort mit Problem", "1 LEG mit Problem", "2 Messpunkte mit Problem",
+            "Zur Liste Standorte", "Zur Liste LEGs", "Zur Liste Messpunkte",
         ):
             self.assertContains(page, text)
-        # The button opens the first affected list of the menu with the filter on; every row does the same for its list.
-        self.assertContains(page, 'class="btn btn-warning-outline" href="/management/locations/?problems=1"')
+        # No summary button: it would count all lists but open one.
+        self.assertNotContains(page, "Probleme filtern")
+        self.assertContains(page, 'href="/management/locations/?problems=1"')
         self.assertContains(page, 'href="/management/legs/?problems=1"')
         self.assertContains(page, 'href="/management/metering-points/?problems=1"')
         self.assertNotContains(page, "Personen mit Problem")
-        # The sum is the count of the buttons of the lists themselves.
+        # Each row's count is the count of the button of the list itself.
         self.assertContains(self.client.get(reverse("management:legs")), "Probleme filtern (1)")
         self.assertContains(self.client.get(reverse("management:metering_points")), "Probleme filtern (2)")
 

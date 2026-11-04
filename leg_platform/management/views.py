@@ -56,9 +56,9 @@ PROBLEM_LISTS = (
 
 class OverviewView(ManagementAccessMixin, TemplateView):
     """The start page: the work of the staff (the queues of the onboarding, ``overview_tasks``), then a row per list
-    with problems and the "Filter problems" button.
+    with problems, each linking to its list with the problem filter on.
 
-    The button opens the first affected list (menu order) with the problem filter on. The queues and the problems of
+    No summary "Filter problems" button: it could open only one list while counting all. The queues and the problems of
     the lists are two different things and are not added up."""
 
     template_name = "management/overview.html"
@@ -81,10 +81,8 @@ class OverviewView(ManagementAccessMixin, TemplateView):
                 )
         return super().get_context_data(
             page_title=_("Overview"),
-            task_rows=overview_tasks.task_rows(self.request.user),
+            task_rows=overview_tasks.task_rows(self.request),
             problem_lists=rows,
-            problem_count=sum(row["count"] for row in rows),
-            filter_url=rows[0]["url"] if rows else "",
             **kwargs,
         )
 
@@ -106,7 +104,9 @@ class SettingsFieldCheckView(ManagementAccessMixin, View):
 
 
 class SettingsView(ManagementAccessMixin, View):
-    """The settings page: every staff account may show and save it; one button saves all sections (D-086).
+    """The settings page: every staff account may show and save it (D-086). Three forms, each with its own button: the
+    cards sender, metering points and quota; the time of the address directory (``RunTimeView``); the reminders and
+    deadlines (``DeadlinesView``).
 
     The sender address is checked against the directory on the server when the page is shown."""
 

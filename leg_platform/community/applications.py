@@ -354,9 +354,11 @@ def delete_application(application, reason, actor=None):
 # ---- Draft ----
 
 
-def start_draft(person, *, location=None, today=None):
+def start_draft(person, *, location=None, today=None, single=False):
     """Start a draft; with ``location`` (an own building: "add a metering point") the building is chosen and fixed.
 
+    ``single`` (the wizard's start page): ``draft_exists`` (``details["draft"]``, the newest) when the account has a
+    draft already, checked under the account lock so two requests never make two drafts.
     ``too_many_applications``, ``too_many_drafts``; for ``location``: ``not_found`` (not the account's building, the
     same answer for every foreign id), ``already_in_progress`` (an own application already names it),
     ``building_complete`` (draw and feed-in exist)."""
@@ -364,6 +366,10 @@ def start_draft(person, *, location=None, today=None):
     now = timezone.now()
     with transaction.atomic():
         fresh = locked_customer(person)
+        if single:
+            draft = Application.objects.filter(person=fresh, state__in=Application.DRAFT_STATES).order_by("-pk").first()
+            if draft is not None:
+                raise ApplicationError("draft_exists", draft=draft)
         open_rows = Application.objects.filter(person=fresh, state__in=Application.OPEN_STATES)
         if open_rows.count() >= MAX_OPEN_APPLICATIONS_PER_PERSON:
             raise ApplicationError("too_many_applications")

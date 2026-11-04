@@ -7,6 +7,7 @@ claim through the row lock. This module never imports the importer at the top (w
 """
 
 import logging
+import threading
 import uuid
 from datetime import timedelta
 from typing import NamedTuple
@@ -23,6 +24,9 @@ from .published import refresh as refresh_published
 from .storage import DIRECTORY_ALIAS, reset_marker
 
 logger = logging.getLogger(__name__)
+# Set by the import worker while a job runs (D-133): its stop signal interrupts the run only then. ``execute`` clears it
+# before the outcome is recorded, so that the bookkeeping is never cut.
+interruptible = threading.Event()
 AUTOMATIC_INTERVAL = timedelta(days=90)
 # While the directory is missing or empty (new instance, restore), the automatic attempt is due after this time.
 EMPTY_DIRECTORY_INTERVAL = timedelta(hours=24)
@@ -526,23 +530,26 @@ def execute(claimed, progress=None):
     options = {} if progress is None else {"progress": progress}
     transformer = None
     try:
-        if claimed.source == ImportRequest.Source.TRANSFORMER:
-            from .transformers import run_scan
+        try:
+            if claimed.source == ImportRequest.Source.TRANSFORMER:
+                from .transformers import run_scan
 
-            transformer = run_scan(claimed.token, progress=progress)
-            count = transformer.buildings
-        elif claimed.source == ImportRequest.Source.PLANT:
-            from .plants import import_plants
+                transformer = run_scan(claimed.token, progress=progress)
+                count = transformer.buildings
+            elif claimed.source == ImportRequest.Source.PLANT:
+                from .plants import import_plants
 
-            count = import_plants(claim_token=claimed.token, **options)
-        else:
-            if claimed.took_over:
-                # The process that held the lease on the directory is gone (its heartbeat or lease ran out, D-090).
-                clear_stale_lease()
-            if claimed.manual:
-                count = import_directory(repair=True, **options)
+                count = import_plants(claim_token=claimed.token, **options)
             else:
-                count = import_directory(**options)
+                if claimed.took_over:
+                    # The process that held the lease on the directory is gone (its heartbeat or lease ran out, D-090).
+                    clear_stale_lease()
+                if claimed.manual:
+                    count = import_directory(repair=True, **options)
+                else:
+                    count = import_directory(**options)
+        finally:
+            interruptible.clear()
     except WorkerStopped:
         # The service is stopping: the run is queued again and starts first with the service (D-133).
         record_interruption(claimed, STOPPED, requeue=True)

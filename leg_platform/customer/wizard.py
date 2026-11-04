@@ -261,8 +261,11 @@ class ApplicationStartView(CustomerAccessMixin, View):
             # over (W1-05). Without anything on file the overview would only repeat the steps: straight to step 1.
             return redirect(self.page_url(location))
         try:
-            application = applications.start_draft(request.user, location=location)
+            application = applications.start_draft(request.user, location=location, single=True)
         except ApplicationError as error:
+            if error.code == "draft_exists":
+                # A second tab or a double click: the page offers the existing draft.
+                return redirect(self.page_url(location))
             if error.code in ("not_found", "not_allowed"):
                 raise Http404 from None
             messages.error(request, texts.message(error.code))
