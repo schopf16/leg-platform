@@ -8,7 +8,7 @@ Every view uses ``management.access`` (every staff account, D-086); rules live i
 
 from dataclasses import dataclass
 
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.db import transaction
 from django.core.exceptions import PermissionDenied, SuspiciousOperation, ValidationError
 from django.http import Http404
@@ -25,7 +25,7 @@ from leg_platform.customer.access import is_customer
 from leg_platform.community import addressing, grid_operator, history, person_list, persons
 from leg_platform.community import iban as iban_module
 from leg_platform.community.status import MeteringPointStatus
-from leg_platform.management import lists
+from leg_platform.management import lists, process_views
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_views import DialogView, event_label
 from leg_platform.management.metering_point_views import format_date
@@ -256,6 +256,16 @@ def registration_text(row):
     return lines, tone
 
 
+def account_admin_url(request, person):
+    """The account in the administration, for a viewer with the user permission whose administration lists this account
+    (``UserAdmin.get_queryset``); else "". A link only: the administration checks its permissions itself (D-012)."""
+    if not (request.user.has_perm("accounts.view_user") or request.user.has_perm("accounts.change_user")):
+        return ""
+    if not admin.site.get_model_admin(type(person)).get_queryset(request).filter(pk=person.pk).exists():
+        return ""
+    return reverse("admin:accounts_user_change", args=[person.pk])
+
+
 class PersonObjectMixin:
     def person(self, pk=None):
         if not hasattr(self, "_person"):
@@ -348,6 +358,8 @@ class PersonDetailView(PersonObjectMixin, ManagementAccessMixin, View):
             "show_new": request.GET.get("new") == "1",
             "origin_point_url": origin_point_url(request) if request.GET.get("new") == "1" else "",
             "metering_points_url": reverse("management:metering_points"),
+            "processes": process_views.person_entries(person, request),
+            "admin_url": account_admin_url(request, person),
         }
         context.update(self.points_context(request, person, today))
         return render(request, "management/persons/detail.html", context)

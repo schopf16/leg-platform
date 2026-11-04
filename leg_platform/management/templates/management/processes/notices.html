@@ -1,8 +1,9 @@
 {% extends "management/page.html" %}
 {% load i18n %}{% comment %}
 The open notices for the staff (D-103): a customer was refused a building or a metering point number without being told
-why (it belongs to someone else), or an application was rolled back because the grid operator did not confirm in time and the
-registration there must be withdrawn. Oldest first; "Mark as resolved" deletes the numbers of the notice. Staff data only.
+why (it belongs to someone else), or a registration at the grid operator must be withdrawn (confirmation lapsed, account
+deleted) or checked (data changed after the registration). Each notice links to the person page. Oldest first; "Mark as
+resolved" deletes the numbers of the notice. Staff data only.
 {% endcomment %}
 {% block header_actions %}<a class="btn btn-secondary-action" href="{{ back_url }}">{% translate "Back to processes" %}</a>{% endblock %}
 {% block page_content %}

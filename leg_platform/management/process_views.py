@@ -41,7 +41,7 @@ from leg_platform.management import lists
 from leg_platform.management.access import ManagementAccessMixin
 from leg_platform.management.location_views import event_label
 from leg_platform.management.metering_point_views import format_date
-from leg_platform.management.returns import return_url, with_next
+from leg_platform.management.returns import return_url, view_name_of, with_next
 
 # The applications the staff can open: the drafts too (D-107; read-only, marked as not submitted), the running ones and
 # the completed ones. The dialogs and services of the staff act only on the states they name.
@@ -57,6 +57,7 @@ STATE_TONES = {
     Application.State.COMPLETED: "ok",
     process_list.STATE_DEREGISTRATION_SUBMITTED: "warn",
     process_list.STATE_DEREGISTRATION_CONFIRMED: "accent",
+    process_list.STATE_DEREGISTRATION_EFFECTIVE: "ok",
 }
 STEP_TONES = {applications.DONE: "ok", "next": "accent", applications.OPEN: "muted"}
 
@@ -67,6 +68,8 @@ def state_label(state):
         return Deregistration.State.SUBMITTED.label
     if state == process_list.STATE_DEREGISTRATION_CONFIRMED:
         return Deregistration.State.CONFIRMED.label
+    if state == process_list.STATE_DEREGISTRATION_EFFECTIVE:
+        return Deregistration.State.EFFECTIVE.label
     # The staff's words for a draft say what matters to them: nothing was submitted yet (D-107).
     if state == Application.State.DRAFT:
         return _("Draft / not submitted")
@@ -226,6 +229,17 @@ def list_entry(row):
         "changed_text": format_date(row.changed.astimezone(timezone.get_current_timezone())),
         "detail_url": detail_url,
     }
+
+
+def person_entries(person, request):
+    """The processes of a person for the card on the person page; each link leads back to the current page."""
+    entries = []
+    for row in process_list.person_rows(person.pk, VISIBLE_APPLICATION_STATES):
+        entry = list_entry(row)
+        entry["detail_url"] = with_next(entry["detail_url"], request)
+        entry["subject"] = f"{entry['kind_label']} {entry['changed_text']}"
+        entries.append(entry)
+    return entries
 
 
 class ProcessListView(ManagementAccessMixin, View):
@@ -475,7 +489,7 @@ class ApplicationDetailView(ManagementAccessMixin, View):
             "current_url": request.get_full_path(),
             "notices": notice_rows(application_notices.open_notices().filter(person_id=person.pk), request),
             "history": history_rows(application, person.pk),
-            "back_url": return_url(request, reverse("management:processes")),
+            **back_link(request),
         }
         return render(request, "management/processes/application.html", context)
 
@@ -493,6 +507,12 @@ class ApplicationDetailView(ManagementAccessMixin, View):
         if application.start_choice == Application.StartChoice.DATE and application.desired_start_date:
             return format_date(application.desired_start_date)
         return ""
+
+
+def back_link(request):
+    """The back link of a process page; it is neutral when it leads elsewhere than the processes (the overview, a list)."""
+    back = return_url(request, reverse("management:processes"))
+    return {"back_url": back, "back_is_origin": view_name_of(back) != "management:processes"}
 
 
 # ---- One deregistration ----
@@ -582,7 +602,7 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
             ),
             "operator": operator,
             "history": history_rows(deregistration, person.pk),
-            "back_url": return_url(request, reverse("management:processes")),
+            **back_link(request),
         }
         return render(request, "management/processes/deregistration.html", context)
 
@@ -591,14 +611,17 @@ class DeregistrationDetailView(ManagementAccessMixin, View):
 
 
 class NoticesView(ManagementAccessMixin, View):
-    """The open notices for the staff: a customer was refused something without being told why, or an application
-    must be withdrawn at the grid operator. Oldest first; resolving a notice deletes its numbers."""
+    """The open notices for the staff: a customer was refused something without being told why, or a registration at
+    the grid operator must be withdrawn or checked. Oldest first; resolving a notice deletes its numbers."""
 
     def get(self, request):
         queryset = application_notices.open_notices()[: application_queue.MAX_ROWS]
         context = {
             "page_title": _("Notices"),
-            "page_subtitle": _("Customers who were refused something without being told why."),
+            "page_subtitle": _(
+                "What the LEG has to act on: refusals the customer was not told the reason for, and registrations at "
+                "the grid operator that must be withdrawn or checked."
+            ),
             "notices": notice_rows(queryset, request),
             "back_url": return_url(request, reverse("management:processes")),
             "current_url": request.get_full_path(),

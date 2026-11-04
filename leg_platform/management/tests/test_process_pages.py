@@ -13,6 +13,7 @@ the second factor (``test_access`` walks every route, ``test_acceptance_matrix``
 from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 from django.test import Client, TestCase, tag
 from django.urls import reverse
@@ -782,6 +783,71 @@ class DeregistrationPageTests(ProcessBase):
 
 
 @tag("mariadb")
+class PersonProcessesTests(ProcessBase):
+    """The card "Processes" on the person page and the links between the person and the account."""
+
+    databases = {"default", "addresses"}
+
+    def test_the_person_page_lists_only_the_own_processes_with_a_way_back(self):
+        mine = self.submitted()
+        foreign = self.submitted(self.bert, egid=90004270, number=5, address={"house_number": "52"})
+        person_url = reverse("management:persons_detail", args=[self.anna.pk])
+        page = self.client.get(person_url)
+        own_link = reverse("management:processes_application", args=[mine.pk])
+        with_back = f"{own_link}?{urlencode({'next': person_url})}"
+        self.assertContains(page, with_back)
+        self.assertNotContains(page, reverse("management:processes_application", args=[foreign.pk]))
+
+        back = self.client.get(with_back)
+        self.assertEqual(back.context["back_url"], person_url)
+        self.assertTrue(back.context["back_is_origin"])
+
+    def test_a_person_without_processes_says_so(self):
+        page = self.client.get(reverse("management:persons_detail", args=[self.bert.pk]))
+        self.assertContains(page, "Keine Vorgänge.")
+
+    def test_only_a_viewer_with_the_user_permission_gets_the_link_to_the_account(self):
+        admin_link = reverse("admin:accounts_user_change", args=[self.anna.pk])
+        person_url = reverse("management:persons_detail", args=[self.anna.pk])
+        self.assertNotContains(self.client.get(person_url), admin_link)
+        administrator = staff_user("process.admin@example.org", superuser=True)
+        self.assertContains(self.login(administrator).get(person_url), admin_link)
+
+    def test_the_account_in_the_administration_links_to_the_person(self):
+        administrator = staff_user("process.admin@example.org", superuser=True)
+        client = self.login(administrator)
+        person_url = reverse("management:persons_detail", args=[self.anna.pk])
+        page = client.get(reverse("admin:accounts_user_change", args=[self.anna.pk]))
+        self.assertContains(page, f'href="{person_url}"')
+
+    def test_no_link_into_the_management_area_for_a_viewer_who_may_not_enter(self):
+        from django.test import RequestFactory
+
+        from leg_platform.accounts.admin.users import management_url
+
+        request = RequestFactory().get("/")
+        request.user = self.plain
+        self.assertEqual(management_url(request, self.anna), "")
+
+    def test_the_recovery_link_returns_to_the_person_page_and_nowhere_else(self):
+        person_url = reverse("management:persons_detail", args=[self.anna.pk])
+        reset = reverse("admin:accounts_user_reset_second_factor", args=[self.anna.pk])
+        self.assertContains(self.client.get(person_url), f"{reset}?next=")
+        form = self.client.get(reset, {"next": person_url})
+        self.assertContains(form, f'href="{person_url}"')
+        self.assertContains(form, "Zurück zur Person")
+        with patch("leg_platform.accounts.second_factor_reset.request_link"):
+            done = self.client.post(f"{reset}?{urlencode({'next': person_url})}", {"identity_verified": "on"})
+            self.assertRedirects(done, person_url, fetch_redirect_response=False)
+            change_url = reverse("admin:accounts_user_change", args=[self.anna.pk])
+            other = reverse("management:persons_detail", args=[self.bert.pk])
+            for hostile in (other, "https://evil.example/x", "//evil.example/x", "/admin/"):
+                with self.subTest(next=hostile):
+                    done = self.client.post(f"{reset}?{urlencode({'next': hostile})}", {"identity_verified": "on"})
+                    self.assertRedirects(done, change_url, fetch_redirect_response=False)
+
+
+@tag("mariadb")
 class NoticePageTests(ProcessBase):
     def make_notice(self, person=None):
         return application_notices.record(
@@ -871,6 +937,15 @@ class OverviewQueueTests(ProcessBase):
         page = self.client.get(self.URL)
         self.assertNotContains(page, "Anna Muster")
         self.assertNotContains(page, "wartet auf Prüfung")
+
+    def test_an_entry_leads_to_the_application_and_its_back_link_returns_to_the_overview(self):
+        application = self.submitted(self.anna)
+        url = reverse("management:processes_application", args=[application.pk])
+        self.assertContains(self.client.get(self.URL), f'href="{url}?{urlencode({"next": self.URL})}"')
+        from_overview = self.client.get(url, {"next": self.URL})
+        self.assertContains(from_overview, f'<a class="mgmt-back" href="{self.URL}">← Zurück</a>')
+        from_list = self.client.get(url, {"next": "/management/processes/?state=submitted"})
+        self.assertContains(from_list, "← Zurück zu den Vorgängen</a>")
 
     def test_notices_deregistrations_and_a_missing_contract_have_their_rows(self):
         today = timezone.localdate()

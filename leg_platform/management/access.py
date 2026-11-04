@@ -60,6 +60,11 @@ def is_management_user(user):
     return bool(user.is_authenticated and user.is_active and user.is_staff)
 
 
+def may_enter(user):
+    """Whether ``check_access`` lets the account in (for a link into the area; the views check every request)."""
+    return is_management_user(user) and is_second_factor_complete(user)
+
+
 def check_access(request):
     """Return None if the request may proceed, a redirect response for an anonymous visitor, or
     raise ``Http404`` / ``PermissionDenied``."""

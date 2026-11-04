@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.http import Http404, HttpResponseNotAllowed, HttpResponseRedirect, StreamingHttpResponse
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -31,7 +31,6 @@ DEFAULT_RANGE = "24"
 # The number of lines a log box shows (owner decision): the newest at the bottom; the default 200.
 LINE_COUNTS = ("50", "200", "500")
 DEFAULT_LINES = "200"
-ROW_LIMIT = 200
 # One mail per source and this long at most; further events in that time are only counted (owner decision, D-120).
 MAIL_INTERVAL = timedelta(hours=1)
 HIGH_SEVERITY_SENTENCE = _("A high-severity entry was recorded. Please sign in to the server and check the log.")
@@ -81,7 +80,7 @@ def line_count(request):
 def text_box_lines(source, since, count):
     """The newest ``count`` lines of a source as text, oldest first (the newest at the bottom), redacted like the
     download (D-099): the same lines as the download, only fewer."""
-    chosen = list(itertools.islice(_text_lines(source, since), count))
+    chosen = list(itertools.islice(_text_lines(source, since, limit=count), count))
     chosen.reverse()
     return [redact_personal_data(redact_tokens(line)) for line in chosen]
 
@@ -97,21 +96,45 @@ def require_superuser(request):
         raise PermissionDenied
 
 
-def _security_rows(since):
-    return SecurityEvent.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk")[:ROW_LIMIT]
+DOWNLOAD_BATCH = 2000
 
 
-def _import_rows(since):
+def _limited(query, limit):
+    """The newest ``limit`` rows for a log box; all rows of the range for a download (``limit`` None), read in batches
+    by (occurred_at, pk) because MySQL drivers load a whole result set into memory."""
+    if limit:
+        return query[:limit]
+    return _batches(query)
+
+
+def _batches(query):
+    last = None
+    while True:
+        batch = query
+        if last is not None:
+            batch = batch.filter(Q(occurred_at__lt=last.occurred_at) | Q(occurred_at=last.occurred_at, pk__lt=last.pk))
+        rows = list(batch[:DOWNLOAD_BATCH])
+        yield from rows
+        if len(rows) < DOWNLOAD_BATCH:
+            return
+        last = rows[-1]
+
+
+def _security_rows(since, limit=None):
+    return _limited(SecurityEvent.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk"), limit)
+
+
+def _import_rows(since, limit=None):
     from leg_platform.addresses.models import ImportLogEntry
 
-    return ImportLogEntry.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk")[:ROW_LIMIT]
+    return _limited(ImportLogEntry.objects.filter(occurred_at__gte=since).order_by("-occurred_at", "-pk"), limit)
 
 
-def _housekeeping_rows(since):
+def _housekeeping_rows(since, limit=None):
     # Imported here: the addresses app is loaded by the admin; the rows are the housekeeping error log (D-119).
     from leg_platform.addresses import housekeeping
 
-    return [row for row in housekeeping.error_rows(limit=ROW_LIMIT) if row["occurred_at"] >= since]
+    return [row for row in housekeeping.error_rows(limit=limit) if row["occurred_at"] >= since]
 
 
 def page(request):
@@ -169,18 +192,18 @@ def download(request, source):
     return response
 
 
-def _text_lines(source, since):
+def _text_lines(source, since, limit=None):
     if source == "security":
-        for row in _security_rows(since):
+        for row in _security_rows(since, limit):
             yield f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}\t{row.get_event_display()}"
     elif source == "import":
-        for row in _import_rows(since):
+        for row in _import_rows(since, limit):
             yield "\t".join([
                 f"{timezone.localtime(row.occurred_at):%Y-%m-%d %H:%M:%S}", str(row.get_source_display()),
                 row.step or "-", str(_(row.reason)),
             ])
     else:
-        for row in _housekeeping_rows(since):
+        for row in _housekeeping_rows(since, limit):
             yield "\t".join([
                 f"{timezone.localtime(row['occurred_at']):%Y-%m-%d %H:%M:%S}", str(row["step"]),
                 str(row["reason"]), row["dump"] or "-",

@@ -13,6 +13,7 @@ from leg_platform.community import application_notices, application_queue, grid_
 from leg_platform.community.models import Application
 from leg_platform.management.metering_point_views import format_date
 from leg_platform.management.process_views import person_card
+from leg_platform.management.returns import with_next
 
 PREVIEW = 5
 
@@ -21,7 +22,7 @@ def _points_text(count):
     return ngettext("%(count)d metering point", "%(count)d metering points", count) % {"count": count}
 
 
-def _application_entries(found):
+def _application_entries(found, request):
     zone = timezone.get_current_timezone()
     entries = []
     for row in found[:PREVIEW]:
@@ -32,20 +33,20 @@ def _application_entries(found):
             {
                 "label": row.person_label,
                 "sub": " · ".join(parts),
-                "url": reverse("management:processes_application", args=[row.application_id]),
+                "url": with_next(reverse("management:processes_application", args=[row.application_id]), request),
             }
         )
     return entries
 
 
-def _deregistration_entries(found):
+def _deregistration_entries(found, request):
     return [
         {
             "label": row.person_label,
             "sub": " · ".join(
                 [_("requested date %(date)s") % {"date": format_date(row.desired_date)}, _points_text(row.metering_points)]
             ),
-            "url": reverse("management:processes_deregistration", args=[row.deregistration_id]),
+            "url": with_next(reverse("management:processes_deregistration", args=[row.deregistration_id]), request),
         }
         for row in found[:PREVIEW]
     ]
@@ -68,8 +69,9 @@ def _list_url(state):
     return f"{reverse('management:processes')}?state={state}"
 
 
-def task_rows(actor):
+def task_rows(request):
     """The rows of the card "To do" for an active staff account, in the order of the way an application goes."""
+    actor = request.user
     counts = application_queue.queue_counts()
     operator = grid_operator.name()
     State = Application.State
@@ -86,14 +88,14 @@ def task_rows(actor):
             "%(count)d application waiting for review", "%(count)d applications waiting for review", count
         ) % {"count": count},
         _list_url(State.SUBMITTED.value), _("Go to the applications waiting for review"),
-        _application_entries(application_queue.pending_applications(actor, (State.SUBMITTED,))),
+        _application_entries(application_queue.pending_applications(actor, (State.SUBMITTED,)), request),
     )
     count = counts["applications_in_review"]
     add(
         count,
         ngettext("%(count)d application in review", "%(count)d applications in review", count) % {"count": count},
         _list_url(State.IN_REVIEW.value), _("Go to the applications in review"),
-        _application_entries(application_queue.pending_applications(actor, (State.IN_REVIEW,))),
+        _application_entries(application_queue.pending_applications(actor, (State.IN_REVIEW,)), request),
     )
     count = counts["applications_at_operator"]
     add(
@@ -102,7 +104,7 @@ def task_rows(actor):
             "%(count)d application at the %(operator)s", "%(count)d applications at the %(operator)s", count
         ) % {"count": count, "operator": operator},
         _list_url(process_list.STATE_AT_OPERATOR), _("Go to the applications at the grid operator"),
-        _application_entries(application_queue.applications_at_operator(actor)),
+        _application_entries(application_queue.applications_at_operator(actor), request),
     )
     count = counts["deregistrations_waiting"]
     add(
@@ -112,7 +114,7 @@ def task_rows(actor):
             "%(count)d deregistrations waiting for the date confirmation", count,
         ) % {"count": count},
         _list_url(process_list.STATE_DEREGISTRATION_SUBMITTED), _("Go to the deregistrations waiting for their date"),
-        _deregistration_entries(application_queue.waiting_deregistrations(actor)),
+        _deregistration_entries(application_queue.waiting_deregistrations(actor), request),
     )
     count = counts["problems"]
     add(

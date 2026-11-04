@@ -626,6 +626,16 @@ class StartDraftTests(TestCase):
         with patch.object(applications, "MAX_OPEN_APPLICATIONS_PER_PERSON", 2):
             self.assertEqual(code_of(lambda: applications.start_draft(self.person)), "too_many_applications")
 
+    def test_the_start_page_rule_never_makes_a_second_draft(self):
+        first = applications.start_draft(self.person, single=True)
+        with self.assertRaises(ApplicationError) as caught:
+            applications.start_draft(self.person, single=True)
+        self.assertEqual((caught.exception.code, caught.exception.details["draft"]), ("draft_exists", first))
+        location = make_location(street="Single", egid=EGID + 5)
+        assign_person(make_metering_point(6, location=location), self.person)
+        self.assertEqual(code_of(lambda: applications.start_draft(self.person, location=location, single=True)), "draft_exists")
+        self.assertEqual(Application.objects.filter(person=self.person).count(), 1)
+
     def test_an_archived_location_is_not_found(self):
         location = make_location(egid=EGID + 4, is_archived=True)
         assign_person(make_metering_point(5, location=location), self.person)

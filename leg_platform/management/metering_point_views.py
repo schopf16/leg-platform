@@ -183,7 +183,8 @@ class MeteringPointListView(ManagementAccessMixin, View):
             page_title=_("Metering points"),
             page_subtitle=_("All metering points with their state. Here you see what is still to do at the %(operator)s.") % operator,
             entries=entries,
-            pending=pending.points(request, state.query),
+            # The rows of applications ignore the filters and the pages: only in the default view, on its first page.
+            pending=pending.points(request, state.query) if page.page == 1 and not state.filtered else None,
             print_url=state.url_to(reverse("management:metering_points_print")),
             show_steps=show_steps,
             quick_filters=[
@@ -920,7 +921,11 @@ class ArchiveView(PointPostView):
     """Archive and restore."""
 
     def act(self, request, point):
-        metering_points.set_archived(point, request.POST.get("archive") != "0", request.user)
+        try:
+            metering_points.set_archived(point, request.POST.get("archive") != "0", request.user)
+        except metering_points.StatusError as error:
+            messages.error(request, STATUS_ERRORS.get(error.code, STATUS_ERRORS["wrong_status"]))
+            return
         messages.success(request, _("Saved."))
 
 

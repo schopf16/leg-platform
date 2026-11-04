@@ -148,7 +148,7 @@ def request_deregistration(person, *, metering_point_ids=None, location_id=None,
         # The points are locked in id order, then checked once more (a staff step may have changed one).
         locked = list(MeteringPoint.objects.select_for_update().filter(pk__in=[p.pk for p in chosen]).order_by("pk"))
         if len(locked) != len(chosen) or any(
-            point.terminated_on is not None
+            point.terminated_on is not None or point.is_archived
             or not (point.status(today) == MeteringPointStatus.ACTIVE or is_not_active(point, today))
             for point in locked
         ) or DeregistrationItem.objects.filter(metering_point__in=locked).exists():
@@ -175,7 +175,8 @@ def own_deregistration(person, pk):
 
 def confirm(deregistration, actor, confirmed_date, today=None):
     """The staff confirms the termination date (a month end, not in the past): records it at every point with
-    ``metering_points.terminate`` (all or none; ``cannot_terminate``). The customer's account is locked first."""
+    ``metering_points.terminate`` (all or none; ``cannot_terminate``); a point already ended on that date counts as done.
+    The customer's account is locked first."""
     staff = staff_actor(actor)
     today = today or timezone.localdate()
     if confirmed_date != month_end(confirmed_date):
@@ -192,9 +193,14 @@ def confirm(deregistration, actor, confirmed_date, today=None):
         fresh = Deregistration.objects.select_for_update().get(pk=deregistration.pk)
         if fresh.state != State.SUBMITTED:
             raise ApplicationError("wrong_state")
-        for item in fresh.items.select_related("metering_point").order_by("metering_point_id"):
+        for item in fresh.items.order_by("metering_point_id"):
+            point = MeteringPoint.objects.select_for_update().get(pk=item.metering_point_id)
+            if point.terminated_on == confirmed_date:
+                continue  # already ended on this date at the point itself
             try:
-                metering_points.terminate(item.metering_point, confirmed_date, staff, today, allow_not_active=True)
+                metering_points.terminate(
+                    point, confirmed_date, staff, today, allow_not_active=True, deregistration=fresh
+                )
             except metering_points.StatusError:
                 raise ApplicationError("cannot_terminate") from None
         fresh.state = State.CONFIRMED

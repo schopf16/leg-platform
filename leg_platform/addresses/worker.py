@@ -15,7 +15,7 @@ import logging
 import signal
 import threading
 
-from django.db import DatabaseError
+from django.db import DatabaseError, close_old_connections, connections
 
 from . import jobs, runner
 
@@ -26,8 +26,8 @@ POLL_SECONDS = 5.0
 
 stop_requested = threading.Event()
 # Set only while a job runs: a stop signal then interrupts it. Outside it the signal only ends the loop, so that the
-# bookkeeping of a claim or of a finished job is never cut in the middle.
-_interruptible = threading.Event()
+# bookkeeping of a claim or of a finished job is never cut in the middle (``jobs.execute`` clears it before recording).
+_interruptible = jobs.interruptible
 
 
 def request_stop(signum=None, frame=None):
@@ -75,11 +75,19 @@ def run_job(claimed):
         _interruptible.clear()
 
 
+def _replace_closed_connections():
+    """A connection that the database closed (restart, timeout) is replaced, as in ``process_mail_queue``; never inside
+    a caller's transaction, which closing would abort."""
+    if not any(conn.in_atomic_block for conn in connections.all(initialized_only=True)):
+        close_old_connections()
+
+
 def drain():
     """Run the waiting jobs one after the other until the queue is empty or a stop is requested; returns the number of
     jobs that ran."""
     ran = 0
     while not stop_requested.is_set():
+        _replace_closed_connections()
         jobs.mark_worker_seen()
         claimed = _next_queued()
         if claimed is None:
@@ -92,6 +100,7 @@ def drain():
 def run_loop(poll_seconds=POLL_SECONDS):
     """Work off the queue, then wait and look again, until a stop is requested."""
     while not stop_requested.is_set():
+        _replace_closed_connections()
         drain()
         jobs.mark_worker_seen()
         stop_requested.wait(poll_seconds)

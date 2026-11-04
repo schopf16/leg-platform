@@ -24,6 +24,6 @@
       <button type="submit" class="button recovery-action">{% translate "Send the link" %}</button>
     </form>
   {% endif %}
-  <p><a href="{{ change_url }}">{% translate "Back to the account" %}</a></p>
+  <p>{% if person_url %}<a href="{{ person_url }}">{% translate "Back to the person" %}</a>{% else %}<a href="{{ change_url }}">{% translate "Back to the account" %}</a>{% endif %}</p>
 </div>
 {% endblock %}

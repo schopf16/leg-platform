@@ -15,6 +15,8 @@ from leg_platform.accounts.tests.helpers import VerifiedClient, create_active_us
 from leg_platform.community import assignments, history, metering_points, numbers
 from leg_platform.community.history import HistoryEvent
 from leg_platform.community.models import (
+    Deregistration,
+    DeregistrationItem,
     Direction,
     GridOperator,
     LegAssignment,
@@ -302,6 +304,18 @@ class MeteringPointPageTests(TestCase):
         self.assertEqual(client.get(url).status_code, 302)
         # A point that is not active has no such dialog.
         self.assertEqual(client.get(self.url("terminate", self.registered)).status_code, 302)
+
+    def test_a_point_of_a_waiting_deregistration_is_ended_only_through_the_deregistration(self):
+        dereg = Deregistration.objects.create(
+            person=self.anna, earliest_date=month_end_after(130), desired_date=month_end_after(130)
+        )
+        DeregistrationItem.objects.create(deregistration=dereg, metering_point=self.active)
+        refusal = "Dieser Messpunkt wird gerade abgemeldet. Bestätigen Sie stattdessen die Abmeldung."
+        client = self.login(self.staff)
+        self.assertContains(client.post(self.url("terminate", self.active), {"terminated_on": month_end_after(40).isoformat()}), refusal)
+        self.assertContains(client.post(self.url("archive", self.active), {}, follow=True), refusal)
+        self.active.refresh_from_db()
+        self.assertEqual((self.active.terminated_on, self.active.is_archived), (None, False))
 
     def test_a_step_cannot_be_forged_in_the_wrong_state(self):
         client = self.login(self.staff)

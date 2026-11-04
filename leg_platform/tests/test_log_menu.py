@@ -320,6 +320,28 @@ class LogTextBoxTests(LogMenuBase):
         self.assertGreaterEqual(box.count('class="log-line"'), 1)
         self.assertIn('value="200" selected', html)
 
+    def test_500_lines_show_more_than_200_and_the_download_holds_every_row(self):
+        for _ in range(250):
+            SecurityEvent.objects.create(event=SecurityEvent.Event.LOG_VIEWED)
+        client = self.client_for(self.superuser)
+        response = client.get(reverse("admin:logmenu"), {"show": "security", "lines": "500"})
+        box = self.section(response.content.decode("utf-8"), 'id="logmenu-security-box"', "</pre>")
+        self.assertEqual(box.count('class="log-line"'), SecurityEvent.objects.count())
+        self.assertGreater(box.count('class="log-line"'), 250)
+        response = client.get(reverse("admin:logmenu_download", kwargs={"source": "security"}))
+        lines = b"".join(response.streaming_content).decode("utf-8").splitlines()
+        self.assertEqual(len(lines), SecurityEvent.objects.count())
+
+    def test_the_download_reads_in_batches_without_losing_or_repeating_rows(self):
+        for _ in range(250):
+            SecurityEvent.objects.create(event=SecurityEvent.Event.LOG_VIEWED)
+        since = timezone.now() - timedelta(days=1)
+        expected = list(SecurityEvent.objects.filter(occurred_at__gte=since).values_list("pk", flat=True))
+        with patch.object(log_menu, "DOWNLOAD_BATCH", 100):
+            read = [row.pk for row in log_menu._security_rows(since)]
+        self.assertEqual(sorted(read), sorted(expected))
+        self.assertEqual(len(read), len(set(read)))
+
     def test_the_failed_login_log_is_a_text_box_with_the_chosen_lines(self):
         from axes.models import AccessFailureLog
 

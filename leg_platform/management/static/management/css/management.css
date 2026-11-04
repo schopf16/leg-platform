@@ -1979,10 +1979,6 @@ a.mgmt-sort:hover {
   margin-left: 0;
 }
 
-.mgmt-overview-hint {
-  margin: 12px 0 0;
-}
-
 /* ---- The dialog "Print list" (D-082) ---- */
 .mgmt-print-options {
   margin: 0 0 8px;

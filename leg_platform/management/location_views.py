@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from django.contrib import messages
 from django.core.exceptions import SuspiciousOperation, ValidationError
+from django.db import IntegrityError
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -185,7 +186,8 @@ class LocationListView(ManagementAccessMixin, View):
             page_title=_("Locations"),
             page_subtitle=_("All locations of the LEG with their metering points."),
             entries=entries,
-            pending=pending.new_buildings(request, state.query),
+            # The rows of applications ignore the filters and the pages: only in the default view, on its first page.
+            pending=pending.new_buildings(request, state.query) if page.page == 1 and not state.filtered else None,
             print_url=state.url_to(reverse("management:locations_print")),
             all_open=all_open,
             expand_ids=[entry["location"].pk for entry in openable],
@@ -459,8 +461,13 @@ class LocationAddressView(LocationObjectDialog):
             )
         except locations.Archived:
             return archived_redirect(request, location.pk)
-        except locations.MergeRefused:
-            form.add_error(None, _("This address already exists."))
+        except locations.MergeRefused as refused:
+            if refused.code == "application_conflict":
+                form.add_error(None, _(
+                    "One application names both locations. Settle that application first, then merge the locations."
+                ))
+            else:
+                form.add_error(None, _("This address already exists."))
             return self.render_dialog(request, form)
         except locations.MergeNeeded as needed:
             data = request.POST.copy()
@@ -553,7 +560,21 @@ class CircuitEditView(DialogView):
         if form.existing is not None:
             form.add_error("grid_number", _("This transformer circuit already exists."))
             return None
-        transformer_circuits.update(self.circuit(), form.cleaned_data["grid_number"], form.cleaned_data["name"])
+        try:
+            transformer_circuits.update(self.circuit(), form.cleaned_data["grid_number"], form.cleaned_data["name"])
+        except ValidationError as error:
+            # A parallel change took the number after the form check (full_clean under the lock or the constraint).
+            if not hasattr(error, "error_dict"):
+                form.add_error(None, _("The data could not be saved."))
+            for key, errors in getattr(error, "error_dict", {}).items():
+                if key == "grid_number" and any(item.code == "unique" for item in errors):
+                    form.add_error("grid_number", _("This transformer circuit already exists."))
+                else:
+                    form.add_error(key if key in form.fields else None, errors)
+            return None
+        except IntegrityError:
+            form.add_error("grid_number", _("This transformer circuit already exists."))
+            return None
         messages.success(request, _("Saved."))
         return redirect(self.back(request))
 

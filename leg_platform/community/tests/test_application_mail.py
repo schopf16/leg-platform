@@ -40,7 +40,7 @@ class DefinitionTests(SimpleTestCase):
             with self.subTest(kind=kind):
                 self.assertIn(kind, Key.values)
                 self.assertIn(kind, email_texts.DEFINITIONS)
-                self.assertIn(kind, mail_queue.HANDLERS)
+                self.assertIn(kind, {**mail_queue.HANDLERS, **mail_queue.ACCOUNT_HANDLERS})
                 self.assertIn(kind, MailJob.NOTIFICATION_KINDS)
                 self.assertIn(email_texts.GREETING, email_texts.placeholders_of(kind))
 
