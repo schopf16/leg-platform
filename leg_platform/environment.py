@@ -109,6 +109,8 @@ class EnvironmentConfig:
     address_import_automatic: bool = True
     # Folder of the application log files (D-092); "" = no file logging (standard error only, e.g. journald).
     log_directory: str = ""
+    # The one server that collects the Swisseldex Datahub messages (D-139); never with APP_ENV=local.
+    datahub_collection_allowed: bool = False
 
     @property
     def is_local(self) -> bool:
@@ -545,6 +547,18 @@ def parse_log_directory(env: Mapping[str, str], app_env: str) -> str:
     return value
 
 
+def parse_datahub_collection_allowed(env: Mapping[str, str], app_env: str) -> bool:
+    """DATAHUB_COLLECTION_ALLOWED (default False): only the one server that collects sets it (D-139).
+
+    The Datahub gives one access for the LEG and collected messages are deleted there, so two collecting servers
+    would each miss messages. A development machine never collects.
+    """
+    allowed = _parse_bool(env, "DATAHUB_COLLECTION_ALLOWED", default=False)
+    if allowed and app_env == APP_ENV_LOCAL:
+        raise ImproperlyConfigured("DATAHUB_COLLECTION_ALLOWED=True is not allowed with APP_ENV=local.")
+    return allowed
+
+
 def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
     """Validate the environment and return the configuration; raise ImproperlyConfigured."""
     refuse_moved_variables(env)
@@ -586,6 +600,7 @@ def load_environment(env: Mapping[str, str]) -> EnvironmentConfig:
         address_directory_file=parse_address_directory_file(env, app_env),
         address_import_automatic=_parse_bool(env, "ADDRESS_IMPORT_AUTOMATIC", True),
         log_directory=parse_log_directory(env, app_env),
+        datahub_collection_allowed=parse_datahub_collection_allowed(env, app_env),
     )
 
 

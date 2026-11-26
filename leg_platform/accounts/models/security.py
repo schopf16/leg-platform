@@ -220,6 +220,7 @@ class SecurityEvent(models.Model):
         )
         RETENTION_OBLIGATION_SET = "retention_obligation_set", _("Retention obligation set")
         LIST_PRINTED = "list_printed", _("List printed")
+        PERSON_CREATED = "person_created", _("Person created by staff")
         PERSON_INVITED = "person_invited", _("Person created and invited by staff")
         INVITATION_RESENT = "invitation_resent", _("Invitation sent again by staff")
         ACCOUNT_DATA_CHANGED_BY_STAFF = "account_data_changed_by_staff", _("Account data changed by staff")
@@ -252,6 +253,9 @@ class SecurityEvent(models.Model):
         RENDER_AS_ENDED = "render_as_ended", _("Support view (view as a person) ended")
         RENDER_AS_PAGE_VIEWED = "render_as_page_viewed", _("Page shown in the support view (view as a person)")
         RENDER_AS_REQUEST_REFUSED = "render_as_request_refused", _("Request refused in the support view (view as a person)")
+        # The Swisseldex Datahub access (D-139): field names or a fixed result code in the log line, never a value.
+        DATAHUB_CONFIGURATION_CHANGED = "datahub_configuration_changed", _("Swisseldex Datahub configuration changed")
+        DATAHUB_CONNECTION_TESTED = "datahub_connection_tested", _("Swisseldex Datahub connection tested")
 
     # Kept for the long period: misuse is noticed late (D-018, D-006, D-056, D-084, D-087, D-092).
     LONG_RETENTION = frozenset(
@@ -266,9 +270,11 @@ class SecurityEvent(models.Model):
             Event.EMERGENCY_KEYS_REENCRYPTED,
             Event.GRAPH_CONFIGURATION_CHANGED,
             Event.GRAPH_CERTIFICATE_UPLOADED,
+            Event.DATAHUB_CONFIGURATION_CHANGED,
             Event.PORTAL_SETTINGS_CHANGED,
             Event.TWO_FACTOR_REMOVED_PHONE_LOST,
             Event.LIST_PRINTED,
+            Event.PERSON_CREATED,
             Event.ACCOUNT_DATA_CHANGED_BY_STAFF,
             Event.GRID_OPERATOR_CHANGED,
             Event.LOG_VIEWED,

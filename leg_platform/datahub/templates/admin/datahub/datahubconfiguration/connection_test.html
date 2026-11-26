@@ -1,0 +1,27 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<ol class="breadcrumbs">
+  <li><a href="{% url 'admin:index' %}">{% translate "Home" %}</a></li>
+  {% include "admin/_crumb_group.html" %}
+  <li><a href="{{ change_url }}">{{ opts.verbose_name|capfirst }}</a></li>
+  <li aria-current="page">{% translate "Test connection" %}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% if complete %}
+    <p>{% translate "The platform logs in to the Datahub with the stored data and counts the files in the directory. It downloads, moves and deletes nothing." %}</p>
+    <p>{% translate "The Datahub refuses a second login within 60 seconds. The test takes at most 20 seconds." %}</p>
+    <form method="post" action="{% url 'admin:datahub_datahubconfiguration_connection_test' %}">
+      {% csrf_token %}
+      <input type="submit" class="default" value="{% translate 'Test connection' %}">
+    </form>
+  {% else %}
+    <p>{% translate "The test needs the server, the port, the user name and the password." %}</p>
+  {% endif %}
+  <p><a href="{{ change_url }}">{% translate "Back to the configuration" %}</a></p>
+</div>
+{% endblock %}

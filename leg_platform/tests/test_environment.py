@@ -328,6 +328,43 @@ class SecurityLogRetentionTests(SimpleTestCase):
                     load_environment(make_env(**{name: value}))
 
 
+class DatahubCollectionAllowedTests(SimpleTestCase):
+    """DATAHUB_COLLECTION_ALLOWED: only the one server that collects the Datahub messages sets it (D-139)."""
+
+    def test_the_collection_is_locked_by_default(self):
+        for app_env in ("local", "stage", "production"):
+            with self.subTest(app_env=app_env):
+                self.assertIs(load_environment(make_env(app_env)).datahub_collection_allowed, False)
+                self.assertIs(
+                    load_environment(make_env(app_env, DATAHUB_COLLECTION_ALLOWED="")).datahub_collection_allowed,
+                    False,
+                )
+
+    def test_false_is_accepted_everywhere(self):
+        for app_env in ("local", "stage", "production"):
+            with self.subTest(app_env=app_env):
+                config = load_environment(make_env(app_env, DATAHUB_COLLECTION_ALLOWED="False"))
+                self.assertIs(config.datahub_collection_allowed, False)
+
+    def test_true_refuses_the_start_on_a_development_machine(self):
+        for value in ("True", "true"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DATAHUB_COLLECTION_ALLOWED"):
+                    load_environment(make_env("local", DATAHUB_COLLECTION_ALLOWED=value))
+
+    def test_true_is_accepted_on_stage_and_production(self):
+        for app_env in ("stage", "production"):
+            with self.subTest(app_env=app_env):
+                config = load_environment(make_env(app_env, DATAHUB_COLLECTION_ALLOWED="True"))
+                self.assertIs(config.datahub_collection_allowed, True)
+
+    def test_an_invalid_value_refuses_the_start(self):
+        for value in ("1", "yes", "on", "maybe"):
+            with self.subTest(value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, "DATAHUB_COLLECTION_ALLOWED"):
+                    load_environment(make_env(DATAHUB_COLLECTION_ALLOWED=value))
+
+
 class MovedToAdministrationTests(SimpleTestCase):
     """D-116: the sender and the contact address are not read from the environment any more; they are in the E-Mail
     chapter of the administration. A value left there refuses the start, so that it is never ignored silently."""

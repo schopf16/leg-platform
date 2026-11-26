@@ -158,6 +158,14 @@ The sender address receives replies and bounces; protect its mailbox. It must be
 
 Upload size (D-048): certificate and private key are files of at most 16 KiB each, checked only after the whole request has been received. The web server or reverse proxy must limit the request body size (value open, D-048). The portal settings page (two logos) is limited to 3 MiB by `leg_platform/middleware.py`; the proxy limit must not be lower for that page.
 
+### Swisseldex Datahub
+
+D-139. The LEG is a market partner of the Swisseldex Datahub (variant "Server beim Datahub"); the Datahub issues the FTPES access (user name and password). A system administrator enters it in the administration, chapter "Swisseldex Datahub" (the password is never shown again), with the own market partner name and EIC and the EIC of the distribution system operator, and presses "Verbindung testen" (it only lists the files; at most one test per 60 seconds).
+
+* Outbound connection of the web unit: TCP 21 to `datahub.swisseldex.ch` (FTP with explicit TLS) and the passive data ports the server names; the range is not stated in the Datahub manual (`docs/DEPLOYMENT.md`, 8.1).
+* `DATAHUB_COLLECTION_ALLOWED=True` only on the one server that collects (production). Without it the switch "Abholung aktiv" cannot be switched on and has no effect; with `APP_ENV=local` the value stops the start.
+* Enter the production access only on production. Stage gets an access only if the Datahub issues a separate one (no production secret on stage, D-020).
+
 ### Scheduled tasks
 
 The scheduler is decided with the hosting (D-008, D-037, D-038, D-041).
@@ -218,7 +226,7 @@ Second factor keys are encrypted with a key derived from `SECRET_KEY`; recovery 
 1. Put the old value into `DJANGO_SECRET_KEY_FALLBACKS`. Keys and recovery codes keep working; a key is encrypted again with the new one at its next use.
 2. Do not remove the old value before every active account with a second factor has logged in once (except accounts whose second factor a system administrator reset). To encrypt all keys at once run `python manage.py emergency_access reencrypt-second-factor-keys` (D-041). Remove the old value once it reports no key that cannot be decrypted.
 3. IBANs: run `python manage.py reencrypt_ibans` (prints numbers only, never a value; **exits with an error if any IBAN could not be decrypted**: keep the old key in the fallbacks then). Remove the old value from the fallbacks only after it succeeded. An IBAN under a key that is no longer known is unreadable and has to be entered again.
-4. Recovery codes cannot be converted: they work only while the old value stays in the fallbacks; afterwards their owners create new ones. The Microsoft Graph private key follows the same rule (D-006).
+4. Recovery codes cannot be converted: they work only while the old value stays in the fallbacks; afterwards their owners create new ones. The Microsoft Graph private key and the Swisseldex Datahub password follow the same rule (D-006, D-139): re-encrypted at their next use; without the old key enter them again.
 
 The in-place IBAN encryption (D-087) leaves old plain values in the pre-update backup, the binary log and freed table pages (`docs/DEPLOYMENT.md`, section 12.3, step 6).
 

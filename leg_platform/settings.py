@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "leg_platform.community",
     "leg_platform.customer",
     "leg_platform.management",
+    "leg_platform.datahub",
     # Replaces django.contrib.admin; checks the second factor (D-040).
     "leg_platform.admin_site.PortalAdminConfig",
     "django.contrib.auth",
@@ -338,3 +339,5 @@ LOG_DIRECTORY = usable_log_directory(ENVIRONMENT.log_directory)
 LOGGING = logging_config(LOG_DIRECTORY)
 # The web application starts the import of the address directory when it is due (D-090).
 ADDRESS_IMPORT_AUTOMATIC = ENVIRONMENT.address_import_automatic
+# Whether this server may collect the Datahub messages (D-139); never True with APP_ENV=local.
+DATAHUB_COLLECTION_ALLOWED = ENVIRONMENT.datahub_collection_allowed

@@ -43,6 +43,7 @@ A = "leg_platform.accounts.tests."
 D = "leg_platform.addresses.tests."
 C = "leg_platform.community.tests."
 M = "leg_platform.management.tests."
+H = "leg_platform.datahub.tests."
 
 
 def _labels(prefix, *names):
@@ -92,6 +93,7 @@ CORE_PATHS = (
     # Shared test infrastructure of many modules.
     "leg_platform/accounts/tests/__init__.py",
     "leg_platform/accounts/tests/helpers.py",
+    "leg_platform/accounts/tests/legacy_invitation.py",
     "leg_platform/tests/__init__.py",
     "leg_platform/tests/urls.py",
 )
@@ -293,7 +295,8 @@ AREAS: dict[str, Area] = {
         tests=(
             _labels(A, "test_registration", "test_registration_hardening", "test_entry_pages",
                     "test_invalid_link_redirect", "test_token_page_forms", "test_browser_origin",
-                    "test_invitations", "test_registration_methods", "test_registration_code")
+                    "test_invitations", "test_registration_methods", "test_registration_code",
+                    "test_person_creation")
             + _FLOW_REVIEWS
         ),
     ),
@@ -365,7 +368,7 @@ AREAS: dict[str, Area] = {
         tests=("leg_platform.tests.test_log_menu",),
     ),
     "admin": Area(
-        "The administration: users, rights, email texts, Graph configuration and portal settings.",
+        "The administration: users, rights, email texts, Graph configuration, portal settings and the Datahub access.",
         paths=("leg_platform/accounts/admin/", "leg_platform/admin_site.py", "leg_platform/community/admin.py",
                "leg_platform/community/raw_tables.py", "leg_platform/community/templatetags/",
                "leg_platform/log_views.py", "leg_platform/logfiles.py",
@@ -379,7 +382,15 @@ AREAS: dict[str, Area] = {
                     "test_portal_branding", "test_portal_favicon", "test_workspaces")
             + _labels(T, "test_mail_graph", "test_logs", "test_language")
             + _labels(C, "test_rights", "test_admin_tables", "test_admin_raw_tables")
+            + _labels(H, "test_admin", "test_models")
         ),
+    ),
+    "datahub": Area(
+        "The Swisseldex Datahub access (D-139): the configuration row with the encrypted password, the EIC check, the "
+        "administration page and the connection test (the migrations have their own area).",
+        paths=("leg_platform/datahub/",),
+        exclude=("leg_platform/datahub/migrations/",),
+        tests=("leg_platform.datahub.tests", A + "test_admin_exposure", C + "test_admin_raw_tables"),
     ),
     "mail": Area(
         "Outgoing email: the mail queue, request limits, texts, greeting, Graph sender and the "
@@ -413,7 +424,9 @@ AREAS: dict[str, Area] = {
             _labels(A, "test_models", "test_model_rules", "test_account_lifecycle", "test_mail_queue",
                     "test_mail_address_migration")
             + _labels(T, "test_database")
-            + _labels(C, "test_models", "test_migration_0004", "test_iban", "test_onboarding_models")
+            + _labels(C, "test_models", "test_migration_0004", "test_migration_0016", "test_iban",
+                      "test_onboarding_models")
+            + _labels(H, "test_models")
             + ("leg_platform.addresses.tests",)
         ),
         fresh_db=True,

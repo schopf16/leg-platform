@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 NEW_ROW_PREFIX = "new"
 NEW_ROW_FORM_ID = "raw-new-row-form"
 # Never an input: the ciphertext would be destroyed by editing it; the digest is recomputed by ``Location.save``.
-NEVER_EDITABLE = frozenset({"iban_encrypted", "address_digest"})
+# ``encrypted_password`` is the Datahub password (D-139): it has no raw table, the rule holds should it get one.
+NEVER_EDITABLE = frozenset({"iban_encrypted", "address_digest", "encrypted_password"})
 MAX_LOGGED_ROWS = 100
 # A refusal by the database is a message, never a 500.
 DATABASE_ERRORS = (IntegrityError, DataError, OperationalError)
